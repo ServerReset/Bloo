@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.bloo.bluelink"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.bloo.bluelink"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
         vectorDrawables { useSupportLibrary = true }
@@ -46,7 +46,7 @@ android {
 }
 
 dependencies {
-    val composeUi = "1.8.2"
+    val composeUi = "1.11.2"
 
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
@@ -60,8 +60,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling:$composeUi")
     implementation("androidx.compose.foundation:foundation:$composeUi")
 
-    // Material 3 Expressive (1.4.x) — Expressive components & MaterialExpressiveTheme.
-    implementation("androidx.compose.material3:material3:1.4.0")
+    // Material 3 Expressive — the Expressive components (ButtonGroup,
+    // SplitButtonLayout, FloatingToolbar, LoadingIndicator) live in 1.5.0-alpha.
+    implementation("androidx.compose.material3:material3:1.5.0-alpha21")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
