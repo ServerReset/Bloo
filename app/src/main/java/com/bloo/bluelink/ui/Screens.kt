@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -195,7 +196,7 @@ private fun VehicleListScreen(state: UiState, vm: AppViewModel) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun VehicleDetailPager(state: UiState, vm: AppViewModel) {
     val vehicles = state.vehicles
@@ -330,10 +331,10 @@ private fun DiagnosticsCard(status: VehicleStatus?) {
     val rows = buildList {
         status.tirePressureLamp?.let { tp ->
             add("Tire pressure" to if (tp.hasWarning) "Warning" else "OK")
-            if (tp.frontLeft != null) add("  Front left" to warn(tp.frontLeft))
-            if (tp.frontRight != null) add("  Front right" to warn(tp.frontRight))
-            if (tp.rearLeft != null) add("  Rear left" to warn(tp.rearLeft))
-            if (tp.rearRight != null) add("  Rear right" to warn(tp.rearRight))
+            tp.frontLeft?.let { add("  Front left" to warn(it)) }
+            tp.frontRight?.let { add("  Front right" to warn(it)) }
+            tp.rearLeft?.let { add("  Rear left" to warn(it)) }
+            tp.rearRight?.let { add("  Rear right" to warn(it)) }
         }
         status.fuelLevel?.let { add("Fuel level" to "$it%") }
         status.lowFuelLight?.let { add("Low fuel" to yesNo(it)) }
