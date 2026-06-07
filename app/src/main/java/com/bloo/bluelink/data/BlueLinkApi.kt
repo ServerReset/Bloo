@@ -1,0 +1,234 @@
+package com.bloo.bluelink.data
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.logging.HttpLoggingInterceptor
+import java.util.TimeZone
+import java.util.concurrent.TimeUnit
+
+/**
+ * Thin client over the real Hyundai Blue Link US telematics API.
+ *
+ * Base URL, credentials, paths and headers come from the reverse-engineered
+ * community projects referenced in [Models]. There is no mock/simulated path:
+ * every call goes to https://api.telematics.hyundaiusa.com.
+ */
+class BlueLinkApi {
+
+    companion object {
+        const val BASE_URL = "https://api.telematics.hyundaiusa.com"
+        const val HOST = "api.telematics.hyundaiusa.com"
+
+        // Hyundai US OAuth client credentials (public, community-known values).
+        const val CLIENT_ID = "m66129Bb-em93-SPAHYN-bZ91-am4540zp19920"
+        const val CLIENT_SECRET = "v558o935-6nne-423i-baa8"
+        const val BRAND_INDICATOR = "H"
+
+        const val UA_OKHTTP = "okhttp/3.12.0"
+        const val UA_POSTMAN = "PostmanRuntime/7.26.10"
+    }
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+        isLenient = true
+    }
+
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        })
+        .build()
+
+    private val jsonMedia = "application/json".toMediaType()
+    private val formMedia = "application/x-www-form-urlencoded".toMediaType()
+
+    /** Current GMT offset in whole hours (e.g. -5 EST, -4 EDT). */
+    private fun gmtOffsetHours(): String {
+        val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
+        return (offsetMs / 3_600_000).toString()
+    }
+
+    // --- Auth ------------------------------------------------------------
+
+    suspend fun login(username: String, password: String): TokenResponse = execute {
+        val body = json.encodeToString(
+            kotlinx.serialization.json.JsonObject.serializer(),
+            kotlinx.serialization.json.buildJsonObject {
+                put("username", kotlinx.serialization.json.JsonPrimitive(username))
+                put("password", kotlinx.serialization.json.JsonPrimitive(password))
+            }
+        ).toRequestBody(jsonMedia)
+
+        val request = Request.Builder()
+            .url("$BASE_URL/v2/ac/oauth/token")
+            .post(body)
+            .header("Content-Type", "application/json")
+            .header("client_id", CLIENT_ID)
+            .header("client_secret", CLIENT_SECRET)
+            .header("User-Agent", UA_POSTMAN)
+            .build()
+        json.decodeFromString(TokenResponse.serializer(), call(request))
+    }
+
+    suspend fun refresh(refreshToken: String): TokenResponse = execute {
+        val body = json.encodeToString(
+            kotlinx.serialization.json.JsonObject.serializer(),
+            kotlinx.serialization.json.buildJsonObject {
+                put("refresh_token", kotlinx.serialization.json.JsonPrimitive(refreshToken))
+            }
+        ).toRequestBody(jsonMedia)
+
+        val request = Request.Builder()
+            .url("$BASE_URL/v2/ac/oauth/token/refresh")
+            .post(body)
+            .header("Content-Type", "application/json")
+            .header("client_id", CLIENT_ID)
+            .header("client_secret", CLIENT_SECRET)
+            .header("User-Agent", UA_POSTMAN)
+            .build()
+        json.decodeFromString(TokenResponse.serializer(), call(request))
+    }
+
+    // --- Vehicles --------------------------------------------------------
+
+    suspend fun vehicles(accessToken: String, username: String): List<Vehicle> = execute {
+        val request = Request.Builder()
+            .url("$BASE_URL/ac/v2/enrollment/details/$username")
+            .get()
+            .header("access_token", accessToken)
+            .header("client_id", CLIENT_ID)
+            .header("Host", HOST)
+            .header("User-Agent", UA_OKHTTP)
+            .header("payloadGenerated", "20200226171938")
+            .header("includeNonConnectedVehicles", "Y")
+            .build()
+        val parsed = json.decodeFromString(EnrollmentResponse.serializer(), call(request))
+        parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle() }
+    }
+
+    // --- Commands --------------------------------------------------------
+
+    suspend fun status(token: String, username: String, pin: String, v: Vehicle, refresh: Boolean): VehicleStatus? =
+        execute {
+            val request = baseRequest("/ac/v2/rcs/rvs/vehicleStatus", token, username, pin, v)
+                .get()
+                .header("REFRESH", refresh.toString())
+                .build()
+            json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus
+        }
+
+    suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =
+        formCommand("/ac/v2/rcs/rdo/off", token, username, pin, v)
+
+    suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
+        formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
+
+    suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
+        val request = baseRequest("/ac/v2/rcs/rsc/stop", token, username, pin, v)
+            .post(ByteArray(0).toRequestBody(null))
+            .build()
+        call(request)
+    }
+
+    /** Start climate / remote start. Temperature is Fahrenheit for US vehicles. */
+    suspend fun startClimate(
+        token: String, username: String, pin: String, v: Vehicle,
+        tempF: Int, defrost: Boolean, durationMinutes: Int,
+    ): String = execute {
+        val path = if (v.isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
+        val payload = json.encodeToString(
+            kotlinx.serialization.json.JsonObject.serializer(),
+            kotlinx.serialization.json.buildJsonObject {
+                put("Ims", kotlinx.serialization.json.JsonPrimitive(0))
+                put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
+                put("airTemp", kotlinx.serialization.json.buildJsonObject {
+                    put("unit", kotlinx.serialization.json.JsonPrimitive(1))
+                    put("value", kotlinx.serialization.json.JsonPrimitive(tempF.toString()))
+                })
+                put("defrost", kotlinx.serialization.json.JsonPrimitive(defrost))
+                put("heating1", kotlinx.serialization.json.JsonPrimitive(if (defrost) 1 else 0))
+                put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(durationMinutes))
+                put("username", kotlinx.serialization.json.JsonPrimitive(username))
+                put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
+            }
+        ).toRequestBody(jsonMedia)
+
+        val request = baseRequest(path, token, username, pin, v)
+            .post(payload)
+            .build()
+        call(request)
+    }
+
+    private suspend fun formCommand(
+        path: String, token: String, username: String, pin: String, v: Vehicle,
+    ): String = execute {
+        val form = "userName=$username&vin=${v.vin}".toRequestBody(formMedia)
+        val request = baseRequest(path, token, username, pin, v)
+            .post(form)
+            .build()
+        call(request)
+    }
+
+    private fun baseRequest(
+        path: String, token: String, username: String, pin: String, v: Vehicle,
+    ): Request.Builder = Request.Builder()
+        .url("$BASE_URL$path")
+        .header("access_token", token)
+        .header("client_id", CLIENT_ID)
+        .header("Host", HOST)
+        .header("User-Agent", UA_OKHTTP)
+        .header("registrationId", v.regId)
+        .header("gen", v.generation)
+        .header("vin", v.vin)
+        .header("APPCLOUD-VIN", v.vin)
+        .header("username", username)
+        .header("blueLinkServicePin", pin)
+        .header("offset", gmtOffsetHours())
+        .header("Language", "0")
+        .header("to", "ISS")
+        .header("encryptFlag", "false")
+        .header("from", "SPA")
+        .header("brandIndicator", v.brandIndicator.ifBlank { BRAND_INDICATOR })
+
+    // --- Plumbing --------------------------------------------------------
+
+    private fun call(request: Request): String {
+        client.newCall(request).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
+                throw BlueLinkException("HTTP ${resp.code}: ${text.take(500)}")
+            }
+            return text
+        }
+    }
+
+    private suspend fun <T> execute(block: () -> T): T = withContext(Dispatchers.IO) {
+        try {
+            block()
+        } catch (e: BlueLinkException) {
+            throw e
+        } catch (e: Exception) {
+            throw BlueLinkException(e.message ?: "Network error", e)
+        }
+    }
+}
+
+private fun VehicleDetails.toVehicle(): Vehicle = Vehicle(
+    vin = vin,
+    regId = regid,
+    name = nickName?.takeIf { it.isNotBlank() } ?: modelName ?: vin.takeLast(6),
+    model = listOfNotNull(modelYear, modelName).joinToString(" ").ifBlank { "Hyundai" },
+    generation = vehicleGeneration ?: "2",
+    brandIndicator = brandIndicator ?: BlueLinkApi.BRAND_INDICATOR,
+    isEv = evStatus.equals("E", ignoreCase = true),
+)
+
+class BlueLinkException(message: String, cause: Throwable? = null) : Exception(message, cause)
