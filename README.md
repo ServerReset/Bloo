@@ -22,6 +22,25 @@ account, the app shows errors rather than fake values.
   steering-wheel heat, and **per-seat heating/cooling**
 - **Set EV charge limits** (separate AC and DC target SOC)
 - **Find my car** — live GPS location with one-tap "Open in Maps"
+- **Material 3 Expressive** look — vibrant palette, rounded "expressive"
+  shapes, bold display type, and Material You dynamic color on Android 12+
+- **Appearance settings** (⚙️): theme = System / Light / Dark / **AMOLED**
+  (pure black), a dynamic-color toggle, and font = System /
+  **Atkinson Hyperlegible** / Product Sans style (**Poppins**)
+
+### Fonts & licensing
+
+Fonts are bundled (no network needed) under the SIL Open Font License; the
+license texts ship in `app/src/main/assets/licenses/`:
+
+- **Atkinson Hyperlegible** (Braille Institute) — a high-legibility typeface.
+- **Poppins** — used for the "Product Sans style" option. Google's actual
+  Product Sans is proprietary and cannot be redistributed, so this open
+  geometric sans stands in for that look.
+
+Note: genuine `MaterialExpressiveTheme` components are still alpha-only in
+Compose; Bloo applies the expressive *aesthetic* (color, shape, type) on the
+stable Material 3 release.
 
 ### Capability detection
 

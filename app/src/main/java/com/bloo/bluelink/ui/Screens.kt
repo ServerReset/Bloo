@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -93,6 +95,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Login -> LoginScreen(state.loading, vm::login)
                 Screen.Vehicles -> VehicleListScreen(state, vm)
                 is Screen.Detail -> VehicleDetailPager(state, vm)
+                Screen.Settings -> SettingsScreen(vm)
             }
         }
     }
@@ -167,6 +170,9 @@ private fun VehicleListScreen(state: UiState, vm: AppViewModel) {
         TopAppBar(
             title = { Text("My Vehicles") },
             actions = {
+                IconButton(onClick = { vm.openSettings() }) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                }
                 IconButton(onClick = { vm.loadVehicles() }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Reload")
                 }
@@ -514,6 +520,95 @@ private fun LocationCard(location: GeoLocation?, enabled: Boolean, onLocate: () 
                 }
             }
         }
+    }
+}
+
+// --- Settings -------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsScreen(vm: AppViewModel) {
+    val appearance by vm.appearance.collectAsState()
+
+    Column(Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text("Settings") },
+            navigationIcon = {
+                IconButton(onClick = { vm.closeSettings() }) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+        )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    val labels = mapOf(
+                        ThemeMode.SYSTEM to "Follow system",
+                        ThemeMode.LIGHT to "Light",
+                        ThemeMode.DARK to "Dark",
+                        ThemeMode.AMOLED to "AMOLED (pure black)",
+                    )
+                    ThemeMode.entries.forEach { mode ->
+                        ChoiceRow(labels.getValue(mode), appearance.themeMode == mode) {
+                            vm.setThemeMode(mode)
+                        }
+                    }
+                }
+            }
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Color", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) {
+                        vm.setDynamicColor(it)
+                    }
+                    Text(
+                        "Uses your wallpaper palette on Android 12+. Turn off for Bloo's " +
+                            "built-in expressive colors.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Font", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    val labels = mapOf(
+                        FontChoice.SYSTEM to "System default",
+                        FontChoice.ATKINSON to "Atkinson Hyperlegible",
+                        FontChoice.PRODUCT_SANS to "Product Sans style (Poppins)",
+                    )
+                    FontChoice.entries.forEach { choice ->
+                        ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) {
+                            vm.setFontChoice(choice)
+                        }
+                    }
+                    Text(
+                        "Atkinson Hyperlegible improves legibility. Google's Product Sans is " +
+                            "proprietary, so Poppins (open source) stands in for that look.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onSelect)
+        Text(label, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyLarge)
     }
 }
 

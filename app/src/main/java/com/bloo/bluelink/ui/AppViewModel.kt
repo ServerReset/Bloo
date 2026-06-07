@@ -9,11 +9,14 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.SeatCapability
 import com.bloo.bluelink.data.SessionStore
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -21,6 +24,7 @@ sealed interface Screen {
     data object Login : Screen
     data object Vehicles : Screen
     data class Detail(val index: Int) : Screen
+    data object Settings : Screen
 }
 
 data class UiState(
@@ -40,10 +44,33 @@ data class UiState(
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = SessionStore(app)
+    private val settingsStore = SettingsStore(app)
     private val repo = BlueLinkRepository(BlueLinkApi(), store)
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    val appearance: StateFlow<SettingsStore.Appearance> =
+        settingsStore.appearance.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            SettingsStore.Appearance(),
+        )
+
+    fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
+    fun closeSettings() = _state.update { it.copy(screen = Screen.Vehicles) }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { settingsStore.setThemeMode(mode) }
+    }
+
+    fun setFontChoice(choice: FontChoice) {
+        viewModelScope.launch { settingsStore.setFontChoice(choice) }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
+    }
 
     init {
         viewModelScope.launch {
