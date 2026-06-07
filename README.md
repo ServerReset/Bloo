@@ -10,8 +10,17 @@ account, the app shows errors rather than fake values.
 
 ## Features
 
-- Sign in with your Blue Link email, password and service PIN
-- **Swipe left/right** between all the cars on your account
+- Sign in with your Blue Link email, password and service PIN; credentials are
+  stored **encrypted** (Jetpack Security) and remembered
+- **Fingerprint / biometric lock** (optional) that gates the app on launch
+- Opens straight to the **last car** you viewed — no chooser; **swipe** to
+  switch cars, and switching is **instant** (statuses are cached, no spinner)
+- **Responsive layout**: a swipe carousel on phones; on tablets/foldables a
+  multi-car grid, with any car expandable to full screen
+- A **hero header** with a car image and a prominent **charge/fuel bar**
+  showing percentage and range
+- A copy-pasteable **activity log** and your saved credentials + a sign-out
+  button, all in **Settings**
 - Live vehicle status: lock state, individual doors / trunk / hood, climate,
   engine, range, odometer, 12V battery, EV charge % and charging state
 - **Comprehensive diagnostics** card: per-tire pressure warnings, fuel level /

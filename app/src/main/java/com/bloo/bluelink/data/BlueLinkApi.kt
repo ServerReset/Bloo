@@ -42,9 +42,13 @@ class BlueLinkApi {
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
-        .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        })
+        .addInterceptor(
+            // BASIC level logs the request line + response line only (no bodies),
+            // so the password in the auth body is never written to the log.
+            HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            }
+        )
         .build()
 
     private val jsonMedia = "application/json".toMediaType()
@@ -246,7 +250,9 @@ class BlueLinkApi {
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) {
-                throw BlueLinkException(friendlyError(resp.code, text), code = resp.code)
+                val message = friendlyError(resp.code, text)
+                AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $message")
+                throw BlueLinkException(message, code = resp.code)
             }
             return text
         }

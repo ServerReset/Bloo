@@ -1,0 +1,50 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="360dp"
+    android:height="150dp"
+    android:viewportWidth="360"
+    android:viewportHeight="150">
+    <!-- Stylised side profile of a car (UI chrome, not vehicle data). -->
+    <path
+        android:fillColor="#FF000000"
+        android:fillAlpha="0.9"
+        android:pathData="M40,108
+            C32,108 26,102 26,94
+            L26,84
+            C26,78 30,73 36,71
+            L86,57
+            C94,46 108,33 126,28
+            C150,21 210,21 236,30
+            C256,37 274,52 288,66
+            L320,74
+            C330,77 336,85 336,95
+            L336,96
+            C336,103 330,108 323,108
+            L300,108
+            A26,26 0 0,0 248,108
+            L150,108
+            A26,26 0 0,0 98,108
+            Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.85"
+        android:pathData="M132,40
+            C150,35 196,35 214,41
+            C224,49 234,58 242,66
+            L120,66
+            C124,57 128,47 132,40 Z" />
+    <!-- Wheels -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M124,92 m-18,0 a18,18 0 1,0 36,0 a18,18 0 1,0 -36,0" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M274,92 m-18,0 a18,18 0 1,0 36,0 a18,18 0 1,0 -36,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.95"
+        android:pathData="M124,92 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.95"
+        android:pathData="M274,92 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+</vector>

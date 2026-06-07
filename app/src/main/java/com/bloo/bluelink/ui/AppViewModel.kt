@@ -1,11 +1,15 @@
 package com.bloo.bluelink.ui
 
 import android.app.Application
+import androidx.biometric.BiometricManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.CredentialStore
+import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.SeatCapability
 import com.bloo.bluelink.data.SessionStore
@@ -16,39 +20,60 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface Screen {
     data object Login : Screen
-    data object Vehicles : Screen
-    data class Detail(val index: Int) : Screen
+    data object Locked : Screen
+    /** No vehicles enrolled (or still loading the first time). */
+    data object Empty : Screen
+    /** Main screen: the car carousel/grid. */
+    data object Garage : Screen
     data object Settings : Screen
 }
 
 data class UiState(
     val screen: Screen = Screen.Login,
     val loading: Boolean = false,
+    val refreshing: Boolean = false,
     val vehicles: List<Vehicle> = emptyList(),
-    val status: VehicleStatus? = null,
-    val location: GeoLocation? = null,
-    val seatCapability: SeatCapability = SeatCapability(),
-    val ventilatedSeats: Boolean = false,
+    val currentIndex: Int = 0,
+    /** On large screens, the index expanded to full screen (null = grid view). */
+    val expandedIndex: Int? = null,
+    val statuses: Map<String, VehicleStatus> = emptyMap(),
+    val locations: Map<String, GeoLocation> = emptyMap(),
+    val ventilated: Map<String, Boolean> = emptyMap(),
+    val credentials: Credentials? = null,
     val message: String? = null,
 ) {
-    val currentVehicle: Vehicle?
-        get() = (screen as? Screen.Detail)?.index?.let { vehicles.getOrNull(it) }
+    fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
+
+    fun seatCapabilityFor(v: Vehicle): SeatCapability {
+        val s = statuses[v.vin]?.seatHeaterVentState ?: return SeatCapability()
+        return SeatCapability(
+            frontLeft = s.flSeatHeatState != null,
+            frontRight = s.frSeatHeatState != null,
+            rearLeft = s.rlSeatHeatState != null,
+            rearRight = s.rrSeatHeatState != null,
+        )
+    }
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = SessionStore(app)
     private val settingsStore = SettingsStore(app)
+    private val credentialStore = CredentialStore(app)
     private val repo = BlueLinkRepository(BlueLinkApi(), store)
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    /** Copy-pasteable activity log shown in Settings. */
+    val logs: StateFlow<List<String>> = AppLog.lines
 
     val appearance: StateFlow<SettingsStore.Appearance> =
         settingsStore.appearance.stateIn(
@@ -57,26 +82,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SettingsStore.Appearance(),
         )
 
-    fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
-    fun closeSettings() = _state.update { it.copy(screen = Screen.Vehicles) }
-
-    fun setThemeMode(mode: ThemeMode) {
-        viewModelScope.launch { settingsStore.setThemeMode(mode) }
-    }
-
-    fun setFontChoice(choice: FontChoice) {
-        viewModelScope.launch { settingsStore.setFontChoice(choice) }
-    }
-
-    fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
-    }
-
     init {
         viewModelScope.launch {
-            if (store.load() != null) loadVehicles()
+            val session = store.load() ?: return@launch
+            _state.update { it.copy(credentials = credentialStore.load()) }
+            val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
+            if (locked) {
+                _state.update { it.copy(screen = Screen.Locked) }
+            } else {
+                loadGarage()
+            }
         }
     }
+
+    // --- Auth ------------------------------------------------------------
 
     fun login(username: String, password: String, pin: String) {
         if (username.isBlank() || password.isBlank() || pin.isBlank()) {
@@ -85,71 +104,109 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         launchBusy {
             repo.login(username.trim(), password, pin.trim())
-            loadVehiclesInternal()
+            val creds = Credentials(username.trim(), password, pin.trim())
+            credentialStore.save(creds)
+            AppLog.log("Signed in as ${creds.email}")
+            _state.update { it.copy(credentials = creds) }
+            loadGarageInternal()
         }
     }
 
     fun logout() {
         viewModelScope.launch {
             repo.logout()
+            credentialStore.clear()
+            AppLog.log("Signed out")
             _state.value = UiState(screen = Screen.Login)
         }
     }
 
-    fun loadVehicles() = launchBusy { loadVehiclesInternal() }
+    fun unlocked() = loadGarage()
 
-    private suspend fun loadVehiclesInternal() {
+    fun canUseBiometrics(): Boolean =
+        BiometricManager.from(getApplication())
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+
+    fun setBiometricLock(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
+    }
+
+    // --- Garage / vehicles ----------------------------------------------
+
+    fun loadGarage() = launchBusy { loadGarageInternal() }
+
+    private suspend fun loadGarageInternal() {
         val vehicles = repo.vehicles()
+        if (vehicles.isEmpty()) {
+            _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty) }
+            return
+        }
+        val ventilated = vehicles.associate { it.vin to store.ventilatedSeats(it.vin) }
+        val lastVin = settingsStore.lastVehicleVin()
+        val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         _state.update {
             it.copy(
                 vehicles = vehicles,
-                screen = Screen.Vehicles,
-                message = if (vehicles.isEmpty()) "No enrolled vehicles found on this account" else null,
+                ventilated = ventilated,
+                currentIndex = index,
+                screen = Screen.Garage,
             )
+        }
+        // Fetch current car first for an immediate view, then prefetch the rest
+        // (REFRESH=false -> cached last-known status, doesn't burn remote quota).
+        ensureStatus(vehicles[index])
+        viewModelScope.launch {
+            vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
         }
     }
 
-    /** Open the detail/pager at the given vehicle. Status is loaded by the pager. */
-    fun openVehicle(v: Vehicle) {
-        val index = _state.value.vehicles.indexOfFirst { it.vin == v.vin }.coerceAtLeast(0)
-        _state.update {
-            it.copy(
-                screen = Screen.Detail(index),
-                status = null,
-                location = null,
-                seatCapability = SeatCapability(),
-            )
-        }
-    }
-
-    /**
-     * Called when the pager settles on a page. Loads that car's status once;
-     * a no-op if we're already showing it (avoids burning remote-request quota).
-     */
-    fun onPageSettled(index: Int) {
+    /** Switch the visible car (swipe). Uses cache, so no loading flash. */
+    fun selectIndex(index: Int) {
         val v = _state.value.vehicles.getOrNull(index) ?: return
-        val current = (_state.value.screen as? Screen.Detail)?.index
-        if (current == index && _state.value.status != null) return
-        _state.update {
-            it.copy(
-                screen = Screen.Detail(index),
-                status = null,
-                location = null,
-                seatCapability = SeatCapability(),
-            )
-        }
-        viewModelScope.launch { _state.update { it.copy(ventilatedSeats = store.ventilatedSeats(v.vin)) } }
-        refreshStatus(v, forceRefresh = false)
+        _state.update { it.copy(currentIndex = index) }
+        viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
+        ensureStatus(v)
     }
 
-    fun back() {
-        _state.update {
-            it.copy(screen = Screen.Vehicles, status = null, location = null, message = null)
+    fun expand(index: Int) = _state.update { it.copy(expandedIndex = index, currentIndex = index) }
+    fun collapse() = _state.update { it.copy(expandedIndex = null) }
+
+    /** Loads status only if we don't already have it cached (no UI flash). */
+    private fun ensureStatus(v: Vehicle) {
+        if (_state.value.statuses.containsKey(v.vin)) return
+        viewModelScope.launch {
+            _state.update { it.copy(refreshing = true) }
+            try {
+                repo.status(v, refresh = false)?.let { s ->
+                    _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(message = e.message ?: "Couldn't load status") }
+            } finally {
+                _state.update { it.copy(refreshing = false) }
+            }
+        }
+    }
+
+    fun refreshStatus(v: Vehicle) {
+        viewModelScope.launch {
+            _state.update { it.copy(refreshing = true) }
+            try {
+                repo.status(v, refresh = true)?.let { s ->
+                    _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
+                }
+                AppLog.log("Status refreshed for ${v.name}")
+            } catch (e: Exception) {
+                _state.update { it.copy(message = e.message ?: "Refresh failed") }
+            } finally {
+                _state.update { it.copy(refreshing = false) }
+            }
         }
     }
 
     fun setVentilatedSeats(v: Vehicle, value: Boolean) {
-        _state.update { it.copy(ventilatedSeats = value) }
+        _state.update { it.copy(ventilated = it.ventilated + (v.vin to value)) }
         viewModelScope.launch { store.setVentilatedSeats(v.vin, value) }
     }
 
@@ -157,26 +214,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val loc = repo.location(v)
         _state.update {
             it.copy(
-                location = loc,
+                locations = if (loc != null) it.locations + (v.vin to loc) else it.locations,
                 message = if (loc == null) "Could not get the car's location" else "Location updated",
             )
         }
     }
 
-    fun refreshStatus(v: Vehicle, forceRefresh: Boolean) = launchBusy {
-        val status = repo.status(v, forceRefresh)
-        _state.update { it.copy(status = status, seatCapability = capabilityOf(status)) }
-    }
-
-    private fun capabilityOf(status: VehicleStatus?): SeatCapability {
-        val s = status?.seatHeaterVentState ?: return SeatCapability()
-        return SeatCapability(
-            frontLeft = s.flSeatHeatState != null,
-            frontRight = s.frSeatHeatState != null,
-            rearLeft = s.rlSeatHeatState != null,
-            rearRight = s.rrSeatHeatState != null,
-        )
-    }
+    // --- Commands --------------------------------------------------------
 
     fun lock(v: Vehicle) = command("Lock requested") { repo.lock(v) }
     fun unlock(v: Vehicle) = command("Unlock requested") { repo.unlock(v) }
@@ -192,9 +236,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun command(success: String, block: suspend () -> Unit) = launchBusy {
         block()
+        AppLog.log(success)
         _state.update { it.copy(message = success) }
     }
 
+    // --- Settings / nav --------------------------------------------------
+
+    fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
+    fun closeSettings() {
+        _state.update { it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage) }
+    }
+
+    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settingsStore.setThemeMode(mode) }
+    fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
+    fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
+
+    fun clearLogs() = AppLog.clear()
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     private fun launchBusy(block: suspend () -> Unit) {
