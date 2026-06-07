@@ -2,8 +2,11 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -74,13 +77,14 @@ private val DarkExpressive = darkColorScheme(
     error = Color(0xFFFFB4AB),
 )
 
-// Expressive shapes: generous, rounded corners for a soft, modern feel.
+// Expressive shapes: generous rounded corners, with a cut-corner accent on the
+// smallest slot to create the intentional "visual tension" of mixed geometry.
 private val ExpressiveShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    extraSmall = CutCornerShape(6.dp),
+    small = RoundedCornerShape(16.dp),
+    medium = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(32.dp),
+    extraLarge = RoundedCornerShape(40.dp),
 )
 
 private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
@@ -102,12 +106,12 @@ private fun expressiveTypography(choice: FontChoice): Typography {
     val family = fontFamilyFor(choice)
     val base = Typography()
     return base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = family, fontWeight = FontWeight.Bold),
-        displayMedium = base.displayMedium.copy(fontFamily = family, fontWeight = FontWeight.Bold),
-        displaySmall = base.displaySmall.copy(fontFamily = family, fontWeight = FontWeight.Bold),
-        headlineLarge = base.headlineLarge.copy(fontFamily = family, fontWeight = FontWeight.Bold),
-        headlineMedium = base.headlineMedium.copy(fontFamily = family, fontWeight = FontWeight.SemiBold),
-        headlineSmall = base.headlineSmall.copy(fontFamily = family, fontWeight = FontWeight.SemiBold),
+        displayLarge = base.displayLarge.copy(fontFamily = family, fontWeight = FontWeight.Black),
+        displayMedium = base.displayMedium.copy(fontFamily = family, fontWeight = FontWeight.Black),
+        displaySmall = base.displaySmall.copy(fontFamily = family, fontWeight = FontWeight.ExtraBold),
+        headlineLarge = base.headlineLarge.copy(fontFamily = family, fontWeight = FontWeight.ExtraBold),
+        headlineMedium = base.headlineMedium.copy(fontFamily = family, fontWeight = FontWeight.Bold),
+        headlineSmall = base.headlineSmall.copy(fontFamily = family, fontWeight = FontWeight.Bold),
         titleLarge = base.titleLarge.copy(fontFamily = family, fontWeight = FontWeight.SemiBold),
         titleMedium = base.titleMedium.copy(fontFamily = family, fontWeight = FontWeight.SemiBold),
         titleSmall = base.titleSmall.copy(fontFamily = family),
@@ -120,6 +124,7 @@ private fun expressiveTypography(choice: FontChoice): Typography {
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BlooTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -158,8 +163,9 @@ fun BlooTheme(
         base
     }
 
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = scheme,
+        motionScheme = MotionScheme.expressive(),
         typography = expressiveTypography(fontChoice),
         shapes = ExpressiveShapes,
         content = content,

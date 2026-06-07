@@ -1,7 +1,17 @@
+@file:OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+    ExperimentalFoundationApi::class,
+)
+
 package com.bloo.bluelink.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -40,12 +50,16 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -54,6 +68,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SplitButtonDefaults
+import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -173,7 +189,7 @@ private fun LoginScreen(loading: Boolean, onLogin: (String, String, String) -> U
             enabled = !loading,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            if (loading) CircularProgressIndicator(Modifier.height(20.dp)) else Text("Sign in")
+            if (loading) LoadingIndicator() else Text("Sign in")
         }
         Spacer(Modifier.height(16.dp))
         Text(
@@ -268,7 +284,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             },
             actions = {
                 if (state.refreshing) {
-                    CircularProgressIndicator(Modifier.size(20.dp).padding(end = 4.dp))
+                    ContainedLoadingIndicator(Modifier.size(36.dp).padding(end = 4.dp))
                 }
                 if (!showGrid) {
                     IconButton(onClick = { vm.refreshStatus(actionTarget) }) {
@@ -343,7 +359,17 @@ private fun PagerDots(current: Int, count: Int) {
 
 @Composable
 private fun HeroHeader(v: Vehicle, status: VehicleStatus?) {
-    Card(Modifier.fillMaxWidth()) {
+    // Shape morph: corners spring outward while the car is charging.
+    val charging = v.isEv && status?.evStatus?.batteryCharge == true
+    val corner by animateDpAsState(
+        targetValue = if (charging) 40.dp else 24.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "heroCorner",
+    )
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(corner)) {
         Column(Modifier.padding(16.dp)) {
             Image(
                 painter = painterResource(R.drawable.ic_car_hero),
@@ -400,8 +426,17 @@ private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
             }
         }
         Spacer(Modifier.height(8.dp))
+        // Expressive motion: the fill springs in with a gentle overshoot.
+        val animatedFrac by animateFloatAsState(
+            targetValue = frac,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+            label = "chargeFill",
+        )
         LinearProgressIndicator(
-            progress = frac,
+            progress = { animatedFrac },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(14.dp)
@@ -456,9 +491,29 @@ private fun VehicleDetailContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     ) {
         HeroHeader(v, status)
 
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CommandButton("Lock", Icons.Filled.Lock, Modifier.weight(1f), enabled) { vm.lock(v) }
-            CommandButton("Unlock", Icons.Filled.LockOpen, Modifier.weight(1f), enabled) { vm.unlock(v) }
+        // Expressive connected primary actions.
+        ButtonGroup(modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { vm.lock(v) }, enabled = enabled) {
+                Icon(Icons.Filled.Lock, contentDescription = null)
+                Text("  Lock")
+            }
+            Button(onClick = { vm.unlock(v) }, enabled = enabled) {
+                Icon(Icons.Filled.LockOpen, contentDescription = null)
+                Text("  Unlock")
+            }
+        }
+
+        // Expressive floating toolbar of contextual actions.
+        HorizontalFloatingToolbar(expanded = true, modifier = Modifier.fillMaxWidth()) {
+            IconButton(onClick = { vm.refreshStatus(v) }, enabled = enabled) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+            }
+            IconButton(onClick = { vm.locate(v) }, enabled = enabled) {
+                Icon(Icons.Filled.LocationOn, contentDescription = "Locate")
+            }
+            IconButton(onClick = { vm.stopClimate(v) }, enabled = enabled) {
+                Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Stop climate")
+            }
         }
 
         StatusCard(v, status, state.refreshing)
@@ -584,26 +639,41 @@ private fun ClimateCard(
                 if (cap.rearRight) SeatControl("Rear right seat", rr, ventilated) { rr = it }
             }
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CommandButton("Start", Icons.Filled.AcUnit, Modifier.weight(1f), enabled) {
-                    vm.startClimate(
-                        v,
-                        ClimateRequest(
-                            tempF = tempF,
-                            defrost = defrost,
-                            durationMinutes = duration,
-                            steeringWheelHeat = steeringHeat,
-                            seatFrontLeft = fl,
-                            seatFrontRight = fr,
-                            seatRearLeft = rl,
-                            seatRearRight = rr,
-                        ),
-                    )
-                }
-                CommandButton("Stop", Icons.Filled.PowerSettingsNew, Modifier.weight(1f), enabled) {
-                    vm.stopClimate(v)
-                }
-            }
+            // Expressive split button: leading = Start, trailing = Stop.
+            SplitButtonLayout(
+                leadingButton = {
+                    SplitButtonDefaults.LeadingButton(
+                        onClick = {
+                            vm.startClimate(
+                                v,
+                                ClimateRequest(
+                                    tempF = tempF,
+                                    defrost = defrost,
+                                    durationMinutes = duration,
+                                    steeringWheelHeat = steeringHeat,
+                                    seatFrontLeft = fl,
+                                    seatFrontRight = fr,
+                                    seatRearLeft = rl,
+                                    seatRearRight = rr,
+                                ),
+                            )
+                        },
+                        enabled = enabled,
+                    ) {
+                        Icon(Icons.Filled.AcUnit, contentDescription = null)
+                        Text("  Start climate")
+                    }
+                },
+                trailingButton = {
+                    SplitButtonDefaults.TrailingButton(
+                        checked = false,
+                        onCheckedChange = { vm.stopClimate(v) },
+                        enabled = enabled,
+                    ) {
+                        Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Stop")
+                    }
+                },
+            )
         }
     }
 }

@@ -47,9 +47,10 @@ license texts ship in `app/src/main/assets/licenses/`:
   Product Sans is proprietary and cannot be redistributed, so this open
   geometric sans stands in for that look.
 
-Note: genuine `MaterialExpressiveTheme` components are still alpha-only in
-Compose; Bloo applies the expressive *aesthetic* (color, shape, type) on the
-stable Material 3 release.
+The UI uses **Material 3 Expressive** (`material3` 1.4.x): `MaterialExpressiveTheme`
+with an expressive `MotionScheme`, Expressive components (`ContainedLoadingIndicator`/
+`LoadingIndicator`, `ButtonGroup`, `SplitButtonLayout`, `HorizontalFloatingToolbar`),
+spring-based motion with overshoot, shape morphing, and an emphasized type scale.
 
 ### Capability detection
 
