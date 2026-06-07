@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -56,6 +57,18 @@ class SessionStore(private val context: Context) {
 
     suspend fun clear() {
         context.dataStore.edit { it.clear() }
+    }
+
+    // --- Per-vehicle preferences ----------------------------------------
+    // The US API exposes no flag for whether seats can cool (ventilate), only
+    // whether a seat heater/vent exists at all. Cooling capability is therefore
+    // stored as a per-car preference the owner can set.
+
+    suspend fun ventilatedSeats(vin: String): Boolean =
+        context.dataStore.data.first()[booleanPreferencesKey("vent_$vin")] ?: false
+
+    suspend fun setVentilatedSeats(vin: String, value: Boolean) {
+        context.dataStore.edit { it[booleanPreferencesKey("vent_$vin")] = value }
     }
 
     val isLoggedIn = context.dataStore.data.map { it[Keys.ACCESS] != null }

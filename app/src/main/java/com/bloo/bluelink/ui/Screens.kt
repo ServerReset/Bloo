@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,16 +12,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -31,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -40,24 +50,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.SeatCapability
+import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun BlooApp(vm: AppViewModel) {
@@ -74,10 +88,10 @@ fun BlooApp(vm: AppViewModel) {
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Column(Modifier.padding(padding)) {
-            when (val screen = state.screen) {
+            when (state.screen) {
                 Screen.Login -> LoginScreen(state.loading, vm::login)
                 Screen.Vehicles -> VehicleListScreen(state, vm)
-                is Screen.Detail -> VehicleDetailScreen(screen.vehicle, state, vm)
+                is Screen.Detail -> VehicleDetailPager(state, vm)
             }
         }
     }
@@ -165,10 +179,7 @@ private fun VehicleListScreen(state: UiState, vm: AppViewModel) {
         } else {
             LazyColumn(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(state.vehicles) { v ->
-                    Card(
-                        onClick = { vm.openVehicle(v) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
+                    Card(onClick = { vm.openVehicle(v) }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
                             Text(v.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(v.model, style = MaterialTheme.typography.bodyMedium)
@@ -186,70 +197,100 @@ private fun VehicleListScreen(state: UiState, vm: AppViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VehicleDetailScreen(v: Vehicle, state: UiState, vm: AppViewModel) {
-    var tempF by remember { mutableStateOf(72) }
-    var defrost by remember { mutableStateOf(false) }
+private fun VehicleDetailPager(state: UiState, vm: AppViewModel) {
+    val vehicles = state.vehicles
+    if (vehicles.isEmpty()) return
+    val initial = (state.screen as? Screen.Detail)?.index ?: 0
+    val pagerState = rememberPagerState(initialPage = initial.coerceIn(0, vehicles.lastIndex)) { vehicles.size }
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { vm.onPageSettled(it) }
+    }
+
+    val currentVehicle = vehicles[pagerState.currentPage]
 
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(v.name) },
+            title = { Text(currentVehicle.name) },
             navigationIcon = {
                 IconButton(onClick = { vm.back() }) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                 }
             },
             actions = {
-                IconButton(onClick = { vm.refreshStatus(v, forceRefresh = true) }) {
+                IconButton(onClick = { vm.refreshStatus(currentVehicle, forceRefresh = true) }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh status")
                 }
             },
         )
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            StatusCard(v, state.status, state.loading)
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CommandButton("Lock", Icons.Filled.Lock, Modifier.weight(1f), !state.loading) { vm.lock(v) }
-                CommandButton("Unlock", Icons.Filled.LockOpen, Modifier.weight(1f), !state.loading) { vm.unlock(v) }
+        if (vehicles.size > 1) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                vehicles.indices.forEach { i ->
+                    val selected = i == pagerState.currentPage
+                    Box(
+                        Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(if (selected) 10.dp else 7.dp)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline,
+                                CircleShape,
+                            )
+                    )
+                }
             }
+        }
 
-            LocationCard(state.location, !state.loading, onLocate = { vm.locate(v) })
-
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Climate", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Temperature: $tempF°F", Modifier.weight(1f))
-                        OutlinedButton(onClick = { if (tempF > 62) tempF-- }) { Text("-") }
-                        Spacer(Modifier.height(0.dp))
-                        OutlinedButton(
-                            onClick = { if (tempF < 82) tempF++ },
-                            modifier = Modifier.padding(start = 8.dp),
-                        ) { Text("+") }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Defrost", Modifier.weight(1f))
-                        Switch(checked = defrost, onCheckedChange = { defrost = it })
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CommandButton("Start", Icons.Filled.AcUnit, Modifier.weight(1f), !state.loading) {
-                            vm.startClimate(v, tempF, defrost, minutes = 10)
-                        }
-                        CommandButton("Stop", Icons.Filled.PowerSettingsNew, Modifier.weight(1f), !state.loading) {
-                            vm.stopClimate(v)
-                        }
-                    }
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            val v = vehicles[page]
+            val active = pagerState.settledPage == page
+            if (active) {
+                VehicleDetailContent(v, state, vm)
+            } else {
+                Box(Modifier.fillMaxSize()) {
+                    Text(
+                        v.name,
+                        Modifier.align(Alignment.Center),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
                 }
             }
         }
     }
 }
+
+@Composable
+private fun VehicleDetailContent(v: Vehicle, state: UiState, vm: AppViewModel) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        StatusCard(v, state.status, state.loading)
+        DiagnosticsCard(state.status)
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CommandButton("Lock", Icons.Filled.Lock, Modifier.weight(1f), !state.loading) { vm.lock(v) }
+            CommandButton("Unlock", Icons.Filled.LockOpen, Modifier.weight(1f), !state.loading) { vm.unlock(v) }
+        }
+
+        ClimateCard(v, state, vm)
+
+        if (v.isEv) {
+            ChargeLimitCard(v, state, vm)
+        }
+
+        LocationCard(state.location, !state.loading, onLocate = { vm.locate(v) })
+    }
+}
+
+// --- Status ---------------------------------------------------------------
 
 @Composable
 private fun StatusCard(v: Vehicle, status: VehicleStatus?, loading: Boolean) {
@@ -266,9 +307,6 @@ private fun StatusCard(v: Vehicle, status: VehicleStatus?, loading: Boolean) {
                     status.hoodOpen?.let { StatusRow("Hood", if (it) "Open" else "Closed") }
                     StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                     status.engine?.let { StatusRow("Engine", if (it) "Running" else "Off") }
-                    status.tirePressureLamp?.tirePressureLampAll?.let {
-                        StatusRow("Tire pressure", if (it == 0) "OK" else "Warning")
-                    }
                     status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
                     status.evStatus?.batteryStatus?.let { StatusRow("EV charge", "$it%") }
                     status.evStatus?.batteryCharge?.let { StatusRow("Charging", if (it) "Yes" else "No") }
@@ -283,6 +321,166 @@ private fun StatusCard(v: Vehicle, status: VehicleStatus?, loading: Boolean) {
         }
     }
 }
+
+// --- Diagnostics ----------------------------------------------------------
+
+@Composable
+private fun DiagnosticsCard(status: VehicleStatus?) {
+    if (status == null) return
+    val rows = buildList {
+        status.tirePressureLamp?.let { tp ->
+            add("Tire pressure" to if (tp.hasWarning) "Warning" else "OK")
+            if (tp.frontLeft != null) add("  Front left" to warn(tp.frontLeft))
+            if (tp.frontRight != null) add("  Front right" to warn(tp.frontRight))
+            if (tp.rearLeft != null) add("  Rear left" to warn(tp.rearLeft))
+            if (tp.rearRight != null) add("  Rear right" to warn(tp.rearRight))
+        }
+        status.fuelLevel?.let { add("Fuel level" to "$it%") }
+        status.lowFuelLight?.let { add("Low fuel" to yesNo(it)) }
+        status.washerFluidStatus?.let { add("Washer fluid" to if (it) "Low" else "OK") }
+        status.breakOilStatus?.let { add("Brake fluid" to if (it) "Check" else "OK") }
+        status.smartKeyBatteryWarning?.let { add("Key fob battery" to if (it) "Low" else "OK") }
+        status.steerWheelHeat?.let { add("Steering wheel heat" to onOff(it)) }
+        status.sideBackWindowHeat?.let { add("Rear defroster" to onOff(it)) }
+        status.sideMirrorHeat?.let { add("Mirror heat" to onOff(it)) }
+        status.evStatus?.pluggedInLabel?.let { add("Plug" to it) }
+        status.evStatus?.remainTime2?.atc?.value?.let { add("Time to full" to "${it.toInt()} min") }
+    }
+    if (rows.isEmpty()) return
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Diagnostics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            rows.forEach { (label, value) -> StatusRow(label, value) }
+        }
+    }
+}
+
+private fun warn(v: Int) = if (v == 0) "OK" else "Warning"
+private fun yesNo(v: Boolean) = if (v) "Yes" else "No"
+private fun onOff(v: Int) = if (v == 0) "Off" else "On"
+
+// --- Climate --------------------------------------------------------------
+
+@Composable
+private fun ClimateCard(v: Vehicle, state: UiState, vm: AppViewModel) {
+    var tempF by remember(v.vin) { mutableIntStateOf(72) }
+    var duration by remember(v.vin) { mutableIntStateOf(10) }
+    var defrost by remember(v.vin) { mutableStateOf(false) }
+    var steeringHeat by remember(v.vin) { mutableStateOf(false) }
+    var fl by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    var fr by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    var rl by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    var rr by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+
+    val cap = state.seatCapability
+    val enabled = !state.loading
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Climate", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+            StepRow("Temperature", "$tempF°F")
+            Slider(
+                value = tempF.toFloat(),
+                onValueChange = { tempF = it.roundToInt() },
+                valueRange = 62f..82f,
+                steps = 19,
+            )
+
+            StepRow("Run time", "$duration min")
+            Slider(
+                value = duration.toFloat(),
+                onValueChange = { duration = it.roundToInt() },
+                valueRange = 1f..10f,
+                steps = 8,
+            )
+
+            ToggleRow("Defrost", defrost) { defrost = it }
+            if (state.status?.steerWheelHeat != null) {
+                ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
+            }
+
+            if (cap.any) {
+                ToggleRow("Ventilated (cooled) seats", state.ventilatedSeats) { vm.setVentilatedSeats(v, it) }
+                if (cap.frontLeft) SeatControl("Driver seat", fl, state.ventilatedSeats) { fl = it }
+                if (cap.frontRight) SeatControl("Passenger seat", fr, state.ventilatedSeats) { fr = it }
+                if (cap.rearLeft) SeatControl("Rear left seat", rl, state.ventilatedSeats) { rl = it }
+                if (cap.rearRight) SeatControl("Rear right seat", rr, state.ventilatedSeats) { rr = it }
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CommandButton("Start", Icons.Filled.AcUnit, Modifier.weight(1f), enabled) {
+                    vm.startClimate(
+                        v,
+                        ClimateRequest(
+                            tempF = tempF,
+                            defrost = defrost,
+                            durationMinutes = duration,
+                            steeringWheelHeat = steeringHeat,
+                            seatFrontLeft = fl,
+                            seatFrontRight = fr,
+                            seatRearLeft = rl,
+                            seatRearRight = rr,
+                        ),
+                    )
+                }
+                CommandButton("Stop", Icons.Filled.PowerSettingsNew, Modifier.weight(1f), enabled) {
+                    vm.stopClimate(v)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeatControl(label: String, level: SeatLevel, ventilated: Boolean, onChange: (SeatLevel) -> Unit) {
+    val range = if (ventilated) SeatLevel.ventilatedRange else SeatLevel.heatOnlyRange
+    val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
+    Column {
+        StepRow(label, range[index].label)
+        Slider(
+            value = index.toFloat(),
+            onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
+            valueRange = 0f..range.lastIndex.toFloat(),
+            steps = (range.size - 2).coerceAtLeast(0),
+        )
+    }
+}
+
+// --- Charge limits --------------------------------------------------------
+
+@Composable
+private fun ChargeLimitCard(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val targets = state.status?.evStatus?.reservChargeInfos
+    var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
+    var dc by remember(v.vin) { mutableIntStateOf(targets?.level(0) ?: 80) }
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Charge limits", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+            StepRow("AC (home) target", "$ac%")
+            Slider(
+                value = ac.toFloat(),
+                onValueChange = { ac = (it / 10f).roundToInt() * 10 },
+                valueRange = 50f..100f,
+                steps = 4,
+            )
+            StepRow("DC (fast) target", "$dc%")
+            Slider(
+                value = dc.toFloat(),
+                onValueChange = { dc = (it / 10f).roundToInt() * 10 },
+                valueRange = 50f..100f,
+                steps = 4,
+            )
+            CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), !state.loading) {
+                vm.setChargeLimits(v, ac, dc)
+            }
+        }
+    }
+}
+
+// --- Location -------------------------------------------------------------
 
 @Composable
 private fun LocationCard(location: GeoLocation?, enabled: Boolean, onLocate: () -> Unit) {
@@ -318,6 +516,8 @@ private fun LocationCard(location: GeoLocation?, enabled: Boolean, onLocate: () 
     }
 }
 
+// --- Small reusable pieces ------------------------------------------------
+
 @Composable
 private fun StatusRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth()) {
@@ -327,16 +527,31 @@ private fun StatusRow(label: String, value: String) {
 }
 
 @Composable
+private fun StepRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text(value, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
 private fun CommandButton(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     modifier: Modifier,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     Button(onClick = onClick, enabled = enabled, modifier = modifier) {
         Icon(icon, contentDescription = label)
-        Spacer(Modifier.height(0.dp))
         Text("  $label")
     }
 }

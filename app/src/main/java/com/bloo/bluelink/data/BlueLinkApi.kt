@@ -151,8 +151,7 @@ class BlueLinkApi {
 
     /** Start climate / remote start. Temperature is Fahrenheit for US vehicles. */
     suspend fun startClimate(
-        token: String, username: String, pin: String, v: Vehicle,
-        tempF: Int, defrost: Boolean, durationMinutes: Int,
+        token: String, username: String, pin: String, v: Vehicle, req: ClimateRequest,
     ): String = execute {
         val path = if (v.isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
         val payload = json.encodeToString(
@@ -162,17 +161,49 @@ class BlueLinkApi {
                 put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
                 put("airTemp", kotlinx.serialization.json.buildJsonObject {
                     put("unit", kotlinx.serialization.json.JsonPrimitive(1))
-                    put("value", kotlinx.serialization.json.JsonPrimitive(tempF.toString()))
+                    put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
                 })
-                put("defrost", kotlinx.serialization.json.JsonPrimitive(defrost))
-                put("heating1", kotlinx.serialization.json.JsonPrimitive(if (defrost) 1 else 0))
-                put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(durationMinutes))
+                put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
+                put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat) 1 else 0))
+                put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
+                put("seatHeaterVentInfo", kotlinx.serialization.json.buildJsonObject {
+                    put("drvSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontLeft.apiValue))
+                    put("astSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontRight.apiValue))
+                    put("rlSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearLeft.apiValue))
+                    put("rrSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearRight.apiValue))
+                })
                 put("username", kotlinx.serialization.json.JsonPrimitive(username))
                 put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
             }
         ).toRequestBody(jsonMedia)
 
         val request = baseRequest(path, token, username, pin, v)
+            .post(payload)
+            .build()
+        call(request)
+    }
+
+    /** Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) in percent. */
+    suspend fun setChargeTargets(
+        token: String, username: String, pin: String, v: Vehicle, acPercent: Int, dcPercent: Int,
+    ): String = execute {
+        val payload = json.encodeToString(
+            kotlinx.serialization.json.JsonObject.serializer(),
+            kotlinx.serialization.json.buildJsonObject {
+                put("targetSOClist", kotlinx.serialization.json.buildJsonArray {
+                    add(kotlinx.serialization.json.buildJsonObject {
+                        put("plugType", kotlinx.serialization.json.JsonPrimitive(0))
+                        put("targetSOClevel", kotlinx.serialization.json.JsonPrimitive(dcPercent))
+                    })
+                    add(kotlinx.serialization.json.buildJsonObject {
+                        put("plugType", kotlinx.serialization.json.JsonPrimitive(1))
+                        put("targetSOClevel", kotlinx.serialization.json.JsonPrimitive(acPercent))
+                    })
+                })
+            }
+        ).toRequestBody(jsonMedia)
+
+        val request = baseRequest("/ac/v2/evc/charge/targetsoc/set", token, username, pin, v)
             .post(payload)
             .build()
         call(request)
@@ -215,10 +246,23 @@ class BlueLinkApi {
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) {
-                throw BlueLinkException("HTTP ${resp.code}: ${text.take(500)}")
+                throw BlueLinkException(friendlyError(resp.code, text), code = resp.code)
             }
             return text
         }
+    }
+
+    /** Pull the human-readable message out of Blue Link's JSON error envelope. */
+    private fun friendlyError(code: Int, body: String): String {
+        val message = runCatching {
+            json.parseToJsonElement(body).let { el ->
+                (el as? kotlinx.serialization.json.JsonObject)?.let { obj ->
+                    (obj["errorMessage"] ?: obj["errorSubMessage"])
+                        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+                }
+            }
+        }.getOrNull()
+        return message?.takeIf { it.isNotBlank() } ?: "Request failed (HTTP $code)"
     }
 
     private suspend fun <T> execute(block: () -> T): T = withContext(Dispatchers.IO) {
@@ -243,4 +287,8 @@ private fun VehicleDetails.toVehicle(): Vehicle = Vehicle(
     odometer = odometer,
 )
 
-class BlueLinkException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class BlueLinkException(
+    message: String,
+    cause: Throwable? = null,
+    val code: Int? = null,
+) : Exception(message, cause)

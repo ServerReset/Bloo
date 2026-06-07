@@ -39,11 +39,14 @@ class BlueLinkRepository(
 
     suspend fun unlock(v: Vehicle) = withSession { s -> api.unlock(s.accessToken, s.username, s.pin, v) }
 
-    suspend fun startClimate(v: Vehicle, tempF: Int, defrost: Boolean, minutes: Int) =
-        withSession { s -> api.startClimate(s.accessToken, s.username, s.pin, v, tempF, defrost, minutes) }
+    suspend fun startClimate(v: Vehicle, req: ClimateRequest) =
+        withSession { s -> api.startClimate(s.accessToken, s.username, s.pin, v, req) }
 
     suspend fun stopClimate(v: Vehicle) =
         withSession { s -> api.stopClimate(s.accessToken, s.username, s.pin, v) }
+
+    suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int) =
+        withSession { s -> api.setChargeTargets(s.accessToken, s.username, s.pin, v, acPercent, dcPercent) }
 
     /** Runs [block] with the current session, refreshing the token once on 401/403. */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
@@ -52,7 +55,7 @@ class BlueLinkRepository(
             block(session)
         } catch (e: BlueLinkException) {
             val refreshToken = session.refreshToken
-            val isAuth = e.message?.let { it.contains("401") || it.contains("403") } == true
+            val isAuth = e.code == 401 || e.code == 403
             if (isAuth && refreshToken != null) {
                 val refreshed = api.refresh(refreshToken)
                 store.updateAccessToken(refreshed.accessToken, refreshed.refreshToken)

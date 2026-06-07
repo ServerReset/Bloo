@@ -11,18 +11,31 @@ account, the app shows errors rather than fake values.
 ## Features
 
 - Sign in with your Blue Link email, password and service PIN
-- List the vehicles enrolled on your account
+- **Swipe left/right** between all the cars on your account
 - Live vehicle status: lock state, individual doors / trunk / hood, climate,
-  engine, tire-pressure warning, range, odometer, 12V battery, EV charge %
-  and charging state
+  engine, range, odometer, 12V battery, EV charge % and charging state
+- **Comprehensive diagnostics** card: per-tire pressure warnings, fuel level /
+  low-fuel, washer & brake fluid, key-fob battery, steering-wheel / rear-window
+  / mirror heaters, plug state and time-to-full
 - Remote **lock / unlock**
-- Remote **climate start / stop** (temperature + defrost), ICE and EV
+- Remote **climate** with sliders: target temperature, run time, defrost,
+  steering-wheel heat, and **per-seat heating/cooling**
+- **Set EV charge limits** (separate AC and DC target SOC)
 - **Find my car** — live GPS location with one-tap "Open in Maps"
 
-Charge *control* (start/stop) is intentionally not wired up: the only
-community endpoint for the US region points at a different API base and an
-identifier the US enrollment flow doesn't return, so shipping it would mean
-guessing. Charge *state* is still shown in the status card.
+### Capability detection
+
+The US Blue Link API has **no feature/capability flags**. Following the same
+approach as the community libraries, Bloo *infers* capability from the live
+data: a seat control is shown only for seats the car actually reports in
+`seatHeaterVentState`, charge limits only appear for EVs, and a status row is
+rendered only when the field is present (never a fabricated value).
+
+One thing the API genuinely can't tell us is whether a seat can *cool* vs only
+*heat*. Rather than guess, that's a per-car toggle ("Ventilated seats") that
+widens the seat slider to include cooling levels. Charge start/stop *control*
+is still omitted — the only community endpoint for it points at a different API
+base and an id the US enrollment flow doesn't return.
 
 ## How it works
 
