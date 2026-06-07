@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkRepository
+import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
@@ -25,6 +26,7 @@ data class UiState(
     val loading: Boolean = false,
     val vehicles: List<Vehicle> = emptyList(),
     val status: VehicleStatus? = null,
+    val location: GeoLocation? = null,
     val message: String? = null,
 )
 
@@ -74,12 +76,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openVehicle(v: Vehicle) {
-        _state.update { it.copy(screen = Screen.Detail(v), status = null) }
+        _state.update { it.copy(screen = Screen.Detail(v), status = null, location = null) }
         refreshStatus(v, forceRefresh = false)
     }
 
     fun back() {
-        _state.update { it.copy(screen = Screen.Vehicles, status = null, message = null) }
+        _state.update { it.copy(screen = Screen.Vehicles, status = null, location = null, message = null) }
+    }
+
+    fun locate(v: Vehicle) = launchBusy {
+        val loc = repo.location(v)
+        _state.update {
+            it.copy(
+                location = loc,
+                message = if (loc == null) "Could not get the car's location" else "Location updated",
+            )
+        }
     }
 
     fun refreshStatus(v: Vehicle, forceRefresh: Boolean) = launchBusy {

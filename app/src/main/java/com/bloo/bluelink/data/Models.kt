@@ -59,6 +59,7 @@ data class Vehicle(
     val generation: String,
     val brandIndicator: String,
     val isEv: Boolean,
+    val odometer: String? = null,
 )
 
 // --- Vehicle status -------------------------------------------------------
@@ -76,11 +77,30 @@ data class VehicleStatus(
     val trunkOpen: Boolean? = null,
     val hoodOpen: Boolean? = null,
     val defrost: Boolean? = null,
+    val doorOpen: DoorOpen? = null,
+    val tirePressureLamp: TirePressureLamp? = null,
     val dte: Dte? = null,
     val airTemp: TempValue? = null,
     val battery: Battery12V? = null,
     val evStatus: EvStatus? = null,
     val dateTime: String? = null,
+)
+
+/** Per-door open state. The API encodes each door as 0 (closed) or 1 (open). */
+@Serializable
+data class DoorOpen(
+    val frontLeft: Int? = null,
+    val frontRight: Int? = null,
+    val backLeft: Int? = null,
+    val backRight: Int? = null,
+) {
+    val anyOpen: Boolean
+        get() = listOf(frontLeft, frontRight, backLeft, backRight).any { it == 1 }
+}
+
+@Serializable
+data class TirePressureLamp(
+    val tirePressureLampAll: Int? = null,
 )
 
 @Serializable
@@ -115,4 +135,32 @@ data class DrvDistance(
 @Serializable
 data class RangeByFuel(
     val totalAvailableRange: Dte? = null,
+)
+
+// --- Location -------------------------------------------------------------
+
+@Serializable
+data class VehicleLocationResponse(
+    val coord: Coord? = null,
+    val head: Double? = null,
+    val speed: Speed? = null,
+)
+
+@Serializable
+data class Coord(
+    val lat: Double? = null,
+    val lon: Double? = null,
+    val alt: Double? = null,
+)
+
+@Serializable
+data class Speed(
+    val value: Double? = null,
+    val unit: Int? = null,
+)
+
+/** UI-facing location result. */
+data class GeoLocation(
+    val latitude: Double,
+    val longitude: Double,
 )

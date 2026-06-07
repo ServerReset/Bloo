@@ -12,9 +12,17 @@ account, the app shows errors rather than fake values.
 
 - Sign in with your Blue Link email, password and service PIN
 - List the vehicles enrolled on your account
-- Live vehicle status (lock state, climate, range, 12V / EV battery)
+- Live vehicle status: lock state, individual doors / trunk / hood, climate,
+  engine, tire-pressure warning, range, odometer, 12V battery, EV charge %
+  and charging state
 - Remote **lock / unlock**
 - Remote **climate start / stop** (temperature + defrost), ICE and EV
+- **Find my car** — live GPS location with one-tap "Open in Maps"
+
+Charge *control* (start/stop) is intentionally not wired up: the only
+community endpoint for the US region points at a different API base and an
+identifier the US enrollment flow doesn't return, so shipping it would mean
+guessing. Charge *state* is still shown in the status card.
 
 ## How it works
 

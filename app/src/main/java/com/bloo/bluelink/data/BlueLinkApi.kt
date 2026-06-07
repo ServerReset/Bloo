@@ -125,6 +125,17 @@ class BlueLinkApi {
             json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus
         }
 
+    suspend fun location(token: String, username: String, pin: String, v: Vehicle): GeoLocation? =
+        execute {
+            val request = baseRequest("/ac/v2/rcs/rfc/findMyCar", token, username, pin, v)
+                .get()
+                .build()
+            val coord = json.decodeFromString(VehicleLocationResponse.serializer(), call(request)).coord
+            val lat = coord?.lat
+            val lon = coord?.lon
+            if (lat != null && lon != null) GeoLocation(lat, lon) else null
+        }
+
     suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/off", token, username, pin, v)
 
@@ -229,6 +240,7 @@ private fun VehicleDetails.toVehicle(): Vehicle = Vehicle(
     generation = vehicleGeneration ?: "2",
     brandIndicator = brandIndicator ?: BlueLinkApi.BRAND_INDICATOR,
     isEv = evStatus.equals("E", ignoreCase = true),
+    odometer = odometer,
 )
 
 class BlueLinkException(message: String, cause: Throwable? = null) : Exception(message, cause)

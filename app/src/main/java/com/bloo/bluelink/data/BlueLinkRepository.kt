@@ -31,6 +31,10 @@ class BlueLinkRepository(
         api.status(s.accessToken, s.username, s.pin, v, refresh)
     }
 
+    suspend fun location(v: Vehicle): GeoLocation? = withSession { s ->
+        api.location(s.accessToken, s.username, s.pin, v)
+    }
+
     suspend fun lock(v: Vehicle) = withSession { s -> api.lock(s.accessToken, s.username, s.pin, v) }
 
     suspend fun unlock(v: Vehicle) = withSession { s -> api.unlock(s.accessToken, s.username, s.pin, v) }

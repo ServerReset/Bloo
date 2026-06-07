@@ -44,12 +44,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.launch
@@ -207,12 +212,14 @@ private fun VehicleDetailScreen(v: Vehicle, state: UiState, vm: AppViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            StatusCard(state.status, state.loading)
+            StatusCard(v, state.status, state.loading)
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CommandButton("Lock", Icons.Filled.Lock, Modifier.weight(1f), !state.loading) { vm.lock(v) }
                 CommandButton("Unlock", Icons.Filled.LockOpen, Modifier.weight(1f), !state.loading) { vm.unlock(v) }
             }
+
+            LocationCard(state.location, !state.loading, onLocate = { vm.locate(v) })
 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -245,24 +252,66 @@ private fun VehicleDetailScreen(v: Vehicle, state: UiState, vm: AppViewModel) {
 }
 
 @Composable
-private fun StatusCard(status: VehicleStatus?, loading: Boolean) {
+private fun StatusCard(v: Vehicle, status: VehicleStatus?, loading: Boolean) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             when {
                 status == null && loading -> Text("Fetching live status…")
-                status == null -> Text("No status yet. Pull refresh to query the car.")
+                status == null -> Text("No status yet. Tap refresh to query the car.")
                 else -> {
-                    StatusRow("Doors", if (status.doorLock == true) "Locked" else "Unlocked")
+                    StatusRow("Doors locked", if (status.doorLock == true) "Yes" else "No")
+                    status.doorOpen?.let { StatusRow("A door open", if (it.anyOpen) "Yes" else "No") }
+                    status.trunkOpen?.let { StatusRow("Trunk", if (it) "Open" else "Closed") }
+                    status.hoodOpen?.let { StatusRow("Hood", if (it) "Open" else "Closed") }
                     StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                     status.engine?.let { StatusRow("Engine", if (it) "Running" else "Off") }
+                    status.tirePressureLamp?.tirePressureLampAll?.let {
+                        StatusRow("Tire pressure", if (it == 0) "OK" else "Warning")
+                    }
                     status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
                     status.evStatus?.batteryStatus?.let { StatusRow("EV charge", "$it%") }
+                    status.evStatus?.batteryCharge?.let { StatusRow("Charging", if (it) "Yes" else "No") }
                     val range = status.evStatus?.drvDistance?.firstOrNull()
                         ?.rangeByFuel?.totalAvailableRange?.value
                         ?: status.dte?.value
                     range?.let { StatusRow("Range", "${it.toInt()} mi") }
+                    v.odometer?.takeIf { it.isNotBlank() }?.let { StatusRow("Odometer", "$it mi") }
                     status.dateTime?.let { StatusRow("Updated", it) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationCard(location: GeoLocation?, enabled: Boolean, onLocate: () -> Unit) {
+    val context = LocalContext.current
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (location != null) {
+                StatusRow("Latitude", String.format("%.5f", location.latitude))
+                StatusRow("Longitude", String.format("%.5f", location.longitude))
+            } else {
+                Text("Tap Locate to query the car's current position.")
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CommandButton("Locate", Icons.Filled.LocationOn, Modifier.weight(1f), enabled, onLocate)
+                if (location != null) {
+                    OutlinedButton(
+                        onClick = {
+                            val uri = Uri.parse(
+                                "geo:${location.latitude},${location.longitude}" +
+                                    "?q=${location.latitude},${location.longitude}(My car)"
+                            )
+                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            runCatching { context.startActivity(intent) }
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Open in Maps") }
                 }
             }
         }
