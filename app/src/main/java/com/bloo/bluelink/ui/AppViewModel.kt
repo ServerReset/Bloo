@@ -225,14 +225,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Switch the visible car (swipe). Purely local — every car's last-known
-     * status is loaded once at startup, so switching pages never hits the
-     * network. Live data only comes from an explicit pull-to-refresh.
+     * Switch the visible car (swipe). Updates the index, and lazily loads this
+     * car's status only if we don't already have it — so already-loaded cars are
+     * never re-fetched on a swipe, but a car that failed to load at startup gets
+     * another chance when you view it.
      */
     fun selectIndex(index: Int) {
         val v = _state.value.vehicles.getOrNull(index) ?: return
         _state.update { it.copy(currentIndex = index) }
         viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
+        ensureStatus(v)
     }
 
     fun expand(index: Int) = _state.update { it.copy(expandedIndex = index, currentIndex = index) }
@@ -241,11 +243,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Loads status only if we don't already have it cached (no UI flash). */
     private fun ensureStatus(v: Vehicle) {
         if (_state.value.statuses.containsKey(v.vin)) return
-        loadStatus(v, refresh = false, errorMessage = "Couldn't load status")
+        // Background load: log failures but don't interrupt with a toast (one
+        // flaky car shouldn't spam errors over the others).
+        loadStatus(v, refresh = false, errorMessage = "Couldn't load status", surfaceErrors = false)
     }
 
     fun refreshStatus(v: Vehicle) =
-        loadStatus(v, refresh = true, errorMessage = "Refresh failed", logSuccess = "Status refreshed for ${v.name}")
+        loadStatus(
+            v, refresh = true, errorMessage = "Refresh failed",
+            logSuccess = "Status refreshed for ${v.name}", surfaceErrors = true,
+        )
 
     /**
      * Fetches one car's status. All fetches funnel through [statusMutex] so they
@@ -257,6 +264,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refresh: Boolean,
         errorMessage: String,
         logSuccess: String? = null,
+        surfaceErrors: Boolean = true,
     ) {
         synchronized(statusInFlight) {
             if (!statusInFlight.add(v.vin)) return
@@ -272,7 +280,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 logSuccess?.let { AppLog.log(it) }
             } catch (e: Exception) {
-                _state.update { it.copy(message = e.message ?: errorMessage) }
+                val msg = e.message ?: errorMessage
+                AppLog.log("⚠ ${v.name}: $msg")
+                if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg") }
             } finally {
                 val stillBusy = synchronized(statusInFlight) {
                     statusInFlight.remove(v.vin)
@@ -380,7 +390,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
-        val loc = repo.location(v) ?: throw BlueLinkException("Could not get the car's location")
+        val loc = repo.location(v) ?: throw BlueLinkException(
+            "Couldn't get the car's location — it may be asleep, out of coverage, or over " +
+                "the daily location-lookup limit. Try again later.",
+        )
         _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
         reverseGeocode(loc)?.let { place ->
             _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
@@ -471,7 +484,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 persistSnapshots()
             } catch (e: Exception) {
-                _state.update { it.copy(message = e.message ?: "Command failed") }
+                val msg = e.message ?: "Command failed"
+                AppLog.log("⚠ $msg")
+                _state.update { it.copy(message = msg) }
             } finally {
                 _state.update { it.copy(pending = it.pending - key) }
             }
@@ -504,7 +519,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 block()
             } catch (e: Exception) {
-                _state.update { it.copy(message = e.message ?: "Something went wrong") }
+                val msg = e.message ?: "Something went wrong"
+                AppLog.log("⚠ $msg")
+                _state.update { it.copy(message = msg) }
             } finally {
                 _state.update { it.copy(loading = false) }
             }

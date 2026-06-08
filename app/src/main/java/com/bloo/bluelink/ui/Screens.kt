@@ -22,7 +22,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
@@ -70,6 +72,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
@@ -181,6 +184,8 @@ fun BlooApp(vm: AppViewModel) {
     val state by vm.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -192,9 +197,9 @@ fun BlooApp(vm: AppViewModel) {
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbar) { data ->
-                // Themed, rounded "toast" — used for errors/notices.
+                // Themed, rounded, copyable "toast" — used for errors/notices.
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     tonalElevation = 6.dp,
@@ -202,19 +207,34 @@ fun BlooApp(vm: AppViewModel) {
                     modifier = Modifier.padding(16.dp),
                 ) {
                     Row(
-                        Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        Modifier.padding(start = 18.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.ErrorOutline, contentDescription = null)
                         Spacer(Modifier.width(12.dp))
-                        Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
+                        SelectionContainer(Modifier.weight(1f)) {
+                            Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        IconButton(onClick = { clipboard.setText(AnnotatedString(data.visuals.message)) }) {
+                            Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
+                        }
                     }
                 }
             }
         },
     ) { padding ->
-        Column(Modifier.padding(padding)) {
-            when (state.screen) {
+        AnimatedContent(
+            targetState = state.screen,
+            modifier = Modifier.padding(padding),
+            transitionSpec = {
+                // Settings slides in from the right; returning slides back left.
+                val sign = if (targetState == Screen.Settings) 1 else -1
+                (slideInHorizontally { w -> sign * w } + fadeIn()) togetherWith
+                    (slideOutHorizontally { w -> -sign * w } + fadeOut())
+            },
+            label = "screen",
+        ) { screen ->
+            when (screen) {
                 Screen.Login -> LoginScreen(state.loading, vm::login)
                 Screen.Locked -> LockScreen(vm)
                 Screen.Empty -> EmptyScreen(vm)
@@ -225,27 +245,54 @@ fun BlooApp(vm: AppViewModel) {
     }
 
     if (state.showOnboarding && state.screen == Screen.Garage) {
+        val canBio = remember { vm.canUseBiometrics() }
         OnboardingDialog(
+            canBiometric = canBio,
             onOpenSettings = { vm.dismissOnboarding(openSettings = true) },
+            onEnableBiometric = {
+                context.findFragmentActivity()?.let { activity ->
+                    showBiometricPrompt(
+                        activity = activity,
+                        title = "Enable fingerprint lock",
+                        subtitle = "Confirm to require it when opening Bloo",
+                        onSuccess = { vm.setBiometricLock(true) },
+                        onError = { },
+                    )
+                }
+            },
             onDismiss = { vm.dismissOnboarding(openSettings = false) },
         )
     }
 }
 
-/** First-run nudge: configure each car's features and (optionally) add a photo. */
+/** First-run nudge: configure each car's features, add a photo, and lock the app. */
 @Composable
-private fun OnboardingDialog(onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
+private fun OnboardingDialog(
+    canBiometric: Boolean,
+    onOpenSettings: () -> Unit,
+    onEnableBiometric: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
-        title = { Text("Set up your cars") },
+        title = { Text("Welcome to Bloo") },
         text = {
-            Text(
-                "Hyundai's API doesn't report everything about your car, so head to " +
-                    "Settings to tell Bloo what each car has — its powertrain (gas, hybrid, " +
-                    "PHEV or EV) and which seats can heat/cool. While you're there, you can " +
-                    "add a photo of your car to replace the default gradient.",
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Hyundai's API doesn't report everything about your car, so head to " +
+                        "Settings to tell Bloo what each car has — its powertrain (gas, hybrid, " +
+                        "PHEV or EV) and which seats and steering wheel can heat/cool. While " +
+                        "you're there, you can add a photo of each car.",
+                )
+                if (canBiometric) {
+                    FilledTonalButton(onClick = onEnableBiometric, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Lock Bloo with fingerprint")
+                    }
+                }
+            }
         },
         confirmButton = { Button(onClick = onOpenSettings) { Text("Open settings") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Later") } },
@@ -254,82 +301,100 @@ private fun OnboardingDialog(onOpenSettings: () -> Unit, onDismiss: () -> Unit) 
 
 // --- Login ----------------------------------------------------------------
 
+private val FieldShape = RoundedCornerShape(18.dp)
+
 @Composable
 private fun LoginScreen(loading: Boolean, onLogin: (String, String, String, Brand) -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
+    val scheme = MaterialTheme.colorScheme
 
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text("Bloo", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Black)
-        Text(
-            "A better Blue Link · US",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.height(24.dp))
-
-        Text("Brand", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-            Brand.entries.forEach { b ->
-                FilterChip(
-                    selected = brand == b,
-                    onClick = { brand = b },
-                    label = { Text(b.label) },
+        // Gradient hero with the wordmark.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
+            contentAlignment = Alignment.BottomStart,
+        ) {
+            Column(Modifier.padding(24.dp)) {
+                Text(
+                    "Bloo",
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Black,
+                    color = scheme.onPrimary,
+                )
+                Text(
+                    "A better Blue Link · US",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = scheme.onPrimary.copy(alpha = 0.85f),
                 )
             }
         }
-        Spacer(Modifier.height(16.dp))
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Blue Link email") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = pin,
-            onValueChange = { pin = it },
-            label = { Text("Service PIN") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { onLogin(email, password, pin, brand) },
-            enabled = !loading,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (loading) LoadingIndicator() else Text("Sign in")
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("Brand", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Brand.entries.forEach { b ->
+                    FilterChip(
+                        selected = brand == b,
+                        onClick = { brand = b },
+                        label = { Text(b.label) },
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Blue Link email") },
+                singleLine = true,
+                shape = FieldShape,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                singleLine = true,
+                shape = FieldShape,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { pin = it },
+                label = { Text("Service PIN") },
+                singleLine = true,
+                shape = FieldShape,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                onClick = { onLogin(email, password, pin, brand) },
+                enabled = !loading,
+                shape = FieldShape,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+            ) {
+                if (loading) LoadingIndicator() else Text("Sign in")
+            }
+            Text(
+                "Credentials are sent directly to ${brand.label}'s telematics servers and " +
+                    "stored encrypted on this device.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Credentials are sent directly to ${brand.label}'s telematics servers and " +
-                "stored encrypted on this device.",
-            style = MaterialTheme.typography.bodySmall,
-        )
     }
 }
 
@@ -407,45 +472,90 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val widthDp = LocalConfiguration.current.screenWidthDp
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
-    val pageCount = (count + perPage - 1) / perPage
+    // Expanding one car to fill the screen only matters when several share it.
+    val canExpand = perPage > 1
+    val expanded = state.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
 
-    val pager = rememberPagerState(
-        initialPage = (state.currentIndex.coerceIn(0, count - 1)) / perPage,
-    ) { pageCount }
-    LaunchedEffect(pager, perPage) {
-        snapshotFlow { pager.settledPage }.collect { page ->
-            vm.selectIndex((page * perPage).coerceIn(0, count - 1))
-        }
-    }
+    BackHandler(enabled = expanded != null) { vm.collapse() }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-                val start = page * perPage
-                val end = minOf(start + perPage, count)
-                Row(Modifier.fillMaxSize()) {
-                    for (i in start until end) {
-                        Box(Modifier.weight(1f).fillMaxHeight()) {
-                            VehicleDetailContent(vehicles[i], state, vm)
+        AnimatedContent(
+            targetState = expanded,
+            transitionSpec = {
+                val spec = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                (fadeIn(spec) + scaleIn(spec, initialScale = 0.94f)) togetherWith
+                    (fadeOut(spec) + scaleOut(spec, targetScale = 0.94f))
+            },
+            label = "expand",
+        ) { exp ->
+            if (exp != null) {
+                Box(Modifier.fillMaxSize()) {
+                    VehicleDetailContent(vehicles[exp], state, vm)
+                    FloatingIcon(
+                        icon = Icons.Filled.ArrowBack,
+                        description = "Back to all cars",
+                        onClick = { vm.collapse() },
+                        modifier = Modifier.align(Alignment.TopStart),
+                    )
+                }
+            } else {
+                val pageCount = (count + perPage - 1) / perPage
+                val pager = rememberPagerState(
+                    initialPage = (state.currentIndex.coerceIn(0, count - 1)) / perPage,
+                ) { pageCount }
+                LaunchedEffect(pager, perPage) {
+                    snapshotFlow { pager.settledPage }.collect { page ->
+                        vm.selectIndex((page * perPage).coerceIn(0, count - 1))
+                    }
+                }
+                Column(Modifier.fillMaxSize()) {
+                    HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
+                        val start = page * perPage
+                        val end = minOf(start + perPage, count)
+                        Row(Modifier.fillMaxSize()) {
+                            for (i in start until end) {
+                                Box(Modifier.weight(1f).fillMaxHeight()) {
+                                    VehicleDetailContent(
+                                        vehicles[i], state, vm,
+                                        onExpand = if (canExpand) ({ vm.expand(i) }) else null,
+                                    )
+                                }
+                            }
+                            // Keep columns equal width if the last page is short.
+                            repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
                         }
                     }
-                    // Keep columns equal width if the last page is short.
-                    repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
+                    if (pageCount > 1) PagerDots(pager.currentPage, pageCount)
                 }
             }
-            if (pageCount > 1) PagerDots(pager.currentPage, pageCount)
         }
         // Floating settings button (there is no app bar / header).
-        Surface(
+        FloatingIcon(
+            icon = Icons.Filled.Settings,
+            description = "Settings",
             onClick = { vm.openSettings() },
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.85f),
-            shadowElevation = 3.dp,
-            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(44.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings")
-            }
+            modifier = Modifier.align(Alignment.TopEnd),
+        )
+    }
+}
+
+/** A small translucent circular icon button used as a floating overlay control. */
+@Composable
+private fun FloatingIcon(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.85f),
+        shadowElevation = 3.dp,
+        modifier = modifier.padding(12.dp).size(44.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = description)
         }
     }
 }
@@ -692,14 +802,22 @@ private fun <T> ReorderColumn(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
         order.forEach { item ->
             val k = keyOf(item)
-            val dragging = draggingKey == k
-            Box(
-                Modifier
-                    .zIndex(if (dragging) 1f else 0f)
-                    .graphicsLayer { translationY = if (dragging) offsetY else 0f }
-                    .onSizeChanged { heights[k] = it.height },
-            ) {
-                val handle = Modifier.pointerInput(k) {
+            // Identity key so Compose moves the existing node when the order
+            // changes (instead of reusing nodes by slot, which looks janky).
+            key(k) {
+                val dragging = draggingKey == k
+                val lift by animateFloatAsState(if (dragging) 1.03f else 1f, label = "lift")
+                Box(
+                    Modifier
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (dragging) offsetY else 0f
+                            scaleX = lift
+                            scaleY = lift
+                        }
+                        .onSizeChanged { heights[k] = it.height },
+                ) {
+                    val handle = Modifier.pointerInput(k) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { draggingKey = k; offsetY = 0f },
                         onDragEnd = { draggingKey = null; offsetY = 0f; onReorder(order) },
@@ -725,8 +843,9 @@ private fun <T> ReorderColumn(
                             }
                         },
                     )
+                    }
+                    content(item, handle, dragging)
                 }
-                content(item, handle, dragging)
             }
         }
     }
@@ -769,6 +888,7 @@ private fun VehicleDetailContent(
     v: Vehicle,
     state: UiState,
     vm: AppViewModel,
+    onExpand: (() -> Unit)? = null,
 ) {
     val status = state.statusFor(v)
     val seats = state.seatConfigFor(v)
@@ -797,13 +917,20 @@ private fun VehicleDetailContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Car identity (there's no shared app bar any more).
-            Column {
-                Text(v.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    "${v.model} · ${state.powertrainLabel(v)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(v.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${v.model} · ${state.powertrainLabel(v)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (onExpand != null) {
+                    IconButton(onClick = onExpand) {
+                        Icon(Icons.Filled.Fullscreen, contentDescription = "Expand to full screen")
+                    }
+                }
             }
             // Fixed top: car image + gauge, then the primary actions.
             HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v))
@@ -938,6 +1065,7 @@ private fun Pebble(
     state: UiState,
     vm: AppViewModel,
     dragHandle: Modifier = Modifier,
+    summary: String? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -963,12 +1091,21 @@ private fun Pebble(
             ) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(
-                    title,
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (summary != null) {
+                        Text(
+                            summary,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 Icon(
                     Icons.Filled.DragHandle,
                     contentDescription = "Drag to reorder",
@@ -1265,11 +1402,11 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     val location = state.locations[v.vin]
     val place = state.placeNames[v.vin]
     val locating = state.isPending(v.vin, "locate")
-    Pebble(v, "location", "Location", Icons.Filled.LocationOn, state, vm, dragHandle) {
-        when {
-            place != null -> Text(place, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            location != null -> Text("Location updated")
-            else -> Text("Tap Locate to query the car's current position.")
+    // Show the place name (or a hint) in the header so it's visible even collapsed.
+    val summary = place ?: if (location != null) "Located" else "Not located yet"
+    Pebble(v, "location", "Location", Icons.Filled.LocationOn, state, vm, dragHandle, summary = summary) {
+        if (location == null) {
+            Text("Tap Locate to query the car's current position.")
         }
         location?.let { loc ->
             CarMap(
@@ -1608,6 +1745,7 @@ private fun CarSettingsCard(
                         onValueChange = { vm.setVehicleImage(v.vin, it) },
                         label = { Text("Image URL (blank = gradient)") },
                         singleLine = true,
+                        shape = FieldShape,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
