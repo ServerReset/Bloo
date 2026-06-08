@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
@@ -94,6 +96,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    /**
+     * Serializes ALL vehicleStatus calls account-wide. Blue Link rejects
+     * overlapping requests with `502 ... a previous request is pending`, so
+     * status fetches must run strictly one at a time.
+     */
+    private val statusMutex = Mutex()
+
+    /** VINs with a status request currently queued or running (de-dupes). */
+    private val statusInFlight = mutableSetOf<String>()
 
     /** Copy-pasteable activity log shown in Settings. */
     val logs: StateFlow<List<String>> = AppLog.lines
@@ -206,34 +218,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Loads status only if we don't already have it cached (no UI flash). */
     private fun ensureStatus(v: Vehicle) {
         if (_state.value.statuses.containsKey(v.vin)) return
-        viewModelScope.launch {
-            _state.update { it.copy(refreshing = true) }
-            try {
-                repo.status(v, refresh = false)?.let { s ->
-                    _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
-                    persistSnapshots()
-                }
-            } catch (e: Exception) {
-                _state.update { it.copy(message = e.message ?: "Couldn't load status") }
-            } finally {
-                _state.update { it.copy(refreshing = false) }
-            }
-        }
+        loadStatus(v, refresh = false, errorMessage = "Couldn't load status")
     }
 
-    fun refreshStatus(v: Vehicle) {
+    fun refreshStatus(v: Vehicle) =
+        loadStatus(v, refresh = true, errorMessage = "Refresh failed", logSuccess = "Status refreshed for ${v.name}")
+
+    /**
+     * Fetches one car's status. All fetches funnel through [statusMutex] so they
+     * run strictly sequentially (Blue Link 502s on overlapping requests), and a
+     * VIN already queued/running is skipped so we never pile up duplicates.
+     */
+    private fun loadStatus(
+        v: Vehicle,
+        refresh: Boolean,
+        errorMessage: String,
+        logSuccess: String? = null,
+    ) {
+        synchronized(statusInFlight) {
+            if (!statusInFlight.add(v.vin)) return
+        }
+        _state.update { it.copy(refreshing = true) }
         viewModelScope.launch {
-            _state.update { it.copy(refreshing = true) }
             try {
-                repo.status(v, refresh = true)?.let { s ->
-                    _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
-                    persistSnapshots()
+                statusMutex.withLock {
+                    repo.status(v, refresh = refresh)?.let { s ->
+                        _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
+                        persistSnapshots()
+                    }
                 }
-                AppLog.log("Status refreshed for ${v.name}")
+                logSuccess?.let { AppLog.log(it) }
             } catch (e: Exception) {
-                _state.update { it.copy(message = e.message ?: "Refresh failed") }
+                _state.update { it.copy(message = e.message ?: errorMessage) }
             } finally {
-                _state.update { it.copy(refreshing = false) }
+                val stillBusy = synchronized(statusInFlight) {
+                    statusInFlight.remove(v.vin)
+                    statusInFlight.isNotEmpty()
+                }
+                if (!stillBusy) _state.update { it.copy(refreshing = false) }
             }
         }
     }
