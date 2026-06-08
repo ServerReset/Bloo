@@ -1,15 +1,16 @@
 package com.bloo.bluelink.widget
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.Button
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceId
 import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
-import androidx.glance.appwidget.Button
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
@@ -26,10 +27,10 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
-import androidx.glance.material3.GlanceTheme
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import android.content.Context
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.data.SnapshotStore
@@ -55,12 +56,15 @@ class BlooGlanceWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = SnapshotStore(context.applicationContext).current()
         provideContent {
-            GlanceTheme {
-                WidgetRoot(data)
-            }
+            WidgetRoot(data)
         }
     }
 }
+
+private val Bg = ColorProvider(Color(0xFF12141C))
+private val OnBg = ColorProvider(Color(0xFFF2F4F8))
+private val Accent = ColorProvider(Color(0xFF7AA8FF))
+private val Muted = ColorProvider(Color(0xFFAEB6C2))
 
 class BlooWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = BlooGlanceWidget()
@@ -73,7 +77,7 @@ private fun WidgetRoot(data: SnapshotStore.SnapshotData) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(GlanceTheme.colors.background)
+            .background(Bg)
             .cornerRadius(24.dp)
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>()),
@@ -144,7 +148,7 @@ private fun HeaderRow(data: SnapshotStore.SnapshotData, v: VehicleSnapshot, comp
         Text(
             v.name,
             style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
+                color = OnBg,
                 fontSize = if (compact) 13.sp else 16.sp,
                 fontWeight = FontWeight.Bold,
             ),
@@ -160,10 +164,10 @@ private fun percentText(v: VehicleSnapshot) = v.percent?.let { "$it%" } ?: "—"
 private fun rangeText(v: VehicleSnapshot) = v.rangeMi?.let { "$it mi range" } ?: ""
 
 @Composable private fun title(sizeSp: Int) =
-    TextStyle(color = GlanceTheme.colors.primary, fontSize = sizeSp.sp, fontWeight = FontWeight.Bold)
+    TextStyle(color = Accent, fontSize = sizeSp.sp, fontWeight = FontWeight.Bold)
 
 @Composable private fun body() =
-    TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp)
+    TextStyle(color = OnBg, fontSize = 14.sp)
 
 @Composable private fun caption() =
-    TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp)
+    TextStyle(color = Muted, fontSize = 12.sp)

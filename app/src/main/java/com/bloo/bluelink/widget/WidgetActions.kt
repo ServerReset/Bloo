@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.SessionStore

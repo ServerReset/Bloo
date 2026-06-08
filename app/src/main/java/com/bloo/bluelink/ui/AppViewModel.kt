@@ -18,6 +18,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
+import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.widget.BlooGlanceWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
