@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -196,7 +197,8 @@ fun BlooApp(vm: AppViewModel) {
 
     Scaffold(
         snackbarHost = {
-            SnackbarHost(snackbar) { data ->
+            // imePadding so the toast rises above the keyboard when it's open.
+            SnackbarHost(snackbar, modifier = Modifier.imePadding()) { data ->
                 // Themed, rounded, copyable "toast" — used for errors/notices.
                 Surface(
                     shape = RoundedCornerShape(24.dp),

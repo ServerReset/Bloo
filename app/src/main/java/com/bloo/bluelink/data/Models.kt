@@ -168,7 +168,10 @@ data class TempValue(
 data class Battery12V(
     val batSoc: Int? = null,
     val batState: Int? = null,
-    val batSignalReferenceValue: Int? = null,
+    // NB: batSignalReferenceValue is intentionally omitted — some vehicles
+    // (e.g. newer CCNC head units) return it as an object like
+    // {"batWarning":65} rather than a number, which would break parsing. It's
+    // unused, so we let ignoreUnknownKeys skip it whatever its shape.
 ) {
     /** Coarse 12V battery health from state of charge / state flag. */
     val health: String?
