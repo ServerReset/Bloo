@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
@@ -64,6 +65,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,6 +99,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -110,6 +113,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import coil.compose.AsyncImage
@@ -325,9 +329,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     itemsIndexed(vehicles) { i, v ->
-                        VehicleSummaryCard(v, state.statusFor(v), selected = i == current) {
-                            vm.expand(i)
-                        }
+                        CarPanel(v, state, vm) { vm.expand(i) }
                     }
                 }
             }
@@ -405,8 +407,7 @@ private fun PagerDots(current: Int, count: Int) {
 // --- Hero header + charge/fuel bar ---------------------------------------
 
 @Composable
-private fun HeroHeader(v: Vehicle, status: VehicleStatus?) {
-    // Shape morph: corners spring outward while the car is charging.
+private fun HeroHeader(v: Vehicle, status: VehicleStatus?, imageUrl: String?, height: Dp = 150.dp) {
     val charging = v.isEv && status?.evStatus?.batteryCharge == true
     val corner by animateDpAsState(
         targetValue = if (charging) 40.dp else 24.dp,
@@ -418,7 +419,7 @@ private fun HeroHeader(v: Vehicle, status: VehicleStatus?) {
     )
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(corner)) {
         Column(Modifier.padding(16.dp)) {
-            CarImage(v)
+            HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(8.dp))
             Text(v.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
@@ -432,52 +433,38 @@ private fun HeroHeader(v: Vehicle, status: VehicleStatus?) {
     }
 }
 
-/** Real model photo from the internet (Coil) with the built-in illustration as fallback. */
+/** Default = a pleasing brand gradient. If the user set a photo URL, show that instead. */
 @Composable
-private fun CarImage(v: Vehicle) {
-    val fallback = painterResource(R.drawable.ic_car_hero)
-    val url = carImageUrl(v)
-    if (url == null) {
-        Image(
-            painter = fallback,
-            contentDescription = v.model,
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxWidth().height(150.dp),
-        )
+private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
+    if (imageUrl.isNullOrBlank()) {
+        val scheme = MaterialTheme.colorScheme
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height)
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(scheme.primary, scheme.tertiary, scheme.secondary),
+                    )
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_car_hero),
+                contentDescription = v.model,
+                tint = scheme.onPrimary.copy(alpha = 0.9f),
+                modifier = Modifier.fillMaxWidth(0.7f).height(height * 0.6f),
+            )
+        }
     } else {
         AsyncImage(
-            model = url,
+            model = imageUrl,
             contentDescription = v.model,
-            placeholder = fallback,
-            error = fallback,
-            fallback = fallback,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxWidth().height(150.dp),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(18.dp)),
         )
     }
-}
-
-/**
- * Representative model photos from Wikimedia (best-effort; the Blue Link API does
- * not expose your specific car's image). Unknown models fall back to the
- * illustration.
- */
-private fun carImageUrl(v: Vehicle): String? {
-    val m = v.model.lowercase()
-    val file = when {
-        "ioniq 5" in m -> "2022_Hyundai_Ioniq_5_Premium_72_kWh_Front.jpg"
-        "ioniq 6" in m -> "Hyundai_Ioniq_6_1X7A6739.jpg"
-        "ioniq" in m -> "Hyundai_Ioniq_Electric_1X7A6739.jpg"
-        "kona" in m -> "Hyundai_Kona_Electric_IMG_4612.jpg"
-        "tucson" in m -> "2021_Hyundai_Tucson.jpg"
-        "santa fe" in m -> "2024_Hyundai_Santa_Fe.jpg"
-        "elantra" in m -> "2021_Hyundai_Elantra.jpg"
-        "sonata" in m -> "2020_Hyundai_Sonata.jpg"
-        "palisade" in m -> "2020_Hyundai_Palisade.jpg"
-        else -> return null
-    }
-    return "https://commons.wikimedia.org/wiki/Special:FilePath/${file.replace(" ", "_")}"
 }
 
 @Composable
@@ -540,40 +527,27 @@ private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
 
 private val ChargeGreen = Color(0xFF2EBD59)
 
-// --- Summary card (wide layout) ------------------------------------------
+// --- Car panel (large-screen grid: a full, controllable car) --------------
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VehicleSummaryCard(
-    v: Vehicle,
-    status: VehicleStatus?,
-    selected: Boolean = false,
-    onOpen: () -> Unit,
-) {
-    val colors = if (selected) {
-        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-    } else {
-        CardDefaults.cardColors()
-    }
-    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth(), colors = colors) {
-        Column(Modifier.padding(16.dp)) {
-            Image(
-                painter = painterResource(R.drawable.ic_car_hero),
-                contentDescription = v.model,
-                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().height(96.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(v.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
+private fun CarPanel(v: Vehicle, state: UiState, vm: AppViewModel, onExpand: () -> Unit) {
+    val status = state.statusFor(v)
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    v.name,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                IconButton(onClick = onExpand) {
+                    Icon(Icons.Filled.Fullscreen, contentDescription = "Expand")
+                }
+            }
+            HeroVisual(v, state.imageUrls[v.vin], height = 120.dp)
             ChargeFuelBar(v, status)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Doors ${if (status?.doorLock == true) "locked" else "unlocked"} · tap to open",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            PrimaryActions(v, status, state.locations[v.vin], !state.loading, vm)
         }
     }
 }
@@ -604,42 +578,136 @@ private fun VehicleDetailContent(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 1. Car image + 2. charge/fuel gauge
-            HeroHeader(v, status)
+            // 1. Car image (gradient by default) + 2. charge/fuel gauge
+            HeroHeader(v, status, state.imageUrls[v.vin])
             // 3. Important actions
-            PrimaryActions(v, enabled, vm)
-            // Quick status
-            StatusCard(v, status, state.refreshing)
+            PrimaryActions(v, status, state.locations[v.vin], enabled, vm)
             // 4. Climate
             ClimateCard(v, status, cap, ventilated, enabled, vm)
+            // 5. Status (moved below climate, per request)
+            StatusCard(v, status, state.refreshing)
             if (v.isEv) ChargeLimitCard(v, status, enabled, vm)
-            LocationCard(state.locations[v.vin], enabled) { vm.locate(v) }
-            // 5. Diagnostics (moves to the right pane on large screens)
+            // 6. Diagnostics (moves to the right pane on large screens)
             if (showDiagnostics) DiagnosticsCard(status)
         }
     }
 }
 
 @Composable
-private fun PrimaryActions(v: Vehicle, enabled: Boolean, vm: AppViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CommandButton("Lock", Icons.Filled.Lock, Modifier.weight(1f), enabled) { vm.lock(v) }
-            CommandButton("Unlock", Icons.Filled.LockOpen, Modifier.weight(1f), enabled) { vm.unlock(v) }
+private fun PrimaryActions(
+    v: Vehicle,
+    status: VehicleStatus?,
+    location: GeoLocation?,
+    enabled: Boolean,
+    vm: AppViewModel,
+) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        StateControl(
+            name = "Doors",
+            isOn = status?.doorLock,
+            stateOn = "Locked", stateOff = "Unlocked",
+            turnOn = "Lock", turnOff = "Unlock",
+            icon = Icons.Filled.Lock, enabled = enabled,
+            onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
+        )
+        StateControl(
+            name = "Climate",
+            isOn = status?.airCtrlOn,
+            stateOn = "On", stateOff = "Off",
+            turnOn = "Start", turnOff = "Stop",
+            icon = Icons.Filled.AcUnit, enabled = enabled,
+            onActivate = { vm.engineStart(v) }, onDeactivate = { vm.stopClimate(v) },
+        )
+        if (v.isEv) {
+            StateControl(
+                name = "Charging",
+                isOn = status?.evStatus?.batteryCharge,
+                stateOn = "Charging", stateOff = "Idle",
+                turnOn = "Start", turnOff = "Stop",
+                icon = Icons.Filled.Bolt, enabled = enabled,
+                onActivate = { vm.startCharge(v) }, onDeactivate = { vm.stopCharge(v) },
+            )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CommandButton("Start", Icons.Filled.PlayArrow, Modifier.weight(1f), enabled) { vm.engineStart(v) }
-            CommandButton("Stop", Icons.Filled.Stop, Modifier.weight(1f), enabled) { vm.stopClimate(v) }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CommandButton("Locate", Icons.Filled.LocationOn, Modifier.weight(1f), enabled) { vm.locate(v) }
-            if (v.isEv) {
-                CommandButton("Charge", Icons.Filled.Bolt, Modifier.weight(1f), enabled) { vm.startCharge(v) }
+            CommandButton(
+                label = location?.let { String.format("%.4f, %.4f", it.latitude, it.longitude) } ?: "Locate",
+                icon = Icons.Filled.LocationOn,
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+            ) { vm.locate(v) }
+            if (location != null) {
+                CommandButton("Map", Icons.Filled.Map, Modifier.weight(0.5f), true) {
+                    val uri = Uri.parse(
+                        "geo:${location.latitude},${location.longitude}" +
+                            "?q=${location.latitude},${location.longitude}(My car)"
+                    )
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                        )
+                    }
+                }
             }
         }
-        if (v.isEv) {
-            CommandButton("Stop charging", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
-                vm.stopCharge(v)
+    }
+}
+
+/**
+ * A chunky stateful control: shows the current On/Off state and a button
+ * offering the *opposite* action. The button morphs from a pill (deactivated)
+ * to a rounded square (activated).
+ */
+@Composable
+private fun StateControl(
+    name: String,
+    isOn: Boolean?,
+    stateOn: String,
+    stateOff: String,
+    turnOn: String,
+    turnOff: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    onActivate: () -> Unit,
+    onDeactivate: () -> Unit,
+) {
+    val active = isOn == true
+    val corner by animateDpAsState(
+        targetValue = if (active) 18.dp else 32.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "ctrlCorner",
+    )
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                when (isOn) {
+                    true -> stateOn
+                    false -> stateOff
+                    null -> "Unknown"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (active) ChargeGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            )
+        }
+        val onClick = { if (active) onDeactivate() else onActivate() }
+        val shape = RoundedCornerShape(corner)
+        if (active) {
+            Button(onClick = onClick, enabled = enabled, shape = shape, modifier = Modifier.height(60.dp)) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(turnOff, fontWeight = FontWeight.SemiBold)
+            }
+        } else {
+            FilledTonalButton(onClick = onClick, enabled = enabled, shape = shape, modifier = Modifier.height(60.dp)) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(turnOn, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -649,7 +717,10 @@ private fun PrimaryActions(v: Vehicle, enabled: Boolean, vm: AppViewModel) {
 
 @Composable
 private fun StatusCard(v: Vehicle, status: VehicleStatus?, refreshing: Boolean) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             when {
@@ -695,7 +766,10 @@ private fun DiagnosticsCard(status: VehicleStatus?) {
         status.evStatus?.remainTime2?.atc?.value?.let { add("Time to full" to "${it.toInt()} min") }
     }
     if (rows.isEmpty()) return
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Diagnostics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             rows.forEach { (label, value) -> StatusRow(label, value) }
@@ -727,7 +801,12 @@ private fun ClimateCard(
     var rl by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var rr by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Climate", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
@@ -752,13 +831,14 @@ private fun ClimateCard(
                 ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
             }
 
-            if (cap.any) {
-                ToggleRow("Ventilated (cooled) seats", ventilated) { vm.setVentilatedSeats(v, it) }
-                if (cap.frontLeft) SeatControl("Driver seat", fl, ventilated) { fl = it }
-                if (cap.frontRight) SeatControl("Passenger seat", fr, ventilated) { fr = it }
-                if (cap.rearLeft) SeatControl("Rear left seat", rl, ventilated) { rl = it }
-                if (cap.rearRight) SeatControl("Rear right seat", rr, ventilated) { rr = it }
-            }
+            // Seat heating/cooling. Front seats are always offered; rears appear
+            // when the car reports them. Toggle ventilation to expose cooling levels.
+            Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            ToggleRow("Ventilated (cooled) seats", ventilated) { vm.setVentilatedSeats(v, it) }
+            SeatControl("Driver seat", fl, ventilated) { fl = it }
+            SeatControl("Passenger seat", fr, ventilated) { fr = it }
+            if (cap.rearLeft) SeatControl("Rear left seat", rl, ventilated) { rl = it }
+            if (cap.rearRight) SeatControl("Rear right seat", rr, ventilated) { rr = it }
 
             // Expressive split button: leading = Start, trailing = Stop.
             SplitButtonLayout(
@@ -822,7 +902,10 @@ private fun ChargeLimitCard(v: Vehicle, status: VehicleStatus?, enabled: Boolean
     var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
     var dc by remember(v.vin) { mutableIntStateOf(targets?.level(0) ?: 80) }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Charge limits", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
@@ -971,6 +1054,25 @@ private fun SettingsScreen(vm: AppViewModel) {
                                 Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
                             }
                         }
+                    }
+                }
+            }
+
+            // Car photos
+            if (state.vehicles.isNotEmpty()) {
+                SettingsCard("Car photos") {
+                    Text(
+                        "Leave blank for the default gradient, or paste an image URL.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    state.vehicles.forEach { v ->
+                        OutlinedTextField(
+                            value = state.imageUrls[v.vin] ?: "",
+                            onValueChange = { vm.setVehicleImage(v.vin, it) },
+                            label = { Text(v.name) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        )
                     }
                 }
             }

@@ -50,6 +50,7 @@ data class UiState(
     val statuses: Map<String, VehicleStatus> = emptyMap(),
     val locations: Map<String, GeoLocation> = emptyMap(),
     val ventilated: Map<String, Boolean> = emptyMap(),
+    val imageUrls: Map<String, String> = emptyMap(),
     val credentials: Credentials? = null,
     val message: String? = null,
 ) {
@@ -150,12 +151,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder())
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, null) })
         val ventilated = vehicles.associate { it.vin to store.ventilatedSeats(it.vin) }
+        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         _state.update {
             it.copy(
                 vehicles = vehicles,
                 ventilated = ventilated,
+                imageUrls = images,
                 currentIndex = index,
                 screen = Screen.Garage,
             )
@@ -260,6 +263,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ordered = order.mapNotNull { byVin[it] }
         val rest = vehicles.filter { it.vin !in order }
         return ordered + rest
+    }
+
+    fun setVehicleImage(vin: String, url: String) {
+        _state.update {
+            it.copy(
+                imageUrls = if (url.isBlank()) it.imageUrls - vin else it.imageUrls + (vin to url.trim()),
+            )
+        }
+        viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
     }
 
     fun setVentilatedSeats(v: Vehicle, value: Boolean) {

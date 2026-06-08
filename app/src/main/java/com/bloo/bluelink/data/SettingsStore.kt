@@ -62,6 +62,17 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[Keys.ORDER] = order.joinToString("\n") }
     }
 
+    /** Optional user-set photo URL per vehicle (empty = use the default gradient). */
+    suspend fun imageUrl(vin: String): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("img_$vin")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setImageUrl(vin: String, url: String) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("img_$vin")
+            if (url.isBlank()) it.remove(key) else it[key] = url.trim()
+        }
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         context.settingsDataStore.edit { it[Keys.THEME] = mode.name }
     }
