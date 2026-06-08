@@ -91,6 +91,22 @@ data class UiState(
     /** Burns fuel (everything except a pure EV). */
     fun hasFuel(v: Vehicle): Boolean = powertrainOf(v) != Powertrain.EV
 
+    /**
+     * Whether the car is moving/on, for the header. Speed (from a location fix)
+     * is the strongest signal; otherwise fall back to the ignition state. Null
+     * when we genuinely can't tell (e.g. an EV that's never been located).
+     */
+    fun drivingLabel(v: Vehicle): String? {
+        val speed = locations[v.vin]?.speed
+        val engine = statusFor(v)?.engine
+        return when {
+            speed != null && speed > 0 -> "Driving"
+            engine == true -> "Running"
+            engine == false -> "Parked"
+            else -> null
+        }
+    }
+
     /** Powertrain label for the header. */
     fun powertrainLabel(v: Vehicle): String = when (powertrainOf(v)) {
         Powertrain.GAS -> "Gas"
@@ -509,6 +525,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settingsStore.setThemeMode(mode) }
     fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
+    fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
 
     fun clearLogs() = AppLog.clear()
     fun clearMessage() = _state.update { it.copy(message = null) }

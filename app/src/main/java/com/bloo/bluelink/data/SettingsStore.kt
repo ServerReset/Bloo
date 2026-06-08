@@ -54,6 +54,7 @@ class SettingsStore(private val context: Context) {
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
+        val FLIPPED = stringPreferencesKey("columns_flipped")
     }
 
     data class Appearance(
@@ -61,6 +62,8 @@ class SettingsStore(private val context: Context) {
         val fontChoice: FontChoice = FontChoice.SYSTEM,
         val dynamicColor: Boolean = true,
         val biometricLock: Boolean = false,
+        /** In the wide expanded view, put pebbles on the left, controls right. */
+        val columnsFlipped: Boolean = false,
     )
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
@@ -71,11 +74,16 @@ class SettingsStore(private val context: Context) {
                 ?: FontChoice.SYSTEM,
             dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
+            columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
         )
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {
         context.settingsDataStore.edit { it[Keys.BIOMETRIC] = enabled.toString() }
+    }
+
+    suspend fun setColumnsFlipped(flipped: Boolean) {
+        context.settingsDataStore.edit { it[Keys.FLIPPED] = flipped.toString() }
     }
 
     suspend fun lastVehicleVin(): String? =

@@ -131,10 +131,11 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             val request = baseRequest("/ac/v2/rcs/rfc/findMyCar", token, username, pin, v)
                 .get()
                 .build()
-            val coord = json.decodeFromString(VehicleLocationResponse.serializer(), call(request)).coord
+            val parsed = json.decodeFromString(VehicleLocationResponse.serializer(), call(request))
+            val coord = parsed.coord
             val lat = coord?.lat
             val lon = coord?.lon
-            if (lat != null && lon != null) GeoLocation(lat, lon) else null
+            if (lat != null && lon != null) GeoLocation(lat, lon, parsed.speed?.value) else null
         }
 
     suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =

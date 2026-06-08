@@ -322,4 +322,6 @@ data class Speed(
 data class GeoLocation(
     val latitude: Double,
     val longitude: Double,
+    /** Speed at the time of the fix, if reported. >0 implies the car is moving. */
+    val speed: Double? = null,
 )

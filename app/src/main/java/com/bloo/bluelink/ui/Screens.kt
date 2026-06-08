@@ -41,6 +41,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -91,6 +92,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -469,37 +471,34 @@ private const val MIN_CARD_DP = 380
 private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val vehicles = state.vehicles
     if (vehicles.isEmpty()) return
+    val appearance by vm.appearance.collectAsState()
 
     val count = vehicles.size
     val widthDp = LocalConfiguration.current.screenWidthDp
+    val large = widthDp >= 600
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
-    // Expanding one car to fill the screen only matters when several share it.
-    val canExpand = perPage > 1
-    val expanded = state.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
+    // Expanding to the dual-column view only makes sense on a wide screen.
+    val canExpand = large && count > 1
+    val singleLarge = large && count == 1
+    // A car expanded by the user (multi-car), or the lone car on a big screen.
+    val expandedByUser = state.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
+    val expandedIdx = if (singleLarge) 0 else expandedByUser
 
-    BackHandler(enabled = expanded != null) { vm.collapse() }
+    BackHandler(enabled = expandedByUser != null) { vm.collapse() }
 
     Box(Modifier.fillMaxSize()) {
         AnimatedContent(
-            targetState = expanded,
+            targetState = expandedIdx,
             transitionSpec = {
-                val spec = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                val spec = spring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
                 (fadeIn(spec) + scaleIn(spec, initialScale = 0.94f)) togetherWith
                     (fadeOut(spec) + scaleOut(spec, targetScale = 0.94f))
             },
             label = "expand",
-        ) { exp ->
-            if (exp != null) {
-                Box(Modifier.fillMaxSize()) {
-                    VehicleDetailContent(vehicles[exp], state, vm)
-                    FloatingIcon(
-                        icon = Icons.Filled.ArrowBack,
-                        description = "Back to all cars",
-                        onClick = { vm.collapse() },
-                        modifier = Modifier.align(Alignment.TopStart),
-                    )
-                }
+        ) { idx ->
+            if (idx != null) {
+                ExpandedCar(vehicles[idx], state, vm, flipped = appearance.columnsFlipped)
             } else {
                 val pageCount = (count + perPage - 1) / perPage
                 val pager = rememberPagerState(
@@ -511,6 +510,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                 }
                 Column(Modifier.fillMaxSize()) {
+                    // Page dots up top so you can see which car(s) you're on.
+                    if (pageCount > 1) PagerDots(pager.currentPage, pageCount)
                     HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
                         val start = page * perPage
                         val end = minOf(start + perPage, count)
@@ -520,6 +521,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     VehicleDetailContent(
                                         vehicles[i], state, vm,
                                         onExpand = if (canExpand) ({ vm.expand(i) }) else null,
+                                        // The rightmost card's header sits under the
+                                        // settings button — reserve room so both show.
+                                        reserveHeaderEnd = canExpand && i == end - 1,
                                     )
                                 }
                             }
@@ -527,11 +531,26 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
                         }
                     }
-                    if (pageCount > 1) PagerDots(pager.currentPage, pageCount)
                 }
             }
         }
-        // Floating settings button (there is no app bar / header).
+        // Floating overlay controls.
+        if (expandedByUser != null) {
+            FloatingIcon(
+                icon = Icons.Filled.ArrowBack,
+                description = "Back to all cars",
+                onClick = { vm.collapse() },
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+        }
+        if (expandedIdx != null) {
+            FloatingIcon(
+                icon = Icons.Filled.SwapHoriz,
+                description = "Flip columns",
+                onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
+                modifier = Modifier.align(Alignment.TopEnd).padding(end = 52.dp),
+            )
+        }
         FloatingIcon(
             icon = Icons.Filled.Settings,
             description = "Settings",
@@ -599,7 +618,7 @@ private fun HeroHeader(
     val corner by animateDpAsState(
         targetValue = if (charging) 40.dp else 24.dp,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
+            dampingRatio = SoftDamping,
             stiffness = Spring.StiffnessMediumLow,
         ),
         label = "heroCorner",
@@ -712,7 +731,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
         val animatedFrac by animateFloatAsState(
             targetValue = frac,
             animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
+                dampingRatio = SoftDamping,
                 stiffness = Spring.StiffnessLow,
             ),
             label = "chargeFill",
@@ -774,6 +793,9 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
 }
 
 private val ChargeGreen = Color(0xFF2EBD59)
+
+/** Gentle spring damping — present, but not an aggressive overshoot (0.82). */
+private const val SoftDamping = 0.82f
 
 // --- Drag-and-drop reordering --------------------------------------------
 
@@ -870,7 +892,7 @@ private fun AnimatedSlider(
     val dragging by interaction.collectIsDraggedAsState()
     val animated by animateFloatAsState(
         targetValue = value,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "sliderValue",
     )
     Slider(
@@ -885,82 +907,162 @@ private fun AnimatedSlider(
 
 // --- Full detail ----------------------------------------------------------
 
+/** Single-column car view (phones, and each column of the grid). */
 @Composable
 private fun VehicleDetailContent(
     v: Vehicle,
     state: UiState,
     vm: AppViewModel,
     onExpand: (() -> Unit)? = null,
+    reserveHeaderEnd: Boolean = false,
 ) {
-    val status = state.statusFor(v)
-    val seats = state.seatConfigFor(v)
-    val enabled = !state.loading
+    Refreshable(v, state, vm) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
+            CriticalContent(v, state, vm)
+            PebbleList(v, state, vm)
+        }
+    }
+}
 
+/** Wide expanded view: critical info in one column, pebbles in the other. */
+@Composable
+private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
+    val controls: @Composable ColumnScope.() -> Unit = {
+        CarHeaderRow(v, state, onExpand = null, reserveHeaderEnd = false)
+        CriticalContent(v, state, vm)
+    }
+    val pebbles: @Composable ColumnScope.() -> Unit = {
+        PebbleList(v, state, vm)
+    }
+    Refreshable(v, state, vm) {
+        Row(
+            // Top padding clears the floating back / flip / settings buttons.
+            Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(
+                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = if (flipped) pebbles else controls,
+            )
+            Column(
+                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = if (flipped) controls else pebbles,
+            )
+        }
+    }
+}
+
+/** Wraps content with the pull-to-refresh gesture, offset and squiggly indicator. */
+@Composable
+private fun Refreshable(
+    v: Vehicle,
+    state: UiState,
+    vm: AppViewModel,
+    content: @Composable BoxScope.() -> Unit,
+) {
     val ptrState = rememberPullToRefreshState()
     val density = LocalDensity.current
     Box(
         Modifier
             .fillMaxSize()
-            .pullToRefresh(
-                isRefreshing = state.refreshing,
-                state = ptrState,
-                onRefresh = { vm.refreshStatus(v) },
-            ),
+            .pullToRefresh(isRefreshing = state.refreshing, state = ptrState, onRefresh = { vm.refreshStatus(v) }),
     ) {
-        // Content slides down as you pull / while refreshing, then springs back.
         val maxShift = 72.dp
         val shift = if (state.refreshing) maxShift else (maxShift * ptrState.distanceFraction).coerceIn(0.dp, maxShift)
-        Column(
-            Modifier
-                .fillMaxSize()
-                .offset { IntOffset(0, with(density) { shift.roundToPx() }) }
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Car identity (there's no shared app bar any more).
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(v.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${v.model} · ${state.powertrainLabel(v)}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (onExpand != null) {
-                    IconButton(onClick = onExpand) {
-                        Icon(Icons.Filled.Fullscreen, contentDescription = "Expand to full screen")
-                    }
-                }
-            }
-            // Fixed top: car image + gauge, then the primary actions.
-            HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v))
-            PrimaryActions(v, state, vm)
-            // Reorderable pebbles — long-press a pebble header to drag it into a
-            // new position. Order + open/closed state is kept per car.
-            val sections = state.sectionsFor(v).filter { it != "charge" || state.hasBattery(v) }
-            ReorderColumn(
-                items = sections,
-                keyOf = { it },
-                onReorder = { vm.setSectionOrder(v, it) },
-            ) { section, dragHandle, _ ->
-                when (section) {
-                    "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
-                    "charge" -> ChargePebble(v, status, enabled, state, vm, dragHandle)
-                    "location" -> LocationPebble(v, state, vm, dragHandle)
-                    "information" -> InformationPebble(v, status, state, vm, dragHandle)
-                    "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
-                    else -> Spacer(Modifier.fillMaxWidth())
-                }
-            }
+        Box(Modifier.fillMaxSize().offset { IntOffset(0, with(density) { shift.roundToPx() }) }) {
+            content()
         }
-        // Expressive squiggly refresh indicator.
         PullToRefreshDefaults.LoadingIndicator(
             state = ptrState,
             isRefreshing = state.refreshing,
             modifier = Modifier.align(Alignment.TopCenter),
         )
+    }
+}
+
+/** Car name/model + a Driving/Parked badge, with an optional expand button. */
+@Composable
+private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(v.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "${v.model} · ${state.powertrainLabel(v)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.drivingLabel(v)?.let {
+                Spacer(Modifier.height(4.dp))
+                DrivingBadge(it)
+            }
+        }
+        if (onExpand != null) {
+            IconButton(onClick = onExpand) {
+                Icon(Icons.Filled.Fullscreen, contentDescription = "Expand to full screen")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrivingBadge(label: String) {
+    val bg: Color
+    val fg: Color
+    when (label) {
+        "Driving" -> { bg = MaterialTheme.colorScheme.primary; fg = MaterialTheme.colorScheme.onPrimary }
+        "Running" -> { bg = ChargeGreen; fg = Color.White }
+        else -> { bg = MaterialTheme.colorScheme.surfaceVariant; fg = MaterialTheme.colorScheme.onSurfaceVariant }
+    }
+    Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(8.dp)) {
+        Text(
+            label,
+            Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/** Hero image + gauge, then the primary lock/charge controls. */
+@Composable
+private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v))
+    PrimaryActions(v, state, vm)
+}
+
+/** The reorderable pebble stack for a car. */
+@Composable
+private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val seats = state.seatConfigFor(v)
+    val enabled = !state.loading
+    val sections = state.sectionsFor(v).filter { it != "charge" || state.hasBattery(v) }
+    ReorderColumn(
+        items = sections,
+        keyOf = { it },
+        onReorder = { vm.setSectionOrder(v, it) },
+    ) { section, dragHandle, _ ->
+        when (section) {
+            "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
+            "charge" -> ChargePebble(v, status, enabled, state, vm, dragHandle)
+            "location" -> LocationPebble(v, state, vm, dragHandle)
+            "information" -> InformationPebble(v, status, state, vm, dragHandle)
+            "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
+            else -> Spacer(Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -1010,7 +1112,7 @@ private fun StateControl(
     val active = isOn == true
     val corner by animateDpAsState(
         targetValue = if (active) 18.dp else 32.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "ctrlCorner",
     )
     Row(
@@ -1074,7 +1176,7 @@ private fun Pebble(
     val expanded = state.isPebbleExpanded(v.vin, section)
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "pebbleChevron",
     )
     Card(
@@ -1124,7 +1226,7 @@ private fun Pebble(
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(
-                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
                 ) + fadeIn(),
                 exit = shrinkVertically(spring(stiffness = Spring.StiffnessMedium)) + fadeOut(),
             ) {
@@ -1557,47 +1659,56 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
-            // Cars: drag to reorder, tap a car to expand its setup + photo.
+            // Cars: drag to reorder, tap a car to expand its setup + photo. With a
+            // single car there's nothing to order, so it's just shown expanded.
             if (state.vehicles.isNotEmpty()) {
                 var expandedCar by remember { mutableStateOf<String?>(null) }
-                SettingsCard("Cars") {
-                    Text(
-                        "Long-press a car to drag it into a new order. Tap one to set its " +
-                            "powertrain, seats, steering wheel and photo.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                val single = state.vehicles.size == 1
+                val pick: (String) -> Unit = { vin ->
+                    pickTarget = vin
+                    cropLauncher.launch(
+                        CropImageContractOptions(
+                            uri = null,
+                            cropImageOptions = CropImageOptions(
+                                imageSourceIncludeGallery = true,
+                                imageSourceIncludeCamera = false,
+                                fixAspectRatio = true,
+                                aspectRatioX = 16,
+                                aspectRatioY = 9,
+                            ),
+                        ),
                     )
-                    Spacer(Modifier.height(8.dp))
-                    ReorderColumn(
-                        items = state.vehicles,
-                        keyOf = { it.vin },
-                        onReorder = { vm.reorderVehicles(it) },
-                        spacing = 8.dp,
-                    ) { v, dragHandle, dragging ->
+                }
+                SettingsCard(if (single) "Car" else "Cars") {
+                    if (single) {
+                        val v = state.vehicles[0]
                         CarSettingsCard(
-                            v = v,
-                            state = state,
-                            vm = vm,
-                            expanded = expandedCar == v.vin,
-                            dragging = dragging,
-                            dragHandle = dragHandle,
-                            onToggle = { expandedCar = if (expandedCar == v.vin) null else v.vin },
-                            onPickPhoto = {
-                                pickTarget = v.vin
-                                cropLauncher.launch(
-                                    CropImageContractOptions(
-                                        uri = null,
-                                        cropImageOptions = CropImageOptions(
-                                            imageSourceIncludeGallery = true,
-                                            imageSourceIncludeCamera = false,
-                                            fixAspectRatio = true,
-                                            aspectRatioX = 16,
-                                            aspectRatioY = 9,
-                                        ),
-                                    ),
-                                )
-                            },
+                            v = v, state = state, vm = vm,
+                            expanded = true, dragging = false, dragHandle = Modifier,
+                            collapsible = false, showHandle = false,
+                            onToggle = {}, onPickPhoto = { pick(v.vin) },
                         )
+                    } else {
+                        Text(
+                            "Long-press a car to drag it into a new order. Tap one to set its " +
+                                "powertrain, seats, steering wheel and photo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        ReorderColumn(
+                            items = state.vehicles,
+                            keyOf = { it.vin },
+                            onReorder = { vm.reorderVehicles(it) },
+                            spacing = 8.dp,
+                        ) { v, dragHandle, dragging ->
+                            CarSettingsCard(
+                                v = v, state = state, vm = vm,
+                                expanded = expandedCar == v.vin, dragging = dragging, dragHandle = dragHandle,
+                                onToggle = { expandedCar = if (expandedCar == v.vin) null else v.vin },
+                                onPickPhoto = { pick(v.vin) },
+                            )
+                        }
                     }
                 }
             }
@@ -1677,6 +1788,8 @@ private fun CarSettingsCard(
     dragHandle: Modifier,
     onToggle: () -> Unit,
     onPickPhoto: () -> Unit,
+    collapsible: Boolean = true,
+    showHandle: Boolean = true,
 ) {
     val seats = state.seatConfigs[v.vin] ?: SeatConfig()
     Card(
@@ -1688,15 +1801,19 @@ private fun CarSettingsCard(
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(
-                Modifier.fillMaxWidth().clickable { onToggle() }.then(dragHandle),
+                Modifier.fillMaxWidth()
+                    .then(if (collapsible) Modifier.clickable { onToggle() } else Modifier)
+                    .then(dragHandle),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Filled.DragHandle,
-                    contentDescription = "Drag to reorder",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(10.dp))
+                if (showHandle) {
+                    Icon(
+                        Icons.Filled.DragHandle,
+                        contentDescription = "Drag to reorder",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                }
                 Column(Modifier.weight(1f)) {
                     Text(v.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                     Text(
@@ -1705,10 +1822,12 @@ private fun CarSettingsCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Icon(
-                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                )
+                if (collapsible) {
+                    Icon(
+                        if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                    )
+                }
             }
             AnimatedVisibility(visible = expanded) {
                 Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
