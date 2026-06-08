@@ -23,8 +23,6 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
-import androidx.glance.appwidget.updateAll
-import com.bloo.bluelink.widget.BlooGlanceWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -226,12 +224,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Switch the visible car (swipe). Uses cache, so no loading flash. */
+    /**
+     * Switch the visible car (swipe). Purely local — every car's last-known
+     * status is loaded once at startup, so switching pages never hits the
+     * network. Live data only comes from an explicit pull-to-refresh.
+     */
     fun selectIndex(index: Int) {
         val v = _state.value.vehicles.getOrNull(index) ?: return
         _state.update { it.copy(currentIndex = index) }
         viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
-        ensureStatus(v)
     }
 
     fun expand(index: Int) = _state.update { it.copy(expandedIndex = index, currentIndex = index) }
@@ -299,7 +300,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin]) })
-        runCatching { BlooGlanceWidget().updateAll(getApplication()) }
     }
 
     private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {

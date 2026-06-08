@@ -8,6 +8,8 @@ package com.bloo.bluelink.ui
 
 import android.content.Intent
 import android.net.Uri
+import android.webkit.WebView
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
@@ -20,6 +22,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -30,6 +34,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -118,6 +124,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -143,6 +150,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -394,6 +402,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val isGrid = large && !singleLarge && expanded == null && vehicles.size > 1
     val actionTarget = vehicles[(expanded ?: current).coerceIn(0, vehicles.lastIndex)]
 
+    // On large screens, back collapses an expanded car to the grid.
+    BackHandler(enabled = expanded != null && !singleLarge) { vm.collapse() }
+
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = {
@@ -624,11 +635,21 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
 
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                pct?.let { "$it%" } ?: "—",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-            )
+            // Roll the headline number when it changes.
+            AnimatedContent(
+                targetState = pct,
+                transitionSpec = {
+                    (fadeIn() + slideInVertically { it / 2 }) togetherWith
+                        (fadeOut() + slideOutVertically { -it / 2 })
+                },
+                label = "pctRoll",
+            ) { p ->
+                Text(
+                    p?.let { "$it%" } ?: "—",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -734,6 +755,36 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
 }
 
 private val ChargeGreen = Color(0xFF2EBD59)
+
+/**
+ * A [Slider] whose thumb springs to its target with a gentle bounce when the
+ * value changes by tap or snap, while tracking the finger directly during an
+ * active drag (so dragging still feels immediate).
+ */
+@Composable
+private fun AnimatedSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int = 0,
+    colors: androidx.compose.material3.SliderColors = SliderDefaults.colors(),
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val dragging by interaction.collectIsDraggedAsState()
+    val animated by animateFloatAsState(
+        targetValue = value,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "sliderValue",
+    )
+    Slider(
+        value = if (dragging) value else animated,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        steps = steps,
+        colors = colors,
+        interactionSource = interaction,
+    )
+}
 
 // --- Full detail ----------------------------------------------------------
 
@@ -1069,7 +1120,7 @@ private fun ClimatePebble(
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
     ) {
         StepRow("Temperature", "$tempF°F")
-        Slider(
+        AnimatedSlider(
             value = tempF.toFloat(),
             onValueChange = { tempF = it.roundToInt() },
             valueRange = 62f..82f,
@@ -1077,7 +1128,7 @@ private fun ClimatePebble(
         )
 
         StepRow("Run time", "$duration min")
-        Slider(
+        AnimatedSlider(
             value = duration.toFloat(),
             onValueChange = { duration = it.roundToInt() },
             valueRange = 1f..10f,
@@ -1162,7 +1213,7 @@ private fun SeatControl(
     }
     Column {
         StepRow(label, current.label)
-        Slider(
+        AnimatedSlider(
             value = index.toFloat(),
             onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
             valueRange = 0f..range.lastIndex.toFloat(),
@@ -1185,14 +1236,14 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         containerColor = MaterialTheme.colorScheme.primaryContainer,
     ) {
         StepRow("AC (home) target", "$ac%")
-        Slider(
+        AnimatedSlider(
             value = ac.toFloat(),
             onValueChange = { ac = (it / 10f).roundToInt() * 10 },
             valueRange = 50f..100f,
             steps = 4,
         )
         StepRow("DC (fast) target", "$dc%")
-        Slider(
+        AnimatedSlider(
             value = dc.toFloat(),
             onValueChange = { dc = (it / 10f).roundToInt() * 10 },
             valueRange = 50f..100f,
@@ -1218,8 +1269,15 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel) {
             location != null -> Text("Location updated")
             else -> Text("Tap Locate to query the car's current position.")
         }
-        location?.let {
-            StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude))
+        location?.let { loc ->
+            CarMap(
+                loc,
+                Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(18.dp)),
+            )
+            StatusRow("Coordinates", String.format("%.5f, %.5f", loc.latitude, loc.longitude))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CommandButton(
@@ -1245,6 +1303,35 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel) {
     }
 }
 
+/**
+ * A small embedded OpenStreetMap with a pin at the car's position. Uses the
+ * key-free OSM embed page in a WebView (no Maps API key / Play Services needed).
+ * Keyed on the coordinates so a fresh map loads when the location changes.
+ */
+@Composable
+private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
+    val span = 0.008
+    val lat = location.latitude
+    val lon = location.longitude
+    val url = "https://www.openstreetmap.org/export/embed.html" +
+        "?bbox=${lon - span}%2C${lat - span}%2C${lon + span}%2C${lat + span}" +
+        "&layer=mapnik&marker=$lat%2C$lon"
+    key(lat, lon) {
+        AndroidView(
+            modifier = modifier,
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    isVerticalScrollBarEnabled = false
+                    isHorizontalScrollBarEnabled = false
+                    loadUrl(url)
+                }
+            },
+        )
+    }
+}
+
 // --- Settings -------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1256,6 +1343,9 @@ private fun SettingsScreen(vm: AppViewModel) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val canBio = remember { vm.canUseBiometrics() }
+
+    // System back returns to the garage, not out of the app.
+    BackHandler { vm.closeSettings() }
 
     var pickTarget by remember { mutableStateOf<String?>(null) }
     val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
