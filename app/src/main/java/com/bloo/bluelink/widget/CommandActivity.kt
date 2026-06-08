@@ -74,7 +74,8 @@ class CommandActivity : FragmentActivity() {
             val message = if (selected == null) {
                 "No car selected — open Bloo first"
             } else {
-                val repo = BlueLinkRepository(BlueLinkApi(), SessionStore(ctx))
+                val brand = SessionStore(ctx).load()?.brand ?: com.bloo.bluelink.data.Brand.HYUNDAI
+                val repo = BlueLinkRepository(BlueLinkApi(brand), SessionStore(ctx))
                 runCatching { perform(repo, selected.toVehicle(), action) }
                     .fold({ confirmText(action) }, { it.message ?: "Command failed" })
             }

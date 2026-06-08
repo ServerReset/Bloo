@@ -18,17 +18,14 @@ import java.util.concurrent.TimeUnit
  * community projects referenced in [Models]. There is no mock/simulated path:
  * every call goes to https://api.telematics.hyundaiusa.com.
  */
-class BlueLinkApi {
+class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
+
+    private val baseUrl get() = brand.baseUrl
+    private val host get() = brand.host
+    private val clientId get() = brand.clientId
+    private val clientSecret get() = brand.clientSecret
 
     companion object {
-        const val BASE_URL = "https://api.telematics.hyundaiusa.com"
-        const val HOST = "api.telematics.hyundaiusa.com"
-
-        // Hyundai US OAuth client credentials (public, community-known values).
-        const val CLIENT_ID = "m66129Bb-em93-SPAHYN-bZ91-am4540zp19920"
-        const val CLIENT_SECRET = "v558o935-6nne-423i-baa8"
-        const val BRAND_INDICATOR = "H"
-
         const val UA_OKHTTP = "okhttp/3.12.0"
         const val UA_POSTMAN = "PostmanRuntime/7.26.10"
     }
@@ -72,11 +69,11 @@ class BlueLinkApi {
         ).toRequestBody(jsonMedia)
 
         val request = Request.Builder()
-            .url("$BASE_URL/v2/ac/oauth/token")
+            .url("$baseUrl/v2/ac/oauth/token")
             .post(body)
             .header("Content-Type", "application/json")
-            .header("client_id", CLIENT_ID)
-            .header("client_secret", CLIENT_SECRET)
+            .header("client_id", clientId)
+            .header("client_secret", clientSecret)
             .header("User-Agent", UA_POSTMAN)
             .build()
         json.decodeFromString(TokenResponse.serializer(), call(request))
@@ -91,11 +88,11 @@ class BlueLinkApi {
         ).toRequestBody(jsonMedia)
 
         val request = Request.Builder()
-            .url("$BASE_URL/v2/ac/oauth/token/refresh")
+            .url("$baseUrl/v2/ac/oauth/token/refresh")
             .post(body)
             .header("Content-Type", "application/json")
-            .header("client_id", CLIENT_ID)
-            .header("client_secret", CLIENT_SECRET)
+            .header("client_id", clientId)
+            .header("client_secret", clientSecret)
             .header("User-Agent", UA_POSTMAN)
             .build()
         json.decodeFromString(TokenResponse.serializer(), call(request))
@@ -105,11 +102,11 @@ class BlueLinkApi {
 
     suspend fun vehicles(accessToken: String, username: String): List<Vehicle> = execute {
         val request = Request.Builder()
-            .url("$BASE_URL/ac/v2/enrollment/details/$username")
+            .url("$baseUrl/ac/v2/enrollment/details/$username")
             .get()
             .header("access_token", accessToken)
-            .header("client_id", CLIENT_ID)
-            .header("Host", HOST)
+            .header("client_id", clientId)
+            .header("Host", host)
             .header("User-Agent", UA_OKHTTP)
             .header("payloadGenerated", "20200226171938")
             .header("includeNonConnectedVehicles", "Y")
@@ -243,10 +240,10 @@ class BlueLinkApi {
     private fun baseRequest(
         path: String, token: String, username: String, pin: String, v: Vehicle,
     ): Request.Builder = Request.Builder()
-        .url("$BASE_URL$path")
+        .url("$baseUrl$path")
         .header("access_token", token)
-        .header("client_id", CLIENT_ID)
-        .header("Host", HOST)
+        .header("client_id", clientId)
+        .header("Host", host)
         .header("User-Agent", UA_OKHTTP)
         .header("registrationId", v.regId)
         .header("gen", v.generation)
@@ -259,7 +256,7 @@ class BlueLinkApi {
         .header("to", "ISS")
         .header("encryptFlag", "false")
         .header("from", "SPA")
-        .header("brandIndicator", v.brandIndicator.ifBlank { BRAND_INDICATOR })
+        .header("brandIndicator", v.brandIndicator.ifBlank { brand.code })
 
     // --- Plumbing --------------------------------------------------------
 
@@ -305,7 +302,7 @@ private fun VehicleDetails.toVehicle(): Vehicle = Vehicle(
     name = nickName?.takeIf { it.isNotBlank() } ?: modelName ?: vin.takeLast(6),
     model = listOfNotNull(modelYear, modelName).joinToString(" ").ifBlank { "Hyundai" },
     generation = vehicleGeneration ?: "2",
-    brandIndicator = brandIndicator ?: BlueLinkApi.BRAND_INDICATOR,
+    brandIndicator = brandIndicator ?: "",
     isEv = evStatus.equals("E", ignoreCase = true),
     odometer = odometer,
 )

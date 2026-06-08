@@ -9,7 +9,7 @@ class BlueLinkRepository(
     private val store: SessionStore,
 ) {
 
-    suspend fun login(username: String, password: String, pin: String) {
+    suspend fun login(brand: Brand, username: String, password: String, pin: String) {
         val token = api.login(username, password)
         store.save(
             SessionStore.Session(
@@ -17,6 +17,7 @@ class BlueLinkRepository(
                 refreshToken = token.refreshToken,
                 username = username,
                 pin = pin,
+                brand = brand,
             )
         )
     }

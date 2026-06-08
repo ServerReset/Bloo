@@ -9,6 +9,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
+import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
@@ -65,6 +66,10 @@ data class UiState(
     val placeNames: Map<String, String> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
     val pending: Set<String> = emptySet(),
+    /** Collapsed pebbles, keyed "vin:section". Absent = expanded. */
+    val collapsedPebbles: Set<String> = emptySet(),
+    /** Show the first-run "configure your car" prompt. */
+    val showOnboarding: Boolean = false,
     val credentials: Credentials? = null,
     val message: String? = null,
 ) {
@@ -72,17 +77,28 @@ data class UiState(
 
     fun isPending(vin: String, action: String): Boolean = "$vin:$action" in pending
 
+    fun isPebbleExpanded(vin: String, section: String): Boolean = "$vin:$section" !in collapsedPebbles
+
     fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
 
     fun sectionsFor(v: Vehicle): List<String> = sectionOrders[v.vin] ?: DEFAULT_SECTIONS
 
-    /** Powertrain label for the header: user override, else EV/Gas from the API. */
-    fun powertrainLabel(v: Vehicle): String = when (powertrains[v.vin]) {
+    /** Effective powertrain: user override, else EV/gas inferred from the API. */
+    fun powertrainOf(v: Vehicle): Powertrain =
+        powertrains[v.vin] ?: if (v.isEv) Powertrain.EV else Powertrain.GAS
+
+    /** Has a high-voltage battery you can charge (EV or plug-in hybrid). */
+    fun hasBattery(v: Vehicle): Boolean = powertrainOf(v) == Powertrain.EV || powertrainOf(v) == Powertrain.PHEV
+
+    /** Burns fuel (everything except a pure EV). */
+    fun hasFuel(v: Vehicle): Boolean = powertrainOf(v) != Powertrain.EV
+
+    /** Powertrain label for the header. */
+    fun powertrainLabel(v: Vehicle): String = when (powertrainOf(v)) {
         Powertrain.GAS -> "Gas"
         Powertrain.HYBRID -> "Hybrid"
         Powertrain.PHEV -> "PHEV"
         Powertrain.EV -> "EV"
-        null -> if (v.isEv) "EV" else "Gas"
     }
 }
 
@@ -92,7 +108,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val settingsStore = SettingsStore(app)
     private val credentialStore = CredentialStore(app)
     private val snapshotStore = SnapshotStore(app)
-    private val repo = BlueLinkRepository(BlueLinkApi(), store)
+    // Rebuilt whenever the brand becomes known (Hyundai vs Genesis use different
+    // hosts + OAuth clients).
+    private var repo = BlueLinkRepository(BlueLinkApi(), store)
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -120,6 +138,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             val session = store.load() ?: return@launch
+            repo = BlueLinkRepository(BlueLinkApi(session.brand), store)
             _state.update { it.copy(credentials = credentialStore.load()) }
             val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
             if (locked) {
@@ -132,16 +151,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Auth ------------------------------------------------------------
 
-    fun login(username: String, password: String, pin: String) {
+    fun login(username: String, password: String, pin: String, brand: Brand) {
         if (username.isBlank() || password.isBlank() || pin.isBlank()) {
             _state.update { it.copy(message = "Email, password and PIN are all required") }
             return
         }
         launchBusy {
-            repo.login(username.trim(), password, pin.trim())
-            val creds = Credentials(username.trim(), password, pin.trim())
+            repo = BlueLinkRepository(BlueLinkApi(brand), store)
+            repo.login(brand, username.trim(), password, pin.trim())
+            val creds = Credentials(username.trim(), password, pin.trim(), brand)
             credentialStore.save(creds)
-            AppLog.log("Signed in as ${creds.email}")
+            AppLog.log("Signed in as ${creds.email} (${brand.label})")
             _state.update { it.copy(credentials = creds) }
             loadGarageInternal()
         }
@@ -185,6 +205,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
+        val showOnboarding = !settingsStore.onboardingSeen()
         _state.update {
             it.copy(
                 vehicles = vehicles,
@@ -194,6 +215,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 imageUrls = images,
                 currentIndex = index,
                 screen = Screen.Garage,
+                showOnboarding = showOnboarding,
             )
         }
         // Fetch current car first for an immediate view, then prefetch the rest
@@ -320,14 +342,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setSeatFlag(v: Vehicle, field: String, value: Boolean) {
         val current = _state.value.seatConfigs[v.vin] ?: SeatConfig()
         val updated = when (field) {
-            "fh" -> current.copy(frontHeat = value)
-            "fc" -> current.copy(frontCool = value)
-            "rh" -> current.copy(rearHeat = value)
-            "rc" -> current.copy(rearCool = value)
+            "dh" -> current.copy(driverHeat = value)
+            "dc" -> current.copy(driverCool = value)
+            "ph" -> current.copy(passHeat = value)
+            "pc" -> current.copy(passCool = value)
+            "rlh" -> current.copy(rearLeftHeat = value)
+            "rlc" -> current.copy(rearLeftCool = value)
+            "rrh" -> current.copy(rearRightHeat = value)
+            "rrc" -> current.copy(rearRightCool = value)
             else -> current
         }
         _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
         viewModelScope.launch { settingsStore.setSeatFlag(v.vin, field, value) }
+    }
+
+    /** Toggle a pebble (detail section) open/closed for a car. */
+    fun togglePebble(v: Vehicle, section: String) {
+        val key = "${v.vin}:$section"
+        _state.update {
+            it.copy(
+                collapsedPebbles = if (key in it.collapsedPebbles) it.collapsedPebbles - key
+                else it.collapsedPebbles + key,
+            )
+        }
+    }
+
+    fun dismissOnboarding(openSettings: Boolean) {
+        _state.update { it.copy(showOnboarding = false) }
+        viewModelScope.launch { settingsStore.setOnboardingSeen() }
+        if (openSettings) openSettings()
     }
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {
@@ -369,36 +412,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Commands (per-action pending + optimistic state flip) -----------
 
+    /**
+     * The endpoint family (EV vs ICE) is chosen from [v.isEv], but the user can
+     * mark a car as a plug-in hybrid that the API reports as gas. Honour that so
+     * PHEVs use the EV climate/charge endpoints.
+     */
+    private fun electric(v: Vehicle): Vehicle =
+        if (_state.value.hasBattery(v)) v.copy(isEv = true) else v
+
     fun lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repo.lock(v) }
     fun unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repo.unlock(v) }
 
     fun stopClimate(v: Vehicle) =
-        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repo.stopClimate(v) }
+        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repo.stopClimate(electric(v)) }
 
     fun startClimate(v: Vehicle, req: ClimateRequest) =
         runCommand(v.vin, "climate", "Climate on (${req.tempF}°F)", { it.copy(airCtrlOn = true) }) {
-            repo.startClimate(v, req)
+            repo.startClimate(electric(v), req)
         }
 
     /** Remote engine/climate start with defaults (the primary Climate action). */
     fun engineStart(v: Vehicle) =
         runCommand(v.vin, "climate", "Climate on", { it.copy(airCtrlOn = true) }) {
-            repo.startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+            repo.startClimate(electric(v), ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
         }
 
     fun startCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
-            repo.startCharge(v)
+            repo.startCharge(electric(v))
         }
 
     fun stopCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) }) {
-            repo.stopCharge(v)
+            repo.stopCharge(electric(v))
         }
 
     fun setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
         runCommand(v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)", null) {
-            repo.setChargeTargets(v, acPercent, dcPercent)
+            repo.setChargeTargets(electric(v), acPercent, dcPercent)
         }
 
     /**

@@ -13,10 +13,13 @@ import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -25,11 +28,13 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -65,13 +70,16 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroup
@@ -119,6 +127,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -139,6 +148,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import coil.compose.AsyncImage
+import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
@@ -196,15 +206,43 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
+
+    if (state.showOnboarding && state.screen == Screen.Garage) {
+        OnboardingDialog(
+            onOpenSettings = { vm.dismissOnboarding(openSettings = true) },
+            onDismiss = { vm.dismissOnboarding(openSettings = false) },
+        )
+    }
+}
+
+/** First-run nudge: configure each car's features and (optionally) add a photo. */
+@Composable
+private fun OnboardingDialog(onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+        title = { Text("Set up your cars") },
+        text = {
+            Text(
+                "Hyundai's API doesn't report everything about your car, so head to " +
+                    "Settings to tell Bloo what each car has — its powertrain (gas, hybrid, " +
+                    "PHEV or EV) and which seats can heat/cool. While you're there, you can " +
+                    "add a photo of your car to replace the default gradient.",
+            )
+        },
+        confirmButton = { Button(onClick = onOpenSettings) { Text("Open settings") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Later") } },
+    )
 }
 
 // --- Login ----------------------------------------------------------------
 
 @Composable
-private fun LoginScreen(loading: Boolean, onLogin: (String, String, String) -> Unit) {
+private fun LoginScreen(loading: Boolean, onLogin: (String, String, String, Brand) -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    var brand by remember { mutableStateOf(Brand.HYUNDAI) }
 
     Column(
         Modifier
@@ -220,6 +258,18 @@ private fun LoginScreen(loading: Boolean, onLogin: (String, String, String) -> U
             color = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(24.dp))
+
+        Text("Brand", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+            Brand.entries.forEach { b ->
+                FilterChip(
+                    selected = brand == b,
+                    onClick = { brand = b },
+                    label = { Text(b.label) },
+                )
+            }
+        }
+        Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
             value = email,
@@ -251,7 +301,7 @@ private fun LoginScreen(loading: Boolean, onLogin: (String, String, String) -> U
         )
         Spacer(Modifier.height(24.dp))
         Button(
-            onClick = { onLogin(email, password, pin) },
+            onClick = { onLogin(email, password, pin, brand) },
             enabled = !loading,
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -259,7 +309,7 @@ private fun LoginScreen(loading: Boolean, onLogin: (String, String, String) -> U
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            "Credentials are sent directly to Hyundai's telematics servers and " +
+            "Credentials are sent directly to ${brand.label}'s telematics servers and " +
                 "stored encrypted on this device.",
             style = MaterialTheme.typography.bodySmall,
         )
@@ -335,10 +385,13 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 
     val widthDp = LocalConfiguration.current.screenWidthDp
     val large = widthDp >= 600
+    // A single car on a large screen always fills the screen (no card view —
+    // there's nothing to switch between).
+    val singleLarge = large && vehicles.size == 1
     val current = state.currentIndex.coerceIn(0, vehicles.lastIndex)
-    val expanded = state.expandedIndex?.takeIf { it in vehicles.indices }
+    val expanded = if (singleLarge) 0 else state.expandedIndex?.takeIf { it in vehicles.indices }
     // "Garage" title only when showing multiple collapsed cars.
-    val isGrid = large && expanded == null && vehicles.size > 1
+    val isGrid = large && !singleLarge && expanded == null && vehicles.size > 1
     val actionTarget = vehicles[(expanded ?: current).coerceIn(0, vehicles.lastIndex)]
 
     Column(Modifier.fillMaxSize()) {
@@ -358,7 +411,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
             },
             navigationIcon = {
-                if (expanded != null) {
+                if (expanded != null && !singleLarge) {
                     IconButton(onClick = { vm.collapse() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back to garage")
                     }
@@ -371,7 +424,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             },
         )
 
-        if (large) {
+        if (singleLarge) {
+            Box(Modifier.weight(1f)) { DualColumn(vehicles[0], state, vm) }
+        } else if (large) {
             AnimatedContent(
                 targetState = expanded,
                 modifier = Modifier.weight(1f),
@@ -453,21 +508,26 @@ private fun LargeExpandedPager(vehicles: List<Vehicle>, startIndex: Int, state: 
         snapshotFlow { pager.settledPage }.collect { vm.expand(it) }
     }
     HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-        val v = vehicles[page]
-        Row(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1.4f).fillMaxHeight()) {
-                VehicleDetailContent(v, state, vm, showDiagnostics = false)
-            }
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                DiagnosticsCard(state.statusFor(v))
-            }
+        DualColumn(vehicles[page], state, vm)
+    }
+}
+
+/** Wide layout: controls on the left, diagnostics on the right. */
+@Composable
+private fun DualColumn(v: Vehicle, state: UiState, vm: AppViewModel) {
+    Row(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1.4f).fillMaxHeight()) {
+            VehicleDetailContent(v, state, vm, showDiagnostics = false)
+        }
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            DiagnosticsPebble(v, state.statusFor(v), state, vm)
         }
     }
 }
@@ -497,8 +557,15 @@ private fun PagerDots(current: Int, count: Int) {
 // --- Hero header + charge/fuel bar ---------------------------------------
 
 @Composable
-private fun HeroHeader(v: Vehicle, status: VehicleStatus?, imageUrl: String?, height: Dp = 150.dp) {
-    val charging = v.isEv && status?.evStatus?.batteryCharge == true
+private fun HeroHeader(
+    v: Vehicle,
+    status: VehicleStatus?,
+    imageUrl: String?,
+    hasBattery: Boolean,
+    hasFuel: Boolean,
+    height: Dp = 150.dp,
+) {
+    val charging = hasBattery && status?.evStatus?.batteryCharge == true
     val corner by animateDpAsState(
         targetValue = if (charging) 40.dp else 24.dp,
         animationSpec = spring(
@@ -511,7 +578,7 @@ private fun HeroHeader(v: Vehicle, status: VehicleStatus?, imageUrl: String?, he
         Column(Modifier.padding(16.dp)) {
             HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(16.dp))
-            ChargeFuelBar(v, status)
+            ChargeFuelBar(status, hasBattery, hasFuel)
         }
     }
 }
@@ -543,13 +610,17 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
 }
 
 @Composable
-private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
-    val pct = if (v.isEv) status?.evStatus?.batteryStatus else status?.fuelLevel
+private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean) {
+    // Primary metric: battery if the car has one, else fuel. Plug-in hybrids show
+    // both — battery as the headline and fuel as a secondary line.
+    val battPct = status?.evStatus?.batteryStatus
+    val fuelPct = status?.fuelLevel
+    val pct = if (hasBattery) battPct else fuelPct
     val frac = ((pct ?: 0).coerceIn(0, 100)) / 100f
-    val range = status?.evStatus?.drvDistance?.firstOrNull()
+    val battRange = status?.evStatus?.drvDistance?.firstOrNull()
         ?.rangeByFuel?.totalAvailableRange?.value
-        ?: status?.dte?.value
-    val charging = v.isEv && status?.evStatus?.batteryCharge == true
+    val range = (if (hasBattery) battRange else null) ?: status?.dte?.value
+    val charging = hasBattery && status?.evStatus?.batteryCharge == true
 
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -569,12 +640,30 @@ private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
                     when {
                         charging && pct != null -> "Charging · $pct%"
                         charging -> "Charging"
-                        v.isEv -> "Battery · range"
+                        hasBattery -> "Battery · range"
                         else -> "Fuel · range"
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = if (charging) ChargeGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (charging) FontWeight.Bold else FontWeight.Normal,
+                )
+            }
+        }
+        // Plug-in hybrid: surface the fuel tank too.
+        if (hasBattery && hasFuel && fuelPct != null) {
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.LocalGasStation,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Fuel $fuelPct%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -646,31 +735,6 @@ private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
 
 private val ChargeGreen = Color(0xFF2EBD59)
 
-// --- Car panel (large-screen grid: a full, controllable car) --------------
-
-@Composable
-private fun CarPanel(v: Vehicle, state: UiState, vm: AppViewModel, onExpand: () -> Unit) {
-    val status = state.statusFor(v)
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    v.name,
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                IconButton(onClick = onExpand) {
-                    Icon(Icons.Filled.Fullscreen, contentDescription = "Expand")
-                }
-            }
-            HeroVisual(v, state.imageUrls[v.vin], height = 120.dp)
-            ChargeFuelBar(v, status)
-            PrimaryActions(v, state, vm)
-        }
-    }
-}
-
 // --- Full detail ----------------------------------------------------------
 
 @Composable
@@ -707,15 +771,16 @@ private fun VehicleDetailContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Fixed top: car image + gauge, then the primary actions.
-            HeroHeader(v, status, state.imageUrls[v.vin])
+            HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v))
             PrimaryActions(v, state, vm)
-            // Reorderable sections (order set per car in Settings).
+            // Reorderable sections (pebbles) — order + open/closed set per car.
             state.sectionsFor(v).forEach { section ->
                 when (section) {
-                    "climate" -> ClimateCard(v, status, seats, state.isPending(v.vin, "climate"), vm)
-                    "charge" -> if (v.isEv) ChargeLimitCard(v, status, enabled, vm)
-                    "information" -> StatusCard(v, status, state.locations[v.vin], state.refreshing)
-                    "diagnostics" -> if (showDiagnostics) DiagnosticsCard(status)
+                    "climate" -> ClimatePebble(v, status, seats, state, vm)
+                    "charge" -> if (state.hasBattery(v)) ChargePebble(v, status, enabled, state, vm)
+                    "location" -> LocationPebble(v, state, vm)
+                    "information" -> InformationPebble(v, status, state, vm)
+                    "diagnostics" -> if (showDiagnostics) DiagnosticsPebble(v, status, state, vm)
                 }
             }
         }
@@ -730,9 +795,7 @@ private fun VehicleDetailContent(
 
 @Composable
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val context = LocalContext.current
     val status = state.statusFor(v)
-    val location = state.locations[v.vin]
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         StateControl(
             name = "Doors",
@@ -742,7 +805,7 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
             icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
         )
-        if (v.isEv) {
+        if (state.hasBattery(v)) {
             StateControl(
                 name = "Charging",
                 isOn = status?.evStatus?.batteryCharge,
@@ -751,34 +814,6 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.Bolt, pending = state.isPending(v.vin, "charge"),
                 onActivate = { vm.startCharge(v) }, onDeactivate = { vm.stopCharge(v) },
             )
-        }
-        val locating = state.isPending(v.vin, "locate")
-        val place = state.placeNames[v.vin]
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CommandButton(
-                label = when {
-                    locating -> "Locating…"
-                    place != null -> place
-                    location != null -> "Located"
-                    else -> "Locate"
-                },
-                icon = Icons.Filled.LocationOn,
-                modifier = Modifier.weight(1f),
-                enabled = !locating,
-            ) { vm.locate(v) }
-            if (location != null) {
-                CommandButton("Map", Icons.Filled.Map, Modifier.weight(0.5f), true) {
-                    val uri = Uri.parse(
-                        "geo:${location.latitude},${location.longitude}" +
-                            "?q=${location.latitude},${location.longitude}(My car)"
-                    )
-                    runCatching {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -845,34 +880,96 @@ private fun StateControl(
     }
 }
 
-// --- Status ---------------------------------------------------------------
+// --- Pebble (expandable, reorderable section) -----------------------------
 
+/**
+ * A collapsible "pebble" — a titled section that springs open/closed with a
+ * playful bounce. Open/closed state lives in the ViewModel (per car + section),
+ * and the section order is user-configurable in Settings.
+ */
 @Composable
-private fun StatusCard(v: Vehicle, status: VehicleStatus?, location: GeoLocation?, refreshing: Boolean) {
+private fun Pebble(
+    v: Vehicle,
+    section: String,
+    title: String,
+    icon: ImageVector,
+    state: UiState,
+    vm: AppViewModel,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val expanded = state.isPebbleExpanded(v.vin, section)
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "pebbleChevron",
+    )
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            when {
-                status == null && refreshing -> Text("Fetching live status…")
-                status == null -> Text("No status yet. Tap refresh to query the car.")
-                else -> {
-                    StatusRow("Doors locked", if (status.doorLock == true) "Yes" else "No")
-                    status.doorOpen?.let { StatusRow("A door open", if (it.anyOpen) "Yes" else "No") }
-                    status.trunkOpen?.let { StatusRow("Trunk", if (it) "Open" else "Closed") }
-                    status.hoodOpen?.let { StatusRow("Hood", if (it) "Open" else "Closed") }
-                    StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
-                    status.engine?.let { StatusRow("Engine", if (it) "Running" else "Off") }
-                    status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
-                    v.odometer?.takeIf { it.isNotBlank() }?.let { StatusRow("Odometer", "$it mi") }
-                    status.dateTime?.let { StatusRow("Updated", it) }
-                }
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { vm.togglePebble(v, section) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    title,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.rotate(rotation),
+                )
             }
-            location?.let {
-                StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude))
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                ) + fadeIn(),
+                exit = shrinkVertically(spring(stiffness = Spring.StiffnessMedium)) + fadeOut(),
+            ) {
+                Column(
+                    Modifier.padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    content = content,
+                )
             }
+        }
+    }
+}
+
+// --- Information ----------------------------------------------------------
+
+@Composable
+private fun InformationPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel) {
+    val location = state.locations[v.vin]
+    Pebble(v, "information", "Information", Icons.Filled.Info, state, vm) {
+        when {
+            status == null && state.refreshing -> Text("Fetching live status…")
+            status == null -> Text("No status yet. Pull down to refresh.")
+            else -> {
+                StatusRow("Doors locked", if (status.doorLock == true) "Yes" else "No")
+                status.doorOpen?.let { StatusRow("A door open", if (it.anyOpen) "Yes" else "No") }
+                status.trunkOpen?.let { StatusRow("Trunk", if (it) "Open" else "Closed") }
+                status.hoodOpen?.let { StatusRow("Hood", if (it) "Open" else "Closed") }
+                StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
+                status.engine?.let { StatusRow("Engine", if (it) "Running" else "Off") }
+                status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
+                v.odometer?.takeIf { it.isNotBlank() }?.let { StatusRow("Odometer", "$it mi") }
+                status.dateTime?.let { StatusRow("Updated", it) }
+            }
+        }
+        location?.let {
+            StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude))
         }
     }
 }
@@ -882,64 +979,62 @@ private fun StatusCard(v: Vehicle, status: VehicleStatus?, location: GeoLocation
 private data class DiagRow(val label: String, val value: String, val indent: Boolean = false)
 
 @Composable
-private fun DiagnosticsCard(status: VehicleStatus?) {
-    if (status == null) return
+private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel) {
     val rows = buildList {
-        status.tirePressureLamp?.let { tp ->
+        status?.tirePressureLamp?.let { tp ->
             add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning" else "OK"))
             tp.frontLeft?.let { add(DiagRow("Front left", warn(it), indent = true)) }
             tp.frontRight?.let { add(DiagRow("Front right", warn(it), indent = true)) }
             tp.rearLeft?.let { add(DiagRow("Rear left", warn(it), indent = true)) }
             tp.rearRight?.let { add(DiagRow("Rear right", warn(it), indent = true)) }
         }
-        status.battery?.let { b ->
+        status?.battery?.let { b ->
             b.batSoc?.let { soc ->
                 add(DiagRow("12V battery", "$soc%" + (b.health?.let { " · $it" } ?: "")))
             }
         }
-        status.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
-        status.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
-        status.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
-        status.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
-        status.breakOilStatus?.let { add(DiagRow("Brake fluid", if (it) "Check" else "OK")) }
-        status.smartKeyBatteryWarning?.let { add(DiagRow("Key fob battery", if (it) "Low" else "OK")) }
-        status.steerWheelHeat?.let { add(DiagRow("Steering wheel heat", onOff(it))) }
-        status.sideBackWindowHeat?.let { add(DiagRow("Rear defroster", onOff(it))) }
-        status.sideMirrorHeat?.let { add(DiagRow("Mirror heat", onOff(it))) }
-        status.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
-        status.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
+        status?.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
+        status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
+        status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
+        status?.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
+        status?.breakOilStatus?.let { add(DiagRow("Brake fluid", if (it) "Check" else "OK")) }
+        status?.smartKeyBatteryWarning?.let { add(DiagRow("Key fob battery", if (it) "Low" else "OK")) }
+        status?.steerWheelHeat?.let { add(DiagRow("Steering wheel heat", onOff(it))) }
+        status?.sideBackWindowHeat?.let { add(DiagRow("Rear defroster", onOff(it))) }
+        status?.sideMirrorHeat?.let { add(DiagRow("Mirror heat", onOff(it))) }
+        status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
+        status?.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
     }
-    if (rows.isEmpty()) return
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    Pebble(
+        v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Diagnostics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            rows.forEach { row ->
-                if (row.indent) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            row.label,
-                            Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(row.value, style = MaterialTheme.typography.bodyMedium)
-                    }
-                } else {
-                    StatusRow(row.label, row.value)
+        if (rows.isEmpty()) {
+            Text("No diagnostics yet. Pull down to refresh.")
+        }
+        rows.forEach { row ->
+            if (row.indent) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        row.label,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(row.value, style = MaterialTheme.typography.bodyMedium)
                 }
+            } else {
+                StatusRow(row.label, row.value)
             }
         }
     }
@@ -952,97 +1047,96 @@ private fun onOff(v: Int) = if (v == 0) "Off" else "On"
 // --- Climate --------------------------------------------------------------
 
 @Composable
-private fun ClimateCard(
+private fun ClimatePebble(
     v: Vehicle,
     status: VehicleStatus?,
     seats: SeatConfig,
-    pending: Boolean,
+    state: UiState,
     vm: AppViewModel,
 ) {
+    val pending = state.isPending(v.vin, "climate")
     var tempF by remember(v.vin) { mutableIntStateOf(72) }
     var duration by remember(v.vin) { mutableIntStateOf(10) }
     var defrost by remember(v.vin) { mutableStateOf(false) }
     var steeringHeat by remember(v.vin) { mutableStateOf(false) }
-    var fl by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
-    var fr by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
-    var rl by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
-    var rr by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
-    val climateOn = status?.airCtrlOn == true
+    var driver by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    var passenger by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    var rearLeft by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    var rearRight by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
 
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
+    Pebble(
+        v, "climate", "Climate", Icons.Filled.AcUnit, state, vm,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Climate", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        StepRow("Temperature", "$tempF°F")
+        Slider(
+            value = tempF.toFloat(),
+            onValueChange = { tempF = it.roundToInt() },
+            valueRange = 62f..82f,
+            steps = 19,
+        )
 
-            StepRow("Temperature", "$tempF°F")
-            Slider(
-                value = tempF.toFloat(),
-                onValueChange = { tempF = it.roundToInt() },
-                valueRange = 62f..82f,
-                steps = 19,
-            )
+        StepRow("Run time", "$duration min")
+        Slider(
+            value = duration.toFloat(),
+            onValueChange = { duration = it.roundToInt() },
+            valueRange = 1f..10f,
+            steps = 8,
+        )
 
-            StepRow("Run time", "$duration min")
-            Slider(
-                value = duration.toFloat(),
-                onValueChange = { duration = it.roundToInt() },
-                valueRange = 1f..10f,
-                steps = 8,
-            )
-
-            ToggleRow("Defrost", defrost) { defrost = it }
-            if (status?.steerWheelHeat != null) {
-                ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
-            }
-
-            // Seats are shown only for functions the car actually has (set per car
-            // in Settings, since the API exposes no reliable capability flags).
-            if (seats.any) {
-                Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    "Slide left to cool, right to heat",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (seats.frontHeat || seats.frontCool) {
-                    SeatControl("Driver seat", fl, seats.frontCool, seats.frontHeat) { fl = it }
-                    SeatControl("Passenger seat", fr, seats.frontCool, seats.frontHeat) { fr = it }
-                }
-                if (seats.rearHeat || seats.rearCool) {
-                    SeatControl("Rear left seat", rl, seats.rearCool, seats.rearHeat) { rl = it }
-                    SeatControl("Rear right seat", rr, seats.rearCool, seats.rearHeat) { rr = it }
-                }
-            }
-
-            // Combined start/stop: morphs pill <-> rounded square, shows On/Off.
-            StateControl(
-                name = "Climate",
-                isOn = status?.airCtrlOn,
-                stateOn = "On", stateOff = "Off",
-                turnOn = "Start", turnOff = "Stop",
-                icon = Icons.Filled.AcUnit, pending = pending,
-                onActivate = {
-                    vm.startClimate(
-                        v,
-                        ClimateRequest(
-                            tempF = tempF,
-                            defrost = defrost,
-                            durationMinutes = duration,
-                            steeringWheelHeat = steeringHeat,
-                            seatFrontLeft = fl,
-                            seatFrontRight = fr,
-                            seatRearLeft = rl,
-                            seatRearRight = rr,
-                        ),
-                    )
-                },
-                onDeactivate = { vm.stopClimate(v) },
-            )
+        ToggleRow("Defrost", defrost) { defrost = it }
+        if (status?.steerWheelHeat != null) {
+            ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
         }
+
+        // Seats are shown only for functions the car actually has (set per car
+        // in Settings, since the API exposes no reliable capability flags). The
+        // remote command addresses four positions only.
+        if (seats.any) {
+            Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Slide left to cool, right to heat",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (seats.driverHeat || seats.driverCool) {
+                SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
+            }
+            if (seats.passHeat || seats.passCool) {
+                SeatControl("Passenger seat", passenger, seats.passCool, seats.passHeat) { passenger = it }
+            }
+            if (seats.rearLeftHeat || seats.rearLeftCool) {
+                SeatControl("Rear left seat", rearLeft, seats.rearLeftCool, seats.rearLeftHeat) { rearLeft = it }
+            }
+            if (seats.rearRightHeat || seats.rearRightCool) {
+                SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
+            }
+        }
+
+        // Combined start/stop: morphs pill <-> rounded square, shows On/Off.
+        StateControl(
+            name = "Climate",
+            isOn = status?.airCtrlOn,
+            stateOn = "On", stateOff = "Off",
+            turnOn = "Start", turnOff = "Stop",
+            icon = Icons.Filled.AcUnit, pending = pending,
+            onActivate = {
+                vm.startClimate(
+                    v,
+                    ClimateRequest(
+                        tempF = tempF,
+                        defrost = defrost,
+                        durationMinutes = duration,
+                        steeringWheelHeat = steeringHeat,
+                        seatFrontLeft = driver,
+                        seatFrontRight = passenger,
+                        seatRearLeft = rearLeft,
+                        seatRearRight = rearRight,
+                    ),
+                )
+            },
+            onDeactivate = { vm.stopClimate(v) },
+        )
     }
 }
 
@@ -1081,35 +1175,31 @@ private fun SeatControl(
 // --- Charge limits --------------------------------------------------------
 
 @Composable
-private fun ChargeLimitCard(v: Vehicle, status: VehicleStatus?, enabled: Boolean, vm: AppViewModel) {
+private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel) {
     val targets = status?.evStatus?.reservChargeInfos
     var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
     var dc by remember(v.vin) { mutableIntStateOf(targets?.level(0) ?: 80) }
 
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    Pebble(
+        v, "charge", "Charge limits", Icons.Filled.Bolt, state, vm,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Charge limits", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-
-            StepRow("AC (home) target", "$ac%")
-            Slider(
-                value = ac.toFloat(),
-                onValueChange = { ac = (it / 10f).roundToInt() * 10 },
-                valueRange = 50f..100f,
-                steps = 4,
-            )
-            StepRow("DC (fast) target", "$dc%")
-            Slider(
-                value = dc.toFloat(),
-                onValueChange = { dc = (it / 10f).roundToInt() * 10 },
-                valueRange = 50f..100f,
-                steps = 4,
-            )
-            CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
-                vm.setChargeLimits(v, ac, dc)
-            }
+        StepRow("AC (home) target", "$ac%")
+        Slider(
+            value = ac.toFloat(),
+            onValueChange = { ac = (it / 10f).roundToInt() * 10 },
+            valueRange = 50f..100f,
+            steps = 4,
+        )
+        StepRow("DC (fast) target", "$dc%")
+        Slider(
+            value = dc.toFloat(),
+            onValueChange = { dc = (it / 10f).roundToInt() * 10 },
+            valueRange = 50f..100f,
+            steps = 4,
+        )
+        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
+            vm.setChargeLimits(v, ac, dc)
         }
     }
 }
@@ -1117,33 +1207,38 @@ private fun ChargeLimitCard(v: Vehicle, status: VehicleStatus?, enabled: Boolean
 // --- Location -------------------------------------------------------------
 
 @Composable
-private fun LocationCard(location: GeoLocation?, enabled: Boolean, onLocate: () -> Unit) {
+private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel) {
     val context = LocalContext.current
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    val location = state.locations[v.vin]
+    val place = state.placeNames[v.vin]
+    val locating = state.isPending(v.vin, "locate")
+    Pebble(v, "location", "Location", Icons.Filled.LocationOn, state, vm) {
+        when {
+            place != null -> Text(place, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            location != null -> Text("Location updated")
+            else -> Text("Tap Locate to query the car's current position.")
+        }
+        location?.let {
+            StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CommandButton(
+                label = if (locating) "Locating…" else "Locate",
+                icon = Icons.Filled.LocationOn,
+                modifier = Modifier.weight(1f),
+                enabled = !locating,
+            ) { vm.locate(v) }
             if (location != null) {
-                StatusRow("Latitude", String.format("%.5f", location.latitude))
-                StatusRow("Longitude", String.format("%.5f", location.longitude))
-            } else {
-                Text("Tap Locate to query the car's current position.")
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CommandButton("Locate", Icons.Filled.LocationOn, Modifier.weight(1f), enabled, onLocate)
-                if (location != null) {
-                    OutlinedButton(
-                        onClick = {
-                            val uri = Uri.parse(
-                                "geo:${location.latitude},${location.longitude}" +
-                                    "?q=${location.latitude},${location.longitude}(My car)"
-                            )
-                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            runCatching { context.startActivity(intent) }
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) { Text("Open in Maps") }
+                CommandButton("Map", Icons.Filled.Map, Modifier.weight(1f), true) {
+                    val uri = Uri.parse(
+                        "geo:${location.latitude},${location.longitude}" +
+                            "?q=${location.latitude},${location.longitude}(My car)"
+                    )
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                        )
+                    }
                 }
             }
         }
@@ -1308,10 +1403,20 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("Seats this car has", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    ToggleRow("Front heated", seats.frontHeat) { vm.setSeatFlag(v, "fh", it) }
-                    ToggleRow("Front cooled", seats.frontCool) { vm.setSeatFlag(v, "fc", it) }
-                    ToggleRow("Rear heated", seats.rearHeat) { vm.setSeatFlag(v, "rh", it) }
-                    ToggleRow("Rear cooled", seats.rearCool) { vm.setSeatFlag(v, "rc", it) }
+                    Text(
+                        "The remote climate command controls four positions. Enable heating " +
+                            "and/or cooling for each seat your car actually has.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    SeatConfigRow("Driver", seats.driverHeat, seats.driverCool,
+                        { vm.setSeatFlag(v, "dh", it) }, { vm.setSeatFlag(v, "dc", it) })
+                    SeatConfigRow("Front passenger", seats.passHeat, seats.passCool,
+                        { vm.setSeatFlag(v, "ph", it) }, { vm.setSeatFlag(v, "pc", it) })
+                    SeatConfigRow("Rear left", seats.rearLeftHeat, seats.rearLeftCool,
+                        { vm.setSeatFlag(v, "rlh", it) }, { vm.setSeatFlag(v, "rlc", it) })
+                    SeatConfigRow("Rear right", seats.rearRightHeat, seats.rearRightCool,
+                        { vm.setSeatFlag(v, "rrh", it) }, { vm.setSeatFlag(v, "rrc", it) })
 
                     Spacer(Modifier.height(8.dp))
                     Text("Section order", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -1319,6 +1424,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     val sectionLabels = mapOf(
                         "climate" to "Climate",
                         "charge" to "Charge limits",
+                        "location" to "Location",
                         "information" to "Information",
                         "diagnostics" to "Diagnostics",
                     )
@@ -1371,7 +1477,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
-                    FontChoice.PRODUCT_SANS to "Product Sans style (Poppins)",
+                    FontChoice.GOOGLE_SANS to "Google Sans",
                 )
                 FontChoice.entries.forEach { choice ->
                     ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
@@ -1465,6 +1571,26 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/** One seat's heat + cool capability toggles, shown as two compact filter chips. */
+@Composable
+private fun SeatConfigRow(
+    label: String,
+    heat: Boolean,
+    cool: Boolean,
+    onHeat: (Boolean) -> Unit,
+    onCool: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        FilterChip(selected = heat, onClick = { onHeat(!heat) }, label = { Text("Heat") })
+        Spacer(Modifier.width(8.dp))
+        FilterChip(selected = cool, onClick = { onCool(!cool) }, label = { Text("Cool") })
     }
 }
 

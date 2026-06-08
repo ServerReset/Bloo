@@ -10,6 +10,7 @@ data class Credentials(
     val email: String,
     val password: String,
     val pin: String,
+    val brand: Brand = Brand.HYUNDAI,
 )
 
 /**
@@ -37,6 +38,7 @@ class CredentialStore(context: Context) {
             .putString(KEY_EMAIL, credentials.email)
             .putString(KEY_PASSWORD, credentials.password)
             .putString(KEY_PIN, credentials.pin)
+            .putString(KEY_BRAND, credentials.brand.name)
             .apply()
     }
 
@@ -44,7 +46,7 @@ class CredentialStore(context: Context) {
         val email = prefs.getString(KEY_EMAIL, null) ?: return null
         val password = prefs.getString(KEY_PASSWORD, null) ?: return null
         val pin = prefs.getString(KEY_PIN, null) ?: return null
-        return Credentials(email, password, pin)
+        return Credentials(email, password, pin, Brand.fromName(prefs.getString(KEY_BRAND, null)))
     }
 
     fun clear() {
@@ -55,5 +57,6 @@ class CredentialStore(context: Context) {
         const val KEY_EMAIL = "email"
         const val KEY_PASSWORD = "password"
         const val KEY_PIN = "pin"
+        const val KEY_BRAND = "brand"
     }
 }

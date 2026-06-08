@@ -22,6 +22,7 @@ class SessionStore(private val context: Context) {
         val REFRESH = stringPreferencesKey("refresh_token")
         val USERNAME = stringPreferencesKey("username")
         val PIN = stringPreferencesKey("pin")
+        val BRAND = stringPreferencesKey("brand")
     }
 
     data class Session(
@@ -29,6 +30,7 @@ class SessionStore(private val context: Context) {
         val refreshToken: String?,
         val username: String,
         val pin: String,
+        val brand: Brand = Brand.HYUNDAI,
     )
 
     suspend fun save(session: Session) {
@@ -37,6 +39,7 @@ class SessionStore(private val context: Context) {
             session.refreshToken?.let { prefs[Keys.REFRESH] = it }
             prefs[Keys.USERNAME] = session.username
             prefs[Keys.PIN] = session.pin
+            prefs[Keys.BRAND] = session.brand.name
         }
     }
 
@@ -45,7 +48,7 @@ class SessionStore(private val context: Context) {
         val access = prefs[Keys.ACCESS] ?: return null
         val username = prefs[Keys.USERNAME] ?: return null
         val pin = prefs[Keys.PIN] ?: return null
-        return Session(access, prefs[Keys.REFRESH], username, pin)
+        return Session(access, prefs[Keys.REFRESH], username, pin, Brand.fromName(prefs[Keys.BRAND]))
     }
 
     suspend fun updateAccessToken(access: String, refresh: String?) {

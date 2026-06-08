@@ -13,21 +13,34 @@ import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore by preferencesDataStore(name = "bloo_settings")
 
-/** Which seat heat/cool functions a specific car actually has (user-configured). */
+/**
+ * Which seat heat/cool functions a specific car actually has (user-configured).
+ *
+ * The US remote-start climate command addresses four seat positions only —
+ * driver, front passenger, rear-left and rear-right — so even on a 7-seater
+ * those are the seats that can be controlled remotely. Each is independently
+ * heat- and/or cool-capable.
+ */
 data class SeatConfig(
-    val frontHeat: Boolean = true,
-    val frontCool: Boolean = false,
-    val rearHeat: Boolean = false,
-    val rearCool: Boolean = false,
+    val driverHeat: Boolean = true,
+    val driverCool: Boolean = false,
+    val passHeat: Boolean = true,
+    val passCool: Boolean = false,
+    val rearLeftHeat: Boolean = false,
+    val rearLeftCool: Boolean = false,
+    val rearRightHeat: Boolean = false,
+    val rearRightCool: Boolean = false,
 ) {
-    val any: Boolean get() = frontHeat || frontCool || rearHeat || rearCool
+    val any: Boolean
+        get() = driverHeat || driverCool || passHeat || passCool ||
+            rearLeftHeat || rearLeftCool || rearRightHeat || rearRightCool
 }
 
 /** User-confirmed powertrain (the US API only exposes EV vs gas). */
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
-/** Reorderable detail sections, in their default order. */
-val DEFAULT_SECTIONS = listOf("climate", "charge", "information", "diagnostics")
+/** Reorderable detail sections (pebbles), in their default order. */
+val DEFAULT_SECTIONS = listOf("climate", "charge", "location", "information", "diagnostics")
 
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
@@ -92,18 +105,38 @@ class SettingsStore(private val context: Context) {
 
     // --- Per-car seat capability (the API has no reliable flags) ---------
 
-    suspend fun seatConfig(vin: String, defaultRearHeat: Boolean = false): SeatConfig {
+    suspend fun seatConfig(vin: String): SeatConfig {
         val p = context.settingsDataStore.data.first()
+        fun b(key: String): Boolean? = p[booleanPreferencesKey(key)]
+        // Migration: older builds stored grouped front/rear flags.
+        val oldFrontHeat = b("seat_fh_$vin")
+        val oldFrontCool = b("seat_fc_$vin")
+        val oldRearHeat = b("seat_rh_$vin")
+        val oldRearCool = b("seat_rc_$vin")
         return SeatConfig(
-            frontHeat = p[booleanPreferencesKey("seat_fh_$vin")] ?: true,
-            frontCool = p[booleanPreferencesKey("seat_fc_$vin")] ?: false,
-            rearHeat = p[booleanPreferencesKey("seat_rh_$vin")] ?: defaultRearHeat,
-            rearCool = p[booleanPreferencesKey("seat_rc_$vin")] ?: false,
+            driverHeat = b("seat_dh_$vin") ?: oldFrontHeat ?: true,
+            driverCool = b("seat_dc_$vin") ?: oldFrontCool ?: false,
+            passHeat = b("seat_ph_$vin") ?: oldFrontHeat ?: true,
+            passCool = b("seat_pc_$vin") ?: oldFrontCool ?: false,
+            rearLeftHeat = b("seat_rlh_$vin") ?: oldRearHeat ?: false,
+            rearLeftCool = b("seat_rlc_$vin") ?: oldRearCool ?: false,
+            rearRightHeat = b("seat_rrh_$vin") ?: oldRearHeat ?: false,
+            rearRightCool = b("seat_rrc_$vin") ?: oldRearCool ?: false,
         )
     }
 
+    /** [field] is one of dh/dc/ph/pc/rlh/rlc/rrh/rrc. */
     suspend fun setSeatFlag(vin: String, field: String, value: Boolean) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
+    }
+
+    // --- First-run onboarding -------------------------------------------
+
+    suspend fun onboardingSeen(): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("onboarding_seen")] ?: false
+
+    suspend fun setOnboardingSeen() {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("onboarding_seen")] = true }
     }
 
     // --- Per-car section order -------------------------------------------

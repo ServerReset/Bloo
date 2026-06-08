@@ -27,10 +27,11 @@ import com.bloo.bluelink.R
 enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED }
 
 /**
- * User-selectable typeface. PRODUCT_SANS uses Poppins (an OFL geometric sans)
- * because Google's Product Sans is proprietary and cannot be redistributed.
+ * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex — Google's
+ * officially open-sourced (OFL) sibling of the proprietary Product Sans — so it
+ * ships legitimately as the geometric option.
  */
-enum class FontChoice { SYSTEM, ATKINSON, PRODUCT_SANS }
+enum class FontChoice { SYSTEM, ATKINSON, GOOGLE_SANS }
 
 // --- Expressive color palettes -------------------------------------------
 // A vibrant, high-emphasis Material 3 palette used when dynamic color
@@ -88,9 +89,9 @@ private val ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(40.dp),
 )
 
-/** Atkinson Hyperlegible Next is a variable font; map each weight via fontVariationSettings. */
-private fun atkinsonNext(weight: FontWeight, axis: Int) = Font(
-    R.font.atkinson_next,
+/** Map each weight of a variable font via fontVariationSettings (wght axis). */
+private fun variableFont(resId: Int, weight: FontWeight, axis: Int) = Font(
+    resId,
     weight,
     variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
 )
@@ -98,17 +99,18 @@ private fun atkinsonNext(weight: FontWeight, axis: Int) = Font(
 private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
     FontChoice.SYSTEM -> FontFamily.Default
     FontChoice.ATKINSON -> FontFamily(
-        atkinsonNext(FontWeight.Normal, 400),
-        atkinsonNext(FontWeight.Medium, 500),
-        atkinsonNext(FontWeight.SemiBold, 600),
-        atkinsonNext(FontWeight.Bold, 700),
-        atkinsonNext(FontWeight.ExtraBold, 800),
+        variableFont(R.font.atkinson_next, FontWeight.Normal, 400),
+        variableFont(R.font.atkinson_next, FontWeight.Medium, 500),
+        variableFont(R.font.atkinson_next, FontWeight.SemiBold, 600),
+        variableFont(R.font.atkinson_next, FontWeight.Bold, 700),
+        variableFont(R.font.atkinson_next, FontWeight.ExtraBold, 800),
     )
-    FontChoice.PRODUCT_SANS -> FontFamily(
-        Font(R.font.poppins_regular, FontWeight.Normal),
-        Font(R.font.poppins_medium, FontWeight.Medium),
-        Font(R.font.poppins_semibold, FontWeight.SemiBold),
-        Font(R.font.poppins_bold, FontWeight.Bold),
+    FontChoice.GOOGLE_SANS -> FontFamily(
+        variableFont(R.font.google_sans_flex, FontWeight.Normal, 400),
+        variableFont(R.font.google_sans_flex, FontWeight.Medium, 500),
+        variableFont(R.font.google_sans_flex, FontWeight.SemiBold, 600),
+        variableFont(R.font.google_sans_flex, FontWeight.Bold, 700),
+        variableFont(R.font.google_sans_flex, FontWeight.ExtraBold, 800),
     )
 }
 
