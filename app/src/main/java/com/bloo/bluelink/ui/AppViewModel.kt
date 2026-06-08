@@ -12,6 +12,7 @@ import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
+import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
@@ -57,6 +58,7 @@ data class UiState(
     val locations: Map<String, GeoLocation> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
+    val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
@@ -69,6 +71,8 @@ data class UiState(
     fun isPending(vin: String, action: String): Boolean = "$vin:$action" in pending
 
     fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
+
+    fun sectionsFor(v: Vehicle): List<String> = sectionOrders[v.vin] ?: DEFAULT_SECTIONS
 
     /** Powertrain label for the header: user override, else EV/Gas from the API. */
     fun powertrainLabel(v: Vehicle): String = when (powertrains[v.vin]) {
@@ -165,6 +169,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, null) })
         val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin)?.let { v.vin to it } }.toMap()
+        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
         val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
@@ -173,6 +178,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 vehicles = vehicles,
                 seatConfigs = seatConfigs,
                 powertrains = powertrains,
+                sectionOrders = sectionOrders,
                 imageUrls = images,
                 currentIndex = index,
                 screen = Screen.Garage,
@@ -305,6 +311,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
+    }
+
+    fun moveSection(v: Vehicle, id: String, up: Boolean) {
+        val list = (_state.value.sectionOrders[v.vin] ?: DEFAULT_SECTIONS).toMutableList()
+        val i = list.indexOf(id)
+        if (i < 0) return
+        val j = if (up) i - 1 else i + 1
+        if (j !in list.indices) return
+        list[i] = list[j].also { list[j] = list[i] }
+        _state.update { it.copy(sectionOrders = it.sectionOrders + (v.vin to list)) }
+        viewModelScope.launch { settingsStore.setSectionOrder(v.vin, list) }
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {

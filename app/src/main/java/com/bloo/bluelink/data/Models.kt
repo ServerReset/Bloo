@@ -167,7 +167,19 @@ data class TempValue(
 @Serializable
 data class Battery12V(
     val batSoc: Int? = null,
-)
+    val batState: Int? = null,
+    val batSignalReferenceValue: Int? = null,
+) {
+    /** Coarse 12V battery health from state of charge / state flag. */
+    val health: String?
+        get() = when {
+            batState == 0 -> "Needs attention"
+            batSoc == null -> null
+            batSoc >= 75 -> "Good"
+            batSoc >= 50 -> "Fair"
+            else -> "Low"
+        }
+}
 
 @Serializable
 data class EvStatus(
@@ -238,12 +250,22 @@ enum class SeatLevel(val apiValue: Int, val label: String) {
     MED_HEAT(7, "Med heat"),
     HIGH_HEAT(8, "High heat");
 
+    val isCool: Boolean get() = apiValue in 3..5
+    val isHeat: Boolean get() = apiValue in 6..8
+
     companion object {
         /** Range offered when the seat can both heat and cool (ventilated). */
         val ventilatedRange = listOf(HIGH_COOL, MED_COOL, LOW_COOL, OFF, LOW_HEAT, MED_HEAT, HIGH_HEAT)
 
         /** Range offered when the seat is heat-only. */
         val heatOnlyRange = listOf(OFF, LOW_HEAT, MED_HEAT, HIGH_HEAT)
+
+        /** Build the slider range for a seat given what it supports. */
+        fun rangeFor(canCool: Boolean, canHeat: Boolean): List<SeatLevel> = buildList {
+            if (canCool) addAll(listOf(HIGH_COOL, MED_COOL, LOW_COOL))
+            add(OFF)
+            if (canHeat) addAll(listOf(LOW_HEAT, MED_HEAT, HIGH_HEAT))
+        }
 
         fun fromApi(value: Int?): SeatLevel = entries.firstOrNull { it.apiValue == value } ?: OFF
     }

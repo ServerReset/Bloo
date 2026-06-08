@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.Button
@@ -53,13 +54,14 @@ class BlooGlanceWidget : GlanceAppWidget() {
     }
 }
 
-// Fixed-size picker entries (see res/xml/bloo_widget_*.xml).
-class BlooWidget1x1Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+// Fixed-size picker entries (see res/xml/bloo_w_*.xml).
 class BlooWidget2x1Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
-class BlooWidget2x2Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
-class BlooWidget3x3Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
-class BlooWidget4x4Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
-class BlooWidget5x5Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget4x1Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget5x1Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget6x1Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget4x2Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget5x2Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget6x2Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
 
 private val Bg = ColorProvider(Color(0xFF12141C))
 private val OnBg = ColorProvider(Color(0xFFF2F4F8))
@@ -84,8 +86,8 @@ private fun WidgetRoot(data: SnapshotStore.SnapshotData) {
             return@Column
         }
         when {
-            size.width < 110.dp || size.height < 90.dp -> TinyLayout(selected)
-            size.width < 220.dp -> SmallLayout(data, selected)
+            size.width < 130.dp -> TinyLayout(selected)
+            size.height < 120.dp -> WideShortLayout(data, selected, size.width)
             else -> LargeLayout(data, selected, size.height >= 220.dp)
         }
     }
@@ -104,13 +106,29 @@ private fun TinyLayout(v: VehicleSnapshot) {
 }
 
 @Composable
-private fun SmallLayout(data: SnapshotStore.SnapshotData, v: VehicleSnapshot) {
-    Column(modifier = GlanceModifier.fillMaxSize()) {
-        Text(v.name, style = TextStyle(color = OnBg, fontSize = 13.sp, fontWeight = FontWeight.Bold))
-        Text(percentText(v), style = title(26))
-        Text(rangeText(v), style = caption())
-        Spacer(GlanceModifier.height(6.dp))
-        Row { DoorsButton(v); Spacer(GlanceModifier.width(6.dp)); ClimateButton(v) }
+private fun WideShortLayout(data: SnapshotStore.SnapshotData, v: VehicleSnapshot, width: Dp) {
+    Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            Text(v.name, style = TextStyle(color = OnBg, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+            Text(percentText(v), style = title(28))
+            Text(
+                if (v.charging == true) "Charging · ${rangeText(v)}" else rangeText(v),
+                style = if (v.charging == true) {
+                    TextStyle(color = Green, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                } else {
+                    caption()
+                },
+            )
+        }
+        DoorsButton(v)
+        if (width >= 300.dp) {
+            Spacer(GlanceModifier.width(6.dp))
+            ClimateButton(v)
+        }
+        if (width >= 380.dp && v.isEv) {
+            Spacer(GlanceModifier.width(6.dp))
+            ChargeButton(v)
+        }
     }
 }
 

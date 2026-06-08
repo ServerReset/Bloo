@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
@@ -87,11 +88,21 @@ private val ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(40.dp),
 )
 
+/** Atkinson Hyperlegible Next is a variable font; map each weight via fontVariationSettings. */
+private fun atkinsonNext(weight: FontWeight, axis: Int) = Font(
+    R.font.atkinson_next,
+    weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
+)
+
 private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
     FontChoice.SYSTEM -> FontFamily.Default
     FontChoice.ATKINSON -> FontFamily(
-        Font(R.font.atkinson_hyperlegible_regular, FontWeight.Normal),
-        Font(R.font.atkinson_hyperlegible_bold, FontWeight.Bold),
+        atkinsonNext(FontWeight.Normal, 400),
+        atkinsonNext(FontWeight.Medium, 500),
+        atkinsonNext(FontWeight.SemiBold, 600),
+        atkinsonNext(FontWeight.Bold, 700),
+        atkinsonNext(FontWeight.ExtraBold, 800),
     )
     FontChoice.PRODUCT_SANS -> FontFamily(
         Font(R.font.poppins_regular, FontWeight.Normal),

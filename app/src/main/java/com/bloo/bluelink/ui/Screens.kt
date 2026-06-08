@@ -28,6 +28,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -95,6 +96,7 @@ import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -211,8 +213,12 @@ private fun LoginScreen(loading: Boolean, onLogin: (String, String, String) -> U
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("Bloo", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-        Text("Hyundai Blue Link (US)", style = MaterialTheme.typography.bodyMedium)
+        Text("Bloo", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Black)
+        Text(
+            "A better Blue Link · US",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.height(24.dp))
 
         OutlinedTextField(
@@ -582,15 +588,36 @@ private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
             ),
             label = "chargeFill",
         )
-        LinearProgressIndicator(
-            progress = { animatedFrac },
-            color = ChargeGreen,
-            trackColor = ChargeGreen.copy(alpha = 0.22f),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(18.dp)
-                .clip(RoundedCornerShape(9.dp)),
-        )
+        // Target-SOC marker: dot at the AC/DC limit for the active plug type.
+        val ev = status?.evStatus
+        val targetPct = if (charging && ev != null) {
+            when (ev.batteryPlugin) {
+                1 -> ev.reservChargeInfos?.level(0) // DC fast
+                2 -> ev.reservChargeInfos?.level(1) // AC
+                else -> null
+            }
+        } else {
+            null
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().height(18.dp)) {
+            LinearProgressIndicator(
+                progress = { animatedFrac },
+                color = ChargeGreen,
+                trackColor = ChargeGreen.copy(alpha = 0.22f),
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp)),
+            )
+            if (targetPct != null) {
+                val x = maxWidth * (targetPct.coerceIn(0, 100) / 100f)
+                Box(
+                    Modifier
+                        .offset(x = x - 9.dp)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurface)
+                        .align(Alignment.CenterStart),
+                )
+            }
+        }
         if (charging) {
             val minutes = status?.evStatus?.remainTime2?.atc?.value?.toInt()
             val plug = when (status?.evStatus?.batteryPlugin) {
@@ -679,17 +706,18 @@ private fun VehicleDetailContent(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 1. Car image (gradient by default) + 2. charge/fuel gauge
+            // Fixed top: car image + gauge, then the primary actions.
             HeroHeader(v, status, state.imageUrls[v.vin])
-            // 3. Important actions
             PrimaryActions(v, state, vm)
-            // 4. Climate
-            ClimateCard(v, status, seats, state.isPending(v.vin, "climate"), vm)
-            // 5. Status (moved below climate, per request)
-            StatusCard(v, status, state.locations[v.vin], state.refreshing)
-            if (v.isEv) ChargeLimitCard(v, status, enabled, vm)
-            // 6. Diagnostics (moves to the right pane on large screens)
-            if (showDiagnostics) DiagnosticsCard(status)
+            // Reorderable sections (order set per car in Settings).
+            state.sectionsFor(v).forEach { section ->
+                when (section) {
+                    "climate" -> ClimateCard(v, status, seats, state.isPending(v.vin, "climate"), vm)
+                    "charge" -> if (v.isEv) ChargeLimitCard(v, status, enabled, vm)
+                    "information" -> StatusCard(v, status, state.locations[v.vin], state.refreshing)
+                    "diagnostics" -> if (showDiagnostics) DiagnosticsCard(status)
+                }
+            }
         }
         // Expressive squiggly refresh indicator.
         PullToRefreshDefaults.LoadingIndicator(
@@ -864,6 +892,13 @@ private fun DiagnosticsCard(status: VehicleStatus?) {
             tp.rearLeft?.let { add(DiagRow("Rear left", warn(it), indent = true)) }
             tp.rearRight?.let { add(DiagRow("Rear right", warn(it), indent = true)) }
         }
+        status.battery?.let { b ->
+            b.batSoc?.let { soc ->
+                add(DiagRow("12V battery", "$soc%" + (b.health?.let { " · $it" } ?: "")))
+            }
+        }
+        status.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
+        status.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
         status.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
         status.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
         status.breakOilStatus?.let { add(DiagRow("Brake fluid", if (it) "Check" else "OK")) }
@@ -968,13 +1003,18 @@ private fun ClimateCard(
             // in Settings, since the API exposes no reliable capability flags).
             if (seats.any) {
                 Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "Slide left to cool, right to heat",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (seats.frontHeat || seats.frontCool) {
-                    SeatControl("Driver seat", fl, seats.frontCool) { fl = it }
-                    SeatControl("Passenger seat", fr, seats.frontCool) { fr = it }
+                    SeatControl("Driver seat", fl, seats.frontCool, seats.frontHeat) { fl = it }
+                    SeatControl("Passenger seat", fr, seats.frontCool, seats.frontHeat) { fr = it }
                 }
                 if (seats.rearHeat || seats.rearCool) {
-                    SeatControl("Rear left seat", rl, seats.rearCool) { rl = it }
-                    SeatControl("Rear right seat", rr, seats.rearCool) { rr = it }
+                    SeatControl("Rear left seat", rl, seats.rearCool, seats.rearHeat) { rl = it }
+                    SeatControl("Rear right seat", rr, seats.rearCool, seats.rearHeat) { rr = it }
                 }
             }
 
@@ -1006,17 +1046,34 @@ private fun ClimateCard(
     }
 }
 
+private val SeatCool = Color(0xFF2E78FF)
+private val SeatHeat = Color(0xFFE5484D)
+
 @Composable
-private fun SeatControl(label: String, level: SeatLevel, cooled: Boolean, onChange: (SeatLevel) -> Unit) {
-    val range = if (cooled) SeatLevel.ventilatedRange else SeatLevel.heatOnlyRange
+private fun SeatControl(
+    label: String,
+    level: SeatLevel,
+    canCool: Boolean,
+    canHeat: Boolean,
+    onChange: (SeatLevel) -> Unit,
+) {
+    val range = SeatLevel.rangeFor(canCool, canHeat)
+    if (range.size <= 1) return
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
+    val current = range[index]
+    val tint = when {
+        current.isCool -> SeatCool
+        current.isHeat -> SeatHeat
+        else -> MaterialTheme.colorScheme.primary
+    }
     Column {
-        StepRow(label, range[index].label)
+        StepRow(label, current.label)
         Slider(
             value = index.toFloat(),
             onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
             valueRange = 0f..range.lastIndex.toFloat(),
             steps = (range.size - 2).coerceAtLeast(0),
+            colors = SliderDefaults.colors(thumbColor = tint, activeTrackColor = tint),
         )
     }
 }
@@ -1255,6 +1312,34 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ToggleRow("Front cooled", seats.frontCool) { vm.setSeatFlag(v, "fc", it) }
                     ToggleRow("Rear heated", seats.rearHeat) { vm.setSeatFlag(v, "rh", it) }
                     ToggleRow("Rear cooled", seats.rearCool) { vm.setSeatFlag(v, "rc", it) }
+
+                    Spacer(Modifier.height(8.dp))
+                    Text("Section order", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    val sections = state.sectionOrders[v.vin] ?: com.bloo.bluelink.data.DEFAULT_SECTIONS
+                    val sectionLabels = mapOf(
+                        "climate" to "Climate",
+                        "charge" to "Charge limits",
+                        "information" to "Information",
+                        "diagnostics" to "Diagnostics",
+                    )
+                    sections.forEachIndexed { index, id ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                sectionLabels[id] ?: id,
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            IconButton(onClick = { vm.moveSection(v, id, up = true) }, enabled = index > 0) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                            }
+                            IconButton(
+                                onClick = { vm.moveSection(v, id, up = false) },
+                                enabled = index < sections.lastIndex,
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                            }
+                        }
+                    }
                 }
             }
 

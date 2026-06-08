@@ -26,6 +26,9 @@ data class SeatConfig(
 /** User-confirmed powertrain (the US API only exposes EV vs gas). */
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
+/** Reorderable detail sections, in their default order. */
+val DEFAULT_SECTIONS = listOf("climate", "charge", "information", "diagnostics")
+
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
 
@@ -101,6 +104,20 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setSeatFlag(vin: String, field: String, value: Boolean) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
+    }
+
+    // --- Per-car section order -------------------------------------------
+
+    suspend fun sectionOrder(vin: String): List<String> {
+        val saved = context.settingsDataStore.data.first()[stringPreferencesKey("sections_$vin")]
+            ?.split(",")?.filter { it.isNotBlank() }
+        val valid = saved?.filter { it in DEFAULT_SECTIONS } ?: emptyList()
+        // Keep any defaults that aren't in the saved list (e.g. newly added sections).
+        return (valid + DEFAULT_SECTIONS.filter { it !in valid })
+    }
+
+    suspend fun setSectionOrder(vin: String, order: List<String>) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("sections_$vin")] = order.joinToString(",") }
     }
 
     // --- Per-car powertrain override -------------------------------------

@@ -1,12 +1,13 @@
 <resources>
     <string name="app_name">Bloo</string>
     <string name="widget_description">Bloo car status and quick controls</string>
-    <string name="widget_1x1">Bloo 1×1</string>
     <string name="widget_2x1">Bloo 2×1</string>
-    <string name="widget_2x2">Bloo 2×2</string>
-    <string name="widget_3x3">Bloo 3×3</string>
-    <string name="widget_4x4">Bloo 4×4</string>
-    <string name="widget_5x5">Bloo 5×5</string>
+    <string name="widget_4x1">Bloo 4×1</string>
+    <string name="widget_5x1">Bloo 5×1</string>
+    <string name="widget_6x1">Bloo 6×1</string>
+    <string name="widget_4x2">Bloo 4×2</string>
+    <string name="widget_5x2">Bloo 5×2</string>
+    <string name="widget_6x2">Bloo 6×2</string>
     <string name="tile_lock">Lock car</string>
     <string name="tile_unlock">Unlock car</string>
     <string name="tile_climate_start">Start climate</string>
