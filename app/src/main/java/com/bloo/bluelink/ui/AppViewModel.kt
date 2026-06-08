@@ -361,13 +361,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 block()
                 AppLog.log(success)
+                // Success is shown through the control's state (no toast); only
+                // optimistically flip the cached status so the toggle updates.
                 _state.update { st ->
                     val statuses = if (optimistic != null && st.statuses[vin] != null) {
                         st.statuses + (vin to optimistic(st.statuses.getValue(vin)))
                     } else {
                         st.statuses
                     }
-                    st.copy(message = success, statuses = statuses)
+                    st.copy(statuses = statuses)
                 }
                 persistSnapshots()
             } catch (e: Exception) {

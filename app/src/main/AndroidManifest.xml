@@ -23,39 +23,68 @@
             </intent-filter>
         </activity>
 
-        <!-- Home-screen widgets: small, medium, large (all reflow to fit) -->
+        <!-- Auth-gated command runner for widget buttons -->
+        <activity
+            android:name=".widget.CommandActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Bloo.Transparent" />
+
+        <!-- Home-screen widgets: fixed sizes 1x1 .. 5x5 -->
         <receiver
-            android:name=".widget.BlooWidgetReceiver"
+            android:name=".widget.BlooWidget1x1Receiver"
             android:exported="true"
-            android:label="@string/widget_small">
+            android:label="@string/widget_1x1">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/bloo_widget_info" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_w_1x1" />
         </receiver>
         <receiver
-            android:name=".widget.BlooWidgetMediumReceiver"
+            android:name=".widget.BlooWidget2x1Receiver"
             android:exported="true"
-            android:label="@string/widget_medium">
+            android:label="@string/widget_2x1">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/bloo_widget_medium" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_w_2x1" />
         </receiver>
         <receiver
-            android:name=".widget.BlooWidgetLargeReceiver"
+            android:name=".widget.BlooWidget2x2Receiver"
             android:exported="true"
-            android:label="@string/widget_large">
+            android:label="@string/widget_2x2">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/bloo_widget_large" />
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_w_2x2" />
+        </receiver>
+        <receiver
+            android:name=".widget.BlooWidget3x3Receiver"
+            android:exported="true"
+            android:label="@string/widget_3x3">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_w_3x3" />
+        </receiver>
+        <receiver
+            android:name=".widget.BlooWidget4x4Receiver"
+            android:exported="true"
+            android:label="@string/widget_4x4">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_w_4x4" />
+        </receiver>
+        <receiver
+            android:name=".widget.BlooWidget5x5Receiver"
+            android:exported="true"
+            android:label="@string/widget_5x5">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_w_5x5" />
         </receiver>
 
         <!-- Quick Settings tiles -->

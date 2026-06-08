@@ -50,6 +50,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -88,6 +89,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Switch
@@ -149,7 +151,30 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+    Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbar) { data ->
+                // Themed, rounded "toast" — used for errors/notices.
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.padding(16.dp),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.ErrorOutline, contentDescription = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        },
+    ) { padding ->
         Column(Modifier.padding(padding)) {
             when (state.screen) {
                 Screen.Login -> LoginScreen(state.loading, vm::login)
@@ -294,17 +319,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     if (vehicles.isEmpty()) return
 
     val widthDp = LocalConfiguration.current.screenWidthDp
-    // Multi-car grid on unfolded foldables, tablets and desktops.
-    val twoPane = widthDp >= 600
+    val large = widthDp >= 600
     val current = state.currentIndex.coerceIn(0, vehicles.lastIndex)
     val expanded = state.expandedIndex?.takeIf { it in vehicles.indices }
-    val showTwoPane = twoPane && expanded == null
+    // Grid of cars only makes sense with more than one car and nothing expanded.
+    val isGrid = large && expanded == null && vehicles.size > 1
+    // A single car (or an expanded one) on a big screen uses the dual column.
+    val dualIndex = if (large && !isGrid) (expanded ?: current) else null
     val actionTarget = vehicles[(expanded ?: current).coerceIn(0, vehicles.lastIndex)]
 
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = {
-                if (showTwoPane) {
+                if (isGrid) {
                     Text("Garage")
                 } else {
                     Column {
@@ -318,9 +345,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
             },
             navigationIcon = {
-                if (twoPane && expanded != null) {
+                if (expanded != null) {
                     IconButton(onClick = { vm.collapse() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back to split view")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back to garage")
                     }
                 }
             },
@@ -331,11 +358,6 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 IconButton(onClick = { vm.refreshStatus(actionTarget) }) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh status")
                 }
-                if (twoPane && expanded == null) {
-                    IconButton(onClick = { vm.expand(current) }) {
-                        Icon(Icons.Filled.Fullscreen, contentDescription = "Expand car")
-                    }
-                }
                 IconButton(onClick = { vm.openSettings() }) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                 }
@@ -343,10 +365,10 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         )
 
         when {
-            // Large + not expanded: show several cars at once.
-            showTwoPane -> {
+            // Big screen, multiple cars: a grid of full car panels (no swiping).
+            isGrid -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(300.dp),
+                    columns = GridCells.Fixed(if (widthDp >= 1040) 3 else 2),
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -357,11 +379,11 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
             }
 
-            // Large + expanded: one car in a dual column — controls left, diagnostics right.
-            twoPane && expanded != null -> {
+            // Big screen, one car: dual column — controls left, diagnostics right.
+            dualIndex != null -> {
                 Row(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(1.4f).fillMaxHeight()) {
-                        VehicleDetailContent(vehicles[expanded], state, vm, showDiagnostics = false)
+                        VehicleDetailContent(vehicles[dualIndex], state, vm, showDiagnostics = false)
                     }
                     Column(
                         Modifier
@@ -371,7 +393,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        DiagnosticsCard(state.statusFor(vehicles[expanded]))
+                        DiagnosticsCard(state.statusFor(vehicles[dualIndex]))
                     }
                 }
             }

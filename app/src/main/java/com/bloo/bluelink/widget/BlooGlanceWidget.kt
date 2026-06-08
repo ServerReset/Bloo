@@ -1,13 +1,16 @@
 package com.bloo.bluelink.widget
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.Button
-import androidx.glance.GlanceModifier
 import androidx.glance.GlanceId
+import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -31,47 +34,38 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import android.content.Context
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 
 /**
- * A single, fully responsive home-screen widget. It reflows from a 1x1 tile
- * (just the charge/fuel %) up to a full-screen panel, reading the on-disk
- * snapshot the app maintains. Includes car switching and quick commands.
+ * One reflowing widget rendered at several fixed footprints (1x1 … 5x5 — see the
+ * receivers + provider XML). Reads the on-disk snapshot. Command buttons launch
+ * [CommandActivity], which authenticates (fingerprint/PIN) then sends + toasts.
  */
 class BlooGlanceWidget : GlanceAppWidget() {
 
-    // Exact = recompose with the real size, so the layout reflows precisely.
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = SnapshotStore(context.applicationContext).current()
-        provideContent {
-            WidgetRoot(data)
-        }
+        provideContent { WidgetRoot(data) }
     }
 }
 
-// Three picker entries that all render the same reflowing content but default to
-// small/medium/large footprints (see their provider XML).
-class BlooWidgetMediumReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = BlooGlanceWidget()
-}
-
-class BlooWidgetLargeReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = BlooGlanceWidget()
-}
+// Fixed-size picker entries (see res/xml/bloo_widget_*.xml).
+class BlooWidget1x1Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget2x1Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget2x2Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget3x3Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget4x4Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
+class BlooWidget5x5Receiver : GlanceAppWidgetReceiver() { override val glanceAppWidget = BlooGlanceWidget() }
 
 private val Bg = ColorProvider(Color(0xFF12141C))
 private val OnBg = ColorProvider(Color(0xFFF2F4F8))
 private val Accent = ColorProvider(Color(0xFF7AA8FF))
+private val Green = ColorProvider(Color(0xFF2EBD59))
 private val Muted = ColorProvider(Color(0xFFAEB6C2))
-
-class BlooWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = BlooGlanceWidget()
-}
 
 @Composable
 private fun WidgetRoot(data: SnapshotStore.SnapshotData) {
@@ -82,87 +76,112 @@ private fun WidgetRoot(data: SnapshotStore.SnapshotData) {
             .fillMaxSize()
             .background(Bg)
             .cornerRadius(24.dp)
-            .padding(12.dp)
+            .padding(10.dp)
             .clickable(actionStartActivity<MainActivity>()),
     ) {
         if (selected == null) {
-            Text("Open Bloo to sign in", style = body())
+            Text("Open Bloo", style = body())
             return@Column
         }
         when {
-            size.width < 120.dp -> TinyLayout(selected)
+            size.width < 110.dp || size.height < 90.dp -> TinyLayout(selected)
             size.width < 220.dp -> SmallLayout(data, selected)
-            else -> LargeLayout(data, selected, size.height >= 240.dp)
+            else -> LargeLayout(data, selected, size.height >= 220.dp)
         }
     }
 }
 
 @Composable
 private fun TinyLayout(v: VehicleSnapshot) {
-    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(percentText(v), style = title(26))
-        Text(if (v.isEv) "battery" else "fuel", style = caption())
+    Column(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(percentText(v), style = title(24))
+        Text(if (v.charging == true) "charging" else if (v.isEv) "battery" else "fuel", style = caption())
     }
 }
 
 @Composable
 private fun SmallLayout(data: SnapshotStore.SnapshotData, v: VehicleSnapshot) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
-        HeaderRow(data, v, compact = true)
-        Spacer(GlanceModifier.height(4.dp))
-        Text(percentText(v), style = title(28))
+        Text(v.name, style = TextStyle(color = OnBg, fontSize = 13.sp, fontWeight = FontWeight.Bold))
+        Text(percentText(v), style = title(26))
         Text(rangeText(v), style = caption())
         Spacer(GlanceModifier.height(6.dp))
-        Row {
-            Button("Lock", actionRunCallback<LockAction>())
-            Spacer(GlanceModifier.width(6.dp))
-            Button("Unlock", actionRunCallback<UnlockAction>())
-        }
+        Row { DoorsButton(v); Spacer(GlanceModifier.width(6.dp)); ClimateButton(v) }
     }
 }
 
 @Composable
 private fun LargeLayout(data: SnapshotStore.SnapshotData, v: VehicleSnapshot, tall: Boolean) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
-        HeaderRow(data, v, compact = false)
+        HeaderRow(data, v)
         Spacer(GlanceModifier.height(6.dp))
         Text(percentText(v), style = title(40))
         Text(rangeText(v), style = body())
         v.locked?.let { Text(if (it) "Doors locked" else "Doors unlocked", style = caption()) }
-        if (v.charging == true) Text("Charging", style = caption())
+        if (v.charging == true) Text("Charging", style = TextStyle(color = Green, fontSize = 12.sp, fontWeight = FontWeight.Bold))
         if (tall) {
-            v.model.let { Text(it, style = caption()) }
+            Text(v.model, style = caption())
             v.updated?.let { Text("Updated $it", style = caption()) }
         }
         Spacer(GlanceModifier.height(8.dp))
         Row(modifier = GlanceModifier.fillMaxWidth()) {
-            Button("Lock", actionRunCallback<LockAction>())
+            DoorsButton(v)
             Spacer(GlanceModifier.width(6.dp))
-            Button("Unlock", actionRunCallback<UnlockAction>())
-            Spacer(GlanceModifier.width(6.dp))
-            Button("Refresh", actionRunCallback<RefreshAction>())
+            ClimateButton(v)
+        }
+        if (v.isEv) {
+            Spacer(GlanceModifier.height(6.dp))
+            ChargeButton(v)
         }
         Spacer(GlanceModifier.height(6.dp))
-        Button("Climate", actionRunCallback<ClimateAction>())
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
+            Button("Refresh", actionRunCallback<RefreshAction>())
+            if (data.vehicles.size > 1) {
+                Spacer(GlanceModifier.width(6.dp))
+                Button("↔ Car", actionRunCallback<SwitchCarAction>())
+            }
+        }
     }
 }
 
 @Composable
-private fun HeaderRow(data: SnapshotStore.SnapshotData, v: VehicleSnapshot, compact: Boolean) {
-    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            v.name,
-            style = TextStyle(
-                color = OnBg,
-                fontSize = if (compact) 13.sp else 16.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-            modifier = GlanceModifier.fillMaxWidth(),
-        )
+private fun HeaderRow(data: SnapshotStore.SnapshotData, v: VehicleSnapshot) {
+    Text(
+        v.name,
+        style = TextStyle(color = OnBg, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+        modifier = GlanceModifier.fillMaxWidth(),
+    )
+}
+
+// --- Auth-gated command buttons ------------------------------------------
+
+@Composable
+private fun DoorsButton(v: VehicleSnapshot) {
+    if (v.locked == true) CommandButton("Unlock", "unlock", v.vin) else CommandButton("Lock", "lock", v.vin)
+}
+
+@Composable
+private fun ClimateButton(v: VehicleSnapshot) = CommandButton("Climate", "climate_on", v.vin)
+
+@Composable
+private fun ChargeButton(v: VehicleSnapshot) {
+    if (v.charging == true) CommandButton("Stop charge", "charge_off", v.vin)
+    else CommandButton("Charge", "charge_on", v.vin)
+}
+
+@Composable
+private fun CommandButton(label: String, action: String, vin: String) {
+    val context = LocalContext.current
+    val intent = Intent(context, CommandActivity::class.java).apply {
+        putExtra(CommandActivity.EXTRA_ACTION, action)
+        // Unique data so each button gets its own PendingIntent.
+        data = Uri.parse("bloo://cmd/$action/$vin")
     }
-    if (data.vehicles.size > 1) {
-        Button("↔ Switch car", actionRunCallback<SwitchCarAction>())
-    }
+    Button(label, androidx.glance.appwidget.action.actionStartActivity(intent))
 }
 
 private fun percentText(v: VehicleSnapshot) = v.percent?.let { "$it%" } ?: "—"
@@ -171,8 +190,6 @@ private fun rangeText(v: VehicleSnapshot) = v.rangeMi?.let { "$it mi range" } ?:
 @Composable private fun title(sizeSp: Int) =
     TextStyle(color = Accent, fontSize = sizeSp.sp, fontWeight = FontWeight.Bold)
 
-@Composable private fun body() =
-    TextStyle(color = OnBg, fontSize = 14.sp)
+@Composable private fun body() = TextStyle(color = OnBg, fontSize = 14.sp)
 
-@Composable private fun caption() =
-    TextStyle(color = Muted, fontSize = 12.sp)
+@Composable private fun caption() = TextStyle(color = Muted, fontSize = 12.sp)
