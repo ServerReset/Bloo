@@ -14,8 +14,11 @@ import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.SeatCapability
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.widget.BlooGlanceWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -67,6 +70,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = SessionStore(app)
     private val settingsStore = SettingsStore(app)
     private val credentialStore = CredentialStore(app)
+    private val snapshotStore = SnapshotStore(app)
     private val repo = BlueLinkRepository(BlueLinkApi(), store)
 
     private val _state = MutableStateFlow(UiState())
@@ -137,11 +141,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun loadGarage() = launchBusy { loadGarageInternal() }
 
     private suspend fun loadGarageInternal() {
-        val vehicles = repo.vehicles()
-        if (vehicles.isEmpty()) {
+        val fetched = repo.vehicles()
+        if (fetched.isEmpty()) {
             _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty) }
             return
         }
+        val vehicles = applyOrder(fetched, settingsStore.vehicleOrder())
+        snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, null) })
         val ventilated = vehicles.associate { it.vin to store.ventilatedSeats(it.vin) }
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
@@ -180,6 +186,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 repo.status(v, refresh = false)?.let { s ->
                     _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
+                    persistSnapshots()
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(message = e.message ?: "Couldn't load status") }
@@ -195,6 +202,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 repo.status(v, refresh = true)?.let { s ->
                     _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
+                    persistSnapshots()
                 }
                 AppLog.log("Status refreshed for ${v.name}")
             } catch (e: Exception) {
@@ -203,6 +211,54 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(refreshing = false) }
             }
         }
+    }
+
+    /** Move a car up/down in the user's order and persist it. */
+    fun moveVehicle(vin: String, up: Boolean) {
+        val list = _state.value.vehicles.toMutableList()
+        val i = list.indexOfFirst { it.vin == vin }
+        if (i < 0) return
+        val j = if (up) i - 1 else i + 1
+        if (j !in list.indices) return
+        list[i] = list[j].also { list[j] = list[i] }
+        _state.update { it.copy(vehicles = list) }
+        viewModelScope.launch {
+            settingsStore.setVehicleOrder(list.map { it.vin })
+            persistSnapshots(list)
+        }
+    }
+
+    private suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
+        snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin]) })
+        runCatching { BlooGlanceWidget().updateAll(getApplication()) }
+    }
+
+    private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {
+        val percent = if (v.isEv) status?.evStatus?.batteryStatus else status?.fuelLevel
+        val range = (status?.evStatus?.drvDistance?.firstOrNull()
+            ?.rangeByFuel?.totalAvailableRange?.value ?: status?.dte?.value)?.toInt()
+        return VehicleSnapshot(
+            vin = v.vin,
+            name = v.name,
+            model = v.model,
+            isEv = v.isEv,
+            regId = v.regId,
+            generation = v.generation,
+            brandIndicator = v.brandIndicator,
+            percent = percent,
+            rangeMi = range,
+            locked = status?.doorLock,
+            charging = status?.evStatus?.batteryCharge,
+            updated = status?.dateTime,
+        )
+    }
+
+    private fun applyOrder(vehicles: List<Vehicle>, order: List<String>): List<Vehicle> {
+        if (order.isEmpty()) return vehicles
+        val byVin = vehicles.associateBy { it.vin }
+        val ordered = order.mapNotNull { byVin[it] }
+        val rest = vehicles.filter { it.vin !in order }
+        return ordered + rest
     }
 
     fun setVentilatedSeats(v: Vehicle, value: Boolean) {

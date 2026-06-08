@@ -20,15 +20,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -42,6 +43,9 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocationOn
@@ -52,6 +56,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -267,18 +272,21 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val vehicles = state.vehicles
     if (vehicles.isEmpty()) return
 
-    val wide = LocalConfiguration.current.screenWidthDp >= 600
+    val widthDp = LocalConfiguration.current.screenWidthDp
+    // Two-pane (list + detail) on tablets/desktops/unfolded foldables.
+    val twoPane = widthDp >= 840
+    val current = state.currentIndex.coerceIn(0, vehicles.lastIndex)
     val expanded = state.expandedIndex?.takeIf { it in vehicles.indices }
-    val showGrid = wide && expanded == null
-    val actionTarget = vehicles[(expanded ?: state.currentIndex).coerceIn(0, vehicles.lastIndex)]
+    val showTwoPane = twoPane && expanded == null
+    val actionTarget = vehicles[(expanded ?: current).coerceIn(0, vehicles.lastIndex)]
 
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(if (showGrid) "Garage" else actionTarget.name) },
+            title = { Text(if (showTwoPane) "Garage" else actionTarget.name) },
             navigationIcon = {
-                if (wide && expanded != null) {
+                if (twoPane && expanded != null) {
                     IconButton(onClick = { vm.collapse() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back to garage")
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back to split view")
                     }
                 }
             },
@@ -286,9 +294,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 if (state.refreshing) {
                     ContainedLoadingIndicator(Modifier.size(36.dp).padding(end = 4.dp))
                 }
-                if (!showGrid) {
-                    IconButton(onClick = { vm.refreshStatus(actionTarget) }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh status")
+                IconButton(onClick = { vm.refreshStatus(actionTarget) }) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh status")
+                }
+                if (twoPane && expanded == null) {
+                    IconButton(onClick = { vm.expand(current) }) {
+                        Icon(Icons.Filled.Fullscreen, contentDescription = "Expand car")
                     }
                 }
                 IconButton(onClick = { vm.openSettings() }) {
@@ -298,35 +309,53 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         )
 
         when {
-            showGrid -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(340.dp),
-                    modifier = Modifier.fillMaxSize().padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    itemsIndexed(vehicles) { i, v ->
-                        VehicleSummaryCard(v, state.statusFor(v)) { vm.expand(i) }
+            showTwoPane -> {
+                Row(Modifier.fillMaxSize()) {
+                    // Left pane: every car at a glance.
+                    LazyColumn(
+                        modifier = Modifier.width(340.dp).fillMaxHeight().padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(vehicles) { i, v ->
+                            VehicleSummaryCard(v, state.statusFor(v), selected = i == current) {
+                                vm.selectIndex(i)
+                            }
+                        }
+                    }
+                    // Right pane: full detail of the selected car.
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        VehicleDetailContent(vehicles[current], state, vm)
                     }
                 }
             }
 
-            wide && expanded != null -> {
+            twoPane && expanded != null -> {
                 VehicleDetailContent(vehicles[expanded], state, vm)
             }
 
             else -> {
-                val pager = rememberPagerState(
-                    initialPage = state.currentIndex.coerceIn(0, vehicles.lastIndex),
-                ) { vehicles.size }
-                LaunchedEffect(pager) {
-                    snapshotFlow { pager.settledPage }.collect { vm.selectIndex(it) }
+                // Phones / cover screens: an endless swipe carousel.
+                val count = vehicles.size
+                val loop = count > 1
+                val pageCount = if (loop) Int.MAX_VALUE else 1
+                val initial = remember(count) {
+                    if (!loop) 0 else {
+                        val mid = Int.MAX_VALUE / 2
+                        mid - (mid % count) + current
+                    }
+                }
+                val pager = rememberPagerState(initialPage = initial) { pageCount }
+                LaunchedEffect(pager, count) {
+                    snapshotFlow { pager.settledPage }.collect { page ->
+                        vm.selectIndex(if (loop) page.mod(count) else page)
+                    }
                 }
                 Column(Modifier.fillMaxSize()) {
                     HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-                        VehicleDetailContent(vehicles[page], state, vm)
+                        val v = vehicles[if (loop) page.mod(count) else page]
+                        VehicleDetailContent(v, state, vm)
                     }
-                    if (vehicles.size > 1) PagerDots(pager.currentPage, vehicles.size)
+                    if (loop) PagerDots(pager.currentPage.mod(count), count)
                 }
             }
         }
@@ -449,8 +478,18 @@ private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VehicleSummaryCard(v: Vehicle, status: VehicleStatus?, onOpen: () -> Unit) {
-    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+private fun VehicleSummaryCard(
+    v: Vehicle,
+    status: VehicleStatus?,
+    selected: Boolean = false,
+    onOpen: () -> Unit,
+) {
+    val colors = if (selected) {
+        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    } else {
+        CardDefaults.cardColors()
+    }
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth(), colors = colors) {
         Column(Modifier.padding(16.dp)) {
             Image(
                 painter = painterResource(R.drawable.ic_car_hero),
@@ -831,6 +870,26 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                 } else {
                     Text("No fingerprint/biometric is enrolled on this device.")
+                }
+            }
+
+            // Vehicle order
+            if (state.vehicles.size > 1) {
+                SettingsCard("Vehicle order") {
+                    state.vehicles.forEachIndexed { index, v ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(v.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                            IconButton(onClick = { vm.moveVehicle(v.vin, up = true) }, enabled = index > 0) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                            }
+                            IconButton(
+                                onClick = { vm.moveVehicle(v.vin, up = false) },
+                                enabled = index < state.vehicles.lastIndex,
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                            }
+                        }
+                    }
                 }
             }
 

@@ -21,6 +21,7 @@ class SettingsStore(private val context: Context) {
         val DYNAMIC = stringPreferencesKey("dynamic_color")
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
+        val ORDER = stringPreferencesKey("vehicle_order")
     }
 
     data class Appearance(
@@ -50,6 +51,15 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setLastVehicleVin(vin: String) {
         context.settingsDataStore.edit { it[Keys.LAST_VIN] = vin }
+    }
+
+    /** User-defined display order of vehicles (by VIN). */
+    suspend fun vehicleOrder(): List<String> =
+        context.settingsDataStore.data.first()[Keys.ORDER]
+            ?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
+
+    suspend fun setVehicleOrder(order: List<String>) {
+        context.settingsDataStore.edit { it[Keys.ORDER] = order.joinToString("\n") }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
