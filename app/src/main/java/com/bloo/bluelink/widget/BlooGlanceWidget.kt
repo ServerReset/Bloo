@@ -139,6 +139,8 @@ private fun LargeLayout(data: SnapshotStore.SnapshotData, v: VehicleSnapshot, ta
             Spacer(GlanceModifier.width(6.dp))
             Button("Refresh", actionRunCallback<RefreshAction>())
         }
+        Spacer(GlanceModifier.height(6.dp))
+        Button("Climate", actionRunCallback<ClimateAction>())
     }
 }
 

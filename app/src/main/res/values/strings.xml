@@ -3,4 +3,6 @@
     <string name="widget_description">Bloo car status and quick controls</string>
     <string name="tile_lock">Lock car</string>
     <string name="tile_unlock">Unlock car</string>
+    <string name="tile_climate_start">Start climate</string>
+    <string name="tile_climate_stop">Stop climate</string>
 </resources>

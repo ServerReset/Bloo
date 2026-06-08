@@ -147,7 +147,24 @@ class BlueLinkApi {
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
-        val request = baseRequest("/ac/v2/rcs/rsc/stop", token, username, pin, v)
+        val path = if (v.isEv) "/ac/v2/evc/fatc/stop" else "/ac/v2/rcs/rsc/stop"
+        val request = baseRequest(path, token, username, pin, v)
+            .post(ByteArray(0).toRequestBody(null))
+            .build()
+        call(request)
+    }
+
+    /** Start charging (EV). Real US endpoint: /ac/v2/evc/charge/start */
+    suspend fun startCharge(token: String, username: String, pin: String, v: Vehicle): String = execute {
+        val request = baseRequest("/ac/v2/evc/charge/start", token, username, pin, v)
+            .post(ByteArray(0).toRequestBody(null))
+            .build()
+        call(request)
+    }
+
+    /** Stop charging (EV). Real US endpoint: /ac/v2/evc/charge/stop */
+    suspend fun stopCharge(token: String, username: String, pin: String, v: Vehicle): String = execute {
+        val request = baseRequest("/ac/v2/evc/charge/stop", token, username, pin, v)
             .post(ByteArray(0).toRequestBody(null))
             .build()
         call(request)

@@ -48,6 +48,10 @@ class BlueLinkRepository(
     suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int) =
         withSession { s -> api.setChargeTargets(s.accessToken, s.username, s.pin, v, acPercent, dcPercent) }
 
+    suspend fun startCharge(v: Vehicle) = withSession { s -> api.startCharge(s.accessToken, s.username, s.pin, v) }
+
+    suspend fun stopCharge(v: Vehicle) = withSession { s -> api.stopCharge(s.accessToken, s.username, s.pin, v) }
+
     /** Runs [block] with the current session, refreshing the token once on 401/403. */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
         val session = store.load() ?: throw BlueLinkException("Not logged in")

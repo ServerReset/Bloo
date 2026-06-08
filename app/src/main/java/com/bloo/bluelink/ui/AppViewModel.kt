@@ -291,6 +291,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repo.setChargeTargets(v, acPercent, dcPercent)
         }
 
+    fun startCharge(v: Vehicle) = command("Charge start requested") { repo.startCharge(v) }
+    fun stopCharge(v: Vehicle) = command("Charge stop requested") { repo.stopCharge(v) }
+
+    /** Remote engine/climate start with sensible defaults (for the primary action). */
+    fun engineStart(v: Vehicle) =
+        command("Remote start requested") {
+            repo.startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+        }
+
     private fun command(success: String, block: suspend () -> Unit) = launchBusy {
         block()
         AppLog.log(success)

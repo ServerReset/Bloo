@@ -4,6 +4,7 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkRepository
+import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.CoroutineScope
@@ -52,5 +53,17 @@ class LockTileService : CommandTileService("Lock car") {
 class UnlockTileService : CommandTileService("Unlock car") {
     override suspend fun runCommand(repo: BlueLinkRepository, vehicle: com.bloo.bluelink.data.Vehicle) {
         repo.unlock(vehicle)
+    }
+}
+
+class StartClimateTileService : CommandTileService("Start climate") {
+    override suspend fun runCommand(repo: BlueLinkRepository, vehicle: com.bloo.bluelink.data.Vehicle) {
+        repo.startClimate(vehicle, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+    }
+}
+
+class StopClimateTileService : CommandTileService("Stop climate") {
+    override suspend fun runCommand(repo: BlueLinkRepository, vehicle: com.bloo.bluelink.data.Vehicle) {
+        repo.stopClimate(vehicle)
     }
 }

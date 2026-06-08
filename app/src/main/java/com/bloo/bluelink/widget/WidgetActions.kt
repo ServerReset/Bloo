@@ -7,6 +7,7 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkRepository
+import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.merged
@@ -47,6 +48,20 @@ class UnlockAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         SnapshotStore(context.applicationContext).current().selected?.let {
             runCatching { repo(context).unlock(it.toVehicle()) }
+        }
+        BlooGlanceWidget().updateAll(context)
+    }
+}
+
+class ClimateAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        SnapshotStore(context.applicationContext).current().selected?.let {
+            runCatching {
+                repo(context).startClimate(
+                    it.toVehicle(),
+                    ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10),
+                )
+            }
         }
         BlooGlanceWidget().updateAll(context)
     }
