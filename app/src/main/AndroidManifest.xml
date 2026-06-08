@@ -23,16 +23,39 @@
             </intent-filter>
         </activity>
 
-        <!-- Home-screen widget -->
+        <!-- Home-screen widgets: small, medium, large (all reflow to fit) -->
         <receiver
             android:name=".widget.BlooWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_small">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/bloo_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.BlooWidgetMediumReceiver"
+            android:exported="true"
+            android:label="@string/widget_medium">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/bloo_widget_medium" />
+        </receiver>
+        <receiver
+            android:name=".widget.BlooWidgetLargeReceiver"
+            android:exported="true"
+            android:label="@string/widget_large">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/bloo_widget_large" />
         </receiver>
 
         <!-- Quick Settings tiles -->

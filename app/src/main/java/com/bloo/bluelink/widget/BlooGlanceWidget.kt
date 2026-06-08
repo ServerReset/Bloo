@@ -43,15 +43,8 @@ import com.bloo.bluelink.data.VehicleSnapshot
  */
 class BlooGlanceWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Responsive(
-        setOf(
-            DpSize(60.dp, 60.dp),    // 1x1
-            DpSize(140.dp, 60.dp),   // 2x1
-            DpSize(180.dp, 130.dp),  // small-medium
-            DpSize(260.dp, 200.dp),  // medium-large
-            DpSize(320.dp, 320.dp),  // large-full
-        ),
-    )
+    // Exact = recompose with the real size, so the layout reflows precisely.
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = SnapshotStore(context.applicationContext).current()
@@ -59,6 +52,16 @@ class BlooGlanceWidget : GlanceAppWidget() {
             WidgetRoot(data)
         }
     }
+}
+
+// Three picker entries that all render the same reflowing content but default to
+// small/medium/large footprints (see their provider XML).
+class BlooWidgetMediumReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = BlooGlanceWidget()
+}
+
+class BlooWidgetLargeReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = BlooGlanceWidget()
 }
 
 private val Bg = ColorProvider(Color(0xFF12141C))

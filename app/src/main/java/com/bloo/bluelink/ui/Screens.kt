@@ -8,6 +8,8 @@ package com.bloo.bluelink.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -547,7 +550,7 @@ private fun CarPanel(v: Vehicle, state: UiState, vm: AppViewModel, onExpand: () 
             }
             HeroVisual(v, state.imageUrls[v.vin], height = 120.dp)
             ChargeFuelBar(v, status)
-            PrimaryActions(v, status, state.locations[v.vin], !state.loading, vm)
+            PrimaryActions(v, state, vm)
         }
     }
 }
@@ -581,7 +584,7 @@ private fun VehicleDetailContent(
             // 1. Car image (gradient by default) + 2. charge/fuel gauge
             HeroHeader(v, status, state.imageUrls[v.vin])
             // 3. Important actions
-            PrimaryActions(v, status, state.locations[v.vin], enabled, vm)
+            PrimaryActions(v, state, vm)
             // 4. Climate
             ClimateCard(v, status, cap, ventilated, enabled, vm)
             // 5. Status (moved below climate, per request)
@@ -594,21 +597,17 @@ private fun VehicleDetailContent(
 }
 
 @Composable
-private fun PrimaryActions(
-    v: Vehicle,
-    status: VehicleStatus?,
-    location: GeoLocation?,
-    enabled: Boolean,
-    vm: AppViewModel,
-) {
+private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val context = LocalContext.current
+    val status = state.statusFor(v)
+    val location = state.locations[v.vin]
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         StateControl(
             name = "Doors",
             isOn = status?.doorLock,
             stateOn = "Locked", stateOff = "Unlocked",
             turnOn = "Lock", turnOff = "Unlock",
-            icon = Icons.Filled.Lock, enabled = enabled,
+            icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
         )
         StateControl(
@@ -616,7 +615,7 @@ private fun PrimaryActions(
             isOn = status?.airCtrlOn,
             stateOn = "On", stateOff = "Off",
             turnOn = "Start", turnOff = "Stop",
-            icon = Icons.Filled.AcUnit, enabled = enabled,
+            icon = Icons.Filled.AcUnit, pending = state.isPending(v.vin, "climate"),
             onActivate = { vm.engineStart(v) }, onDeactivate = { vm.stopClimate(v) },
         )
         if (v.isEv) {
@@ -625,16 +624,21 @@ private fun PrimaryActions(
                 isOn = status?.evStatus?.batteryCharge,
                 stateOn = "Charging", stateOff = "Idle",
                 turnOn = "Start", turnOff = "Stop",
-                icon = Icons.Filled.Bolt, enabled = enabled,
+                icon = Icons.Filled.Bolt, pending = state.isPending(v.vin, "charge"),
                 onActivate = { vm.startCharge(v) }, onDeactivate = { vm.stopCharge(v) },
             )
         }
+        val locating = state.isPending(v.vin, "locate")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CommandButton(
-                label = location?.let { String.format("%.4f, %.4f", it.latitude, it.longitude) } ?: "Locate",
+                label = when {
+                    locating -> "Locating…"
+                    location != null -> String.format("%.4f, %.4f", location.latitude, location.longitude)
+                    else -> "Locate"
+                },
                 icon = Icons.Filled.LocationOn,
                 modifier = Modifier.weight(1f),
-                enabled = enabled,
+                enabled = !locating,
             ) { vm.locate(v) }
             if (location != null) {
                 CommandButton("Map", Icons.Filled.Map, Modifier.weight(0.5f), true) {
@@ -667,7 +671,7 @@ private fun StateControl(
     turnOn: String,
     turnOff: String,
     icon: ImageVector,
-    enabled: Boolean,
+    pending: Boolean,
     onActivate: () -> Unit,
     onDeactivate: () -> Unit,
 ) {
@@ -685,10 +689,11 @@ private fun StateControl(
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                when (isOn) {
-                    true -> stateOn
-                    false -> stateOff
-                    null -> "Unknown"
+                when {
+                    pending -> "Sending…"
+                    isOn == true -> stateOn
+                    isOn == false -> stateOff
+                    else -> "Unknown"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (active) ChargeGreen else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -697,18 +702,19 @@ private fun StateControl(
         }
         val onClick = { if (active) onDeactivate() else onActivate() }
         val shape = RoundedCornerShape(corner)
+        val content: @Composable RowScope.() -> Unit = {
+            if (pending) {
+                LoadingIndicator(Modifier.size(22.dp))
+            } else {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (active) turnOff else turnOn, fontWeight = FontWeight.SemiBold)
+            }
+        }
         if (active) {
-            Button(onClick = onClick, enabled = enabled, shape = shape, modifier = Modifier.height(60.dp)) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(turnOff, fontWeight = FontWeight.SemiBold)
-            }
+            Button(onClick = onClick, enabled = !pending, shape = shape, modifier = Modifier.height(60.dp), content = content)
         } else {
-            FilledTonalButton(onClick = onClick, enabled = enabled, shape = shape, modifier = Modifier.height(60.dp)) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(turnOn, fontWeight = FontWeight.SemiBold)
-            }
+            FilledTonalButton(onClick = onClick, enabled = !pending, shape = shape, modifier = Modifier.height(60.dp), content = content)
         }
     }
 }
@@ -978,6 +984,18 @@ private fun SettingsScreen(vm: AppViewModel) {
     val clipboard = LocalClipboardManager.current
     val canBio = remember { vm.canUseBiometrics() }
 
+    var pickTarget by remember { mutableStateOf<String?>(null) }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val target = pickTarget
+        if (uri != null && target != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            vm.setVehicleImage(target, uri.toString())
+        }
+        pickTarget = null
+    }
+
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Settings") },
@@ -1073,6 +1091,15 @@ private fun SettingsScreen(vm: AppViewModel) {
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                pickTarget = v.vin
+                                photoPicker.launch(arrayOf("image/*"))
+                            }) { Text("Choose photo") }
+                            if (state.imageUrls[v.vin] != null) {
+                                TextButton(onClick = { vm.setVehicleImage(v.vin, "") }) { Text("Clear") }
+                            }
+                        }
                     }
                 }
             }

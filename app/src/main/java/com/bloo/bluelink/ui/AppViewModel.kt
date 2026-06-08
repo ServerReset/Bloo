@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkApi
+import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.CredentialStore
@@ -51,10 +52,14 @@ data class UiState(
     val locations: Map<String, GeoLocation> = emptyMap(),
     val ventilated: Map<String, Boolean> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
+    /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
+    val pending: Set<String> = emptySet(),
     val credentials: Credentials? = null,
     val message: String? = null,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
+
+    fun isPending(vin: String, action: String): Boolean = "$vin:$action" in pending
 
     fun seatCapabilityFor(v: Vehicle): SeatCapability {
         val s = statuses[v.vin]?.seatHeaterVentState ?: return SeatCapability()
@@ -279,43 +284,77 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { store.setVentilatedSeats(v.vin, value) }
     }
 
-    fun locate(v: Vehicle) = launchBusy {
-        val loc = repo.location(v)
-        _state.update {
-            it.copy(
-                locations = if (loc != null) it.locations + (v.vin to loc) else it.locations,
-                message = if (loc == null) "Could not get the car's location" else "Location updated",
-            )
-        }
+    fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
+        val loc = repo.location(v) ?: throw BlueLinkException("Could not get the car's location")
+        _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
     }
 
-    // --- Commands --------------------------------------------------------
+    // --- Commands (per-action pending + optimistic state flip) -----------
 
-    fun lock(v: Vehicle) = command("Lock requested") { repo.lock(v) }
-    fun unlock(v: Vehicle) = command("Unlock requested") { repo.unlock(v) }
-    fun stopClimate(v: Vehicle) = command("Climate stop requested") { repo.stopClimate(v) }
+    fun lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repo.lock(v) }
+    fun unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repo.unlock(v) }
+
+    fun stopClimate(v: Vehicle) =
+        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repo.stopClimate(v) }
 
     fun startClimate(v: Vehicle, req: ClimateRequest) =
-        command("Climate start requested (${req.tempF}°F)") { repo.startClimate(v, req) }
-
-    fun setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
-        command("Charge limits set (AC $acPercent% / DC $dcPercent%)") {
-            repo.setChargeTargets(v, acPercent, dcPercent)
+        runCommand(v.vin, "climate", "Climate on (${req.tempF}°F)", { it.copy(airCtrlOn = true) }) {
+            repo.startClimate(v, req)
         }
 
-    fun startCharge(v: Vehicle) = command("Charge start requested") { repo.startCharge(v) }
-    fun stopCharge(v: Vehicle) = command("Charge stop requested") { repo.stopCharge(v) }
-
-    /** Remote engine/climate start with sensible defaults (for the primary action). */
+    /** Remote engine/climate start with defaults (the primary Climate action). */
     fun engineStart(v: Vehicle) =
-        command("Remote start requested") {
+        runCommand(v.vin, "climate", "Climate on", { it.copy(airCtrlOn = true) }) {
             repo.startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
         }
 
-    private fun command(success: String, block: suspend () -> Unit) = launchBusy {
-        block()
-        AppLog.log(success)
-        _state.update { it.copy(message = success) }
+    fun startCharge(v: Vehicle) =
+        runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
+            repo.startCharge(v)
+        }
+
+    fun stopCharge(v: Vehicle) =
+        runCommand(v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) }) {
+            repo.stopCharge(v)
+        }
+
+    fun setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
+        runCommand(v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)", null) {
+            repo.setChargeTargets(v, acPercent, dcPercent)
+        }
+
+    /**
+     * Runs a command tracking a per-action spinner. On success it logs, shows a
+     * message, and optimistically flips the cached status so the toggle updates.
+     */
+    private fun runCommand(
+        vin: String,
+        action: String,
+        success: String,
+        optimistic: ((VehicleStatus) -> VehicleStatus)?,
+        block: suspend () -> Unit,
+    ) {
+        val key = "$vin:$action"
+        viewModelScope.launch {
+            _state.update { it.copy(pending = it.pending + key, message = null) }
+            try {
+                block()
+                AppLog.log(success)
+                _state.update { st ->
+                    val statuses = if (optimistic != null && st.statuses[vin] != null) {
+                        st.statuses + (vin to optimistic(st.statuses.getValue(vin)))
+                    } else {
+                        st.statuses
+                    }
+                    st.copy(message = success, statuses = statuses)
+                }
+                persistSnapshots()
+            } catch (e: Exception) {
+                _state.update { it.copy(message = e.message ?: "Command failed") }
+            } finally {
+                _state.update { it.copy(pending = it.pending - key) }
+            }
+        }
     }
 
     // --- Settings / nav --------------------------------------------------
