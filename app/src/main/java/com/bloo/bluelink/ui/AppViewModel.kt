@@ -283,18 +283,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Move a car up/down in the user's order and persist it. */
-    fun moveVehicle(vin: String, up: Boolean) {
-        val list = _state.value.vehicles.toMutableList()
-        val i = list.indexOfFirst { it.vin == vin }
-        if (i < 0) return
-        val j = if (up) i - 1 else i + 1
-        if (j !in list.indices) return
-        list[i] = list[j].also { list[j] = list[i] }
-        _state.update { it.copy(vehicles = list) }
+    /** Persist a new car display order (drag-and-drop in Settings). */
+    fun reorderVehicles(order: List<Vehicle>) {
+        _state.update { it.copy(vehicles = order) }
         viewModelScope.launch {
-            settingsStore.setVehicleOrder(list.map { it.vin })
-            persistSnapshots(list)
+            settingsStore.setVehicleOrder(order.map { it.vin })
+            persistSnapshots(order)
         }
     }
 
@@ -350,6 +344,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "rlc" -> current.copy(rearLeftCool = value)
             "rrh" -> current.copy(rearRightHeat = value)
             "rrc" -> current.copy(rearRightCool = value)
+            "sw" -> current.copy(steeringWheel = value)
             else -> current
         }
         _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
@@ -378,15 +373,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
     }
 
-    fun moveSection(v: Vehicle, id: String, up: Boolean) {
-        val list = (_state.value.sectionOrders[v.vin] ?: DEFAULT_SECTIONS).toMutableList()
-        val i = list.indexOf(id)
-        if (i < 0) return
-        val j = if (up) i - 1 else i + 1
-        if (j !in list.indices) return
-        list[i] = list[j].also { list[j] = list[i] }
-        _state.update { it.copy(sectionOrders = it.sectionOrders + (v.vin to list)) }
-        viewModelScope.launch { settingsStore.setSectionOrder(v.vin, list) }
+    /** Persist a new pebble order for a car (drag-and-drop on the card). */
+    fun setSectionOrder(v: Vehicle, order: List<String>) {
+        _state.update { it.copy(sectionOrders = it.sectionOrders + (v.vin to order)) }
+        viewModelScope.launch { settingsStore.setSectionOrder(v.vin, order) }
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {

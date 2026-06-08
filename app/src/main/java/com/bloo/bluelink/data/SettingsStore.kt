@@ -30,6 +30,8 @@ data class SeatConfig(
     val rearLeftCool: Boolean = false,
     val rearRightHeat: Boolean = false,
     val rearRightCool: Boolean = false,
+    /** Whether the car has a heated steering wheel (no reliable API flag). */
+    val steeringWheel: Boolean = false,
 ) {
     val any: Boolean
         get() = driverHeat || driverCool || passHeat || passCool ||
@@ -122,6 +124,7 @@ class SettingsStore(private val context: Context) {
             rearLeftCool = b("seat_rlc_$vin") ?: oldRearCool ?: false,
             rearRightHeat = b("seat_rrh_$vin") ?: oldRearHeat ?: false,
             rearRightCool = b("seat_rrc_$vin") ?: oldRearCool ?: false,
+            steeringWheel = b("seat_sw_$vin") ?: false,
         )
     }
 
