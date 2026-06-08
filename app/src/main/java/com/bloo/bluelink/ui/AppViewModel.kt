@@ -13,7 +13,8 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.GeoLocation
-import com.bloo.bluelink.data.SeatCapability
+import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
@@ -54,7 +55,8 @@ data class UiState(
     val expandedIndex: Int? = null,
     val statuses: Map<String, VehicleStatus> = emptyMap(),
     val locations: Map<String, GeoLocation> = emptyMap(),
-    val ventilated: Map<String, Boolean> = emptyMap(),
+    val seatConfigs: Map<String, SeatConfig> = emptyMap(),
+    val powertrains: Map<String, Powertrain> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
@@ -66,14 +68,15 @@ data class UiState(
 
     fun isPending(vin: String, action: String): Boolean = "$vin:$action" in pending
 
-    fun seatCapabilityFor(v: Vehicle): SeatCapability {
-        val s = statuses[v.vin]?.seatHeaterVentState ?: return SeatCapability()
-        return SeatCapability(
-            frontLeft = s.flSeatHeatState != null,
-            frontRight = s.frSeatHeatState != null,
-            rearLeft = s.rlSeatHeatState != null,
-            rearRight = s.rrSeatHeatState != null,
-        )
+    fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
+
+    /** Powertrain label for the header: user override, else EV/Gas from the API. */
+    fun powertrainLabel(v: Vehicle): String = when (powertrains[v.vin]) {
+        Powertrain.GAS -> "Gas"
+        Powertrain.HYBRID -> "Hybrid"
+        Powertrain.PHEV -> "PHEV"
+        Powertrain.EV -> "EV"
+        null -> if (v.isEv) "EV" else "Gas"
     }
 }
 
@@ -160,14 +163,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder())
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, null) })
-        val ventilated = vehicles.associate { it.vin to store.ventilatedSeats(it.vin) }
+        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
+        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin)?.let { v.vin to it } }.toMap()
         val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         _state.update {
             it.copy(
                 vehicles = vehicles,
-                ventilated = ventilated,
+                seatConfigs = seatConfigs,
+                powertrains = powertrains,
                 imageUrls = images,
                 currentIndex = index,
                 screen = Screen.Garage,
@@ -284,9 +289,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
     }
 
-    fun setVentilatedSeats(v: Vehicle, value: Boolean) {
-        _state.update { it.copy(ventilated = it.ventilated + (v.vin to value)) }
-        viewModelScope.launch { store.setVentilatedSeats(v.vin, value) }
+    fun setSeatFlag(v: Vehicle, field: String, value: Boolean) {
+        val current = _state.value.seatConfigs[v.vin] ?: SeatConfig()
+        val updated = when (field) {
+            "fh" -> current.copy(frontHeat = value)
+            "fc" -> current.copy(frontCool = value)
+            "rh" -> current.copy(rearHeat = value)
+            "rc" -> current.copy(rearCool = value)
+            else -> current
+        }
+        _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
+        viewModelScope.launch { settingsStore.setSeatFlag(v.vin, field, value) }
+    }
+
+    fun setPowertrain(v: Vehicle, value: Powertrain) {
+        _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
+        viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
@@ -384,7 +402,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
     fun closeSettings() {
-        _state.update { it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage) }
+        // Always return to the card/grid view (collapse any expanded car).
+        _state.update {
+            it.copy(
+                screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage,
+                expandedIndex = null,
+            )
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settingsStore.setThemeMode(mode) }

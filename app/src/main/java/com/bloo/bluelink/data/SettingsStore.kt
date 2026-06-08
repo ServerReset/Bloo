@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -11,6 +12,19 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore by preferencesDataStore(name = "bloo_settings")
+
+/** Which seat heat/cool functions a specific car actually has (user-configured). */
+data class SeatConfig(
+    val frontHeat: Boolean = true,
+    val frontCool: Boolean = false,
+    val rearHeat: Boolean = false,
+    val rearCool: Boolean = false,
+) {
+    val any: Boolean get() = frontHeat || frontCool || rearHeat || rearCool
+}
+
+/** User-confirmed powertrain (the US API only exposes EV vs gas). */
+enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
@@ -71,6 +85,32 @@ class SettingsStore(private val context: Context) {
             val key = stringPreferencesKey("img_$vin")
             if (url.isBlank()) it.remove(key) else it[key] = url.trim()
         }
+    }
+
+    // --- Per-car seat capability (the API has no reliable flags) ---------
+
+    suspend fun seatConfig(vin: String, defaultRearHeat: Boolean = false): SeatConfig {
+        val p = context.settingsDataStore.data.first()
+        return SeatConfig(
+            frontHeat = p[booleanPreferencesKey("seat_fh_$vin")] ?: true,
+            frontCool = p[booleanPreferencesKey("seat_fc_$vin")] ?: false,
+            rearHeat = p[booleanPreferencesKey("seat_rh_$vin")] ?: defaultRearHeat,
+            rearCool = p[booleanPreferencesKey("seat_rc_$vin")] ?: false,
+        )
+    }
+
+    suspend fun setSeatFlag(vin: String, field: String, value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
+    }
+
+    // --- Per-car powertrain override -------------------------------------
+
+    suspend fun powertrain(vin: String): Powertrain? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("ptrain_$vin")]
+            ?.let { runCatching { Powertrain.valueOf(it) }.getOrNull() }
+
+    suspend fun setPowertrain(vin: String, value: Powertrain) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("ptrain_$vin")] = value.name }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {

@@ -12,6 +12,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,6 +25,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +80,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -131,7 +139,8 @@ import com.bloo.bluelink.R
 import coil.compose.AsyncImage
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.GeoLocation
-import com.bloo.bluelink.data.SeatCapability
+import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
@@ -322,10 +331,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val large = widthDp >= 600
     val current = state.currentIndex.coerceIn(0, vehicles.lastIndex)
     val expanded = state.expandedIndex?.takeIf { it in vehicles.indices }
-    // Grid of cars only makes sense with more than one car and nothing expanded.
+    // "Garage" title only when showing multiple collapsed cars.
     val isGrid = large && expanded == null && vehicles.size > 1
-    // A single car (or an expanded one) on a big screen uses the dual column.
-    val dualIndex = if (large && !isGrid) (expanded ?: current) else null
     val actionTarget = vehicles[(expanded ?: current).coerceIn(0, vehicles.lastIndex)]
 
     Column(Modifier.fillMaxSize()) {
@@ -337,7 +344,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     Column {
                         Text(actionTarget.name, fontWeight = FontWeight.Bold)
                         Text(
-                            actionTarget.model,
+                            "${actionTarget.model} · ${state.powertrainLabel(actionTarget)}",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -352,76 +359,108 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
             },
             actions = {
-                if (state.refreshing) {
-                    ContainedLoadingIndicator(Modifier.size(36.dp).padding(end = 4.dp))
-                }
-                IconButton(onClick = { vm.refreshStatus(actionTarget) }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh status")
-                }
                 IconButton(onClick = { vm.openSettings() }) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                 }
             },
         )
 
-        when {
-            // Big screen, multiple cars: a grid of full car panels (no swiping).
-            isGrid -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(if (widthDp >= 1040) 3 else 2),
-                    modifier = Modifier.fillMaxSize().padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    itemsIndexed(vehicles) { i, v ->
-                        CarPanel(v, state, vm) { vm.expand(i) }
-                    }
+        if (large) {
+            AnimatedContent(
+                targetState = expanded,
+                modifier = Modifier.weight(1f),
+                transitionSpec = {
+                    val spec = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                    (fadeIn(spec) + scaleIn(spec, initialScale = 0.92f)) togetherWith
+                        (fadeOut(spec) + scaleOut(spec, targetScale = 0.92f))
+                },
+                label = "expandCollapse",
+            ) { exp ->
+                if (exp != null && exp in vehicles.indices) {
+                    LargeExpandedPager(vehicles, exp, state, vm)
+                } else {
+                    LargeCollapsedRow(vehicles, state, vm)
                 }
             }
-
-            // Big screen, one car: dual column — controls left, diagnostics right.
-            dualIndex != null -> {
-                Row(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1.4f).fillMaxHeight()) {
-                        VehicleDetailContent(vehicles[dualIndex], state, vm, showDiagnostics = false)
-                    }
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        DiagnosticsCard(state.statusFor(vehicles[dualIndex]))
-                    }
+        } else {
+            // Phones / cover screens: an endless swipe carousel.
+            val count = vehicles.size
+            val loop = count > 1
+            val pageCount = if (loop) Int.MAX_VALUE else 1
+            val initial = remember(count) {
+                if (!loop) 0 else {
+                    val mid = Int.MAX_VALUE / 2
+                    mid - (mid % count) + current
                 }
             }
+            val pager = rememberPagerState(initialPage = initial) { pageCount }
+            LaunchedEffect(pager, count) {
+                snapshotFlow { pager.settledPage }.collect { page ->
+                    vm.selectIndex(if (loop) page.mod(count) else page)
+                }
+            }
+            Column(Modifier.fillMaxSize()) {
+                HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
+                    val v = vehicles[if (loop) page.mod(count) else page]
+                    VehicleDetailContent(v, state, vm)
+                }
+                if (loop) PagerDots(pager.currentPage.mod(count), count)
+            }
+        }
+    }
+}
 
-            else -> {
-                // Phones / cover screens: an endless swipe carousel.
-                val count = vehicles.size
-                val loop = count > 1
-                val pageCount = if (loop) Int.MAX_VALUE else 1
-                val initial = remember(count) {
-                    if (!loop) 0 else {
-                        val mid = Int.MAX_VALUE / 2
-                        mid - (mid % count) + current
+/** Large + collapsed: every car's full data, in vertical feeds shown side by side. */
+@Composable
+private fun LargeCollapsedRow(vehicles: List<Vehicle>, state: UiState, vm: AppViewModel) {
+    Row(
+        Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        vehicles.forEachIndexed { i, v ->
+            Column(Modifier.width(400.dp).fillMaxHeight()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(v.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${v.model} · ${state.powertrainLabel(v)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = { vm.expand(i) }) {
+                        Icon(Icons.Filled.Fullscreen, contentDescription = "Expand")
                     }
                 }
-                val pager = rememberPagerState(initialPage = initial) { pageCount }
-                LaunchedEffect(pager, count) {
-                    snapshotFlow { pager.settledPage }.collect { page ->
-                        vm.selectIndex(if (loop) page.mod(count) else page)
-                    }
-                }
-                Column(Modifier.fillMaxSize()) {
-                    HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-                        val v = vehicles[if (loop) page.mod(count) else page]
-                        VehicleDetailContent(v, state, vm)
-                    }
-                    if (loop) PagerDots(pager.currentPage.mod(count), count)
-                }
+                Box(Modifier.weight(1f)) { VehicleDetailContent(v, state, vm) }
+            }
+        }
+    }
+}
+
+/** Large + expanded: one car filling the screen; swipe left/right to switch. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LargeExpandedPager(vehicles: List<Vehicle>, startIndex: Int, state: UiState, vm: AppViewModel) {
+    val pager = rememberPagerState(initialPage = startIndex.coerceIn(0, vehicles.lastIndex)) { vehicles.size }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.collect { vm.expand(it) }
+    }
+    HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+        val v = vehicles[page]
+        Row(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1.4f).fillMaxHeight()) {
+                VehicleDetailContent(v, state, vm, showDiagnostics = false)
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                DiagnosticsCard(state.statusFor(v))
             }
         }
     }
@@ -552,6 +591,29 @@ private fun ChargeFuelBar(v: Vehicle, status: VehicleStatus?) {
                 .height(18.dp)
                 .clip(RoundedCornerShape(9.dp)),
         )
+        if (charging) {
+            val minutes = status?.evStatus?.remainTime2?.atc?.value?.toInt()
+            val plug = when (status?.evStatus?.batteryPlugin) {
+                1 -> "DC fast"
+                2 -> "AC"
+                else -> null
+            }
+            val parts = buildList {
+                if (minutes != null && minutes > 0) {
+                    add(if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m to full" else "$minutes min to full")
+                }
+                plug?.let { add("$it charger") }
+            }
+            if (parts.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    parts.joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ChargeGreen,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
     }
 }
 
@@ -592,8 +654,7 @@ private fun VehicleDetailContent(
     showDiagnostics: Boolean = true,
 ) {
     val status = state.statusFor(v)
-    val cap = state.seatCapabilityFor(v)
-    val ventilated = state.ventilated[v.vin] ?: false
+    val seats = state.seatConfigFor(v)
     val enabled = !state.loading
 
     val ptrState = rememberPullToRefreshState()
@@ -623,7 +684,7 @@ private fun VehicleDetailContent(
             // 3. Important actions
             PrimaryActions(v, state, vm)
             // 4. Climate
-            ClimateCard(v, status, cap, ventilated, enabled, vm)
+            ClimateCard(v, status, seats, state.isPending(v.vin, "climate"), vm)
             // 5. Status (moved below climate, per request)
             StatusCard(v, status, state.locations[v.vin], state.refreshing)
             if (v.isEv) ChargeLimitCard(v, status, enabled, vm)
@@ -652,14 +713,6 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
             turnOn = "Lock", turnOff = "Unlock",
             icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
-        )
-        StateControl(
-            name = "Climate",
-            isOn = status?.airCtrlOn,
-            stateOn = "On", stateOff = "Off",
-            turnOn = "Start", turnOff = "Stop",
-            icon = Icons.Filled.AcUnit, pending = state.isPending(v.vin, "climate"),
-            onActivate = { vm.engineStart(v) }, onDeactivate = { vm.stopClimate(v) },
         )
         if (v.isEv) {
             StateControl(
@@ -798,26 +851,28 @@ private fun StatusCard(v: Vehicle, status: VehicleStatus?, location: GeoLocation
 
 // --- Diagnostics ----------------------------------------------------------
 
+private data class DiagRow(val label: String, val value: String, val indent: Boolean = false)
+
 @Composable
 private fun DiagnosticsCard(status: VehicleStatus?) {
     if (status == null) return
     val rows = buildList {
         status.tirePressureLamp?.let { tp ->
-            add("Tire pressure" to if (tp.hasWarning) "Warning" else "OK")
-            tp.frontLeft?.let { add("  Front left" to warn(it)) }
-            tp.frontRight?.let { add("  Front right" to warn(it)) }
-            tp.rearLeft?.let { add("  Rear left" to warn(it)) }
-            tp.rearRight?.let { add("  Rear right" to warn(it)) }
+            add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning" else "OK"))
+            tp.frontLeft?.let { add(DiagRow("Front left", warn(it), indent = true)) }
+            tp.frontRight?.let { add(DiagRow("Front right", warn(it), indent = true)) }
+            tp.rearLeft?.let { add(DiagRow("Rear left", warn(it), indent = true)) }
+            tp.rearRight?.let { add(DiagRow("Rear right", warn(it), indent = true)) }
         }
-        status.lowFuelLight?.let { add("Low fuel" to yesNo(it)) }
-        status.washerFluidStatus?.let { add("Washer fluid" to if (it) "Low" else "OK") }
-        status.breakOilStatus?.let { add("Brake fluid" to if (it) "Check" else "OK") }
-        status.smartKeyBatteryWarning?.let { add("Key fob battery" to if (it) "Low" else "OK") }
-        status.steerWheelHeat?.let { add("Steering wheel heat" to onOff(it)) }
-        status.sideBackWindowHeat?.let { add("Rear defroster" to onOff(it)) }
-        status.sideMirrorHeat?.let { add("Mirror heat" to onOff(it)) }
-        status.evStatus?.pluggedInLabel?.let { add("Plug" to it) }
-        status.evStatus?.remainTime2?.atc?.value?.let { add("Time to full" to "${it.toInt()} min") }
+        status.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
+        status.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
+        status.breakOilStatus?.let { add(DiagRow("Brake fluid", if (it) "Check" else "OK")) }
+        status.smartKeyBatteryWarning?.let { add(DiagRow("Key fob battery", if (it) "Low" else "OK")) }
+        status.steerWheelHeat?.let { add(DiagRow("Steering wheel heat", onOff(it))) }
+        status.sideBackWindowHeat?.let { add(DiagRow("Rear defroster", onOff(it))) }
+        status.sideMirrorHeat?.let { add(DiagRow("Mirror heat", onOff(it))) }
+        status.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
+        status.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
     }
     if (rows.isEmpty()) return
     Card(
@@ -826,7 +881,31 @@ private fun DiagnosticsCard(status: VehicleStatus?) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Diagnostics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            rows.forEach { (label, value) -> StatusRow(label, value) }
+            rows.forEach { row ->
+                if (row.indent) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            row.label,
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(row.value, style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    StatusRow(row.label, row.value)
+                }
+            }
         }
     }
 }
@@ -841,9 +920,8 @@ private fun onOff(v: Int) = if (v == 0) "Off" else "On"
 private fun ClimateCard(
     v: Vehicle,
     status: VehicleStatus?,
-    cap: SeatCapability,
-    ventilated: Boolean,
-    enabled: Boolean,
+    seats: SeatConfig,
+    pending: Boolean,
     vm: AppViewModel,
 ) {
     var tempF by remember(v.vin) { mutableIntStateOf(72) }
@@ -854,6 +932,7 @@ private fun ClimateCard(
     var fr by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var rl by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var rr by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    val climateOn = status?.airCtrlOn == true
 
     Card(
         Modifier.fillMaxWidth(),
@@ -885,57 +964,51 @@ private fun ClimateCard(
                 ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
             }
 
-            // Seat heating/cooling. Front seats are always offered; rears appear
-            // when the car reports them. Toggle ventilation to expose cooling levels.
-            Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            ToggleRow("Ventilated (cooled) seats", ventilated) { vm.setVentilatedSeats(v, it) }
-            SeatControl("Driver seat", fl, ventilated) { fl = it }
-            SeatControl("Passenger seat", fr, ventilated) { fr = it }
-            if (cap.rearLeft) SeatControl("Rear left seat", rl, ventilated) { rl = it }
-            if (cap.rearRight) SeatControl("Rear right seat", rr, ventilated) { rr = it }
+            // Seats are shown only for functions the car actually has (set per car
+            // in Settings, since the API exposes no reliable capability flags).
+            if (seats.any) {
+                Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                if (seats.frontHeat || seats.frontCool) {
+                    SeatControl("Driver seat", fl, seats.frontCool) { fl = it }
+                    SeatControl("Passenger seat", fr, seats.frontCool) { fr = it }
+                }
+                if (seats.rearHeat || seats.rearCool) {
+                    SeatControl("Rear left seat", rl, seats.rearCool) { rl = it }
+                    SeatControl("Rear right seat", rr, seats.rearCool) { rr = it }
+                }
+            }
 
-            // Expressive split button: leading = Start, trailing = Stop.
-            SplitButtonLayout(
-                leadingButton = {
-                    SplitButtonDefaults.LeadingButton(
-                        onClick = {
-                            vm.startClimate(
-                                v,
-                                ClimateRequest(
-                                    tempF = tempF,
-                                    defrost = defrost,
-                                    durationMinutes = duration,
-                                    steeringWheelHeat = steeringHeat,
-                                    seatFrontLeft = fl,
-                                    seatFrontRight = fr,
-                                    seatRearLeft = rl,
-                                    seatRearRight = rr,
-                                ),
-                            )
-                        },
-                        enabled = enabled,
-                    ) {
-                        Icon(Icons.Filled.AcUnit, contentDescription = null)
-                        Text("  Start climate")
-                    }
+            // Combined start/stop: morphs pill <-> rounded square, shows On/Off.
+            StateControl(
+                name = "Climate",
+                isOn = status?.airCtrlOn,
+                stateOn = "On", stateOff = "Off",
+                turnOn = "Start", turnOff = "Stop",
+                icon = Icons.Filled.AcUnit, pending = pending,
+                onActivate = {
+                    vm.startClimate(
+                        v,
+                        ClimateRequest(
+                            tempF = tempF,
+                            defrost = defrost,
+                            durationMinutes = duration,
+                            steeringWheelHeat = steeringHeat,
+                            seatFrontLeft = fl,
+                            seatFrontRight = fr,
+                            seatRearLeft = rl,
+                            seatRearRight = rr,
+                        ),
+                    )
                 },
-                trailingButton = {
-                    SplitButtonDefaults.TrailingButton(
-                        checked = false,
-                        onCheckedChange = { vm.stopClimate(v) },
-                        enabled = enabled,
-                    ) {
-                        Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Stop")
-                    }
-                },
+                onDeactivate = { vm.stopClimate(v) },
             )
         }
     }
 }
 
 @Composable
-private fun SeatControl(label: String, level: SeatLevel, ventilated: Boolean, onChange: (SeatLevel) -> Unit) {
-    val range = if (ventilated) SeatLevel.ventilatedRange else SeatLevel.heatOnlyRange
+private fun SeatControl(label: String, level: SeatLevel, cooled: Boolean, onChange: (SeatLevel) -> Unit) {
+    val range = if (cooled) SeatLevel.ventilatedRange else SeatLevel.heatOnlyRange
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
     Column {
         StepRow(label, range[index].label)
@@ -1157,6 +1230,31 @@ private fun SettingsScreen(vm: AppViewModel) {
                             }
                         }
                     }
+                }
+            }
+
+            // Per-car setup (powertrain + which seat functions exist)
+            state.vehicles.forEach { v ->
+                val seats = state.seatConfigs[v.vin] ?: com.bloo.bluelink.data.SeatConfig()
+                SettingsCard("${v.name} setup") {
+                    Text("Powertrain", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    val current = state.powertrains[v.vin]
+                        ?: if (v.isEv) com.bloo.bluelink.data.Powertrain.EV else com.bloo.bluelink.data.Powertrain.GAS
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.bloo.bluelink.data.Powertrain.entries.forEach { pt ->
+                            FilterChip(
+                                selected = current == pt,
+                                onClick = { vm.setPowertrain(v, pt) },
+                                label = { Text(pt.name) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Seats this car has", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    ToggleRow("Front heated", seats.frontHeat) { vm.setSeatFlag(v, "fh", it) }
+                    ToggleRow("Front cooled", seats.frontCool) { vm.setSeatFlag(v, "fc", it) }
+                    ToggleRow("Rear heated", seats.rearHeat) { vm.setSeatFlag(v, "rh", it) }
+                    ToggleRow("Rear cooled", seats.rearCool) { vm.setSeatFlag(v, "rc", it) }
                 }
             }
 
