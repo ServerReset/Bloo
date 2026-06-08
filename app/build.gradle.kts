@@ -77,6 +77,8 @@ dependencies {
 
     // Real car photos from the internet
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Built-in image crop tool (pick + crop to the app's frame)
+    implementation("com.vanniktech:android-image-cropper:4.6.0")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")

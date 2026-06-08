@@ -9,7 +9,9 @@ package com.bloo.bluelink.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -78,7 +81,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -110,6 +115,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -117,6 +123,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import coil.compose.AsyncImage
@@ -287,8 +294,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     if (vehicles.isEmpty()) return
 
     val widthDp = LocalConfiguration.current.screenWidthDp
-    // Two-pane (list + detail) on tablets/desktops/unfolded foldables.
-    val twoPane = widthDp >= 840
+    // Multi-car grid on unfolded foldables, tablets and desktops.
+    val twoPane = widthDp >= 600
     val current = state.currentIndex.coerceIn(0, vehicles.lastIndex)
     val expanded = state.expandedIndex?.takeIf { it in vehicles.indices }
     val showTwoPane = twoPane && expanded == null
@@ -296,7 +303,20 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(if (showTwoPane) "Garage" else actionTarget.name) },
+            title = {
+                if (showTwoPane) {
+                    Text("Garage")
+                } else {
+                    Column {
+                        Text(actionTarget.name, fontWeight = FontWeight.Bold)
+                        Text(
+                            actionTarget.model,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            },
             navigationIcon = {
                 if (twoPane && expanded != null) {
                     IconButton(onClick = { vm.collapse() }) {
@@ -326,7 +346,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             // Large + not expanded: show several cars at once.
             showTwoPane -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(380.dp),
+                    columns = GridCells.Adaptive(300.dp),
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -423,20 +443,13 @@ private fun HeroHeader(v: Vehicle, status: VehicleStatus?, imageUrl: String?, he
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(corner)) {
         Column(Modifier.padding(16.dp)) {
             HeroVisual(v, imageUrl, height)
-            Spacer(Modifier.height(8.dp))
-            Text(v.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "${if (v.isEv) "Electric" else "Gas"} · ${v.model}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Spacer(Modifier.height(16.dp))
             ChargeFuelBar(v, status)
         }
     }
 }
 
-/** Default = a pleasing brand gradient. If the user set a photo URL, show that instead. */
+/** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
 private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
     if (imageUrl.isNullOrBlank()) {
@@ -451,15 +464,7 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
                         listOf(scheme.primary, scheme.tertiary, scheme.secondary),
                     )
                 ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_car_hero),
-                contentDescription = v.model,
-                tint = scheme.onPrimary.copy(alpha = 0.9f),
-                modifier = Modifier.fillMaxWidth(0.7f).height(height * 0.6f),
-            )
-        }
+        )
     } else {
         AsyncImage(
             model = imageUrl,
@@ -569,14 +574,24 @@ private fun VehicleDetailContent(
     val ventilated = state.ventilated[v.vin] ?: false
     val enabled = !state.loading
 
-    PullToRefreshBox(
-        isRefreshing = state.refreshing,
-        onRefresh = { vm.refreshStatus(v) },
-        modifier = Modifier.fillMaxSize(),
+    val ptrState = rememberPullToRefreshState()
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pullToRefresh(
+                isRefreshing = state.refreshing,
+                state = ptrState,
+                onRefresh = { vm.refreshStatus(v) },
+            ),
     ) {
+        // Content slides down as you pull / while refreshing, then springs back.
+        val maxShift = 72.dp
+        val shift = if (state.refreshing) maxShift else (maxShift * ptrState.distanceFraction).coerceIn(0.dp, maxShift)
         Column(
             Modifier
                 .fillMaxSize()
+                .offset { IntOffset(0, with(density) { shift.roundToPx() }) }
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -588,11 +603,17 @@ private fun VehicleDetailContent(
             // 4. Climate
             ClimateCard(v, status, cap, ventilated, enabled, vm)
             // 5. Status (moved below climate, per request)
-            StatusCard(v, status, state.refreshing)
+            StatusCard(v, status, state.locations[v.vin], state.refreshing)
             if (v.isEv) ChargeLimitCard(v, status, enabled, vm)
             // 6. Diagnostics (moves to the right pane on large screens)
             if (showDiagnostics) DiagnosticsCard(status)
         }
+        // Expressive squiggly refresh indicator.
+        PullToRefreshDefaults.LoadingIndicator(
+            state = ptrState,
+            isRefreshing = state.refreshing,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 }
 
@@ -629,11 +650,13 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
             )
         }
         val locating = state.isPending(v.vin, "locate")
+        val place = state.placeNames[v.vin]
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CommandButton(
                 label = when {
                     locating -> "Locating…"
-                    location != null -> String.format("%.4f, %.4f", location.latitude, location.longitude)
+                    place != null -> place
+                    location != null -> "Located"
                     else -> "Locate"
                 },
                 icon = Icons.Filled.LocationOn,
@@ -722,7 +745,7 @@ private fun StateControl(
 // --- Status ---------------------------------------------------------------
 
 @Composable
-private fun StatusCard(v: Vehicle, status: VehicleStatus?, refreshing: Boolean) {
+private fun StatusCard(v: Vehicle, status: VehicleStatus?, location: GeoLocation?, refreshing: Boolean) {
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -743,6 +766,9 @@ private fun StatusCard(v: Vehicle, status: VehicleStatus?, refreshing: Boolean) 
                     v.odometer?.takeIf { it.isNotBlank() }?.let { StatusRow("Odometer", "$it mi") }
                     status.dateTime?.let { StatusRow("Updated", it) }
                 }
+            }
+            location?.let {
+                StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude))
             }
         }
     }
@@ -985,13 +1011,10 @@ private fun SettingsScreen(vm: AppViewModel) {
     val canBio = remember { vm.canUseBiometrics() }
 
     var pickTarget by remember { mutableStateOf<String?>(null) }
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
         val target = pickTarget
-        if (uri != null && target != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            vm.setVehicleImage(target, uri.toString())
+        if (result.isSuccessful && target != null) {
+            result.uriContent?.let { vm.setVehicleImage(target, it.toString()) }
         }
         pickTarget = null
     }
@@ -1094,8 +1117,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = {
                                 pickTarget = v.vin
-                                photoPicker.launch(arrayOf("image/*"))
-                            }) { Text("Choose photo") }
+                                cropLauncher.launch(
+                                    CropImageContractOptions(
+                                        uri = null,
+                                        cropImageOptions = CropImageOptions(
+                                            imageSourceIncludeGallery = true,
+                                            imageSourceIncludeCamera = false,
+                                            fixAspectRatio = true,
+                                            aspectRatioX = 16,
+                                            aspectRatioY = 9,
+                                        ),
+                                    ),
+                                )
+                            }) { Text("Choose & crop photo") }
                             if (state.imageUrls[v.vin] != null) {
                                 TextButton(onClick = { vm.setVehicleImage(v.vin, "") }) { Text("Clear") }
                             }

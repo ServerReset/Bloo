@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import android.app.Application
+import android.location.Geocoder
 import androidx.biometric.BiometricManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,8 +28,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 sealed interface Screen {
     data object Login : Screen
@@ -52,6 +56,7 @@ data class UiState(
     val locations: Map<String, GeoLocation> = emptyMap(),
     val ventilated: Map<String, Boolean> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
+    val placeNames: Map<String, String> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
     val pending: Set<String> = emptySet(),
     val credentials: Credentials? = null,
@@ -287,6 +292,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
         val loc = repo.location(v) ?: throw BlueLinkException("Could not get the car's location")
         _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
+        reverseGeocode(loc)?.let { place ->
+            _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
+        }
+    }
+
+    private suspend fun reverseGeocode(loc: GeoLocation): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val results = Geocoder(getApplication(), Locale.getDefault())
+                .getFromLocation(loc.latitude, loc.longitude, 1)
+            results?.firstOrNull()?.let { a ->
+                listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea)
+                    .distinct()
+                    .joinToString(", ")
+                    .ifBlank { a.getAddressLine(0) }
+            }
+        }.getOrNull()
     }
 
     // --- Commands (per-action pending + optimistic state flip) -----------
