@@ -935,7 +935,7 @@ private fun VehicleDetailContent(
 @Composable
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, onExpand = null, reserveHeaderEnd = false)
+        CarHeaderRow(v, state, onExpand = null, reserveEnd = false)
         CriticalContent(v, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
