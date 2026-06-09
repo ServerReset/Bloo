@@ -62,6 +62,9 @@ data class UiState(
     val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
+    val licensePlates: Map<String, String> = emptyMap(),
+    val lastServiceMiles: Map<String, Int> = emptyMap(),
+    val serviceIntervalMiles: Map<String, Int> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
     val pending: Set<String> = emptySet(),
     /** Collapsed pebbles, keyed "vin:section". Absent = expanded. */
@@ -217,6 +220,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin)?.let { v.vin to it } }.toMap()
         val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
         val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
+        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin) }.filterValues { it.isNotBlank() }
+        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
+        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val showOnboarding = !settingsStore.onboardingSeen()
@@ -227,6 +233,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 powertrains = powertrains,
                 sectionOrders = sectionOrders,
                 imageUrls = images,
+                licensePlates = plates,
+                lastServiceMiles = lastSvc,
+                serviceIntervalMiles = svcInterval,
                 currentIndex = index,
                 screen = Screen.Garage,
                 showOnboarding = showOnboarding,
@@ -357,6 +366,61 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
+    }
+
+    /**
+     * Copies a picked/cropped image into the app's own storage so it survives
+     * (cropper output lives in a temp cache and otherwise shows blank later).
+     */
+    fun importCarImage(vin: String, source: android.net.Uri) {
+        viewModelScope.launch {
+            val path = withContext(Dispatchers.IO) {
+                runCatching {
+                    val app = getApplication<Application>()
+                    val dir = java.io.File(app.filesDir, "cars").apply { mkdirs() }
+                    val out = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.jpg")
+                    app.contentResolver.openInputStream(source)!!.use { input ->
+                        out.outputStream().use { input.copyTo(it) }
+                    }
+                    out.absolutePath
+                }.getOrNull()
+            }
+            if (path != null) {
+                setVehicleImage(vin, path)
+            } else {
+                _state.update { it.copy(message = "Couldn't save that photo") }
+            }
+        }
+    }
+
+    fun setLicensePlate(vin: String, plate: String) {
+        _state.update {
+            it.copy(
+                licensePlates = if (plate.isBlank()) it.licensePlates - vin
+                else it.licensePlates + (vin to plate.trim()),
+            )
+        }
+        viewModelScope.launch { settingsStore.setLicensePlate(vin, plate) }
+    }
+
+    fun setLastServiceMiles(vin: String, miles: Int?) {
+        _state.update {
+            it.copy(
+                lastServiceMiles = if (miles == null) it.lastServiceMiles - vin
+                else it.lastServiceMiles + (vin to miles),
+            )
+        }
+        viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles) }
+    }
+
+    fun setServiceIntervalMiles(vin: String, miles: Int?) {
+        _state.update {
+            it.copy(
+                serviceIntervalMiles = if (miles == null) it.serviceIntervalMiles - vin
+                else it.serviceIntervalMiles + (vin to miles),
+            )
+        }
+        viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles) }
     }
 
     fun setSeatFlag(v: Vehicle, field: String, value: Boolean) {
@@ -526,9 +590,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
+    fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
 
     fun clearLogs() = AppLog.clear()
     fun clearMessage() = _state.update { it.copy(message = null) }
+
+    /** Surface (and log) an error raised by the UI layer. */
+    fun reportError(msg: String) {
+        AppLog.log("⚠ $msg")
+        _state.update { it.copy(message = msg) }
+    }
 
     private fun launchBusy(block: suspend () -> Unit) {
         viewModelScope.launch {

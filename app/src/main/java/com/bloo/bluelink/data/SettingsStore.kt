@@ -42,7 +42,7 @@ data class SeatConfig(
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
 /** Reorderable detail sections (pebbles), in their default order. */
-val DEFAULT_SECTIONS = listOf("climate", "charge", "location", "information", "diagnostics")
+val DEFAULT_SECTIONS = listOf("climate", "charge", "location", "information", "service", "diagnostics", "links")
 
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
@@ -55,6 +55,7 @@ class SettingsStore(private val context: Context) {
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
         val FLIPPED = stringPreferencesKey("columns_flipped")
+        val LINKS_IN_APP = stringPreferencesKey("links_in_app")
     }
 
     data class Appearance(
@@ -64,6 +65,8 @@ class SettingsStore(private val context: Context) {
         val biometricLock: Boolean = false,
         /** In the wide expanded view, put pebbles on the left, controls right. */
         val columnsFlipped: Boolean = false,
+        /** Open Hyundai/Genesis links in an in-app browser tab vs the system browser. */
+        val linksInApp: Boolean = true,
     )
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
@@ -75,6 +78,7 @@ class SettingsStore(private val context: Context) {
             dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
+            linksInApp = prefs[Keys.LINKS_IN_APP]?.toBooleanStrictOrNull() ?: true,
         )
     }
 
@@ -84,6 +88,42 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setColumnsFlipped(flipped: Boolean) {
         context.settingsDataStore.edit { it[Keys.FLIPPED] = flipped.toString() }
+    }
+
+    suspend fun setLinksInApp(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.LINKS_IN_APP] = value.toString() }
+    }
+
+    // --- Per-car identity + service (the API has no service-history fields) ---
+
+    suspend fun licensePlate(vin: String): String =
+        context.settingsDataStore.data.first()[stringPreferencesKey("plate_$vin")] ?: ""
+
+    suspend fun setLicensePlate(vin: String, value: String) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("plate_$vin")
+            if (value.isBlank()) it.remove(key) else it[key] = value.trim()
+        }
+    }
+
+    suspend fun lastServiceMiles(vin: String): Int? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
+
+    suspend fun setLastServiceMiles(vin: String, value: Int?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("svc_last_$vin")
+            if (value == null) it.remove(key) else it[key] = value.toString()
+        }
+    }
+
+    suspend fun serviceIntervalMiles(vin: String): Int? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
+
+    suspend fun setServiceIntervalMiles(vin: String, value: Int?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("svc_interval_$vin")
+            if (value == null) it.remove(key) else it[key] = value.toString()
+        }
     }
 
     suspend fun lastVehicleVin(): String? =

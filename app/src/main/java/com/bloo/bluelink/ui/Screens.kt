@@ -6,9 +6,11 @@
 
 package com.bloo.bluelink.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.webkit.WebView
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import com.canhub.cropper.CropImageContract
@@ -74,8 +76,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
@@ -649,8 +653,10 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
                 ),
         )
     } else {
+        // A locally-cropped photo is an absolute path; a pasted one is a URL.
+        val model: Any = if (imageUrl.startsWith("/")) java.io.File(imageUrl) else imageUrl
         AsyncImage(
-            model = imageUrl,
+            model = model,
             contentDescription = v.model,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(18.dp)),
@@ -1060,7 +1066,9 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel) {
             "charge" -> ChargePebble(v, status, enabled, state, vm, dragHandle)
             "location" -> LocationPebble(v, state, vm, dragHandle)
             "information" -> InformationPebble(v, status, state, vm, dragHandle)
+            "service" -> ServicePebble(v, status, state, vm, dragHandle)
             "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
+            "links" -> LinksPebble(v, state, vm, dragHandle)
             else -> Spacer(Modifier.fillMaxWidth())
         }
     }
@@ -1070,6 +1078,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel) {
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Doors: locked is the calm/grey state; unlocked is highlighted + red text.
         StateControl(
             name = "Doors",
             isOn = status?.doorLock,
@@ -1077,24 +1086,34 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
             turnOn = "Lock", turnOff = "Unlock",
             icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
+            highlightWhenOff = true,
+            offTextColor = MaterialTheme.colorScheme.error,
         )
         if (state.hasBattery(v)) {
+            val ev = status?.evStatus
+            val plugIn = ev?.batteryPlugin
+            // Allow if charging, plugged (1/2) or unknown; disable only when known-unplugged.
+            val plugged = ev?.batteryCharge == true || plugIn == null || plugIn != 0
             StateControl(
                 name = "Charging",
-                isOn = status?.evStatus?.batteryCharge,
+                isOn = ev?.batteryCharge,
                 stateOn = "Charging", stateOff = "Idle",
                 turnOn = "Start", turnOff = "Stop",
                 icon = Icons.Filled.Bolt, pending = state.isPending(v.vin, "charge"),
                 onActivate = { vm.startCharge(v) }, onDeactivate = { vm.stopCharge(v) },
+                highlightColor = ChargeGreen,
+                highlightContentColor = Color.White,
+                enabled = plugged,
+                disabledNote = "Not plugged in",
             )
         }
     }
 }
 
 /**
- * A chunky stateful control: shows the current On/Off state and a button
- * offering the *opposite* action. The button morphs from a pill (deactivated)
- * to a rounded square (activated).
+ * A chunky stateful control: shows the current state and a button offering the
+ * *opposite* action. The button is always a clearly filled control that morphs
+ * from a pill (calm) to a rounded square (highlighted).
  */
 @Composable
 private fun StateControl(
@@ -1108,10 +1127,17 @@ private fun StateControl(
     pending: Boolean,
     onActivate: () -> Unit,
     onDeactivate: () -> Unit,
+    enabled: Boolean = true,
+    disabledNote: String? = null,
+    highlightWhenOff: Boolean = false,
+    highlightColor: Color = MaterialTheme.colorScheme.primary,
+    highlightContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    offTextColor: Color? = null,
 ) {
-    val active = isOn == true
+    // Which state is the "highlighted" (square, coloured) one.
+    val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
     val corner by animateDpAsState(
-        targetValue = if (active) 18.dp else 32.dp,
+        targetValue = if (highlighted) 18.dp else 34.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "ctrlCorner",
     )
@@ -1122,33 +1148,43 @@ private fun StateControl(
     ) {
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            val stateText = when {
+                !enabled && disabledNote != null -> disabledNote
+                pending -> "Sending…"
+                isOn == true -> stateOn
+                isOn == false -> stateOff
+                else -> "Unknown"
+            }
+            val stateColor = when {
+                !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                isOn == false && offTextColor != null -> offTextColor
+                highlighted -> highlightColor
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
             Text(
-                when {
-                    pending -> "Sending…"
-                    isOn == true -> stateOn
-                    isOn == false -> stateOff
-                    else -> "Unknown"
-                },
+                stateText,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (active) ChargeGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                color = stateColor,
+                fontWeight = if (stateColor != MaterialTheme.colorScheme.onSurfaceVariant) FontWeight.Bold else FontWeight.Normal,
             )
         }
-        val onClick = { if (active) onDeactivate() else onActivate() }
-        val shape = RoundedCornerShape(corner)
-        val content: @Composable RowScope.() -> Unit = {
+        val onClick = { if (isOn == true) onDeactivate() else onActivate() }
+        val container = if (highlighted) highlightColor else MaterialTheme.colorScheme.surfaceContainerHighest
+        val contentColor = if (highlighted) highlightContentColor else MaterialTheme.colorScheme.onSurface
+        Button(
+            onClick = onClick,
+            enabled = enabled && !pending,
+            shape = RoundedCornerShape(corner),
+            colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
+            modifier = Modifier.height(60.dp),
+        ) {
             if (pending) {
                 LoadingIndicator(Modifier.size(22.dp))
             } else {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (active) turnOff else turnOn, fontWeight = FontWeight.SemiBold)
+                Text(if (isOn == true) turnOff else turnOn, fontWeight = FontWeight.SemiBold)
             }
-        }
-        if (active) {
-            Button(onClick = onClick, enabled = !pending, shape = shape, modifier = Modifier.height(60.dp), content = content)
-        } else {
-            FilledTonalButton(onClick = onClick, enabled = !pending, shape = shape, modifier = Modifier.height(60.dp), content = content)
         }
     }
 }
@@ -1250,12 +1286,21 @@ private fun InformationPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet. Pull down to refresh.")
             else -> {
+                status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
                 StatusRow("Doors locked", if (status.doorLock == true) "Yes" else "No")
-                status.doorOpen?.let { StatusRow("A door open", if (it.anyOpen) "Yes" else "No") }
+                status.doorOpen?.let { d ->
+                    val open = listOfNotNull(
+                        if (d.frontLeft == 1) "front-left" else null,
+                        if (d.frontRight == 1) "front-right" else null,
+                        if (d.backLeft == 1) "rear-left" else null,
+                        if (d.backRight == 1) "rear-right" else null,
+                    )
+                    StatusRow("Doors", if (open.isEmpty()) "All closed" else "Open: ${open.joinToString(", ")}")
+                }
                 status.trunkOpen?.let { StatusRow("Trunk", if (it) "Open" else "Closed") }
                 status.hoodOpen?.let { StatusRow("Hood", if (it) "Open" else "Closed") }
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
-                status.engine?.let { StatusRow("Engine", if (it) "Running" else "Off") }
+                status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
                 v.odometer?.takeIf { it.isNotBlank() }?.let { StatusRow("Odometer", "$it mi") }
                 status.dateTime?.let { StatusRow("Updated", it) }
@@ -1295,6 +1340,15 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         status?.steerWheelHeat?.let { add(DiagRow("Steering wheel heat", onOff(it))) }
         status?.sideBackWindowHeat?.let { add(DiagRow("Rear defroster", onOff(it))) }
         status?.sideMirrorHeat?.let { add(DiagRow("Mirror heat", onOff(it))) }
+        status?.seatHeaterVentState?.let { s ->
+            val seats = listOfNotNull(
+                s.flSeatHeatState?.takeIf { it != 0 }?.let { "Driver" },
+                s.frSeatHeatState?.takeIf { it != 0 }?.let { "Passenger" },
+                s.rlSeatHeatState?.takeIf { it != 0 }?.let { "Rear-left" },
+                s.rrSeatHeatState?.takeIf { it != 0 }?.let { "Rear-right" },
+            )
+            if (seats.isNotEmpty()) add(DiagRow("Seat heat/vent active", seats.joinToString(", ")))
+        }
         status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
         status?.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
     }
@@ -1547,31 +1601,151 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 }
 
 /**
- * A small embedded OpenStreetMap with a pin at the car's position. Uses the
- * key-free OSM embed page in a WebView (no Maps API key / Play Services needed).
- * Keyed on the coordinates so a fresh map loads when the location changes.
+ * A small embedded map with a pin at the car's position. Renders a self-hosted
+ * Leaflet page (loaded from an OSM base URL) rather than the OSM embed iframe —
+ * the embed page often paints blank inside a WebView. Key-free, no Play
+ * Services. Keyed on the coordinates so a fresh map loads when they change.
  */
 @Composable
 private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
-    val span = 0.008
     val lat = location.latitude
     val lon = location.longitude
-    val url = "https://www.openstreetmap.org/export/embed.html" +
-        "?bbox=${lon - span}%2C${lat - span}%2C${lon + span}%2C${lat + span}" +
-        "&layer=mapnik&marker=$lat%2C$lon"
+    val html = """
+        <!DOCTYPE html><html><head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+        <style>html,body,#m{height:100%;margin:0;background:#e9eef3}</style>
+        </head><body><div id="m"></div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+          var map=L.map('m',{zoomControl:false,attributionControl:false}).setView([$lat,$lon],15);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+          L.marker([$lat,$lon]).addTo(map);
+        </script></body></html>
+    """.trimIndent()
     key(lat, lon) {
         AndroidView(
             modifier = modifier,
             factory = { ctx ->
                 WebView(ctx).apply {
+                    webViewClient = android.webkit.WebViewClient()
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.useWideViewPort = true
+                    settings.loadWithOverviewMode = true
                     isVerticalScrollBarEnabled = false
                     isHorizontalScrollBarEnabled = false
-                    loadUrl(url)
+                    loadDataWithBaseURL("https://www.openstreetmap.org", html, "text/html", "UTF-8", null)
                 }
             },
         )
+    }
+}
+
+// --- Service & links ------------------------------------------------------
+
+/** Identity + (user-tracked) service info; the API has no service history. */
+@Composable
+private fun ServicePebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val odo = v.odometer?.trim()?.takeIf { it.isNotBlank() }
+    val odoInt = odo?.replace(",", "")?.toDoubleOrNull()?.toInt()
+    val plate = state.licensePlates[v.vin]
+    val lastSvc = state.lastServiceMiles[v.vin]
+    val interval = state.serviceIntervalMiles[v.vin]
+    val nextDue = if (lastSvc != null && interval != null) lastSvc + interval else null
+    val remaining = if (nextDue != null && odoInt != null) nextDue - odoInt else null
+    Pebble(v, "service", "Service & info", Icons.Filled.Build, state, vm, dragHandle) {
+        SelectionContainer { StatusRow("VIN", v.vin) }
+        if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
+        odo?.let { StatusRow("Odometer", "$it mi") }
+        lastSvc?.let { StatusRow("Last service at", "$it mi") }
+        nextDue?.let {
+            val note = remaining?.let { r -> if (r >= 0) " · $r mi to go" else " · overdue ${-r} mi" } ?: ""
+            StatusRow("Next service due", "$it mi$note")
+        }
+        if (lastSvc == null || interval == null) {
+            Text(
+                "Set last-service mileage and a service interval in Settings to track upcoming service.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Brand-aware quick links to the owner's official tools. */
+@Composable
+private fun LinksPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val context = LocalContext.current
+    val appearance by vm.appearance.collectAsState()
+    val inApp = appearance.linksInApp
+    val genesis = v.brandIndicator.equals("G", ignoreCase = true)
+    Pebble(
+        v, "links", if (genesis) "Genesis links" else "Hyundai links",
+        Icons.Filled.OpenInNew, state, vm, dragHandle,
+    ) {
+        if (genesis) {
+            LinkRow("Open Genesis app") {
+                openApp(context, listOf("com.genesis.connectedcar", "com.genesis.mobile.us"),
+                    "https://play.google.com/store/search?q=genesis%20intelligent%20assistant&c=apps", inApp)
+            }
+            LinkRow("Genesis owners site") { openUrl(context, "https://owners.genesis.com", inApp) }
+            LinkRow("Schedule service") { openUrl(context, "https://www.genesis.com/us/en/genesis-service.html", inApp) }
+            LinkRow("Owner's manuals & guides") { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
+            LinkRow("Roadside assistance") { dial(context, "8443409741") }
+        } else {
+            LinkRow("Open Bluelink app") {
+                openApp(context, listOf("com.hyundai.bluelink", "com.hyundai.bluelinkc"),
+                    "https://play.google.com/store/search?q=myhyundai%20with%20bluelink&c=apps", inApp)
+            }
+            LinkRow("MyHyundai owners site") { openUrl(context, "https://owners.hyundaiusa.com", inApp) }
+            LinkRow("Schedule service") { openUrl(context, "https://owners.hyundaiusa.com/us/en/my-account/my-service.html", inApp) }
+            LinkRow("Find a dealer") { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
+            LinkRow("Owner's manuals & guides") { openUrl(context, "https://owners.hyundaiusa.com/us/en/resources/manuals-warranties.html", inApp) }
+            LinkRow("Roadside assistance") { dial(context, "8002437766") }
+        }
+    }
+}
+
+@Composable
+private fun LinkRow(label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onClick() }.padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Icon(
+            Icons.Filled.OpenInNew,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun openUrl(context: Context, url: String, inApp: Boolean) {
+    val uri = Uri.parse(url)
+    val external = { context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) }
+    if (inApp) {
+        runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
+            .onFailure { runCatching { external() } }
+    } else {
+        runCatching { external() }
+    }
+}
+
+private fun openApp(context: Context, packages: List<String>, fallbackUrl: String, inApp: Boolean) {
+    for (p in packages) {
+        context.packageManager.getLaunchIntentForPackage(p)?.let {
+            runCatching { context.startActivity(it) }.onSuccess { return }
+        }
+    }
+    openUrl(context, fallbackUrl, inApp)
+}
+
+private fun dial(context: Context, number: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
     }
 }
 
@@ -1593,8 +1767,10 @@ private fun SettingsScreen(vm: AppViewModel) {
     var pickTarget by remember { mutableStateOf<String?>(null) }
     val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
         val target = pickTarget
-        if (result.isSuccessful && target != null) {
-            result.uriContent?.let { vm.setVehicleImage(target, it.toString()) }
+        when {
+            // Copy the cropper's temp output into our own storage so it persists.
+            result.isSuccessful && target != null -> result.uriContent?.let { vm.importCarImage(target, it) }
+            result.error != null -> vm.reportError("Couldn't crop photo: ${result.error?.message ?: "unknown error"}")
         }
         pickTarget = null
     }
@@ -1748,6 +1924,16 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
+            // Links
+            SettingsCard("Links") {
+                ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
+                Text(
+                    "On uses an in-app browser tab; off opens your default browser.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             // Logs
             SettingsCard("Logs") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1861,19 +2047,59 @@ private fun CarSettingsCard(
                     ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
 
                     Text("Photo", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    OutlinedTextField(
-                        value = state.imageUrls[v.vin] ?: "",
-                        onValueChange = { vm.setVehicleImage(v.vin, it) },
-                        label = { Text("Image URL (blank = gradient)") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    val storedImage = state.imageUrls[v.vin]
+                    if (storedImage != null && storedImage.startsWith("/")) {
+                        Text(
+                            "Custom photo set",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = storedImage ?: "",
+                            onValueChange = { vm.setVehicleImage(v.vin, it) },
+                            label = { Text("Image URL (blank = gradient)") },
+                            singleLine = true,
+                            shape = FieldShape,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = onPickPhoto) { Text("Choose & crop photo") }
                         if (state.imageUrls[v.vin] != null) {
                             TextButton(onClick = { vm.setVehicleImage(v.vin, "") }) { Text("Clear") }
                         }
+                    }
+
+                    Text("Identity & service", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    SelectionContainer { StatusRow("VIN", v.vin) }
+                    OutlinedTextField(
+                        value = state.licensePlates[v.vin] ?: "",
+                        onValueChange = { vm.setLicensePlate(v.vin, it) },
+                        label = { Text("License plate") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = state.lastServiceMiles[v.vin]?.toString() ?: "",
+                            onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                            label = { Text("Last service (mi)") },
+                            singleLine = true,
+                            shape = FieldShape,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
+                            onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                            label = { Text("Interval (mi)") },
+                            singleLine = true,
+                            shape = FieldShape,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
             }

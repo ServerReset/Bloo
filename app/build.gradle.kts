@@ -69,6 +69,8 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.biometric:biometric:1.1.0")
+    // Chrome Custom Tabs for opening Hyundai/Genesis links in-app
+    implementation("androidx.browser:browser:1.8.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Home-screen widgets (Jetpack Glance)
