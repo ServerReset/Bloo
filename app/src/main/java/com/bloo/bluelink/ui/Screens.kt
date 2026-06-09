@@ -68,6 +68,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -151,6 +152,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -503,8 +505,25 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val appearance by vm.appearance.collectAsState()
 
     val count = vehicles.size
-    val widthDp = LocalConfiguration.current.screenWidthDp
+    val cfg = LocalConfiguration.current
+    val widthDp = cfg.screenWidthDp
+    val heightDp = cfg.screenHeightDp
     val large = widthDp >= 600
+    // Very small screens (e.g. flip-phone cover): tile layout, one section at a
+    // time, swipe up/down between them; swipe left/right between cars.
+    val compact = !large && heightDp < 480
+    if (compact) {
+        Box(Modifier.fillMaxSize()) {
+            CompactGarage(state, vm)
+            FloatingIcon(
+                icon = Icons.Filled.Settings,
+                description = "Settings",
+                onClick = { vm.openSettings() },
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+        }
+        return
+    }
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
     // Expanding to the dual-column view only makes sense on a wide screen.
@@ -586,6 +605,86 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             onClick = { vm.openSettings() },
             modifier = Modifier.align(Alignment.TopEnd),
         )
+    }
+}
+
+/** Cover-screen layout: swipe left/right for cars, up/down for section tiles. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CompactGarage(state: UiState, vm: AppViewModel) {
+    val vehicles = state.vehicles
+    val count = vehicles.size
+    val pager = rememberPagerState(initialPage = state.currentIndex.coerceIn(0, count - 1)) { count }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.collect { vm.selectIndex(it) }
+    }
+    HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+        CompactCar(vehicles[page], state, vm)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val sections = state.sectionsFor(v).filter { it != "charge" || state.hasBattery(v) }
+    val tiles = listOf("main") + sections
+    val vPager = rememberPagerState { tiles.size }
+    VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { i ->
+        Box(Modifier.fillMaxSize().padding(10.dp)) {
+            when (val tile = tiles[i]) {
+                "main" -> CompactMainTile(v, state, vm)
+                else -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    when (tile) {
+                        "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
+                        "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
+                        "location" -> LocationPebble(v, state, vm, Modifier)
+                        "info" -> InfoPebble(v, status, state, vm, Modifier)
+                        "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The dense main tile: faded car photo behind name, gauge and key controls. */
+@Composable
+private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val img = state.imageUrls[v.vin]
+    val scheme = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp))) {
+        if (!img.isNullOrBlank()) {
+            AsyncImage(
+                model = if (img.startsWith("/")) java.io.File(img) else img,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().alpha(0.22f),
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize().alpha(0.18f)
+                    .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
+            )
+        }
+        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(v.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                IconButton(onClick = { vm.refreshStatus(v) }) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                }
+            }
+            ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
+            Spacer(Modifier.weight(1f))
+            PrimaryActions(v, state, vm)
+            Text(
+                "Swipe up for more",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        }
     }
 }
 
@@ -1903,6 +2002,7 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
 @Composable
 private fun SettingsScreen(vm: AppViewModel) {
     val appearance by vm.appearance.collectAsState()
+    val notif by vm.notifications.collectAsState()
     val state by vm.state.collectAsState()
     val logs by vm.logs.collectAsState()
     val context = LocalContext.current
@@ -2091,6 +2191,33 @@ private fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
                 Text(
                     "On uses an in-app browser tab; off opens your default browser.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Notifications
+            SettingsCard("Notifications") {
+                ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
+                ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
+                if (notif.doorOpen) {
+                    var minutes by remember(notif.doorOpenMinutes) { mutableStateOf(notif.doorOpenMinutes.toString()) }
+                    OutlinedTextField(
+                        value = minutes,
+                        onValueChange = {
+                            minutes = it.filter(Char::isDigit)
+                            minutes.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setDoorOpenMinutes)
+                        },
+                        label = { Text("Door-open minutes") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
+                Text(
+                    "Background checks run roughly every 30 minutes, so door alerts may " +
+                        "arrive a little after your set time.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

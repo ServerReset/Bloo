@@ -1,0 +1,52 @@
+package com.bloo.bluelink.work
+
+import android.content.Context
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import com.bloo.bluelink.data.BlueLinkApi
+import com.bloo.bluelink.data.BlueLinkRepository
+import com.bloo.bluelink.data.CarAlerts
+import com.bloo.bluelink.data.Notifications
+import com.bloo.bluelink.data.SessionStore
+import com.bloo.bluelink.data.SettingsStore
+import java.util.concurrent.TimeUnit
+
+/**
+ * Periodically refreshes each signed-in car's status in the background and posts
+ * service-due / door-open notifications even when the app is closed.
+ */
+class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result {
+        val store = SessionStore(applicationContext)
+        val settings = SettingsStore(applicationContext)
+        val prefs = settings.notificationPrefs()
+        if (!prefs.service && !prefs.doorOpen) return Result.success()
+
+        for (brand in store.loggedInBrands()) {
+            val repo = BlueLinkRepository(BlueLinkApi(brand), store, brand)
+            val vehicles = runCatching { repo.vehicles() }.getOrElse { emptyList() }
+            for (v in vehicles) {
+                val status = runCatching { repo.status(v, refresh = false) }.getOrNull()
+                CarAlerts.evaluate(settings, v, status).forEach {
+                    Notifications.post(applicationContext, it.id, it.title, it.text)
+                }
+            }
+        }
+        return Result.success()
+    }
+
+    companion object {
+        fun schedule(context: Context) {
+            val request = PeriodicWorkRequestBuilder<AlertWorker>(30, TimeUnit.MINUTES).build()
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                "bloo_alerts",
+                ExistingPeriodicWorkPolicy.KEEP,
+                request,
+            )
+        }
+    }
+}

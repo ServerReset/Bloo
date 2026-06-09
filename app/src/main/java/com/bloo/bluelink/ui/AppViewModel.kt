@@ -10,7 +10,9 @@ import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
@@ -164,6 +166,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SharingStarted.Eagerly,
             SettingsStore.Appearance(),
         )
+
+    val notifications: StateFlow<SettingsStore.NotificationPrefs> =
+        settingsStore.notifications.stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            SettingsStore.NotificationPrefs(),
+        )
+
+    private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
+        val alerts = CarAlerts.evaluate(settingsStore, v, status)
+        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text) }
+        alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text) } }
+    }
+
+    fun setNotifyService(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyService(v) }
+    fun setNotifyDoor(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyDoor(v) }
+    fun setDoorOpenMinutes(m: Int) = viewModelScope.launch { settingsStore.setDoorOpenMinutes(m) }
 
     init {
         viewModelScope.launch {
@@ -352,6 +371,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     repoFor(v).status(v, refresh = refresh)?.let { s ->
                         _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
                         persistSnapshots()
+                        checkAlerts(v, s)
                     }
                 }
                 logSuccess?.let { AppLog.log(it) }

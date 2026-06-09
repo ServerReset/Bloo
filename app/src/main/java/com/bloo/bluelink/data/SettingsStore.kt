@@ -90,6 +90,58 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[Keys.FLIPPED] = flipped.toString() }
     }
 
+    // --- Notifications --------------------------------------------------
+
+    data class NotificationPrefs(
+        val service: Boolean = true,
+        val doorOpen: Boolean = true,
+        val doorOpenMinutes: Int = 5,
+    )
+
+    suspend fun notificationPrefs(): NotificationPrefs {
+        val p = context.settingsDataStore.data.first()
+        return NotificationPrefs(
+            service = p[booleanPreferencesKey("notify_service")] ?: true,
+            doorOpen = p[booleanPreferencesKey("notify_door")] ?: true,
+            doorOpenMinutes = p[stringPreferencesKey("notify_door_min")]?.toIntOrNull() ?: 5,
+        )
+    }
+
+    val notifications: Flow<NotificationPrefs> = context.settingsDataStore.data.map { p ->
+        NotificationPrefs(
+            service = p[booleanPreferencesKey("notify_service")] ?: true,
+            doorOpen = p[booleanPreferencesKey("notify_door")] ?: true,
+            doorOpenMinutes = p[stringPreferencesKey("notify_door_min")]?.toIntOrNull() ?: 5,
+        )
+    }
+
+    suspend fun setNotifyService(v: Boolean) =
+        context.settingsDataStore.edit { it[booleanPreferencesKey("notify_service")] = v }.let {}
+
+    suspend fun setNotifyDoor(v: Boolean) =
+        context.settingsDataStore.edit { it[booleanPreferencesKey("notify_door")] = v }.let {}
+
+    suspend fun setDoorOpenMinutes(v: Int) =
+        context.settingsDataStore.edit { it[stringPreferencesKey("notify_door_min")] = v.toString() }.let {}
+
+    // Transient alert bookkeeping (per car), used to fire each alert only once.
+    suspend fun doorOpenSince(vin: String): Long? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("door_since_$vin")]?.toLongOrNull()
+
+    suspend fun setDoorOpenSince(vin: String, value: Long?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("door_since_$vin")
+            if (value == null) it.remove(k) else it[k] = value.toString()
+        }
+    }
+
+    suspend fun alertFired(key: String): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("alert_$key")] ?: false
+
+    suspend fun setAlertFired(key: String, value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("alert_$key")] = value }
+    }
+
     suspend fun setLinksInApp(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.LINKS_IN_APP] = value.toString() }
     }
