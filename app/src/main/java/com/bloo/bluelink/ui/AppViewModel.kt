@@ -71,7 +71,10 @@ data class UiState(
     val collapsedPebbles: Set<String> = emptySet(),
     /** Show the first-run "configure your car" prompt. */
     val showOnboarding: Boolean = false,
-    val credentials: Credentials? = null,
+    /** All signed-in accounts (one per brand). */
+    val accounts: List<Credentials> = emptyList(),
+    /** Showing the login form to add another account while already signed in. */
+    val addingAccount: Boolean = false,
     val message: String? = null,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
@@ -125,9 +128,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val settingsStore = SettingsStore(app)
     private val credentialStore = CredentialStore(app)
     private val snapshotStore = SnapshotStore(app)
-    // Rebuilt whenever the brand becomes known (Hyundai vs Genesis use different
-    // hosts + OAuth clients).
-    private var repo = BlueLinkRepository(BlueLinkApi(), store)
+    // One repository per signed-in brand (Hyundai/Genesis can both be active).
+    private val repos = mutableMapOf<Brand, BlueLinkRepository>()
+
+    private fun repoFor(brand: Brand): BlueLinkRepository =
+        repos.getOrPut(brand) { BlueLinkRepository(BlueLinkApi(brand), store, brand) }
+
+    private fun brandOf(v: Vehicle): Brand =
+        if (v.brandIndicator.equals("G", ignoreCase = true)) Brand.GENESIS else Brand.HYUNDAI
+
+    private fun repoFor(v: Vehicle): BlueLinkRepository = repoFor(brandOf(v))
+
+    @Volatile
+    private var loadingGarage = false
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -154,9 +167,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            val session = store.load() ?: return@launch
-            repo = BlueLinkRepository(BlueLinkApi(session.brand), store)
-            _state.update { it.copy(credentials = credentialStore.load()) }
+            val brands = store.loggedInBrands()
+            if (brands.isEmpty()) return@launch
+            brands.forEach { repoFor(it) }
+            _state.update { it.copy(accounts = credentialStore.loadAll()) }
             val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
             if (locked) {
                 _state.update { it.copy(screen = Screen.Locked) }
@@ -168,28 +182,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Auth ------------------------------------------------------------
 
+    /** Sign in (or add another account). Both brands can be active at once. */
     fun login(username: String, password: String, pin: String, brand: Brand) {
         if (username.isBlank() || password.isBlank() || pin.isBlank()) {
             _state.update { it.copy(message = "Email, password and PIN are all required") }
             return
         }
         launchBusy {
-            repo = BlueLinkRepository(BlueLinkApi(brand), store)
-            repo.login(brand, username.trim(), password, pin.trim())
-            val creds = Credentials(username.trim(), password, pin.trim(), brand)
-            credentialStore.save(creds)
-            AppLog.log("Signed in as ${creds.email} (${brand.label})")
-            _state.update { it.copy(credentials = creds) }
+            repoFor(brand).login(username.trim(), password, pin.trim())
+            credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
+            AppLog.log("Signed in as ${username.trim()} (${brand.label})")
+            _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
             loadGarageInternal()
         }
     }
 
-    fun logout() {
+    fun beginAddAccount() = _state.update { it.copy(addingAccount = true) }
+    fun cancelAddAccount() = _state.update { it.copy(addingAccount = false) }
+
+    fun logout(brand: Brand) {
         viewModelScope.launch {
-            repo.logout()
-            credentialStore.clear()
-            AppLog.log("Signed out")
-            _state.value = UiState(screen = Screen.Login)
+            runCatching { repoFor(brand).logout() }
+            credentialStore.clear(brand)
+            repos.remove(brand)
+            AppLog.log("Signed out of ${brand.label}")
+            val remaining = credentialStore.loadAll()
+            if (remaining.isEmpty()) {
+                _state.value = UiState(screen = Screen.Login)
+            } else {
+                _state.update { it.copy(accounts = remaining) }
+                loadGarage()
+            }
+        }
+    }
+
+    /** Fix a wrong/locked service PIN without re-entering the whole account. */
+    fun updatePin(brand: Brand, pin: String) {
+        if (pin.isBlank()) return
+        viewModelScope.launch {
+            store.updatePin(brand, pin.trim())
+            credentialStore.updatePin(brand, pin.trim())
+            _state.update { it.copy(accounts = credentialStore.loadAll(), message = "PIN updated for ${brand.label}") }
+            AppLog.log("Updated PIN for ${brand.label}")
         }
     }
 
@@ -209,7 +243,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun loadGarage() = launchBusy { loadGarageInternal() }
 
     private suspend fun loadGarageInternal() {
-        val fetched = repo.vehicles()
+        if (loadingGarage) return
+        loadingGarage = true
+        try {
+            loadGarageInner()
+        } finally {
+            loadingGarage = false
+        }
+    }
+
+    private suspend fun loadGarageInner() {
+        // Merge vehicles from every signed-in brand; one brand failing shouldn't
+        // hide the others.
+        val fetched = repos.values.flatMap { r ->
+            runCatching { r.vehicles() }.getOrElse { e ->
+                AppLog.log("⚠ ${e.message ?: "Couldn't load vehicles"}")
+                emptyList()
+            }
+        }
         if (fetched.isEmpty()) {
             _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty) }
             return
@@ -298,7 +349,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 statusMutex.withLock {
-                    repo.status(v, refresh = refresh)?.let { s ->
+                    repoFor(v).status(v, refresh = refresh)?.let { s ->
                         _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
                         persistSnapshots()
                     }
@@ -470,7 +521,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
-        val loc = repo.location(v) ?: throw BlueLinkException(
+        val loc = repoFor(v).location(v) ?: throw BlueLinkException(
             "Couldn't get the car's location — it may be asleep, out of coverage, or over " +
                 "the daily location-lookup limit. Try again later.",
         )
@@ -503,36 +554,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun electric(v: Vehicle): Vehicle =
         if (_state.value.hasBattery(v)) v.copy(isEv = true) else v
 
-    fun lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repo.lock(v) }
-    fun unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repo.unlock(v) }
+    fun lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repoFor(v).lock(v) }
+    fun unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repoFor(v).unlock(v) }
 
     fun stopClimate(v: Vehicle) =
-        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repo.stopClimate(electric(v)) }
+        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repoFor(v).stopClimate(electric(v)) }
 
     fun startClimate(v: Vehicle, req: ClimateRequest) =
         runCommand(v.vin, "climate", "Climate on (${req.tempF}°F)", { it.copy(airCtrlOn = true) }) {
-            repo.startClimate(electric(v), req)
+            repoFor(v).startClimate(electric(v), req)
         }
 
     /** Remote engine/climate start with defaults (the primary Climate action). */
     fun engineStart(v: Vehicle) =
         runCommand(v.vin, "climate", "Climate on", { it.copy(airCtrlOn = true) }) {
-            repo.startClimate(electric(v), ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+            repoFor(v).startClimate(electric(v), ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
         }
 
     fun startCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
-            repo.startCharge(electric(v))
+            repoFor(v).startCharge(electric(v))
         }
 
     fun stopCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) }) {
-            repo.stopCharge(electric(v))
+            repoFor(v).stopCharge(electric(v))
         }
 
     fun setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
         runCommand(v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)", null) {
-            repo.setChargeTargets(electric(v), acPercent, dcPercent)
+            repoFor(v).setChargeTargets(electric(v), acPercent, dcPercent)
         }
 
     /**

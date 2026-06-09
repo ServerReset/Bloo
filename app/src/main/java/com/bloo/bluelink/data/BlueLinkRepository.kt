@@ -1,15 +1,16 @@
 package com.bloo.bluelink.data
 
 /**
- * Coordinates the API client with the persisted session, retrying once on an
- * auth failure by refreshing the access token. All data is live from Hyundai.
+ * Coordinates one brand's API client with its persisted session, retrying once
+ * on an auth failure by refreshing the access token. All data is live.
  */
 class BlueLinkRepository(
     private val api: BlueLinkApi,
     private val store: SessionStore,
+    private val brand: Brand,
 ) {
 
-    suspend fun login(brand: Brand, username: String, password: String, pin: String) {
+    suspend fun login(username: String, password: String, pin: String) {
         val token = api.login(username, password)
         store.save(
             SessionStore.Session(
@@ -22,10 +23,10 @@ class BlueLinkRepository(
         )
     }
 
-    suspend fun logout() = store.clear()
+    suspend fun logout() = store.clear(brand)
 
     suspend fun vehicles(): List<Vehicle> = withSession { s ->
-        api.vehicles(s.accessToken, s.username)
+        api.vehicles(s.accessToken, s.username).map { it.copy(brandIndicator = brand.code) }
     }
 
     suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus? = withSession { s ->
@@ -53,9 +54,9 @@ class BlueLinkRepository(
 
     suspend fun stopCharge(v: Vehicle) = withSession { s -> api.stopCharge(s.accessToken, s.username, s.pin, v) }
 
-    /** Runs [block] with the current session, refreshing the token once on 401/403. */
+    /** Runs [block] with this brand's session, refreshing the token once on 401/403. */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
-        val session = store.load() ?: throw BlueLinkException("Not logged in")
+        val session = store.load(brand) ?: throw BlueLinkException("Not logged in")
         return try {
             block(session)
         } catch (e: BlueLinkException) {
@@ -63,8 +64,8 @@ class BlueLinkRepository(
             val isAuth = e.code == 401 || e.code == 403
             if (isAuth && refreshToken != null) {
                 val refreshed = api.refresh(refreshToken)
-                store.updateAccessToken(refreshed.accessToken, refreshed.refreshToken)
-                val updated = store.load() ?: throw e
+                store.updateAccessToken(brand, refreshed.accessToken, refreshed.refreshToken)
+                val updated = store.load(brand) ?: throw e
                 block(updated)
             } else {
                 throw e

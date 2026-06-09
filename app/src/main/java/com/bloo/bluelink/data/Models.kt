@@ -74,10 +74,12 @@ data class VehicleStatus(
     val doorLock: Boolean? = null,
     val airCtrlOn: Boolean? = null,
     val engine: Boolean? = null,
+    val acc: Boolean? = null,
     val trunkOpen: Boolean? = null,
     val hoodOpen: Boolean? = null,
     val defrost: Boolean? = null,
     val doorOpen: DoorOpen? = null,
+    val windowOpen: WindowOpen? = null,
     val tirePressureLamp: TirePressureLamp? = null,
     val dte: Dte? = null,
     val airTemp: TempValue? = null,
@@ -97,6 +99,18 @@ data class VehicleStatus(
     val fuelLevel: Int? = null,
     val tirePressure: TirePressure? = null,
 )
+
+/** Per-window open state (0 closed, 1 open), like [DoorOpen]. */
+@Serializable
+data class WindowOpen(
+    val frontLeft: Int? = null,
+    val frontRight: Int? = null,
+    val backLeft: Int? = null,
+    val backRight: Int? = null,
+) {
+    val anyOpen: Boolean
+        get() = listOf(frontLeft, frontRight, backLeft, backRight).any { it == 1 }
+}
 
 /** Current per-seat heater/vent state, used to infer which seats the car has. */
 @Serializable

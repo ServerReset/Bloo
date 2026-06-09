@@ -15,8 +15,8 @@ data class Credentials(
 
 /**
  * Stores credentials at rest using AES-256 via Jetpack Security
- * (EncryptedSharedPreferences). Used to remember the login and to re-auth
- * after a token expires.
+ * (EncryptedSharedPreferences) — one set per brand, so multiple accounts can be
+ * remembered and re-authenticated after a token expires.
  */
 class CredentialStore(context: Context) {
 
@@ -34,29 +34,66 @@ class CredentialStore(context: Context) {
     }
 
     fun save(credentials: Credentials) {
+        migrateLegacy()
+        val b = credentials.brand.name
+        val brands = brandSet().toMutableSet().apply { add(b) }
         prefs.edit()
-            .putString(KEY_EMAIL, credentials.email)
-            .putString(KEY_PASSWORD, credentials.password)
-            .putString(KEY_PIN, credentials.pin)
-            .putString(KEY_BRAND, credentials.brand.name)
+            .putString("${b}_email", credentials.email)
+            .putString("${b}_password", credentials.password)
+            .putString("${b}_pin", credentials.pin)
+            .putStringSet(KEY_BRANDS, brands)
             .apply()
     }
 
-    fun load(): Credentials? {
-        val email = prefs.getString(KEY_EMAIL, null) ?: return null
-        val password = prefs.getString(KEY_PASSWORD, null) ?: return null
-        val pin = prefs.getString(KEY_PIN, null) ?: return null
-        return Credentials(email, password, pin, Brand.fromName(prefs.getString(KEY_BRAND, null)))
+    fun load(brand: Brand): Credentials? {
+        migrateLegacy()
+        val b = brand.name
+        val email = prefs.getString("${b}_email", null) ?: return null
+        val password = prefs.getString("${b}_password", null) ?: return null
+        val pin = prefs.getString("${b}_pin", null) ?: return null
+        return Credentials(email, password, pin, brand)
     }
 
-    fun clear() {
+    fun loadAll(): List<Credentials> {
+        migrateLegacy()
+        return brandSet().mapNotNull { name ->
+            runCatching { Brand.valueOf(name) }.getOrNull()?.let { load(it) }
+        }
+    }
+
+    fun updatePin(brand: Brand, pin: String) {
+        prefs.edit().putString("${brand.name}_pin", pin).apply()
+    }
+
+    fun clear(brand: Brand) {
+        val b = brand.name
+        val brands = brandSet().toMutableSet().apply { remove(b) }
+        prefs.edit()
+            .remove("${b}_email").remove("${b}_password").remove("${b}_pin")
+            .putStringSet(KEY_BRANDS, brands)
+            .apply()
+    }
+
+    fun clearAll() {
         prefs.edit().clear().apply()
     }
 
+    private fun brandSet(): Set<String> = prefs.getStringSet(KEY_BRANDS, emptySet()) ?: emptySet()
+
+    /** Migrate the old single-account keys into the per-brand layout (one-shot). */
+    private fun migrateLegacy() {
+        val email = prefs.getString("email", null) ?: return
+        val brand = Brand.fromName(prefs.getString("brand", null)).name
+        prefs.edit()
+            .putString("${brand}_email", email)
+            .putString("${brand}_password", prefs.getString("password", null))
+            .putString("${brand}_pin", prefs.getString("pin", null))
+            .putStringSet(KEY_BRANDS, setOf(brand))
+            .remove("email").remove("password").remove("pin").remove("brand")
+            .apply()
+    }
+
     private companion object {
-        const val KEY_EMAIL = "email"
-        const val KEY_PASSWORD = "password"
-        const val KEY_PIN = "pin"
-        const val KEY_BRAND = "brand"
+        const val KEY_BRANDS = "brands"
     }
 }

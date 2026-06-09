@@ -13,9 +13,8 @@ import android.webkit.WebView
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import com.canhub.cropper.CropImageContract
-import com.canhub.cropper.CropImageContractOptions
-import com.canhub.cropper.CropImageOptions
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -231,8 +230,10 @@ fun BlooApp(vm: AppViewModel) {
             }
         },
     ) { padding ->
+        // Adding an account shows the login form even while already signed in.
+        val target = if (state.addingAccount) Screen.Login else state.screen
         AnimatedContent(
-            targetState = state.screen,
+            targetState = target,
             modifier = Modifier.padding(padding),
             transitionSpec = {
                 // Settings slides in from the right; returning slides back left.
@@ -243,7 +244,11 @@ fun BlooApp(vm: AppViewModel) {
             label = "screen",
         ) { screen ->
             when (screen) {
-                Screen.Login -> LoginScreen(state.loading, vm::login)
+                Screen.Login -> LoginScreen(
+                    loading = state.loading,
+                    onLogin = vm::login,
+                    onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
+                )
                 Screen.Locked -> LockScreen(vm)
                 Screen.Empty -> EmptyScreen(vm)
                 Screen.Garage -> GarageScreen(state, vm)
@@ -312,12 +317,18 @@ private fun OnboardingDialog(
 private val FieldShape = RoundedCornerShape(18.dp)
 
 @Composable
-private fun LoginScreen(loading: Boolean, onLogin: (String, String, String, Brand) -> Unit) {
+private fun LoginScreen(
+    loading: Boolean,
+    onLogin: (String, String, String, Brand) -> Unit,
+    onCancel: (() -> Unit)? = null,
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
+
+    if (onCancel != null) BackHandler { onCancel() }
 
     Column(
         Modifier
@@ -395,6 +406,9 @@ private fun LoginScreen(loading: Boolean, onLogin: (String, String, String, Bran
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 if (loading) LoadingIndicator() else Text("Sign in")
+            }
+            if (onCancel != null) {
+                TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
             }
             Text(
                 "Credentials are sent directly to ${brand.label}'s telematics servers and " +
@@ -616,6 +630,7 @@ private fun HeroHeader(
     imageUrl: String?,
     hasBattery: Boolean,
     hasFuel: Boolean,
+    drivingLabel: String? = null,
     height: Dp = 150.dp,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
@@ -631,7 +646,7 @@ private fun HeroHeader(
         Column(Modifier.padding(16.dp)) {
             HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(16.dp))
-            ChargeFuelBar(status, hasBattery, hasFuel)
+            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel)
         }
     }
 }
@@ -665,7 +680,7 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
 }
 
 @Composable
-private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean) {
+private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean, drivingLabel: String? = null) {
     // Primary metric: battery if the car has one, else fuel. Plug-in hybrids show
     // both — battery as the headline and fuel as a secondary line.
     val battPct = status?.evStatus?.batteryStatus
@@ -713,6 +728,11 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                     fontWeight = if (charging) FontWeight.Bold else FontWeight.Normal,
                 )
             }
+        }
+        // Driving / parked status, right under the gauge readout.
+        drivingLabel?.let {
+            Spacer(Modifier.height(6.dp))
+            DrivingBadge(it)
         }
         // Plug-in hybrid: surface the fuel tank too.
         if (hasBattery && hasFuel && fuelPct != null) {
@@ -1009,10 +1029,6 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            state.drivingLabel(v)?.let {
-                Spacer(Modifier.height(4.dp))
-                DrivingBadge(it)
-            }
         }
         if (onExpand != null) {
             IconButton(onClick = onExpand) {
@@ -1045,7 +1061,7 @@ private fun DrivingBadge(label: String) {
 @Composable
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v))
+    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
     PrimaryActions(v, state, vm)
 }
 
@@ -1297,8 +1313,18 @@ private fun InformationPebble(v: Vehicle, status: VehicleStatus?, state: UiState
                     )
                     StatusRow("Doors", if (open.isEmpty()) "All closed" else "Open: ${open.joinToString(", ")}")
                 }
+                status.windowOpen?.let { w ->
+                    val open = listOfNotNull(
+                        if (w.frontLeft == 1) "front-left" else null,
+                        if (w.frontRight == 1) "front-right" else null,
+                        if (w.backLeft == 1) "rear-left" else null,
+                        if (w.backRight == 1) "rear-right" else null,
+                    )
+                    StatusRow("Windows", if (open.isEmpty()) "All closed" else "Open: ${open.joinToString(", ")}")
+                }
                 status.trunkOpen?.let { StatusRow("Trunk", if (it) "Open" else "Closed") }
                 status.hoodOpen?.let { StatusRow("Hood", if (it) "Open" else "Closed") }
+                status.acc?.let { StatusRow("Accessory power", if (it) "On" else "Off") }
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                 status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
@@ -1549,8 +1575,13 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
             vm.setChargeLimits(v, ac, dc)
         }
+        val rt = status?.evStatus?.remainTime2
+        rt?.etc1?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on AC", fmtMinutes(it)) }
+        rt?.etc3?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on DC", fmtMinutes(it)) }
     }
 }
+
+private fun fmtMinutes(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
 // --- Location -------------------------------------------------------------
 
@@ -1686,22 +1717,21 @@ private fun LinksPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
     ) {
         if (genesis) {
             LinkRow("Open Genesis app") {
-                openApp(context, listOf("com.genesis.connectedcar", "com.genesis.mobile.us"),
-                    "https://play.google.com/store/search?q=genesis%20intelligent%20assistant&c=apps", inApp)
+                openApp(context, listOf("com.stationdm.genesis"),
+                    "https://play.google.com/store/apps/details?id=com.stationdm.genesis", inApp)
             }
             LinkRow("Genesis owners site") { openUrl(context, "https://owners.genesis.com", inApp) }
-            LinkRow("Schedule service") { openUrl(context, "https://www.genesis.com/us/en/genesis-service.html", inApp) }
+            LinkRow("Schedule service / find retailer") { openUrl(context, "https://www.genesis.com/us/en/find-a-retailer.html", inApp) }
             LinkRow("Owner's manuals & guides") { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
             LinkRow("Roadside assistance") { dial(context, "8443409741") }
         } else {
             LinkRow("Open Bluelink app") {
-                openApp(context, listOf("com.hyundai.bluelink", "com.hyundai.bluelinkc"),
-                    "https://play.google.com/store/search?q=myhyundai%20with%20bluelink&c=apps", inApp)
+                openApp(context, listOf("com.stationdm.bluelink"),
+                    "https://play.google.com/store/apps/details?id=com.stationdm.bluelink", inApp)
             }
             LinkRow("MyHyundai owners site") { openUrl(context, "https://owners.hyundaiusa.com", inApp) }
-            LinkRow("Schedule service") { openUrl(context, "https://owners.hyundaiusa.com/us/en/my-account/my-service.html", inApp) }
-            LinkRow("Find a dealer") { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
-            LinkRow("Owner's manuals & guides") { openUrl(context, "https://owners.hyundaiusa.com/us/en/resources/manuals-warranties.html", inApp) }
+            LinkRow("Schedule service / find dealer") { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
+            LinkRow("Owner's manuals & guides") { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
             LinkRow("Roadside assistance") { dial(context, "8002437766") }
         }
     }
@@ -1765,13 +1795,13 @@ private fun SettingsScreen(vm: AppViewModel) {
     BackHandler { vm.closeSettings() }
 
     var pickTarget by remember { mutableStateOf<String?>(null) }
-    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+    // System photo picker (crash-free; the old crop dialog could crash the app).
+    // The hero crops to fit via ContentScale.Crop, so no manual crop is needed.
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
         val target = pickTarget
-        when {
-            // Copy the cropper's temp output into our own storage so it persists.
-            result.isSuccessful && target != null -> result.uriContent?.let { vm.importCarImage(target, it) }
-            result.error != null -> vm.reportError("Couldn't crop photo: ${result.error?.message ?: "unknown error"}")
-        }
+        if (uri != null && target != null) vm.importCarImage(target, uri)
         pickTarget = null
     }
 
@@ -1791,25 +1821,49 @@ private fun SettingsScreen(vm: AppViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Account
-            SettingsCard("Account") {
-                val creds = state.credentials
-                if (creds != null) {
-                    StatusRow("Email", creds.email)
-                    SecretRow("Service PIN", creds.pin)
-                    SecretRow("Password", creds.password)
-                } else {
+            // Accounts (one per brand; Hyundai + Genesis can both be signed in).
+            SettingsCard("Accounts") {
+                if (state.accounts.isEmpty()) {
                     Text("Not signed in")
                 }
+                state.accounts.forEachIndexed { i, creds ->
+                    if (i > 0) Spacer(Modifier.height(12.dp))
+                    Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    StatusRow("Email", creds.email)
+                    SecretRow("Password", creds.password)
+                    var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
+                    OutlinedTextField(
+                        value = pin,
+                        onValueChange = { pin = it },
+                        label = { Text("Service PIN") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            onClick = { vm.updatePin(creds.brand, pin) },
+                            enabled = pin.isNotBlank() && pin != creds.pin,
+                        ) { Text("Update PIN") }
+                        TextButton(
+                            onClick = { vm.logout(creds.brand) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) { Text("Sign out") }
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { vm.logout() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    ),
-                ) { Text("Sign out") }
+                OutlinedButton(onClick = { vm.beginAddAccount() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Add another account")
+                }
+                Text(
+                    "If commands fail with a locked PIN, fix the Service PIN above — too " +
+                        "many wrong-PIN attempts lock it for a few minutes server-side.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
 
             // Security
@@ -1842,17 +1896,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                 val single = state.vehicles.size == 1
                 val pick: (String) -> Unit = { vin ->
                     pickTarget = vin
-                    cropLauncher.launch(
-                        CropImageContractOptions(
-                            uri = null,
-                            cropImageOptions = CropImageOptions(
-                                imageSourceIncludeGallery = true,
-                                imageSourceIncludeCamera = false,
-                                fixAspectRatio = true,
-                                aspectRatioX = 16,
-                                aspectRatioY = 9,
-                            ),
-                        ),
+                    photoLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
                 SettingsCard(if (single) "Car" else "Cars") {
@@ -2065,7 +2110,7 @@ private fun CarSettingsCard(
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onPickPhoto) { Text("Choose & crop photo") }
+                        TextButton(onClick = onPickPhoto) { Text("Choose photo") }
                         if (state.imageUrls[v.vin] != null) {
                             TextButton(onClick = { vm.setVehicleImage(v.vin, "") }) { Text("Clear") }
                         }

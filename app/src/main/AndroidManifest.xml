@@ -6,10 +6,8 @@
 
     <!-- So we can detect the official apps and open web/dial/custom-tab links. -->
     <queries>
-        <package android:name="com.hyundai.bluelink" />
-        <package android:name="com.hyundai.bluelinkc" />
-        <package android:name="com.genesis.connectedcar" />
-        <package android:name="com.genesis.mobile.us" />
+        <package android:name="com.stationdm.bluelink" />
+        <package android:name="com.stationdm.genesis" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />

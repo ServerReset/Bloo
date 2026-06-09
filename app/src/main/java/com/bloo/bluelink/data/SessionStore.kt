@@ -1,29 +1,19 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "bloo_session")
 
 /**
- * Persists the Blue Link session (tokens + credentials needed for commands).
- * The service PIN is required as a header on every remote command, so it is
- * stored locally on-device only.
+ * Persists Blue Link sessions — one per brand, so a Hyundai and a Genesis
+ * account can be signed in at the same time. The service PIN is required as a
+ * header on every remote command, so it is stored locally on-device only.
  */
 class SessionStore(private val context: Context) {
-
-    private object Keys {
-        val ACCESS = stringPreferencesKey("access_token")
-        val REFRESH = stringPreferencesKey("refresh_token")
-        val USERNAME = stringPreferencesKey("username")
-        val PIN = stringPreferencesKey("pin")
-        val BRAND = stringPreferencesKey("brand")
-    }
 
     data class Session(
         val accessToken: String,
@@ -33,46 +23,73 @@ class SessionStore(private val context: Context) {
         val brand: Brand = Brand.HYUNDAI,
     )
 
+    private fun key(brand: Brand, field: String) = stringPreferencesKey("${brand.name}_$field")
+    private val brandsKey = stringPreferencesKey("brands")
+
     suspend fun save(session: Session) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.ACCESS] = session.accessToken
-            session.refreshToken?.let { prefs[Keys.REFRESH] = it }
-            prefs[Keys.USERNAME] = session.username
-            prefs[Keys.PIN] = session.pin
-            prefs[Keys.BRAND] = session.brand.name
+        context.dataStore.edit { p ->
+            p[key(session.brand, "access")] = session.accessToken
+            session.refreshToken?.let { p[key(session.brand, "refresh")] = it }
+            p[key(session.brand, "username")] = session.username
+            p[key(session.brand, "pin")] = session.pin
+            val set = (p[brandsKey]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()).toMutableSet()
+            set.add(session.brand.name)
+            p[brandsKey] = set.joinToString(",")
         }
     }
 
-    suspend fun load(): Session? {
-        val prefs = context.dataStore.data.first()
-        val access = prefs[Keys.ACCESS] ?: return null
-        val username = prefs[Keys.USERNAME] ?: return null
-        val pin = prefs[Keys.PIN] ?: return null
-        return Session(access, prefs[Keys.REFRESH], username, pin, Brand.fromName(prefs[Keys.BRAND]))
+    suspend fun load(brand: Brand): Session? {
+        migrateLegacy()
+        val p = context.dataStore.data.first()
+        val access = p[key(brand, "access")] ?: return null
+        val username = p[key(brand, "username")] ?: return null
+        val pin = p[key(brand, "pin")] ?: return null
+        return Session(access, p[key(brand, "refresh")], username, pin, brand)
     }
 
-    suspend fun updateAccessToken(access: String, refresh: String?) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.ACCESS] = access
-            refresh?.let { prefs[Keys.REFRESH] = it }
+    suspend fun loggedInBrands(): List<Brand> {
+        migrateLegacy()
+        return context.dataStore.data.first()[brandsKey]
+            ?.split(",")?.mapNotNull { runCatching { Brand.valueOf(it) }.getOrNull() } ?: emptyList()
+    }
+
+    suspend fun updateAccessToken(brand: Brand, access: String, refresh: String?) {
+        context.dataStore.edit { p ->
+            p[key(brand, "access")] = access
+            refresh?.let { p[key(brand, "refresh")] = it }
         }
     }
 
-    suspend fun clear() {
+    suspend fun updatePin(brand: Brand, pin: String) {
+        context.dataStore.edit { it[key(brand, "pin")] = pin }
+    }
+
+    suspend fun clear(brand: Brand) {
+        context.dataStore.edit { p ->
+            listOf("access", "refresh", "username", "pin").forEach { p.remove(key(brand, it)) }
+            val set = p[brandsKey]?.split(",")?.filter { it.isNotBlank() && it != brand.name } ?: emptyList()
+            if (set.isEmpty()) p.remove(brandsKey) else p[brandsKey] = set.joinToString(",")
+        }
+    }
+
+    suspend fun clearAll() {
         context.dataStore.edit { it.clear() }
     }
 
-    // --- Per-vehicle preferences ----------------------------------------
-    // The US API exposes no flag for whether seats can cool (ventilate), only
-    // whether a seat heater/vent exists at all. Cooling capability is therefore
-    // stored as a per-car preference the owner can set.
-
-    suspend fun ventilatedSeats(vin: String): Boolean =
-        context.dataStore.data.first()[booleanPreferencesKey("vent_$vin")] ?: false
-
-    suspend fun setVentilatedSeats(vin: String, value: Boolean) {
-        context.dataStore.edit { it[booleanPreferencesKey("vent_$vin")] = value }
+    /** Migrate the old single-session keys into the per-brand layout (one-shot). */
+    private suspend fun migrateLegacy() {
+        val p = context.dataStore.data.first()
+        val legacyAccess = p[stringPreferencesKey("access_token")] ?: return
+        val brand = Brand.fromName(p[stringPreferencesKey("brand")])
+        context.dataStore.edit { e ->
+            e[key(brand, "access")] = legacyAccess
+            p[stringPreferencesKey("refresh_token")]?.let { e[key(brand, "refresh")] = it }
+            p[stringPreferencesKey("username")]?.let { e[key(brand, "username")] = it }
+            p[stringPreferencesKey("pin")]?.let { e[key(brand, "pin")] = it }
+            e[brandsKey] = brand.name
+            listOf("access_token", "refresh_token", "username", "pin", "brand").forEach {
+                e.remove(stringPreferencesKey(it))
+            }
+        }
     }
-
-    val isLoggedIn = context.dataStore.data.map { it[Keys.ACCESS] != null }
 }
