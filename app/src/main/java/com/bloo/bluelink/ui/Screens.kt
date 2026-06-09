@@ -8,8 +8,9 @@ package com.bloo.bluelink.ui
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
-import android.webkit.WebView
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,12 +36,15 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -149,8 +153,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
@@ -171,6 +178,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import coil.compose.AsyncImage
@@ -182,7 +190,10 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
@@ -710,6 +721,11 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 )
             }
             Spacer(Modifier.weight(1f))
+            // Driving / parked badge sits between the percentage and the range.
+            drivingLabel?.let {
+                DrivingBadge(it)
+                Spacer(Modifier.width(12.dp))
+            }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     range?.let { "${it.toInt()} mi" } ?: "—",
@@ -728,11 +744,6 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                     fontWeight = if (charging) FontWeight.Bold else FontWeight.Normal,
                 )
             }
-        }
-        // Driving / parked status, right under the gauge readout.
-        drivingLabel?.let {
-            Spacer(Modifier.height(6.dp))
-            DrivingBadge(it)
         }
         // Plug-in hybrid: surface the fuel tank too.
         if (hasBattery && hasFuel && fuelPct != null) {
@@ -774,11 +785,17 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             null
         }
         BoxWithConstraints(Modifier.fillMaxWidth().height(18.dp)) {
-            LinearProgressIndicator(
-                progress = { animatedFrac },
-                color = ChargeGreen,
-                trackColor = ChargeGreen.copy(alpha = 0.22f),
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp)),
+            // Track + gradient fill (darker green on the left → current green right).
+            Box(
+                Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp))
+                    .background(ChargeGreen.copy(alpha = 0.18f)),
+            )
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .width(maxWidth * animatedFrac.coerceIn(0f, 1f))
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Brush.horizontalGradient(listOf(ChargeGreenDark, ChargeGreen))),
             )
             if (targetPct != null) {
                 val x = maxWidth * (targetPct.coerceIn(0, 100) / 100f)
@@ -819,6 +836,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
 }
 
 private val ChargeGreen = Color(0xFF2EBD59)
+private val ChargeGreenDark = Color(0xFF1B8A41)
 
 /** Gentle spring damping — present, but not an aggressive overshoot (0.82). */
 private const val SoftDamping = 0.82f
@@ -968,21 +986,32 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         PebbleList(v, state, vm)
     }
     Refreshable(v, state, vm) {
-        Row(
-            // Top padding clears the floating back / flip / settings buttons.
-            Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Column(
-                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                content = if (flipped) pebbles else controls,
-            )
-            Column(
-                Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                content = if (flipped) controls else pebbles,
-            )
+        // Animate the swap when the columns are flipped.
+        AnimatedContent(
+            targetState = flipped,
+            transitionSpec = {
+                val dir = if (targetState) 1 else -1
+                (slideInHorizontally { w -> dir * w / 4 } + fadeIn()) togetherWith
+                    (slideOutHorizontally { w -> -dir * w / 4 } + fadeOut())
+            },
+            label = "flipColumns",
+        ) { isFlipped ->
+            Row(
+                // Top padding clears the floating back / flip / settings buttons.
+                Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    content = if (isFlipped) pebbles else controls,
+                )
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    content = if (isFlipped) controls else pebbles,
+                )
+            }
         }
     }
 }
@@ -1081,10 +1110,8 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel) {
             "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
             "charge" -> ChargePebble(v, status, enabled, state, vm, dragHandle)
             "location" -> LocationPebble(v, state, vm, dragHandle)
-            "information" -> InformationPebble(v, status, state, vm, dragHandle)
-            "service" -> ServicePebble(v, status, state, vm, dragHandle)
+            "info" -> InfoPebble(v, status, state, vm, dragHandle)
             "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
-            "links" -> LinksPebble(v, state, vm, dragHandle)
             else -> Spacer(Modifier.fillMaxWidth())
         }
     }
@@ -1292,12 +1319,24 @@ private fun Pebble(
     }
 }
 
-// --- Information ----------------------------------------------------------
+// --- Car info (status + service + links combined) -------------------------
 
 @Composable
-private fun InformationPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val context = LocalContext.current
+    val appearance by vm.appearance.collectAsState()
+    val inApp = appearance.linksInApp
+    val genesis = v.brandIndicator.equals("G", ignoreCase = true)
     val location = state.locations[v.vin]
-    Pebble(v, "information", "Information", Icons.Filled.Info, state, vm, dragHandle) {
+    val odo = v.odometer?.trim()?.takeIf { it.isNotBlank() }
+    val odoInt = odo?.replace(",", "")?.toDoubleOrNull()?.toInt()
+    val plate = state.licensePlates[v.vin]
+    val lastSvc = state.lastServiceMiles[v.vin]
+    val interval = state.serviceIntervalMiles[v.vin]
+    val nextDue = if (lastSvc != null && interval != null) lastSvc + interval else null
+    val remaining = if (nextDue != null && odoInt != null) nextDue - odoInt else null
+
+    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle) {
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet. Pull down to refresh.")
@@ -1328,12 +1367,53 @@ private fun InformationPebble(v: Vehicle, status: VehicleStatus?, state: UiState
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                 status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
-                v.odometer?.takeIf { it.isNotBlank() }?.let { StatusRow("Odometer", "$it mi") }
                 status.dateTime?.let { StatusRow("Updated", it) }
             }
         }
         location?.let {
             StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude))
+        }
+
+        Text("Service & identity", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        SelectionContainer { StatusRow("VIN", v.vin) }
+        if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
+        odo?.let { StatusRow("Odometer", "$it mi") }
+        lastSvc?.let { StatusRow("Last service at", "$it mi") }
+        nextDue?.let {
+            val note = remaining?.let { r -> if (r >= 0) " · $r mi to go" else " · overdue ${-r} mi" } ?: ""
+            StatusRow("Next service due", "$it mi$note")
+        }
+        if (lastSvc == null || interval == null) {
+            Text(
+                "Set last-service mileage and a service interval in Settings to track service.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Text(
+            if (genesis) "Genesis links" else "Hyundai links",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        if (genesis) {
+            LinkRow("Open Genesis app") {
+                openApp(context, listOf("com.stationdm.genesis"),
+                    "https://play.google.com/store/apps/details?id=com.stationdm.genesis", inApp)
+            }
+            LinkRow("Genesis owners site") { openUrl(context, "https://owners.genesis.com", inApp) }
+            LinkRow("Schedule service / retailer") { openUrl(context, "https://www.genesis.com/us/en/find-a-retailer.html", inApp) }
+            LinkRow("Manuals & guides") { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
+            LinkRow("Roadside assistance") { dial(context, "8443409741") }
+        } else {
+            LinkRow("Open Bluelink app") {
+                openApp(context, listOf("com.stationdm.bluelink"),
+                    "https://play.google.com/store/apps/details?id=com.stationdm.bluelink", inApp)
+            }
+            LinkRow("MyHyundai owners site") { openUrl(context, "https://owners.hyundaiusa.com", inApp) }
+            LinkRow("Schedule service / dealer") { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
+            LinkRow("Manuals & guides") { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
+            LinkRow("Roadside assistance") { dial(context, "8002437766") }
         }
     }
 }
@@ -1632,110 +1712,32 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 }
 
 /**
- * A small embedded map with a pin at the car's position. Renders a self-hosted
- * Leaflet page (loaded from an OSM base URL) rather than the OSM embed iframe —
- * the embed page often paints blank inside a WebView. Key-free, no Play
- * Services. Keyed on the coordinates so a fresh map loads when they change.
+ * A small map with a pin at the car's position. Uses a key-free OSM static-map
+ * image (loaded with Coil) rather than a WebView, which painted blank.
  */
 @Composable
 private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
     val lat = location.latitude
     val lon = location.longitude
-    val html = """
-        <!DOCTYPE html><html><head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-        <style>html,body,#m{height:100%;margin:0;background:#e9eef3}</style>
-        </head><body><div id="m"></div>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <script>
-          var map=L.map('m',{zoomControl:false,attributionControl:false}).setView([$lat,$lon],15);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-          L.marker([$lat,$lon]).addTo(map);
-        </script></body></html>
-    """.trimIndent()
-    key(lat, lon) {
-        AndroidView(
-            modifier = modifier,
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    webViewClient = android.webkit.WebViewClient()
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.useWideViewPort = true
-                    settings.loadWithOverviewMode = true
-                    isVerticalScrollBarEnabled = false
-                    isHorizontalScrollBarEnabled = false
-                    loadDataWithBaseURL("https://www.openstreetmap.org", html, "text/html", "UTF-8", null)
-                }
-            },
+    val url = "https://staticmap.openstreetmap.de/staticmap.php" +
+        "?center=$lat,$lon&zoom=15&size=640x360&maptype=mapnik&markers=$lat,$lon,red-pushpin"
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+        AsyncImage(
+            model = url,
+            contentDescription = "Map",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Icon(
+            Icons.Filled.LocationOn,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.0f),
         )
     }
 }
 
 // --- Service & links ------------------------------------------------------
 
-/** Identity + (user-tracked) service info; the API has no service history. */
-@Composable
-private fun ServicePebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val odo = v.odometer?.trim()?.takeIf { it.isNotBlank() }
-    val odoInt = odo?.replace(",", "")?.toDoubleOrNull()?.toInt()
-    val plate = state.licensePlates[v.vin]
-    val lastSvc = state.lastServiceMiles[v.vin]
-    val interval = state.serviceIntervalMiles[v.vin]
-    val nextDue = if (lastSvc != null && interval != null) lastSvc + interval else null
-    val remaining = if (nextDue != null && odoInt != null) nextDue - odoInt else null
-    Pebble(v, "service", "Service & info", Icons.Filled.Build, state, vm, dragHandle) {
-        SelectionContainer { StatusRow("VIN", v.vin) }
-        if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
-        odo?.let { StatusRow("Odometer", "$it mi") }
-        lastSvc?.let { StatusRow("Last service at", "$it mi") }
-        nextDue?.let {
-            val note = remaining?.let { r -> if (r >= 0) " · $r mi to go" else " · overdue ${-r} mi" } ?: ""
-            StatusRow("Next service due", "$it mi$note")
-        }
-        if (lastSvc == null || interval == null) {
-            Text(
-                "Set last-service mileage and a service interval in Settings to track upcoming service.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/** Brand-aware quick links to the owner's official tools. */
-@Composable
-private fun LinksPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val context = LocalContext.current
-    val appearance by vm.appearance.collectAsState()
-    val inApp = appearance.linksInApp
-    val genesis = v.brandIndicator.equals("G", ignoreCase = true)
-    Pebble(
-        v, "links", if (genesis) "Genesis links" else "Hyundai links",
-        Icons.Filled.OpenInNew, state, vm, dragHandle,
-    ) {
-        if (genesis) {
-            LinkRow("Open Genesis app") {
-                openApp(context, listOf("com.stationdm.genesis"),
-                    "https://play.google.com/store/apps/details?id=com.stationdm.genesis", inApp)
-            }
-            LinkRow("Genesis owners site") { openUrl(context, "https://owners.genesis.com", inApp) }
-            LinkRow("Schedule service / find retailer") { openUrl(context, "https://www.genesis.com/us/en/find-a-retailer.html", inApp) }
-            LinkRow("Owner's manuals & guides") { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
-            LinkRow("Roadside assistance") { dial(context, "8443409741") }
-        } else {
-            LinkRow("Open Bluelink app") {
-                openApp(context, listOf("com.stationdm.bluelink"),
-                    "https://play.google.com/store/apps/details?id=com.stationdm.bluelink", inApp)
-            }
-            LinkRow("MyHyundai owners site") { openUrl(context, "https://owners.hyundaiusa.com", inApp) }
-            LinkRow("Schedule service / find dealer") { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
-            LinkRow("Owner's manuals & guides") { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
-            LinkRow("Roadside assistance") { dial(context, "8002437766") }
-        }
-    }
-}
 
 @Composable
 private fun LinkRow(label: String, onClick: () -> Unit) {
@@ -1779,6 +1781,122 @@ private fun dial(context: Context, number: String) {
     }
 }
 
+// --- Photo crop -----------------------------------------------------------
+
+/**
+ * Lightweight, crash-free crop: pinch-zoom + drag the picked image inside a 16:9
+ * frame, then export the framed region to a file. Drawn via a Canvas + Matrix so
+ * what you see is what gets saved.
+ */
+@Composable
+private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onSave: (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var bmp by remember(uriString) { mutableStateOf<Bitmap?>(null) }
+    var failed by remember(uriString) { mutableStateOf(false) }
+    var scale by remember(uriString) { mutableFloatStateOf(1f) }
+    var offset by remember(uriString) { mutableStateOf(Offset.Zero) }
+    var frame by remember { mutableStateOf(IntSize.Zero) }
+
+    LaunchedEffect(uriString) {
+        bmp = withContext(Dispatchers.IO) {
+            runCatching {
+                val uri = Uri.parse(uriString)
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (bounds.outWidth / sample > 2200 || bounds.outHeight / sample > 2200) sample *= 2
+                val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+            }.getOrNull()
+        }
+        if (bmp == null) failed = true
+    }
+
+    Surface(Modifier.fillMaxSize(), color = Color.Black) {
+        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Pinch and drag to frame your photo", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                val image = bmp
+                when {
+                    image != null -> Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(18.dp))
+                            .onSizeChanged { frame = it }
+                            .pointerInput(image) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    scale = (scale * zoom).coerceIn(1f, 6f)
+                                    offset += pan
+                                }
+                            },
+                    ) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val wpx = size.width
+                            val hpx = size.height
+                            val cover = max(wpx / image.width, hpx / image.height)
+                            val s = cover * scale
+                            val maxX = ((image.width * s - wpx) / 2f).coerceAtLeast(0f)
+                            val maxY = ((image.height * s - hpx) / 2f).coerceAtLeast(0f)
+                            val cx = offset.x.coerceIn(-maxX, maxX)
+                            val cy = offset.y.coerceIn(-maxY, maxY)
+                            val m = android.graphics.Matrix().apply {
+                                postTranslate(-image.width / 2f, -image.height / 2f)
+                                postScale(s, s)
+                                postTranslate(wpx / 2f + cx, hpx / 2f + cy)
+                            }
+                            drawIntoCanvas { it.nativeCanvas.drawBitmap(image, m, null) }
+                        }
+                    }
+                    failed -> Text("Couldn't load that image", color = Color.White)
+                    else -> LoadingIndicator()
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                Button(
+                    onClick = {
+                        val image = bmp ?: return@Button
+                        val f = frame
+                        scope.launch {
+                            val path = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val wpx = f.width.toFloat()
+                                    val hpx = f.height.toFloat()
+                                    val cover = max(wpx / image.width, hpx / image.height)
+                                    val s = cover * scale
+                                    val maxX = ((image.width * s - wpx) / 2f).coerceAtLeast(0f)
+                                    val maxY = ((image.height * s - hpx) / 2f).coerceAtLeast(0f)
+                                    val cx = offset.x.coerceIn(-maxX, maxX)
+                                    val cy = offset.y.coerceIn(-maxY, maxY)
+                                    val outScale = 1080f / wpx
+                                    val out = Bitmap.createBitmap(1080, (hpx * outScale).toInt(), Bitmap.Config.ARGB_8888)
+                                    val canvas = android.graphics.Canvas(out)
+                                    val m = android.graphics.Matrix().apply {
+                                        postTranslate(-image.width / 2f, -image.height / 2f)
+                                        postScale(s, s)
+                                        postTranslate(wpx / 2f + cx, hpx / 2f + cy)
+                                        postScale(outScale, outScale)
+                                    }
+                                    canvas.drawBitmap(image, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+                                    val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
+                                    val file = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.jpg")
+                                    file.outputStream().use { out.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                                    file.absolutePath
+                                }.getOrNull()
+                            }
+                            if (path != null) onSave(path) else onCancel()
+                        }
+                    },
+                    enabled = bmp != null,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Use photo") }
+            }
+        }
+    }
+}
+
 // --- Settings -------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1795,16 +1913,15 @@ private fun SettingsScreen(vm: AppViewModel) {
     BackHandler { vm.closeSettings() }
 
     var pickTarget by remember { mutableStateOf<String?>(null) }
-    // System photo picker (crash-free; the old crop dialog could crash the app).
-    // The hero crops to fit via ContentScale.Crop, so no manual crop is needed.
+    var cropUri by remember { mutableStateOf<Uri?>(null) }
+    // System photo picker (crash-free), then our own Compose crop step.
     val photoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
-        val target = pickTarget
-        if (uri != null && target != null) vm.importCarImage(target, uri)
-        pickTarget = null
+        if (uri != null && pickTarget != null) cropUri = uri
     }
 
+  Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Settings") },
@@ -2006,6 +2123,18 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
         }
     }
+    cropUri?.let { uri ->
+        val target = pickTarget
+        if (target != null) {
+            CropScreen(
+                vin = target,
+                uriString = uri.toString(),
+                onCancel = { cropUri = null; pickTarget = null },
+                onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
+            )
+        }
+    }
+  }
 }
 
 /** One reorderable car entry in Settings; tap to expand its setup + photo. */
@@ -2201,7 +2330,14 @@ private fun StatusRow(label: String, value: String) {
 private fun StepRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth()) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Text(value, fontWeight = FontWeight.Medium)
+        // Roll the value when it changes (e.g. dragging a slider).
+        AnimatedContent(
+            targetState = value,
+            transitionSpec = {
+                (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { -it / 2 })
+            },
+            label = "stepValue",
+        ) { v -> Text(v, fontWeight = FontWeight.Medium) }
     }
 }
 

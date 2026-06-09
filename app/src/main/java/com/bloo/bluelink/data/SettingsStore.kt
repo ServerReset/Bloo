@@ -42,7 +42,7 @@ data class SeatConfig(
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
 /** Reorderable detail sections (pebbles), in their default order. */
-val DEFAULT_SECTIONS = listOf("climate", "charge", "location", "information", "service", "diagnostics", "links")
+val DEFAULT_SECTIONS = listOf("climate", "charge", "location", "info", "diagnostics")
 
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
