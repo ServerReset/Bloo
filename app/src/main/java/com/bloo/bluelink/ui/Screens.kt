@@ -223,7 +223,24 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
+    // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
+    // status/navigation bars; screen content draws on top of it.
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        scheme.surfaceContainerHigh,
+                        scheme.surface,
+                        scheme.surfaceContainerLow,
+                    ),
+                ),
+            ),
+    ) {
     Scaffold(
+        containerColor = Color.Transparent,
         snackbarHost = {
             // imePadding so the toast rises above the keyboard when it's open.
             SnackbarHost(snackbar, modifier = Modifier.imePadding()) { data ->
@@ -278,6 +295,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Settings -> SettingsScreen(vm)
             }
         }
+    }
     }
 
     if (state.showOnboarding && state.screen == Screen.Garage) {
@@ -903,6 +921,14 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
         ?.rangeByFuel?.totalAvailableRange?.value
     val range = (if (hasBattery) battRange else null) ?: status?.dte?.value
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
+    // Charging time + type, shown in the badge slot (replacing parked/driving,
+    // which is hidden while charging) so the pebble doesn't grow taller.
+    val chargeMinutes = status?.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+    val chargeType = when (status?.evStatus?.batteryPlugin) {
+        1 -> "DC"
+        2 -> "AC"
+        else -> null
+    }
 
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -913,8 +939,11 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.weight(1f))
-            // Driving / parked badge sits between the percentage and the range.
-            drivingLabel?.let {
+            // Charging chip while charging, else the parked/driving badge — same slot.
+            if (charging) {
+                ChargingChip(chargeMinutes, chargeType)
+                Spacer(Modifier.width(12.dp))
+            } else drivingLabel?.let {
                 DrivingBadge(it)
                 Spacer(Modifier.width(12.dp))
             }
@@ -1002,28 +1031,28 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 )
             }
         }
-        if (charging) {
-            val minutes = status?.evStatus?.remainTime2?.atc?.value?.toInt()
-            val plug = when (status?.evStatus?.batteryPlugin) {
-                1 -> "DC fast"
-                2 -> "AC"
-                else -> null
-            }
-            val parts = buildList {
-                if (minutes != null && minutes > 0) {
-                    add(if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m to full" else "$minutes min to full")
-                }
-                plug?.let { add("$it charger") }
-            }
-            if (parts.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    parts.joinToString(" · "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ChargeGreen,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+    }
+}
+
+/** Compact green chip with bolt + time-to-full + charger type, for the badge slot. */
+@Composable
+private fun ChargingChip(minutes: Int?, type: String?) {
+    val text = buildString {
+        if (minutes != null) append(if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m")
+        if (type != null) {
+            if (isNotEmpty()) append(" · ")
+            append(type)
+        }
+        if (isEmpty()) append("Charging")
+    }
+    Surface(color = ChargeGreen, contentColor = Color.White, shape = RoundedCornerShape(8.dp)) {
+        Row(
+            Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(3.dp))
+            Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -1420,9 +1449,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
     val seats = state.seatConfigFor(v)
     val enabled = !state.loading
     val sections = state.sectionsFor(v).filter {
-        it !in exclude &&
-            (it != "charge" || state.hasBattery(v)) &&
-            !state.isPebbleHidden(v.vin, it)
+        it !in exclude && !state.isPebbleHidden(v.vin, it)
     }
     ReorderColumn(
         items = sections,
@@ -1436,7 +1463,13 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
             )
             "controls" -> ControlsPebble(v, state, vm, dragHandle)
             "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
-            "charge" -> ChargePebble(v, status, enabled, state, vm, dragHandle)
+            // The "charge" slot is the powertrain's energy pebble: charging for an
+            // EV/PHEV, a fuel readout for a gas/hybrid car (no charge UI at all).
+            "charge" -> if (state.hasBattery(v)) {
+                ChargePebble(v, status, enabled, state, vm, dragHandle)
+            } else {
+                FuelPebble(v, status, state, vm, dragHandle)
+            }
             "location" -> LocationPebble(v, state, vm, dragHandle)
             "info" -> InfoPebble(v, status, state, vm, dragHandle)
             "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
@@ -2074,6 +2107,37 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         )
         CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
             vm.setChargeLimits(v, ac, dc)
+        }
+    }
+}
+
+/**
+ * The energy pebble for a gas/hybrid car: fuel level + range, no charge UI at
+ * all. Occupies the same "charge" slot so order/collapse state carry over.
+ */
+@Composable
+private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val fuelPct = status?.fuelLevel
+    val range = status?.dte?.value?.toInt()
+    val summary = when {
+        fuelPct != null && range != null -> "$fuelPct% · $range mi"
+        fuelPct != null -> "$fuelPct%"
+        range != null -> "$range mi"
+        else -> "—"
+    }
+    Pebble(
+        v, "charge", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
+        summary = summary,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+    ) {
+        when {
+            status == null && state.refreshing -> Text("Fetching live status…")
+            status == null -> Text("No status yet. Pull down to refresh.")
+            else -> {
+                fuelPct?.let { StatusRow("Fuel level", "$it%") }
+                range?.let { StatusRow("Range (distance to empty)", "$it mi") }
+                if (fuelPct == null && range == null) Text("No fuel data reported.")
+            }
         }
     }
 }

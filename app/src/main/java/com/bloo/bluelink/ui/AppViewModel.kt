@@ -15,6 +15,7 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
+import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
@@ -141,6 +142,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val settingsStore = SettingsStore(app)
     private val credentialStore = CredentialStore(app)
     private val snapshotStore = SnapshotStore(app)
+    private val statusCache = StatusCache(app)
     // One repository per signed-in brand (Hyundai/Genesis can both be active).
     private val repos = mutableMapOf<Brand, BlueLinkRepository>()
 
@@ -195,7 +197,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setNotifyDoor(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyDoor(v) }
     fun setDoorOpenMinutes(m: Int) = viewModelScope.launch { settingsStore.setDoorOpenMinutes(m) }
 
+    /** Write the current live status/location maps to disk (survives restart). */
+    private fun persistCache() {
+        val s = _state.value
+        viewModelScope.launch {
+            statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched)
+        }
+    }
+
     init {
+        // Restore the last-known status/location from disk so the UI shows
+        // stale-but-useful data immediately, before any network call returns.
+        viewModelScope.launch {
+            val cached = statusCache.load()
+            if (cached.statuses.isNotEmpty() || cached.locations.isNotEmpty()) {
+                _state.update {
+                    it.copy(
+                        statuses = cached.statuses + it.statuses,
+                        locations = cached.locations + it.locations,
+                        placeNames = cached.placeNames + it.placeNames,
+                        lastFetched = cached.fetched + it.lastFetched,
+                    )
+                }
+            }
+        }
         viewModelScope.launch {
             val brands = store.loggedInBrands()
             if (brands.isEmpty()) return@launch
@@ -391,6 +416,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             )
                         }
                         persistSnapshots()
+                        persistCache()
                         checkAlerts(v, s)
                     }
                 }
@@ -579,6 +605,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         reverseGeocode(loc)?.let { place ->
             _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
         }
+        persistCache()
     }
 
     private suspend fun reverseGeocode(loc: GeoLocation): String? = withContext(Dispatchers.IO) {

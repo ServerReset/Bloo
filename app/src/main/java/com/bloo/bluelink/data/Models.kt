@@ -333,6 +333,7 @@ data class Speed(
 )
 
 /** UI-facing location result. */
+@Serializable
 data class GeoLocation(
     val latitude: Double,
     val longitude: Double,
