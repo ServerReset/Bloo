@@ -797,21 +797,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * charging + time-to-full, driving) and the data block describes only [v], so
      * the summary reflects exactly the car the user tapped Summarize on.
      */
-    private fun summaryPrompt(v: Vehicle, status: VehicleStatus?): String {
-        val instruction = buildString {
-            append("Summarize the status of this one vehicle for its owner as exactly three bullet points. ")
-            append("The first bullet must be the headline and read in this order: ")
-            append("the car's name, whether it is locked or unlocked, ")
-            append("whether it is driving, parked, or charging, ")
-            append("and the battery or fuel percentage together with the driving range in miles. ")
-            append("The second bullet must cover diagnostics, such as tire pressure, the 12V battery, ")
-            append("washer or brake fluid, the key fob battery, and any other warnings. ")
-            append("The third bullet must cover the remaining status, such as climate, ")
-            append("the odometer, location, and any open doors or windows. ")
-            append("Describe only this vehicle and do not invent any details that are not in the data below. ")
-        }
-        return instruction + "\n\nVehicle data for ${v.name}:\n" + carText(v, status)
-    }
+    private fun summaryPrompt(v: Vehicle, status: VehicleStatus?): String =
+        "${v.name} vehicle status:\n" + carText(v, status)
 
     /**
      * A compact, readable description of a single car's current state for the AI,

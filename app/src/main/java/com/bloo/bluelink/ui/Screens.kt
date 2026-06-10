@@ -881,7 +881,6 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
 
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
-    val scope = rememberCoroutineScope()
 
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
@@ -905,38 +904,17 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 }
             }
         }
-        // Car-name chip, top-center, on every tile except the main one (which shows
-        // its own name + dots). Holds the car-switching dots above the larger name,
-        // in one box, so people can see which car they're on and that more exist.
-        androidx.compose.animation.AnimatedVisibility(
-            visible = current != 0,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter),
-        ) {
-            Surface(
-                // Tapping the chip jumps back to the main car-info tile (index 0).
-                onClick = { scope.launch { vPager.animateScrollToPage(vPager.currentPage - current) } },
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shadowElevation = 2.dp,
-                modifier = Modifier.statusBarsPadding().padding(top = 10.dp),
-            ) {
-                Column(
-                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (carCount > 1) PagerDots(current = carIndex, count = carCount)
-                    Text(
-                        v.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
+        // Car-switching dots at top-center on non-main tiles — same minimal indicator
+        // as the regular phone view. No car name; the main tile has that.
+        if (current != 0 && carCount > 1) {
+            PagerDots(
+                current = carIndex,
+                count = carCount,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 10.dp),
+            )
         }
         // Vertical page dots on the right edge — show which pebble tile is visible.
         if (tiles.size > 1) {
@@ -1462,83 +1440,166 @@ private fun AnimatedSlider(
     accent: Color = MaterialTheme.colorScheme.primary,
 ) {
     val haptics = LocalHaptics.current
-    // Central palette: the inactive track and thumb ring always pull from the
-    // theme so the slider stays readable in every colour scheme.
-    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-    val thumbRing = MaterialTheme.colorScheme.surface
-    val tickOnActive = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f)
-    val tickOnInactive = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    val scheme = MaterialTheme.colorScheme
+    val density = LocalDensity.current
 
-    val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
-    val frac = ((value - valueRange.start) / span).coerceIn(0f, 1f)
-    val animFrac by animateFloatAsState(
-        targetValue = frac,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
-        label = "sliderFrac",
+    // During drag: follow raw touch. On release: spring-animate to nearest step.
+    var rawValue by remember { mutableFloatStateOf(value) }
+    var isDragging by remember { mutableStateOf(false) }
+    LaunchedEffect(value) { if (!isDragging) rawValue = value }
+
+    val animValue by animateFloatAsState(
+        targetValue = if (isDragging) rawValue else snapToStep(rawValue, valueRange, steps),
+        animationSpec = if (isDragging) {
+            spring(stiffness = Spring.StiffnessHigh)
+        } else {
+            spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow)
+        },
+        label = "sliderAnim",
     )
 
-    val density = LocalDensity.current
-    var width by remember { mutableFloatStateOf(0f) }
-    var lastSnapped by remember { mutableFloatStateOf(value) }
-    val thumbRadius = 11.dp
-    val trackHeight = 10.dp
-    val insetPx = with(density) { thumbRadius.toPx() }
+    val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
+    val frac = ((animValue - valueRange.start) / span).coerceIn(0f, 1f)
+    var trackWidthPx by remember { mutableFloatStateOf(0f) }
+    var prevSnap by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
 
-    // Map a touch x (in px) to a snapped value and emit it, ticking on each step.
-    fun emit(px: Float) {
-        if (width <= 0f) return
-        // The usable range is inset by the thumb radius at both ends.
-        val usable = (width - 2 * insetPx).coerceAtLeast(1f)
-        val f = ((px - insetPx) / usable).coerceIn(0f, 1f)
-        val snapped = snapToStep(valueRange.start + f * span, valueRange, steps)
-        if (snapped != lastSnapped) {
-            haptics?.tick()
-            lastSnapped = snapped
-        }
-        onValueChange(snapped)
+    // M3 Expressive: thumb grows + active track thickens while dragging.
+    val thumbRadiusDp by animateDpAsState(
+        targetValue = if (isDragging) 13.dp else 10.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
+        label = "thumbR",
+    )
+    val activeTrackDp by animateDpAsState(
+        targetValue = if (isDragging) 6.dp else 4.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
+        label = "trackH",
+    )
+
+    // Position of the thumb in the composable's coordinate space, used to anchor
+    // the value-indicator bubble directly above it.
+    val trackWidthDp = with(density) { trackWidthPx.toDp() }
+    val thumbXDp = thumbRadiusDp + (trackWidthDp - thumbRadiusDp * 2) * frac
+
+    // Convert to px for Canvas (uses fixed 10.dp thumb radius for touch math so
+    // the hit target stays constant even as the visual thumb animates).
+    val fixedRadiusPx = with(density) { 10.dp.toPx() }
+    fun emitRaw(xPx: Float): Float {
+        val usable = (trackWidthPx - 2f * fixedRadiusPx).coerceAtLeast(1f)
+        return valueRange.start + ((xPx - fixedRadiusPx) / usable).coerceIn(0f, 1f) * span
     }
 
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .onSizeChanged { width = it.width.toFloat() }
-            .pointerInput(steps, valueRange) {
-                detectTapGestures { o -> emit(o.x); haptics?.click() }
-            }
-            .pointerInput(steps, valueRange) {
-                detectHorizontalDragGestures(
-                    onDragEnd = { haptics?.click() },
-                ) { change, _ -> change.consume(); emit(change.position.x) }
-            },
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val cy = size.height / 2f
-            val stroke = trackHeight.toPx()
-            val startX = thumbRadius.toPx()
-            val endX = size.width - thumbRadius.toPx()
-            val usable = (endX - startX).coerceAtLeast(0f)
-            val thumbX = startX + usable * animFrac
-            // Inactive (full) track, then the active fill up to the thumb.
-            drawLine(trackColor, Offset(startX, cy), Offset(endX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
-            drawLine(accent, Offset(startX, cy), Offset(thumbX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
-            // Subtle step ticks along the track.
-            if (steps in 1..30) {
-                val n = steps + 2
-                for (i in 0 until n) {
-                    val tf = i.toFloat() / (n - 1)
-                    val cx = startX + usable * tf
-                    drawCircle(
-                        color = if (tf <= animFrac) tickOnActive else tickOnInactive,
-                        radius = 1.6.dp.toPx(),
-                        center = Offset(cx, cy),
-                    )
+    Column(Modifier.fillMaxWidth()) {
+        // Value indicator: a small accent bubble that floats above the thumb while
+        // dragging — the key M3 Expressive slider visual.
+        Box(Modifier.fillMaxWidth().height(22.dp)) {
+            AnimatedVisibility(
+                visible = isDragging,
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it },
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = accent,
+                        contentColor = scheme.onPrimary,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = (thumbXDp - 16.dp).coerceAtLeast(0.dp)),
+                    ) {
+                        Text(
+                            animValue.toInt().toString(),
+                            Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
-            // Thumb: a clean accent disc with a thin surface ring for separation.
-            drawCircle(thumbRing, radius = thumbRadius.toPx(), center = Offset(thumbX, cy))
-            drawCircle(accent, radius = thumbRadius.toPx() - 3.dp.toPx(), center = Offset(thumbX, cy))
+        }
+
+        // Canvas slider: track (inactive full-width, active accent fill), step ticks,
+        // and an animated thumb with a surface-coloured separation ring.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .onSizeChanged { trackWidthPx = it.width.toFloat() }
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        val snapped = snapToStep(emitRaw(offset.x), valueRange, steps)
+                        rawValue = snapped
+                        onValueChange(snapped)
+                        haptics?.click()
+                    }
+                }
+                .pointerInput(steps, valueRange) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { isDragging = true },
+                        onDragEnd = {
+                            isDragging = false
+                            val snapped = snapToStep(rawValue, valueRange, steps)
+                            rawValue = snapped
+                            onValueChange(snapped)
+                            haptics?.click()
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            val snapped = snapToStep(rawValue, valueRange, steps)
+                            rawValue = snapped
+                            onValueChange(snapped)
+                        },
+                    ) { change, _ ->
+                        change.consume()
+                        val raw = emitRaw(change.position.x)
+                        rawValue = raw
+                        val snapped = snapToStep(raw, valueRange, steps)
+                        if (steps > 0 && snapped != prevSnap) {
+                            haptics?.tick()
+                            prevSnap = snapped
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            val thumbRadiusPx = with(density) { thumbRadiusDp.toPx() }
+            val activeTrackPx = with(density) { activeTrackDp.toPx() }
+            val inactiveTrackPx = with(density) { 4.dp.toPx() }
+            val thumbRingPx = with(density) { 3.dp.toPx() }
+            val tickRadiusPx = with(density) { 2.5.dp.toPx() }
+            val inactiveColor = scheme.surfaceContainerHighest
+            val thumbRingColor = scheme.surface
+            val tickOnActive = scheme.onPrimary.copy(alpha = 0.6f)
+            val tickOnInactive = accent.copy(alpha = 0.4f)
+
+            Canvas(Modifier.fillMaxSize()) {
+                val cy = size.height / 2f
+                val startX = fixedRadiusPx
+                val endX = size.width - fixedRadiusPx
+                val usable = (endX - startX).coerceAtLeast(0f)
+                val thumbX = startX + usable * frac
+
+                // Inactive track (full width, thin, neutral)
+                drawLine(inactiveColor, Offset(startX, cy), Offset(endX, cy), inactiveTrackPx, StrokeCap.Round)
+                // Active fill (thicker on drag for M3 Expressive squeeze effect)
+                if (thumbX > startX + 1f) {
+                    drawLine(accent, Offset(startX, cy), Offset(thumbX, cy), activeTrackPx, StrokeCap.Round)
+                }
+                // Step ticks — M3 stop indicators
+                if (steps in 1..30) {
+                    val n = steps + 2
+                    for (i in 0 until n) {
+                        val tf = i.toFloat() / (n - 1)
+                        drawCircle(
+                            color = if (tf <= frac) tickOnActive else tickOnInactive,
+                            radius = tickRadiusPx,
+                            center = Offset(startX + usable * tf, cy),
+                        )
+                    }
+                }
+                // Thumb: surface-coloured outer ring + accent filled disc
+                drawCircle(thumbRingColor, thumbRadiusPx + thumbRingPx, Offset(thumbX, cy))
+                drawCircle(accent, thumbRadiusPx, Offset(thumbX, cy))
+            }
         }
     }
 }
@@ -1811,8 +1872,15 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
  */
 @Composable
 private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    Box(Modifier.fillMaxWidth().then(dragHandle).padding(horizontal = 4.dp)) {
-        PrimaryActions(v, state, vm)
+    Surface(
+        modifier = Modifier.fillMaxWidth().then(dragHandle).height(ControlHeight),
+        shape = RoundedCornerShape(PebbleCornerCollapsed),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+            PrimaryActions(v, state, vm)
+        }
     }
 }
 
@@ -2018,8 +2086,8 @@ private fun StateControl(
     val corner by animateDpAsState(
         targetValue = when {
             pressed -> 10.dp
-            highlighted -> 18.dp
-            else -> 34.dp
+            highlighted -> 20.dp
+            else -> 38.dp
         },
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "ctrlCorner",
@@ -2196,7 +2264,7 @@ private val ControlHeight = 76.dp
 
 /** Uniform collapsed-header height so every pebble lines up at the same size. */
 private val PebbleHeaderHeight = ControlHeight
-private val PebbleCornerCollapsed = 32.dp
+private val PebbleCornerCollapsed = 38.dp
 private val PebbleCornerExpanded = 20.dp
 
 /**
@@ -2222,7 +2290,7 @@ private fun PebbleActionButton(
         enabled = enabled && !pending,
         containerColor = container,
         contentColor = contentColor,
-        restCorner = 20.dp,
+        restCorner = 100.dp,
         pressedCorner = 10.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
