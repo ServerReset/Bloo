@@ -438,12 +438,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         pendingShortcut = null
         val idx = _state.value.vehicles.indexOf(v)
         if (idx >= 0) selectIndex(idx)
+        val status = _state.value.statusFor(v)
         when (cmd) {
+            // Toggles: do the opposite of the last-known state.
+            "doors" -> if (status?.doorLock == true) unlock(v) else lock(v)
+            "climate" -> if (status?.airCtrlOn == true) stopClimate(v) else {
+                startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+            }
             "lock" -> lock(v)
             "unlock" -> unlock(v)
             "locate" -> locate(v)
-            "climate" -> startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+            "bluelink" -> openOemApp(v)
             // "open" just selects the car (done above).
+        }
+    }
+
+    /** Launch the OEM Bluelink/Genesis app for this car's brand. */
+    private fun openOemApp(v: Vehicle) {
+        val ctx = getApplication<Application>()
+        val pkg = if (Brand.fromIndicator(v.brandIndicator) == Brand.GENESIS) {
+            "com.stationdm.genesis"
+        } else {
+            "com.stationdm.bluelink"
+        }
+        val launch = ctx.packageManager.getLaunchIntentForPackage(pkg)
+            ?: android.content.Intent(
+                android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse("https://play.google.com/store/apps/details?id=$pkg"),
+            )
+        runCatching {
+            ctx.startActivity(launch.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
         }
     }
 
@@ -542,6 +566,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             rangeMi = range,
             locked = status?.doorLock,
             charging = status?.evStatus?.batteryCharge,
+            climateOn = status?.airCtrlOn,
             updated = status?.dateTime,
         )
     }

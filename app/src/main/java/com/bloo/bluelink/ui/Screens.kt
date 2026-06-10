@@ -3059,7 +3059,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
-                            "box questions like \"what's the odometer of Daisy\". Everything runs " +
+                            "box plain questions like \"what's the odometer\". Everything runs " +
                             "privately on your device.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -3543,7 +3543,7 @@ private fun SettingsSearchResults(
     }
 }
 
-private val TileActions = listOf("lock" to "Lock", "unlock" to "Unlock", "climate" to "Climate", "charge" to "Charge")
+private val TileActions = listOf("doors" to "Lock / unlock", "climate" to "Climate", "open" to "Open")
 
 /** One Quick Settings tile's car + action assignment, via two dropdowns. */
 @Composable
@@ -3568,7 +3568,7 @@ private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
                 })
                 state.vehicles.forEach { v ->
                     DropdownMenuItem(text = { Text(v.name) }, onClick = {
-                        vm.setTileAssignment(index, v.vin, action ?: "lock"); carMenu = false
+                        vm.setTileAssignment(index, v.vin, action ?: "doors"); carMenu = false
                     })
                 }
             }

@@ -65,7 +65,8 @@ abstract class BlooTileService : TileService() {
                 return@launch
             }
             val (vin, cmd) = cfg
-            if (SettingsStore(ctx).tileBackground()) {
+            // "open" always opens the app; otherwise honour the background setting.
+            if (cmd != "open" && SettingsStore(ctx).tileBackground()) {
                 runInBackground(ctx, vin, cmd)
             } else {
                 openApp(vin, cmd)
@@ -107,9 +108,13 @@ abstract class BlooTileService : TileService() {
                 val brand = Brand.fromIndicator(v.brandIndicator)
                 val repo = BlueLinkRepository(BlueLinkApi(brand), SessionStore(ctx), brand)
                 when (cmd) {
+                    // Toggles based on the last-known snapshot state.
+                    "doors" -> if (snap.locked == true) repo.unlock(v) else repo.lock(v)
+                    "climate" -> if (snap.climateOn == true) repo.stopClimate(v) else {
+                        repo.startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+                    }
                     "lock" -> repo.lock(v)
                     "unlock" -> repo.unlock(v)
-                    "climate" -> repo.startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
                     "charge" -> repo.startCharge(v)
                 }
             }

@@ -28,6 +28,7 @@ data class VehicleSnapshot(
     val rangeMi: Int? = null,
     val locked: Boolean? = null,
     val charging: Boolean? = null,
+    val climateOn: Boolean? = null,
     val updated: String? = null,
 ) {
     /** Rebuild the command-capable Vehicle (used by widgets/tiles). */
@@ -52,6 +53,7 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
         rangeMi = range ?: rangeMi,
         locked = status.doorLock ?: locked,
         charging = status.evStatus?.batteryCharge ?: charging,
+        climateOn = status.airCtrlOn ?: climateOn,
         updated = status.dateTime ?: updated,
     )
 }
