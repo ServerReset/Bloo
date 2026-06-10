@@ -947,17 +947,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repoFor(v).unlock(v) }
 
     fun stopClimate(v: Vehicle) =
-        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repoFor(v).stopClimate(electric(v)) }
+        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repoFor(v).stopClimate(v) }
 
     fun startClimate(v: Vehicle, req: ClimateRequest) =
         runCommand(v.vin, "climate", "Climate on (${req.tempF}°F)", { it.copy(airCtrlOn = true) }) {
-            repoFor(v).startClimate(electric(v), req)
+            repoFor(v).startClimate(v, req)
         }
 
     /** Remote engine/climate start with defaults (the primary Climate action). */
     fun engineStart(v: Vehicle) =
         runCommand(v.vin, "climate", "Climate on", { it.copy(airCtrlOn = true) }) {
-            repoFor(v).startClimate(electric(v), ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+            repoFor(v).startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
         }
 
     fun startCharge(v: Vehicle) =

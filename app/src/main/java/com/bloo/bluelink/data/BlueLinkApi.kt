@@ -145,10 +145,11 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
-        // Climate/remote-start uses rcs/rsc for every US vehicle (gas, hybrid,
-        // EV). The evc/* paths are charging-only; using evc/fatc here returns a
-        // 502 on EVs such as the Gen5 platform.
-        val request = baseRequest("/ac/v2/rcs/rsc/stop", token, username, pin, v)
+        // Pure EVs use evc/fatc/stop (no engine). ICE and PHEVs use rcs/rsc/stop
+        // (remote engine start can be cancelled). The v.isEv flag comes from the
+        // enrollment API and is true only for pure EVs — PHEVs are false.
+        val path = if (v.isEv) "/ac/v2/evc/fatc/stop" else "/ac/v2/rcs/rsc/stop"
+        val request = baseRequest(path, token, username, pin, v)
             .post(ByteArray(0).toRequestBody(null))
             .build()
         call(request)
@@ -174,9 +175,9 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     suspend fun startClimate(
         token: String, username: String, pin: String, v: Vehicle, req: ClimateRequest,
     ): String = execute {
-        // All US vehicles (gas, hybrid, EV) start climate via rcs/rsc/start. The
-        // evc/fatc endpoint is not valid for this command and returns a 502.
-        val path = "/ac/v2/rcs/rsc/start"
+        // Pure EVs use evc/fatc/start (no engine to start; just HVAC).
+        // ICE and PHEVs use rcs/rsc/start (remote engine start + climate).
+        val path = if (v.isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
         val payload = json.encodeToString(
             kotlinx.serialization.json.JsonObject.serializer(),
             kotlinx.serialization.json.buildJsonObject {
@@ -188,7 +189,11 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                 })
                 put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
                 put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat) 1 else 0))
-                put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
+                // igniOnDuration is only meaningful for ICE/PHEV remote start;
+                // pure EVs have no engine ignition so omitting prevents a 502.
+                if (!v.isEv) {
+                    put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
+                }
                 put("seatHeaterVentInfo", kotlinx.serialization.json.buildJsonObject {
                     put("drvSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontLeft.apiValue))
                     put("astSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontRight.apiValue))

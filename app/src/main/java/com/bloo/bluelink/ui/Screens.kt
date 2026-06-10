@@ -1493,9 +1493,41 @@ private fun AnimatedSlider(
             thumbColor = accent,
             activeTrackColor = accent,
             inactiveTrackColor = scheme.surfaceContainerHighest,
-            activeTickColor = scheme.onPrimary.copy(alpha = 0.6f),
-            inactiveTickColor = accent.copy(alpha = 0.4f),
         ),
+        track = { state ->
+            val tickOnActive = scheme.onPrimary.copy(alpha = 0.6f)
+            val tickOnInactive = accent.copy(alpha = 0.4f)
+            // Compute fraction from the animated position so dot colors track the thumb.
+            val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
+            val frac2 = ((state.value - valueRange.start) / span2).coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth()) {
+                SliderDefaults.Track(
+                    sliderState = state,
+                    colors = SliderDefaults.colors(
+                        thumbColor = accent,
+                        activeTrackColor = accent,
+                        inactiveTrackColor = scheme.surfaceContainerHighest,
+                    ),
+                )
+                if (steps > 0) {
+                    Canvas(Modifier.matchParentSize()) {
+                        val thumbHalfPx = 10.dp.toPx()
+                        val usable = (size.width - 2 * thumbHalfPx).coerceAtLeast(0f)
+                        val cy = size.height / 2f
+                        val n = steps + 2
+                        for (i in 0 until n) {
+                            val tf = i.toFloat() / (n - 1)
+                            val x = thumbHalfPx + usable * tf
+                            drawCircle(
+                                if (tf <= frac2) tickOnActive else tickOnInactive,
+                                2.5.dp.toPx(),
+                                Offset(x, cy),
+                            )
+                        }
+                    }
+                }
+            }
+        },
         modifier = Modifier.fillMaxWidth(),
     )
 }
@@ -2029,6 +2061,7 @@ private fun StateControl(
             shape = RoundedCornerShape(corner),
             interactionSource = interaction,
             colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
+            border = if (!highlighted) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
             modifier = Modifier.height(ControlHeight),
         ) {
             if (pending) {
