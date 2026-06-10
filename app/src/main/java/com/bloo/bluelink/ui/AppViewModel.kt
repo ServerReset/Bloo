@@ -109,8 +109,11 @@ data class UiState(
      * when we genuinely can't tell (e.g. an EV that's never been located).
      */
     fun drivingLabel(v: Vehicle): String? {
+        val status = statusFor(v)
+        // If it's charging it's definitely parked — don't show a driving badge.
+        if (status?.evStatus?.batteryCharge == true) return null
         val speed = locations[v.vin]?.speed
-        val engine = statusFor(v)?.engine
+        val engine = status?.engine
         return when {
             speed != null && speed > 0 -> "Driving"
             engine == true -> "Running"
@@ -279,7 +282,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Merge vehicles from every signed-in brand; one brand failing shouldn't
         // hide the others.
         val fetched = repos.values.flatMap { r ->
-            runCatching { r.vehicles() }.getOrElse { e ->
+            runCatching { statusMutex.withLock { r.vehicles() } }.getOrElse { e ->
                 AppLog.log("⚠ ${e.message ?: "Couldn't load vehicles"}")
                 emptyList()
             }
@@ -639,7 +642,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _state.update { it.copy(pending = it.pending + key, message = null) }
             try {
-                block()
+                // Serialize with status fetches: Hyundai rejects overlapping
+                // requests with "a previous request is pending".
+                statusMutex.withLock { block() }
                 AppLog.log(success)
                 // Success is shown through the control's state (no toast); only
                 // optimistically flip the cached status so the toggle updates.

@@ -894,10 +894,11 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             ),
             label = "chargeFill",
         )
-        // Target-SOC marker: dot at the AC/DC limit for the active plug type.
+        // Target-SOC marker: dot at the AC/DC limit, only when plugged in.
         val ev = status?.evStatus
-        val targetPct = if (charging && ev != null) {
-            when (ev.batteryPlugin) {
+        val plugged = ev?.batteryPlugin != null && ev.batteryPlugin != 0
+        val targetPct = if (plugged) {
+            when (ev?.batteryPlugin) {
                 1 -> ev.reservChargeInfos?.level(0) // DC fast
                 2 -> ev.reservChargeInfos?.level(1) // AC
                 else -> null
@@ -922,10 +923,10 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 val x = maxWidth * (targetPct.coerceIn(0, 100) / 100f)
                 Box(
                     Modifier
-                        .offset(x = x - 9.dp)
-                        .size(18.dp)
+                        .offset(x = x - 6.dp)
+                        .size(12.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurface)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f))
                         .align(Alignment.CenterStart),
                 )
             }
@@ -1277,37 +1278,37 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
 @Composable
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // Doors: locked is the calm/grey state; unlocked is highlighted + red text.
-        StateControl(
-            name = "Doors",
-            isOn = status?.doorLock,
-            stateOn = "Locked", stateOff = "Unlocked",
-            turnOn = "Lock", turnOff = "Unlock",
-            icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
-            onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
-            highlightWhenOff = true,
-            offTextColor = MaterialTheme.colorScheme.error,
-        )
-        if (state.hasBattery(v)) {
-            val ev = status?.evStatus
-            val plugIn = ev?.batteryPlugin
-            // Allow if charging, plugged (1/2) or unknown; disable only when known-unplugged.
-            val plugged = ev?.batteryCharge == true || plugIn == null || plugIn != 0
-            StateControl(
-                name = "Charging",
-                isOn = ev?.batteryCharge,
-                stateOn = "Charging", stateOff = "Idle",
-                turnOn = "Start", turnOff = "Stop",
-                icon = Icons.Filled.Bolt, pending = state.isPending(v.vin, "charge"),
-                onActivate = { vm.startCharge(v) }, onDeactivate = { vm.stopCharge(v) },
-                highlightColor = ChargeGreen,
-                highlightContentColor = Color.White,
-                enabled = plugged,
-                disabledNote = "Not plugged in",
-            )
-        }
-    }
+    // Doors: locked is the calm/grey state; unlocked is highlighted + red text.
+    StateControl(
+        name = "Doors",
+        isOn = status?.doorLock,
+        stateOn = "Locked", stateOff = "Unlocked",
+        turnOn = "Lock", turnOff = "Unlock",
+        icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
+        onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
+        highlightWhenOff = true,
+        offTextColor = MaterialTheme.colorScheme.error,
+    )
+}
+
+/** The charge start/stop control (used in the charge pebble header). */
+@Composable
+private fun ChargeControl(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel) {
+    val ev = status?.evStatus
+    val plugIn = ev?.batteryPlugin
+    val plugged = ev?.batteryCharge == true || plugIn == null || plugIn != 0
+    StateControl(
+        name = "Charging",
+        isOn = ev?.batteryCharge,
+        stateOn = "Charging", stateOff = "Idle",
+        turnOn = "Start", turnOff = "Stop",
+        icon = Icons.Filled.Bolt, pending = state.isPending(v.vin, "charge"),
+        onActivate = { vm.startCharge(v) }, onDeactivate = { vm.stopCharge(v) },
+        highlightColor = ChargeGreen,
+        highlightContentColor = Color.White,
+        enabled = plugged,
+        disabledNote = "Not plugged in",
+    )
 }
 
 /**
@@ -1493,13 +1494,17 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val nextDue = if (lastSvc != null && interval != null) lastSvc + interval else null
     val remaining = if (nextDue != null && odoInt != null) nextDue - odoInt else null
 
+    val ev = status?.evStatus
+    val plugged = (ev?.batteryPlugin ?: 0) != 0 || ev?.batteryCharge == true
+
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle) {
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet. Pull down to refresh.")
             else -> {
+                SectionLabel("Status")
                 status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
-                StatusRow("Doors locked", if (status.doorLock == true) "Yes" else "No")
+                StatusRow("Doors", if (status.doorLock == true) "Locked" else "Unlocked")
                 status.doorOpen?.let { d ->
                     val open = listOfNotNull(
                         if (d.frontLeft == 1) "front-left" else null,
@@ -1507,7 +1512,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                         if (d.backLeft == 1) "rear-left" else null,
                         if (d.backRight == 1) "rear-right" else null,
                     )
-                    StatusRow("Doors", if (open.isEmpty()) "All closed" else "Open: ${open.joinToString(", ")}")
+                    if (open.isNotEmpty()) StatusRow("Doors open", open.joinToString(", "))
                 }
                 status.windowOpen?.let { w ->
                     val open = listOfNotNull(
@@ -1516,22 +1521,33 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                         if (w.backLeft == 1) "rear-left" else null,
                         if (w.backRight == 1) "rear-right" else null,
                     )
-                    StatusRow("Windows", if (open.isEmpty()) "All closed" else "Open: ${open.joinToString(", ")}")
+                    if (open.isNotEmpty()) StatusRow("Windows open", open.joinToString(", "))
                 }
-                status.trunkOpen?.let { StatusRow("Trunk", if (it) "Open" else "Closed") }
-                status.hoodOpen?.let { StatusRow("Hood", if (it) "Open" else "Closed") }
-                status.acc?.let { StatusRow("Accessory power", if (it) "On" else "Off") }
+                if (status.trunkOpen == true) StatusRow("Trunk", "Open")
+                if (status.hoodOpen == true) StatusRow("Hood", "Open")
+                if (status.acc == true) StatusRow("Accessory power", "On")
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
-                status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
+                if (status.defrost == true) StatusRow("Defrost", "On")
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
-                status.dateTime?.let { StatusRow("Updated", it) }
+                location?.let { StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude)) }
+                status.dateTime?.let { StatusRow("Last refreshed", it) }
+
+                if (plugged) {
+                    SectionLabel("Charging")
+                    ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+                        ?.let { StatusRow("Time to full", fmtMinutes(it)) }
+                    chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
+                    val tgt = when (ev?.batteryPlugin) {
+                        1 -> ev.reservChargeInfos?.level(0)
+                        2 -> ev.reservChargeInfos?.level(1)
+                        else -> null
+                    }
+                    tgt?.let { StatusRow("Charge limit", "$it%") }
+                }
             }
         }
-        location?.let {
-            StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude))
-        }
 
-        Text("Service & identity", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        SectionLabel("Service & identity")
         SelectionContainer { StatusRow("VIN", v.vin) }
         if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
         odo?.let { StatusRow("Odometer", "$it mi") }
@@ -1548,11 +1564,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
             )
         }
 
-        Text(
-            if (genesis) "Genesis links" else "Hyundai links",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-        )
+        SectionLabel(if (genesis) "Genesis links" else "Hyundai links")
         if (genesis) {
             LinkRow("Open Genesis app") {
                 openApp(context, listOf("com.stationdm.genesis"),
@@ -1785,38 +1797,80 @@ private fun SeatControl(
 
 // --- Charge limits --------------------------------------------------------
 
+/**
+ * Charge pebble: collapsed shows just the charge start/stop control; expand to
+ * set limits and see charging info. Long-press to drag-reorder.
+ */
 @Composable
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val expanded = state.isPebbleExpanded(v.vin, "charge")
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "chargeChevron",
+    )
     val targets = status?.evStatus?.reservChargeInfos
     var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
     var dc by remember(v.vin) { mutableIntStateOf(targets?.level(0) ?: 80) }
+    val ev = status?.evStatus
+    val plugged = (ev?.batteryPlugin != null && ev.batteryPlugin != 0) || ev?.batteryCharge == true
 
-    Pebble(
-        v, "charge", "Charge limits", Icons.Filled.Bolt, state, vm, dragHandle,
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
-        StepRow("AC (home) target", "$ac%")
-        AnimatedSlider(
-            value = ac.toFloat(),
-            onValueChange = { ac = (it / 10f).roundToInt() * 10 },
-            valueRange = 50f..100f,
-            steps = 4,
-        )
-        StepRow("DC (fast) target", "$dc%")
-        AnimatedSlider(
-            value = dc.toFloat(),
-            onValueChange = { dc = (it / 10f).roundToInt() * 10 },
-            valueRange = 50f..100f,
-            steps = 4,
-        )
-        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
-            vm.setChargeLimits(v, ac, dc)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().then(dragHandle),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f)) { ChargeControl(v, status, state, vm) }
+                IconButton(onClick = { vm.togglePebble(v, "charge") }) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        modifier = Modifier.rotate(rotation),
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)) + fadeIn(),
+                exit = shrinkVertically(spring(stiffness = Spring.StiffnessMedium)) + fadeOut(),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (plugged) {
+                        ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+                            ?.let { StatusRow("Time to full", fmtMinutes(it)) }
+                        chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
+                    }
+                    StepRow("AC (home) target", "$ac%")
+                    AnimatedSlider(
+                        value = ac.toFloat(),
+                        onValueChange = { ac = (it / 10f).roundToInt() * 10 },
+                        valueRange = 50f..100f,
+                        steps = 4,
+                    )
+                    StepRow("DC (fast) target", "$dc%")
+                    AnimatedSlider(
+                        value = dc.toFloat(),
+                        onValueChange = { dc = (it / 10f).roundToInt() * 10 },
+                        valueRange = 50f..100f,
+                        steps = 4,
+                    )
+                    CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
+                        vm.setChargeLimits(v, ac, dc)
+                    }
+                }
+            }
         }
-        val rt = status?.evStatus?.remainTime2
-        // etc3 is the AC (slower) estimate, etc1 the DC fast estimate.
-        rt?.etc1?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on DC", fmtMinutes(it)) }
-        rt?.etc3?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on AC", fmtMinutes(it)) }
     }
+}
+
+private fun chargerLabel(plugin: Int?): String? = when (plugin) {
+    1 -> "DC fast"
+    2 -> "AC (level 2)"
+    else -> null
 }
 
 private fun fmtMinutes(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
@@ -2559,6 +2613,18 @@ private fun StatusRow(label: String, value: String) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Text(value, fontWeight = FontWeight.Medium)
     }
+}
+
+/** A small bold group heading used inside the Car-info pebble. */
+@Composable
+private fun SectionLabel(text: String) {
+    Spacer(Modifier.height(2.dp))
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
