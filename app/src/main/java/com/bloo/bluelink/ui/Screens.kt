@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
@@ -980,7 +981,9 @@ private fun FloatingIcon(
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.85f),
+        // Explicit palette colours so the icon always contrasts with the chip.
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 3.dp,
         modifier = modifier.padding(12.dp).size(44.dp),
     ) {
@@ -1100,6 +1103,23 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
         else -> null
     }
 
+    // The state line under the range: charging (with time/type) replaces it while
+    // charging, then driving/parked, then a plain battery/fuel descriptor.
+    val statusLine = when {
+        charging -> buildString {
+            append("Charging")
+            chargeMinutes?.let { append(" · ${fmtMinutes(it)}") }
+            chargeType?.let { append(" · $it") }
+        }
+        drivingLabel != null -> drivingLabel
+        else -> if (hasBattery) "Battery" else "Fuel"
+    }
+    val statusColor = when {
+        charging -> ChargeGreen
+        drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
+        else -> LocalContentColor.current.copy(alpha = 0.7f)
+    }
+
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
             // Roll the headline number when it changes.
@@ -1109,14 +1129,6 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.weight(1f))
-            // Charging chip while charging, else the parked/driving badge — same slot.
-            if (charging) {
-                ChargingChip(chargeMinutes, chargeType)
-                Spacer(Modifier.width(12.dp))
-            } else drivingLabel?.let {
-                DrivingBadge(it)
-                Spacer(Modifier.width(12.dp))
-            }
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(
                     text = range?.let { "$it mi" } ?: "—",
@@ -1124,15 +1136,10 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    when {
-                        charging && pct != null -> "Charging · $pct%"
-                        charging -> "Charging"
-                        hasBattery -> "Battery · range"
-                        else -> "Fuel · range"
-                    },
+                    statusLine,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (charging) ChargeGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (charging) FontWeight.Bold else FontWeight.Normal,
+                    color = statusColor,
+                    fontWeight = if (charging || drivingLabel == "Driving") FontWeight.Bold else FontWeight.Normal,
                 )
             }
         }
@@ -1190,29 +1197,6 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                         .align(Alignment.CenterStart),
                 )
             }
-        }
-    }
-}
-
-/** Compact green chip with bolt + time-to-full + charger type, for the badge slot. */
-@Composable
-private fun ChargingChip(minutes: Int?, type: String?) {
-    val text = buildString {
-        if (minutes != null) append(if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m")
-        if (type != null) {
-            if (isNotEmpty()) append(" · ")
-            append(type)
-        }
-        if (isEmpty()) append("Charging")
-    }
-    Surface(color = ChargeGreen, contentColor = Color.White, shape = RoundedCornerShape(8.dp)) {
-        Row(
-            Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(3.dp))
-            Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -1689,25 +1673,6 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
     }
 }
 
-@Composable
-private fun DrivingBadge(label: String) {
-    val bg: Color
-    val fg: Color
-    when (label) {
-        "Driving" -> { bg = MaterialTheme.colorScheme.primary; fg = MaterialTheme.colorScheme.onPrimary }
-        "Running" -> { bg = ChargeGreen; fg = Color.White }
-        else -> { bg = MaterialTheme.colorScheme.surfaceVariant; fg = MaterialTheme.colorScheme.onSurfaceVariant }
-    }
-    Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(8.dp)) {
-        Text(
-            label,
-            Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
 /** Hero image + gauge, then the primary lock/charge controls (expanded view). */
 @Composable
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
@@ -1936,11 +1901,12 @@ private fun StateControl(
         label = "ctrlCorner",
     )
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().height(60.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.weight(1f)) {
+        // Fill the button's height so the status reads as one tall control.
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Center) {
             Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             val stateText = when {
                 !enabled && disabledNote != null -> disabledNote
@@ -2211,33 +2177,43 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OwnerLinks(genesis: Boolean, context: Context, inApp: Boolean) {
-    FlowRow(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (genesis) {
-            LinkButton("Genesis app", Icons.Filled.OpenInNew) {
-                openApp(context, listOf("com.stationdm.genesis"),
-                    "https://play.google.com/store/apps/details?id=com.stationdm.genesis", inApp)
+    // Manufacturer-specific destinations, defined once and grouped below.
+    val appPkg = if (genesis) "com.stationdm.genesis" else "com.stationdm.bluelink"
+    val appName = if (genesis) "Genesis app" else "Bluelink app"
+    val ownersUrl = if (genesis) "https://owners.genesis.com" else "https://owners.hyundaiusa.com"
+    val dealerLabel = if (genesis) "Find a retailer" else "Find a dealer"
+    val dealerUrl = if (genesis) "https://www.genesis.com/us/en/find-a-retailer.html"
+        else "https://www.hyundaiusa.com/us/en/dealer-locator"
+    val manualsUrl = if (genesis) "https://www.genesis.com/us/en/owners.html"
+        else "https://www.hyundaiusa.com/us/en/owner-resources"
+    val roadside = if (genesis) "8443409741" else "8002437766"
+
+    @Composable
+    fun group(title: String, content: @Composable FlowRowScope.() -> Unit) {
+        SectionLabel(title)
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = content,
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        group("App & account") {
+            LinkButton(appName, Icons.Filled.OpenInNew) {
+                openApp(context, listOf(appPkg), "https://play.google.com/store/apps/details?id=$appPkg", inApp)
             }
-            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, "https://owners.genesis.com", inApp) }
-            LinkButton("Find a retailer", Icons.Filled.OpenInNew) { openUrl(context, "https://www.genesis.com/us/en/find-a-retailer.html", inApp) }
-            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
-            LinkButton("Roadside", Icons.Filled.Call) { dial(context, "8443409741") }
-            LinkButton("Call collision", Icons.Filled.Call) { dial(context, "8443409741") }
-            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
-        } else {
-            LinkButton("Bluelink app", Icons.Filled.OpenInNew) {
-                openApp(context, listOf("com.stationdm.bluelink"),
-                    "https://play.google.com/store/apps/details?id=com.stationdm.bluelink", inApp)
-            }
-            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, "https://owners.hyundaiusa.com", inApp) }
-            LinkButton("Find a dealer", Icons.Filled.OpenInNew) { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
-            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
-            LinkButton("Roadside", Icons.Filled.Call) { dial(context, "8002437766") }
-            LinkButton("Call collision", Icons.Filled.Call) { dial(context, "8002437766") }
-            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
+            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, ownersUrl, inApp) }
+        }
+        group("Service") {
+            LinkButton(dealerLabel, Icons.Filled.OpenInNew) { openUrl(context, dealerUrl, inApp) }
+            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, manualsUrl, inApp) }
+        }
+        group("Assistance") {
+            LinkButton("Roadside", Icons.Filled.Call) { dial(context, roadside) }
+            LinkButton("Call collision", Icons.Filled.Call) { dial(context, roadside) }
+            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, manualsUrl, inApp) }
         }
     }
 }
