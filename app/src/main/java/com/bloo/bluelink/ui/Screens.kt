@@ -9,6 +9,7 @@ package com.bloo.bluelink.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Build
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
@@ -107,6 +108,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -143,6 +145,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -158,7 +161,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -394,6 +396,25 @@ private fun OnboardingScreen(vm: AppViewModel) {
             OnboardingPoint("🧩", "Pebbles", "Tap a pebble to expand it; long-press to drag and reorder. Lock, charge, climate and more live here.")
             OnboardingPoint("⚙️", "Tell Bloo about each car", "Hyundai's API doesn't report a car's powertrain, seats or heated wheel — set those in Settings so the right controls appear. Add a photo while you're there.")
             OnboardingPoint("⚡", "Quick access", "Add Quick Settings tiles and long-press app-icon shortcuts for one-tap lock / unlock / climate.")
+
+            // Ask for notifications here, on a tap — not silently on first launch.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                var notifGranted by remember {
+                    mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context))
+                }
+                val notifLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted -> notifGranted = granted }
+                FilledTonalButton(
+                    onClick = { notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+                    enabled = !notifGranted,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (notifGranted) "Notifications enabled" else "Enable notifications")
+                }
+            }
 
             if (canBio) {
                 FilledTonalButton(
@@ -692,13 +713,15 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     if (vehicles.isEmpty()) return
     val appearance by vm.appearance.collectAsState()
 
-    // Slot-machine settle haptic when a refresh lands and the numbers roll.
+    // Settle haptic when a refresh lands.
     val haptics = LocalHaptics.current
     var wasRefreshing by remember { mutableStateOf(false) }
     LaunchedEffect(state.refreshing) {
         if (wasRefreshing && !state.refreshing) haptics?.slotSettle()
         wasRefreshing = state.refreshing
     }
+    // Drop the page indicator while refreshing so the squiggly indicator has room.
+    val dotsTop by animateDpAsState(if (state.refreshing) 76.dp else 10.dp, label = "dotsTop")
 
     val count = vehicles.size
     val cfg = LocalConfiguration.current
@@ -752,7 +775,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         ExpandedCar(vehicles[page], state, vm, flipped = appearance.columnsFlipped)
                     }
                     if (count > 1) {
-                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp))
+                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = dotsTop))
                     }
                 }
             } else {
@@ -784,7 +807,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
-                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp))
+                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = dotsTop))
                     }
                 }
             }
@@ -1220,11 +1243,7 @@ private val LocalForceExpanded = staticCompositionLocalOf { false }
  */
 private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
 
-/**
- * A slot-machine number. When the value changes it spins its digits — fast at
- * first, decelerating to a stop — with a RenderEffect motion blur (a no-op below
- * API 31) that fades out as it settles. Non-numeric text just snaps.
- */
+/** A headline number that cross-fades when it changes. */
 @Composable
 private fun RollingNumber(
     text: String,
@@ -1232,29 +1251,11 @@ private fun RollingNumber(
     fontWeight: FontWeight,
     color: Color = Color.Unspecified,
 ) {
-    var display by remember { mutableStateOf(text) }
-    var blurTarget by remember { mutableStateOf(0.dp) }
-    val blur by animateDpAsState(blurTarget, label = "rollBlur")
-
-    LaunchedEffect(text) {
-        if (display == text) return@LaunchedEffect
-        if (text.none { it.isDigit() }) { // nothing to spin (e.g. "—")
-            display = text
-            return@LaunchedEffect
-        }
-        val rnd = kotlin.random.Random(System.nanoTime())
-        val steps = 14
-        for (i in 0 until steps) {
-            // Randomize each digit position to look like spinning reels.
-            display = text.map { c -> if (c.isDigit()) '0' + rnd.nextInt(10) else c }.joinToString("")
-            blurTarget = 7.dp * (1f - i.toFloat() / steps)
-            delay((20L + i * 6L)) // accelerate→decelerate: gaps grow as it slows
-        }
-        blurTarget = 0.dp
-        display = text
-    }
-
-    Text(display, modifier = Modifier.blur(blur), style = style, fontWeight = fontWeight, color = color)
+    AnimatedContent(
+        targetState = text,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        label = "num",
+    ) { t -> Text(t, style = style, fontWeight = fontWeight, color = color) }
 }
 
 /** A coarse, self-ticking "x min ago" string for [millis] (null → null). */
@@ -1493,11 +1494,18 @@ private fun VehicleDetailContent(
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    // Show the floating name pill once the car name has scrolled out of view.
+    val nameHidden by remember {
+        derivedStateOf { scroll.value > with(density) { (topInset + 56.dp).toPx() } }
+    }
     Refreshable(v, state, vm) {
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1507,6 +1515,30 @@ private fun VehicleDetailContent(
             // summary (image+gauge) and controls are reorderable pebbles too.
             PebbleList(v, state, vm)
             Spacer(Modifier.height(bottomInset + 16.dp))
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = nameHidden,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
+        ) {
+            // Tap to jump back to the top (the main car-info pebble).
+            Surface(
+                onClick = { scope.launch { scroll.animateScrollTo(0) } },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shadowElevation = 3.dp,
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 }
@@ -1679,7 +1711,12 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(v.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                v.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             Text(
                 "${v.model} · ${state.powertrainLabel(v)}",
                 style = MaterialTheme.typography.labelMedium,
@@ -1688,9 +1725,8 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
             LastUpdatedLabel(v, state, Modifier.padding(top = 2.dp))
         }
         if (onExpand != null) {
-            IconButton(onClick = onExpand) {
-                Icon(Icons.Filled.Fullscreen, contentDescription = "Expand to full screen")
-            }
+            // A proper floating chip (was a hard-to-see bare icon).
+            FloatingIcon(Icons.Filled.Fullscreen, "Expand to full screen", onExpand)
         }
     }
 }
@@ -1801,8 +1837,9 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     // Doors: locked is the calm/grey state; unlocked is highlighted + red text.
+    // No title — the Locked/Unlocked state itself is the (full-height) headline.
     StateControl(
-        name = "Doors",
+        name = "",
         isOn = status?.doorLock,
         stateOn = "Locked", stateOff = "Unlocked",
         turnOn = "Lock", turnOff = "Unlock",
@@ -1923,13 +1960,15 @@ private fun StateControl(
         label = "ctrlCorner",
     )
     Row(
-        Modifier.fillMaxWidth().height(60.dp),
+        Modifier.fillMaxWidth().height(ControlHeight),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Fill the button's height so the status reads as one tall control.
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Center) {
-            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (name.isNotBlank()) {
+                Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
             val stateText = when {
                 !enabled && disabledNote != null -> disabledNote
                 pending -> "Sending…"
@@ -1938,16 +1977,17 @@ private fun StateControl(
                 else -> "Unknown"
             }
             val stateColor = when {
-                !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                !enabled -> LocalContentColor.current.copy(alpha = 0.7f)
                 isOn == false && offTextColor != null -> offTextColor
                 highlighted -> highlightColor
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                else -> LocalContentColor.current.copy(alpha = 0.7f)
             }
+            // With no title, the state itself is the headline (fills the height).
             Text(
                 stateText,
-                style = MaterialTheme.typography.bodyMedium,
+                style = if (name.isBlank()) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium,
                 color = stateColor,
-                fontWeight = if (stateColor != MaterialTheme.colorScheme.onSurfaceVariant) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = FontWeight.Bold,
             )
         }
         val haptics = LocalHaptics.current
@@ -1960,7 +2000,7 @@ private fun StateControl(
             shape = RoundedCornerShape(corner),
             interactionSource = interaction,
             colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
-            modifier = Modifier.height(60.dp),
+            modifier = Modifier.height(ControlHeight),
         ) {
             if (pending) {
                 LoadingIndicator(Modifier.size(22.dp))
@@ -2038,7 +2078,7 @@ private fun Pebble(
                     )
                     .then(dragHandle)
                     .heightIn(min = PebbleHeaderHeight)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -2086,8 +2126,11 @@ private fun Pebble(
     }
 }
 
+/** Shared control height: a collapsed pebble matches the lock/unlock button. */
+private val ControlHeight = 64.dp
+
 /** Uniform collapsed-header height so every pebble lines up at the same size. */
-private val PebbleHeaderHeight = 60.dp
+private val PebbleHeaderHeight = ControlHeight
 private val PebbleCornerCollapsed = 32.dp
 private val PebbleCornerExpanded = 20.dp
 
@@ -2302,11 +2345,29 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
         status?.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
     }
+    // Surface a warning affordance if any diagnostic reports a problem.
+    val hasWarning = (status?.tirePressureLamp?.hasWarning == true) ||
+        status?.lowFuelLight == true || status?.washerFluidStatus == true ||
+        status?.breakOilStatus == true || status?.smartKeyBatteryWarning == true
     val diagSummary = if (rows.isEmpty()) "No data" else "${rows.count { !it.indent }} checks"
     Pebble(
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
         summary = diagSummary,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        headerAction = if (hasWarning) ({
+            // Red warning chip; tapping it just expands the pebble like the arrow.
+            FilledTonalButton(
+                onClick = { vm.togglePebble(v, "diagnostics") },
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.heightIn(min = 42.dp),
+            ) {
+                Icon(Icons.Filled.Warning, contentDescription = "Has warnings", modifier = Modifier.size(18.dp))
+            }
+        }) else null,
     ) {
         if (rows.isEmpty()) {
             Text("No diagnostics yet. Pull down to refresh.")
@@ -2832,6 +2893,8 @@ private fun SettingsScreen(vm: AppViewModel) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val canBio = remember { vm.canUseBiometrics() }
+    val settingsScroll = rememberScrollState()
+    val settingsScope = rememberCoroutineScope()
 
     // System back returns to the garage, not out of the app.
     BackHandler { vm.closeSettings() }
@@ -2851,7 +2914,7 @@ private fun SettingsScreen(vm: AppViewModel) {
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(settingsScroll)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -3181,6 +3244,7 @@ private fun SettingsScreen(vm: AppViewModel) {
         ) {
             FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
             Surface(
+                onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurface,

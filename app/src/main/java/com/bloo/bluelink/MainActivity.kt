@@ -1,6 +1,5 @@
 package com.bloo.bluelink
 
-import android.Manifest
 import android.content.Intent
 import android.graphics.Color
 import android.os.Build
@@ -8,7 +7,6 @@ import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,9 +20,6 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel: AppViewModel by viewModels()
 
-    private val requestNotifications =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Fully transparent system bars so the app's gradient shows through and
@@ -37,11 +32,8 @@ class MainActivity : FragmentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         AlertWorker.schedule(applicationContext)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !com.bloo.bluelink.data.Notifications.hasPermission(this)
-        ) {
-            requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        // Notification permission is requested from the onboarding screen (on a
+        // button tap), not silently on first launch.
         handleShortcutIntent(intent)
         setContent {
             val appearance by viewModel.appearance.collectAsState()
