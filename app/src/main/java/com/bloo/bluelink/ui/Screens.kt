@@ -455,8 +455,6 @@ private fun OnboardingScreen(vm: AppViewModel) {
             MorphButton(
                 onClick = { vm.startSetup() },
                 modifier = Modifier.fillMaxWidth(),
-                restCorner = 30.dp,
-                pressedCorner = 14.dp,
                 contentPadding = PaddingValues(vertical = 18.dp),
             ) {
                 Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -621,8 +619,6 @@ private fun LoginScreen(
                 onClick = { onLogin(email, password, pin, brand) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 enabled = !loading,
-                restCorner = 28.dp,
-                pressedCorner = 14.dp,
             ) {
                 if (loading) LoadingIndicator() else Text("Sign in", fontWeight = FontWeight.SemiBold)
             }
@@ -677,12 +673,8 @@ private fun LockScreen(vm: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(28.dp))
-        // Expressive morphing button: a big pill that squishes into a rounded
-        // square as you press it, springing back on release.
         MorphButton(
             onClick = { authenticate() },
-            restCorner = 36.dp,
-            pressedCorner = 16.dp,
             contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
         ) {
             Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -1943,71 +1935,77 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     )
 }
 
-/**
- * A Material 3 Expressive button whose shape springs from a soft pill to a
- * tighter rounded-square while pressed, then bounces back on release. Shared
- * infrastructure for any "morphing" button in the app.
- */
+// ---- M3 Expressive dynamic button ----------------------------------------
+//
+// Two modes, one primitive:
+//
+//  Tap  (toggled omitted / null)
+//       Rests as a full pill. While the finger is down — or for 200 ms after a
+//       quick tap — morphs to a rounded rectangle, then springs back to pill.
+//
+//  Toggle  (toggled = true | false)
+//       false → pill + [idleContainerColor].
+//       true  → rounded rectangle + [activeContainerColor], held until toggled back.
+//       Color and shape both animate on every state change.
+
+private val MorphPill = 100.dp   // always clamps to half the button height = true capsule
+private val MorphBox  = 10.dp    // clearly-a-rounded-rectangle for any typical button size
+
 @Composable
 private fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    // null = tap button (momentary pill -> box -> pill pulse on tap).
-    // true/false = toggle button: off is [containerColor] + pill, on morphs to a
-    // [selectedContainerColor] rounded box and stays there until tapped again.
-    selected: Boolean? = null,
-    containerColor: Color = MaterialTheme.colorScheme.primary,
-    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    selectedContainerColor: Color = MaterialTheme.colorScheme.primary,
-    selectedContentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    restCorner: Dp = 28.dp,
-    pressedCorner: Dp = 12.dp,
-    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    toggled: Boolean? = null,
+    idleContainerColor: Color = MaterialTheme.colorScheme.primary,
+    idleContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    activeContainerColor: Color = idleContainerColor,
+    activeContentColor: Color = idleContentColor,
     border: BorderStroke? = null,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
+    val source  = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
     val haptics = LocalHaptics.current
-    val scope = rememberCoroutineScope()
+    val scope   = rememberCoroutineScope()
+    // For tap mode: keeps the button in box shape for 200 ms after a quick tap so
+    // the morph is always visible even if the finger lifts before the spring settles.
+    var tapHold by remember { mutableStateOf(false) }
 
-    // Tap buttons momentarily morph to the box shape and spring back, so a quick
-    // tap still reads as pill -> rounded box -> pill even when not held.
-    var tapPulse by remember { mutableStateOf(false) }
-    // Toggle buttons hold the box shape while selected.
-    val boxy = selected == true || pressed || tapPulse
+    val box = pressed || tapHold || toggled == true
     val corner by animateDpAsState(
-        targetValue = if (boxy) pressedCorner else restCorner,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+        targetValue   = if (box) MorphBox else MorphPill,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessMedium,
+        ),
         label = "morphCorner",
     )
-    val container by androidx.compose.animation.animateColorAsState(
-        if (selected == true) selectedContainerColor else containerColor,
+    val bg by androidx.compose.animation.animateColorAsState(
+        targetValue = if (toggled == true) activeContainerColor else idleContainerColor,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "morphBg",
     )
-    val onContainer = if (selected == true) selectedContentColor else contentColor
     Button(
         onClick = {
             haptics?.click()
-            // Toggles get their shape from `selected`; tap buttons pulse instead.
-            if (selected == null) {
-                scope.launch {
-                    tapPulse = true
-                    delay(150)
-                    tapPulse = false
-                }
+            if (toggled == null) {
+                scope.launch { tapHold = true; delay(200); tapHold = false }
             }
             onClick()
         },
-        modifier = modifier,
-        enabled = enabled,
-        shape = RoundedCornerShape(corner),
-        interactionSource = interaction,
-        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = onContainer),
-        border = border,
+        modifier          = modifier,
+        enabled           = enabled,
+        shape             = RoundedCornerShape(corner),
+        interactionSource = source,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = bg,
+            contentColor   = if (toggled == true) activeContentColor else idleContentColor,
+        ),
+        border         = border,
         contentPadding = contentPadding,
-        content = content,
+        content        = content,
     )
 }
 
@@ -2104,18 +2102,14 @@ private fun StateControl(
         }
         val haptics = LocalHaptics.current
         val onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() }
-        // Standard dynamic toggle (same shape as the Pebble quick buttons): a
-        // bordered pill when off, morphing to a filled rounded box when on.
         MorphButton(
             onClick = onClick,
             enabled = enabled && !pending,
-            selected = highlighted,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            selectedContainerColor = highlightColor,
-            selectedContentColor = highlightContentColor,
-            restCorner = 38.dp,
-            pressedCorner = 20.dp,
+            toggled = highlighted,
+            idleContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            idleContentColor = MaterialTheme.colorScheme.onSurface,
+            activeContainerColor = highlightColor,
+            activeContentColor = highlightContentColor,
             border = if (!highlighted) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
             modifier = Modifier.height(ControlHeight),
         ) {
@@ -2267,15 +2261,11 @@ private fun PebbleActionButton(
     container: Color = MaterialTheme.colorScheme.secondaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
 ) {
-    // Press-morphing is the standard for togglable controls. A faint outline
-    // guarantees the button's shape stays visible on any pebble background.
     MorphButton(
         onClick = onClick,
         enabled = enabled && !pending,
-        containerColor = container,
-        contentColor = contentColor,
-        restCorner = 100.dp,
-        pressedCorner = 10.dp,
+        idleContainerColor = container,
+        idleContentColor = contentColor,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         modifier = Modifier.heightIn(min = 42.dp),
