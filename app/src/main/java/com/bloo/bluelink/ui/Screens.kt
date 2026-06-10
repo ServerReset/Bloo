@@ -138,7 +138,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1458,6 +1457,19 @@ private fun AnimatedSlider(
         if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
     }
 
+    // Geometry of the fully custom track + thumb. Drawing it ourselves (instead
+    // of overlaying dots on the stock M3 track) keeps the rounded ends clean and
+    // guarantees a tick never doubles up against the thumb.
+    val trackThickness = 14.dp
+    val thumbW = 6.dp
+    val thumbH = 44.dp
+    val gap = 6.dp
+    val dotR = 2.5.dp
+
+    val inactiveColor = scheme.surfaceContainerHighest
+    val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
+    val dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f)
+
     Slider(
         value = anim.value,
         onValueChange = { v ->
@@ -1489,41 +1501,63 @@ private fun AnimatedSlider(
         valueRange = valueRange,
         steps = 0,
         interactionSource = interactionSource,
-        colors = SliderDefaults.colors(
-            thumbColor = accent,
-            activeTrackColor = accent,
-            inactiveTrackColor = scheme.surfaceContainerHighest,
-        ),
+        thumb = {
+            Box(
+                Modifier
+                    .size(thumbW, thumbH)
+                    .background(accent, RoundedCornerShape(thumbW / 2)),
+            )
+        },
         track = { state ->
-            val tickOnActive = scheme.onPrimary.copy(alpha = 0.6f)
-            val tickOnInactive = accent.copy(alpha = 0.4f)
-            // Compute fraction from the animated position so dot colors track the thumb.
             val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
             val frac2 = ((state.value - valueRange.start) / span2).coerceIn(0f, 1f)
-            Box(Modifier.fillMaxWidth()) {
-                SliderDefaults.Track(
-                    sliderState = state,
-                    colors = SliderDefaults.colors(
-                        thumbColor = accent,
-                        activeTrackColor = accent,
-                        inactiveTrackColor = scheme.surfaceContainerHighest,
-                    ),
-                )
+            Canvas(
+                Modifier
+                    .fillMaxWidth()
+                    .height(thumbH),
+            ) {
+                val halfThumb = thumbW.toPx() / 2f
+                val gapPx = gap.toPx()
+                val usable = (size.width - thumbW.toPx()).coerceAtLeast(0f)
+                val thumbX = halfThumb + usable * frac2
+                val cy = size.height / 2f
+                val th = trackThickness.toPx()
+                val top = cy - th / 2f
+                val radius = androidx.compose.ui.geometry.CornerRadius(th / 2f)
+
+                // Inactive segment (right of the thumb).
+                val inStart = (thumbX + gapPx).coerceAtMost(size.width)
+                if (inStart < size.width) {
+                    drawRoundRect(
+                        inactiveColor,
+                        topLeft = Offset(inStart, top),
+                        size = androidx.compose.ui.geometry.Size(size.width - inStart, th),
+                        cornerRadius = radius,
+                    )
+                }
+                // Active segment (left of the thumb).
+                val acEnd = (thumbX - gapPx).coerceAtLeast(0f)
+                if (acEnd > 0f) {
+                    drawRoundRect(
+                        accent,
+                        topLeft = Offset(0f, top),
+                        size = androidx.compose.ui.geometry.Size(acEnd, th),
+                        cornerRadius = radius,
+                    )
+                }
+                // Tick dots — evenly spaced, skipping any that fall under the thumb.
                 if (steps > 0) {
-                    Canvas(Modifier.matchParentSize()) {
-                        val thumbHalfPx = 10.dp.toPx()
-                        val usable = (size.width - 2 * thumbHalfPx).coerceAtLeast(0f)
-                        val cy = size.height / 2f
-                        val n = steps + 2
-                        for (i in 0 until n) {
-                            val tf = i.toFloat() / (n - 1)
-                            val x = thumbHalfPx + usable * tf
-                            drawCircle(
-                                if (tf <= frac2) tickOnActive else tickOnInactive,
-                                2.5.dp.toPx(),
-                                Offset(x, cy),
-                            )
-                        }
+                    val n = steps + 2
+                    val rPx = dotR.toPx()
+                    for (i in 0 until n) {
+                        val tf = i.toFloat() / (n - 1)
+                        val x = halfThumb + usable * tf
+                        if (kotlin.math.abs(x - thumbX) < gapPx + halfThumb) continue
+                        drawCircle(
+                            if (x <= thumbX) dotOnActive else dotOnInactive,
+                            rPx,
+                            Offset(x, cy),
+                        )
                     }
                 }
             }
@@ -1919,8 +1953,14 @@ private fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    // null = tap button (momentary pill -> box -> pill pulse on tap).
+    // true/false = toggle button: off is [containerColor] + pill, on morphs to a
+    // [selectedContainerColor] rounded box and stays there until tapped again.
+    selected: Boolean? = null,
     containerColor: Color = MaterialTheme.colorScheme.primary,
     contentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    selectedContainerColor: Color = MaterialTheme.colorScheme.primary,
+    selectedContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     restCorner: Dp = 28.dp,
     pressedCorner: Dp = 12.dp,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
@@ -1930,18 +1970,41 @@ private fun MorphButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHaptics.current
+    val scope = rememberCoroutineScope()
+
+    // Tap buttons momentarily morph to the box shape and spring back, so a quick
+    // tap still reads as pill -> rounded box -> pill even when not held.
+    var tapPulse by remember { mutableStateOf(false) }
+    // Toggle buttons hold the box shape while selected.
+    val boxy = selected == true || pressed || tapPulse
     val corner by animateDpAsState(
-        targetValue = if (pressed) pressedCorner else restCorner,
-        animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
+        targetValue = if (boxy) pressedCorner else restCorner,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
         label = "morphCorner",
     )
+    val container by androidx.compose.animation.animateColorAsState(
+        if (selected == true) selectedContainerColor else containerColor,
+        label = "morphBg",
+    )
+    val onContainer = if (selected == true) selectedContentColor else contentColor
     Button(
-        onClick = { haptics?.click(); onClick() },
+        onClick = {
+            haptics?.click()
+            // Toggles get their shape from `selected`; tap buttons pulse instead.
+            if (selected == null) {
+                scope.launch {
+                    tapPulse = true
+                    delay(150)
+                    tapPulse = false
+                }
+            }
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = RoundedCornerShape(corner),
         interactionSource = interaction,
-        colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = onContainer),
         border = border,
         contentPadding = contentPadding,
         content = content,
@@ -2008,18 +2071,6 @@ private fun StateControl(
 ) {
     // Which state is the "highlighted" (square, coloured) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    // Pill when calm, rounded box when active — and it squishes further on press.
-    val corner by animateDpAsState(
-        targetValue = when {
-            pressed -> 10.dp
-            highlighted -> 20.dp
-            else -> 38.dp
-        },
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "ctrlCorner",
-    )
     Row(
         Modifier.fillMaxWidth().height(ControlHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -2053,14 +2104,18 @@ private fun StateControl(
         }
         val haptics = LocalHaptics.current
         val onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() }
-        val container = if (highlighted) highlightColor else MaterialTheme.colorScheme.surfaceContainerHighest
-        val contentColor = if (highlighted) highlightContentColor else MaterialTheme.colorScheme.onSurface
-        Button(
+        // Standard dynamic toggle (same shape as the Pebble quick buttons): a
+        // bordered pill when off, morphing to a filled rounded box when on.
+        MorphButton(
             onClick = onClick,
             enabled = enabled && !pending,
-            shape = RoundedCornerShape(corner),
-            interactionSource = interaction,
-            colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
+            selected = highlighted,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            selectedContainerColor = highlightColor,
+            selectedContentColor = highlightContentColor,
+            restCorner = 38.dp,
+            pressedCorner = 20.dp,
             border = if (!highlighted) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
             modifier = Modifier.height(ControlHeight),
         ) {

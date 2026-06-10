@@ -208,7 +208,10 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         val request = baseRequest(path, token, username, pin, v)
             .post(payload)
             .build()
-        call(request)
+        // Hyundai's HVAC endpoint intermittently returns a 502 "could not complete
+        // your request" even for a valid call (seen on Gen5W cars). One short retry
+        // clears the transient failure without bothering the user.
+        callWithRetry(request)
     }
 
     /** Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) in percent. */
@@ -269,6 +272,22 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         .header("brandIndicator", v.brandIndicator.ifBlank { brand.code })
 
     // --- Plumbing --------------------------------------------------------
+
+    /**
+     * Like [call], but retries once after a short pause when the server returns a
+     * transient 5xx. Used for HVAC, where Hyundai occasionally 502s a valid call.
+     */
+    private fun callWithRetry(request: Request): String {
+        return try {
+            call(request)
+        } catch (e: BlueLinkException) {
+            val transient = e.code != null && e.code in 500..599
+            if (!transient) throw e
+            AppLog.log("Retrying ${request.method} ${request.url.encodedPath} after ${e.code}…")
+            Thread.sleep(1500)
+            call(request)
+        }
+    }
 
     private fun call(request: Request): String {
         client.newCall(request).execute().use { resp ->

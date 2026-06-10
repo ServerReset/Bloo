@@ -24,6 +24,11 @@ class Ai(context: Context) {
     private val app = context.applicationContext
     private val direct = Executor { it.run() }
 
+    private companion object {
+        // ML Kit's ARTICLE summarizer requires at least this many input characters.
+        const val MIN_ARTICLE_CHARS = 400
+    }
+
     private val summarizer: Summarizer by lazy {
         Summarization.getClient(
             SummarizerOptions.builder(app)
@@ -45,9 +50,21 @@ class Ai(context: Context) {
      */
     suspend fun summarize(text: String): String {
         ensureFeatureReady()
-        val request = SummarizationRequest.builder(text).build()
+        val request = SummarizationRequest.builder(padToMinimum(text)).build()
         val result = summarizer.runInference(request).await()
         return result.summary
+    }
+
+    /**
+     * The ARTICLE input type rejects anything under 400 characters. A single car's
+     * status can fall short, so we repeat the same facts until the floor is met —
+     * the model sees no new information, so the summary stays accurate.
+     */
+    private fun padToMinimum(text: String): String {
+        if (text.length >= MIN_ARTICLE_CHARS) return text
+        val sb = StringBuilder(text)
+        while (sb.length < MIN_ARTICLE_CHARS) sb.append('\n').append(text)
+        return sb.toString()
     }
 
     private suspend fun ensureFeatureReady() {
