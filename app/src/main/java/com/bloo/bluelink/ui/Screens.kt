@@ -59,6 +59,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -221,10 +226,15 @@ import kotlin.math.roundToInt
 @Composable
 fun BlooApp(vm: AppViewModel) {
     val state by vm.state.collectAsState()
+    val appearance by vm.appearance.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+
+    // One haptics engine for the whole app; its enabled flag tracks the setting.
+    val haptics = remember { Haptics(context.applicationContext) }
+    haptics.enabled = appearance.hapticsEnabled
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -233,9 +243,11 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
+    CompositionLocalProvider(LocalHaptics provides haptics) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
     // status/navigation bars; screen content draws on top of it.
     val scheme = MaterialTheme.colorScheme
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(
         Modifier
             .fillMaxSize()
@@ -284,7 +296,6 @@ fun BlooApp(vm: AppViewModel) {
         val target = if (state.addingAccount) Screen.Login else state.screen
         AnimatedContent(
             targetState = target,
-            modifier = Modifier.padding(padding),
             transitionSpec = {
                 // Settings slides in from the right; returning slides back left.
                 val sign = if (targetState == Screen.Settings) 1 else -1
@@ -293,18 +304,36 @@ fun BlooApp(vm: AppViewModel) {
             },
             label = "screen",
         ) { screen ->
+            // The garage draws full-bleed (content scrolls behind the bars and
+            // handles its own insets); other screens stay inset by the Scaffold.
             when (screen) {
-                Screen.Login -> LoginScreen(
-                    loading = state.loading,
-                    onLogin = vm::login,
-                    onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
-                )
-                Screen.Locked -> LockScreen(vm)
-                Screen.Empty -> EmptyScreen(vm)
+                Screen.Login -> Box(Modifier.padding(padding)) {
+                    LoginScreen(
+                        loading = state.loading,
+                        onLogin = vm::login,
+                        onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
+                    )
+                }
+                Screen.Locked -> Box(Modifier.padding(padding)) { LockScreen(vm) }
+                Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
                 Screen.Garage -> GarageScreen(state, vm)
-                Screen.Settings -> SettingsScreen(vm)
+                Screen.Settings -> Box(Modifier.padding(padding)) { SettingsScreen(vm) }
             }
         }
+    }
+        // Fade-to-black scrim over the status bar so content stays legible as it
+        // scrolls underneath.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(topInset + 22.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent),
+                    ),
+                ),
+        )
     }
     }
 
@@ -542,6 +571,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     if (vehicles.isEmpty()) return
     val appearance by vm.appearance.collectAsState()
 
+    // Slot-machine settle haptic when a refresh lands and the numbers roll.
+    val haptics = LocalHaptics.current
+    var wasRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(state.refreshing) {
+        if (wasRefreshing && !state.refreshing) haptics?.slotSettle()
+        wasRefreshing = state.refreshing
+    }
+
     val count = vehicles.size
     val cfg = LocalConfiguration.current
     val widthDp = cfg.screenWidthDp
@@ -557,7 +594,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.Settings,
                 description = "Settings",
                 onClick = { vm.openSettings() },
-                modifier = Modifier.align(Alignment.TopEnd),
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
             )
         }
         return
@@ -594,7 +631,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         ExpandedCar(vehicles[page], state, vm, flipped = appearance.columnsFlipped)
                     }
                     if (count > 1) {
-                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).padding(top = 10.dp))
+                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp))
                     }
                 }
             } else {
@@ -626,7 +663,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
-                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).padding(top = 10.dp))
+                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp))
                     }
                 }
             }
@@ -637,7 +674,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.ArrowBack,
                 description = "Back to all cars",
                 onClick = { vm.collapse() },
-                modifier = Modifier.align(Alignment.TopStart),
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
             )
         }
         if (expandedIdx != null) {
@@ -645,14 +682,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.SwapHoriz,
                 description = "Flip columns",
                 onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
-                modifier = Modifier.align(Alignment.TopEnd).padding(end = 52.dp),
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp),
             )
         }
         FloatingIcon(
             icon = Icons.Filled.Settings,
             description = "Settings",
             onClick = { vm.openSettings() },
-            modifier = Modifier.align(Alignment.TopEnd),
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
         )
     }
 }
@@ -1264,7 +1301,9 @@ private fun AnimatedSlider(
     val interaction = remember { MutableInteractionSource() }
     val dragging by interaction.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
+    val haptics = LocalHaptics.current
     var pos by remember { mutableFloatStateOf(value) }
+    var lastSnapped by remember { mutableFloatStateOf(value) }
     val settle = remember { Animatable(value) }
 
     // When idle, keep the thumb parked on the real (snapped) value.
@@ -1292,11 +1331,19 @@ private fun AnimatedSlider(
             value = if (dragging) pos else settle.value,
             onValueChange = {
                 pos = it
-                onValueChange(snapToStep(it, valueRange, steps))
+                val snapped = snapToStep(it, valueRange, steps)
+                // A crisp tick each time the finger crosses a step.
+                if (snapped != lastSnapped) {
+                    haptics?.tick()
+                    lastSnapped = snapped
+                }
+                onValueChange(snapped)
             },
             onValueChangeFinished = {
                 val target = snapToStep(pos, valueRange, steps)
+                lastSnapped = target
                 onValueChange(target)
+                haptics?.click()
                 scope.launch {
                     settle.snapTo(pos)
                     settle.animateTo(target, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium))
@@ -1328,17 +1375,22 @@ private fun VehicleDetailContent(
     onExpand: (() -> Unit)? = null,
     reserveHeaderEnd: Boolean = false,
 ) {
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Refreshable(v, state, vm) {
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Inset spacers (not padding) so content scrolls *behind* the bars.
+            Spacer(Modifier.height(topInset + 8.dp))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
             // summary (image+gauge) and controls are reorderable pebbles too.
             PebbleList(v, state, vm)
+            Spacer(Modifier.height(bottomInset + 16.dp))
         }
     }
 }
@@ -1367,9 +1419,14 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             },
             label = "flipColumns",
         ) { isFlipped ->
+            val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             Row(
                 // Top padding clears the floating back / flip / settings buttons.
-                Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 16.dp),
+                Modifier.fillMaxSize().padding(
+                    start = 16.dp, end = 16.dp,
+                    top = topInset + 56.dp, bottom = bottomInset + 16.dp,
+                ),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Column(
@@ -1460,10 +1517,15 @@ private fun Refreshable(
 ) {
     val ptrState = rememberPullToRefreshState()
     val density = LocalDensity.current
+    val haptics = LocalHaptics.current
     Box(
         Modifier
             .fillMaxSize()
-            .pullToRefresh(isRefreshing = state.refreshing, state = ptrState, onRefresh = { vm.refreshStatus(v) }),
+            .pullToRefresh(
+                isRefreshing = state.refreshing,
+                state = ptrState,
+                onRefresh = { haptics?.diceRoll(); vm.refreshStatus(v) },
+            ),
     ) {
         val maxShift = 72.dp
         val shift = if (state.refreshing) maxShift else (maxShift * ptrState.distanceFraction).coerceIn(0.dp, maxShift)
@@ -1678,7 +1740,8 @@ private fun StateControl(
                 fontWeight = if (stateColor != MaterialTheme.colorScheme.onSurfaceVariant) FontWeight.Bold else FontWeight.Normal,
             )
         }
-        val onClick = { if (isOn == true) onDeactivate() else onActivate() }
+        val haptics = LocalHaptics.current
+        val onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() }
         val container = if (highlighted) highlightColor else MaterialTheme.colorScheme.surfaceContainerHighest
         val contentColor = if (highlighted) highlightContentColor else MaterialTheme.colorScheme.onSurface
         Button(
@@ -1722,6 +1785,7 @@ private fun Pebble(
 ) {
     val forceExpanded = LocalForceExpanded.current
     val expanded = forceExpanded || state.isPebbleExpanded(v.vin, section)
+    val haptics = LocalHaptics.current
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
@@ -1751,7 +1815,13 @@ private fun Pebble(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .then(if (forceExpanded) Modifier else Modifier.clickable { vm.togglePebble(v, section) })
+                    .then(
+                        if (forceExpanded) Modifier
+                        else Modifier.clickable {
+                            if (expanded) haptics?.tick() else haptics?.click()
+                            vm.togglePebble(v, section)
+                        },
+                    )
                     .then(dragHandle)
                     .heightIn(min = PebbleHeaderHeight)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -1816,8 +1886,9 @@ private fun PebbleActionButton(
     container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
+    val haptics = LocalHaptics.current
     Button(
-        onClick = onClick,
+        onClick = { haptics?.heavy(); onClick() },
         enabled = enabled && !pending,
         shape = RoundedCornerShape(20.dp),
         colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
@@ -2719,6 +2790,18 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
+            // Sounds & vibration
+            SettingsCard("Sounds & vibration") {
+                ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
+                Text(
+                    "Crisp, distinct vibrations across the app — slider notches, a dice-roll on " +
+                        "pull-to-refresh, and a slot-machine settle when fresh data lands. Intensity " +
+                        "follows your system setting.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             // Links
             SettingsCard("Links") {
                 ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
@@ -3054,9 +3137,13 @@ private fun StepRow(label: String, value: String) {
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val haptics = LocalHaptics.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = { if (it) haptics?.toggleOn() else haptics?.toggleOff(); onChange(it) },
+        )
     }
 }
 
@@ -3088,8 +3175,9 @@ private fun CommandButton(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
+    val haptics = LocalHaptics.current
     Button(
-        onClick = onClick,
+        onClick = { haptics?.heavy(); onClick() },
         enabled = enabled,
         modifier = modifier.height(64.dp),
         contentPadding = PaddingValues(horizontal = 18.dp),

@@ -61,6 +61,7 @@ class SettingsStore(private val context: Context) {
         val LINKS_IN_APP = stringPreferencesKey("links_in_app")
         val UI_SCALE = stringPreferencesKey("ui_scale")
         val VIBRANCY = stringPreferencesKey("vibrancy")
+        val HAPTICS = stringPreferencesKey("haptics_enabled")
     }
 
     data class Appearance(
@@ -76,6 +77,8 @@ class SettingsStore(private val context: Context) {
         val uiScale: Float = 1f,
         /** Colour vibrancy multiplier (0.5–1.6, 1 = default). */
         val vibrancy: Float = 1f,
+        /** Haptic feedback across the UI. */
+        val hapticsEnabled: Boolean = true,
     )
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
@@ -90,7 +93,12 @@ class SettingsStore(private val context: Context) {
             linksInApp = prefs[Keys.LINKS_IN_APP]?.toBooleanStrictOrNull() ?: true,
             uiScale = prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f,
             vibrancy = prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f,
+            hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
         )
+    }
+
+    suspend fun setHapticsEnabled(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.HAPTICS] = value.toString() }
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {

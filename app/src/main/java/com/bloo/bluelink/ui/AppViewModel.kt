@@ -739,6 +739,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
     fun setUiScale(value: Float) = viewModelScope.launch { settingsStore.setUiScale(value) }
     fun setVibrancy(value: Float) = viewModelScope.launch { settingsStore.setVibrancy(value) }
+    fun setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
     fun clearLogs() = AppLog.clear()
     fun clearMessage() = _state.update { it.copy(message = null) }
