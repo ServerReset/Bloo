@@ -851,20 +851,20 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
             val i = ((page % tiles.size) + tiles.size) % tiles.size
-            // Pebbles inside cover-screen tiles are always open (no collapsing).
-            CompositionLocalProvider(LocalForceExpanded provides true) {
+            // Cover-screen tiles are always open (no collapsing) and fill the
+            // screen height (scrolling internally only if taller).
+            CompositionLocalProvider(
+                LocalForceExpanded provides true,
+                LocalPebbleFillHeight provides true,
+            ) {
                 Box(Modifier.fillMaxSize().padding(10.dp)) {
                     when (val tile = tiles[i]) {
                         "main" -> CompactMainTile(v, state, vm)
-                        else -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                            when (tile) {
-                                "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
-                                "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
-                                "location" -> LocationPebble(v, state, vm, Modifier)
-                                "info" -> InfoPebble(v, status, state, vm, Modifier)
-                                "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
-                            }
-                        }
+                        "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
+                        "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
+                        "location" -> LocationPebble(v, state, vm, Modifier)
+                        "info" -> InfoPebble(v, status, state, vm, Modifier)
+                        "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
                     }
                 }
             }
@@ -879,9 +879,10 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
         ) {
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 2.dp,
-                modifier = Modifier.padding(14.dp),
+                modifier = Modifier.statusBarsPadding().padding(14.dp),
             ) {
                 Text(
                     v.name,
@@ -1214,6 +1215,12 @@ private const val SoftDamping = 0.82f
 private val LocalForceExpanded = staticCompositionLocalOf { false }
 
 /**
+ * When true (cover-screen tiles), a pebble stretches to fill the available height
+ * and scrolls internally if its content is taller — so each tile fills the screen.
+ */
+private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
+
+/**
  * A slot-machine number. When the value changes it spins its digits — fast at
  * first, decelerating to a stop — with a RenderEffect motion blur (a no-op below
  * API 31) that fades out as it settles. Non-numeric text just snaps.
@@ -1530,24 +1537,24 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         ) { isFlipped ->
             val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val leftCol = if (isFlipped) pebbles else controls
+            val rightCol = if (isFlipped) controls else pebbles
+            // Inset spacers (not padding) so content scrolls *behind* the bars;
+            // the leading spacer also clears the floating overlay buttons.
+            val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + 52.dp)) }
+            val trail: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(bottomInset + 16.dp)) }
             Row(
-                // Top padding clears the floating back / flip / settings buttons.
-                Modifier.fillMaxSize().padding(
-                    start = 16.dp, end = 16.dp,
-                    top = topInset + 56.dp, bottom = bottomInset + 16.dp,
-                ),
+                Modifier.fillMaxSize().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Column(
                     Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    content = if (isFlipped) pebbles else controls,
-                )
+                ) { lead(); leftCol(); trail() }
                 Column(
                     Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    content = if (isFlipped) controls else pebbles,
-                )
+                ) { lead(); rightCol(); trail() }
             }
         }
     }
@@ -1572,16 +1579,31 @@ private fun sectionLabel(section: String): String = when (section) {
 @Composable
 private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppViewModel) {
     if (hotspot != null) {
-        Box(Modifier.fillMaxWidth()) {
+        // A small header row (not an overlay) so the Unpin control never covers
+        // the pinned pebble's own header/actions.
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.PushPin,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Pinned here",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { vm.setHotspot(v, null) }) { Text("Unpin") }
+            }
             // Forced-open + no drag handle: the hot spot pebble can't be collapsed.
             CompositionLocalProvider(LocalForceExpanded provides true) {
                 SinglePebble(hotspot, v, state, vm, Modifier)
-            }
-            IconButton(
-                onClick = { vm.setHotspot(v, null) },
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-            ) {
-                Icon(Icons.Filled.Close, contentDescription = "Unpin from hot spot")
             }
         }
     } else {
@@ -1986,17 +2008,20 @@ private fun Pebble(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "pebbleCorner",
     )
+    val fillHeight = LocalPebbleFillHeight.current
     Card(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier),
         shape = RoundedCornerShape(corner),
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         // animateContentSize gives a smooth, correctly-measured collapse (no
-        // post-animation size jump) for both fixed- and variable-height bodies.
+        // post-animation size jump). Cover-screen tiles fill instead.
         Column(
-            Modifier.animateContentSize(
-                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-            ),
+            if (fillHeight) {
+                Modifier.fillMaxHeight()
+            } else {
+                Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
+            },
         ) {
             // Header: tap anywhere to toggle, long-press to drag-reorder. The
             // action button and chevron handle their own clicks. Fixed min height
@@ -2046,8 +2071,13 @@ private fun Pebble(
                 }
             }
             if (expanded) {
+                val bodyMod = if (fillHeight) {
+                    Modifier.weight(1f).verticalScroll(rememberScrollState())
+                } else {
+                    Modifier
+                }
                 Column(
-                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                    bodyMod.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     content = content,
                 )
