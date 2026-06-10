@@ -58,6 +58,8 @@ data class UiState(
     /** On large screens, the index expanded to full screen (null = grid view). */
     val expandedIndex: Int? = null,
     val statuses: Map<String, VehicleStatus> = emptyMap(),
+    /** Wall-clock millis the app last pulled status from the server, keyed by VIN. */
+    val lastFetched: Map<String, Long> = emptyMap(),
     val locations: Map<String, GeoLocation> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
@@ -82,6 +84,8 @@ data class UiState(
     val message: String? = null,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
+
+    fun fetchedAt(v: Vehicle): Long? = lastFetched[v.vin]
 
     fun isPending(vin: String, action: String): Boolean = "$vin:$action" in pending
 
@@ -380,7 +384,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 statusMutex.withLock {
                     repoFor(v).status(v, refresh = refresh)?.let { s ->
-                        _state.update { st -> st.copy(statuses = st.statuses + (v.vin to s)) }
+                        _state.update { st ->
+                            st.copy(
+                                statuses = st.statuses + (v.vin to s),
+                                lastFetched = st.lastFetched + (v.vin to System.currentTimeMillis()),
+                            )
+                        }
                         persistSnapshots()
                         checkAlerts(v, s)
                     }

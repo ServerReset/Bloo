@@ -30,7 +30,9 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EnterExitState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -139,21 +141,25 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -174,6 +180,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -194,6 +201,7 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -645,20 +653,90 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             !state.isPebbleHidden(v.vin, it)
     }
     val tiles = listOf("main") + sections
-    val vPager = rememberPagerState { tiles.size }
-    VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { i ->
-        Box(Modifier.fillMaxSize().padding(10.dp)) {
-            when (val tile = tiles[i]) {
-                "main" -> CompactMainTile(v, state, vm)
-                else -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                    when (tile) {
-                        "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
-                        "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
-                        "location" -> LocationPebble(v, state, vm, Modifier)
-                        "info" -> InfoPebble(v, status, state, vm, Modifier)
-                        "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
+    // Infinite wrap-around: start in the middle of a huge virtual range and map
+    // each virtual page back onto a real tile with modulo.
+    val loop = tiles.size > 1
+    val virtualCount = if (loop) tiles.size * 1000 else tiles.size
+    val start = if (loop) virtualCount / 2 else 0
+    val vPager = rememberPagerState(initialPage = start) { virtualCount }
+    val current = ((vPager.currentPage % tiles.size) + tiles.size) % tiles.size
+
+    Box(Modifier.fillMaxSize()) {
+        VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
+            val i = ((page % tiles.size) + tiles.size) % tiles.size
+            // Pebbles inside cover-screen tiles are always open (no collapsing).
+            CompositionLocalProvider(LocalForceExpanded provides true) {
+                Box(Modifier.fillMaxSize().padding(10.dp)) {
+                    when (val tile = tiles[i]) {
+                        "main" -> CompactMainTile(v, state, vm)
+                        else -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            when (tile) {
+                                "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
+                                "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
+                                "location" -> LocationPebble(v, state, vm, Modifier)
+                                "info" -> InfoPebble(v, status, state, vm, Modifier)
+                                "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
+                            }
+                        }
                     }
                 }
+            }
+        }
+        // Car-name chip, top-left, on every tile except the main one (which shows
+        // the name itself).
+        androidx.compose.animation.AnimatedVisibility(
+            visible = current != 0,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.85f),
+                shadowElevation = 2.dp,
+                modifier = Modifier.padding(14.dp),
+            ) {
+                Text(
+                    v.name,
+                    Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        // Vertical page dots on the right edge.
+        if (tiles.size > 1) {
+            VerticalPagerDots(
+                current = current,
+                count = tiles.size,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp),
+            )
+        }
+    }
+}
+
+/** Vertical sibling of [PagerDots] for the cover-screen tile stack. */
+@Composable
+private fun VerticalPagerDots(current: Int, count: Int, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
+        shadowElevation = 2.dp,
+    ) {
+        Column(
+            Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            repeat(count) { i ->
+                val selected = i == current
+                val h by animateDpAsState(if (selected) 20.dp else 7.dp, label = "vdotH")
+                val color by androidx.compose.animation.animateColorAsState(
+                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    label = "vdotC",
+                )
+                Box(Modifier.width(7.dp).height(h).clip(CircleShape).background(color))
             }
         }
     }
@@ -691,6 +769,7 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                 }
             }
+            LastUpdatedLabel(v, state)
             ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
             Spacer(Modifier.weight(1f))
             PrimaryActions(v, state, vm)
@@ -827,20 +906,11 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
             // Roll the headline number when it changes.
-            AnimatedContent(
-                targetState = pct,
-                transitionSpec = {
-                    (fadeIn() + slideInVertically { it / 2 }) togetherWith
-                        (fadeOut() + slideOutVertically { -it / 2 })
-                },
-                label = "pctRoll",
-            ) { p ->
-                Text(
-                    p?.let { "$it%" } ?: "—",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            RollingNumber(
+                text = pct?.let { "$it%" } ?: "—",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+            )
             Spacer(Modifier.weight(1f))
             // Driving / parked badge sits between the percentage and the range.
             drivingLabel?.let {
@@ -848,8 +918,8 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 Spacer(Modifier.width(12.dp))
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    range?.let { "${it.toInt()} mi" } ?: "—",
+                RollingNumber(
+                    text = range?.let { "${it.toInt()} mi" } ?: "—",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -962,6 +1032,80 @@ private val ChargeGreenDark = Color(0xFF1B8A41)
 
 /** Gentle spring damping — present, but not an aggressive overshoot (0.82). */
 private const val SoftDamping = 0.82f
+
+/**
+ * When true (cover-screen tiles), pebbles render permanently open with no
+ * collapse chevron or drag handle — collapsing a full-screen tile makes no sense.
+ */
+private val LocalForceExpanded = staticCompositionLocalOf { false }
+
+/**
+ * A number that rolls vertically when it changes, with a light directional
+ * "motion blur" while the glyphs are in motion. The blur is RenderEffect-backed
+ * (a no-op below API 31), so it costs nothing on the steady state.
+ */
+@Composable
+private fun RollingNumber(
+    text: String,
+    style: TextStyle,
+    fontWeight: FontWeight,
+    color: Color = Color.Unspecified,
+) {
+    AnimatedContent(
+        targetState = text,
+        transitionSpec = {
+            (slideInVertically { it / 2 } + fadeIn()) togetherWith
+                (slideOutVertically { -it / 2 } + fadeOut())
+        },
+        label = "roll",
+    ) { t ->
+        val blur by transition.animateDp(
+            transitionSpec = { spring(stiffness = Spring.StiffnessMediumLow) },
+            label = "rollBlur",
+        ) { st -> if (st == EnterExitState.Visible) 0.dp else 7.dp }
+        Text(t, modifier = Modifier.blur(blur), style = style, fontWeight = fontWeight, color = color)
+    }
+}
+
+/** A coarse, self-ticking "x min ago" string for [millis] (null → null). */
+@Composable
+private fun rememberRelativeTime(millis: Long?): String? {
+    if (millis == null) return null
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(millis) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(30_000)
+        }
+    }
+    val diff = (now - millis).coerceAtLeast(0L)
+    return when {
+        diff < 60_000L -> "just now"
+        diff < 3_600_000L -> "${diff / 60_000L} min ago"
+        diff < 86_400_000L -> "${diff / 3_600_000L} hr ago"
+        else -> "${diff / 86_400_000L} d ago"
+    }
+}
+
+/** Small "Updated x ago" caption shown prominently under the car name. */
+@Composable
+private fun LastUpdatedLabel(v: Vehicle, state: UiState, modifier: Modifier = Modifier) {
+    val rel = rememberRelativeTime(state.fetchedAt(v)) ?: return
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Filled.Refresh,
+            contentDescription = null,
+            modifier = Modifier.size(12.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            "Updated $rel",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 // --- Drag-and-drop reordering --------------------------------------------
 
@@ -1199,6 +1343,7 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            LastUpdatedLabel(v, state, Modifier.padding(top = 2.dp))
         }
         if (onExpand != null) {
             IconButton(onClick = onExpand) {
@@ -1410,7 +1555,8 @@ private fun Pebble(
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val expanded = state.isPebbleExpanded(v.vin, section)
+    val forceExpanded = LocalForceExpanded.current
+    val expanded = forceExpanded || state.isPebbleExpanded(v.vin, section)
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
@@ -1426,7 +1572,7 @@ private fun Pebble(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { vm.togglePebble(v, section) }
+                    .then(if (forceExpanded) Modifier else Modifier.clickable { vm.togglePebble(v, section) })
                     .then(dragHandle),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1447,18 +1593,21 @@ private fun Pebble(
                         )
                     }
                 }
-                Icon(
-                    Icons.Filled.DragHandle,
-                    contentDescription = "Drag to reorder",
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    modifier = Modifier.rotate(rotation),
-                )
+                // On cover-screen tiles there's no reordering or collapsing.
+                if (!forceExpanded) {
+                    Icon(
+                        Icons.Filled.DragHandle,
+                        contentDescription = "Drag to reorder",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        modifier = Modifier.rotate(rotation),
+                    )
+                }
             }
             AnimatedVisibility(
                 visible = expanded,
@@ -1530,7 +1679,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 if (status.defrost == true) StatusRow("Defrost", "On")
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
                 location?.let { StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude)) }
-                status.dateTime?.let { StatusRow("Last refreshed", it) }
+                rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
 
                 if (plugged) {
                     SectionLabel("Charging")
@@ -1803,7 +1952,8 @@ private fun SeatControl(
  */
 @Composable
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val expanded = state.isPebbleExpanded(v.vin, "charge")
+    val forceExpanded = LocalForceExpanded.current
+    val expanded = forceExpanded || state.isPebbleExpanded(v.vin, "charge")
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
@@ -1825,12 +1975,14 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.weight(1f)) { ChargeControl(v, status, state, vm) }
-                IconButton(onClick = { vm.togglePebble(v, "charge") }) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
-                        modifier = Modifier.rotate(rotation),
-                    )
+                if (!forceExpanded) {
+                    IconButton(onClick = { vm.togglePebble(v, "charge") }) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (expanded) "Collapse" else "Expand",
+                            modifier = Modifier.rotate(rotation),
+                        )
+                    }
                 }
             }
             AnimatedVisibility(
