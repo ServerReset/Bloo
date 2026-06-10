@@ -70,6 +70,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     // Chrome Custom Tabs for opening Hyundai/Genesis links in-app
     implementation("androidx.browser:browser:1.8.0")
     // Background service/door alerts

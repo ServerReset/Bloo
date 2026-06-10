@@ -511,7 +511,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val large = widthDp >= 600
     // Very small screens (e.g. flip-phone cover): tile layout, one section at a
     // time, swipe up/down between them; swipe left/right between cars.
-    val compact = !large && heightDp < 480
+    val compact = !large && heightDp < 520
     if (compact) {
         Box(Modifier.fillMaxSize()) {
             CompactGarage(state, vm)
@@ -627,7 +627,11 @@ private fun CompactGarage(state: UiState, vm: AppViewModel) {
 @Composable
 private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    val sections = state.sectionsFor(v).filter { it != "charge" || state.hasBattery(v) }
+    val sections = state.sectionsFor(v).filter {
+        it !in listOf("summary", "controls") &&
+            (it != "charge" || state.hasBattery(v)) &&
+            !state.isPebbleHidden(v.vin, it)
+    }
     val tiles = listOf("main") + sections
     val vPager = rememberPagerState { tiles.size }
     VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { i ->
@@ -741,6 +745,7 @@ private fun HeroHeader(
     hasBattery: Boolean,
     hasFuel: Boolean,
     drivingLabel: String? = null,
+    dragHandle: Modifier = Modifier,
     height: Dp = 150.dp,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
@@ -752,7 +757,7 @@ private fun HeroHeader(
         ),
         label = "heroCorner",
     )
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(corner)) {
+    Card(modifier = Modifier.fillMaxWidth().then(dragHandle), shape = RoundedCornerShape(corner)) {
         Column(Modifier.padding(16.dp)) {
             HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(16.dp))
@@ -1068,7 +1073,7 @@ private fun VehicleDetailContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
-            CriticalContent(v, state, vm)
+            // summary (image+gauge) and controls are reorderable pebbles too.
             PebbleList(v, state, vm)
         }
     }
@@ -1082,7 +1087,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         CriticalContent(v, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
-        PebbleList(v, state, vm)
+        PebbleList(v, state, vm, exclude = setOf("summary", "controls"))
     }
     Refreshable(v, state, vm) {
         // Animate the swap when the columns are flipped.
@@ -1185,7 +1190,7 @@ private fun DrivingBadge(label: String) {
     }
 }
 
-/** Hero image + gauge, then the primary lock/charge controls. */
+/** Hero image + gauge, then the primary lock/charge controls (expanded view). */
 @Composable
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
@@ -1193,19 +1198,36 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     PrimaryActions(v, state, vm)
 }
 
+/** Non-collapsible card holding the lock/charge controls (a reorderable pebble). */
+@Composable
+private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    Card(Modifier.fillMaxWidth().then(dragHandle)) {
+        Column(Modifier.padding(16.dp)) { PrimaryActions(v, state, vm) }
+    }
+}
+
 /** The reorderable pebble stack for a car. */
 @Composable
-private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel) {
+private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Set<String> = emptySet()) {
     val status = state.statusFor(v)
     val seats = state.seatConfigFor(v)
     val enabled = !state.loading
-    val sections = state.sectionsFor(v).filter { it != "charge" || state.hasBattery(v) }
+    val sections = state.sectionsFor(v).filter {
+        it !in exclude &&
+            (it != "charge" || state.hasBattery(v)) &&
+            !state.isPebbleHidden(v.vin, it)
+    }
     ReorderColumn(
         items = sections,
         keyOf = { it },
         onReorder = { vm.setSectionOrder(v, it) },
     ) { section, dragHandle, _ ->
         when (section) {
+            "summary" -> HeroHeader(
+                v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
+                state.drivingLabel(v), dragHandle = dragHandle,
+            )
+            "controls" -> ControlsPebble(v, state, vm, dragHandle)
             "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
             "charge" -> ChargePebble(v, status, enabled, state, vm, dragHandle)
             "location" -> LocationPebble(v, state, vm, dragHandle)
@@ -1559,7 +1581,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
     }
     Pebble(
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         if (rows.isEmpty()) {
             Text("No diagnostics yet. Pull down to refresh.")
@@ -1755,8 +1777,9 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             vm.setChargeLimits(v, ac, dc)
         }
         val rt = status?.evStatus?.remainTime2
-        rt?.etc1?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on AC", fmtMinutes(it)) }
-        rt?.etc3?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on DC", fmtMinutes(it)) }
+        // etc3 is the AC (slower) estimate, etc1 the DC fast estimate.
+        rt?.etc1?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on DC", fmtMinutes(it)) }
+        rt?.etc3?.value?.toInt()?.takeIf { it > 0 }?.let { StatusRow("Est. full on AC", fmtMinutes(it)) }
     }
 }
 
@@ -1906,7 +1929,25 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
                 var sample = 1
                 while (bounds.outWidth / sample > 2200 || bounds.outHeight / sample > 2200) sample *= 2
                 val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                val raw = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                    ?: return@runCatching null
+                // Apply the photo's EXIF orientation (camera photos are often rotated).
+                val orientation = context.contentResolver.openInputStream(uri)?.use {
+                    androidx.exifinterface.media.ExifInterface(it).getAttributeInt(
+                        androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                        androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL,
+                    )
+                } ?: androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+                val m = android.graphics.Matrix()
+                when (orientation) {
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> m.postRotate(90f)
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> m.postRotate(180f)
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> m.postRotate(270f)
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> m.postScale(-1f, 1f)
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> m.postScale(1f, -1f)
+                }
+                if (m.isIdentity) raw
+                else Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true)
             }.getOrNull()
         }
         if (bmp == null) failed = true
@@ -2401,6 +2442,20 @@ private fun CarSettingsCard(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                         )
+                    }
+
+                    Text("Sections shown", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    val labels = mapOf(
+                        "climate" to "Climate",
+                        "charge" to "Charge limits",
+                        "location" to "Location",
+                        "info" to "Car info",
+                        "diagnostics" to "Diagnostics",
+                    )
+                    com.bloo.bluelink.data.HIDEABLE_SECTIONS.forEach { sec ->
+                        ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
+                            vm.setSectionHidden(v, sec, !show)
+                        }
                     }
                 }
             }

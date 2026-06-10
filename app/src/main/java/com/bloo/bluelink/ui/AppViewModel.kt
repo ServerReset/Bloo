@@ -71,6 +71,8 @@ data class UiState(
     val pending: Set<String> = emptySet(),
     /** Collapsed pebbles, keyed "vin:section". Absent = expanded. */
     val collapsedPebbles: Set<String> = emptySet(),
+    /** Hidden pebbles, keyed "vin:section". */
+    val hiddenPebbles: Set<String> = emptySet(),
     /** Show the first-run "configure your car" prompt. */
     val showOnboarding: Boolean = false,
     /** All signed-in accounts (one per brand). */
@@ -84,6 +86,8 @@ data class UiState(
     fun isPending(vin: String, action: String): Boolean = "$vin:$action" in pending
 
     fun isPebbleExpanded(vin: String, section: String): Boolean = "$vin:$section" !in collapsedPebbles
+
+    fun isPebbleHidden(vin: String, section: String): Boolean = "$vin:$section" in hiddenPebbles
 
     fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
 
@@ -293,6 +297,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin) }.filterValues { it.isNotBlank() }
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
+        val collapsed = vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
+        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val showOnboarding = !settingsStore.onboardingSeen()
@@ -306,6 +312,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 licensePlates = plates,
                 lastServiceMiles = lastSvc,
                 serviceIntervalMiles = svcInterval,
+                collapsedPebbles = collapsed,
+                hiddenPebbles = hidden,
                 currentIndex = index,
                 screen = Screen.Garage,
                 showOnboarding = showOnboarding,
@@ -512,15 +520,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setSeatFlag(v.vin, field, value) }
     }
 
-    /** Toggle a pebble (detail section) open/closed for a car. */
+    /** Toggle a pebble (detail section) open/closed for a car (persisted). */
     fun togglePebble(v: Vehicle, section: String) {
         val key = "${v.vin}:$section"
+        val collapsedNow = key !in _state.value.collapsedPebbles
         _state.update {
             it.copy(
-                collapsedPebbles = if (key in it.collapsedPebbles) it.collapsedPebbles - key
-                else it.collapsedPebbles + key,
+                collapsedPebbles = if (collapsedNow) it.collapsedPebbles + key else it.collapsedPebbles - key,
             )
         }
+        viewModelScope.launch { settingsStore.setSectionCollapsed(v.vin, section, collapsedNow) }
+    }
+
+    /** Show/hide a non-essential pebble for a car (persisted). */
+    fun setSectionHidden(v: Vehicle, section: String, hidden: Boolean) {
+        val key = "${v.vin}:$section"
+        _state.update {
+            it.copy(hiddenPebbles = if (hidden) it.hiddenPebbles + key else it.hiddenPebbles - key)
+        }
+        viewModelScope.launch { settingsStore.setSectionHidden(v.vin, section, hidden) }
     }
 
     fun dismissOnboarding(openSettings: Boolean) {

@@ -42,7 +42,10 @@ data class SeatConfig(
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
 /** Reorderable detail sections (pebbles), in their default order. */
-val DEFAULT_SECTIONS = listOf("climate", "charge", "location", "info", "diagnostics")
+val DEFAULT_SECTIONS = listOf("summary", "controls", "climate", "charge", "location", "info", "diagnostics")
+
+/** Pebbles the user may hide (the others are essential). */
+val HIDEABLE_SECTIONS = listOf("climate", "charge", "location", "info", "diagnostics")
 
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
@@ -248,12 +251,39 @@ class SettingsStore(private val context: Context) {
         val saved = context.settingsDataStore.data.first()[stringPreferencesKey("sections_$vin")]
             ?.split(",")?.filter { it.isNotBlank() }
         val valid = saved?.filter { it in DEFAULT_SECTIONS } ?: emptyList()
-        // Keep any defaults that aren't in the saved list (e.g. newly added sections).
-        return (valid + DEFAULT_SECTIONS.filter { it !in valid })
+        // Add any newly-introduced sections: summary/controls lead, the rest trail.
+        val missing = DEFAULT_SECTIONS.filter { it !in valid }
+        val (lead, trail) = missing.partition { it == "summary" || it == "controls" }
+        return lead + valid + trail
     }
 
     suspend fun setSectionOrder(vin: String, order: List<String>) {
         context.settingsDataStore.edit { it[stringPreferencesKey("sections_$vin")] = order.joinToString(",") }
+    }
+
+    private fun csv(p: androidx.datastore.preferences.core.Preferences, key: String): Set<String> =
+        p[stringPreferencesKey(key)]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
+    suspend fun collapsedSections(vin: String): Set<String> =
+        csv(context.settingsDataStore.data.first(), "collapsed_$vin")
+
+    suspend fun setSectionCollapsed(vin: String, section: String, collapsed: Boolean) {
+        context.settingsDataStore.edit {
+            val set = csv(it, "collapsed_$vin").toMutableSet()
+            if (collapsed) set.add(section) else set.remove(section)
+            it[stringPreferencesKey("collapsed_$vin")] = set.joinToString(",")
+        }
+    }
+
+    suspend fun hiddenSections(vin: String): Set<String> =
+        csv(context.settingsDataStore.data.first(), "hidden_$vin")
+
+    suspend fun setSectionHidden(vin: String, section: String, hidden: Boolean) {
+        context.settingsDataStore.edit {
+            val set = csv(it, "hidden_$vin").toMutableSet()
+            if (hidden) set.add(section) else set.remove(section)
+            it[stringPreferencesKey("hidden_$vin")] = set.joinToString(",")
+        }
     }
 
     // --- Per-car powertrain override -------------------------------------
