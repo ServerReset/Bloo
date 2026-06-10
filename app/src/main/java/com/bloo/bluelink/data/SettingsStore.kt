@@ -302,6 +302,18 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
+
+    suspend fun hotspot(vin: String): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("hotspot_$vin")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setHotspot(vin: String, section: String?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("hotspot_$vin")
+            if (section.isNullOrBlank()) it.remove(key) else it[key] = section
+        }
+    }
+
     // --- Per-car powertrain override -------------------------------------
 
     suspend fun powertrain(vin: String): Powertrain? =

@@ -86,8 +86,10 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
@@ -112,6 +114,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -1341,12 +1346,15 @@ private fun VehicleDetailContent(
 /** Wide expanded view: critical info in one column, pebbles in the other. */
 @Composable
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
+    val hotspot = state.hotspotFor(v.vin)
+        ?.takeIf { it in state.sectionsFor(v) && !state.isPebbleHidden(v.vin, it) }
     val controls: @Composable ColumnScope.() -> Unit = {
         CarHeaderRow(v, state, onExpand = null, reserveEnd = false)
         CriticalContent(v, state, vm)
+        HotspotSlot(v, hotspot, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
-        PebbleList(v, state, vm, exclude = setOf("summary", "controls"))
+        PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
     }
     Refreshable(v, state, vm) {
         // Animate the swap when the columns are flipped.
@@ -1374,6 +1382,69 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     content = if (isFlipped) controls else pebbles,
                 )
+            }
+        }
+    }
+}
+
+/** A friendly label for a pebble/section id. */
+private fun sectionLabel(section: String): String = when (section) {
+    "charge" -> "Charge / fuel"
+    "climate" -> "Climate"
+    "location" -> "Location"
+    "info" -> "Car info"
+    "diagnostics" -> "Diagnostics"
+    "controls" -> "Lock / unlock"
+    else -> section.replaceFirstChar { it.uppercase() }
+}
+
+/**
+ * The dual-column "hot spot": a fixed slot under the car-info column. When a
+ * pebble is pinned here it renders non-collapsible (always open); otherwise it's
+ * a chooser to pin one. Pinning moves the pebble out of the scrolling list.
+ */
+@Composable
+private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppViewModel) {
+    if (hotspot != null) {
+        Box(Modifier.fillMaxWidth()) {
+            // Forced-open + no drag handle: the hot spot pebble can't be collapsed.
+            CompositionLocalProvider(LocalForceExpanded provides true) {
+                SinglePebble(hotspot, v, state, vm, Modifier)
+            }
+            IconButton(
+                onClick = { vm.setHotspot(v, null) },
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "Unpin from hot spot")
+            }
+        }
+    } else {
+        var menu by remember { mutableStateOf(false) }
+        val options = state.sectionsFor(v).filter {
+            it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it)
+        }
+        Box {
+            OutlinedCard(onClick = { menu = true }, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.PushPin, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Pin a pebble here",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                options.forEach { sec ->
+                    DropdownMenuItem(
+                        text = { Text(sectionLabel(sec)) },
+                        onClick = { vm.setHotspot(v, sec); menu = false },
+                    )
+                }
             }
         }
     }
@@ -1474,9 +1545,6 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 /** The reorderable pebble stack for a car. */
 @Composable
 private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Set<String> = emptySet()) {
-    val status = state.statusFor(v)
-    val seats = state.seatConfigFor(v)
-    val enabled = !state.loading
     val sections = state.sectionsFor(v).filter {
         it !in exclude && !state.isPebbleHidden(v.vin, it)
     }
@@ -1485,25 +1553,34 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
         keyOf = { it },
         onReorder = { vm.setSectionOrder(v, it) },
     ) { section, dragHandle, _ ->
-        when (section) {
-            "summary" -> HeroHeader(
-                v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
-                state.drivingLabel(v), dragHandle = dragHandle,
-            )
-            "controls" -> ControlsPebble(v, state, vm, dragHandle)
-            "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
-            // The "charge" slot is the powertrain's energy pebble: charging for an
-            // EV/PHEV, a fuel readout for a gas/hybrid car (no charge UI at all).
-            "charge" -> if (state.hasBattery(v)) {
-                ChargePebble(v, status, enabled, state, vm, dragHandle)
-            } else {
-                FuelPebble(v, status, state, vm, dragHandle)
-            }
-            "location" -> LocationPebble(v, state, vm, dragHandle)
-            "info" -> InfoPebble(v, status, state, vm, dragHandle)
-            "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
-            else -> Spacer(Modifier.fillMaxWidth())
+        SinglePebble(section, v, state, vm, dragHandle)
+    }
+}
+
+/** Renders one pebble by section name (used by the list and the hot spot). */
+@Composable
+private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val status = state.statusFor(v)
+    val seats = state.seatConfigFor(v)
+    val enabled = !state.loading
+    when (section) {
+        "summary" -> HeroHeader(
+            v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
+            state.drivingLabel(v), dragHandle = dragHandle,
+        )
+        "controls" -> ControlsPebble(v, state, vm, dragHandle)
+        "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
+        // The "charge" slot is the powertrain's energy pebble: charging for an
+        // EV/PHEV, a fuel readout for a gas/hybrid car (no charge UI at all).
+        "charge" -> if (state.hasBattery(v)) {
+            ChargePebble(v, status, enabled, state, vm, dragHandle)
+        } else {
+            FuelPebble(v, status, state, vm, dragHandle)
         }
+        "location" -> LocationPebble(v, state, vm, dragHandle)
+        "info" -> InfoPebble(v, status, state, vm, dragHandle)
+        "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
+        else -> Spacer(Modifier.fillMaxWidth())
     }
 }
 

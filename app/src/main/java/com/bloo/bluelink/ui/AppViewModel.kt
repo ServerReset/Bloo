@@ -76,6 +76,8 @@ data class UiState(
     val collapsedPebbles: Set<String> = emptySet(),
     /** Hidden pebbles, keyed "vin:section". */
     val hiddenPebbles: Set<String> = emptySet(),
+    /** Per-VIN pebble pinned to the dual-column "hot spot" (under car info). */
+    val hotspotSections: Map<String, String> = emptyMap(),
     /** Show the first-run "configure your car" prompt. */
     val showOnboarding: Boolean = false,
     /** All signed-in accounts (one per brand). */
@@ -93,6 +95,8 @@ data class UiState(
     fun isPebbleExpanded(vin: String, section: String): Boolean = "$vin:$section" !in collapsedPebbles
 
     fun isPebbleHidden(vin: String, section: String): Boolean = "$vin:$section" in hiddenPebbles
+
+    fun hotspotFor(vin: String): String? = hotspotSections[vin]
 
     fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
 
@@ -331,6 +335,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
         val collapsed = vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
+        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val showOnboarding = !settingsStore.onboardingSeen()
@@ -346,6 +351,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 serviceIntervalMiles = svcInterval,
                 collapsedPebbles = collapsed,
                 hiddenPebbles = hidden,
+                hotspotSections = hotspots,
                 currentIndex = index,
                 screen = Screen.Garage,
                 showOnboarding = showOnboarding,
@@ -588,6 +594,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
+    }
+
+    /** Pin (or clear, with null) a pebble to the dual-column hot spot. */
+    fun setHotspot(v: Vehicle, section: String?) {
+        _state.update {
+            val m = it.hotspotSections.toMutableMap()
+            if (section == null) m.remove(v.vin) else m[v.vin] = section
+            it.copy(hotspotSections = m)
+        }
+        viewModelScope.launch { settingsStore.setHotspot(v.vin, section) }
     }
 
     /** Persist a new pebble order for a car (drag-and-drop on the card). */
