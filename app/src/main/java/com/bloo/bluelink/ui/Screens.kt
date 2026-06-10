@@ -37,14 +37,12 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -76,9 +74,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -115,20 +110,16 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -144,8 +135,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
-import androidx.compose.material3.SplitButtonDefaults
-import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -181,21 +170,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onPlaced
@@ -242,10 +228,12 @@ fun BlooApp(vm: AppViewModel) {
     haptics.enabled = appearance.hapticsEnabled
 
     // While a command is in flight (or the garage is loading), loop a soft
-    // left-to-right sweep so progress is felt until it completes.
+    // left-to-right sweep so progress is felt until it completes. The effect is
+    // keyed on `busy`, so it cancels as soon as work finishes.
     val busy = state.loading || state.pending.isNotEmpty()
     LaunchedEffect(busy) {
-        while (busy) {
+        if (!busy) return@LaunchedEffect
+        while (true) {
             haptics.loadingSweep()
             delay(560)
         }
@@ -2634,16 +2622,12 @@ private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
     val url = "https://staticmap.openstreetmap.de/staticmap.php" +
         "?center=$lat,$lon&zoom=15&size=640x360&maptype=mapnik&markers=$lat,$lon,red-pushpin"
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+        // The static map already renders a red pin at the marker coordinates.
         AsyncImage(
             model = url,
             contentDescription = "Map",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
-        )
-        Icon(
-            Icons.Filled.LocationOn,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.0f),
         )
     }
 }
@@ -3014,7 +2998,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
                 Spacer(Modifier.height(8.dp))
                 StepRow("Vibrancy", "${(appearance.vibrancy * 100).roundToInt()}%")
-                Slider(
+                AnimatedSlider(
                     value = appearance.vibrancy,
                     onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
                     valueRange = 0.5f..1.6f,
@@ -3024,7 +3008,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Display scale
             SettingsCard("Display") {
                 StepRow("Text & layout scale", "${(appearance.uiScale * 100).roundToInt()}%")
-                Slider(
+                AnimatedSlider(
                     value = appearance.uiScale,
                     onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
                     valueRange = 0.85f..1.3f,
@@ -3402,7 +3386,7 @@ private fun SettingsSearchResults(
     }
     add("Text & layout scale", "display size zoom bigger") {
         StepRow("Scale", "${(appearance.uiScale * 100).roundToInt()}%")
-        Slider(
+        AnimatedSlider(
             value = appearance.uiScale,
             onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
             valueRange = 0.85f..1.3f,
@@ -3410,7 +3394,7 @@ private fun SettingsSearchResults(
     }
     add("Colour vibrancy", "color saturation vivid material you") {
         StepRow("Vibrancy", "${(appearance.vibrancy * 100).roundToInt()}%")
-        Slider(
+        AnimatedSlider(
             value = appearance.vibrancy,
             onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
             valueRange = 0.5f..1.6f,
@@ -3697,9 +3681,8 @@ private fun CommandButton(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val haptics = LocalHaptics.current
-    Button(
-        onClick = { haptics?.heavy(); onClick() },
+    MorphButton(
+        onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(64.dp),
         contentPadding = PaddingValues(horizontal = 18.dp),

@@ -336,9 +336,6 @@ class SettingsStore(private val context: Context) {
 
     // --- Quick Settings tiles --------------------------------------------
 
-    /** How many configurable QS tiles Bloo ships. */
-    val tileCount get() = TILE_COUNT
-
     /** Per-tile assignment: (vin, command) or null if unassigned. */
     suspend fun tileConfig(index: Int): Pair<String, String>? {
         val p = context.settingsDataStore.data.first()

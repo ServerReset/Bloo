@@ -30,7 +30,4 @@ object AppLog {
     fun clear() {
         _lines.value = emptyList()
     }
-
-    /** Full log as a single copy-pasteable string. */
-    fun asText(): String = _lines.value.joinToString("\n")
 }

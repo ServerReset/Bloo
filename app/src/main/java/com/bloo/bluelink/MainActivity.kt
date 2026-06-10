@@ -37,7 +37,9 @@ class MainActivity : FragmentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         AlertWorker.schedule(applicationContext)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !com.bloo.bluelink.data.Notifications.hasPermission(this)
+        ) {
             requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         handleShortcutIntent(intent)
