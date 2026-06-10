@@ -313,6 +313,18 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    // --- App-icon shortcut selection -------------------------------------
+
+    /** Enabled shortcut ids ("cmd_vin"); null = never customised (show all). */
+    suspend fun enabledShortcuts(): Set<String>? {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("enabled_shortcuts")] ?: return null
+        return raw.split(",").filter { it.isNotBlank() }.toSet()
+    }
+
+    suspend fun setEnabledShortcuts(ids: Set<String>) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("enabled_shortcuts")] = ids.joinToString(",") }
+    }
+
     // --- Quick Settings tiles --------------------------------------------
 
     /** How many configurable QS tiles Bloo ships. */

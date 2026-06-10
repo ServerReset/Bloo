@@ -48,6 +48,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
@@ -91,6 +94,7 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
@@ -210,6 +214,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import coil.compose.AsyncImage
 import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
@@ -237,6 +242,16 @@ fun BlooApp(vm: AppViewModel) {
     // One haptics engine for the whole app; its enabled flag tracks the setting.
     val haptics = remember { Haptics(context.applicationContext) }
     haptics.enabled = appearance.hapticsEnabled
+
+    // While a command is in flight (or the garage is loading), loop a soft
+    // left-to-right sweep so progress is felt until it completes.
+    val busy = state.loading || state.pending.isNotEmpty()
+    LaunchedEffect(busy) {
+        while (busy) {
+            haptics.loadingSweep()
+            delay(560)
+        }
+    }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -528,13 +543,30 @@ private fun LockScreen(vm: AppViewModel) {
         Icon(
             Icons.Filled.Fingerprint,
             contentDescription = null,
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(72.dp),
             tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(16.dp))
-        Text("Bloo is locked", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(24.dp))
-        Button(onClick = { authenticate() }) { Text("Unlock") }
+        Text("Bloo is locked", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Confirm it's you to reach your vehicles.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(28.dp))
+        // Expressive morphing button: a big pill that squishes into a rounded
+        // square as you press it, springing back on release.
+        MorphButton(
+            onClick = { authenticate() },
+            restCorner = 36.dp,
+            pressedCorner = 16.dp,
+            contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+        ) {
+            Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -949,11 +981,17 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
     } else {
         // A locally-cropped photo is an absolute path; a pasted one is a URL.
         val model: Any = if (imageUrl.startsWith("/")) java.io.File(imageUrl) else imageUrl
+        // A transparent PNG renders edge-to-edge with no opaque box, so it blends
+        // seamlessly into the pebble (fit, not crop, so the whole subject shows).
+        val transparent = imageUrl.endsWith(".png", ignoreCase = true)
         AsyncImage(
             model = model,
             contentDescription = v.model,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(18.dp)),
+            contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(height)
+                .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(18.dp))),
         )
     }
 }
@@ -1685,6 +1723,41 @@ private fun ChargeControl(v: Vehicle, status: VehicleStatus?, state: UiState, vm
 }
 
 /**
+ * A Material 3 Expressive button whose shape springs from a soft pill to a
+ * tighter rounded-square while pressed, then bounces back on release. Shared
+ * infrastructure for any "morphing" button in the app.
+ */
+@Composable
+private fun MorphButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    restCorner: Dp = 28.dp,
+    pressedCorner: Dp = 12.dp,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val haptics = LocalHaptics.current
+    val corner by animateDpAsState(
+        targetValue = if (pressed) pressedCorner else restCorner,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
+        label = "morphCorner",
+    )
+    Button(
+        onClick = { haptics?.click(); onClick() },
+        modifier = modifier,
+        shape = RoundedCornerShape(corner),
+        interactionSource = interaction,
+        colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
+        contentPadding = contentPadding,
+        content = content,
+    )
+}
+
+/**
  * A chunky stateful control: shows the current state and a button offering the
  * *opposite* action. The button is always a clearly filled control that morphs
  * from a pill (calm) to a rounded square (highlighted).
@@ -1914,7 +1987,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val context = LocalContext.current
     val appearance by vm.appearance.collectAsState()
     val inApp = appearance.linksInApp
-    val genesis = v.brandIndicator.equals("G", ignoreCase = true)
+    val genesis = v.brand == Brand.GENESIS
     val location = state.locations[v.vin]
     val odo = v.odometer?.trim()?.takeIf { it.isNotBlank() }
     val odoInt = odo?.replace(",", "")?.toDoubleOrNull()?.toInt()
@@ -1995,26 +2068,60 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
             )
         }
 
-        SectionLabel(if (genesis) "Genesis links" else "Hyundai links")
+        SectionLabel(if (genesis) "Genesis owners" else "Hyundai owners")
+        OwnerLinks(genesis, context, inApp)
+    }
+}
+
+/**
+ * Owner/assistance destinations as compact labelled buttons that flow 2+ per row
+ * where they fit. Each says where it goes; phone icons dial, others open links.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OwnerLinks(genesis: Boolean, context: Context, inApp: Boolean) {
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         if (genesis) {
-            LinkRow("Open Genesis app") {
+            LinkButton("Genesis app", Icons.Filled.OpenInNew) {
                 openApp(context, listOf("com.stationdm.genesis"),
                     "https://play.google.com/store/apps/details?id=com.stationdm.genesis", inApp)
             }
-            LinkRow("Genesis owners site") { openUrl(context, "https://owners.genesis.com", inApp) }
-            LinkRow("Schedule service / retailer") { openUrl(context, "https://www.genesis.com/us/en/find-a-retailer.html", inApp) }
-            LinkRow("Manuals & guides") { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
-            LinkRow("Roadside assistance") { dial(context, "8443409741") }
+            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, "https://owners.genesis.com", inApp) }
+            LinkButton("Find a retailer", Icons.Filled.OpenInNew) { openUrl(context, "https://www.genesis.com/us/en/find-a-retailer.html", inApp) }
+            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
+            LinkButton("Roadside", Icons.Filled.Call) { dial(context, "8443409741") }
+            LinkButton("Call collision", Icons.Filled.Call) { dial(context, "8443409741") }
+            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, "https://www.genesis.com/us/en/owners.html", inApp) }
         } else {
-            LinkRow("Open Bluelink app") {
+            LinkButton("Bluelink app", Icons.Filled.OpenInNew) {
                 openApp(context, listOf("com.stationdm.bluelink"),
                     "https://play.google.com/store/apps/details?id=com.stationdm.bluelink", inApp)
             }
-            LinkRow("MyHyundai owners site") { openUrl(context, "https://owners.hyundaiusa.com", inApp) }
-            LinkRow("Schedule service / dealer") { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
-            LinkRow("Manuals & guides") { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
-            LinkRow("Roadside assistance") { dial(context, "8002437766") }
+            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, "https://owners.hyundaiusa.com", inApp) }
+            LinkButton("Find a dealer", Icons.Filled.OpenInNew) { openUrl(context, "https://www.hyundaiusa.com/us/en/dealer-locator", inApp) }
+            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
+            LinkButton("Roadside", Icons.Filled.Call) { dial(context, "8002437766") }
+            LinkButton("Call collision", Icons.Filled.Call) { dial(context, "8002437766") }
+            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, "https://www.hyundaiusa.com/us/en/owner-resources", inApp) }
         }
+    }
+}
+
+/** A compact owner-area destination button (sized to its label, not full width). */
+@Composable
+private fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
+    val haptics = LocalHaptics.current
+    FilledTonalButton(
+        onClick = { haptics?.click(); onClick() },
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -2569,8 +2676,15 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
                                     }
                                     canvas.drawBitmap(image, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
                                     val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
-                                    val file = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.jpg")
-                                    file.outputStream().use { out.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                                    // Preserve transparency: alpha sources are saved as PNG (so the
+                                    // background stays see-through and renders seamlessly), others JPEG.
+                                    val alpha = image.hasAlpha()
+                                    val ext = if (alpha) "png" else "jpg"
+                                    val file = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.$ext")
+                                    file.outputStream().use {
+                                        if (alpha) out.compress(Bitmap.CompressFormat.PNG, 100, it)
+                                        else out.compress(Bitmap.CompressFormat.JPEG, 90, it)
+                                    }
                                     file.absolutePath
                                 }.getOrNull()
                             }
@@ -2840,6 +2954,26 @@ private fun SettingsScreen(vm: AppViewModel) {
                 Spacer(Modifier.height(4.dp))
                 for (i in 0 until com.bloo.bluelink.data.TILE_COUNT) {
                     TileAssignRow(i, state, vm)
+                }
+            }
+
+            // App-icon shortcuts (long-press the launcher icon)
+            SettingsCard("App shortcuts") {
+                Text(
+                    "Pick which long-press app-icon shortcuts appear. Launchers usually show " +
+                        "only the first 4–5.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                state.vehicles.forEach { v ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
+                        ToggleRow(
+                            com.bloo.bluelink.Shortcuts.actionLabel(cmd),
+                            state.isShortcutEnabled(v.vin, cmd),
+                        ) { vm.setShortcutEnabled(v.vin, cmd, it) }
+                    }
                 }
             }
 

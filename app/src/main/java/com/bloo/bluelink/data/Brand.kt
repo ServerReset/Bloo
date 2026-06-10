@@ -39,5 +39,12 @@ enum class Brand(
     companion object {
         fun fromName(name: String?): Brand =
             entries.firstOrNull { it.name == name } ?: HYUNDAI
+
+        /** Map a vehicle's brand indicator ("G" = Genesis) to a [Brand]. */
+        fun fromIndicator(indicator: String?): Brand =
+            if (indicator.equals("G", ignoreCase = true)) GENESIS else HYUNDAI
     }
 }
+
+/** The telematics brand a vehicle belongs to. */
+val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)

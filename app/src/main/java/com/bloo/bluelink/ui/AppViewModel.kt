@@ -82,6 +82,8 @@ data class UiState(
     val tileConfigs: List<Pair<String, String>?> = List(4) { null },
     /** Quick tiles run the command in the background (vs opening the app). */
     val tileBackground: Boolean = false,
+    /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
+    val shortcutSet: Set<String>? = null,
     /** Show the first-run "configure your car" prompt. */
     val showOnboarding: Boolean = false,
     /** All signed-in accounts (one per brand). */
@@ -101,6 +103,9 @@ data class UiState(
     fun isPebbleHidden(vin: String, section: String): Boolean = "$vin:$section" in hiddenPebbles
 
     fun hotspotFor(vin: String): String? = hotspotSections[vin]
+
+    fun isShortcutEnabled(vin: String, cmd: String): Boolean =
+        shortcutSet?.contains("${cmd}_$vin") ?: true
 
     fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
 
@@ -158,7 +163,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         repos.getOrPut(brand) { BlueLinkRepository(BlueLinkApi(brand), store, brand) }
 
     private fun brandOf(v: Vehicle): Brand =
-        if (v.brandIndicator.equals("G", ignoreCase = true)) Brand.GENESIS else Brand.HYUNDAI
+        Brand.fromIndicator(v.brandIndicator)
 
     private fun repoFor(v: Vehicle): BlueLinkRepository = repoFor(brandOf(v))
 
@@ -346,6 +351,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
         val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
         val tileBackground = settingsStore.tileBackground()
+        val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val showOnboarding = !settingsStore.onboardingSeen()
@@ -364,13 +370,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 hotspotSections = hotspots,
                 tileConfigs = tileConfigs,
                 tileBackground = tileBackground,
+                shortcutSet = shortcutSet,
                 currentIndex = index,
                 screen = Screen.Garage,
                 showOnboarding = showOnboarding,
             )
         }
         // Keep the app-icon long-press shortcuts in sync with the current cars.
-        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles)
+        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet)
         // Run any shortcut that was tapped before the garage finished loading.
         tryRunPendingShortcut()
         // Fetch current car first for an immediate view, then prefetch the rest
@@ -634,6 +641,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
+    }
+
+    /** Toggle whether a given car+action app-icon shortcut is shown. */
+    fun setShortcutEnabled(vin: String, cmd: String, enabled: Boolean) {
+        val universe = _state.value.vehicles.flatMap { v ->
+            com.bloo.bluelink.Shortcuts.ACTIONS.map { "${it}_${v.vin}" }
+        }.toSet()
+        val current = _state.value.shortcutSet ?: universe
+        val updated = if (enabled) current + "${cmd}_$vin" else current - "${cmd}_$vin"
+        _state.update { it.copy(shortcutSet = updated) }
+        viewModelScope.launch {
+            settingsStore.setEnabledShortcuts(updated)
+            com.bloo.bluelink.Shortcuts.refresh(getApplication(), _state.value.vehicles, updated)
+        }
     }
 
     /** Assign (or clear) a Quick Settings tile to a car + command. */

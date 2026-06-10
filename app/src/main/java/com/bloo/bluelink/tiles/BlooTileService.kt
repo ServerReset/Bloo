@@ -104,7 +104,7 @@ abstract class BlooTileService : TileService() {
             runCatching {
                 val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin } ?: return@runCatching
                 val v = snap.toVehicle()
-                val brand = if (v.brandIndicator.equals("G", true)) Brand.GENESIS else Brand.HYUNDAI
+                val brand = Brand.fromIndicator(v.brandIndicator)
                 val repo = BlueLinkRepository(BlueLinkApi(brand), SessionStore(ctx), brand)
                 when (cmd) {
                     "lock" -> repo.lock(v)

@@ -14,21 +14,43 @@ object Shortcuts {
     const val EXTRA_VIN = "vin"
     const val EXTRA_CMD = "cmd"
 
-    /** Rebuild the dynamic shortcut set for the current cars. */
-    fun refresh(context: Context, vehicles: List<Vehicle>) {
+    /** The selectable shortcut actions, in priority order. */
+    val ACTIONS = listOf("lock", "unlock", "climate", "open")
+
+    fun actionLabel(cmd: String): String = when (cmd) {
+        "lock" -> "Lock"
+        "unlock" -> "Unlock"
+        "climate" -> "Climate"
+        "open" -> "Open"
+        else -> cmd.replaceFirstChar { it.uppercase() }
+    }
+
+    private fun id(cmd: String, vin: String) = "${cmd}_$vin"
+
+    /**
+     * Rebuild the dynamic shortcut set for the current cars. [enabled] is the set
+     * of "cmd_vin" ids the user wants shown; null means show them all.
+     */
+    fun refresh(context: Context, vehicles: List<Vehicle>, enabled: Set<String>? = null) {
         runCatching {
             val max = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context).coerceAtLeast(4)
             val items = ArrayList<ShortcutInfoCompat>()
-            // Per car: lock / unlock / climate / open. The first cars get the full
-            // set; we trim to the launcher's capacity.
             vehicles.forEach { v ->
-                items += shortcut(context, v, "lock", "Lock", "Lock ${v.name}", R.drawable.ic_shortcut_lock)
-                items += shortcut(context, v, "unlock", "Unlock", "Unlock ${v.name}", R.drawable.ic_shortcut_unlock)
-                items += shortcut(context, v, "climate", "Climate", "Start climate · ${v.name}", R.drawable.ic_shortcut_climate)
-                items += shortcut(context, v, "open", v.name.take(10), "Open ${v.name}", R.drawable.ic_shortcut_car)
+                ACTIONS.forEach { cmd ->
+                    if (enabled == null || id(cmd, v.vin) in enabled) {
+                        items += build(context, v, cmd)
+                    }
+                }
             }
             ShortcutManagerCompat.setDynamicShortcuts(context, items.take(max))
         }
+    }
+
+    private fun build(context: Context, v: Vehicle, cmd: String): ShortcutInfoCompat = when (cmd) {
+        "lock" -> shortcut(context, v, "lock", "Lock", "Lock ${v.name}", R.drawable.ic_shortcut_lock)
+        "unlock" -> shortcut(context, v, "unlock", "Unlock", "Unlock ${v.name}", R.drawable.ic_shortcut_unlock)
+        "climate" -> shortcut(context, v, "climate", "Climate", "Start climate · ${v.name}", R.drawable.ic_shortcut_climate)
+        else -> shortcut(context, v, "open", v.name.take(10), "Open ${v.name}", R.drawable.ic_shortcut_car)
     }
 
     private fun shortcut(

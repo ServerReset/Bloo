@@ -156,6 +156,19 @@ class Haptics(context: Context) {
         }
     }
 
+    /**
+     * A short left-to-right "sweep" (soft → strong rise), looped by the UI while
+     * something is loading so progress is felt, not just seen.
+     */
+    fun loadingSweep() {
+        if (composes) composed {
+            add(PRIM_TICK, 0.3f, 0)
+            add(PRIM_QUICK_RISE, 0.6f, 24)
+        } else {
+            waveform(longArrayOf(0, 8, 18, 16, 16, 22), intArrayOf(0, 40, 0, 90, 0, 160))
+        }
+    }
+
     /** Success chime — rise then crisp click. */
     fun success() {
         if (composes) composed {
