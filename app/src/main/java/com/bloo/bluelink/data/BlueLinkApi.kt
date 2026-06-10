@@ -145,8 +145,10 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
-        val path = if (v.isEv) "/ac/v2/evc/fatc/stop" else "/ac/v2/rcs/rsc/stop"
-        val request = baseRequest(path, token, username, pin, v)
+        // Climate/remote-start uses rcs/rsc for every US vehicle (gas, hybrid,
+        // EV). The evc/* paths are charging-only; using evc/fatc here returns a
+        // 502 on EVs such as the Gen5 platform.
+        val request = baseRequest("/ac/v2/rcs/rsc/stop", token, username, pin, v)
             .post(ByteArray(0).toRequestBody(null))
             .build()
         call(request)
@@ -172,7 +174,9 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     suspend fun startClimate(
         token: String, username: String, pin: String, v: Vehicle, req: ClimateRequest,
     ): String = execute {
-        val path = if (v.isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
+        // All US vehicles (gas, hybrid, EV) start climate via rcs/rsc/start. The
+        // evc/fatc endpoint is not valid for this command and returns a 502.
+        val path = "/ac/v2/rcs/rsc/start"
         val payload = json.encodeToString(
             kotlinx.serialization.json.JsonObject.serializer(),
             kotlinx.serialization.json.buildJsonObject {
