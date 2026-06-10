@@ -2859,6 +2859,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                 shape = FieldShape,
                 modifier = Modifier.fillMaxWidth(),
             )
+          // Drop any stale AI answer once the search box is cleared.
+          LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
           if (query.isNotBlank()) {
             SettingsSearchResults(query, vm, state, appearance, notif)
           } else {
