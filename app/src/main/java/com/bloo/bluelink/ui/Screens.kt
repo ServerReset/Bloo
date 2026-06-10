@@ -1854,7 +1854,8 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val ev = status?.evStatus
     val plugged = (ev?.batteryPlugin ?: 0) != 0 || ev?.batteryCharge == true
 
-    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle) {
+    val infoSummary = if (status?.doorLock == true) "Locked" else "Unlocked"
+    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary) {
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet. Pull down to refresh.")
@@ -1984,8 +1985,10 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
         status?.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
     }
+    val diagSummary = if (rows.isEmpty()) "No data" else "${rows.count { !it.indent }} checks"
     Pebble(
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
+        summary = diagSummary,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         if (rows.isEmpty()) {
