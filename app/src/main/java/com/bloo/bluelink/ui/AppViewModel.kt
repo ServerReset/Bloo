@@ -78,6 +78,10 @@ data class UiState(
     val hiddenPebbles: Set<String> = emptySet(),
     /** Per-VIN pebble pinned to the dual-column "hot spot" (under car info). */
     val hotspotSections: Map<String, String> = emptyMap(),
+    /** Quick-tile assignments: index -> (vin, command), or null if unassigned. */
+    val tileConfigs: List<Pair<String, String>?> = List(4) { null },
+    /** Quick tiles run the command in the background (vs opening the app). */
+    val tileBackground: Boolean = false,
     /** Show the first-run "configure your car" prompt. */
     val showOnboarding: Boolean = false,
     /** All signed-in accounts (one per brand). */
@@ -340,6 +344,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val collapsed = vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
         val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
+        val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
+        val tileBackground = settingsStore.tileBackground()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val showOnboarding = !settingsStore.onboardingSeen()
@@ -356,6 +362,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 collapsedPebbles = collapsed,
                 hiddenPebbles = hidden,
                 hotspotSections = hotspots,
+                tileConfigs = tileConfigs,
+                tileBackground = tileBackground,
                 currentIndex = index,
                 screen = Screen.Garage,
                 showOnboarding = showOnboarding,
@@ -626,6 +634,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
+    }
+
+    /** Assign (or clear) a Quick Settings tile to a car + command. */
+    fun setTileAssignment(index: Int, vin: String?, cmd: String?) {
+        _state.update {
+            val list = it.tileConfigs.toMutableList()
+            if (index in list.indices) {
+                list[index] = if (vin != null && cmd != null) vin to cmd else null
+            }
+            it.copy(tileConfigs = list)
+        }
+        viewModelScope.launch {
+            settingsStore.setTileConfig(index, vin, cmd)
+            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
+        }
+    }
+
+    fun setTileBackground(value: Boolean) {
+        _state.update { it.copy(tileBackground = value) }
+        viewModelScope.launch {
+            settingsStore.setTileBackground(value)
+            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
+        }
     }
 
     /** Pin (or clear, with null) a pebble to the dual-column hot spot. */

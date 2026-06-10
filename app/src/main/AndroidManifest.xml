@@ -42,6 +42,47 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".tiles.BlooTile1"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_car"
+            android:label="Bloo tile 1"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".tiles.BlooTile2"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_lock"
+            android:label="Bloo tile 2"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".tiles.BlooTile3"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_unlock"
+            android:label="Bloo tile 3"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".tiles.BlooTile4"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_climate"
+            android:label="Bloo tile 4"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>

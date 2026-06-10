@@ -2822,6 +2822,27 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
+            // Quick Settings tiles
+            SettingsCard("Quick tiles") {
+                Text(
+                    "Assign each Quick Settings tile to a car and action, then add the tiles " +
+                        "from your notification shade's edit screen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ToggleRow("Run command in background", state.tileBackground) { vm.setTileBackground(it) }
+                Text(
+                    if (state.tileBackground) "Tiles fire the command directly (no app open)."
+                    else "Tiles open Bloo and run the command there.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                for (i in 0 until com.bloo.bluelink.data.TILE_COUNT) {
+                    TileAssignRow(i, state, vm)
+                }
+            }
+
             // Links
             SettingsCard("Links") {
                 ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
@@ -3226,6 +3247,51 @@ private fun SettingsSearchResults(
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 e.content()
+            }
+        }
+    }
+}
+
+private val TileActions = listOf("lock" to "Lock", "unlock" to "Unlock", "climate" to "Climate", "charge" to "Charge")
+
+/** One Quick Settings tile's car + action assignment, via two dropdowns. */
+@Composable
+private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
+    val cfg = state.tileConfigs.getOrNull(index)
+    val car = cfg?.let { c -> state.vehicles.firstOrNull { it.vin == c.first } }
+    val action = cfg?.second
+    var carMenu by remember { mutableStateOf(false) }
+    var actMenu by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Tile ${index + 1}", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.weight(1f))
+        Box {
+            OutlinedButton(onClick = { carMenu = true }) { Text(car?.name?.take(10) ?: "Car") }
+            DropdownMenu(expanded = carMenu, onDismissRequest = { carMenu = false }) {
+                DropdownMenuItem(text = { Text("None") }, onClick = {
+                    vm.setTileAssignment(index, null, null); carMenu = false
+                })
+                state.vehicles.forEach { v ->
+                    DropdownMenuItem(text = { Text(v.name) }, onClick = {
+                        vm.setTileAssignment(index, v.vin, action ?: "lock"); carMenu = false
+                    })
+                }
+            }
+        }
+        Box {
+            OutlinedButton(onClick = { actMenu = true }, enabled = car != null) {
+                Text(TileActions.firstOrNull { it.first == action }?.second ?: "Action")
+            }
+            DropdownMenu(expanded = actMenu, onDismissRequest = { actMenu = false }) {
+                TileActions.forEach { (cmd, label) ->
+                    DropdownMenuItem(text = { Text(label) }, onClick = {
+                        car?.let { vm.setTileAssignment(index, it.vin, cmd) }; actMenu = false
+                    })
+                }
             }
         }
     }

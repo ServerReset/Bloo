@@ -47,6 +47,9 @@ val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "climate", "locat
 /** Pebbles the user may hide (the others are essential). */
 val HIDEABLE_SECTIONS = listOf("climate", "location", "info", "diagnostics")
 
+/** Number of configurable Quick Settings tiles. */
+const val TILE_COUNT = 4
+
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
 
@@ -308,6 +311,36 @@ class SettingsStore(private val context: Context) {
             if (hidden) set.add(section) else set.remove(section)
             it[stringPreferencesKey("hidden_$vin")] = set.joinToString(",")
         }
+    }
+
+    // --- Quick Settings tiles --------------------------------------------
+
+    /** How many configurable QS tiles Bloo ships. */
+    val tileCount get() = TILE_COUNT
+
+    /** Per-tile assignment: (vin, command) or null if unassigned. */
+    suspend fun tileConfig(index: Int): Pair<String, String>? {
+        val p = context.settingsDataStore.data.first()
+        val vin = p[stringPreferencesKey("tile_${index}_vin")]?.takeIf { it.isNotBlank() } ?: return null
+        val cmd = p[stringPreferencesKey("tile_${index}_cmd")]?.takeIf { it.isNotBlank() } ?: return null
+        return vin to cmd
+    }
+
+    suspend fun setTileConfig(index: Int, vin: String?, cmd: String?) {
+        context.settingsDataStore.edit {
+            val vk = stringPreferencesKey("tile_${index}_vin")
+            val ck = stringPreferencesKey("tile_${index}_cmd")
+            if (vin.isNullOrBlank() || cmd.isNullOrBlank()) { it.remove(vk); it.remove(ck) }
+            else { it[vk] = vin; it[ck] = cmd }
+        }
+    }
+
+    /** When true, tiles run the command in the background; else they open the app. */
+    suspend fun tileBackground(): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("tile_background")] ?: false
+
+    suspend fun setTileBackground(value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("tile_background")] = value }
     }
 
     // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
