@@ -14,8 +14,12 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -137,12 +141,23 @@ private fun expressiveTypography(choice: FontChoice): Typography {
     )
 }
 
+/** Scale a colour's saturation (HSV) by [factor]; 1 = unchanged. */
+private fun Color.saturate(factor: Float): Color {
+    if (factor == 1f) return this
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(toArgb(), hsv)
+    hsv[1] = (hsv[1] * factor).coerceIn(0f, 1f)
+    return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BlooTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     fontChoice: FontChoice = FontChoice.SYSTEM,
     dynamicColor: Boolean = true,
+    uiScale: Float = 1f,
+    vibrancy: Float = 1f,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode) {
@@ -161,7 +176,7 @@ fun BlooTheme(
         else -> LightExpressive
     }
 
-    val scheme = if (themeMode == ThemeMode.AMOLED) {
+    val amoled = if (themeMode == ThemeMode.AMOLED) {
         val black = Color(0xFF000000)
         base.copy(
             background = black,
@@ -176,11 +191,25 @@ fun BlooTheme(
         base
     }
 
+    // Vibrancy: scale the saturation of the accent colours + containers.
+    val scheme = if (vibrancy == 1f) amoled else amoled.copy(
+        primary = amoled.primary.saturate(vibrancy),
+        secondary = amoled.secondary.saturate(vibrancy),
+        tertiary = amoled.tertiary.saturate(vibrancy),
+        primaryContainer = amoled.primaryContainer.saturate(vibrancy),
+        secondaryContainer = amoled.secondaryContainer.saturate(vibrancy),
+        tertiaryContainer = amoled.tertiaryContainer.saturate(vibrancy),
+    )
+
+    val density = LocalDensity.current
+    val scaledDensity = Density(density.density, density.fontScale * uiScale)
+
     MaterialExpressiveTheme(
         colorScheme = scheme,
         motionScheme = MotionScheme.expressive(),
         typography = expressiveTypography(fontChoice),
         shapes = ExpressiveShapes,
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalDensity provides scaledDensity, content = content)
+    }
 }

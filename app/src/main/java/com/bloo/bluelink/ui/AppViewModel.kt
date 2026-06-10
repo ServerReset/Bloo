@@ -680,6 +680,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
     fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
+    fun setUiScale(value: Float) = viewModelScope.launch { settingsStore.setUiScale(value) }
+    fun setVibrancy(value: Float) = viewModelScope.launch { settingsStore.setVibrancy(value) }
 
     fun clearLogs() = AppLog.clear()
     fun clearMessage() = _state.update { it.copy(message = null) }

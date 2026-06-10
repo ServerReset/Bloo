@@ -59,6 +59,8 @@ class SettingsStore(private val context: Context) {
         val ORDER = stringPreferencesKey("vehicle_order")
         val FLIPPED = stringPreferencesKey("columns_flipped")
         val LINKS_IN_APP = stringPreferencesKey("links_in_app")
+        val UI_SCALE = stringPreferencesKey("ui_scale")
+        val VIBRANCY = stringPreferencesKey("vibrancy")
     }
 
     data class Appearance(
@@ -70,6 +72,10 @@ class SettingsStore(private val context: Context) {
         val columnsFlipped: Boolean = false,
         /** Open Hyundai/Genesis links in an in-app browser tab vs the system browser. */
         val linksInApp: Boolean = true,
+        /** Text/UI scale multiplier (0.85–1.3). */
+        val uiScale: Float = 1f,
+        /** Colour vibrancy multiplier (0.5–1.6, 1 = default). */
+        val vibrancy: Float = 1f,
     )
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
@@ -82,6 +88,8 @@ class SettingsStore(private val context: Context) {
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
             linksInApp = prefs[Keys.LINKS_IN_APP]?.toBooleanStrictOrNull() ?: true,
+            uiScale = prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f,
+            vibrancy = prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f,
         )
     }
 
@@ -143,6 +151,14 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setAlertFired(key: String, value: Boolean) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("alert_$key")] = value }
+    }
+
+    suspend fun setUiScale(value: Float) {
+        context.settingsDataStore.edit { it[Keys.UI_SCALE] = value.toString() }
+    }
+
+    suspend fun setVibrancy(value: Float) {
+        context.settingsDataStore.edit { it[Keys.VIBRANCY] = value.toString() }
     }
 
     suspend fun setLinksInApp(value: Boolean) {

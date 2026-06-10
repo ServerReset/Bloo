@@ -35,6 +35,8 @@ class MainActivity : FragmentActivity() {
                 themeMode = appearance.themeMode,
                 fontChoice = appearance.fontChoice,
                 dynamicColor = appearance.dynamicColor,
+                uiScale = appearance.uiScale,
+                vibrancy = appearance.vibrancy,
             ) {
                 BlooApp(viewModel)
             }

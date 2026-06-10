@@ -29,6 +29,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -537,16 +538,28 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 
     Box(Modifier.fillMaxSize()) {
         AnimatedContent(
-            targetState = expandedIdx,
+            targetState = expandedIdx != null,
             transitionSpec = {
                 val spec = spring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
                 (fadeIn(spec) + scaleIn(spec, initialScale = 0.94f)) togetherWith
                     (fadeOut(spec) + scaleOut(spec, targetScale = 0.94f))
             },
             label = "expand",
-        ) { idx ->
-            if (idx != null) {
-                ExpandedCar(vehicles[idx], state, vm, flipped = appearance.columnsFlipped)
+        ) { isExpanded ->
+            if (isExpanded) {
+                // Full-screen car; swipe left/right to switch cars.
+                val exPager = rememberPagerState(initialPage = (expandedIdx ?: 0).coerceIn(0, count - 1)) { count }
+                LaunchedEffect(exPager) {
+                    snapshotFlow { exPager.settledPage }.collect { vm.expand(it) }
+                }
+                Box(Modifier.fillMaxSize()) {
+                    HorizontalPager(state = exPager, modifier = Modifier.fillMaxSize()) { page ->
+                        ExpandedCar(vehicles[page], state, vm, flipped = appearance.columnsFlipped)
+                    }
+                    if (count > 1) {
+                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).padding(top = 10.dp))
+                    }
+                }
             } else {
                 val pageCount = (count + perPage - 1) / perPage
                 val pager = rememberPagerState(
@@ -557,10 +570,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         vm.selectIndex((page * perPage).coerceIn(0, count - 1))
                     }
                 }
-                Column(Modifier.fillMaxSize()) {
-                    // Page dots up top so you can see which car(s) you're on.
-                    if (pageCount > 1) PagerDots(pager.currentPage, pageCount)
-                    HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
+                Box(Modifier.fillMaxSize()) {
+                    HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                         val start = page * perPage
                         val end = minOf(start + perPage, count)
                         Row(Modifier.fillMaxSize()) {
@@ -569,15 +580,16 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     VehicleDetailContent(
                                         vehicles[i], state, vm,
                                         onExpand = if (canExpand) ({ vm.expand(i) }) else null,
-                                        // The rightmost card's header sits under the
-                                        // settings button — reserve room so both show.
                                         reserveHeaderEnd = canExpand && i == end - 1,
                                     )
                                 }
                             }
-                            // Keep columns equal width if the last page is short.
                             repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
                         }
+                    }
+                    // Floating animated page indicator (no thin top bar).
+                    if (pageCount > 1) {
+                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).padding(top = 10.dp))
                     }
                 }
             }
@@ -714,23 +726,28 @@ private fun FloatingIcon(
 }
 
 @Composable
-private fun PagerDots(current: Int, count: Int) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 10.dp),
-        horizontalArrangement = Arrangement.Center,
+private fun PagerDots(current: Int, count: Int, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
+        shadowElevation = 2.dp,
     ) {
-        repeat(count) { i ->
-            val selected = i == current
-            Box(
-                Modifier
-                    .padding(horizontal = 4.dp)
-                    .size(if (selected) 10.dp else 7.dp)
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant,
-                        CircleShape,
-                    )
-            )
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(count) { i ->
+                val selected = i == current
+                // The active page stretches into a pill; others are small dots.
+                val w by animateDpAsState(if (selected) 20.dp else 7.dp, label = "dotW")
+                val color by androidx.compose.animation.animateColorAsState(
+                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    label = "dotC",
+                )
+                Box(Modifier.height(7.dp).width(w).clip(CircleShape).background(color))
+            }
         }
     }
 }
@@ -1024,9 +1041,8 @@ private fun <T> ReorderColumn(
 }
 
 /**
- * A [Slider] whose thumb springs to its target with a gentle bounce when the
- * value changes by tap or snap, while tracking the finger directly during an
- * active drag (so dragging still feels immediate).
+ * A [Slider] whose thumb follows your finger continuously while dragging, then
+ * springs (with a little bounce) to the nearest step when you let go.
  */
 @Composable
 private fun AnimatedSlider(
@@ -1038,19 +1054,39 @@ private fun AnimatedSlider(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val dragging by interaction.collectIsDraggedAsState()
-    val animated by animateFloatAsState(
-        targetValue = value,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
-        label = "sliderValue",
-    )
+    val scope = rememberCoroutineScope()
+    var pos by remember { mutableFloatStateOf(value) }
+    val settle = remember { Animatable(value) }
+
+    // When idle, keep the thumb parked on the real (snapped) value.
+    LaunchedEffect(value) { if (!dragging) settle.snapTo(value) }
+
     Slider(
-        value = if (dragging) value else animated,
-        onValueChange = onValueChange,
+        value = if (dragging) pos else settle.value,
+        onValueChange = {
+            pos = it
+            onValueChange(snapToStep(it, valueRange, steps))
+        },
+        onValueChangeFinished = {
+            val target = snapToStep(pos, valueRange, steps)
+            onValueChange(target)
+            scope.launch {
+                settle.snapTo(pos)
+                settle.animateTo(target, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium))
+            }
+        },
         valueRange = valueRange,
-        steps = steps,
+        steps = 0, // continuous while dragging; we snap on release ourselves
         colors = colors,
         interactionSource = interaction,
     )
+}
+
+private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
+    if (steps <= 0) return v.coerceIn(range.start, range.endInclusive)
+    val inc = (range.endInclusive - range.start) / (steps + 1)
+    val snapped = range.start + Math.round((v - range.start) / inc) * inc
+    return snapped.coerceIn(range.start, range.endInclusive)
 }
 
 // --- Full detail ----------------------------------------------------------
@@ -2212,6 +2248,23 @@ private fun SettingsScreen(vm: AppViewModel) {
                     "Uses your wallpaper palette on Android 12+. Turn off for Bloo's " +
                         "built-in expressive colors.",
                     style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(8.dp))
+                StepRow("Vibrancy", "${(appearance.vibrancy * 100).roundToInt()}%")
+                Slider(
+                    value = appearance.vibrancy,
+                    onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
+                    valueRange = 0.5f..1.6f,
+                )
+            }
+
+            // Display scale
+            SettingsCard("Display") {
+                StepRow("Text & layout scale", "${(appearance.uiScale * 100).roundToInt()}%")
+                Slider(
+                    value = appearance.uiScale,
+                    onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
+                    valueRange = 0.85f..1.3f,
                 )
             }
 
