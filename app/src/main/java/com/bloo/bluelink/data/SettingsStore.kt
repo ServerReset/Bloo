@@ -313,6 +313,15 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    // --- On-device AI ----------------------------------------------------
+
+    suspend fun aiEnabled(): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("ai_enabled")] ?: false
+
+    suspend fun setAiEnabled(value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("ai_enabled")] = value }
+    }
+
     // --- App-icon shortcut selection -------------------------------------
 
     /** Enabled shortcut ids ("cmd_vin"); null = never customised (show all). */

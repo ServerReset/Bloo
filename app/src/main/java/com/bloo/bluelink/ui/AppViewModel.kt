@@ -86,6 +86,13 @@ data class UiState(
     val tileBackground: Boolean = false,
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
     val shortcutSet: Set<String>? = null,
+    /** On-device Gemini Nano availability + opt-in, and produced summaries. */
+    val aiSupported: Boolean = false,
+    val aiEnabled: Boolean = false,
+    val aiSummaries: Map<String, String> = emptyMap(),
+    /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
+    val aiBusy: Set<String> = emptySet(),
+    val aiSearchReply: String? = null,
     /** All signed-in accounts (one per brand). */
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */
@@ -156,6 +163,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val credentialStore = CredentialStore(app)
     private val snapshotStore = SnapshotStore(app)
     private val statusCache = StatusCache(app)
+    private val ai = com.bloo.bluelink.data.Ai(app)
     // One repository per signed-in brand (Hyundai/Genesis can both be active).
     private val repos = mutableMapOf<Brand, BlueLinkRepository>()
 
@@ -223,6 +231,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        // Probe on-device Gemini Nano once; the AI toggle only appears if present.
+        viewModelScope.launch {
+            val supported = ai.isSupported()
+            if (supported) {
+                _state.update { it.copy(aiSupported = true, aiEnabled = settingsStore.aiEnabled()) }
+            }
+        }
         // Restore the last-known status/location from disk so the UI shows
         // stale-but-useful data immediately, before any network call returns.
         viewModelScope.launch {
@@ -641,6 +656,77 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
+    }
+
+    // --- On-device AI (Gemini Nano) --------------------------------------
+
+    fun setAiEnabled(value: Boolean) {
+        _state.update { it.copy(aiEnabled = value) }
+        viewModelScope.launch { settingsStore.setAiEnabled(value) }
+    }
+
+    /** Summarize a car's last-fetched status with on-device Gemini Nano. */
+    fun summarizeCar(v: Vehicle) {
+        if (v.vin in _state.value.aiBusy) return
+        val status = _state.value.statusFor(v) ?: run {
+            _state.update { it.copy(message = "Refresh ${v.name} first, then summarize.") }
+            return
+        }
+        _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
+        viewModelScope.launch {
+            val summary = ai.summarize(carText(v, status))
+            _state.update {
+                it.copy(
+                    aiBusy = it.aiBusy - v.vin,
+                    aiSummaries = if (summary != null) it.aiSummaries + (v.vin to summary) else it.aiSummaries,
+                    message = if (summary == null) "AI summary isn't available right now." else it.message,
+                )
+            }
+        }
+    }
+
+    /** Ask Gemini Nano a free-form question answered from the cars' live data. */
+    fun askAi(query: String) {
+        if (!_state.value.aiEnabled || query.isBlank()) return
+        _state.update { it.copy(aiBusy = it.aiBusy + "search") }
+        viewModelScope.launch {
+            val data = _state.value.vehicles.joinToString("\n\n") { v ->
+                carText(v, _state.value.statusFor(v))
+            }
+            val reply = ai.summarize("Answer this question using only the data below.\nQuestion: $query\n\nData:\n$data")
+            _state.update { it.copy(aiBusy = it.aiBusy - "search", aiSearchReply = reply) }
+        }
+    }
+
+    fun clearAiReply() = _state.update { it.copy(aiSearchReply = null) }
+
+    /** A compact, readable description of a car's current state for the AI. */
+    private fun carText(v: Vehicle, status: VehicleStatus?): String {
+        val s = _state.value
+        val parts = mutableListOf<String>()
+        parts += "Car: ${v.name} (${v.model})."
+        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "Odometer: $it miles." }
+        if (status == null) {
+            parts += "No live status has been fetched yet."
+            return parts.joinToString(" ")
+        }
+        parts += "Doors are ${if (status.doorLock == true) "locked" else "unlocked"}."
+        status.engine?.let { parts += "The engine/vehicle is ${if (it) "on" else "off"}." }
+        if (s.hasBattery(v)) {
+            status.evStatus?.batteryStatus?.let { parts += "Battery is at $it%." }
+            if (status.evStatus?.batteryCharge == true) parts += "It is currently charging."
+            status.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+                ?.let { parts += "About $it minutes to a full charge." }
+        }
+        if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
+        val range = status.evStatus?.drvDistance?.firstOrNull()?.rangeByFuel?.totalAvailableRange?.value
+            ?: status.dte?.value
+        range?.toInt()?.let { parts += "Estimated range is $it miles." }
+        s.drivingLabel(v)?.let { parts += "The car appears $it." }
+        status.battery?.batSoc?.let { parts += "12V battery is at $it%." }
+        if (status.airCtrlOn == true) parts += "Climate is on."
+        s.placeNames[v.vin]?.let { parts += "Last known location: $it." }
+        return parts.joinToString(" ")
     }
 
     /** Toggle whether a given car+action app-icon shortcut is shown. */

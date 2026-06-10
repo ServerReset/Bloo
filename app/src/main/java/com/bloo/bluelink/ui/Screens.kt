@@ -92,6 +92,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
@@ -1747,9 +1748,11 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 /** The reorderable pebble stack for a car. */
 @Composable
 private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Set<String> = emptySet()) {
-    val sections = state.sectionsFor(v).filter {
+    val base = state.sectionsFor(v).filter {
         it !in exclude && !state.isPebbleHidden(v.vin, it)
     }
+    // The optional AI summary pebble leads the stack when enabled.
+    val sections = if (state.aiEnabled && "ai" !in exclude) listOf("ai") + base else base
     ReorderColumn(
         items = sections,
         keyOf = { it },
@@ -1782,7 +1785,43 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
         "location" -> LocationPebble(v, state, vm, dragHandle)
         "info" -> InfoPebble(v, status, state, vm, dragHandle)
         "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
+        "ai" -> AiPebble(v, state, vm, dragHandle)
         else -> Spacer(Modifier.fillMaxWidth())
+    }
+}
+
+/** Optional on-device Gemini Nano summary of the car's last-refreshed status. */
+@Composable
+private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val busy = v.vin in state.aiBusy
+    val summary = state.aiSummaries[v.vin]
+    Pebble(
+        v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, dragHandle,
+        summary = "On-device Gemini Nano",
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        headerAction = {
+            PebbleActionButton(
+                label = if (busy) "…" else "Summarize",
+                icon = Icons.Filled.AutoAwesome,
+                onClick = { vm.summarizeCar(v) },
+                pending = busy,
+            )
+        },
+    ) {
+        if (summary != null) {
+            Text(summary, style = MaterialTheme.typography.bodyMedium)
+        } else {
+            Text(
+                "Summarize this car's last-refreshed status, generated privately on your device.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            "Reflects the last refresh — tap Summarize to update.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -3046,6 +3085,20 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
+            // On-device AI — only when the device supports Gemini Nano.
+            if (state.aiSupported) {
+                SettingsCard("AI") {
+                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
+                    Text(
+                        "Adds an AI summary pebble to each car and lets you ask the search " +
+                            "box questions like \"what's the odometer of Daisy\". Everything runs " +
+                            "privately on your device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             // Quick Settings tiles
             SettingsCard("Quick tiles") {
                 Text(
@@ -3464,6 +3517,40 @@ private fun SettingsSearchResults(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+
+    // On-device AI reply (when enabled): answer the question in natural language,
+    // while the structured data below still surfaces the exact values.
+    if (state.aiEnabled) {
+        LaunchedEffect(query) {
+            if (query.isNotBlank()) {
+                delay(450)
+                vm.askAi(query)
+            } else {
+                vm.clearAiReply()
+            }
+        }
+        val thinking = "search" in state.aiBusy
+        val reply = state.aiSearchReply
+        if (thinking || reply != null) {
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("AI answer", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    }
+                    if (reply != null) {
+                        Text(reply, style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        Text("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
     }
 

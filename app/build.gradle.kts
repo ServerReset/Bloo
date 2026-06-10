@@ -84,6 +84,10 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
+    // runtime by feature availability so unsupported devices simply hide it.
+    implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")
+
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
