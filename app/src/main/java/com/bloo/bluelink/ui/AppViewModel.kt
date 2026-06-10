@@ -90,6 +90,8 @@ data class UiState(
     /** On-device Gemini Nano availability + opt-in, and produced summaries. */
     val aiSupported: Boolean = false,
     val aiEnabled: Boolean = false,
+    /** Run AI summaries automatically on open/refresh/command (manual still works). */
+    val aiAuto: Boolean = false,
     val aiSummaries: Map<String, String> = emptyMap(),
     /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
     val aiBusy: Set<String> = emptySet(),
@@ -241,7 +243,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val supported = ai.isSupported()
             if (supported) {
-                _state.update { it.copy(aiSupported = true, aiEnabled = settingsStore.aiEnabled()) }
+                _state.update {
+                    it.copy(
+                        aiSupported = true,
+                        aiEnabled = settingsStore.aiEnabled(),
+                        aiAuto = settingsStore.aiAuto(),
+                    )
+                }
             }
         }
         // Restore the last-known status/location from disk so the UI shows
@@ -522,6 +530,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         persistSnapshots()
                         persistCache()
                         checkAlerts(v, s)
+                        // Auto-AI: refresh the summary off the new data if enabled.
+                        autoSummarize(v)
                     }
                 }
                 sessionFetched.add(v.vin)
@@ -706,6 +716,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setAiEnabled(value) }
     }
 
+    fun setAiAuto(value: Boolean) {
+        _state.update { it.copy(aiAuto = value) }
+        viewModelScope.launch { settingsStore.setAiAuto(value) }
+    }
+
+    /**
+     * Auto-summarize a car when auto-AI is on (called after open/refresh/command).
+     * Silent: no "refresh first" nudge and no error toast, since the user didn't
+     * explicitly ask — they can always tap Summarize for the surfaced version.
+     */
+    private fun autoSummarize(v: Vehicle) {
+        val s = _state.value
+        if (!s.aiSupported || !s.aiEnabled || !s.aiAuto) return
+        if (v.vin in s.aiBusy) return
+        val status = s.statusFor(v) ?: return
+        _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
+        viewModelScope.launch {
+            val result = runCatching { ai.summarize(summaryPrompt(v, status)) }
+            _state.update { st ->
+                result.fold(
+                    onSuccess = { sum ->
+                        st.copy(aiBusy = st.aiBusy - v.vin, aiSummaries = st.aiSummaries + (v.vin to sum))
+                    },
+                    onFailure = { e ->
+                        AppLog.log("⚠ Auto AI summary: ${e.message}")
+                        st.copy(aiBusy = st.aiBusy - v.vin)
+                    },
+                )
+            }
+        }
+    }
+
     /** Summarize a car's last-fetched status with on-device Gemini Nano. */
     fun summarizeCar(v: Vehicle) {
         if (v.vin in _state.value.aiBusy) return
@@ -757,16 +799,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun summaryPrompt(v: Vehicle, status: VehicleStatus?): String {
         val instruction = buildString {
-            append("Your job is to summarize the current status of this one vehicle for its owner. ")
-            append("Lead with the most important information first, in this exact order: ")
-            append("first, whether the doors are locked or unlocked; ")
-            append("second, whether it is charging, and if it is, how long until it is fully charged; ")
-            append("third, whether the car is currently driving or parked. ")
-            append("After those three, briefly cover the other important status, such as ")
-            append("battery or fuel level, driving range, climate, the 12V battery, location, ")
-            append("and any warnings or open doors. ")
-            append("Keep it short and clear, describe only this vehicle, ")
-            append("and do not invent any details that are not in the data below. ")
+            append("Summarize the status of this one vehicle for its owner as exactly three bullet points. ")
+            append("The first bullet must be the headline and read in this order: ")
+            append("the car's name, whether it is locked or unlocked, ")
+            append("whether it is driving, parked, or charging, ")
+            append("and the battery or fuel percentage together with the driving range in miles. ")
+            append("The second bullet must cover diagnostics, such as tire pressure, the 12V battery, ")
+            append("washer or brake fluid, the key fob battery, and any other warnings. ")
+            append("The third bullet must cover the remaining status, such as climate, ")
+            append("the odometer, location, and any open doors or windows. ")
+            append("Describe only this vehicle and do not invent any details that are not in the data below. ")
         }
         return instruction + "\n\nVehicle data for ${v.name}:\n" + carText(v, status)
     }
@@ -976,6 +1018,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     st.copy(statuses = statuses)
                 }
                 persistSnapshots()
+                // Auto-AI: a command changed the car's state, refresh the summary.
+                _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
             } catch (e: Exception) {
                 val msg = e.message ?: "Command failed"
                 AppLog.log("⚠ $msg")

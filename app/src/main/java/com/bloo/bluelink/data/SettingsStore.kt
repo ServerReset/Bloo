@@ -334,6 +334,14 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("ai_enabled")] = value }
     }
 
+    /** When on, AI summaries run automatically on open/refresh/command (vs only on tap). */
+    suspend fun aiAuto(): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("ai_auto")] ?: false
+
+    suspend fun setAiAuto(value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("ai_auto")] = value }
+    }
+
     // --- App-icon shortcut selection -------------------------------------
 
     /** Enabled shortcut ids ("cmd_vin"); null = never customised (show all). */

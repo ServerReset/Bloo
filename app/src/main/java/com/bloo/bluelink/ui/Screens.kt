@@ -37,13 +37,15 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -62,7 +64,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -132,8 +133,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -166,6 +165,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
@@ -195,6 +195,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.ClimateRequest
@@ -214,8 +215,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.tan
 
 @Composable
 fun BlooApp(vm: AppViewModel) {
@@ -899,7 +904,8 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             }
         }
         // Car-name chip, top-center, on every tile except the main one (which shows
-        // the name itself). Centered so it doesn't overlap pebble content.
+        // its own name + dots). Holds the car-switching dots above the larger name,
+        // in one box, so people can see which car they're on and that more exist.
         androidx.compose.animation.AnimatedVisibility(
             visible = current != 0,
             enter = fadeIn(),
@@ -907,18 +913,25 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 2.dp,
                 modifier = Modifier.statusBarsPadding().padding(top = 10.dp),
             ) {
-                Text(
-                    v.name,
-                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Column(
+                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (carCount > 1) PagerDots(current = carIndex, count = carCount)
+                    Text(
+                        v.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
         }
         // Vertical page dots on the right edge — show which pebble tile is visible.
@@ -927,18 +940,6 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 current = current,
                 count = tiles.size,
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp),
-            )
-        }
-        // Horizontal car-switching dots at the bottom so users know they can swipe
-        // left/right to reach other cars. Only shown when there are multiple cars.
-        if (carCount > 1) {
-            PagerDots(
-                current = carIndex,
-                count = carCount,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 14.dp),
             )
         }
     }
@@ -977,37 +978,59 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val img = state.imageUrls[v.vin]
     val scheme = MaterialTheme.colorScheme
-    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp))) {
-        if (!img.isNullOrBlank()) {
-            AsyncImage(
-                model = if (img.startsWith("/")) java.io.File(img) else img,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().alpha(0.22f),
-            )
-        } else {
-            Box(
-                Modifier.fillMaxSize().alpha(0.18f)
-                    .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
-            )
-        }
-        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(v.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                IconButton(onClick = { vm.refreshStatus(v) }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
-                }
+    val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
+    val carCount = state.vehicles.size
+    // A themed Surface establishes the correct content colour for ALL text inside
+    // (otherwise text on the cover screen falls back to the default black).
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(18.dp),
+        color = scheme.surfaceContainer,
+        contentColor = scheme.onSurface,
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            if (!img.isNullOrBlank()) {
+                AsyncImage(
+                    model = if (img.startsWith("/")) java.io.File(img) else img,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().alpha(0.22f),
+                )
+            } else {
+                Box(
+                    Modifier.fillMaxSize().alpha(0.18f)
+                        .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
+                )
             }
-            LastUpdatedLabel(v, state)
-            ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
-            Spacer(Modifier.weight(1f))
-            PrimaryActions(v, state, vm)
-            Text(
-                "Swipe up for more",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
+            Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // Car-switching dots sit just above the (larger) car name.
+                        if (carCount > 1) {
+                            PagerDots(current = carIndex, count = carCount)
+                        }
+                        Text(
+                            v.name,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = scheme.onSurface,
+                        )
+                    }
+                    IconButton(onClick = { vm.refreshStatus(v) }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = scheme.onSurface)
+                    }
+                }
+                LastUpdatedLabel(v, state)
+                ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
+                Spacer(Modifier.weight(1f))
+                PrimaryActions(v, state, vm)
+                Text(
+                    "Swipe up for more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            }
         }
     }
 }
@@ -1419,8 +1442,9 @@ private fun <T> ReorderColumn(
 }
 
 /**
- * A [Slider] whose thumb follows your finger continuously while dragging, then
- * springs (with a little bounce) to the nearest step when you let go.
+ * A clean, fully custom slider: a rounded track with an accent fill, subtle step
+ * ticks, and a circular thumb that springs to the nearest step. Drawn entirely on
+ * a Canvas (no Material Slider) so its look is consistent and theme-driven.
  */
 @Composable
 private fun AnimatedSlider(
@@ -1428,66 +1452,86 @@ private fun AnimatedSlider(
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
-    colors: androidx.compose.material3.SliderColors = SliderDefaults.colors(),
+    accent: Color = MaterialTheme.colorScheme.primary,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val dragging by interaction.collectIsDraggedAsState()
-    val scope = rememberCoroutineScope()
     val haptics = LocalHaptics.current
-    var pos by remember { mutableFloatStateOf(value) }
+    // Central palette: the inactive track and thumb ring always pull from the
+    // theme so the slider stays readable in every colour scheme.
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val thumbRing = MaterialTheme.colorScheme.surface
+    val tickOnActive = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f)
+    val tickOnInactive = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+
+    val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
+    val frac = ((value - valueRange.start) / span).coerceIn(0f, 1f)
+    val animFrac by animateFloatAsState(
+        targetValue = frac,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+        label = "sliderFrac",
+    )
+
+    val density = LocalDensity.current
+    var width by remember { mutableFloatStateOf(0f) }
     var lastSnapped by remember { mutableFloatStateOf(value) }
-    val settle = remember { Animatable(value) }
+    val thumbRadius = 11.dp
+    val trackHeight = 10.dp
+    val insetPx = with(density) { thumbRadius.toPx() }
 
-    // When idle, keep the thumb parked on the real (snapped) value.
-    LaunchedEffect(value) { if (!dragging) settle.snapTo(value) }
+    // Map a touch x (in px) to a snapped value and emit it, ticking on each step.
+    fun emit(px: Float) {
+        if (width <= 0f) return
+        // The usable range is inset by the thumb radius at both ends.
+        val usable = (width - 2 * insetPx).coerceAtLeast(1f)
+        val f = ((px - insetPx) / usable).coerceIn(0f, 1f)
+        val snapped = snapToStep(valueRange.start + f * span, valueRange, steps)
+        if (snapped != lastSnapped) {
+            haptics?.tick()
+            lastSnapped = snapped
+        }
+        onValueChange(snapped)
+    }
 
-    val disp = if (dragging) pos else settle.value
-    val frac = ((disp - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-    // Tick colours: dark dots show on the light active track, light dots on the
-    // dark inactive track.
-    val activeTick = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-    val inactiveTick = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-
-    Box(contentAlignment = Alignment.Center) {
-        Slider(
-            value = if (dragging) pos else settle.value,
-            onValueChange = {
-                pos = it
-                val snapped = snapToStep(it, valueRange, steps)
-                // A crisp tick each time the finger crosses a step.
-                if (snapped != lastSnapped) {
-                    haptics?.tick()
-                    lastSnapped = snapped
-                }
-                onValueChange(snapped)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .onSizeChanged { width = it.width.toFloat() }
+            .pointerInput(steps, valueRange) {
+                detectTapGestures { o -> emit(o.x); haptics?.click() }
+            }
+            .pointerInput(steps, valueRange) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { haptics?.click() },
+                ) { change, _ -> change.consume(); emit(change.position.x) }
             },
-            onValueChangeFinished = {
-                val target = snapToStep(pos, valueRange, steps)
-                lastSnapped = target
-                onValueChange(target)
-                haptics?.click()
-                scope.launch {
-                    settle.snapTo(pos)
-                    settle.animateTo(target, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium))
-                }
-            },
-            valueRange = valueRange,
-            steps = 0, // continuous while dragging; we snap on release ourselves
-            colors = colors,
-            interactionSource = interaction,
-        )
-        // Step ticks drawn ON TOP of the track so they're actually visible.
-        if (steps > 0) {
-            Canvas(Modifier.matchParentSize().padding(horizontal = 12.dp)) {
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val cy = size.height / 2f
+            val stroke = trackHeight.toPx()
+            val startX = thumbRadius.toPx()
+            val endX = size.width - thumbRadius.toPx()
+            val usable = (endX - startX).coerceAtLeast(0f)
+            val thumbX = startX + usable * animFrac
+            // Inactive (full) track, then the active fill up to the thumb.
+            drawLine(trackColor, Offset(startX, cy), Offset(endX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(accent, Offset(startX, cy), Offset(thumbX, cy), strokeWidth = stroke, cap = StrokeCap.Round)
+            // Subtle step ticks along the track.
+            if (steps in 1..30) {
                 val n = steps + 2
-                val r = 2.5.dp.toPx()
-                val cy = size.height / 2f
                 for (i in 0 until n) {
-                    val tf = if (n <= 1) 0f else i.toFloat() / (n - 1)
-                    val cx = size.width * tf
-                    drawCircle(if (tf <= frac) activeTick else inactiveTick, radius = r, center = Offset(cx, cy))
+                    val tf = i.toFloat() / (n - 1)
+                    val cx = startX + usable * tf
+                    drawCircle(
+                        color = if (tf <= animFrac) tickOnActive else tickOnInactive,
+                        radius = 1.6.dp.toPx(),
+                        center = Offset(cx, cy),
+                    )
                 }
             }
+            // Thumb: a clean accent disc with a thin surface ring for separation.
+            drawCircle(thumbRing, radius = thumbRadius.toPx(), center = Offset(thumbX, cy))
+            drawCircle(accent, radius = thumbRadius.toPx() - 3.dp.toPx(), center = Offset(thumbX, cy))
         }
     }
 }
@@ -1882,6 +1926,7 @@ private fun MorphButton(
     restCorner: Dp = 28.dp,
     pressedCorner: Dp = 12.dp,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    border: BorderStroke? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -1899,6 +1944,7 @@ private fun MorphButton(
         shape = RoundedCornerShape(corner),
         interactionSource = interaction,
         colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
+        border = border,
         contentPadding = contentPadding,
         content = content,
     )
@@ -2144,7 +2190,7 @@ private fun Pebble(
 }
 
 /** Shared control height: a collapsed pebble matches the lock/unlock button. */
-private val ControlHeight = 64.dp
+private val ControlHeight = 76.dp
 
 /** Uniform collapsed-header height so every pebble lines up at the same size. */
 private val PebbleHeaderHeight = ControlHeight
@@ -2162,10 +2208,13 @@ private fun PebbleActionButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
     pending: Boolean = false,
-    container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    // Default to a tinted container so the button always keeps a visible shape,
+    // even on a neutral pebble background in light mode (where surface tones match).
+    container: Color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
 ) {
-    // Press-morphing is the standard for togglable controls.
+    // Press-morphing is the standard for togglable controls. A faint outline
+    // guarantees the button's shape stays visible on any pebble background.
     MorphButton(
         onClick = onClick,
         enabled = enabled && !pending,
@@ -2173,6 +2222,7 @@ private fun PebbleActionButton(
         contentColor = contentColor,
         restCorner = 20.dp,
         pressedCorner = 10.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         modifier = Modifier.heightIn(min = 42.dp),
     ) {
@@ -2548,7 +2598,7 @@ private fun SeatControl(
             onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
             valueRange = 0f..range.lastIndex.toFloat(),
             steps = (range.size - 2).coerceAtLeast(0),
-            colors = SliderDefaults.colors(thumbColor = tint, activeTrackColor = tint),
+            accent = tint,
         )
     }
 }
@@ -2708,22 +2758,60 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 }
 
 /**
- * A small map with a pin at the car's position. Uses a key-free OSM static-map
- * image (loaded with Coil) rather than a WebView, which painted blank.
+ * A small slippy map centred on the car, assembled from key-free OpenStreetMap
+ * raw tiles (tile.openstreetmap.org). We compute the tiles needed to fill the box
+ * with the car at the centre, draw each at its pixel offset, then drop a pin in
+ * the middle. This avoids the flaky static-map render services that painted blank.
  */
 @Composable
 private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
-    val lat = location.latitude
-    val lon = location.longitude
-    val url = "https://staticmap.openstreetmap.de/staticmap.php" +
-        "?center=$lat,$lon&zoom=15&size=640x360&maptype=mapnik&markers=$lat,$lon,red-pushpin"
-    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-        // The static map already renders a red pin at the marker coordinates.
-        AsyncImage(
-            model = url,
-            contentDescription = "Map",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+    val zoom = 15
+    val context = LocalContext.current
+    val pinColor = MaterialTheme.colorScheme.error
+    BoxWithConstraints(
+        modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        val density = LocalDensity.current
+        val tilePx = 256f
+        val wPx = with(density) { maxWidth.toPx() }
+        val hPx = with(density) { maxHeight.toPx() }
+        val span = 1 shl zoom
+        val latRad = Math.toRadians(location.latitude)
+        val xTileF = (location.longitude + 180.0) / 360.0 * span
+        val yTileF = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / Math.PI) / 2.0 * span
+        // World-pixel of the box's top-left so the car lands dead-centre.
+        val originX = (xTileF * tilePx - wPx / 2f).toFloat()
+        val originY = (yTileF * tilePx - hPx / 2f).toFloat()
+        val firstX = floor(originX / tilePx).toInt()
+        val firstY = floor(originY / tilePx).toInt()
+        val lastX = floor((originX + wPx) / tilePx).toInt()
+        val lastY = floor((originY + hPx) / tilePx).toInt()
+        val tileDp = with(density) { tilePx.toDp() }
+        for (tx in firstX..lastX) {
+            for (ty in firstY..lastY) {
+                if (ty < 0 || ty >= span) continue
+                val wrappedX = ((tx % span) + span) % span
+                val offX = tx * tilePx - originX
+                val offY = ty * tilePx - originY
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("https://tile.openstreetmap.org/$zoom/$wrappedX/$ty.png")
+                        .setHeader("User-Agent", "Bloo Bluelink companion app")
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(tileDp)
+                        .offset(x = with(density) { offX.toDp() }, y = with(density) { offY.toDp() }),
+                )
+            }
+        }
+        // A pin whose tip points at the centred car position.
+        Icon(
+            Icons.Filled.LocationOn,
+            contentDescription = "Car location",
+            tint = pinColor,
+            modifier = Modifier.align(Alignment.Center).size(40.dp).offset(y = (-20).dp),
         )
     }
 }
@@ -3145,6 +3233,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (state.aiEnabled) {
+                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
+                        Text(
+                            if (state.aiAuto) {
+                                "Summaries refresh on their own when you open a car, refresh its " +
+                                    "status, or send a command. You can still tap Summarize anytime."
+                            } else {
+                                "Summaries only run when you tap Summarize on a car."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
