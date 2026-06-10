@@ -33,6 +33,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -188,7 +189,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.composed
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
@@ -1140,6 +1145,27 @@ private fun LastUpdatedLabel(v: Vehicle, state: UiState, modifier: Modifier = Mo
 // --- Drag-and-drop reordering --------------------------------------------
 
 /**
+ * Animates an item gliding to its new placement when siblings reorder around it,
+ * instead of snapping. Used for the non-dragged pebbles so they slide out of the
+ * way smoothly. The dragged item is offset manually and must not use this.
+ */
+private fun Modifier.animatePlacement(): Modifier = composed {
+    val scope = rememberCoroutineScope()
+    var target by remember { mutableStateOf(IntOffset.Zero) }
+    var anim by remember { mutableStateOf<Animatable<IntOffset, *>?>(null) }
+    this
+        .onPlaced { target = it.positionInParent().round() }
+        .offset {
+            val a = anim ?: Animatable(target, IntOffset.VectorConverter).also { anim = it }
+            if (a.targetValue != target) {
+                scope.launch { a.animateTo(target, spring(stiffness = Spring.StiffnessMediumLow)) }
+            }
+            a.value - target
+        }
+}
+
+
+/**
  * A vertical list whose items can be reordered by long-pressing the supplied
  * [dragHandle] and dragging. Item heights are measured so variable-height rows
  * reorder correctly; the live order is committed via [onReorder] on drop.
@@ -1174,6 +1200,9 @@ private fun <T> ReorderColumn(
                 Box(
                     Modifier
                         .zIndex(if (dragging) 1f else 0f)
+                        // Non-dragged items glide to their new slot; the dragged
+                        // one is positioned manually via graphicsLayer below.
+                        .then(if (dragging) Modifier else Modifier.animatePlacement())
                         .graphicsLayer {
                             translationY = if (dragging) offsetY else 0f
                             scaleX = lift
@@ -2741,108 +2770,133 @@ private fun CarSettingsCard(
                 }
             }
             AnimatedVisibility(visible = expanded) {
-                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Powertrain", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    val current = state.powertrainOf(v)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Powertrain.entries.forEach { pt ->
-                            FilterChip(
-                                selected = current == pt,
-                                onClick = { vm.setPowertrain(v, pt) },
-                                label = { Text(pt.name) },
-                            )
+                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SettingsGroup("Powertrain") {
+                        val current = state.powertrainOf(v)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Powertrain.entries.forEach { pt ->
+                                FilterChip(
+                                    selected = current == pt,
+                                    onClick = { vm.setPowertrain(v, pt) },
+                                    label = { Text(pt.name) },
+                                )
+                            }
                         }
                     }
 
-                    Text("Features", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        "The remote climate command controls four seat positions. Enable " +
-                            "heating and/or cooling for the seats your car actually has.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    SeatConfigRow("Driver", seats.driverHeat, seats.driverCool,
-                        { vm.setSeatFlag(v, "dh", it) }, { vm.setSeatFlag(v, "dc", it) })
-                    SeatConfigRow("Front passenger", seats.passHeat, seats.passCool,
-                        { vm.setSeatFlag(v, "ph", it) }, { vm.setSeatFlag(v, "pc", it) })
-                    SeatConfigRow("Rear left", seats.rearLeftHeat, seats.rearLeftCool,
-                        { vm.setSeatFlag(v, "rlh", it) }, { vm.setSeatFlag(v, "rlc", it) })
-                    SeatConfigRow("Rear right", seats.rearRightHeat, seats.rearRightCool,
-                        { vm.setSeatFlag(v, "rrh", it) }, { vm.setSeatFlag(v, "rrc", it) })
-                    ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
-
-                    Text("Photo", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    val storedImage = state.imageUrls[v.vin]
-                    if (storedImage != null && storedImage.startsWith("/")) {
+                    SettingsGroup("Climate features") {
                         Text(
-                            "Custom photo set",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "The remote climate command controls four seat positions. Enable " +
+                                "heating and/or cooling for the seats your car actually has.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    } else {
+                        SeatConfigRow("Driver", seats.driverHeat, seats.driverCool,
+                            { vm.setSeatFlag(v, "dh", it) }, { vm.setSeatFlag(v, "dc", it) })
+                        SeatConfigRow("Front passenger", seats.passHeat, seats.passCool,
+                            { vm.setSeatFlag(v, "ph", it) }, { vm.setSeatFlag(v, "pc", it) })
+                        SeatConfigRow("Rear left", seats.rearLeftHeat, seats.rearLeftCool,
+                            { vm.setSeatFlag(v, "rlh", it) }, { vm.setSeatFlag(v, "rlc", it) })
+                        SeatConfigRow("Rear right", seats.rearRightHeat, seats.rearRightCool,
+                            { vm.setSeatFlag(v, "rrh", it) }, { vm.setSeatFlag(v, "rrc", it) })
+                        ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
+                    }
+
+                    SettingsGroup("Photo") {
+                        val storedImage = state.imageUrls[v.vin]
+                        if (storedImage != null && storedImage.startsWith("/")) {
+                            Text(
+                                "Custom photo set",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            OutlinedTextField(
+                                value = storedImage ?: "",
+                                onValueChange = { vm.setVehicleImage(v.vin, it) },
+                                label = { Text("Image URL (blank = gradient)") },
+                                singleLine = true,
+                                shape = FieldShape,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = onPickPhoto) { Text("Choose photo") }
+                            if (state.imageUrls[v.vin] != null) {
+                                TextButton(onClick = { vm.setVehicleImage(v.vin, "") }) { Text("Clear") }
+                            }
+                        }
+                    }
+
+                    SettingsGroup("Identity & service") {
+                        SelectionContainer { StatusRow("VIN", v.vin) }
                         OutlinedTextField(
-                            value = storedImage ?: "",
-                            onValueChange = { vm.setVehicleImage(v.vin, it) },
-                            label = { Text("Image URL (blank = gradient)") },
+                            value = state.licensePlates[v.vin] ?: "",
+                            onValueChange = { vm.setLicensePlate(v.vin, it) },
+                            label = { Text("License plate") },
                             singleLine = true,
                             shape = FieldShape,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onPickPhoto) { Text("Choose photo") }
-                        if (state.imageUrls[v.vin] != null) {
-                            TextButton(onClick = { vm.setVehicleImage(v.vin, "") }) { Text("Clear") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = state.lastServiceMiles[v.vin]?.toString() ?: "",
+                                onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                                label = { Text("Last service (mi)") },
+                                singleLine = true,
+                                shape = FieldShape,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedTextField(
+                                value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
+                                onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                                label = { Text("Interval (mi)") },
+                                singleLine = true,
+                                shape = FieldShape,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
 
-                    Text("Identity & service", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    SelectionContainer { StatusRow("VIN", v.vin) }
-                    OutlinedTextField(
-                        value = state.licensePlates[v.vin] ?: "",
-                        onValueChange = { vm.setLicensePlate(v.vin, it) },
-                        label = { Text("License plate") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = state.lastServiceMiles[v.vin]?.toString() ?: "",
-                            onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                            label = { Text("Last service (mi)") },
-                            singleLine = true,
-                            shape = FieldShape,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
+                    SettingsGroup("Sections shown") {
+                        val labels = mapOf(
+                            "climate" to "Climate",
+                            "location" to "Location",
+                            "info" to "Car info",
+                            "diagnostics" to "Diagnostics",
                         )
-                        OutlinedTextField(
-                            value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
-                            onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                            label = { Text("Interval (mi)") },
-                            singleLine = true,
-                            shape = FieldShape,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-
-                    Text("Sections shown", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    val labels = mapOf(
-                        "climate" to "Climate",
-                        "charge" to "Charge limits",
-                        "location" to "Location",
-                        "info" to "Car info",
-                        "diagnostics" to "Diagnostics",
-                    )
-                    com.bloo.bluelink.data.HIDEABLE_SECTIONS.forEach { sec ->
-                        ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
-                            vm.setSectionHidden(v, sec, !show)
+                        com.bloo.bluelink.data.HIDEABLE_SECTIONS.forEach { sec ->
+                            ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
+                                vm.setSectionHidden(v, sec, !show)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** A titled, boxed sub-group inside the per-car settings card, for hierarchy. */
+@Composable
+private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        content()
     }
 }
 
