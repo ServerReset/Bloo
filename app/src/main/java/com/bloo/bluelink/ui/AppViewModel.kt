@@ -94,6 +94,8 @@ data class UiState(
     /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
     val aiBusy: Set<String> = emptySet(),
     val aiSearchReply: String? = null,
+    /** First-run coach mark on the Settings screen (points at the back arrow). */
+    val showSettingsCoach: Boolean = false,
     /** All signed-in accounts (one per brand). */
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */
@@ -685,8 +687,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Finish first-run onboarding by going (required) into Settings. */
     fun startSetup() {
         viewModelScope.launch { settingsStore.setOnboardingSeen() }
-        _state.update { it.copy(screen = Screen.Settings) }
+        _state.update { it.copy(screen = Screen.Settings, showSettingsCoach = true) }
     }
+
+    fun dismissSettingsCoach() = _state.update { it.copy(showSettingsCoach = false) }
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
@@ -937,6 +941,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage,
                 expandedIndex = null,
+                showSettingsCoach = false,
             )
         }
     }

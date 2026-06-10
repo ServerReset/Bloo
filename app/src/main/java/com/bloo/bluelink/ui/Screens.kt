@@ -321,7 +321,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
                 Screen.Onboarding -> OnboardingScreen(vm)
                 Screen.Garage -> GarageScreen(state, vm)
-                Screen.Settings -> Box(Modifier.padding(padding)) { SettingsScreen(vm) }
+                Screen.Settings -> SettingsScreen(vm)
             }
         }
     }
@@ -2845,23 +2845,18 @@ private fun SettingsScreen(vm: AppViewModel) {
         if (uri != null && pickTarget != null) cropUri = uri
     }
 
+  val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+  val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   Box(Modifier.fillMaxSize()) {
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("Settings") },
-            navigationIcon = {
-                IconButton(onClick = { vm.closeSettings() }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                }
-            },
-        )
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Content scrolls behind the status bar; clear the floating pills.
+            Spacer(Modifier.height(topInset + 56.dp))
             var query by remember { mutableStateOf("") }
             OutlinedTextField(
                 value = query,
@@ -3176,20 +3171,64 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                 }
             }
+            Spacer(Modifier.height(bottomInset + 16.dp))
           }
         }
-    }
-    cropUri?.let { uri ->
-        val target = pickTarget
-        if (target != null) {
-            CropScreen(
-                vin = target,
-                uriString = uri.toString(),
-                onCancel = { cropUri = null; pickTarget = null },
-                onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
-            )
+        // Floating back-arrow + "Settings" label pills over the content.
+        Row(
+            Modifier.align(Alignment.TopStart).statusBarsPadding(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shadowElevation = 3.dp,
+            ) {
+                Text(
+                    "Settings",
+                    Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
-    }
+        // First-run coach mark pointing at the back arrow.
+        if (state.showSettingsCoach) {
+            Surface(
+                onClick = { vm.dismissSettingsCoach() },
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 12.dp, top = 60.dp, end = 12.dp),
+            ) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "That arrow takes you into the app when you're done here. Tap to dismiss.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+        cropUri?.let { uri ->
+            val target = pickTarget
+            if (target != null) {
+                CropScreen(
+                    vin = target,
+                    uriString = uri.toString(),
+                    onCancel = { cropUri = null; pickTarget = null },
+                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
+                )
+            }
+        }
   }
 }
 
