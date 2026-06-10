@@ -1443,26 +1443,51 @@ private fun AnimatedSlider(
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
     val interactionSource = remember { MutableInteractionSource() }
+
+    // The thumb position is driven continuously so it tracks the finger exactly
+    // while dragging (the underlying Slider runs with steps = 0). On release we
+    // spring it to the nearest step, giving a small bounce as it settles.
+    val anim = remember { Animatable(value) }
+    var dragging by remember { mutableStateOf(false) }
     var prevStep by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
 
+    // Follow external value changes when the user isn't interacting.
+    LaunchedEffect(value) {
+        if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
+    }
+
     Slider(
-        value = value,
+        value = anim.value,
         onValueChange = { v ->
+            dragging = true
+            scope.launch { anim.snapTo(v) }
+            // Haptic tick each time the finger crosses into a new step.
             val s = snapToStep(v, valueRange, steps)
             if (steps > 0 && s != prevStep) {
                 haptics?.tick()
                 prevStep = s
             }
-            onValueChange(v)
+            // Report the snapped value so the readout label shows real steps.
+            onValueChange(s)
         },
         onValueChangeFinished = {
-            val s = snapToStep(value, valueRange, steps)
-            if (s != value) onValueChange(s)
+            dragging = false
+            val target = snapToStep(anim.value, valueRange, steps)
+            prevStep = target
             haptics?.click()
+            onValueChange(target)
+            // Bounce-settle the thumb onto the nearest step.
+            scope.launch {
+                anim.animateTo(
+                    target,
+                    animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                )
+            }
         },
         valueRange = valueRange,
-        steps = steps,
+        steps = 0,
         interactionSource = interactionSource,
         colors = SliderDefaults.colors(
             thumbColor = accent,
