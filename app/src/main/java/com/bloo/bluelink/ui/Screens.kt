@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -1206,25 +1207,44 @@ private fun AnimatedSlider(
     // When idle, keep the thumb parked on the real (snapped) value.
     LaunchedEffect(value) { if (!dragging) settle.snapTo(value) }
 
-    Slider(
-        value = if (dragging) pos else settle.value,
-        onValueChange = {
-            pos = it
-            onValueChange(snapToStep(it, valueRange, steps))
-        },
-        onValueChangeFinished = {
-            val target = snapToStep(pos, valueRange, steps)
-            onValueChange(target)
-            scope.launch {
-                settle.snapTo(pos)
-                settle.animateTo(target, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium))
+    Box(contentAlignment = Alignment.Center) {
+        // Step ticks — drawn under the slider so the thumb/active track cover the
+        // passed ones, mimicking native ticks while drag stays continuous.
+        if (steps > 0) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                repeat(steps + 2) {
+                    Box(
+                        Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
+                    )
+                }
             }
-        },
-        valueRange = valueRange,
-        steps = 0, // continuous while dragging; we snap on release ourselves
-        colors = colors,
-        interactionSource = interaction,
-    )
+        }
+        Slider(
+            value = if (dragging) pos else settle.value,
+            onValueChange = {
+                pos = it
+                onValueChange(snapToStep(it, valueRange, steps))
+            },
+            onValueChangeFinished = {
+                val target = snapToStep(pos, valueRange, steps)
+                onValueChange(target)
+                scope.launch {
+                    settle.snapTo(pos)
+                    settle.animateTo(target, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium))
+                }
+            },
+            valueRange = valueRange,
+            steps = 0, // continuous while dragging; we snap on release ourselves
+            colors = colors,
+            interactionSource = interaction,
+        )
+    }
 }
 
 private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
@@ -1380,11 +1400,16 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     PrimaryActions(v, state, vm)
 }
 
-/** Non-collapsible card holding the lock/charge controls (a reorderable pebble). */
+/**
+ * The lock/unlock control. Deliberately *not* styled like the other pebbles —
+ * it's just the morphing Lock/Unlock button with its status on the left, with no
+ * card, header or expand chevron. It can still be long-pressed and dragged to
+ * reorder, like a pebble, even though it doesn't look like one.
+ */
 @Composable
 private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    Card(Modifier.fillMaxWidth().then(dragHandle)) {
-        Column(Modifier.padding(16.dp)) { PrimaryActions(v, state, vm) }
+    Box(Modifier.fillMaxWidth().then(dragHandle).padding(horizontal = 4.dp)) {
+        PrimaryActions(v, state, vm)
     }
 }
 
@@ -1553,6 +1578,7 @@ private fun Pebble(
     dragHandle: Modifier = Modifier,
     summary: String? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    headerAction: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val forceExpanded = LocalForceExpanded.current
@@ -1562,18 +1588,34 @@ private fun Pebble(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "pebbleChevron",
     )
+    // Collapsed = pill-soft corners; expanded morphs to a tighter rounded square.
+    val corner by animateDpAsState(
+        targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "pebbleCorner",
+    )
     Card(
         Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(corner),
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            // Tap the header to expand/collapse; long-press it to drag-reorder.
+        // animateContentSize gives a smooth, correctly-measured collapse (no
+        // post-animation size jump) for both fixed- and variable-height bodies.
+        Column(
+            Modifier.animateContentSize(
+                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+            ),
+        ) {
+            // Header: tap anywhere to toggle, long-press to drag-reorder. The
+            // action button and chevron handle their own clicks. Fixed min height
+            // so every collapsed pebble lines up.
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
                     .then(if (forceExpanded) Modifier else Modifier.clickable { vm.togglePebble(v, section) })
-                    .then(dragHandle),
+                    .then(dragHandle)
+                    .heightIn(min = PebbleHeaderHeight)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -1593,15 +1635,11 @@ private fun Pebble(
                         )
                     }
                 }
-                // On cover-screen tiles there's no reordering or collapsing.
+                if (headerAction != null) {
+                    headerAction()
+                    Spacer(Modifier.width(4.dp))
+                }
                 if (!forceExpanded) {
-                    Icon(
-                        Icons.Filled.DragHandle,
-                        contentDescription = "Drag to reorder",
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(8.dp))
                     Icon(
                         Icons.Filled.KeyboardArrowDown,
                         contentDescription = if (expanded) "Collapse" else "Expand",
@@ -1609,19 +1647,50 @@ private fun Pebble(
                     )
                 }
             }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(
-                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-                ) + fadeIn(),
-                exit = shrinkVertically(spring(stiffness = Spring.StiffnessMedium)) + fadeOut(),
-            ) {
+            if (expanded) {
                 Column(
-                    Modifier.padding(top = 12.dp),
+                    Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     content = content,
                 )
             }
+        }
+    }
+}
+
+/** Uniform collapsed-header height so every pebble lines up at the same size. */
+private val PebbleHeaderHeight = 60.dp
+private val PebbleCornerCollapsed = 32.dp
+private val PebbleCornerExpanded = 20.dp
+
+/**
+ * A compact pill button used in a pebble header (charge/climate/location), shown
+ * even when the pebble is collapsed, sitting just before the expand chevron.
+ */
+@Composable
+private fun PebbleActionButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    pending: Boolean = false,
+    container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled && !pending,
+        shape = RoundedCornerShape(20.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.heightIn(min = 42.dp),
+    ) {
+        if (pending) {
+            LoadingIndicator(Modifier.size(18.dp))
+        } else {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(label, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -1836,9 +1905,37 @@ private fun ClimatePebble(
     var rearLeft by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var rearRight by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
 
+    val climateOn = status?.airCtrlOn == true
+    val startClimate = {
+        vm.startClimate(
+            v,
+            ClimateRequest(
+                tempF = tempF,
+                defrost = defrost,
+                durationMinutes = duration,
+                steeringWheelHeat = steeringHeat,
+                seatFrontLeft = driver,
+                seatFrontRight = passenger,
+                seatRearLeft = rearLeft,
+                seatRearRight = rearRight,
+            ),
+        )
+    }
+
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
+        summary = if (climateOn) "On" else "Off",
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        headerAction = {
+            PebbleActionButton(
+                label = if (climateOn) "Stop" else "Start",
+                icon = Icons.Filled.AcUnit,
+                onClick = { if (climateOn) vm.stopClimate(v) else startClimate() },
+                pending = pending,
+                container = if (climateOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = if (climateOn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            )
+        },
     ) {
         StepRow("Temperature", "$tempF°F")
         AnimatedSlider(
@@ -1884,31 +1981,6 @@ private fun ClimatePebble(
                 SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
             }
         }
-
-        // Combined start/stop: morphs pill <-> rounded square, shows On/Off.
-        StateControl(
-            name = "Climate",
-            isOn = status?.airCtrlOn,
-            stateOn = "On", stateOff = "Off",
-            turnOn = "Start", turnOff = "Stop",
-            icon = Icons.Filled.AcUnit, pending = pending,
-            onActivate = {
-                vm.startClimate(
-                    v,
-                    ClimateRequest(
-                        tempF = tempF,
-                        defrost = defrost,
-                        durationMinutes = duration,
-                        steeringWheelHeat = steeringHeat,
-                        seatFrontLeft = driver,
-                        seatFrontRight = passenger,
-                        seatRearLeft = rearLeft,
-                        seatRearRight = rearRight,
-                    ),
-                )
-            },
-            onDeactivate = { vm.stopClimate(v) },
-        )
     }
 }
 
@@ -1952,69 +2024,56 @@ private fun SeatControl(
  */
 @Composable
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val forceExpanded = LocalForceExpanded.current
-    val expanded = forceExpanded || state.isPebbleExpanded(v.vin, "charge")
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "chargeChevron",
-    )
     val targets = status?.evStatus?.reservChargeInfos
     var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
     var dc by remember(v.vin) { mutableIntStateOf(targets?.level(0) ?: 80) }
     val ev = status?.evStatus
-    val plugged = (ev?.batteryPlugin != null && ev.batteryPlugin != 0) || ev?.batteryCharge == true
+    val charging = ev?.batteryCharge == true
+    val plugged = (ev?.batteryPlugin != null && ev.batteryPlugin != 0) || charging
+    val pending = state.isPending(v.vin, "charge")
+    val mins = ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+    val summary = when {
+        charging -> "Charging" + (mins?.let { " · ${fmtMinutes(it)} to full" } ?: "")
+        plugged -> "Plugged in · idle"
+        else -> "Not plugged in"
+    }
 
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    Pebble(
+        v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
+        summary = summary,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        headerAction = {
+            PebbleActionButton(
+                label = if (charging) "Stop" else "Start",
+                icon = Icons.Filled.Bolt,
+                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
+                enabled = plugged,
+                pending = pending,
+                container = if (charging) ChargeGreen else MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = if (charging) Color.White else MaterialTheme.colorScheme.onSurface,
+            )
+        },
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                Modifier.fillMaxWidth().then(dragHandle),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.weight(1f)) { ChargeControl(v, status, state, vm) }
-                if (!forceExpanded) {
-                    IconButton(onClick = { vm.togglePebble(v, "charge") }) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = if (expanded) "Collapse" else "Expand",
-                            modifier = Modifier.rotate(rotation),
-                        )
-                    }
-                }
-            }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)) + fadeIn(),
-                exit = shrinkVertically(spring(stiffness = Spring.StiffnessMedium)) + fadeOut(),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (plugged) {
-                        ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
-                            ?.let { StatusRow("Time to full", fmtMinutes(it)) }
-                        chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
-                    }
-                    StepRow("AC (home) target", "$ac%")
-                    AnimatedSlider(
-                        value = ac.toFloat(),
-                        onValueChange = { ac = (it / 10f).roundToInt() * 10 },
-                        valueRange = 50f..100f,
-                        steps = 4,
-                    )
-                    StepRow("DC (fast) target", "$dc%")
-                    AnimatedSlider(
-                        value = dc.toFloat(),
-                        onValueChange = { dc = (it / 10f).roundToInt() * 10 },
-                        valueRange = 50f..100f,
-                        steps = 4,
-                    )
-                    CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
-                        vm.setChargeLimits(v, ac, dc)
-                    }
-                }
-            }
+        if (plugged) {
+            mins?.let { StatusRow("Time to full", fmtMinutes(it)) }
+            chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
+        }
+        StepRow("AC (home) target", "$ac%")
+        AnimatedSlider(
+            value = ac.toFloat(),
+            onValueChange = { ac = (it / 10f).roundToInt() * 10 },
+            valueRange = 50f..100f,
+            steps = 4,
+        )
+        StepRow("DC (fast) target", "$dc%")
+        AnimatedSlider(
+            value = dc.toFloat(),
+            onValueChange = { dc = (it / 10f).roundToInt() * 10 },
+            valueRange = 50f..100f,
+            steps = 4,
+        )
+        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
+            vm.setChargeLimits(v, ac, dc)
         }
     }
 }
@@ -2037,7 +2096,18 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     val locating = state.isPending(v.vin, "locate")
     // Show the place name (or a hint) in the header so it's visible even collapsed.
     val summary = place ?: if (location != null) "Located" else "Not located yet"
-    Pebble(v, "location", "Location", Icons.Filled.LocationOn, state, vm, dragHandle, summary = summary) {
+    Pebble(
+        v, "location", "Location", Icons.Filled.LocationOn, state, vm, dragHandle, summary = summary,
+        headerAction = {
+            PebbleActionButton(
+                label = if (locating) "…" else "Locate",
+                icon = Icons.Filled.LocationOn,
+                onClick = { vm.locate(v) },
+                enabled = !locating,
+                pending = locating,
+            )
+        },
+    ) {
         if (location == null) {
             Text("Tap Locate to query the car's current position.")
         }
@@ -2050,25 +2120,15 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
                     .clip(RoundedCornerShape(18.dp)),
             )
             StatusRow("Coordinates", String.format("%.5f, %.5f", loc.latitude, loc.longitude))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CommandButton(
-                label = if (locating) "Locating…" else "Locate",
-                icon = Icons.Filled.LocationOn,
-                modifier = Modifier.weight(1f),
-                enabled = !locating,
-            ) { vm.locate(v) }
-            if (location != null) {
-                CommandButton("Map", Icons.Filled.Map, Modifier.weight(1f), true) {
-                    val uri = Uri.parse(
-                        "geo:${location.latitude},${location.longitude}" +
-                            "?q=${location.latitude},${location.longitude}(My car)"
+            CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
+                val uri = Uri.parse(
+                    "geo:${loc.latitude},${loc.longitude}" +
+                        "?q=${loc.latitude},${loc.longitude}(My car)"
+                )
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
                     )
-                    runCatching {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                        )
-                    }
                 }
             }
         }
