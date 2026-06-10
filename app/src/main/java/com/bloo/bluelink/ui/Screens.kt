@@ -216,6 +216,11 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.coordString
+import com.bloo.bluelink.data.openLabels
+import com.bloo.bluelink.data.percentFor
+import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.targetForCurrentPlug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1094,13 +1099,10 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
 private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean, drivingLabel: String? = null) {
     // Primary metric: battery if the car has one, else fuel. Plug-in hybrids show
     // both — battery as the headline and fuel as a secondary line.
-    val battPct = status?.evStatus?.batteryStatus
     val fuelPct = status?.fuelLevel
-    val pct = if (hasBattery) battPct else fuelPct
+    val pct = status?.percentFor(hasBattery)
     val frac = ((pct ?: 0).coerceIn(0, 100)) / 100f
-    val battRange = status?.evStatus?.drvDistance?.firstOrNull()
-        ?.rangeByFuel?.totalAvailableRange?.value
-    val range = (if (hasBattery) battRange else null) ?: status?.dte?.value
+    val range = status?.rangeMiFor(hasBattery)
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
     // Charging time + type, shown in the badge slot (replacing parked/driving,
     // which is hidden while charging) so the pebble doesn't grow taller.
@@ -1130,7 +1132,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             }
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(
-                    text = range?.let { "${it.toInt()} mi" } ?: "—",
+                    text = range?.let { "$it mi" } ?: "—",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1176,17 +1178,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             label = "chargeFill",
         )
         // Target-SOC marker: dot at the AC/DC limit, only when plugged in.
-        val ev = status?.evStatus
-        val plugged = ev?.batteryPlugin != null && ev.batteryPlugin != 0
-        val targetPct = if (plugged) {
-            when (ev?.batteryPlugin) {
-                1 -> ev.reservChargeInfos?.level(0) // DC fast
-                2 -> ev.reservChargeInfos?.level(1) // AC
-                else -> null
-            }
-        } else {
-            null
-        }
+        val targetPct = status?.evStatus?.targetForCurrentPlug()
         BoxWithConstraints(Modifier.fillMaxWidth().height(18.dp)) {
             // Track + gradient fill (darker green on the left → current green right).
             Box(
@@ -2167,31 +2159,17 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 SectionLabel("Status")
                 status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
                 StatusRow("Doors", if (status.doorLock == true) "Locked" else "Unlocked")
-                status.doorOpen?.let { d ->
-                    val open = listOfNotNull(
-                        if (d.frontLeft == 1) "front-left" else null,
-                        if (d.frontRight == 1) "front-right" else null,
-                        if (d.backLeft == 1) "rear-left" else null,
-                        if (d.backRight == 1) "rear-right" else null,
-                    )
-                    if (open.isNotEmpty()) StatusRow("Doors open", open.joinToString(", "))
-                }
-                status.windowOpen?.let { w ->
-                    val open = listOfNotNull(
-                        if (w.frontLeft == 1) "front-left" else null,
-                        if (w.frontRight == 1) "front-right" else null,
-                        if (w.backLeft == 1) "rear-left" else null,
-                        if (w.backRight == 1) "rear-right" else null,
-                    )
-                    if (open.isNotEmpty()) StatusRow("Windows open", open.joinToString(", "))
-                }
+                status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
+                    ?.let { StatusRow("Doors open", it.joinToString(", ")) }
+                status.windowOpen?.openLabels()?.takeIf { it.isNotEmpty() }
+                    ?.let { StatusRow("Windows open", it.joinToString(", ")) }
                 if (status.trunkOpen == true) StatusRow("Trunk", "Open")
                 if (status.hoodOpen == true) StatusRow("Hood", "Open")
                 if (status.acc == true) StatusRow("Accessory power", "On")
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                 if (status.defrost == true) StatusRow("Defrost", "On")
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
-                location?.let { StatusRow("Coordinates", String.format("%.5f, %.5f", it.latitude, it.longitude)) }
+                location?.let { StatusRow("Coordinates", it.coordString()) }
                 rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
 
                 if (plugged) {
@@ -2199,12 +2177,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                     ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
                         ?.let { StatusRow("Time to full", fmtMinutes(it)) }
                     chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
-                    val tgt = when (ev?.batteryPlugin) {
-                        1 -> ev.reservChargeInfos?.level(0)
-                        2 -> ev.reservChargeInfos?.level(1)
-                        else -> null
-                    }
-                    tgt?.let { StatusRow("Charge limit", "$it%") }
+                    ev?.targetForCurrentPlug()?.let { StatusRow("Charge limit", "$it%") }
                 }
             }
         }
@@ -2507,6 +2480,10 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     val targets = status?.evStatus?.reservChargeInfos
     var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
     var dc by remember(v.vin) { mutableIntStateOf(targets?.level(0) ?: 80) }
+    // Track freshly-fetched targets (the initial remember is keyed only on VIN,
+    // so a later refresh wouldn't otherwise move the sliders).
+    LaunchedEffect(targets?.level(1)) { targets?.level(1)?.let { ac = it } }
+    LaunchedEffect(targets?.level(0)) { targets?.level(0)?.let { dc = it } }
     val ev = status?.evStatus
     val charging = ev?.batteryCharge == true
     val plugged = (ev?.batteryPlugin != null && ev.batteryPlugin != 0) || charging
@@ -2630,7 +2607,7 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
                     .height(220.dp)
                     .clip(RoundedCornerShape(18.dp)),
             )
-            StatusRow("Coordinates", String.format("%.5f, %.5f", loc.latitude, loc.longitude))
+            StatusRow("Coordinates", loc.coordString())
             CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
                 val uri = Uri.parse(
                     "geo:${loc.latitude},${loc.longitude}" +
@@ -3475,11 +3452,8 @@ private fun SettingsSearchResults(
             st?.evStatus?.batteryStatus?.let { b ->
                 add("Battery · ${v.name}", "battery charge soc percent ${v.name}") { StatusRow("Battery", "$b%") }
             }
-            val limit = when (st?.evStatus?.batteryPlugin) {
-                1 -> st?.evStatus?.reservChargeInfos?.level(0)
-                2 -> st?.evStatus?.reservChargeInfos?.level(1)
-                else -> st?.evStatus?.reservChargeInfos?.level(1)
-            }
+            // Current-plug target if plugged in, else the configured AC home limit.
+            val limit = st?.evStatus?.targetForCurrentPlug() ?: st?.evStatus?.reservChargeInfos?.level(1)
             limit?.let { l -> add("Charge limit · ${v.name}", "charge limit target ${v.name}") { StatusRow("Charge limit", "$l%") } }
         } else {
             st?.fuelLevel?.let { f ->
@@ -3489,9 +3463,7 @@ private fun SettingsSearchResults(
         rememberRelativeTime(state.fetchedAt(v))?.let { rel ->
             add("Last refreshed · ${v.name}", "updated refreshed time ${v.name}") { StatusRow("Last refreshed", rel) }
         }
-        (state.placeNames[v.vin] ?: state.locations[v.vin]?.let {
-            String.format("%.4f, %.4f", it.latitude, it.longitude)
-        })?.let { loc ->
+        (state.placeNames[v.vin] ?: state.locations[v.vin]?.coordString(4))?.let { loc ->
             add("Location · ${v.name}", "location where place gps ${v.name}") { StatusRow("Location", loc) }
         }
         add("Powertrain · ${v.name}", "powertrain ev gas hybrid phev ${v.name}") {

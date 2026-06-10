@@ -65,44 +65,44 @@ class Haptics(context: Context) {
 
     /** Light, crisp step — slider notches, list ticks. */
     fun tick() {
-        if (composes) composed { add(PRIM_TICK, 0.45f, 0) } else oneShot(8, 50)
+        if (composes) composed { add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.45f, 0) } else oneShot(8, 50)
     }
 
     /** Standard confirm — taps, expand/collapse, page settle. */
     fun click() {
-        if (composes) composed { add(PRIM_CLICK, 0.6f, 0) } else oneShot(12, 110)
+        if (composes) composed { add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.6f, 0) } else oneShot(12, 110)
     }
 
     /** Weighty confirm — lock/unlock landed, command sent. */
     fun heavy() {
         if (composes) composed {
-            add(PRIM_CLICK, 1f, 0)
-            add(PRIM_TICK, 0.5f, 40)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.5f, 40)
         } else oneShot(22, 200)
     }
 
     /** Toggle on: a quick rise into a click. */
     fun toggleOn() {
         if (composes) composed {
-            add(PRIM_QUICK_RISE, 0.7f, 0)
-            add(PRIM_CLICK, 0.7f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.7f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.7f, 0)
         } else waveform(longArrayOf(0, 10, 30, 14), intArrayOf(0, 80, 0, 160))
     }
 
     /** Toggle off: a click falling away. */
     fun toggleOff() {
         if (composes) composed {
-            add(PRIM_CLICK, 0.6f, 0)
-            add(PRIM_QUICK_FALL, 0.7f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.6f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_QUICK_FALL, 0.7f, 0)
         } else waveform(longArrayOf(0, 14, 20, 10), intArrayOf(0, 150, 0, 70))
     }
 
     /** Energy "flowing" feel when a charge starts — a slow rise with two pulses. */
     fun chargeStart() {
         if (composes) composed {
-            add(PRIM_SLOW_RISE, 0.8f, 0)
-            add(PRIM_TICK, 0.5f, 60)
-            add(PRIM_TICK, 0.6f, 90)
+            add(VibrationEffect.Composition.PRIMITIVE_SLOW_RISE, 0.8f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.5f, 60)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.6f, 90)
         } else waveform(longArrayOf(0, 40, 40, 12, 40, 12), intArrayOf(0, 120, 0, 80, 0, 110))
     }
 
@@ -112,12 +112,12 @@ class Haptics(context: Context) {
      */
     fun diceRoll() {
         if (composes) composed {
-            add(PRIM_TICK, 0.6f, 0)
-            add(PRIM_TICK, 0.4f, 26)
-            add(PRIM_CLICK, 0.55f, 30)
-            add(PRIM_TICK, 0.5f, 18)
-            add(PRIM_TICK, 0.7f, 38)
-            add(PRIM_CLICK, 1f, 44)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.6f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.4f, 26)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.55f, 30)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.5f, 18)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.7f, 38)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 44)
         } else waveform(
             longArrayOf(0, 12, 26, 8, 30, 14, 18, 10, 38, 22),
             intArrayOf(0, 120, 0, 70, 0, 150, 0, 90, 0, 230),
@@ -134,7 +134,7 @@ class Haptics(context: Context) {
             var delay = 16
             var scale = 0.85f
             repeat(16) { i ->
-                c.addPrimitive(PRIM_TICK, scale.coerceAtLeast(0.25f), if (i == 0) 0 else delay)
+                c.addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, scale.coerceAtLeast(0.25f), if (i == 0) 0 else delay)
                 delay = (delay * 1.22f).toInt().coerceAtMost(150)
                 scale *= 0.92f
             }
@@ -162,8 +162,8 @@ class Haptics(context: Context) {
      */
     fun loadingSweep() {
         if (composes) composed {
-            add(PRIM_TICK, 0.3f, 0)
-            add(PRIM_QUICK_RISE, 0.6f, 24)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.3f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.6f, 24)
         } else {
             waveform(longArrayOf(0, 8, 18, 16, 16, 22), intArrayOf(0, 40, 0, 90, 0, 160))
         }
@@ -172,8 +172,8 @@ class Haptics(context: Context) {
     /** Success chime — rise then crisp click. */
     fun success() {
         if (composes) composed {
-            add(PRIM_QUICK_RISE, 0.6f, 0)
-            add(PRIM_CLICK, 0.8f, 10)
+            add(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.6f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.8f, 10)
         } else waveform(longArrayOf(0, 16, 24, 16), intArrayOf(0, 120, 0, 200))
     }
 
@@ -181,11 +181,11 @@ class Haptics(context: Context) {
     fun fireworks() {
         if (composes) {
             val c = VibrationEffect.startComposition()
-            c.addPrimitive(PRIM_CLICK, 1f, 0) // the boom
+            c.addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 0) // the boom
             var delay = 70
             var scale = 0.8f
             repeat(12) {
-                c.addPrimitive(PRIM_TICK, scale.coerceAtLeast(0.25f), delay)
+                c.addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, scale.coerceAtLeast(0.25f), delay)
                 delay = (40 + (Math.random() * 120).toInt())
                 scale *= 0.93f
             }
@@ -201,8 +201,8 @@ class Haptics(context: Context) {
     /** Error buzz — two firm knocks. */
     fun error() {
         if (composes) composed {
-            add(PRIM_CLICK, 1f, 0)
-            add(PRIM_CLICK, 1f, 120)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 120)
         } else waveform(longArrayOf(0, 24, 110, 24), intArrayOf(0, 230, 0, 230))
     }
 
@@ -220,14 +220,6 @@ class Haptics(context: Context) {
         }
     }
 
-    private companion object {
-        // Resolved once; only referenced on API 31+ paths.
-        val PRIM_TICK = VibrationEffect.Composition.PRIMITIVE_TICK
-        val PRIM_CLICK = VibrationEffect.Composition.PRIMITIVE_CLICK
-        val PRIM_QUICK_RISE = VibrationEffect.Composition.PRIMITIVE_QUICK_RISE
-        val PRIM_SLOW_RISE = VibrationEffect.Composition.PRIMITIVE_SLOW_RISE
-        val PRIM_QUICK_FALL = VibrationEffect.Composition.PRIMITIVE_QUICK_FALL
-    }
 }
 
 /** Lets any composable reach the haptics engine. Defaults to a no-op (disabled). */

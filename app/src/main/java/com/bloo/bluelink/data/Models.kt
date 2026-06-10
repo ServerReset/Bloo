@@ -340,3 +340,36 @@ data class GeoLocation(
     /** Speed at the time of the fix, if reported. >0 implies the car is moving. */
     val speed: Double? = null,
 )
+
+// --- Shared status helpers (used across UI, snapshots, cache, AI) ---------
+
+/** The headline charge/fuel percentage for this car. */
+fun VehicleStatus.percentFor(hasBattery: Boolean): Int? =
+    if (hasBattery) evStatus?.batteryStatus else fuelLevel
+
+/** The headline range in miles (battery range for EVs, else distance-to-empty). */
+fun VehicleStatus.rangeMiFor(hasBattery: Boolean): Int? {
+    val batteryRange = evStatus?.drvDistance?.firstOrNull()?.rangeByFuel?.totalAvailableRange?.value
+    return ((if (hasBattery) batteryRange else null) ?: dte?.value)?.toInt()
+}
+
+/** The charge-limit target for the *currently connected* charger, or null if unplugged. */
+fun EvStatus.targetForCurrentPlug(): Int? = when (batteryPlugin) {
+    1 -> reservChargeInfos?.level(0) // DC fast
+    2 -> reservChargeInfos?.level(1) // AC
+    else -> null
+}
+
+private fun openPositions(fl: Int?, fr: Int?, bl: Int?, br: Int?): List<String> = listOfNotNull(
+    if (fl == 1) "front-left" else null,
+    if (fr == 1) "front-right" else null,
+    if (bl == 1) "rear-left" else null,
+    if (br == 1) "rear-right" else null,
+)
+
+fun DoorOpen.openLabels(): List<String> = openPositions(frontLeft, frontRight, backLeft, backRight)
+fun WindowOpen.openLabels(): List<String> = openPositions(frontLeft, frontRight, backLeft, backRight)
+
+/** "lat, lon" formatted to [decimals] places. */
+fun GeoLocation.coordString(decimals: Int = 5): String =
+    "%.${decimals}f, %.${decimals}f".format(latitude, longitude)

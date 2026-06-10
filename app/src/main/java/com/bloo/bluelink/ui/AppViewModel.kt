@@ -16,6 +16,8 @@ import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.StatusCache
+import com.bloo.bluelink.data.percentFor
+import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
@@ -35,7 +37,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -186,14 +187,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     /**
-     * Serializes ALL vehicleStatus calls account-wide. Blue Link rejects
-     * overlapping requests with `502 ... a previous request is pending`, so
-     * status fetches must run strictly one at a time.
+     * Serializes ALL vehicleStatus calls account-wide (shared with the background
+     * worker via [com.bloo.bluelink.data.BlueLinkGate]). Blue Link rejects
+     * overlapping requests with `502 ... a previous request is pending`.
      */
-    private val statusMutex = Mutex()
+    private val statusMutex = com.bloo.bluelink.data.BlueLinkGate.statusMutex
 
     /** VINs with a status request currently queued or running (de-dupes). */
     private val statusInFlight = mutableSetOf<String>()
+
+    /** VINs fetched from the network this session (cache restore doesn't count). */
+    private val sessionFetched = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     /** Copy-pasteable activity log shown in Settings. */
     val logs: StateFlow<List<String>> = AppLog.lines
@@ -443,9 +447,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Loads status only if we don't already have it cached (no UI flash). */
+    /**
+     * Fetches fresh status once per session. Disk-cached data is shown instantly
+     * (so no UI flash), but we still pull a live update — otherwise a warm cache
+     * would leave the garage permanently stale until a manual refresh.
+     */
     private fun ensureStatus(v: Vehicle) {
-        if (_state.value.statuses.containsKey(v.vin)) return
+        if (v.vin in sessionFetched) return
         // Background load: log failures but don't interrupt with a toast (one
         // flaky car shouldn't spam errors over the others).
         loadStatus(v, refresh = false, errorMessage = "Couldn't load status", surfaceErrors = false)
@@ -488,6 +496,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         checkAlerts(v, s)
                     }
                 }
+                sessionFetched.add(v.vin)
                 logSuccess?.let { AppLog.log(it) }
             } catch (e: Exception) {
                 val msg = e.message ?: errorMessage
@@ -517,9 +526,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {
-        val percent = if (v.isEv) status?.evStatus?.batteryStatus else status?.fuelLevel
-        val range = (status?.evStatus?.drvDistance?.firstOrNull()
-            ?.rangeByFuel?.totalAvailableRange?.value ?: status?.dte?.value)?.toInt()
+        // Use the effective powertrain (a PHEV reads battery %, not fuel %).
+        val hasBattery = _state.value.hasBattery(v)
+        val percent = status?.percentFor(hasBattery)
+        val range = status?.rangeMiFor(hasBattery)
         return VehicleSnapshot(
             vin = v.vin,
             name = v.name,
@@ -719,9 +729,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 ?.let { parts += "About $it minutes to a full charge." }
         }
         if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
-        val range = status.evStatus?.drvDistance?.firstOrNull()?.rangeByFuel?.totalAvailableRange?.value
-            ?: status.dte?.value
-        range?.toInt()?.let { parts += "Estimated range is $it miles." }
+        status.rangeMiFor(s.hasBattery(v))?.let { parts += "Estimated range is $it miles." }
         s.drivingLabel(v)?.let { parts += "The car appears $it." }
         status.battery?.batSoc?.let { parts += "12V battery is at $it%." }
         if (status.airCtrlOn == true) parts += "Climate is on."
