@@ -31,10 +31,10 @@ class Haptics(context: Context) {
     private val composes: Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (vibrator?.hasVibrator() == true) &&
             runCatching {
-                vibrator.areAllPrimitivesSupported(
+                vibrator?.areAllPrimitivesSupported(
                     VibrationEffect.Composition.PRIMITIVE_TICK,
                     VibrationEffect.Composition.PRIMITIVE_CLICK,
-                )
+                ) == true
             }.getOrDefault(false)
 
     private val hasAmplitude = vibrator?.hasAmplitudeControl() == true

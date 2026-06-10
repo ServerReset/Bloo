@@ -110,6 +110,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -214,6 +215,7 @@ import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.Dispatchers
@@ -2625,6 +2627,24 @@ private fun SettingsScreen(vm: AppViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            var query by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search settings & car data") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
+                    }
+                },
+                singleLine = true,
+                shape = FieldShape,
+                modifier = Modifier.fillMaxWidth(),
+            )
+          if (query.isNotBlank()) {
+            SettingsSearchResults(query, vm, state, appearance, notif)
+          } else {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
                 if (state.accounts.isEmpty()) {
@@ -2864,6 +2884,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                 }
             }
+          }
         }
     }
     cropUri?.let { uri ->
@@ -3060,6 +3081,153 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
             color = MaterialTheme.colorScheme.primary,
         )
         content()
+    }
+}
+
+private val SearchStopwords = setOf(
+    "for", "the", "of", "show", "me", "what", "whats", "is", "a", "an", "to",
+    "car", "cars", "my", "s", "setting", "settings", "get", "in",
+)
+
+private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
+
+/**
+ * Live search over both app settings and per-car data/fields. Tokenises the
+ * query (dropping filler words like "for"/"the"), so "odometer for xyz" finds
+ * the odometer of the car named xyz, and "plate" lists every car's plate.
+ */
+@Composable
+private fun SettingsSearchResults(
+    query: String,
+    vm: AppViewModel,
+    state: UiState,
+    appearance: SettingsStore.Appearance,
+    notif: SettingsStore.NotificationPrefs,
+) {
+    val tokens = query.lowercase().split(Regex("[^a-z0-9%]+"))
+        .filter { it.isNotBlank() && it !in SearchStopwords }
+
+    val entries = ArrayList<SearchEntry>()
+    fun add(title: String, keywords: String, content: @Composable () -> Unit) {
+        entries.add(SearchEntry(title, "$title $keywords".lowercase(), content))
+    }
+
+    // --- App-wide settings ---
+    add("Haptic feedback", "vibration vibrate buzz sound") {
+        ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
+    }
+    add("Text & layout scale", "display size zoom bigger") {
+        StepRow("Scale", "${(appearance.uiScale * 100).roundToInt()}%")
+        Slider(
+            value = appearance.uiScale,
+            onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
+            valueRange = 0.85f..1.3f,
+        )
+    }
+    add("Colour vibrancy", "color saturation vivid material you") {
+        StepRow("Vibrancy", "${(appearance.vibrancy * 100).roundToInt()}%")
+        Slider(
+            value = appearance.vibrancy,
+            onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
+            valueRange = 0.5f..1.6f,
+        )
+    }
+    add("Open links in app", "browser tab links") {
+        ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
+    }
+    add("Service due alerts", "notification reminder service") {
+        ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
+    }
+    add("Door-left-open alerts", "notification door open") {
+        ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
+    }
+
+    // --- Per-car ---
+    state.vehicles.forEach { v ->
+        val st = state.statusFor(v)
+        val plate = state.licensePlates[v.vin] ?: ""
+        add("License plate · ${v.name}", "plate licence registration ${v.name} $plate") {
+            OutlinedTextField(
+                value = plate,
+                onValueChange = { vm.setLicensePlate(v.vin, it) },
+                label = { Text("License plate") },
+                singleLine = true, shape = FieldShape, modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { odo ->
+            add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { StatusRow("Odometer", "$odo mi") }
+        }
+        add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin}") {
+            SelectionContainer { StatusRow("VIN", v.vin) }
+        }
+        val battRange = st?.evStatus?.drvDistance?.firstOrNull()?.rangeByFuel?.totalAvailableRange?.value
+        ((if (state.hasBattery(v)) battRange else null) ?: st?.dte?.value)?.toInt()?.let { r ->
+            add("Range · ${v.name}", "range distance dte empty ${v.name}") { StatusRow("Range", "$r mi") }
+        }
+        if (state.hasBattery(v)) {
+            st?.evStatus?.batteryStatus?.let { b ->
+                add("Battery · ${v.name}", "battery charge soc percent ${v.name}") { StatusRow("Battery", "$b%") }
+            }
+            val limit = when (st?.evStatus?.batteryPlugin) {
+                1 -> st?.evStatus?.reservChargeInfos?.level(0)
+                2 -> st?.evStatus?.reservChargeInfos?.level(1)
+                else -> st?.evStatus?.reservChargeInfos?.level(1)
+            }
+            limit?.let { l -> add("Charge limit · ${v.name}", "charge limit target ${v.name}") { StatusRow("Charge limit", "$l%") } }
+        } else {
+            st?.fuelLevel?.let { f ->
+                add("Fuel · ${v.name}", "fuel gas tank percent ${v.name}") { StatusRow("Fuel", "$f%") }
+            }
+        }
+        rememberRelativeTime(state.fetchedAt(v))?.let { rel ->
+            add("Last refreshed · ${v.name}", "updated refreshed time ${v.name}") { StatusRow("Last refreshed", rel) }
+        }
+        (state.placeNames[v.vin] ?: state.locations[v.vin]?.let {
+            String.format("%.4f, %.4f", it.latitude, it.longitude)
+        })?.let { loc ->
+            add("Location · ${v.name}", "location where place gps ${v.name}") { StatusRow("Location", loc) }
+        }
+        add("Powertrain · ${v.name}", "powertrain ev gas hybrid phev ${v.name}") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Powertrain.entries.forEach { pt ->
+                    FilterChip(
+                        selected = state.powertrainOf(v) == pt,
+                        onClick = { vm.setPowertrain(v, pt) },
+                        label = { Text(pt.name) },
+                    )
+                }
+            }
+        }
+        add("Last service · ${v.name}", "service maintenance mileage ${v.name}") {
+            OutlinedTextField(
+                value = state.lastServiceMiles[v.vin]?.toString() ?: "",
+                onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                label = { Text("Last service (mi)") },
+                singleLine = true, shape = FieldShape,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+
+    val results = if (tokens.isEmpty()) entries else entries.filter { e -> tokens.all { it in e.haystack } }
+    if (results.isEmpty()) {
+        Card(Modifier.fillMaxWidth()) {
+            Text(
+                "No matches for “$query”",
+                Modifier.padding(16.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    results.forEach { e ->
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                e.content()
+            }
+        }
     }
 }
 
