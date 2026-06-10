@@ -161,6 +161,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile
     private var loadingGarage = false
 
+    /** A pending app-icon shortcut (vin to command) awaiting the garage to load. */
+    @Volatile
+    private var pendingShortcut: Pair<String, String>? = null
+
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -357,6 +361,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 showOnboarding = showOnboarding,
             )
         }
+        // Keep the app-icon long-press shortcuts in sync with the current cars.
+        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles)
+        // Run any shortcut that was tapped before the garage finished loading.
+        tryRunPendingShortcut()
         // Fetch current car first for an immediate view, then prefetch the rest
         // (REFRESH=false -> cached last-known status, doesn't burn remote quota).
         ensureStatus(vehicles[index])
@@ -380,6 +388,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun expand(index: Int) = _state.update { it.copy(expandedIndex = index, currentIndex = index) }
     fun collapse() = _state.update { it.copy(expandedIndex = null) }
+
+    /**
+     * Handle an app-icon shortcut (or, later, a "open app + run" quick tile). If
+     * the garage isn't loaded yet the request is queued and run once it is.
+     */
+    fun handleShortcut(vin: String, cmd: String) {
+        pendingShortcut = vin to cmd
+        tryRunPendingShortcut()
+    }
+
+    private fun tryRunPendingShortcut() {
+        val (vin, cmd) = pendingShortcut ?: return
+        val v = _state.value.vehicles.firstOrNull { it.vin == vin } ?: return
+        pendingShortcut = null
+        val idx = _state.value.vehicles.indexOf(v)
+        if (idx >= 0) selectIndex(idx)
+        when (cmd) {
+            "lock" -> lock(v)
+            "unlock" -> unlock(v)
+            "locate" -> locate(v)
+            "climate" -> startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+            // "open" just selects the car (done above).
+        }
+    }
 
     /** Loads status only if we don't already have it cached (no UI flash). */
     private fun ensureStatus(v: Vehicle) {

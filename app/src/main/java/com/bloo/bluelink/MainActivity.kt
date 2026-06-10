@@ -1,6 +1,7 @@
 package com.bloo.bluelink
 
 import android.Manifest
+import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -39,6 +40,7 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+        handleShortcutIntent(intent)
         setContent {
             val appearance by viewModel.appearance.collectAsState()
             BlooTheme(
@@ -51,5 +53,19 @@ class MainActivity : FragmentActivity() {
                 BlooApp(viewModel)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShortcutIntent(intent)
+    }
+
+    /** Route an app-icon shortcut (lock/unlock/climate/open a car) to the VM. */
+    private fun handleShortcutIntent(intent: Intent?) {
+        if (intent?.action != Shortcuts.ACTION) return
+        val vin = intent.getStringExtra(Shortcuts.EXTRA_VIN) ?: return
+        val cmd = intent.getStringExtra(Shortcuts.EXTRA_CMD) ?: return
+        viewModel.handleShortcut(vin, cmd)
     }
 }
