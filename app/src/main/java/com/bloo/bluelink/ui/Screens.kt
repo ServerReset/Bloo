@@ -1489,30 +1489,29 @@ private fun AnimatedSlider(
     }
 
     Column(Modifier.fillMaxWidth()) {
-        // Value indicator: a small accent bubble that floats above the thumb while
-        // dragging — the key M3 Expressive slider visual.
-        Box(Modifier.fillMaxWidth().height(22.dp)) {
-            AnimatedVisibility(
-                visible = isDragging,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-            ) {
-                Box(Modifier.fillMaxSize()) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = accent,
-                        contentColor = scheme.onPrimary,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .offset(x = (thumbXDp - 16.dp).coerceAtLeast(0.dp)),
-                    ) {
-                        Text(
-                            animValue.toInt().toString(),
-                            Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+        // Value indicator: slides in as a direct Column child so ColumnScope.AnimatedVisibility
+        // is unambiguous — calling it inside a Box would pick up the ColumnScope extension
+        // through the outer receiver and fail to compile.
+        AnimatedVisibility(
+            visible = isDragging,
+            enter = fadeIn() + slideInVertically { it },
+            exit = fadeOut() + slideOutVertically { it },
+        ) {
+            Box(Modifier.fillMaxWidth().height(22.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = accent,
+                    contentColor = scheme.onPrimary,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset(x = (thumbXDp - 16.dp).coerceAtLeast(0.dp)),
+                ) {
+                    Text(
+                        animValue.toInt().toString(),
+                        Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             }
         }
