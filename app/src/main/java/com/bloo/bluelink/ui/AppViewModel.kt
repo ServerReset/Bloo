@@ -684,12 +684,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
         viewModelScope.launch {
-            val summary = ai.summarize(carText(v, status))
-            _state.update {
-                it.copy(
-                    aiBusy = it.aiBusy - v.vin,
-                    aiSummaries = if (summary != null) it.aiSummaries + (v.vin to summary) else it.aiSummaries,
-                    message = if (summary == null) "AI summary isn't available right now." else it.message,
+            val result = runCatching { ai.summarize(carText(v, status)) }
+            _state.update { st ->
+                result.fold(
+                    onSuccess = { s ->
+                        st.copy(aiBusy = st.aiBusy - v.vin, aiSummaries = st.aiSummaries + (v.vin to s))
+                    },
+                    onFailure = { e ->
+                        AppLog.log("⚠ AI summary: ${e.message}")
+                        st.copy(aiBusy = st.aiBusy - v.vin, message = "AI summary failed: ${e.message ?: "unknown error"}")
+                    },
                 )
             }
         }
@@ -703,7 +707,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val data = _state.value.vehicles.joinToString("\n\n") { v ->
                 carText(v, _state.value.statusFor(v))
             }
-            val reply = ai.summarize("Answer this question using only the data below.\nQuestion: $query\n\nData:\n$data")
+            val reply = runCatching {
+                ai.summarize("Answer this question using only the data below.\nQuestion: $query\n\nData:\n$data")
+            }.getOrNull()
             _state.update { it.copy(aiBusy = it.aiBusy - "search", aiSearchReply = reply) }
         }
     }

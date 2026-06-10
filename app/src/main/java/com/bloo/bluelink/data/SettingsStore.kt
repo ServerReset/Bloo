@@ -45,7 +45,7 @@ enum class Powertrain { GAS, HYBRID, PHEV, EV }
 val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "climate", "location", "info", "diagnostics")
 
 /** Pebbles the user may hide (the others are essential). */
-val HIDEABLE_SECTIONS = listOf("climate", "location", "info", "diagnostics")
+val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "info", "diagnostics", "ai")
 
 /** Number of configurable Quick Settings tiles. */
 const val TILE_COUNT = 4

@@ -18,7 +18,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,7 +31,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -121,6 +119,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -1231,9 +1230,9 @@ private const val SoftDamping = 0.82f
 private val LocalForceExpanded = staticCompositionLocalOf { false }
 
 /**
- * A number that rolls vertically when it changes, with a light directional
- * "motion blur" while the glyphs are in motion. The blur is RenderEffect-backed
- * (a no-op below API 31), so it costs nothing on the steady state.
+ * A slot-machine number. When the value changes it spins its digits — fast at
+ * first, decelerating to a stop — with a RenderEffect motion blur (a no-op below
+ * API 31) that fades out as it settles. Non-numeric text just snaps.
  */
 @Composable
 private fun RollingNumber(
@@ -1242,20 +1241,29 @@ private fun RollingNumber(
     fontWeight: FontWeight,
     color: Color = Color.Unspecified,
 ) {
-    AnimatedContent(
-        targetState = text,
-        transitionSpec = {
-            (slideInVertically { it / 2 } + fadeIn()) togetherWith
-                (slideOutVertically { -it / 2 } + fadeOut())
-        },
-        label = "roll",
-    ) { t ->
-        val blur by transition.animateDp(
-            transitionSpec = { spring(stiffness = Spring.StiffnessMediumLow) },
-            label = "rollBlur",
-        ) { st -> if (st == EnterExitState.Visible) 0.dp else 7.dp }
-        Text(t, modifier = Modifier.blur(blur), style = style, fontWeight = fontWeight, color = color)
+    var display by remember { mutableStateOf(text) }
+    var blurTarget by remember { mutableStateOf(0.dp) }
+    val blur by animateDpAsState(blurTarget, label = "rollBlur")
+
+    LaunchedEffect(text) {
+        if (display == text) return@LaunchedEffect
+        if (text.none { it.isDigit() }) { // nothing to spin (e.g. "—")
+            display = text
+            return@LaunchedEffect
+        }
+        val rnd = kotlin.random.Random(System.nanoTime())
+        val steps = 14
+        for (i in 0 until steps) {
+            // Randomize each digit position to look like spinning reels.
+            display = text.map { c -> if (c.isDigit()) '0' + rnd.nextInt(10) else c }.joinToString("")
+            blurTarget = 7.dp * (1f - i.toFloat() / steps)
+            delay((20L + i * 6L)) // accelerate→decelerate: gaps grow as it slows
+        }
+        blurTarget = 0.dp
+        display = text
     }
+
+    Text(display, modifier = Modifier.blur(blur), style = style, fontWeight = fontWeight, color = color)
 }
 
 /** A coarse, self-ticking "x min ago" string for [millis] (null → null). */
@@ -1423,24 +1431,14 @@ private fun AnimatedSlider(
     // When idle, keep the thumb parked on the real (snapped) value.
     LaunchedEffect(value) { if (!dragging) settle.snapTo(value) }
 
+    val disp = if (dragging) pos else settle.value
+    val frac = ((disp - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+    // Tick colours: dark dots show on the light active track, light dots on the
+    // dark inactive track.
+    val activeTick = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+    val inactiveTick = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
     Box(contentAlignment = Alignment.Center) {
-        // Step ticks — drawn under the slider so the thumb/active track cover the
-        // passed ones, mimicking native ticks while drag stays continuous.
-        if (steps > 0) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                repeat(steps + 2) {
-                    Box(
-                        Modifier
-                            .size(4.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
-                    )
-                }
-            }
-        }
         Slider(
             value = if (dragging) pos else settle.value,
             onValueChange = {
@@ -1468,6 +1466,19 @@ private fun AnimatedSlider(
             colors = colors,
             interactionSource = interaction,
         )
+        // Step ticks drawn ON TOP of the track so they're actually visible.
+        if (steps > 0) {
+            Canvas(Modifier.matchParentSize().padding(horizontal = 12.dp)) {
+                val n = steps + 2
+                val r = 2.5.dp.toPx()
+                val cy = size.height / 2f
+                for (i in 0 until n) {
+                    val tf = if (n <= 1) 0f else i.toFloat() / (n - 1)
+                    val cx = size.width * tf
+                    drawCircle(if (tf <= frac) activeTick else inactiveTick, radius = r, center = Offset(cx, cy))
+                }
+            }
+        }
     }
 }
 
@@ -1724,8 +1735,9 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
     val base = state.sectionsFor(v).filter {
         it !in exclude && !state.isPebbleHidden(v.vin, it)
     }
-    // The optional AI summary pebble leads the stack when enabled.
-    val sections = if (state.aiEnabled && "ai" !in exclude) listOf("ai") + base else base
+    // The optional AI summary pebble leads the stack when enabled (and not hidden).
+    val showAi = state.aiEnabled && "ai" !in exclude && !state.isPebbleHidden(v.vin, "ai")
+    val sections = if (showAi) listOf("ai") + base else base
     ReorderColumn(
         items = sections,
         keyOf = { it },
@@ -1787,13 +1799,13 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
             Text(
                 "Summarize this car's last-refreshed status, generated privately on your device.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
             )
         }
         Text(
             "Reflects the last refresh — tap Summarize to update.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = LocalContentColor.current.copy(alpha = 0.7f),
         )
     }
 }
@@ -2050,7 +2062,7 @@ private fun Pebble(
                         Text(
                             summary,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = LocalContentColor.current.copy(alpha = 0.7f),
                             maxLines = 1,
                         )
                     }
@@ -2407,7 +2419,7 @@ private fun ClimatePebble(
             Text(
                 "Slide left to cool, right to heat",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
             )
             if (seats.driverHeat || seats.driverCool) {
                 SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
@@ -3316,16 +3328,21 @@ private fun CarSettingsCard(
 
                     SettingsGroup("Sections shown") {
                         val labels = mapOf(
+                            "charge" to "Charge / fuel",
                             "climate" to "Climate",
                             "location" to "Location",
                             "info" to "Car info",
                             "diagnostics" to "Diagnostics",
+                            "ai" to "AI summary",
                         )
-                        com.bloo.bluelink.data.HIDEABLE_SECTIONS.forEach { sec ->
-                            ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
-                                vm.setSectionHidden(v, sec, !show)
+                        com.bloo.bluelink.data.HIDEABLE_SECTIONS
+                            // The AI toggle only matters when AI is enabled for this device.
+                            .filter { it != "ai" || state.aiEnabled }
+                            .forEach { sec ->
+                                ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
+                                    vm.setSectionHidden(v, sec, !show)
+                                }
                             }
-                        }
                     }
                 }
             }
@@ -3611,7 +3628,12 @@ private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
 @Composable
 private fun StatusRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth()) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = LocalContentColor.current.copy(alpha = 0.7f),
+        )
         Text(value, fontWeight = FontWeight.Medium)
     }
 }
@@ -3624,7 +3646,7 @@ private fun SectionLabel(text: String) {
         text,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = LocalContentColor.current.copy(alpha = 0.85f),
     )
 }
 

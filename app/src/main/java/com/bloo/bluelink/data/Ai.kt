@@ -3,7 +3,9 @@ package com.bloo.bluelink.data
 import android.content.Context
 import com.google.android.gms.tasks.Task
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.mlkit.genai.common.DownloadCallback
 import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.summarization.Summarization
 import com.google.mlkit.genai.summarization.SummarizationRequest
 import com.google.mlkit.genai.summarization.Summarizer
@@ -15,8 +17,7 @@ import kotlin.coroutines.resumeWithException
 
 /**
  * Thin wrapper around on-device Gemini Nano via ML Kit GenAI summarization. All
- * ML Kit usage is isolated here; every call is wrapped so an unsupported device
- * (or any failure) degrades gracefully to "no AI".
+ * ML Kit usage is isolated here; the model is downloaded on demand the first time.
  */
 class Ai(context: Context) {
 
@@ -38,11 +39,34 @@ class Ai(context: Context) {
         summarizer.checkFeatureStatus().await() != FeatureStatus.UNAVAILABLE
     }.getOrDefault(false)
 
-    /** Summarize [text] on-device; null if unavailable or it fails. */
-    suspend fun summarize(text: String): String? = runCatching {
+    /**
+     * Summarize [text] on-device, downloading the model first if needed. Throws
+     * on failure so the caller can surface a real message.
+     */
+    suspend fun summarize(text: String): String {
+        ensureFeatureReady()
         val request = SummarizationRequest.builder(text).build()
-        summarizer.runInference(request).await().summary
-    }.getOrNull()
+        val result = summarizer.runInference(request).await()
+        return result.summary
+    }
+
+    private suspend fun ensureFeatureReady() {
+        val status = summarizer.checkFeatureStatus().await()
+        if (status == FeatureStatus.DOWNLOADABLE || status == FeatureStatus.DOWNLOADING) {
+            suspendCancellableCoroutine { cont ->
+                summarizer.downloadFeature(object : DownloadCallback {
+                    override fun onDownloadStarted(bytesToDownload: Long) {}
+                    override fun onDownloadProgress(totalBytesDownloaded: Long) {}
+                    override fun onDownloadCompleted() {
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                    override fun onDownloadFailed(e: GenAiException) {
+                        if (cont.isActive) cont.resumeWithException(e)
+                    }
+                })
+            }
+        }
+    }
 
     private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
         addOnSuccessListener { if (cont.isActive) cont.resume(it) }
