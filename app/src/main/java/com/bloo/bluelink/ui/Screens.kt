@@ -38,6 +38,7 @@ import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -333,6 +334,7 @@ fun BlooApp(vm: AppViewModel) {
                 }
                 Screen.Locked -> Box(Modifier.padding(padding)) { LockScreen(vm) }
                 Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
+                Screen.Onboarding -> OnboardingScreen(vm)
                 Screen.Garage -> GarageScreen(state, vm)
                 Screen.Settings -> Box(Modifier.padding(padding)) { SettingsScreen(vm) }
             }
@@ -354,59 +356,162 @@ fun BlooApp(vm: AppViewModel) {
     }
     }
 
-    if (state.showOnboarding && state.screen == Screen.Garage) {
-        val canBio = remember { vm.canUseBiometrics() }
-        OnboardingDialog(
-            canBiometric = canBio,
-            onOpenSettings = { vm.dismissOnboarding(openSettings = true) },
-            onEnableBiometric = {
-                context.findFragmentActivity()?.let { activity ->
-                    showBiometricPrompt(
-                        activity = activity,
-                        title = "Enable fingerprint lock",
-                        subtitle = "Confirm to require it when opening Bloo",
-                        onSuccess = { vm.setBiometricLock(true) },
-                        onError = { },
-                    )
+}
+
+// --- Onboarding (first run) -----------------------------------------------
+
+/**
+ * First-run welcome. Celebrates the sign-in with on-screen fireworks (plus sound
+ * and haptics) and explains how Bloo works, then funnels the user into Settings
+ * — the only way forward — so they configure each car before reaching the app.
+ */
+@Composable
+private fun OnboardingScreen(vm: AppViewModel) {
+    val context = LocalContext.current
+    val haptics = LocalHaptics.current
+    val scheme = MaterialTheme.colorScheme
+    val canBio = remember { vm.canUseBiometrics() }
+
+    // Congratulations: fire the works once on entry.
+    LaunchedEffect(Unit) {
+        Fireworks.playSound()
+        haptics?.fireworks()
+    }
+    // There's no way back — you must set up first.
+    BackHandler {}
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh, scheme.surface))),
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Spacer(Modifier.height(24.dp))
+            Text("🎉", style = MaterialTheme.typography.displayMedium)
+            Text(
+                "You're in!",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Black,
+            )
+            Text(
+                "Welcome to Bloo. A quick tour before you drive off:",
+                style = MaterialTheme.typography.titleMedium,
+                color = scheme.onSurfaceVariant,
+            )
+            OnboardingPoint("🚗", "Your cars", "Each car is a screen you swipe between. Pull down to refresh its live status.")
+            OnboardingPoint("🧩", "Pebbles", "Tap a pebble to expand it; long-press to drag and reorder. Lock, charge, climate and more live here.")
+            OnboardingPoint("⚙️", "Tell Bloo about each car", "Hyundai's API doesn't report a car's powertrain, seats or heated wheel — set those in Settings so the right controls appear. Add a photo while you're there.")
+            OnboardingPoint("⚡", "Quick access", "Add Quick Settings tiles and long-press app-icon shortcuts for one-tap lock / unlock / climate.")
+
+            if (canBio) {
+                FilledTonalButton(
+                    onClick = {
+                        context.findFragmentActivity()?.let { activity ->
+                            showBiometricPrompt(
+                                activity = activity,
+                                title = "Enable fingerprint lock",
+                                subtitle = "Confirm to require it when opening Bloo",
+                                onSuccess = { vm.setBiometricLock(true) },
+                                onError = { },
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Lock Bloo with fingerprint")
                 }
-            },
-            onDismiss = { vm.dismissOnboarding(openSettings = false) },
-        )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            MorphButton(
+                onClick = { vm.startSetup() },
+                modifier = Modifier.fillMaxWidth(),
+                restCorner = 30.dp,
+                pressedCorner = 14.dp,
+                contentPadding = PaddingValues(vertical = 18.dp),
+            ) {
+                Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Set up your cars", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Text(
+                "Takes a minute — you'll land in the app right after.",
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+            Spacer(Modifier.height(24.dp))
+        }
+        // Fireworks burst over everything.
+        FireworksOverlay(Modifier.fillMaxSize())
     }
 }
 
-/** First-run nudge: configure each car's features, add a photo, and lock the app. */
 @Composable
-private fun OnboardingDialog(
-    canBiometric: Boolean,
-    onOpenSettings: () -> Unit,
-    onEnableBiometric: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
-        title = { Text("Welcome to Bloo") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Hyundai's API doesn't report everything about your car, so head to " +
-                        "Settings to tell Bloo what each car has — its powertrain (gas, hybrid, " +
-                        "PHEV or EV) and which seats and steering wheel can heat/cool. While " +
-                        "you're there, you can add a photo of each car.",
-                )
-                if (canBiometric) {
-                    FilledTonalButton(onClick = onEnableBiometric, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Lock Bloo with fingerprint")
-                    }
-                }
+private fun OnboardingPoint(emoji: String, title: String, body: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp))
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(emoji, style = MaterialTheme.typography.headlineSmall)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private class Burst(val x: Float, val y: Float, val start: Float, val life: Float, val hue: Float, val count: Int, val maxR: Float)
+
+/** A short, lightweight particle-burst fireworks animation drawn on a Canvas. */
+@Composable
+private fun FireworksOverlay(modifier: Modifier = Modifier) {
+    val bursts = remember {
+        val r = kotlin.random.Random(System.nanoTime())
+        List(7) {
+            Burst(
+                x = r.nextFloat() * 0.8f + 0.1f,
+                y = r.nextFloat() * 0.5f + 0.12f,
+                start = r.nextFloat() * 0.55f,
+                life = r.nextFloat() * 0.25f + 0.35f,
+                hue = r.nextFloat() * 360f,
+                count = 18 + r.nextInt(14),
+                maxR = r.nextFloat() * 0.12f + 0.14f,
+            )
+        }
+    }
+    val t = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { t.animateTo(1f, tween(2600)) }
+    Canvas(modifier) {
+        bursts.forEach { b ->
+            val local = ((t.value - b.start) / b.life)
+            if (local <= 0f || local >= 1f) return@forEach
+            val cx = b.x * size.width
+            val cy = b.y * size.height
+            val r = local * b.maxR * size.height
+            val alpha = (1f - local).coerceIn(0f, 1f)
+            val color = Color.hsv(b.hue, 0.85f, 1f).copy(alpha = alpha)
+            for (k in 0 until b.count) {
+                val ang = (k.toFloat() / b.count) * (2f * Math.PI.toFloat())
+                val px = cx + kotlin.math.cos(ang) * r
+                val py = cy + kotlin.math.sin(ang) * r + local * local * size.height * 0.06f
+                drawCircle(color, radius = 5f * alpha + 1.5f, center = Offset(px, py))
             }
-        },
-        confirmButton = { Button(onClick = onOpenSettings) { Text("Open settings") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Later") } },
-    )
+        }
+    }
 }
 
 // --- Login ----------------------------------------------------------------
@@ -459,11 +564,7 @@ private fun LoginScreen(
             Text("Brand", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Brand.entries.forEach { b ->
-                    FilterChip(
-                        selected = brand == b,
-                        onClick = { brand = b },
-                        label = { Text(b.label) },
-                    )
+                    MorphChip(selected = brand == b, onClick = { brand = b }, label = b.label)
                 }
             }
 
@@ -496,13 +597,14 @@ private fun LoginScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Button(
+            MorphButton(
                 onClick = { onLogin(email, password, pin, brand) },
-                enabled = !loading,
-                shape = FieldShape,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
+                enabled = !loading,
+                restCorner = 28.dp,
+                pressedCorner = 14.dp,
             ) {
-                if (loading) LoadingIndicator() else Text("Sign in")
+                if (loading) LoadingIndicator() else Text("Sign in", fontWeight = FontWeight.SemiBold)
             }
             if (onCancel != null) {
                 TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
@@ -1731,6 +1833,7 @@ private fun ChargeControl(v: Vehicle, status: VehicleStatus?, state: UiState, vm
 private fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     containerColor: Color = MaterialTheme.colorScheme.primary,
     contentColor: Color = MaterialTheme.colorScheme.onPrimary,
     restCorner: Dp = 28.dp,
@@ -1749,12 +1852,47 @@ private fun MorphButton(
     Button(
         onClick = { haptics?.click(); onClick() },
         modifier = modifier,
+        enabled = enabled,
         shape = RoundedCornerShape(corner),
         interactionSource = interaction,
         colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
         contentPadding = contentPadding,
         content = content,
     )
+}
+
+/**
+ * A unified selectable chip: a **pill** when unselected, morphing smoothly into a
+ * filled **rounded box** when selected. Replaces ad-hoc FilterChips so selection
+ * feels the same everywhere.
+ */
+@Composable
+private fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, modifier: Modifier = Modifier) {
+    val haptics = LocalHaptics.current
+    val corner by animateDpAsState(
+        targetValue = if (selected) 12.dp else 22.dp,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        label = "chipCorner",
+    )
+    val container by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+        label = "chipBg",
+    )
+    val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    Surface(
+        onClick = { haptics?.tick(); onClick() },
+        shape = RoundedCornerShape(corner),
+        color = container,
+        contentColor = content,
+        modifier = modifier,
+    ) {
+        Text(
+            label,
+            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+        )
+    }
 }
 
 /**
@@ -3114,11 +3252,7 @@ private fun CarSettingsCard(
                         val current = state.powertrainOf(v)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Powertrain.entries.forEach { pt ->
-                                FilterChip(
-                                    selected = current == pt,
-                                    onClick = { vm.setPowertrain(v, pt) },
-                                    label = { Text(pt.name) },
-                                )
+                                MorphChip(selected = current == pt, onClick = { vm.setPowertrain(v, pt) }, label = pt.name)
                             }
                         }
                     }
@@ -3345,11 +3479,7 @@ private fun SettingsSearchResults(
         add("Powertrain · ${v.name}", "powertrain ev gas hybrid phev ${v.name}") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Powertrain.entries.forEach { pt ->
-                    FilterChip(
-                        selected = state.powertrainOf(v) == pt,
-                        onClick = { vm.setPowertrain(v, pt) },
-                        label = { Text(pt.name) },
-                    )
+                    MorphChip(selected = state.powertrainOf(v) == pt, onClick = { vm.setPowertrain(v, pt) }, label = pt.name)
                 }
             }
         }
@@ -3529,9 +3659,9 @@ private fun SeatConfigRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        FilterChip(selected = heat, onClick = { onHeat(!heat) }, label = { Text("Heat") })
+        MorphChip(selected = heat, onClick = { onHeat(!heat) }, label = "Heat")
         Spacer(Modifier.width(8.dp))
-        FilterChip(selected = cool, onClick = { onCool(!cool) }, label = { Text("Cool") })
+        MorphChip(selected = cool, onClick = { onCool(!cool) }, label = "Cool")
     }
 }
 

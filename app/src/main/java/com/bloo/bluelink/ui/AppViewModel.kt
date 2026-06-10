@@ -45,6 +45,8 @@ sealed interface Screen {
     data object Locked : Screen
     /** No vehicles enrolled (or still loading the first time). */
     data object Empty : Screen
+    /** First-run welcome that funnels the user into Settings before the app. */
+    data object Onboarding : Screen
     /** Main screen: the car carousel/grid. */
     data object Garage : Screen
     data object Settings : Screen
@@ -354,7 +356,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
-        val showOnboarding = !settingsStore.onboardingSeen()
+        val firstRun = !settingsStore.onboardingSeen()
         _state.update {
             it.copy(
                 vehicles = vehicles,
@@ -372,8 +374,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 tileBackground = tileBackground,
                 shortcutSet = shortcutSet,
                 currentIndex = index,
-                screen = Screen.Garage,
-                showOnboarding = showOnboarding,
+                // First run funnels through the onboarding screen → Settings.
+                screen = if (firstRun) Screen.Onboarding else Screen.Garage,
+                showOnboarding = false,
             )
         }
         // Keep the app-icon long-press shortcuts in sync with the current cars.
@@ -632,10 +635,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setSectionHidden(v.vin, section, hidden) }
     }
 
-    fun dismissOnboarding(openSettings: Boolean) {
-        _state.update { it.copy(showOnboarding = false) }
+    /** Finish first-run onboarding by going (required) into Settings. */
+    fun startSetup() {
         viewModelScope.launch { settingsStore.setOnboardingSeen() }
-        if (openSettings) openSettings()
+        _state.update { it.copy(showOnboarding = false, screen = Screen.Settings) }
     }
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {

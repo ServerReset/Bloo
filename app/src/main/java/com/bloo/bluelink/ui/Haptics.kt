@@ -177,6 +177,27 @@ class Haptics(context: Context) {
         } else waveform(longArrayOf(0, 16, 24, 16), intArrayOf(0, 120, 0, 200))
     }
 
+    /** Celebration: a boom that scatters into crackling pops, then trails off. */
+    fun fireworks() {
+        if (composes) {
+            val c = VibrationEffect.startComposition()
+            c.addPrimitive(PRIM_CLICK, 1f, 0) // the boom
+            var delay = 70
+            var scale = 0.8f
+            repeat(12) {
+                c.addPrimitive(PRIM_TICK, scale.coerceAtLeast(0.25f), delay)
+                delay = (40 + (Math.random() * 120).toInt())
+                scale *= 0.93f
+            }
+            play(c.compose())
+        } else {
+            waveform(
+                longArrayOf(0, 30, 60, 8, 50, 8, 40, 8, 90, 8, 70, 8, 120, 8),
+                intArrayOf(0, 240, 0, 150, 0, 110, 0, 160, 0, 90, 0, 120, 0, 80),
+            )
+        }
+    }
+
     /** Error buzz — two firm knocks. */
     fun error() {
         if (composes) composed {
