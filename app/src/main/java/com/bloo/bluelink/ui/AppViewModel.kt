@@ -715,7 +715,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
         viewModelScope.launch {
-            val result = runCatching { ai.summarize(carText(v, status)) }
+            // Build the prompt for THIS car only, so the result reflects just it.
+            val prompt = summaryPrompt(v, status)
+            val result = runCatching { ai.summarize(prompt) }
             _state.update { st ->
                 result.fold(
                     onSuccess = { s ->
@@ -747,50 +749,81 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearAiReply() = _state.update { it.copy(aiSearchReply = null) }
 
-    /** A compact, readable description of a car's current state for the AI. */
+    /**
+     * The instruction + data prompt sent to Gemini Nano for a SINGLE car. The
+     * instruction tells the model to lead with the highest-priority facts (locked,
+     * charging + time-to-full, driving) and the data block describes only [v], so
+     * the summary reflects exactly the car the user tapped Summarize on.
+     */
+    private fun summaryPrompt(v: Vehicle, status: VehicleStatus?): String {
+        val instruction = buildString {
+            append("Your job is to summarize the current status of this one vehicle for its owner. ")
+            append("Lead with the most important information first, in this exact order: ")
+            append("first, whether the doors are locked or unlocked; ")
+            append("second, whether it is charging, and if it is, how long until it is fully charged; ")
+            append("third, whether the car is currently driving or parked. ")
+            append("After those three, briefly cover the other important status, such as ")
+            append("battery or fuel level, driving range, climate, the 12V battery, location, ")
+            append("and any warnings or open doors. ")
+            append("Keep it short and clear, describe only this vehicle, ")
+            append("and do not invent any details that are not in the data below. ")
+        }
+        return instruction + "\n\nVehicle data for ${v.name}:\n" + carText(v, status)
+    }
+
+    /**
+     * A compact, readable description of a single car's current state for the AI,
+     * ordered by importance (doors, charging, driving, then the rest).
+     */
     private fun carText(v: Vehicle, status: VehicleStatus?): String {
         val s = _state.value
         val parts = mutableListOf<String>()
-        parts += "Car: ${v.name} (${v.model})."
-        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "Odometer: $it miles." }
+        parts += "Vehicle: ${v.name} (${v.model})."
         if (status == null) {
-            parts += "No live status has been fetched yet."
-        } else {
-            parts += "Doors are ${if (status.doorLock == true) "locked" else "unlocked"}."
-            status.engine?.let { parts += "The engine/vehicle is ${if (it) "on" else "off"}." }
-            if (s.hasBattery(v)) {
-                status.evStatus?.batteryStatus?.let { parts += "Battery is at $it%." }
-                if (status.evStatus?.batteryCharge == true) parts += "It is currently charging."
-                status.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
-                    ?.let { parts += "About $it minutes to a full charge." }
-            }
-            if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
-            status.rangeMiFor(s.hasBattery(v))?.let { parts += "Estimated range is $it miles." }
-            s.drivingLabel(v)?.let { parts += "The car appears $it." }
-            status.battery?.batSoc?.let { parts += "12V battery is at $it%." }
-            if (status.airCtrlOn == true) parts += "Climate is on."
-            s.placeNames[v.vin]?.let { parts += "Last known location: $it." }
-            status.tirePressureLamp?.let { tp ->
-                if (tp.hasWarning) parts += "Tire pressure warning is active." else parts += "Tire pressure is normal."
-            }
-            status.washerFluidStatus?.let { parts += "Washer fluid is ${if (it) "low" else "OK"}." }
-            status.breakOilStatus?.let { parts += "Brake fluid is ${if (it) "low" else "OK"}." }
+            parts += "No live status has been fetched yet for this car."
+            return parts.joinToString(" ")
         }
-        val raw = parts.joinToString(" ")
-        // ML Kit GenAI ARTICLE InputType requires at least 400 characters. Pad with
-        // a neutral context header so the summarizer has enough material to work with.
-        if (raw.length >= 400) return raw
-        val context = buildString {
-            append("This is a vehicle status report for a connected car application. ")
-            append("The data below was fetched from the manufacturer's telematics system ")
-            append("and reflects the last known state of the vehicle. ")
-            append("Use this information to provide a concise, helpful summary of the car's current condition. ")
+        // Priority 1 — doors.
+        parts += "The doors are ${if (status.doorLock == true) "locked" else "unlocked"}."
+        // Priority 2 — charging + time to full (EV/PHEV only).
+        if (s.hasBattery(v)) {
+            if (status.evStatus?.batteryCharge == true) {
+                val mins = status.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+                parts += if (mins != null) {
+                    "It is charging, with about ${fmtTimeToFull(mins)} until fully charged."
+                } else {
+                    "It is currently charging."
+                }
+            } else {
+                parts += "It is not charging."
+            }
         }
-        val padded = context + raw
-        return if (padded.length >= 400) padded
-        else padded + " " + "No additional status data is available at this time.".repeat(
-            ((400 - padded.length) / 52) + 1,
-        ).take(400 - padded.length)
+        // Priority 3 — driving / parked.
+        s.drivingLabel(v)?.let { parts += "The car is currently ${it.lowercase(Locale.US)}." }
+        status.engine?.let { parts += "The engine is ${if (it) "on" else "off"}." }
+        // Remaining status, most useful first.
+        if (s.hasBattery(v)) status.evStatus?.batteryStatus?.let { parts += "The drive battery is at $it%." }
+        if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
+        status.rangeMiFor(s.hasBattery(v))?.let { parts += "Estimated driving range is $it miles." }
+        parts += "Climate is ${if (status.airCtrlOn == true) "on" else "off"}."
+        status.battery?.batSoc?.let { parts += "The 12V starter battery is at $it%." }
+        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "The odometer reads $it miles." }
+        s.placeNames[v.vin]?.let { parts += "Last known location: $it." }
+        // Warnings.
+        if (status.tirePressureLamp?.hasWarning == true) parts += "There is a tire pressure warning."
+        if (status.washerFluidStatus == true) parts += "The washer fluid is low."
+        if (status.breakOilStatus == true) parts += "The brake fluid needs attention."
+        if (status.smartKeyBatteryWarning == true) parts += "The key fob battery is low."
+        return parts.joinToString(" ")
+    }
+
+    /** "45 minutes" or "1 hour 5 minutes" for a charge-time-to-full readout. */
+    private fun fmtTimeToFull(minutes: Int): String {
+        if (minutes < 60) return "$minutes minutes"
+        val h = minutes / 60
+        val m = minutes % 60
+        val hStr = if (h == 1) "1 hour" else "$h hours"
+        return if (m == 0) hStr else "$hStr $m minutes"
     }
 
     /** Toggle whether a given car+action app-icon shortcut is shown. */
