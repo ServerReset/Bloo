@@ -42,7 +42,7 @@ data class SeatConfig(
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
 /** Reorderable detail sections (pebbles), in their default order. */
-val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "climate", "location", "info", "diagnostics")
+val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", "info", "location", "diagnostics")
 
 /** Pebbles the user may hide (the others are essential). */
 val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "info", "diagnostics", "ai")
@@ -278,10 +278,22 @@ class SettingsStore(private val context: Context) {
         val saved = context.settingsDataStore.data.first()[stringPreferencesKey("sections_$vin")]
             ?.split(",")?.filter { it.isNotBlank() }
         val valid = saved?.filter { it in DEFAULT_SECTIONS } ?: emptyList()
-        // Add any newly-introduced sections: summary/controls lead, the rest trail.
-        val missing = DEFAULT_SECTIONS.filter { it !in valid }
+        if (valid.isEmpty()) return DEFAULT_SECTIONS
+        val result = valid.toMutableList()
+        val missing = DEFAULT_SECTIONS.filter { it !in result }
         val (lead, trail) = missing.partition { it == "summary" || it == "controls" }
-        return lead + valid + trail
+        // Prepend any missing pinned-lead sections in order.
+        lead.reversed().forEach { s -> result.add(0, s) }
+        // Insert each remaining new section after its nearest preceding sibling in
+        // DEFAULT_SECTIONS order so it lands in a sensible position (e.g. "ai" goes
+        // right after "charge" rather than being appended at the end).
+        for (section in trail) {
+            val defIdx = DEFAULT_SECTIONS.indexOf(section)
+            val predecessor = DEFAULT_SECTIONS.subList(0, defIdx).lastOrNull { it in result }
+            val pos = if (predecessor != null) result.indexOf(predecessor) + 1 else result.size
+            result.add(pos, section)
+        }
+        return result
     }
 
     suspend fun setSectionOrder(vin: String, order: List<String>) {

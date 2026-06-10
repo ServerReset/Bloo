@@ -367,7 +367,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin) }.filterValues { it.isNotBlank() }
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
-        val collapsed = vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
+        val firstRun = !settingsStore.onboardingSeen()
+        // On first open all pebbles start expanded regardless of any stored state.
+        val collapsed = if (firstRun) emptySet()
+        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
         val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
         val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
@@ -375,7 +378,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
-        val firstRun = !settingsStore.onboardingSeen()
         _state.update {
             it.copy(
                 vehicles = vehicles,
@@ -753,23 +755,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "Odometer: $it miles." }
         if (status == null) {
             parts += "No live status has been fetched yet."
-            return parts.joinToString(" ")
+        } else {
+            parts += "Doors are ${if (status.doorLock == true) "locked" else "unlocked"}."
+            status.engine?.let { parts += "The engine/vehicle is ${if (it) "on" else "off"}." }
+            if (s.hasBattery(v)) {
+                status.evStatus?.batteryStatus?.let { parts += "Battery is at $it%." }
+                if (status.evStatus?.batteryCharge == true) parts += "It is currently charging."
+                status.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+                    ?.let { parts += "About $it minutes to a full charge." }
+            }
+            if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
+            status.rangeMiFor(s.hasBattery(v))?.let { parts += "Estimated range is $it miles." }
+            s.drivingLabel(v)?.let { parts += "The car appears $it." }
+            status.battery?.batSoc?.let { parts += "12V battery is at $it%." }
+            if (status.airCtrlOn == true) parts += "Climate is on."
+            s.placeNames[v.vin]?.let { parts += "Last known location: $it." }
+            status.tirePressureLamp?.let { tp ->
+                if (tp.hasWarning) parts += "Tire pressure warning is active." else parts += "Tire pressure is normal."
+            }
+            status.washerFluidStatus?.let { parts += "Washer fluid is ${if (it) "low" else "OK"}." }
+            status.breakOilStatus?.let { parts += "Brake fluid is ${if (it) "low" else "OK"}." }
         }
-        parts += "Doors are ${if (status.doorLock == true) "locked" else "unlocked"}."
-        status.engine?.let { parts += "The engine/vehicle is ${if (it) "on" else "off"}." }
-        if (s.hasBattery(v)) {
-            status.evStatus?.batteryStatus?.let { parts += "Battery is at $it%." }
-            if (status.evStatus?.batteryCharge == true) parts += "It is currently charging."
-            status.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
-                ?.let { parts += "About $it minutes to a full charge." }
+        val raw = parts.joinToString(" ")
+        // ML Kit GenAI ARTICLE InputType requires at least 400 characters. Pad with
+        // a neutral context header so the summarizer has enough material to work with.
+        if (raw.length >= 400) return raw
+        val context = buildString {
+            append("This is a vehicle status report for a connected car application. ")
+            append("The data below was fetched from the manufacturer's telematics system ")
+            append("and reflects the last known state of the vehicle. ")
+            append("Use this information to provide a concise, helpful summary of the car's current condition. ")
         }
-        if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
-        status.rangeMiFor(s.hasBattery(v))?.let { parts += "Estimated range is $it miles." }
-        s.drivingLabel(v)?.let { parts += "The car appears $it." }
-        status.battery?.batSoc?.let { parts += "12V battery is at $it%." }
-        if (status.airCtrlOn == true) parts += "Climate is on."
-        s.placeNames[v.vin]?.let { parts += "Last known location: $it." }
-        return parts.joinToString(" ")
+        val padded = context + raw
+        return if (padded.length >= 400) padded
+        else padded + " " + "No additional status data is available at this time.".repeat(
+            ((400 - padded.length) / 52) + 1,
+        ).take(400 - padded.length)
     }
 
     /** Toggle whether a given car+action app-icon shortcut is shown. */

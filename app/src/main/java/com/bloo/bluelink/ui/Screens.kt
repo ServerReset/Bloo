@@ -62,6 +62,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -860,6 +861,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val sections = state.sectionsFor(v).filter {
         it !in listOf("summary", "controls") &&
             (it != "charge" || state.hasBattery(v)) &&
+            (it != "ai" || state.aiEnabled) &&
             !state.isPebbleHidden(v.vin, it)
     }
     val tiles = listOf("main") + sections
@@ -870,6 +872,9 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val start = if (loop) virtualCount / 2 else 0
     val vPager = rememberPagerState(initialPage = start) { virtualCount }
     val current = ((vPager.currentPage % tiles.size) + tiles.size) % tiles.size
+
+    val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
+    val carCount = state.vehicles.size
 
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
@@ -888,39 +893,52 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                         "location" -> LocationPebble(v, state, vm, Modifier)
                         "info" -> InfoPebble(v, status, state, vm, Modifier)
                         "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
+                        "ai" -> AiPebble(v, state, vm, Modifier)
                     }
                 }
             }
         }
-        // Car-name chip, top-left, on every tile except the main one (which shows
-        // the name itself).
+        // Car-name chip, top-center, on every tile except the main one (which shows
+        // the name itself). Centered so it doesn't overlap pebble content.
         androidx.compose.animation.AnimatedVisibility(
             visible = current != 0,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopStart),
+            modifier = Modifier.align(Alignment.TopCenter),
         ) {
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 2.dp,
-                modifier = Modifier.statusBarsPadding().padding(14.dp),
+                modifier = Modifier.statusBarsPadding().padding(top = 10.dp),
             ) {
                 Text(
                     v.name,
-                    Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
         }
-        // Vertical page dots on the right edge.
+        // Vertical page dots on the right edge — show which pebble tile is visible.
         if (tiles.size > 1) {
             VerticalPagerDots(
                 current = current,
                 count = tiles.size,
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp),
+            )
+        }
+        // Horizontal car-switching dots at the bottom so users know they can swipe
+        // left/right to reach other cars. Only shown when there are multiple cars.
+        if (carCount > 1) {
+            PagerDots(
+                current = carIndex,
+                count = carCount,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 14.dp),
             )
         }
     }
@@ -1755,12 +1773,11 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 /** The reorderable pebble stack for a car. */
 @Composable
 private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Set<String> = emptySet()) {
-    val base = state.sectionsFor(v).filter {
-        it !in exclude && !state.isPebbleHidden(v.vin, it)
+    val sections = state.sectionsFor(v).filter {
+        it !in exclude &&
+            !state.isPebbleHidden(v.vin, it) &&
+            (it != "ai" || state.aiEnabled)
     }
-    // The optional AI summary pebble leads the stack when enabled (and not hidden).
-    val showAi = state.aiEnabled && "ai" !in exclude && !state.isPebbleHidden(v.vin, "ai")
-    val sections = if (showAi) listOf("ai") + base else base
     ReorderColumn(
         items = sections,
         keyOf = { it },
@@ -3750,9 +3767,9 @@ private fun StatusRow(label: String, value: String) {
 /** A small bold group heading used inside the Car-info pebble. */
 @Composable
 private fun SectionLabel(text: String) {
-    Spacer(Modifier.height(2.dp))
     Text(
         text,
+        modifier = Modifier.padding(top = 2.dp),
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = LocalContentColor.current.copy(alpha = 0.85f),
