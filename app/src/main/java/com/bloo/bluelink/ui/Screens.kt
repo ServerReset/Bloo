@@ -119,7 +119,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroup
@@ -132,7 +131,6 @@ import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -374,7 +372,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
 
     // Congratulations: fire the works once on entry.
     LaunchedEffect(Unit) {
-        Fireworks.playSound()
+        Fireworks.playSound(context)
         haptics?.fireworks()
     }
     // There's no way back — you must set up first.
@@ -1804,26 +1802,6 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     )
 }
 
-/** The charge start/stop control (used in the charge pebble header). */
-@Composable
-private fun ChargeControl(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel) {
-    val ev = status?.evStatus
-    val plugIn = ev?.batteryPlugin
-    val plugged = ev?.batteryCharge == true || plugIn == null || plugIn != 0
-    StateControl(
-        name = "Charging",
-        isOn = ev?.batteryCharge,
-        stateOn = "Charging", stateOff = "Idle",
-        turnOn = "Start", turnOff = "Stop",
-        icon = Icons.Filled.Bolt, pending = state.isPending(v.vin, "charge"),
-        onActivate = { vm.startCharge(v) }, onDeactivate = { vm.stopCharge(v) },
-        highlightColor = ChargeGreen,
-        highlightContentColor = Color.White,
-        enabled = plugged,
-        disabledNote = "Not plugged in",
-    )
-}
-
 /**
  * A Material 3 Expressive button whose shape springs from a soft pill to a
  * tighter rounded-square while pressed, then bounces back on release. Shared
@@ -1921,8 +1899,15 @@ private fun StateControl(
 ) {
     // Which state is the "highlighted" (square, coloured) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Pill when calm, rounded box when active — and it squishes further on press.
     val corner by animateDpAsState(
-        targetValue = if (highlighted) 18.dp else 34.dp,
+        targetValue = when {
+            pressed -> 10.dp
+            highlighted -> 18.dp
+            else -> 34.dp
+        },
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "ctrlCorner",
     )
@@ -1961,6 +1946,7 @@ private fun StateControl(
             onClick = onClick,
             enabled = enabled && !pending,
             shape = RoundedCornerShape(corner),
+            interactionSource = interaction,
             colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
             modifier = Modifier.height(60.dp),
         ) {
@@ -2099,12 +2085,14 @@ private fun PebbleActionButton(
     container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    val haptics = LocalHaptics.current
-    Button(
-        onClick = { haptics?.heavy(); onClick() },
+    // Press-morphing is the standard for togglable controls.
+    MorphButton(
+        onClick = onClick,
         enabled = enabled && !pending,
-        shape = RoundedCornerShape(20.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
+        containerColor = container,
+        contentColor = contentColor,
+        restCorner = 20.dp,
+        pressedCorner = 10.dp,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         modifier = Modifier.heightIn(min = 42.dp),
     ) {
@@ -2653,22 +2641,6 @@ private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
 
 // --- Service & links ------------------------------------------------------
 
-
-@Composable
-private fun LinkRow(label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onClick() }.padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Icon(
-            Icons.Filled.OpenInNew,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 private fun openUrl(context: Context, url: String, inApp: Boolean) {
     val uri = Uri.parse(url)

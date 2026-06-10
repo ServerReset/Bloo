@@ -86,8 +86,6 @@ data class UiState(
     val tileBackground: Boolean = false,
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
     val shortcutSet: Set<String>? = null,
-    /** Show the first-run "configure your car" prompt. */
-    val showOnboarding: Boolean = false,
     /** All signed-in accounts (one per brand). */
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */
@@ -376,7 +374,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 currentIndex = index,
                 // First run funnels through the onboarding screen → Settings.
                 screen = if (firstRun) Screen.Onboarding else Screen.Garage,
-                showOnboarding = false,
             )
         }
         // Keep the app-icon long-press shortcuts in sync with the current cars.
@@ -638,7 +635,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Finish first-run onboarding by going (required) into Settings. */
     fun startSetup() {
         viewModelScope.launch { settingsStore.setOnboardingSeen() }
-        _state.update { it.copy(showOnboarding = false, screen = Screen.Settings) }
+        _state.update { it.copy(screen = Screen.Settings) }
     }
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {
