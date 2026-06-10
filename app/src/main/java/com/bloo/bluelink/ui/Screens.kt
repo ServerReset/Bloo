@@ -259,6 +259,11 @@ fun BlooApp(vm: AppViewModel) {
     // status/navigation bars; screen content draws on top of it.
     val scheme = MaterialTheme.colorScheme
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // The cover-screen (flip-phone) layout draws its own tiles edge-to-edge and
+    // needs no status-bar scrim; only the regular garage scroll wants one.
+    val cfg = LocalConfiguration.current
+    val compactCover = state.screen == Screen.Garage &&
+        cfg.screenWidthDp < 600 && cfg.screenHeightDp < 520
     Box(
         Modifier
             .fillMaxSize()
@@ -334,7 +339,8 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
         // Fade-to-black scrim over the status bar so content stays legible as it
-        // scrolls underneath.
+        // scrolls underneath. Skipped on the cover screen, which is self-contained.
+        if (!compactCover) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -346,6 +352,7 @@ fun BlooApp(vm: AppViewModel) {
                     ),
                 ),
         )
+        }
     }
     }
 
@@ -738,15 +745,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     // time, swipe up/down between them; swipe left/right between cars.
     val compact = !large && heightDp < 520
     if (compact) {
-        Box(Modifier.fillMaxSize()) {
-            CompactGarage(state, vm)
-            FloatingIcon(
-                icon = Icons.Filled.Settings,
-                description = "Settings",
-                onClick = { vm.openSettings() },
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
-            )
-        }
+        // The cover screen hosts Settings (and refresh) inside the main tile, so
+        // there is no floating overlay here.
+        CompactGarage(state, vm)
         return
     }
     // How many full-height cards fit side by side; pages advance by this many.
@@ -880,6 +881,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
 
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
+    val scope = rememberCoroutineScope()
 
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
@@ -913,6 +915,8 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             Surface(
+                // Tapping the chip jumps back to the main car-info tile (index 0).
+                onClick = { scope.launch { vPager.animateScrollToPage(vPager.currentPage - current) } },
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurface,
@@ -1018,6 +1022,9 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                     }
                     IconButton(onClick = { vm.refreshStatus(v) }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = scheme.onSurface)
+                    }
+                    IconButton(onClick = { vm.openSettings() }) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = scheme.onSurface)
                     }
                 }
                 LastUpdatedLabel(v, state)
@@ -1592,12 +1599,7 @@ private fun VehicleDetailContent(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 3.dp,
             ) {
-                Row(
-                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
+                Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 }
             }
