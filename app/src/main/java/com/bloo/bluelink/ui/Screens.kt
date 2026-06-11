@@ -34,7 +34,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -2139,11 +2143,28 @@ private fun MorphButton(
  * spinner while [pending], so the button width never changes just from loading.
  */
 @Composable
-private fun MorphButtonLabel(icon: ImageVector, label: String, pending: Boolean, iconSize: Dp = 18.dp) {
+private fun MorphButtonLabel(
+    icon: ImageVector,
+    label: String,
+    pending: Boolean,
+    iconSize: Dp = 18.dp,
+    spinning: Boolean = false,
+) {
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
     } else {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(iconSize))
+        val transition = rememberInfiniteTransition(label = "iconSpin")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(durationMillis = 2200, easing = LinearEasing)),
+            label = "iconAngle",
+        )
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(iconSize).rotate(if (spinning) angle else 0f),
+        )
     }
     Spacer(Modifier.width(8.dp))
     Text(label, fontWeight = FontWeight.SemiBold)
@@ -2395,6 +2416,7 @@ private fun PebbleActionButton(
     enabled: Boolean = true,
     pending: Boolean = false,
     active: Boolean = false,
+    spinning: Boolean = false,
     activeContainer: Color = MaterialTheme.colorScheme.primary,
     activeContent: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
@@ -2410,7 +2432,7 @@ private fun PebbleActionButton(
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         modifier = Modifier.heightIn(min = 50.dp),
     ) {
-        MorphButtonLabel(icon, label, pending)
+        MorphButtonLabel(icon, label, pending, spinning = spinning)
     }
 }
 
@@ -2698,6 +2720,7 @@ private fun ClimatePebble(
                 onClick = { if (climateOn) vm.stopClimate(v) else startClimate() },
                 pending = pending,
                 active = climateOn,
+                spinning = climateOn,
             )
         },
     ) {
@@ -2763,11 +2786,13 @@ private fun SeatControl(
     if (range.size <= 1) return
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
     val current = range[index]
-    val tint = when {
-        current.isCool -> SeatCool
-        current.isHeat -> SeatHeat
-        else -> MaterialTheme.colorScheme.primary
-    }
+    // Deeper colour the stronger the setting; smoothly cross-fades as you slide
+    // through neutral between cooling (blues) and heating (reds).
+    val tint by androidx.compose.animation.animateColorAsState(
+        targetValue = seatTint(current),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "seatTint",
+    )
     Column {
         StepRow(label, current.label)
         AnimatedSlider(
@@ -2778,6 +2803,18 @@ private fun SeatControl(
             accent = tint,
         )
     }
+}
+
+/** Seat colour by intensity: light->dark blue for cool, light->dark red for heat. */
+@Composable
+private fun seatTint(level: SeatLevel): Color = when {
+    level.isCool -> androidx.compose.ui.graphics.lerp(
+        Color(0xFF82B1FF), Color(0xFF1A45C0), ((level.apiValue - 3) / 2f).coerceIn(0f, 1f),
+    )
+    level.isHeat -> androidx.compose.ui.graphics.lerp(
+        Color(0xFFFF8A80), Color(0xFFC62828), ((level.apiValue - 6) / 2f).coerceIn(0f, 1f),
+    )
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 // --- Charge limits --------------------------------------------------------
