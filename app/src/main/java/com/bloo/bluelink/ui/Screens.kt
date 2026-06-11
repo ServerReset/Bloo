@@ -455,8 +455,6 @@ private fun OnboardingScreen(vm: AppViewModel) {
             MorphButton(
                 onClick = { vm.startSetup() },
                 modifier = Modifier.fillMaxWidth(),
-                restCorner = 30.dp,
-                pressedCorner = 14.dp,
                 contentPadding = PaddingValues(vertical = 18.dp),
             ) {
                 Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -621,8 +619,6 @@ private fun LoginScreen(
                 onClick = { onLogin(email, password, pin, brand) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 enabled = !loading,
-                restCorner = 28.dp,
-                pressedCorner = 14.dp,
             ) {
                 if (loading) LoadingIndicator() else Text("Sign in", fontWeight = FontWeight.SemiBold)
             }
@@ -677,12 +673,10 @@ private fun LockScreen(vm: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(28.dp))
-        // Expressive morphing button: a big rounded rectangle that squishes
-        // tighter as you press it, springing back on release.
+        // Same dark rounded-rectangle control style as the rest of the app.
         MorphButton(
             onClick = { authenticate() },
-            restCorner = 36.dp,
-            pressedCorner = 16.dp,
+            modifier = Modifier.height(ControlHeight),
             contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
         ) {
             Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -1956,39 +1950,38 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
 }
 
 /**
- * A Material 3 Expressive button whose shape springs from a soft rounded
- * rectangle to a tighter one while pressed, then bounces back on release. Shared
- * infrastructure for any "morphing" button in the app.
+ * The one button style used across the whole app: a dark, generously rounded
+ * rectangle — the same fill and shape as the Doors "Unlock" and charge/climate
+ * "Start" controls. The corner is a fraction of the button's height, so every
+ * button (tall control or small header action) reads with the same rounding, and
+ * it squishes a little while pressed. Colours are overridden only for the
+ * coloured "on" states (e.g. charging green).
  */
 @Composable
 private fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    containerColor: Color = MaterialTheme.colorScheme.primary,
-    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    restCorner: Dp = 28.dp,
-    pressedCorner: Dp = 12.dp,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
-    border: BorderStroke? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHaptics.current
-    val corner by animateDpAsState(
-        targetValue = if (pressed) pressedCorner else restCorner,
-        animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
+    val pct by animateFloatAsState(
+        targetValue = if (pressed) 28f else 45f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphCorner",
     )
     Button(
         onClick = { haptics?.click(); onClick() },
         modifier = modifier,
         enabled = enabled,
-        shape = RoundedCornerShape(corner),
+        shape = RoundedCornerShape(percent = pct.roundToInt()),
         interactionSource = interaction,
         colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
-        border = border,
         contentPadding = contentPadding,
         content = content,
     )
@@ -2242,8 +2235,8 @@ private val PebbleCornerCollapsed = 38.dp
 private val PebbleCornerExpanded = 20.dp
 
 /**
- * A compact pill button used in a pebble header (charge/climate/location), shown
- * even when the pebble is collapsed, sitting just before the expand chevron.
+ * A pebble-header action button (AI summarize / locate), shown even when the
+ * pebble is collapsed. Same dark rounded-rectangle style as every other button.
  */
 @Composable
 private fun PebbleActionButton(
@@ -2252,21 +2245,16 @@ private fun PebbleActionButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
     pending: Boolean = false,
-    // Default to a tinted container so the button always keeps a visible shape,
-    // even on a neutral pebble background in light mode (where surface tones match).
-    container: Color = MaterialTheme.colorScheme.secondaryContainer,
-    contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     MorphButton(
         onClick = onClick,
         enabled = enabled && !pending,
         containerColor = container,
         contentColor = contentColor,
-        restCorner = 20.dp,
-        pressedCorner = 10.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        modifier = Modifier.heightIn(min = 42.dp),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        modifier = Modifier.heightIn(min = 50.dp),
     ) {
         if (pending) {
             LoadingIndicator(Modifier.size(18.dp))
