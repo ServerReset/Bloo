@@ -1123,18 +1123,17 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                         .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
                 )
             }
-            Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // The car-switching dots live at top-center of the screen
-                        // (see CompactCar), not here.
-                        Text(
-                            v.name,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = scheme.onSurface,
-                        )
-                    }
+            Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // The car-switching dots live at top-center of the screen
+                    // (see CompactCar), not here.
+                    Text(
+                        v.name,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = scheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
                     IconButton(onClick = { vm.refreshStatus(v) }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = scheme.onSurface)
                     }
@@ -1142,10 +1141,14 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = scheme.onSurface)
                     }
                 }
+                // Centre the live-status + lock group so the tile reads as one
+                // balanced block instead of top-clustered with a big gap below.
+                Spacer(Modifier.weight(1f))
                 LastUpdatedLabel(v, state)
                 ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(6.dp))
                 PrimaryActions(v, state, vm)
+                Spacer(Modifier.weight(1f))
                 Text(
                     "Swipe up for more",
                     style = MaterialTheme.typography.labelSmall,
