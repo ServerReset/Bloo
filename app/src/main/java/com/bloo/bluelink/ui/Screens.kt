@@ -2322,24 +2322,24 @@ private fun MorphButtonLabel(
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
     } else {
-        // Only run the spin animation when actually spinning — otherwise every
-        // button would hold a live infinite animation forever.
-        val angle = if (spinning) {
-            val transition = rememberInfiniteTransition(label = "iconSpin")
-            val a by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(tween(durationMillis = 2200, easing = LinearEasing)),
-                label = "iconAngle",
-            )
-            a
-        } else {
-            0f
+        // Always-composed Animatable, but it only runs while spinning — so idle
+        // buttons don't each hold a live infinite animation, and we avoid calling
+        // remember conditionally.
+        val angle = remember { Animatable(0f) }
+        LaunchedEffect(spinning) {
+            if (spinning) {
+                angle.animateTo(
+                    targetValue = angle.value + 360f,
+                    animationSpec = infiniteRepeatable(tween(durationMillis = 2200, easing = LinearEasing)),
+                )
+            } else {
+                angle.snapTo(0f)
+            }
         }
         Icon(
             icon,
             contentDescription = null,
-            modifier = Modifier.size(iconSize).rotate(angle),
+            modifier = Modifier.size(iconSize).rotate(angle.value),
         )
     }
     Spacer(Modifier.width(8.dp))
