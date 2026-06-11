@@ -300,23 +300,11 @@ fun BlooApp(vm: AppViewModel) {
         animationSpec = tween(durationMillis = 450),
         label = "lockAlpha",
     )
-    // A blurred snapshot of the whole app, recorded each frame, that floating
-    // elements sample for a frosted-glass background.
-    val backdropLayer = rememberGraphicsLayer()
-    val backdrop = remember(backdropLayer) { Backdrop(backdropLayer) }
-    val blurPx = with(LocalDensity.current) { 24.dp.toPx() }
-    backdropLayer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
     Box(Modifier.fillMaxSize()) {
     Box(
         Modifier
             .fillMaxSize()
             .blur(lockBlur)
-            .drawWithContent {
-                backdrop.recording = true
-                backdropLayer.record { this@drawWithContent.drawContent() }
-                backdrop.recording = false
-                drawContent()
-            }
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -327,7 +315,6 @@ fun BlooApp(vm: AppViewModel) {
                 ),
             ),
     ) {
-    CompositionLocalProvider(LocalBackdrop provides backdrop) {
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = {
@@ -405,7 +392,6 @@ fun BlooApp(vm: AppViewModel) {
                 ),
         )
         }
-    }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         if (lockAlpha > 0.01f) {
@@ -1176,7 +1162,7 @@ private fun FloatingIcon(
         onClick = onClick,
         shape = CircleShape,
         // Frosted glass: real backdrop blur with a faint tint on top.
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 3.dp,
         modifier = modifier.padding(12.dp).backdropBlur(CircleShape).size(44.dp),
@@ -1879,7 +1865,7 @@ private fun VehicleDetailContent(
             Surface(
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 3.dp,
                 modifier = Modifier.backdropBlur(CircleShape),
@@ -2336,17 +2322,24 @@ private fun MorphButtonLabel(
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
     } else {
-        val transition = rememberInfiniteTransition(label = "iconSpin")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(durationMillis = 2200, easing = LinearEasing)),
-            label = "iconAngle",
-        )
+        // Only run the spin animation when actually spinning — otherwise every
+        // button would hold a live infinite animation forever.
+        val angle = if (spinning) {
+            val transition = rememberInfiniteTransition(label = "iconSpin")
+            val a by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(tween(durationMillis = 2200, easing = LinearEasing)),
+                label = "iconAngle",
+            )
+            a
+        } else {
+            0f
+        }
         Icon(
             icon,
             contentDescription = null,
-            modifier = Modifier.size(iconSize).rotate(if (spinning) angle else 0f),
+            modifier = Modifier.size(iconSize).rotate(angle),
         )
     }
     Spacer(Modifier.width(8.dp))
