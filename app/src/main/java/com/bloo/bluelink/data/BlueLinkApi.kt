@@ -123,7 +123,11 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                 .get()
                 .header("REFRESH", refresh.toString())
                 .build()
-            json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus
+            json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus?.also { st ->
+                // Diagnostic: does the status payload carry GPS? (presence only)
+                val hasLoc = st.vehicleLocation?.coord?.lat != null
+                AppLog.log("status ${v.name}: embedded location ${if (hasLoc) "present" else "absent"}")
+            }
         }
 
     suspend fun location(token: String, username: String, pin: String, v: Vehicle): GeoLocation? =

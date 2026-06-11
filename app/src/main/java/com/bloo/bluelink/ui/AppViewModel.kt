@@ -964,15 +964,43 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
-        val loc = repoFor(v).location(v) ?: throw BlueLinkException(
-            "Couldn't get the car's location — it may be asleep, out of coverage, or over " +
-                "the daily location-lookup limit. Try again later.",
-        )
-        _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
-        reverseGeocode(loc)?.let { place ->
-            _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
+        // The GPS rides along with a status refresh (this is what the official app
+        // uses); prefer it over the heavily rate-limited findMyCar, which is the
+        // thing that throws "exceeded the daily remote service request limit".
+        val s = repoFor(v).status(v, refresh = true)
+        s?.let { st ->
+            _state.update { it.copy(statuses = it.statuses + (v.vin to st)) }
         }
-        persistCache()
+        val statusLoc = s?.vehicleLocation?.coord?.let { c ->
+            val lat = c.lat
+            val lon = c.lon
+            if (lat != null && lon != null) GeoLocation(lat, lon, s.vehicleLocation?.speed?.value) else null
+        }
+        // Only hit the rate-limited findMyCar if the status carried no GPS. If it
+        // then fails (e.g. the daily locate limit) but we already have a fix, keep
+        // showing that rather than throwing a scary error.
+        val hadCached = _state.value.locations[v.vin] != null
+        val loc = statusLoc ?: try {
+            repoFor(v).location(v)
+        } catch (e: BlueLinkException) {
+            if (hadCached) null else throw e
+        }
+        when {
+            loc != null -> {
+                _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
+                reverseGeocode(loc)?.let { place ->
+                    _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
+                }
+                persistCache()
+            }
+            hadCached -> _state.update {
+                it.copy(message = "Showing last-known location — a live locate is over today's limit. Try again later.")
+            }
+            else -> throw BlueLinkException(
+                "Couldn't get the car's location — it may be asleep, out of coverage, or over " +
+                    "the daily location-lookup limit. Try again later.",
+            )
+        }
     }
 
     private suspend fun reverseGeocode(loc: GeoLocation): String? = withContext(Dispatchers.IO) {
