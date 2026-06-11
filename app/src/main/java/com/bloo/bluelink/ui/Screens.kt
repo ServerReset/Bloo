@@ -140,8 +140,6 @@ import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -457,6 +455,8 @@ private fun OnboardingScreen(vm: AppViewModel) {
             MorphButton(
                 onClick = { vm.startSetup() },
                 modifier = Modifier.fillMaxWidth(),
+                restCorner = 30.dp,
+                pressedCorner = 14.dp,
                 contentPadding = PaddingValues(vertical = 18.dp),
             ) {
                 Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -621,6 +621,8 @@ private fun LoginScreen(
                 onClick = { onLogin(email, password, pin, brand) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 enabled = !loading,
+                restCorner = 28.dp,
+                pressedCorner = 14.dp,
             ) {
                 if (loading) LoadingIndicator() else Text("Sign in", fontWeight = FontWeight.SemiBold)
             }
@@ -675,8 +677,12 @@ private fun LockScreen(vm: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(28.dp))
+        // Expressive morphing button: a big pill that squishes into a rounded
+        // square as you press it, springing back on release.
         MorphButton(
             onClick = { authenticate() },
+            restCorner = 36.dp,
+            pressedCorner = 16.dp,
             contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
         ) {
             Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -1949,70 +1955,43 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     )
 }
 
-// ---- M3 Expressive buttons -----------------------------------------------
-//
-// Thin wrapper over the stock Material 3 Expressive button components
-// (material3 1.5.0-alpha21) so every button shares the same call shape:
-//
-//  Tap  (toggled == null)            -> the common Button (m3 "type 1"). Rests as
-//       a pill and morphs to a rounded rectangle while pressed, springing back.
-//
-//  Toggle  (toggled == true|false)   -> ToggleButton (m3 "type 2"). Unchecked is a
-//       pill in the idle color; checked morphs to a rounded square in the active
-//       color and stays there. Shape/color animation is handled by the component.
-
+/**
+ * A Material 3 Expressive button whose shape springs from a soft pill to a
+ * tighter rounded-square while pressed, then bounces back on release. Shared
+ * infrastructure for any "morphing" button in the app.
+ */
 @Composable
 private fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    toggled: Boolean? = null,
-    idleContainerColor: Color = MaterialTheme.colorScheme.primary,
-    idleContentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    activeContainerColor: Color = idleContainerColor,
-    activeContentColor: Color = idleContentColor,
-    border: BorderStroke? = null,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    restCorner: Dp = 28.dp,
+    pressedCorner: Dp = 12.dp,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    border: BorderStroke? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHaptics.current
-    if (toggled == null) {
-        Button(
-            onClick = { haptics?.click(); onClick() },
-            // Pill at rest -> rounded rectangle while pressed (the expressive morph).
-            shapes = ButtonDefaults.shapes(
-                shape = CircleShape,
-                pressedShape = RoundedCornerShape(12.dp),
-            ),
-            modifier = modifier,
-            enabled = enabled,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = idleContainerColor,
-                contentColor = idleContentColor,
-            ),
-            border = border,
-            contentPadding = contentPadding,
-            content = content,
-        )
-    } else {
-        ToggleButton(
-            checked = toggled,
-            onCheckedChange = { haptics?.click(); onClick() },
-            // Stock expressive morph: pill (unchecked) <-> rounded square (checked).
-            shapes = ToggleButtonDefaults.shapes(),
-            modifier = modifier,
-            enabled = enabled,
-            colors = ToggleButtonDefaults.toggleButtonColors(
-                containerColor = idleContainerColor,
-                contentColor = idleContentColor,
-                checkedContainerColor = activeContainerColor,
-                checkedContentColor = activeContentColor,
-            ),
-            border = border,
-            contentPadding = contentPadding,
-            content = content,
-        )
-    }
+    val corner by animateDpAsState(
+        targetValue = if (pressed) pressedCorner else restCorner,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
+        label = "morphCorner",
+    )
+    Button(
+        onClick = { haptics?.click(); onClick() },
+        modifier = modifier,
+        enabled = enabled,
+        shape = RoundedCornerShape(corner),
+        interactionSource = interaction,
+        colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
+        border = border,
+        contentPadding = contentPadding,
+        content = content,
+    )
 }
 
 /**
@@ -2075,6 +2054,18 @@ private fun StateControl(
 ) {
     // Which state is the "highlighted" (square, coloured) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Pill when calm, rounded box when active — and it squishes further on press.
+    val corner by animateDpAsState(
+        targetValue = when {
+            pressed -> 10.dp
+            highlighted -> 20.dp
+            else -> 38.dp
+        },
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "ctrlCorner",
+    )
     Row(
         Modifier.fillMaxWidth().height(ControlHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -2108,15 +2099,14 @@ private fun StateControl(
         }
         val haptics = LocalHaptics.current
         val onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() }
-        MorphButton(
+        val container = if (highlighted) highlightColor else MaterialTheme.colorScheme.surfaceContainerHighest
+        val contentColor = if (highlighted) highlightContentColor else MaterialTheme.colorScheme.onSurface
+        Button(
             onClick = onClick,
             enabled = enabled && !pending,
-            toggled = highlighted,
-            idleContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            idleContentColor = MaterialTheme.colorScheme.onSurface,
-            activeContainerColor = highlightColor,
-            activeContentColor = highlightContentColor,
-            border = if (!highlighted) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
+            shape = RoundedCornerShape(corner),
+            interactionSource = interaction,
+            colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
             modifier = Modifier.height(ControlHeight),
         ) {
             if (pending) {
@@ -2270,8 +2260,10 @@ private fun PebbleActionButton(
     MorphButton(
         onClick = onClick,
         enabled = enabled && !pending,
-        idleContainerColor = container,
-        idleContentColor = contentColor,
+        containerColor = container,
+        contentColor = contentColor,
+        restCorner = 100.dp,
+        pressedCorner = 10.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         modifier = Modifier.heightIn(min = 42.dp),
