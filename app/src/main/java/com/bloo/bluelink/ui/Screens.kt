@@ -140,6 +140,8 @@ import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -1449,14 +1451,17 @@ private fun AnimatedSlider(
         if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
     }
 
-    // Geometry of the fully custom track + thumb. Drawing it ourselves (instead
-    // of overlaying dots on the stock M3 track) keeps the rounded ends clean and
-    // guarantees a tick never doubles up against the thumb.
+    // Geometry of the fully custom track + thumb. Drawing it ourselves (thumb
+    // included, so the stock thumb is zero-sized) keeps the rounded ends clean,
+    // lets the thumb sit exactly on its tick, and insets the end ticks from the
+    // track caps so they're not crammed against the edge.
     val trackThickness = 14.dp
     val thumbW = 6.dp
     val thumbH = 44.dp
     val gap = 6.dp
     val dotR = 2.5.dp
+    // How far the thumb travel and the tick row are inset from the track caps.
+    val edgePad = 14.dp
 
     val inactiveColor = scheme.surfaceContainerHighest
     val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
@@ -1493,13 +1498,9 @@ private fun AnimatedSlider(
         valueRange = valueRange,
         steps = 0,
         interactionSource = interactionSource,
-        thumb = {
-            Box(
-                Modifier
-                    .size(thumbW, thumbH)
-                    .background(accent, RoundedCornerShape(thumbW / 2)),
-            )
-        },
+        // The real thumb is invisible — we draw it ourselves in the track so the
+        // thumb, track and ticks all share one inset coordinate space.
+        thumb = { Box(Modifier.size(0.dp)) },
         track = { state ->
             val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
             val frac2 = ((state.value - valueRange.start) / span2).coerceIn(0f, 1f)
@@ -1510,15 +1511,19 @@ private fun AnimatedSlider(
             ) {
                 val halfThumb = thumbW.toPx() / 2f
                 val gapPx = gap.toPx()
-                val usable = (size.width - thumbW.toPx()).coerceAtLeast(0f)
-                val thumbX = halfThumb + usable * frac2
+                val padPx = edgePad.toPx()
+                // Thumb + ticks travel within the inset band; the track bar itself
+                // still spans the full width with rounded caps at the very edges.
+                val travel = (size.width - 2 * padPx).coerceAtLeast(0f)
+                val thumbX = padPx + travel * frac2
                 val cy = size.height / 2f
                 val th = trackThickness.toPx()
                 val top = cy - th / 2f
                 val radius = androidx.compose.ui.geometry.CornerRadius(th / 2f)
+                val cut = halfThumb + gapPx
 
-                // Inactive segment (right of the thumb).
-                val inStart = (thumbX + gapPx).coerceAtMost(size.width)
+                // Inactive segment (right of the thumb, up to the right cap).
+                val inStart = (thumbX + cut).coerceAtMost(size.width)
                 if (inStart < size.width) {
                     drawRoundRect(
                         inactiveColor,
@@ -1527,8 +1532,8 @@ private fun AnimatedSlider(
                         cornerRadius = radius,
                     )
                 }
-                // Active segment (left of the thumb).
-                val acEnd = (thumbX - gapPx).coerceAtLeast(0f)
+                // Active segment (left cap up to the thumb).
+                val acEnd = (thumbX - cut).coerceAtLeast(0f)
                 if (acEnd > 0f) {
                     drawRoundRect(
                         accent,
@@ -1537,14 +1542,15 @@ private fun AnimatedSlider(
                         cornerRadius = radius,
                     )
                 }
-                // Tick dots — evenly spaced, skipping any that fall under the thumb.
+                // Tick dots — evenly spaced across the inset band, skipping any
+                // that fall under the thumb.
                 if (steps > 0) {
                     val n = steps + 2
                     val rPx = dotR.toPx()
                     for (i in 0 until n) {
                         val tf = i.toFloat() / (n - 1)
-                        val x = halfThumb + usable * tf
-                        if (kotlin.math.abs(x - thumbX) < gapPx + halfThumb) continue
+                        val x = padPx + travel * tf
+                        if (kotlin.math.abs(x - thumbX) < cut) continue
                         drawCircle(
                             if (x <= thumbX) dotOnActive else dotOnInactive,
                             rPx,
@@ -1552,6 +1558,14 @@ private fun AnimatedSlider(
                         )
                     }
                 }
+                // The thumb — a tall rounded bar centered on its value.
+                val twPx = thumbW.toPx()
+                drawRoundRect(
+                    accent,
+                    topLeft = Offset(thumbX - twPx / 2f, 0f),
+                    size = androidx.compose.ui.geometry.Size(twPx, size.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(twPx / 2f),
+                )
             }
         },
         modifier = Modifier.fillMaxWidth(),
@@ -1935,21 +1949,17 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     )
 }
 
-// ---- M3 Expressive dynamic button ----------------------------------------
+// ---- M3 Expressive buttons -----------------------------------------------
 //
-// Two modes, one primitive:
+// Thin wrapper over the stock Material 3 Expressive button components
+// (material3 1.5.0-alpha21) so every button shares the same call shape:
 //
-//  Tap  (toggled omitted / null)
-//       Rests as a full pill. While the finger is down — or for 200 ms after a
-//       quick tap — morphs to a rounded rectangle, then springs back to pill.
+//  Tap  (toggled == null)            -> the common Button (m3 "type 1"). Rests as
+//       a pill and morphs to a rounded rectangle while pressed, springing back.
 //
-//  Toggle  (toggled = true | false)
-//       false → pill + [idleContainerColor].
-//       true  → rounded rectangle + [activeContainerColor], held until toggled back.
-//       Color and shape both animate on every state change.
-
-private val MorphPill = 100.dp   // always clamps to half the button height = true capsule
-private val MorphBox  = 10.dp    // clearly-a-rounded-rectangle for any typical button size
+//  Toggle  (toggled == true|false)   -> ToggleButton (m3 "type 2"). Unchecked is a
+//       pill in the idle color; checked morphs to a rounded square in the active
+//       color and stays there. Shape/color animation is handled by the component.
 
 @Composable
 private fun MorphButton(
@@ -1965,48 +1975,44 @@ private fun MorphButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val source  = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
     val haptics = LocalHaptics.current
-    val scope   = rememberCoroutineScope()
-    // For tap mode: keeps the button in box shape for 200 ms after a quick tap so
-    // the morph is always visible even if the finger lifts before the spring settles.
-    var tapHold by remember { mutableStateOf(false) }
-
-    val box = pressed || tapHold || toggled == true
-    val corner by animateDpAsState(
-        targetValue   = if (box) MorphBox else MorphPill,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness    = Spring.StiffnessMedium,
-        ),
-        label = "morphCorner",
-    )
-    val bg by androidx.compose.animation.animateColorAsState(
-        targetValue = if (toggled == true) activeContainerColor else idleContainerColor,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "morphBg",
-    )
-    Button(
-        onClick = {
-            haptics?.click()
-            if (toggled == null) {
-                scope.launch { tapHold = true; delay(200); tapHold = false }
-            }
-            onClick()
-        },
-        modifier          = modifier,
-        enabled           = enabled,
-        shape             = RoundedCornerShape(corner),
-        interactionSource = source,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = bg,
-            contentColor   = if (toggled == true) activeContentColor else idleContentColor,
-        ),
-        border         = border,
-        contentPadding = contentPadding,
-        content        = content,
-    )
+    if (toggled == null) {
+        Button(
+            onClick = { haptics?.click(); onClick() },
+            // Pill at rest -> rounded rectangle while pressed (the expressive morph).
+            shapes = ButtonDefaults.shapes(
+                shape = CircleShape,
+                pressedShape = RoundedCornerShape(12.dp),
+            ),
+            modifier = modifier,
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = idleContainerColor,
+                contentColor = idleContentColor,
+            ),
+            border = border,
+            contentPadding = contentPadding,
+            content = content,
+        )
+    } else {
+        ToggleButton(
+            checked = toggled,
+            onCheckedChange = { haptics?.click(); onClick() },
+            // Stock expressive morph: pill (unchecked) <-> rounded square (checked).
+            shapes = ToggleButtonDefaults.shapes(),
+            modifier = modifier,
+            enabled = enabled,
+            colors = ToggleButtonDefaults.toggleButtonColors(
+                containerColor = idleContainerColor,
+                contentColor = idleContentColor,
+                checkedContainerColor = activeContainerColor,
+                checkedContentColor = activeContentColor,
+            ),
+            border = border,
+            contentPadding = contentPadding,
+            content = content,
+        )
+    }
 }
 
 /**
