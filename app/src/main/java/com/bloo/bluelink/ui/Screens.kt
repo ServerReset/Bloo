@@ -1005,6 +1005,13 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
 
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
+    // Hide the page indicators while a refresh is in flight (pull-to-refresh /
+    // manual refresh) so the loading indicator owns the screen.
+    val dotsAlpha by animateFloatAsState(
+        targetValue = if (state.refreshing) 0f else 1f,
+        animationSpec = tween(durationMillis = 250),
+        label = "coverDotsFade",
+    )
 
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
@@ -1042,7 +1049,8 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 10.dp),
+                    .padding(top = 10.dp)
+                    .alpha(dotsAlpha),
             )
         }
         // Vertical page dots on the right edge — show which pebble tile is visible.
@@ -1050,7 +1058,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             VerticalPagerDots(
                 current = current,
                 count = tiles.size,
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp),
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp).alpha(dotsAlpha),
             )
         }
     }

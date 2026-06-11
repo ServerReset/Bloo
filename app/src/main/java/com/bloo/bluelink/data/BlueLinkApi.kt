@@ -175,42 +175,59 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     suspend fun startClimate(
         token: String, username: String, pin: String, v: Vehicle, req: ClimateRequest,
     ): String = execute {
-        // Pure EVs use evc/fatc/start (no engine to start; just HVAC).
-        // ICE and PHEVs use rcs/rsc/start (remote engine start + climate).
-        val path = if (v.isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
+        // Body shapes mirror the community hyundai_kia_connect_api exactly. Newer
+        // head units (Gen5W) reject the bloated body the old code sent (it included
+        // Ims/username/vin/seat info on every EV) with a 502 "could not complete
+        // your request". For EVs the accepted body is minimal; seat-heat + duration
+        // are only honoured on generation-3 cars, and Ims/username/vin are
+        // ICE-only fields.
+        fun seatInfo() = kotlinx.serialization.json.buildJsonObject {
+            put("drvSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontLeft.apiValue))
+            put("astSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontRight.apiValue))
+            put("rlSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearLeft.apiValue))
+            put("rrSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearRight.apiValue))
+        }
+        val isEv = v.isEv
+        val gen3 = v.generation.trim() == "3"
+        val path = if (isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
         val payload = json.encodeToString(
             kotlinx.serialization.json.JsonObject.serializer(),
             kotlinx.serialization.json.buildJsonObject {
-                put("Ims", kotlinx.serialization.json.JsonPrimitive(0))
-                put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
-                put("airTemp", kotlinx.serialization.json.buildJsonObject {
-                    put("unit", kotlinx.serialization.json.JsonPrimitive(1))
-                    put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
-                })
-                put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
-                put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat) 1 else 0))
-                // igniOnDuration is only meaningful for ICE/PHEV remote start;
-                // pure EVs have no engine ignition so omitting prevents a 502.
-                if (!v.isEv) {
+                if (isEv) {
+                    put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
+                    put("airTemp", kotlinx.serialization.json.buildJsonObject {
+                        put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
+                        put("unit", kotlinx.serialization.json.JsonPrimitive(1))
+                    })
+                    put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
+                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat) 1 else 0))
+                    // Older (gen-3) EVs additionally accept duration + seat heat.
+                    if (gen3) {
+                        put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
+                        put("seatHeaterVentInfo", seatInfo())
+                    }
+                } else {
+                    put("Ims", kotlinx.serialization.json.JsonPrimitive(0))
+                    put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
+                    put("airTemp", kotlinx.serialization.json.buildJsonObject {
+                        put("unit", kotlinx.serialization.json.JsonPrimitive(1))
+                        put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
+                    })
+                    put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
+                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat) 1 else 0))
                     put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
+                    put("seatHeaterVentInfo", seatInfo())
+                    put("username", kotlinx.serialization.json.JsonPrimitive(username))
+                    put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
                 }
-                put("seatHeaterVentInfo", kotlinx.serialization.json.buildJsonObject {
-                    put("drvSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontLeft.apiValue))
-                    put("astSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontRight.apiValue))
-                    put("rlSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearLeft.apiValue))
-                    put("rrSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearRight.apiValue))
-                })
-                put("username", kotlinx.serialization.json.JsonPrimitive(username))
-                put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
             }
         ).toRequestBody(jsonMedia)
 
         val request = baseRequest(path, token, username, pin, v)
             .post(payload)
             .build()
-        // Hyundai's HVAC endpoint intermittently returns a 502 "could not complete
-        // your request" even for a valid call (seen on Gen5W cars). One short retry
-        // clears the transient failure without bothering the user.
+        // One short retry clears the occasional transient 502 without bothering
+        // the user.
         callWithRetry(request)
     }
 
@@ -255,7 +272,14 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     ): Request.Builder = Request.Builder()
         .url("$baseUrl$path")
         .header("access_token", token)
+        // The reference client also passes the access token as `accessToken` and
+        // the secret as `clientSecret` on every command; some endpoints
+        // (findMyCar, fatc) appear to validate these even though rdo does not.
+        .header("accessToken", token)
         .header("client_id", clientId)
+        .header("clientSecret", clientSecret)
+        .header("accept", "application/json, text/plain, */*")
+        .header("accept-language", "en-US,en;q=0.9")
         .header("Host", host)
         .header("User-Agent", UA_OKHTTP)
         .header("registrationId", v.regId)
@@ -266,6 +290,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         .header("blueLinkServicePin", pin)
         .header("offset", gmtOffsetHours())
         .header("Language", "0")
+        .header("language", "0")
         .header("to", "ISS")
         .header("encryptFlag", "false")
         .header("from", "SPA")

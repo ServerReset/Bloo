@@ -86,6 +86,9 @@ data class VehicleStatus(
     val battery: Battery12V? = null,
     val evStatus: EvStatus? = null,
     val dateTime: String? = null,
+    // Last-known GPS, included free with the status payload (no rate-limited
+    // findMyCar call needed). This is how the official app shows location.
+    val vehicleLocation: VehicleLocation? = null,
     // Comfort / climate sub-features
     val steerWheelHeat: Int? = null,
     val sideBackWindowHeat: Int? = null,
@@ -316,6 +319,14 @@ data class ClimateRequest(
 data class VehicleLocationResponse(
     val coord: Coord? = null,
     val head: Double? = null,
+    val speed: Speed? = null,
+)
+
+/** Location embedded in the vehicleStatus payload (free, not rate-limited). */
+@Serializable
+data class VehicleLocation(
+    val coord: Coord? = null,
+    val time: String? = null,
     val speed: Speed? = null,
 )
 

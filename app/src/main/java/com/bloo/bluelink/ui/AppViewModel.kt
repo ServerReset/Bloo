@@ -555,10 +555,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 statusMutex.withLock {
                     repoFor(v).status(v, refresh = refresh)?.let { s ->
+                        // The status payload carries last-known GPS for free — use
+                        // it so the map/location works without the rate-limited
+                        // findMyCar call (this is what the official app does).
+                        val statusLoc = s.vehicleLocation?.coord?.let { c ->
+                            val lat = c.lat
+                            val lon = c.lon
+                            if (lat != null && lon != null) {
+                                GeoLocation(lat, lon, s.vehicleLocation?.speed?.value)
+                            } else null
+                        }
                         _state.update { st ->
                             st.copy(
                                 statuses = st.statuses + (v.vin to s),
                                 lastFetched = st.lastFetched + (v.vin to System.currentTimeMillis()),
+                                locations = if (statusLoc != null) {
+                                    st.locations + (v.vin to statusLoc)
+                                } else st.locations,
                             )
                         }
                         persistSnapshots()
@@ -566,6 +579,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         checkAlerts(v, s)
                         // Auto-AI: refresh the summary off the new data if enabled.
                         autoSummarize(v)
+                        statusLoc?.let { loc ->
+                            reverseGeocode(loc)?.let { place ->
+                                _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
+                            }
+                        }
                     }
                 }
                 sessionFetched.add(v.vin)
