@@ -1460,12 +1460,8 @@ private fun AnimatedSlider(
     val thumbH = 44.dp
     val gap = 6.dp
     val dotR = 2.5.dp
-    // The thumb's touch body is wider than its visible bar. The Slider reserves
-    // half of it at each end, so the value<->x mapping it uses for taps and drags
-    // matches the inset band we draw the bar and ticks in — a tap lands exactly
-    // where you press, and the end ticks sit clear of the track caps.
-    val thumbTouchW = 28.dp
-    val edgePad = thumbTouchW / 2
+    // How far the thumb travel and the tick row are inset from the track caps.
+    val edgePad = 14.dp
 
     val inactiveColor = scheme.surfaceContainerHighest
     val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
@@ -1502,13 +1498,9 @@ private fun AnimatedSlider(
         valueRange = valueRange,
         steps = 0,
         interactionSource = interactionSource,
-        // A wide touch body carrying a slim visible bar. The width is what makes
-        // the Slider inset its value mapping so taps land under the finger.
-        thumb = {
-            Box(Modifier.size(thumbTouchW, thumbH), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(thumbW, thumbH).background(accent, RoundedCornerShape(thumbW / 2)))
-            }
-        },
+        // The real thumb is invisible — we draw it ourselves in the track so the
+        // thumb, track and ticks all share one inset coordinate space.
+        thumb = { Box(Modifier.size(0.dp)) },
         track = { state ->
             val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
             val frac2 = ((state.value - valueRange.start) / span2).coerceIn(0f, 1f)
@@ -1566,6 +1558,14 @@ private fun AnimatedSlider(
                         )
                     }
                 }
+                // The thumb — a tall rounded bar centered on its value.
+                val twPx = thumbW.toPx()
+                drawRoundRect(
+                    accent,
+                    topLeft = Offset(thumbX - twPx / 2f, 0f),
+                    size = androidx.compose.ui.geometry.Size(twPx, size.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(twPx / 2f),
+                )
             }
         },
         modifier = Modifier.fillMaxWidth(),
@@ -1908,7 +1908,7 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         headerAction = {
             PebbleActionButton(
-                label = if (busy) "…" else "Summarize",
+                label = "Summarize",
                 icon = Icons.Filled.AutoAwesome,
                 onClick = { vm.summarizeCar(v) },
                 pending = busy,
@@ -1950,41 +1950,69 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
 }
 
 /**
- * The one button style used across the whole app: a dark, generously rounded
- * rectangle — the same fill and shape as the Doors "Unlock" and charge/climate
- * "Start" controls. The corner is a fraction of the button's height, so every
- * button (tall control or small header action) reads with the same rounding, and
- * it squishes a little while pressed. Colours are overridden only for the
- * coloured "on" states (e.g. charging green).
+ * The one button style used across the whole app. It rests as a **pill** and
+ * becomes a **rounded rectangle** only while [active] (an on/toggled state) — or
+ * momentarily while pressed. When [active], it fills with [activeContainerColor].
+ * Its width springs (with a little overshoot) whenever the content width changes,
+ * e.g. the label flips Start -> Stop.
  */
 @Composable
 private fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    active: Boolean = false,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    activeContainerColor: Color = MaterialTheme.colorScheme.primary,
+    activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHaptics.current
+    // 50% = a true pill; a lower percent = a rounded rectangle.
     val pct by animateFloatAsState(
-        targetValue = if (pressed) 28f else 45f,
+        targetValue = if (active || pressed) 28f else 50f,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphCorner",
     )
+    val bg by androidx.compose.animation.animateColorAsState(
+        if (active) activeContainerColor else containerColor,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "morphBg",
+    )
     Button(
         onClick = { haptics?.click(); onClick() },
-        modifier = modifier,
+        modifier = modifier.animateContentSize(
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        ),
         enabled = enabled,
         shape = RoundedCornerShape(percent = pct.roundToInt()),
         interactionSource = interaction,
-        colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = bg,
+            contentColor = if (active) activeContentColor else contentColor,
+        ),
         contentPadding = contentPadding,
         content = content,
     )
+}
+
+/**
+ * Standard leading slot for a [MorphButton]: shows the [icon], or a same-sized
+ * spinner while [pending], so the button width never changes just from loading.
+ */
+@Composable
+private fun MorphButtonLabel(icon: ImageVector, label: String, pending: Boolean, iconSize: Dp = 18.dp) {
+    if (pending) {
+        LoadingIndicator(Modifier.size(iconSize))
+    } else {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(iconSize))
+    }
+    Spacer(Modifier.width(8.dp))
+    Text(label, fontWeight = FontWeight.SemiBold)
 }
 
 /**
@@ -2045,20 +2073,8 @@ private fun StateControl(
     highlightContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     offTextColor: Color? = null,
 ) {
-    // Which state is the "highlighted" (square, coloured) one.
+    // Which state is the "highlighted" (on) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    // Pill when calm, rounded box when active — and it squishes further on press.
-    val corner by animateDpAsState(
-        targetValue = when {
-            pressed -> 10.dp
-            highlighted -> 18.dp
-            else -> 34.dp
-        },
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "ctrlCorner",
-    )
     Row(
         Modifier.fillMaxWidth().height(ControlHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -2091,24 +2107,17 @@ private fun StateControl(
             )
         }
         val haptics = LocalHaptics.current
-        val onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() }
-        val container = if (highlighted) highlightColor else MaterialTheme.colorScheme.surfaceContainerHighest
-        val contentColor = if (highlighted) highlightContentColor else MaterialTheme.colorScheme.onSurface
-        Button(
-            onClick = onClick,
+        // Pill when off, rounded rectangle + highlight colour when on — same as
+        // the climate/charge controls.
+        MorphButton(
+            onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() },
             enabled = enabled && !pending,
-            shape = RoundedCornerShape(corner),
-            interactionSource = interaction,
-            colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
+            active = highlighted,
+            activeContainerColor = highlightColor,
+            activeContentColor = highlightContentColor,
             modifier = Modifier.height(ControlHeight),
         ) {
-            if (pending) {
-                LoadingIndicator(Modifier.size(22.dp))
-            } else {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (isOn == true) turnOff else turnOn, fontWeight = FontWeight.SemiBold)
-            }
+            MorphButtonLabel(icon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
         }
     }
 }
@@ -2235,8 +2244,10 @@ private val PebbleCornerCollapsed = 38.dp
 private val PebbleCornerExpanded = 20.dp
 
 /**
- * A pebble-header action button (AI summarize / locate), shown even when the
- * pebble is collapsed. Same dark rounded-rectangle style as every other button.
+ * A pebble-header action button (climate/charge/locate/AI), shown even when the
+ * pebble is collapsed. A pill that becomes a rounded rectangle (in
+ * [activeContainer]) when [active] — e.g. climate on, charging. The width is
+ * stable while loading and springs when the label flips Start <-> Stop.
  */
 @Composable
 private fun PebbleActionButton(
@@ -2245,24 +2256,20 @@ private fun PebbleActionButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
     pending: Boolean = false,
-    container: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    active: Boolean = false,
+    activeContainer: Color = MaterialTheme.colorScheme.primary,
+    activeContent: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
     MorphButton(
         onClick = onClick,
         enabled = enabled && !pending,
-        containerColor = container,
-        contentColor = contentColor,
+        active = active,
+        activeContainerColor = activeContainer,
+        activeContentColor = activeContent,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         modifier = Modifier.heightIn(min = 50.dp),
     ) {
-        if (pending) {
-            LoadingIndicator(Modifier.size(18.dp))
-        } else {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(label, fontWeight = FontWeight.SemiBold)
-        }
+        MorphButtonLabel(icon, label, pending)
     }
 }
 
@@ -2543,6 +2550,15 @@ private fun ClimatePebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
         summary = if (climateOn) "On" else "Off",
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        headerAction = {
+            PebbleActionButton(
+                label = if (climateOn) "Stop" else "Start",
+                icon = Icons.Filled.AcUnit,
+                onClick = { if (climateOn) vm.stopClimate(v) else startClimate() },
+                pending = pending,
+                active = climateOn,
+            )
+        },
     ) {
         StepRow("Temperature", "$tempF°F")
         AnimatedSlider(
@@ -2588,19 +2604,6 @@ private fun ClimatePebble(
                 SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
             }
         }
-
-        // Big Start/Stop control at the bottom of the pebble (same button as the
-        // doors Unlock control).
-        StateControl(
-            name = "Climate",
-            isOn = climateOn,
-            stateOn = "On", stateOff = "Off",
-            turnOn = "Start", turnOff = "Stop",
-            icon = Icons.Filled.AcUnit,
-            pending = pending,
-            onActivate = { startClimate() },
-            onDeactivate = { vm.stopClimate(v) },
-        )
     }
 }
 
@@ -2666,23 +2669,19 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
         summary = summary,
         containerColor = MaterialTheme.colorScheme.primaryContainer,
+        headerAction = {
+            PebbleActionButton(
+                label = if (charging) "Stop" else "Start",
+                icon = Icons.Filled.Bolt,
+                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
+                enabled = plugged,
+                pending = pending,
+                active = charging,
+                activeContainer = ChargeGreen,
+                activeContent = Color.White,
+            )
+        },
     ) {
-        // Big Start/Stop control (same button as the doors Unlock control);
-        // disabled with a "Not plugged in" note when there's no cable.
-        StateControl(
-            name = "Charging",
-            isOn = charging,
-            stateOn = "Charging", stateOff = "Idle",
-            turnOn = "Start", turnOff = "Stop",
-            icon = Icons.Filled.Bolt,
-            pending = pending,
-            enabled = plugged,
-            disabledNote = "Not plugged in",
-            onActivate = { vm.startCharge(v) },
-            onDeactivate = { vm.stopCharge(v) },
-            highlightColor = ChargeGreen,
-            highlightContentColor = Color.White,
-        )
         if (plugged) {
             mins?.let { StatusRow("Time to full", fmtMinutes(it)) }
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
@@ -2760,7 +2759,7 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
         v, "location", "Location", Icons.Filled.LocationOn, state, vm, dragHandle, summary = summary,
         headerAction = {
             PebbleActionButton(
-                label = if (locating) "…" else "Locate",
+                label = "Locate",
                 icon = Icons.Filled.LocationOn,
                 onClick = { vm.locate(v) },
                 enabled = !locating,
