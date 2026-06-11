@@ -172,8 +172,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -182,6 +189,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
@@ -289,11 +297,20 @@ fun BlooApp(vm: AppViewModel) {
         animationSpec = tween(durationMillis = 450),
         label = "lockAlpha",
     )
+    // A blurred snapshot of the whole app, recorded each frame, that floating
+    // elements sample for a frosted-glass background.
+    val backdrop = rememberGraphicsLayer()
+    val blurPx = with(LocalDensity.current) { 24.dp.toPx() }
+    backdrop.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
     Box(Modifier.fillMaxSize()) {
     Box(
         Modifier
             .fillMaxSize()
             .blur(lockBlur)
+            .drawWithContent {
+                backdrop.record { this@drawWithContent.drawContent() }
+                drawContent()
+            }
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -304,6 +321,7 @@ fun BlooApp(vm: AppViewModel) {
                 ),
             ),
     ) {
+    CompositionLocalProvider(LocalBackdrop provides backdrop) {
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = {
@@ -381,6 +399,7 @@ fun BlooApp(vm: AppViewModel) {
                 ),
         )
         }
+    }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         if (lockAlpha > 0.01f) {
@@ -1113,11 +1132,11 @@ private fun FloatingIcon(
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        // Frosted/translucent so the content shows faintly through the floating chip.
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f),
+        // Frosted glass: real backdrop blur with a faint tint on top.
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 3.dp,
-        modifier = modifier.padding(12.dp).size(44.dp),
+        modifier = modifier.padding(12.dp).backdropBlur(CircleShape).size(44.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = description)
@@ -1702,6 +1721,28 @@ private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modif
         }
     }
 
+// --- Backdrop blur (frosted glass behind floating elements) ---------------
+
+/** The captured, blurred snapshot of the app, sampled by floating elements. */
+private val LocalBackdrop = staticCompositionLocalOf<GraphicsLayer?> { null }
+
+/**
+ * Frosted-glass background: draws the blurred [LocalBackdrop] snapshot of the app,
+ * aligned to this element's on-screen position and clipped to [shape]. Falls back
+ * to nothing (callers layer their own translucent tint on top) if no backdrop is
+ * available.
+ */
+private fun Modifier.backdropBlur(shape: Shape): Modifier = composed {
+    val layer = LocalBackdrop.current ?: return@composed this.clip(shape)
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    this
+        .onGloballyPositioned { origin = it.positionInRoot() }
+        .clip(shape)
+        .drawBehind {
+            translate(left = -origin.x, top = -origin.y) { drawLayer(layer) }
+        }
+}
+
 // --- Full detail ----------------------------------------------------------
 
 /** Single-column car view (phones, and each column of the grid). */
@@ -1747,9 +1788,10 @@ private fun VehicleDetailContent(
             Surface(
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 3.dp,
+                modifier = Modifier.backdropBlur(CircleShape),
             ) {
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
