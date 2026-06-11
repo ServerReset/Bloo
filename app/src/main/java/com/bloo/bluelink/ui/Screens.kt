@@ -2,6 +2,7 @@
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class,
 )
 
 package com.bloo.bluelink.ui
@@ -80,6 +81,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -164,6 +166,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -203,6 +208,7 @@ import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
@@ -803,8 +809,13 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         if (wasRefreshing && !state.refreshing) haptics?.slotSettle()
         wasRefreshing = state.refreshing
     }
-    // Drop the page indicator while refreshing so the squiggly indicator has room.
-    val dotsTop by animateDpAsState(if (state.refreshing) 76.dp else 10.dp, label = "dotsTop")
+    // Fade the page indicator out while refreshing (and during the settle), so the
+    // squiggly indicator has the stage to itself; fade it back in when done.
+    val dotsAlpha by animateFloatAsState(
+        targetValue = if (state.refreshing) 0f else 1f,
+        animationSpec = tween(durationMillis = 250),
+        label = "dotsFade",
+    )
 
     val count = vehicles.size
     val cfg = LocalConfiguration.current
@@ -852,7 +863,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         ExpandedCar(vehicles[page], state, vm, flipped = appearance.columnsFlipped)
                     }
                     if (count > 1) {
-                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = dotsTop))
+                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
                     }
                 }
             } else {
@@ -884,7 +895,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
-                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = dotsTop))
+                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
                     }
                 }
             }
@@ -1101,8 +1112,8 @@ private fun FloatingIcon(
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        // Explicit palette colours so the icon always contrasts with the chip.
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        // Frosted/translucent so the content shows faintly through the floating chip.
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 3.dp,
         modifier = modifier.padding(12.dp).size(44.dp),
@@ -1654,6 +1665,42 @@ private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: 
     return snapped.coerceIn(range.start, range.endInclusive)
 }
 
+/**
+ * Softly fades the top/bottom [length] of a vertically scrolling area instead of
+ * hard-clipping it at the bounds. The fade only appears on an edge that has more
+ * content past it, and eases in as you scroll toward it.
+ */
+private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val lenPx = length.toPx()
+        val topAlpha = (scroll.value / lenPx).coerceIn(0f, 1f)
+        val botAlpha = ((scroll.maxValue - scroll.value) / lenPx).coerceIn(0f, 1f)
+        if (topAlpha > 0.001f) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black),
+                    startY = 0f,
+                    endY = lenPx,
+                ),
+                blendMode = BlendMode.DstIn,
+                alpha = topAlpha,
+            )
+        }
+        if (botAlpha > 0.001f) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Black, Color.Transparent),
+                    startY = size.height - lenPx,
+                    endY = size.height,
+                ),
+                blendMode = BlendMode.DstIn,
+                alpha = botAlpha,
+            )
+        }
+    }
+
 // --- Full detail ----------------------------------------------------------
 
 /** Single-column car view (phones, and each column of the grid). */
@@ -2017,7 +2064,9 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
         shape = RoundedCornerShape(PebbleCornerCollapsed),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Box(Modifier.padding(horizontal = 16.dp)) {
+        // Extra start inset nudges the "Locked/Unlocked" text in to line up with
+        // the other pebbles' titles.
+        Box(Modifier.padding(start = 26.dp, end = 16.dp)) {
             StateControl(
                 name = "",
                 isOn = status?.doorLock,
@@ -2201,7 +2250,9 @@ private fun StateControl(
             activeContainerColor = highlightColor,
             activeContentColor = highlightContentColor,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-            modifier = Modifier.height(ControlHeight),
+            // Same pill height as the pebble header actions (the row stays
+            // ControlHeight tall, so the button is vertically centred in it).
+            modifier = Modifier.heightIn(min = 50.dp),
         ) {
             MorphButtonLabel(icon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
         }
@@ -2306,8 +2357,9 @@ private fun Pebble(
                 }
             }
             if (expanded) {
+                val bodyScroll = rememberScrollState()
                 val bodyMod = if (fillHeight) {
-                    Modifier.weight(1f).verticalScroll(rememberScrollState())
+                    Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
                 } else {
                     Modifier
                 }
@@ -3234,6 +3286,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                             vm.setBiometricLock(false)
                         }
                     }
+                    if (appearance.biometricLock) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Lock the app", style = MaterialTheme.typography.labelLarge)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LockTiming.entries.forEach { t ->
+                                MorphChip(
+                                    selected = appearance.lockTiming == t,
+                                    onClick = { vm.setLockTiming(t) },
+                                    label = t.label,
+                                )
+                            }
+                        }
+                    }
                 } else {
                     Text("No fingerprint/biometric is enrolled on this device.")
                 }
@@ -3466,6 +3531,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }) { Text("Copy") }
                     TextButton(onClick = { vm.clearLogs() }) { Text("Clear") }
                 }
+                val logScroll = rememberScrollState()
                 SelectionContainer {
                     Text(
                         text = logs.joinToString("\n").ifBlank { "No activity yet." },
@@ -3474,7 +3540,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 280.dp)
-                            .verticalScroll(rememberScrollState()),
+                            .fadingEdges(logScroll)
+                            .verticalScroll(logScroll),
                     )
                 }
             }

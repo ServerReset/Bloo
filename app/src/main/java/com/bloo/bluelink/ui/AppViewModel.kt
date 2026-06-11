@@ -15,6 +15,7 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
+import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
@@ -337,6 +338,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** From the lock overlay, back out to the login screen. */
     fun lockToLogin() = _state.update { it.copy(locked = false, addingAccount = true) }
+
+    fun setLockTiming(value: LockTiming) {
+        viewModelScope.launch { settingsStore.setLockTiming(value) }
+    }
+
+    /**
+     * Re-engage the lock when returning to the foreground, honouring the user's
+     * [LockTiming] setting. [backgroundedAtMs] is when the app was last stopped and
+     * [screenOff] whether the screen turned off while it was away.
+     */
+    fun maybeRelock(backgroundedAtMs: Long, screenOff: Boolean) {
+        if (_state.value.locked) return
+        viewModelScope.launch {
+            val a = settingsStore.appearance.first()
+            if (!a.biometricLock || !canUseBiometrics()) return@launch
+            val elapsed = System.currentTimeMillis() - backgroundedAtMs
+            val shouldLock = when (a.lockTiming) {
+                LockTiming.IMMEDIATE -> true
+                LockTiming.AFTER_1_MIN -> elapsed >= 60_000
+                LockTiming.AFTER_5_MIN -> elapsed >= 300_000
+                LockTiming.SCREEN_OFF -> screenOff
+            }
+            if (shouldLock) _state.update { it.copy(locked = true) }
+        }
+    }
 
     fun canUseBiometrics(): Boolean =
         BiometricManager.from(getApplication())

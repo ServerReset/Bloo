@@ -1,6 +1,9 @@
 package com.bloo.bluelink
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
@@ -19,6 +23,18 @@ import com.bloo.bluelink.work.AlertWorker
 class MainActivity : FragmentActivity() {
 
     private val viewModel: AppViewModel by viewModels()
+
+    // App-lock bookkeeping: when we last left the foreground, whether the screen
+    // turned off meanwhile, and whether this is the very first foreground (cold
+    // start, where the ViewModel already decides the lock).
+    private var backgroundedAt = 0L
+    private var screenOffWhileAway = false
+    private var firstStart = true
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) screenOffWhileAway = true
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +48,12 @@ class MainActivity : FragmentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         AlertWorker.schedule(applicationContext)
+        ContextCompat.registerReceiver(
+            this,
+            screenReceiver,
+            IntentFilter(Intent.ACTION_SCREEN_OFF),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         // Notification permission is requested from the onboarding screen (on a
         // button tap), not silently on first launch.
         handleShortcutIntent(intent)
@@ -47,6 +69,26 @@ class MainActivity : FragmentActivity() {
                 BlooApp(viewModel)
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        backgroundedAt = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
+        if (!firstStart) {
+            viewModel.maybeRelock(backgroundedAt, screenOffWhileAway)
+        }
+        firstStart = false
+        screenOffWhileAway = false
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(screenReceiver) }
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

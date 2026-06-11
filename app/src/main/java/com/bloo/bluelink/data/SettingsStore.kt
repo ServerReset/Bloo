@@ -41,6 +41,14 @@ data class SeatConfig(
 /** User-confirmed powertrain (the US API only exposes EV vs gas). */
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
+/** When the biometric app-lock re-engages after the app leaves the foreground. */
+enum class LockTiming(val label: String) {
+    IMMEDIATE("Immediately"),
+    AFTER_1_MIN("After 1 minute"),
+    AFTER_5_MIN("After 5 minutes"),
+    SCREEN_OFF("When the screen turns off"),
+}
+
 /** Reorderable detail sections (pebbles), in their default order. */
 val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", "info", "location", "diagnostics")
 
@@ -58,6 +66,7 @@ class SettingsStore(private val context: Context) {
         val FONT = stringPreferencesKey("font_choice")
         val DYNAMIC = stringPreferencesKey("dynamic_color")
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
+        val LOCK_TIMING = stringPreferencesKey("lock_timing")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
         val FLIPPED = stringPreferencesKey("columns_flipped")
@@ -72,6 +81,8 @@ class SettingsStore(private val context: Context) {
         val fontChoice: FontChoice = FontChoice.SYSTEM,
         val dynamicColor: Boolean = true,
         val biometricLock: Boolean = false,
+        /** When the biometric lock re-engages after leaving the foreground. */
+        val lockTiming: LockTiming = LockTiming.IMMEDIATE,
         /** In the wide expanded view, put pebbles on the left, controls right. */
         val columnsFlipped: Boolean = false,
         /** Open Hyundai/Genesis links in an in-app browser tab vs the system browser. */
@@ -92,6 +103,8 @@ class SettingsStore(private val context: Context) {
                 ?: FontChoice.SYSTEM,
             dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
+            lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
+                ?: LockTiming.IMMEDIATE,
             columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
             linksInApp = prefs[Keys.LINKS_IN_APP]?.toBooleanStrictOrNull() ?: true,
             uiScale = prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f,
@@ -106,6 +119,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setBiometricLock(enabled: Boolean) {
         context.settingsDataStore.edit { it[Keys.BIOMETRIC] = enabled.toString() }
+    }
+
+    suspend fun setLockTiming(value: LockTiming) {
+        context.settingsDataStore.edit { it[Keys.LOCK_TIMING] = value.name }
     }
 
     suspend fun setColumnsFlipped(flipped: Boolean) {
