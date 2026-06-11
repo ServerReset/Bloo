@@ -11,6 +11,9 @@ interface VehicleRepository {
     suspend fun vehicles(): List<Vehicle>
     suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus?
     suspend fun location(v: Vehicle): GeoLocation?
+
+    /** Recent EV trips; empty where the backend has no equivalent (Kia US). */
+    suspend fun trips(v: Vehicle): List<EvTrip> = emptyList()
     suspend fun lock(v: Vehicle)
     suspend fun unlock(v: Vehicle)
     suspend fun startClimate(v: Vehicle, req: ClimateRequest)
@@ -63,6 +66,10 @@ class BlueLinkRepository(
 
     override suspend fun location(v: Vehicle): GeoLocation? = withSession { s ->
         api.location(s.accessToken, s.username, s.pin, v)
+    }
+
+    override suspend fun trips(v: Vehicle): List<EvTrip> = withSession { s ->
+        api.tripDetails(s.accessToken, s.username, s.pin, v)
     }
 
     override suspend fun lock(v: Vehicle) {

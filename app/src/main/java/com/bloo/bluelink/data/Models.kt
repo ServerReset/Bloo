@@ -384,3 +384,56 @@ fun WindowOpen.openLabels(): List<String> = openPositions(frontLeft, frontRight,
 /** "lat, lon" formatted to [decimals] places. */
 fun GeoLocation.coordString(decimals: Int = 5): String =
     "%.${decimals}f, %.${decimals}f".format(latitude, longitude)
+
+// --- EV trip history (Hyundai/Genesis US evTripDetails) --------------------
+
+/** A {value, unit} pair used throughout the trip-details payload. */
+@Serializable
+data class TripMeasure(
+    val value: Double? = null,
+    val unit: Int? = null,
+)
+
+/**
+ * One recent drive from /ac/v2/ts/alerts/maintenance/evTripDetails (EVs only).
+ * Energy figures are watt-hours; times are seconds; speeds are mph.
+ * Field paths follow the community hyundai_kia_connect_api.
+ */
+@Serializable
+data class EvTrip(
+    val startdate: String? = null,
+    val distance: Double? = null,
+    val totalused: Double? = null,
+    val drivetrain: Double? = null,
+    val climate: Double? = null,
+    val accessories: Double? = null,
+    val batterycare: Double? = null,
+    val regen: Double? = null,
+    val odometer: TripMeasure? = null,
+    val mileagetime: TripMeasure? = null,
+    val duration: TripMeasure? = null,
+    val avgspeed: TripMeasure? = null,
+    val maxspeed: TripMeasure? = null,
+) {
+    /** Minutes actually driving (the API reports seconds). */
+    val driveMinutes: Int? get() = mileagetime?.value?.let { (it / 60).toInt() }
+
+    /** Minutes stopped-but-on: total duration minus driving time. */
+    val idleMinutes: Int?
+        get() {
+            val total = duration?.value ?: return null
+            val driving = mileagetime?.value ?: return null
+            return ((total - driving) / 60).toInt().coerceAtLeast(0)
+        }
+
+    /** Net consumption in kWh (one decimal), if the car reported energy data. */
+    val usedKwh: Double? get() = totalused?.let { Math.round(it / 100.0) / 10.0 }
+
+    /** Regenerated energy in kWh (one decimal). */
+    val regenKwh: Double? get() = regen?.let { Math.round(it / 100.0) / 10.0 }
+}
+
+@Serializable
+data class EvTripDetailsResponse(
+    val tripdetails: List<EvTrip> = emptyList(),
+)

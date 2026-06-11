@@ -142,6 +142,19 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             if (lat != null && lon != null) GeoLocation(lat, lon, parsed.speed?.value) else null
         }
 
+    /**
+     * Recent EV drives with energy breakdowns (EVs only; the endpoint 404s for
+     * gas cars). Mirrors the community client's _get_ev_trip_details.
+     */
+    suspend fun tripDetails(token: String, username: String, pin: String, v: Vehicle): List<EvTrip> =
+        execute {
+            val request = baseRequest("/ac/v2/ts/alerts/maintenance/evTripDetails", token, username, pin, v)
+                .header("userId", username)
+                .get()
+                .build()
+            json.decodeFromString(EvTripDetailsResponse.serializer(), call(request)).tripdetails
+        }
+
     suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/off", token, username, pin, v)
 

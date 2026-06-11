@@ -98,6 +98,8 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -223,6 +225,7 @@ import coil.request.ImageRequest
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
@@ -1084,6 +1087,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val sections = state.sectionsFor(v).filter {
         it !in listOf("summary", "controls") &&
             (it != "charge" || state.hasBattery(v)) &&
+            (it != "trips" || state.hasBattery(v)) &&
             (it != "ai" || state.aiEnabled) &&
             !state.isPebbleHidden(v.vin, it)
     }
@@ -1127,6 +1131,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                         "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
                         "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
                         "location" -> LocationPebble(v, state, vm, Modifier)
+                        "trips" -> TripsPebble(v, state, vm, Modifier)
                         "info" -> InfoPebble(v, status, state, vm, Modifier)
                         "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
                         "ai" -> AiPebble(v, state, vm, Modifier)
@@ -2036,6 +2041,7 @@ private fun sectionLabel(section: String): String = when (section) {
     "charge" -> "Charge / fuel"
     "climate" -> "Climate"
     "location" -> "Location"
+    "trips" -> "Trips"
     "info" -> "Car info"
     "diagnostics" -> "Diagnostics"
     "controls" -> "Lock / unlock"
@@ -2091,7 +2097,9 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
     } else {
         var menu by remember { mutableStateOf(false) }
         val options = state.sectionsFor(v).filter {
-            it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it)
+            it !in setOf("summary", "controls") &&
+                (it != "trips" || state.hasBattery(v)) &&
+                !state.isPebbleHidden(v.vin, it)
         }
         val hotDrag = LocalHotSeatDrag.current
         val hovered = hotDrag?.overSlot == true
@@ -2286,6 +2294,8 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
             FuelPebble(v, status, state, vm, dragHandle)
         }
         "location" -> LocationPebble(v, state, vm, dragHandle)
+        // Trip history rides on the EV trip-details endpoint, so EVs only.
+        "trips" -> if (state.hasBattery(v)) TripsPebble(v, state, vm, dragHandle) else Spacer(Modifier)
         "info" -> InfoPebble(v, status, state, vm, dragHandle)
         "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
         "ai" -> AiPebble(v, state, vm, dragHandle)
@@ -2713,6 +2723,71 @@ private fun PebbleActionButton(
     }
 }
 
+// --- Trips (EV trip history) -----------------------------------------------
+
+/**
+ * Recent drives from the EV trip-details feed (Hyundai/Genesis US), with
+ * distance, time, speeds and the energy/regen breakdown. Loaded lazily the
+ * first time the pebble is composed, once per session.
+ */
+@Composable
+private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val trips = state.trips[v.vin]
+    val loading = state.isPending(v.vin, "trips")
+    LaunchedEffect(v.vin) { vm.loadTrips(v) }
+    val summary = when {
+        trips == null -> if (loading) "Loading…" else null
+        trips.isEmpty() -> "No recent trips"
+        else -> "${trips.size} recent"
+    }
+    Pebble(v, "trips", "Trips", Icons.Filled.Route, state, vm, dragHandle, summary = summary) {
+        when {
+            trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
+            trips.isEmpty() -> Text("No recent trips reported by the car.")
+            else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                trips.take(8).forEach { TripRow(it) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TripRow(trip: EvTrip) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(tripDate(trip.startdate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            trip.distance?.let {
+                Text("%.1f mi".format(it), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        val pace = buildList {
+            trip.driveMinutes?.let { add("$it min") }
+            trip.idleMinutes?.takeIf { it > 0 }?.let { add("$it min idle") }
+            trip.avgspeed?.value?.let { add("avg ${it.toInt()} mph") }
+            trip.maxspeed?.value?.let { add("max ${it.toInt()} mph") }
+        }
+        if (pace.isNotEmpty()) {
+            Text(pace.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        val energy = buildList {
+            trip.usedKwh?.let { add("$it kWh used") }
+            trip.regenKwh?.takeIf { it > 0 }?.let { add("$it kWh regen") }
+        }
+        if (energy.isNotEmpty()) {
+            Text(energy.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** "2026-06-01 18:22:31.0" -> "Mon Jun 1 · 6:22 PM" (falls back to the raw date). */
+private fun tripDate(raw: String?): String {
+    if (raw.isNullOrBlank()) return "Trip"
+    return runCatching {
+        val parsed = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S", java.util.Locale.US).parse(raw)
+        java.text.SimpleDateFormat("EEE MMM d · h:mm a", java.util.Locale.US).format(parsed!!)
+    }.getOrElse { raw.take(16) }
+}
+
 // --- Car info (status + service + links combined) -------------------------
 
 @Composable
@@ -2826,6 +2901,24 @@ private fun OwnerLinks(brand: Brand, context: Context, inApp: Boolean) {
         Brand.KIA -> "8003334542"
         else -> "8002437766"
     }
+    // In-car payments (Hyundai Pay etc.) and Plug & Charge have no public API —
+    // not even the community telematics clients expose them — so these open the
+    // brand's own management pages in the embedded browser.
+    val payLabel = when (brand) {
+        Brand.GENESIS -> "In-car payments"
+        Brand.KIA -> "In-car payments"
+        else -> "Hyundai Pay"
+    }
+    val payUrl = when (brand) {
+        Brand.GENESIS -> "https://owners.genesis.com"
+        Brand.KIA -> "https://owners.kia.com"
+        else -> "https://www.hyundaiusa.com/us/en/hyundai-pay"
+    }
+    val chargingUrl = when (brand) {
+        Brand.GENESIS -> "https://owners.genesis.com"
+        Brand.KIA -> "https://owners.kia.com"
+        else -> "https://owners.hyundaiusa.com"
+    }
 
     @Composable
     fun group(title: String, content: @Composable FlowRowScope.() -> Unit) {
@@ -2844,6 +2937,10 @@ private fun OwnerLinks(brand: Brand, context: Context, inApp: Boolean) {
                 openApp(context, listOf(appPkg), "https://play.google.com/store/apps/details?id=$appPkg", inApp)
             }
             LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, ownersUrl, inApp) }
+        }
+        group("Payments & charging") {
+            LinkButton(payLabel, Icons.Filled.CreditCard) { openUrl(context, payUrl, inApp) }
+            LinkButton("Plug & Charge", Icons.Filled.Bolt) { openUrl(context, chargingUrl, inApp) }
         }
         group("Service") {
             LinkButton(dealerLabel, Icons.Filled.OpenInNew) { openUrl(context, dealerUrl, inApp) }
@@ -4104,6 +4201,7 @@ private fun CarSettingsCard(
                             "charge" to "Charge / fuel",
                             "climate" to "Climate",
                             "location" to "Location",
+                            "trips" to "Trips",
                             "info" to "Car info",
                             "diagnostics" to "Diagnostics",
                             "ai" to "AI summary",
@@ -4111,6 +4209,8 @@ private fun CarSettingsCard(
                         com.bloo.bluelink.data.HIDEABLE_SECTIONS
                             // The AI toggle only matters when AI is enabled for this device.
                             .filter { it != "ai" || state.aiEnabled }
+                            // Trip history is EV-only (the trips feed doesn't exist for gas cars).
+                            .filter { it != "trips" || state.hasBattery(v) }
                             .forEach { sec ->
                                 ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
                                     vm.setSectionHidden(v, sec, !show)

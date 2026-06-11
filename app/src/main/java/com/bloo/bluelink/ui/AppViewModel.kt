@@ -22,6 +22,7 @@ import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
+import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
@@ -70,6 +71,8 @@ data class UiState(
     /** Wall-clock millis the app last pulled status from the server, keyed by VIN. */
     val lastFetched: Map<String, Long> = emptyMap(),
     val locations: Map<String, GeoLocation> = emptyMap(),
+    /** Recent EV trips by VIN (loaded lazily when the Trips pebble is shown). */
+    val trips: Map<String, List<EvTrip>> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
     val sectionOrders: Map<String, List<String>> = emptyMap(),
@@ -1039,6 +1042,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setSectionOrder(v: Vehicle, order: List<String>) {
         _state.update { it.copy(sectionOrders = it.sectionOrders + (v.vin to order)) }
         viewModelScope.launch { settingsStore.setSectionOrder(v.vin, order) }
+    }
+
+    /** Fetch recent EV trips once per session (the Trips pebble calls this lazily). */
+    fun loadTrips(v: Vehicle) {
+        if (v.vin in _state.value.trips || _state.value.isPending(v.vin, "trips")) return
+        viewModelScope.launch {
+            _state.update { it.copy(pending = it.pending + "${v.vin}:trips") }
+            val result = runCatching { repoFor(v).trips(v) }.getOrElse { e ->
+                AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}")
+                emptyList()
+            }
+            _state.update {
+                it.copy(trips = it.trips + (v.vin to result), pending = it.pending - "${v.vin}:trips")
+            }
+        }
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {

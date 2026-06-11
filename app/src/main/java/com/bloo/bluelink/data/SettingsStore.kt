@@ -50,10 +50,10 @@ enum class LockTiming(val label: String) {
 }
 
 /** Reorderable detail sections (pebbles), in their default order. */
-val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", "info", "location", "diagnostics")
+val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", "info", "location", "trips", "diagnostics")
 
 /** Pebbles the user may hide (the others are essential). */
-val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "info", "diagnostics", "ai")
+val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "trips", "info", "diagnostics", "ai")
 
 /** Number of configurable Quick Settings tiles. */
 const val TILE_COUNT = 4

@@ -190,7 +190,6 @@ class KiaUsaApi {
             .apiHeaders(deviceId).header("otpkey", otpKey).header("xid", xid)
             .build()
         val (interimSid, rmtoken) = raw(verifyReq).use { resp ->
-            val text = resp.body?.string().orEmpty()
             val sid = resp.header("sid")
             val rm = resp.header("rmtoken")
             if (sid == null || rm == null) throw BlueLinkException("Invalid code — please try again.", code = resp.code)
@@ -252,7 +251,31 @@ class KiaUsaApi {
         val root = call(req)
         val info = (root.path("payload", "vehicleInfoList") as? JsonArray)?.firstOrNull()?.obj()
             ?: return@withContext null
-        parseStatus(info)
+        val parsed = parseStatus(info)
+        // Charge limits live on a separate endpoint (cmm/gvi omits targetSOC).
+        val ev = parsed.evStatus
+        if (ev == null) parsed
+        else {
+            val targets = runCatching { chargeTargets(session, vehicle) }.getOrNull()
+            if (targets == null) parsed else parsed.copy(evStatus = ev.copy(reservChargeInfos = targets))
+        }
+    }
+
+    /**
+     * Read AC/DC charge limits from evc/gts (payload.targetSOClist). Levels of 0
+     * mean "not reported yet" per the community client, so they're skipped.
+     */
+    private fun chargeTargets(session: KiaSession, vehicle: KiaVehicleSummary): ReservChargeInfos? {
+        val req = Request.Builder().url(API + "evc/gts").get()
+            .authedHeaders(session, vehicle).build()
+        val list = call(req).path("payload", "targetSOClist") as? JsonArray ?: return null
+        val targets = list.mapNotNull { e ->
+            val o = e.obj() ?: return@mapNotNull null
+            val plug = o["plugType"]?.int() ?: return@mapNotNull null
+            val level = o["targetSOClevel"]?.int() ?: return@mapNotNull null
+            if (level == 0) null else TargetSOC(plug, level)
+        }
+        return if (targets.isEmpty()) null else ReservChargeInfos(targets)
     }
 
     /** Force the car to report fresh status (async; returns when accepted). */
@@ -264,29 +287,92 @@ class KiaUsaApi {
         Unit
     }
 
+    /**
+     * Map Kia's cmm/gvi payload (vehicleInfoList[0]) onto our shared
+     * [VehicleStatus]. Field paths follow the community hyundai_kia_connect_api
+     * (KiaUvoApiUSA._update_vehicle_properties).
+     */
     private fun parseStatus(info: JsonObject): VehicleStatus {
         val vs = info.path("lastVehicleInfo", "vehicleStatusRpt", "vehicleStatus")
+        val climate = vs.path("climate")
+        val heat = climate.path("heatingAccessory")
+        val doors = vs.path("doorStatus")
+        val seats = vs.path("seatHeaterVentState")
         val ev = vs.path("evStatus")
-        val coord = info.path("lastVehicleInfo", "location", "coord")
-        val lat = coord.path("lat").dbl()
-        val lon = coord.path("lon").dbl()
-        val rangeVal = ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange", "value").dbl()
+        val location = info.path("lastVehicleInfo", "location")
+        val lat = location.path("coord", "lat").dbl()
+        val lon = location.path("coord", "lon").dbl()
+
+        // Windows: ICE cars report under windowOpen, EVs under evStatus.windowStatus.
+        fun window(key: String, evKey: String): Int? =
+            vs.path("windowOpen", key).int() ?: ev.path("windowStatus", evKey).int()
+
+        val evStatus = if (ev == null) null else EvStatus(
+            batteryCharge = ev.path("batteryCharge").flag(),
+            batteryStatus = ev.path("batteryStatus").int(),
+            batteryPlugin = ev.path("batteryPlugin").int(),
+            drvDistance = run {
+                val range = ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
+                    ?: ev.path("drvDistance", "0", "rangeByFuel", "evModeRange")
+                range.path("value").dbl()
+                    ?.let { listOf(DrvDistance(RangeByFuel(Dte(it, range.path("unit").int())))) }
+                    ?: emptyList()
+            },
+            remainTime2 = RemainTime2(
+                // Current-plug estimate, then AC/DC estimates, all in minutes.
+                atc = ev.path("remainChargeTime", "0", "timeInterval", "value").dbl()?.let { TimeValue(it, 1) },
+                etc1 = ev.path("remainChargeTime", "0", "etc1", "value").dbl()?.let { TimeValue(it, 1) },
+                etc3 = ev.path("remainChargeTime", "0", "etc3", "value").dbl()?.let { TimeValue(it, 1) },
+            ).takeIf { it.atc != null || it.etc1 != null || it.etc3 != null },
+        )
+
         return VehicleStatus(
-            doorLock = vs.path("doorLock").bool(),
-            airCtrlOn = vs.path("climate", "airCtrl").bool(),
-            engine = vs.path("engine").bool(),
+            doorLock = vs.path("doorLock").flag(),
+            airCtrlOn = climate.path("airCtrl").flag(),
+            engine = vs.path("engine").flag(),
+            defrost = climate.path("defrost").flag(),
+            hoodOpen = doors.path("hood").flag(),
+            trunkOpen = doors.path("trunk").flag(),
+            doorOpen = DoorOpen(
+                frontLeft = doors.path("frontLeft").int(),
+                frontRight = doors.path("frontRight").int(),
+                backLeft = doors.path("backLeft").int(),
+                backRight = doors.path("backRight").int(),
+            ),
+            windowOpen = WindowOpen(
+                frontLeft = window("frontLeft", "windowFL"),
+                frontRight = window("frontRight", "windowFR"),
+                backLeft = window("backLeft", "windowRL"),
+                backRight = window("backRight", "windowRR"),
+            ),
+            tirePressureLamp = vs.path("tirePressure", "all").int()?.let {
+                TirePressureLamp(tirePressureLampAll = it)
+            },
+            tirePressure = vs.path("tirePressure", "all").int()?.let { TirePressure(all = it) },
+            airTemp = climate.path("airTemp", "value").str()?.let {
+                TempValue(it, climate.path("airTemp", "unit").int())
+            },
+            battery = vs.path("batteryStatus", "stateOfCharge").int()?.let { Battery12V(batSoc = it) },
+            steerWheelHeat = heat.path("steeringWheel").int(),
+            sideBackWindowHeat = heat.path("rearWindow").int(),
+            sideMirrorHeat = heat.path("sideMirror").int(),
+            seatHeaterVentState = if (seats == null) null else SeatHeaterVentState(
+                flSeatHeatState = seats.path("flSeatHeatState").int(),
+                frSeatHeatState = seats.path("frSeatHeatState").int(),
+                rlSeatHeatState = seats.path("rlSeatHeatState").int(),
+                rrSeatHeatState = seats.path("rrSeatHeatState").int(),
+            ),
+            washerFluidStatus = vs.path("washerFluidStatus").flag(),
+            breakOilStatus = vs.path("breakOilStatus").flag(),
+            smartKeyBatteryWarning = vs.path("smartKeyBatteryWarning").flag(),
             fuelLevel = vs.path("fuelLevel").int(),
-            dte = vs.path("distanceToEmpty", "value").dbl()?.let { Dte(it) },
-            evStatus = if (ev != null) {
-                EvStatus(
-                    batteryCharge = ev.path("batteryCharge").bool(),
-                    batteryStatus = ev.path("batteryStatus").int(),
-                    batteryPlugin = ev.path("batteryPlugin").int(),
-                    drvDistance = rangeVal?.let { listOf(DrvDistance(RangeByFuel(Dte(it)))) } ?: emptyList(),
-                )
-            } else null,
+            dte = vs.path("distanceToEmpty", "value").dbl()?.let {
+                Dte(it, vs.path("distanceToEmpty", "unit").int())
+            },
+            dateTime = vs.path("syncDate", "utc").str(),
+            evStatus = evStatus,
             vehicleLocation = if (lat != null && lon != null) {
-                VehicleLocation(coord = Coord(lat, lon))
+                VehicleLocation(coord = Coord(lat, lon), time = location.path("syncDate", "utc").str())
             } else null,
         )
     }
@@ -419,6 +505,10 @@ class KiaUsaApi {
     private fun JsonElement?.int(): Int? = (this as? JsonPrimitive)?.intOrNull
     private fun JsonElement?.dbl(): Double? = (this as? JsonPrimitive)?.doubleOrNull
     private fun JsonElement?.bool(): Boolean? = (this as? JsonPrimitive)?.booleanOrNull
+
+    /** Boolean that tolerates Kia's mixed encodings: true/false or 0/1. */
+    private fun JsonElement?.flag(): Boolean? =
+        (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
 
     /** Descend through nested objects/arrays by key (numeric keys index arrays). */
     private fun JsonElement?.path(vararg keys: String): JsonElement? {
