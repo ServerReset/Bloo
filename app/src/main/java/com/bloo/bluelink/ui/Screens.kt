@@ -1771,7 +1771,7 @@ private fun Modifier.backdropBlur(shape: Shape): Modifier = composed {
     val layer = LocalBackdrop.current ?: return@composed this.clip(shape)
     var origin by remember { mutableStateOf(Offset.Zero) }
     this
-        .onGloballyPositioned { origin = it.positionInRoot() }
+        .onGloballyPositioned { origin = it.positionInWindow() }
         .clip(shape)
         .drawBehind {
             translate(left = -origin.x, top = -origin.y) { drawLayer(layer) }
