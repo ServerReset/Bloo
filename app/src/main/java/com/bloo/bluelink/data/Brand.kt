@@ -74,7 +74,8 @@ val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)
  * Brand-specific apps, sites and phone numbers — the single source of truth.
  * Everything that opens an OEM app, owner page or assistance line reads from
  * here (owner links, the OEM-app launcher, app shortcuts), so a rotated URL or
- * package name is a one-line fix.
+ * package name is a one-line fix. All URLs are the brands' real US owner-portal
+ * pages (verified June 2026).
  */
 data class BrandLinks(
     /** Play Store package of the official companion app. */
@@ -85,6 +86,8 @@ data class BrandLinks(
     val dealerLabel: String,
     val dealerUrl: String,
     val manualsUrl: String,
+    /** Online service-appointment scheduler. */
+    val serviceScheduleUrl: String,
     /** 24/7 roadside-assistance line, digits only. */
     val roadsidePhone: String,
     /** In-car payments (Hyundai Pay etc.) — managed on the brand's pages; no public API. */
@@ -103,41 +106,44 @@ val Brand.links: BrandLinks
         Brand.HYUNDAI -> BrandLinks(
             appPackage = "com.stationdm.bluelink",
             appName = "Bluelink",
-            ownersUrl = "https://owners.hyundaiusa.com",
+            ownersUrl = "https://owners.hyundaiusa.com/us/en",
             dealerLabel = "Find a dealer",
             dealerUrl = "https://www.hyundaiusa.com/us/en/dealer-locator",
-            manualsUrl = "https://www.hyundaiusa.com/us/en/owner-resources",
+            manualsUrl = "https://owners.hyundaiusa.com/us/en/resources",
+            serviceScheduleUrl = "https://owners.hyundaiusa.com/us/en/page/schedule-service",
             roadsidePhone = "8002437766",
             payLabel = "Hyundai Pay",
-            payUrl = "https://www.hyundaiusa.com/us/en/hyundai-pay",
-            plugChargeUrl = "https://www.hyundaiusa.com/us/en/plug-and-charge",
-            storeUrl = "https://owners.hyundaiusa.com",
+            payUrl = "https://owners.hyundaiusa.com/us/en/resources/blue-link/hyundai-pay-program",
+            plugChargeUrl = "https://owners.hyundaiusa.com/us/en/resources/general-information/ioniq5-ccu-pnc-ota-faqs",
+            storeUrl = "https://owners.hyundaiusa.com/us/en/page/blue-link",
         )
         Brand.GENESIS -> BrandLinks(
             appPackage = "com.stationdm.genesis",
             appName = "Genesis",
-            ownersUrl = "https://owners.genesis.com",
+            ownersUrl = "https://owners.genesis.com/us/en/",
             dealerLabel = "Find a retailer",
             dealerUrl = "https://www.genesis.com/us/en/find-a-retailer.html",
-            manualsUrl = "https://www.genesis.com/us/en/owners.html",
+            manualsUrl = "https://owners.genesis.com/us/en/resources.html",
+            serviceScheduleUrl = "https://owners.genesis.com/us/en/page/schedule-service.html",
             roadsidePhone = "8443409741",
             payLabel = "In-car payments",
-            payUrl = "https://owners.genesis.com",
-            plugChargeUrl = "https://www.genesis.com/us/en/plug-and-charge.html",
-            storeUrl = "https://owners.genesis.com",
+            payUrl = "https://owners.genesis.com/us/en/page/dashboard.html",
+            plugChargeUrl = "https://owners.genesis.com/us/en/resources/genesis-charging-benefit.html",
+            storeUrl = "https://owners.genesis.com/us/en/page/connected-services.html",
         )
         Brand.KIA -> BrandLinks(
             appPackage = "com.myuvo.link",
             appName = "Kia Access",
-            ownersUrl = "https://owners.kia.com",
+            ownersUrl = "https://owners.kia.com/us/en/kia-owner-portal.html",
             dealerLabel = "Find a dealer",
             dealerUrl = "https://www.kia.com/us/en/find-a-dealer",
             manualsUrl = "https://www.kia.com/us/en/owners",
+            serviceScheduleUrl = "https://owners.kia.com/us/en/service-page/schedule-service.html",
             roadsidePhone = "8003334542",
             payLabel = "In-car payments",
-            payUrl = "https://owners.kia.com",
-            plugChargeUrl = "https://www.kia.com/us/en/plug-and-charge",
-            storeUrl = "https://owners.kia.com",
+            payUrl = "https://owners.kia.com/us/en/entertainment-data-services.html",
+            plugChargeUrl = "https://owners.kia.com/content/owners/en/kia-electrify.html",
+            storeUrl = "https://owners.kia.com/us/en/kiaConnectStore/themes.html",
         )
     }
 

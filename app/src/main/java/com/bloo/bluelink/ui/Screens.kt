@@ -98,7 +98,11 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Call
@@ -2785,10 +2789,12 @@ private fun TripRow(trip: EvTrip) {
 /** "2026-06-01 18:22:31.0" -> "Mon Jun 1 · 6:22 PM" (falls back to the raw date). */
 private fun tripDate(raw: String?): String {
     if (raw.isNullOrBlank()) return "Trip"
+    // Drop any fractional seconds — the feed's precision varies (".0" vs ".000000").
+    val trimmed = raw.substringBefore('.').trim()
     return runCatching {
-        val parsed = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S", java.util.Locale.US).parse(raw)
+        val parsed = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).parse(trimmed)
         java.text.SimpleDateFormat("EEE MMM d · h:mm a", java.util.Locale.US).format(parsed!!)
-    }.getOrElse { raw.take(16) }
+    }.getOrElse { trimmed.take(16) }
 }
 
 // --- Car info (status + service + links combined) -------------------------
@@ -2860,7 +2866,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         }
 
         SectionLabel("${v.brand.label} owners")
-        OwnerLinks(v, context, inApp)
+        OwnerLinks(v, isEv = state.hasBattery(v), context, inApp)
     }
 }
 
@@ -2875,7 +2881,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
+private fun OwnerLinks(v: Vehicle, isEv: Boolean, context: Context, inApp: Boolean) {
     val links = v.brand.links
 
     @Composable
@@ -2894,18 +2900,24 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
             LinkButton("${links.appName} app", Icons.Filled.OpenInNew) {
                 openApp(context, listOf(links.appPackage), links.playStoreUrl, inApp)
             }
-            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, links.ownersUrl, inApp) }
-            LinkButton(links.payLabel, Icons.Filled.CreditCard) { openUrl(context, links.payUrl, inApp) }
-            LinkButton("Plug & Charge", Icons.Filled.Bolt) { openUrl(context, links.plugChargeUrl, inApp) }
+            LinkButton("Owners site", Icons.Filled.Person) { openUrl(context, links.ownersUrl, inApp) }
             // Features-on-Demand store (themes, lighting patterns…): ccNC-era
             // head units only — older Gen5W cars have nothing to buy.
             if (v.supportsConnectedStore) {
                 LinkButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
             }
         }
+        group("Charging & payments") {
+            LinkButton(links.payLabel, Icons.Filled.CreditCard) { openUrl(context, links.payUrl, inApp) }
+            // Plug & Charge is an EV-only feature; hide it on gas cars.
+            if (isEv) {
+                LinkButton("Plug & Charge", Icons.Filled.Bolt) { openUrl(context, links.plugChargeUrl, inApp) }
+            }
+        }
         group("Service") {
-            LinkButton(links.dealerLabel, Icons.Filled.OpenInNew) { openUrl(context, links.dealerUrl, inApp) }
-            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, links.manualsUrl, inApp) }
+            LinkButton("Schedule service", Icons.Filled.Build) { openUrl(context, links.serviceScheduleUrl, inApp) }
+            LinkButton(links.dealerLabel, Icons.Filled.Place) { openUrl(context, links.dealerUrl, inApp) }
+            LinkButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
         }
         group("Assistance") {
             LinkButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
