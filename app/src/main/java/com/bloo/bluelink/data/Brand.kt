@@ -39,7 +39,8 @@ enum class Brand(
     /**
      * Kia US runs on a completely different backend (api.owners.kia.com, the
      * "Kia Connect" API) served by [KiaUsaApi]/[KiaRepository] rather than the
-     * Hyundai-shaped [BlueLinkApi]; the client id/secret here are informational.
+     * Hyundai-shaped [BlueLinkApi]; [KiaUsaApi] reads its endpoint and client
+     * credentials from this entry.
      */
     KIA(
         code = "K",
@@ -68,3 +69,84 @@ enum class Brand(
 
 /** The telematics brand a vehicle belongs to. */
 val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)
+
+/**
+ * Brand-specific apps, sites and phone numbers — the single source of truth.
+ * Everything that opens an OEM app, owner page or assistance line reads from
+ * here (owner links, the OEM-app launcher, app shortcuts), so a rotated URL or
+ * package name is a one-line fix.
+ */
+data class BrandLinks(
+    /** Play Store package of the official companion app. */
+    val appPackage: String,
+    /** Short app name ("Bluelink"), used as "<name> app" / "Open the <name> app". */
+    val appName: String,
+    val ownersUrl: String,
+    val dealerLabel: String,
+    val dealerUrl: String,
+    val manualsUrl: String,
+    /** 24/7 roadside-assistance line, digits only. */
+    val roadsidePhone: String,
+    /** In-car payments (Hyundai Pay etc.) — managed on the brand's pages; no public API. */
+    val payLabel: String,
+    val payUrl: String,
+    /** Plug & Charge enrollment/management page. */
+    val plugChargeUrl: String,
+    /** Connected-car content store (Features on Demand: themes, lighting…). */
+    val storeUrl: String,
+) {
+    val playStoreUrl: String get() = "https://play.google.com/store/apps/details?id=$appPackage"
+}
+
+val Brand.links: BrandLinks
+    get() = when (this) {
+        Brand.HYUNDAI -> BrandLinks(
+            appPackage = "com.stationdm.bluelink",
+            appName = "Bluelink",
+            ownersUrl = "https://owners.hyundaiusa.com",
+            dealerLabel = "Find a dealer",
+            dealerUrl = "https://www.hyundaiusa.com/us/en/dealer-locator",
+            manualsUrl = "https://www.hyundaiusa.com/us/en/owner-resources",
+            roadsidePhone = "8002437766",
+            payLabel = "Hyundai Pay",
+            payUrl = "https://www.hyundaiusa.com/us/en/hyundai-pay",
+            plugChargeUrl = "https://www.hyundaiusa.com/us/en/plug-and-charge",
+            storeUrl = "https://owners.hyundaiusa.com",
+        )
+        Brand.GENESIS -> BrandLinks(
+            appPackage = "com.stationdm.genesis",
+            appName = "Genesis",
+            ownersUrl = "https://owners.genesis.com",
+            dealerLabel = "Find a retailer",
+            dealerUrl = "https://www.genesis.com/us/en/find-a-retailer.html",
+            manualsUrl = "https://www.genesis.com/us/en/owners.html",
+            roadsidePhone = "8443409741",
+            payLabel = "In-car payments",
+            payUrl = "https://owners.genesis.com",
+            plugChargeUrl = "https://www.genesis.com/us/en/plug-and-charge.html",
+            storeUrl = "https://owners.genesis.com",
+        )
+        Brand.KIA -> BrandLinks(
+            appPackage = "com.myuvo.link",
+            appName = "Kia Access",
+            ownersUrl = "https://owners.kia.com",
+            dealerLabel = "Find a dealer",
+            dealerUrl = "https://www.kia.com/us/en/find-a-dealer",
+            manualsUrl = "https://www.kia.com/us/en/owners",
+            roadsidePhone = "8003334542",
+            payLabel = "In-car payments",
+            payUrl = "https://owners.kia.com",
+            plugChargeUrl = "https://www.kia.com/us/en/plug-and-charge",
+            storeUrl = "https://owners.kia.com",
+        )
+    }
+
+/**
+ * Whether this car's head unit supports the connected-car content store
+ * (Features on Demand: display themes, ambient-lighting patterns…). That's a
+ * ccNC-era feature: Hyundai/Genesis US report head-unit generation 3+ for
+ * ccNC, while older Gen5W cars report 2. Kia US doesn't expose a generation,
+ * so Kia stays eligible and the store page itself gates by VIN.
+ */
+val Vehicle.supportsConnectedStore: Boolean
+    get() = brand == Brand.KIA || (generation.trim().toIntOrNull() ?: 0) >= 3

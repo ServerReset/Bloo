@@ -17,6 +17,7 @@ import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.KiaAuth
 import com.bloo.bluelink.data.KiaRepository
 import com.bloo.bluelink.data.VehicleRepository
+import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
@@ -586,15 +587,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Launch the OEM Bluelink/Genesis/Kia app for this car's brand. */
     private fun openOemApp(v: Vehicle) {
         val ctx = getApplication<Application>()
-        val pkg = when (Brand.fromIndicator(v.brandIndicator)) {
-            Brand.GENESIS -> "com.stationdm.genesis"
-            Brand.KIA -> "com.myuvo.link"
-            else -> "com.stationdm.bluelink"
-        }
-        val launch = ctx.packageManager.getLaunchIntentForPackage(pkg)
+        val links = brandOf(v).links
+        val launch = ctx.packageManager.getLaunchIntentForPackage(links.appPackage)
             ?: android.content.Intent(
                 android.content.Intent.ACTION_VIEW,
-                android.net.Uri.parse("https://play.google.com/store/apps/details?id=$pkg"),
+                android.net.Uri.parse(links.playStoreUrl),
             )
         runCatching {
             ctx.startActivity(launch.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })

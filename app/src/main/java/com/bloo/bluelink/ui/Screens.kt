@@ -100,6 +100,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -235,7 +236,9 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.coordString
+import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.openLabels
+import com.bloo.bluelink.data.supportsConnectedStore
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.targetForCurrentPlug
@@ -2857,68 +2860,23 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         }
 
         SectionLabel("${v.brand.label} owners")
-        OwnerLinks(v.brand, context, inApp)
+        OwnerLinks(v, context, inApp)
     }
 }
 
 /**
  * Owner/assistance destinations as compact labelled buttons that flow 2+ per row
  * where they fit. Each says where it goes; phone icons dial, others open links.
+ * All destinations come from [BrandLinks] — the per-brand single source of
+ * truth — so nothing here is defined twice. Payments, Plug & Charge and the
+ * connected-car store have no public API (the community telematics clients
+ * don't expose them either), so they open the brand's pages in the embedded
+ * browser.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OwnerLinks(brand: Brand, context: Context, inApp: Boolean) {
-    // Manufacturer-specific destinations, defined once and grouped below.
-    val appPkg = when (brand) {
-        Brand.GENESIS -> "com.stationdm.genesis"
-        Brand.KIA -> "com.myuvo.link"
-        else -> "com.stationdm.bluelink"
-    }
-    val appName = when (brand) {
-        Brand.GENESIS -> "Genesis app"
-        Brand.KIA -> "Kia Access app"
-        else -> "Bluelink app"
-    }
-    val ownersUrl = when (brand) {
-        Brand.GENESIS -> "https://owners.genesis.com"
-        Brand.KIA -> "https://owners.kia.com"
-        else -> "https://owners.hyundaiusa.com"
-    }
-    val dealerLabel = if (brand == Brand.GENESIS) "Find a retailer" else "Find a dealer"
-    val dealerUrl = when (brand) {
-        Brand.GENESIS -> "https://www.genesis.com/us/en/find-a-retailer.html"
-        Brand.KIA -> "https://www.kia.com/us/en/find-a-dealer"
-        else -> "https://www.hyundaiusa.com/us/en/dealer-locator"
-    }
-    val manualsUrl = when (brand) {
-        Brand.GENESIS -> "https://www.genesis.com/us/en/owners.html"
-        Brand.KIA -> "https://www.kia.com/us/en/owners"
-        else -> "https://www.hyundaiusa.com/us/en/owner-resources"
-    }
-    // Brand 24/7 roadside / consumer assistance lines.
-    val roadside = when (brand) {
-        Brand.GENESIS -> "8443409741"
-        Brand.KIA -> "8003334542"
-        else -> "8002437766"
-    }
-    // In-car payments (Hyundai Pay etc.) and Plug & Charge have no public API —
-    // not even the community telematics clients expose them — so these open the
-    // brand's own management pages in the embedded browser.
-    val payLabel = when (brand) {
-        Brand.GENESIS -> "In-car payments"
-        Brand.KIA -> "In-car payments"
-        else -> "Hyundai Pay"
-    }
-    val payUrl = when (brand) {
-        Brand.GENESIS -> "https://owners.genesis.com"
-        Brand.KIA -> "https://owners.kia.com"
-        else -> "https://www.hyundaiusa.com/us/en/hyundai-pay"
-    }
-    val chargingUrl = when (brand) {
-        Brand.GENESIS -> "https://owners.genesis.com"
-        Brand.KIA -> "https://owners.kia.com"
-        else -> "https://owners.hyundaiusa.com"
-    }
+private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
+    val links = v.brand.links
 
     @Composable
     fun group(title: String, content: @Composable FlowRowScope.() -> Unit) {
@@ -2933,23 +2891,26 @@ private fun OwnerLinks(brand: Brand, context: Context, inApp: Boolean) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         group("App & account") {
-            LinkButton(appName, Icons.Filled.OpenInNew) {
-                openApp(context, listOf(appPkg), "https://play.google.com/store/apps/details?id=$appPkg", inApp)
+            LinkButton("${links.appName} app", Icons.Filled.OpenInNew) {
+                openApp(context, listOf(links.appPackage), links.playStoreUrl, inApp)
             }
-            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, ownersUrl, inApp) }
-        }
-        group("Payments & charging") {
-            LinkButton(payLabel, Icons.Filled.CreditCard) { openUrl(context, payUrl, inApp) }
-            LinkButton("Plug & Charge", Icons.Filled.Bolt) { openUrl(context, chargingUrl, inApp) }
+            LinkButton("Owners site", Icons.Filled.OpenInNew) { openUrl(context, links.ownersUrl, inApp) }
+            LinkButton(links.payLabel, Icons.Filled.CreditCard) { openUrl(context, links.payUrl, inApp) }
+            LinkButton("Plug & Charge", Icons.Filled.Bolt) { openUrl(context, links.plugChargeUrl, inApp) }
+            // Features-on-Demand store (themes, lighting patterns…): ccNC-era
+            // head units only — older Gen5W cars have nothing to buy.
+            if (v.supportsConnectedStore) {
+                LinkButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
+            }
         }
         group("Service") {
-            LinkButton(dealerLabel, Icons.Filled.OpenInNew) { openUrl(context, dealerUrl, inApp) }
-            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, manualsUrl, inApp) }
+            LinkButton(links.dealerLabel, Icons.Filled.OpenInNew) { openUrl(context, links.dealerUrl, inApp) }
+            LinkButton("Manuals", Icons.Filled.OpenInNew) { openUrl(context, links.manualsUrl, inApp) }
         }
         group("Assistance") {
-            LinkButton("Roadside", Icons.Filled.Call) { dial(context, roadside) }
-            LinkButton("Call collision", Icons.Filled.Call) { dial(context, roadside) }
-            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, manualsUrl, inApp) }
+            LinkButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
+            LinkButton("Call collision", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
+            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, links.manualsUrl, inApp) }
         }
     }
 }

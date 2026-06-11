@@ -5,9 +5,9 @@ import android.content.Intent
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.links
 
 /** App-icon long-press shortcuts: per-car quick actions and navigation. */
 object Shortcuts {
@@ -68,11 +68,7 @@ object Shortcuts {
     }
 
     private fun oemShortcut(context: Context, v: Vehicle): ShortcutInfoCompat {
-        val name = when (v.brand) {
-            Brand.GENESIS -> "Genesis"
-            Brand.KIA -> "Kia Access"
-            else -> "Bluelink"
-        }
+        val name = v.brand.links.appName
         return shortcut(context, "bluelink_${v.brand.name}", v.vin, "bluelink", name, "Open the $name app", R.drawable.ic_shortcut_car)
     }
 

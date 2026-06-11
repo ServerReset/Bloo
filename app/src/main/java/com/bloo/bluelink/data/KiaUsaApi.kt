@@ -70,10 +70,11 @@ sealed interface KiaAuth {
 class KiaUsaApi {
 
     companion object {
-        const val BASE = "api.owners.kia.com"
-        const val API = "https://api.owners.kia.com/apigw/v1/"
-        private const val CLIENT_ID = "SPACL716-APL"
-        private const val SECRET_KEY = "sydnat-9kykci-Kuhtep-h5nK"
+        // Endpoint + client credentials come from the central Brand definition.
+        val BASE = Brand.KIA.host
+        val API = "${Brand.KIA.baseUrl}/apigw/v1/"
+        private val CLIENT_ID = Brand.KIA.clientId
+        private val SECRET_KEY = Brand.KIA.clientSecret
         private const val USER_AGENT = "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0"
 
         /** A fresh, stable device id (persist it; the rmtoken is bound to it). */
