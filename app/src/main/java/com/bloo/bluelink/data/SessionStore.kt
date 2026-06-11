@@ -21,6 +21,8 @@ class SessionStore(private val context: Context) {
         val username: String,
         val pin: String,
         val brand: Brand = Brand.HYUNDAI,
+        /** Kia US only: the rmtoken is bound to this device id, so it must persist. */
+        val deviceId: String? = null,
     )
 
     private fun key(brand: Brand, field: String) = stringPreferencesKey("${brand.name}_$field")
@@ -32,6 +34,7 @@ class SessionStore(private val context: Context) {
             session.refreshToken?.let { p[key(session.brand, "refresh")] = it }
             p[key(session.brand, "username")] = session.username
             p[key(session.brand, "pin")] = session.pin
+            session.deviceId?.let { p[key(session.brand, "device")] = it }
             val set = (p[brandsKey]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()).toMutableSet()
             set.add(session.brand.name)
             p[brandsKey] = set.joinToString(",")
@@ -44,7 +47,7 @@ class SessionStore(private val context: Context) {
         val access = p[key(brand, "access")] ?: return null
         val username = p[key(brand, "username")] ?: return null
         val pin = p[key(brand, "pin")] ?: return null
-        return Session(access, p[key(brand, "refresh")], username, pin, brand)
+        return Session(access, p[key(brand, "refresh")], username, pin, brand, p[key(brand, "device")])
     }
 
     suspend fun loggedInBrands(): List<Brand> {
@@ -66,7 +69,7 @@ class SessionStore(private val context: Context) {
 
     suspend fun clear(brand: Brand) {
         context.dataStore.edit { p ->
-            listOf("access", "refresh", "username", "pin").forEach { p.remove(key(brand, it)) }
+            listOf("access", "refresh", "username", "pin", "device").forEach { p.remove(key(brand, it)) }
             val set = p[brandsKey]?.split(",")?.filter { it.isNotBlank() && it != brand.name } ?: emptyList()
             if (set.isEmpty()) p.remove(brandsKey) else p[brandsKey] = set.joinToString(",")
         }

@@ -68,7 +68,11 @@ object Shortcuts {
     }
 
     private fun oemShortcut(context: Context, v: Vehicle): ShortcutInfoCompat {
-        val name = if (v.brand == Brand.GENESIS) "Genesis" else "Bluelink"
+        val name = when (v.brand) {
+            Brand.GENESIS -> "Genesis"
+            Brand.KIA -> "Kia Access"
+            else -> "Bluelink"
+        }
         return shortcut(context, "bluelink_${v.brand.name}", v.vin, "bluelink", name, "Open the $name app", R.drawable.ic_shortcut_car)
     }
 

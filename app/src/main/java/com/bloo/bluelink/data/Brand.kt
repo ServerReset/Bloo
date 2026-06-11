@@ -34,15 +34,35 @@ enum class Brand(
         clientId = "3020afa2-30ff-412a-aa51-d28fbe901e10",
         clientSecret = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV",
         label = "Genesis",
+    ),
+
+    /**
+     * Kia US runs on a completely different backend (api.owners.kia.com, the
+     * "Kia Connect" API) served by [KiaUsaApi]/[KiaRepository] rather than the
+     * Hyundai-shaped [BlueLinkApi]; the client id/secret here are informational.
+     */
+    KIA(
+        code = "K",
+        baseUrl = "https://api.owners.kia.com",
+        host = "api.owners.kia.com",
+        clientId = "SPACL716-APL",
+        clientSecret = "sydnat-9kykci-Kuhtep-h5nK",
+        label = "Kia",
     );
+
+    /** True when sign-in uses a one-time code and no service PIN (Kia US). */
+    val usesOtpLogin: Boolean get() = this == KIA
 
     companion object {
         fun fromName(name: String?): Brand =
             entries.firstOrNull { it.name == name } ?: HYUNDAI
 
-        /** Map a vehicle's brand indicator ("G" = Genesis) to a [Brand]. */
-        fun fromIndicator(indicator: String?): Brand =
-            if (indicator.equals("G", ignoreCase = true)) GENESIS else HYUNDAI
+        /** Map a vehicle's brand indicator ("G" = Genesis, "K" = Kia) to a [Brand]. */
+        fun fromIndicator(indicator: String?): Brand = when {
+            indicator.equals("G", ignoreCase = true) -> GENESIS
+            indicator.equals("K", ignoreCase = true) -> KIA
+            else -> HYUNDAI
+        }
     }
 }
 

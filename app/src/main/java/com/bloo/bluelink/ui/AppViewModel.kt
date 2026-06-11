@@ -6,7 +6,6 @@ import androidx.biometric.BiometricManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
@@ -15,6 +14,9 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
+import com.bloo.bluelink.data.KiaAuth
+import com.bloo.bluelink.data.KiaRepository
+import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
@@ -105,6 +107,8 @@ data class UiState(
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */
     val addingAccount: Boolean = false,
+    /** Kia sign-in only: a pending one-time-code challenge. */
+    val kiaOtp: KiaOtpUi? = null,
     val message: String? = null,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
@@ -164,6 +168,15 @@ data class UiState(
     }
 }
 
+/**
+ * A pending Kia one-time-code challenge shown over the login form. [sentTo] is
+ * the destination the code went to ("EMAIL"/"SMS"), null while still choosing.
+ */
+data class KiaOtpUi(
+    val challenge: KiaAuth.OtpRequired,
+    val sentTo: String? = null,
+)
+
 /** Minimum time a command control stays locked after firing, to block double-taps. */
 private const val MIN_COMMAND_LOCK_MS = 3000L
 
@@ -175,16 +188,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val snapshotStore = SnapshotStore(app)
     private val statusCache = StatusCache(app)
     private val ai = com.bloo.bluelink.data.Ai(app)
-    // One repository per signed-in brand (Hyundai/Genesis can both be active).
-    private val repos = mutableMapOf<Brand, BlueLinkRepository>()
+    // One repository per signed-in brand (any mix of brands can be active).
+    private val repos = mutableMapOf<Brand, VehicleRepository>()
 
-    private fun repoFor(brand: Brand): BlueLinkRepository =
-        repos.getOrPut(brand) { BlueLinkRepository(BlueLinkApi(brand), store, brand) }
+    private fun repoFor(brand: Brand): VehicleRepository =
+        repos.getOrPut(brand) { com.bloo.bluelink.data.repositoryFor(brand, store, credentialStore) }
+
+    private fun kiaRepo(): KiaRepository = repoFor(Brand.KIA) as KiaRepository
 
     private fun brandOf(v: Vehicle): Brand =
         Brand.fromIndicator(v.brandIndicator)
 
-    private fun repoFor(v: Vehicle): BlueLinkRepository = repoFor(brandOf(v))
+    private fun repoFor(v: Vehicle): VehicleRepository = repoFor(brandOf(v))
 
     @Volatile
     private var loadingGarage = false
@@ -288,19 +303,82 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Auth ------------------------------------------------------------
 
-    /** Sign in (or add another account). Both brands can be active at once. */
+    /** Sign in (or add another account). Multiple brands can be active at once. */
     fun login(username: String, password: String, pin: String, brand: Brand) {
-        if (username.isBlank() || password.isBlank() || pin.isBlank()) {
+        if (username.isBlank() || password.isBlank() || (pin.isBlank() && !brand.usesOtpLogin)) {
             _state.update { it.copy(message = "Email, password and PIN are all required") }
             return
         }
+        if (brand == Brand.KIA) {
+            loginKia(username.trim(), password, pin.trim())
+            return
+        }
         launchBusy {
-            repoFor(brand).login(username.trim(), password, pin.trim())
+            (repoFor(brand) as BlueLinkRepository).login(username.trim(), password, pin.trim())
             credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
             AppLog.log("Signed in as ${username.trim()} (${brand.label})")
             _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
             loadGarageInternal()
         }
+    }
+
+    // Kia sign-in is a two-step dance: password first, then (usually) a
+    // one-time code sent to the account's email or phone. The credentials are
+    // held here between the steps and only persisted once fully signed in.
+    private var kiaPending: Credentials? = null
+
+    private fun loginKia(username: String, password: String, pin: String) {
+        launchBusy {
+            when (val auth = kiaRepo().startLogin(username, password, pin)) {
+                is KiaAuth.LoggedIn -> {
+                    kiaPending = null
+                    finishKiaLogin(Credentials(username, password, pin, Brand.KIA))
+                }
+                is KiaAuth.OtpRequired -> {
+                    kiaPending = Credentials(username, password, pin, Brand.KIA)
+                    AppLog.log("Kia requires a one-time code (email: ${auth.hasEmail}, sms: ${auth.hasSms})")
+                    _state.update { it.copy(kiaOtp = KiaOtpUi(auth)) }
+                }
+            }
+        }
+    }
+
+    /** Send the Kia one-time code to the chosen destination ("EMAIL"/"SMS"). */
+    fun kiaSendOtp(notifyType: String) {
+        val otp = _state.value.kiaOtp ?: return
+        launchBusy {
+            kiaRepo().sendOtp(otp.challenge, notifyType)
+            AppLog.log("Kia one-time code sent via $notifyType")
+            _state.update { it.copy(kiaOtp = otp.copy(sentTo = notifyType)) }
+        }
+    }
+
+    /** Verify the Kia one-time code and finish signing in. */
+    fun kiaVerifyOtp(code: String) {
+        val otp = _state.value.kiaOtp ?: return
+        val creds = kiaPending ?: return
+        if (code.isBlank()) {
+            _state.update { it.copy(message = "Enter the code you received") }
+            return
+        }
+        launchBusy {
+            kiaRepo().verifyOtp(creds.email, creds.password, creds.pin, code.trim(), otp.challenge)
+            kiaPending = null
+            _state.update { it.copy(kiaOtp = null) }
+            finishKiaLogin(creds)
+        }
+    }
+
+    fun kiaCancelOtp() {
+        kiaPending = null
+        _state.update { it.copy(kiaOtp = null) }
+    }
+
+    private suspend fun finishKiaLogin(creds: Credentials) {
+        credentialStore.save(creds)
+        AppLog.log("Signed in as ${creds.email} (Kia)")
+        _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
+        loadGarageInternal()
     }
 
     fun beginAddAccount() = _state.update { it.copy(addingAccount = true) }
@@ -502,13 +580,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Launch the OEM Bluelink/Genesis app for this car's brand. */
+    /** Launch the OEM Bluelink/Genesis/Kia app for this car's brand. */
     private fun openOemApp(v: Vehicle) {
         val ctx = getApplication<Application>()
-        val pkg = if (Brand.fromIndicator(v.brandIndicator) == Brand.GENESIS) {
-            "com.stationdm.genesis"
-        } else {
-            "com.stationdm.bluelink"
+        val pkg = when (Brand.fromIndicator(v.brandIndicator)) {
+            Brand.GENESIS -> "com.stationdm.genesis"
+            Brand.KIA -> "com.myuvo.link"
+            else -> "com.stationdm.bluelink"
         }
         val launch = ctx.packageManager.getLaunchIntentForPackage(pkg)
             ?: android.content.Intent(

@@ -6,10 +6,10 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.bloo.bluelink.data.BlueLinkApi
 import com.bloo.bluelink.data.BlueLinkGate
-import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.CarAlerts
+import com.bloo.bluelink.data.CredentialStore
+import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
@@ -29,7 +29,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         if (!prefs.service && !prefs.doorOpen) return Result.success()
 
         for (brand in store.loggedInBrands()) {
-            val repo = BlueLinkRepository(BlueLinkApi(brand), store, brand)
+            val repo = repositoryFor(brand, store, CredentialStore(applicationContext))
             // Share the app-wide status gate so a foregrounded app and this worker
             // never issue overlapping requests (Blue Link 502s otherwise).
             val vehicles = runCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }

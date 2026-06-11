@@ -175,7 +175,7 @@ class KiaUsaApi {
             .apiHeaders(deviceId)
             .header("otpkey", otpKey).header("notifytype", notifyType).header("xid", xid)
             .build()
-        raw(req).use { resp -> if (!resp.isSuccessful) throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code) }
+        call(req)
         Unit
     }
 
@@ -260,7 +260,7 @@ class KiaUsaApi {
         val req = Request.Builder().url(API + "rems/rvs")
             .post(buildJsonObject { put("requestType", 0) }.toString().toRequestBody(jsonMedia))
             .authedHeaders(session, vehicle).build()
-        raw(req).use { resp -> if (!resp.isSuccessful) throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code) }
+        call(req)
         Unit
     }
 
@@ -361,19 +361,24 @@ class KiaUsaApi {
 
     private suspend fun getCommand(path: String, session: KiaSession, v: KiaVehicleSummary) = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(API + path).get().authedHeaders(session, v).build()
-        raw(req).use { resp -> if (!resp.isSuccessful) throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code) }
+        call(req)
         Unit
     }
 
     private fun postCommand(path: String, session: KiaSession, v: KiaVehicleSummary, body: JsonObject) {
         val req = Request.Builder().url(API + path)
             .post(body.toString().toRequestBody(jsonMedia)).authedHeaders(session, v).build()
-        raw(req).use { resp -> if (!resp.isSuccessful) throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code) }
+        call(req)
     }
 
     // --- Plumbing --------------------------------------------------------
 
-    /** Run a request and return the parsed JSON body (throws on non-2xx). */
+    /**
+     * Run a request and return the parsed JSON body. Throws on non-2xx, and on
+     * Kia's in-band errors: HTTP 200 with status.statusCode != 0. An expired
+     * session (errorType 1, errorCode 1003/1005) is surfaced as a 401 so the
+     * repository layer can re-authenticate with the rmtoken and retry.
+     */
     private fun call(request: Request): JsonElement = raw(request).use { resp ->
         val text = resp.body?.string().orEmpty()
         if (!resp.isSuccessful) {
@@ -381,7 +386,20 @@ class KiaUsaApi {
             AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")
             throw BlueLinkException(msg, code = resp.code)
         }
-        if (text.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(text)
+        val root = if (text.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(text)
+        val status = root.path("status")
+        val statusCode = status.path("statusCode").int()
+        if (statusCode != null && statusCode != 0) {
+            val errorType = status.path("errorType").int()
+            val errorCode = status.path("errorCode").int()
+            if (statusCode == 1 && errorType == 1 && (errorCode == 1003 || errorCode == 1005)) {
+                throw BlueLinkException("Kia session expired", code = 401)
+            }
+            val msg = status.path("errorMessage").str() ?: "Kia request failed (error $errorCode)"
+            AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg")
+            throw BlueLinkException(msg, code = resp.code)
+        }
+        root
     }
 
     private fun raw(request: Request): Response = client.newCall(request).execute()

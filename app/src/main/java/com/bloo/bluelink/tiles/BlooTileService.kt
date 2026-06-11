@@ -9,11 +9,11 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.Shortcuts
-import com.bloo.bluelink.data.BlueLinkApi
-import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.SessionStore
+import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.CoroutineScope
@@ -106,7 +106,7 @@ abstract class BlooTileService : TileService() {
                 val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin } ?: return@runCatching
                 val v = snap.toVehicle()
                 val brand = Brand.fromIndicator(v.brandIndicator)
-                val repo = BlueLinkRepository(BlueLinkApi(brand), SessionStore(ctx), brand)
+                val repo = repositoryFor(brand, SessionStore(ctx), CredentialStore(ctx))
                 when (cmd) {
                     // Toggles based on the last-known snapshot state.
                     "doors" -> if (snap.locked == true) repo.unlock(v) else repo.lock(v)

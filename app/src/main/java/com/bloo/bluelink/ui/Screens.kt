@@ -145,6 +145,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -397,6 +398,7 @@ fun BlooApp(vm: AppViewModel) {
                         onLogin = vm::login,
                         onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
                     )
+                    state.kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = state.loading, vm = vm) }
                 }
                 // Lock is an overlay (see LockOverlay), not a full screen.
                 Screen.Locked -> Box(Modifier.fillMaxSize())
@@ -673,7 +675,7 @@ private fun LoginScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Blue Link email") },
+                label = { Text(if (brand == Brand.KIA) "Kia Connect email" else "Blue Link email") },
                 singleLine = true,
                 shape = FieldShape,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -689,16 +691,19 @@ private fun LoginScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = pin,
-                onValueChange = { pin = it },
-                label = { Text("Service PIN") },
-                singleLine = true,
-                shape = FieldShape,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // Kia US doesn't use a service PIN; commands are session-keyed.
+            if (!brand.usesOtpLogin) {
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { pin = it },
+                    label = { Text("Service PIN") },
+                    singleLine = true,
+                    shape = FieldShape,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             MorphButton(
                 onClick = { onLogin(email, password, pin, brand) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -718,6 +723,64 @@ private fun LoginScreen(
         }
     }
     }
+}
+
+/**
+ * Kia sign-in verification: pick where the one-time code goes (email/text),
+ * then enter it. Shown over the login form while a Kia OTP challenge is open.
+ */
+@Composable
+private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
+    var code by remember(otp.sentTo) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!loading) vm.kiaCancelOtp() },
+        title = { Text(if (otp.sentTo == null) "Verify it's you" else "Enter your code") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (otp.sentTo == null) {
+                    Text("Kia needs to verify this sign-in with a one-time code. Where should it go?")
+                    if (otp.challenge.hasEmail) {
+                        MorphButton(
+                            onClick = { vm.kiaSendOtp("EMAIL") },
+                            enabled = !loading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: "")) }
+                    }
+                    if (otp.challenge.hasSms) {
+                        MorphButton(
+                            onClick = { vm.kiaSendOtp("SMS") },
+                            enabled = !loading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: "")) }
+                    }
+                } else {
+                    Text(
+                        if (otp.sentTo == "SMS") "We texted you a one-time code."
+                        else "We emailed you a one-time code.",
+                    )
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it },
+                        label = { Text("Code") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (otp.sentTo != null) {
+                TextButton(onClick = { vm.kiaVerifyOtp(code) }, enabled = !loading && code.isNotBlank()) {
+                    if (loading) LoadingIndicator() else Text("Verify")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = vm::kiaCancelOtp, enabled = !loading) { Text("Cancel") }
+        },
+    )
 }
 
 /**
@@ -3497,21 +3560,26 @@ private fun SettingsScreen(vm: AppViewModel) {
                     StatusRow("Email", creds.email)
                     SecretRow("Password", creds.password)
                     var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
-                    OutlinedTextField(
-                        value = pin,
-                        onValueChange = { pin = it },
-                        label = { Text("Service PIN") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
+                    // Kia US has no service PIN; commands are session-keyed.
+                    if (!creds.brand.usesOtpLogin) {
+                        OutlinedTextField(
+                            value = pin,
+                            onValueChange = { pin = it },
+                            label = { Text("Service PIN") },
+                            singleLine = true,
+                            shape = FieldShape,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            onClick = { vm.updatePin(creds.brand, pin) },
-                            enabled = pin.isNotBlank() && pin != creds.pin,
-                        ) { Text("Update PIN") }
+                        if (!creds.brand.usesOtpLogin) {
+                            TextButton(
+                                onClick = { vm.updatePin(creds.brand, pin) },
+                                enabled = pin.isNotBlank() && pin != creds.pin,
+                            ) { Text("Update PIN") }
+                        }
                         TextButton(
                             onClick = { vm.logout(creds.brand) },
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
