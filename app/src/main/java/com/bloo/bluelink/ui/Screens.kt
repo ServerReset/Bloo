@@ -242,6 +242,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.tan
@@ -320,6 +321,11 @@ fun BlooApp(vm: AppViewModel) {
         snackbarHost = {
             // imePadding so the toast rises above the keyboard when it's open.
             SnackbarHost(snackbar, modifier = Modifier.imePadding()) { data ->
+                // Swipe the toast left or right to dismiss it; otherwise it snaps
+                // back. Fades out as it slides.
+                val offsetX = remember(data) { Animatable(0f) }
+                val swipeScope = rememberCoroutineScope()
+                val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
                 // Themed, rounded, copyable "toast" — used for errors/notices.
                 Surface(
                     shape = RoundedCornerShape(24.dp),
@@ -327,7 +333,31 @@ fun BlooApp(vm: AppViewModel) {
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     tonalElevation = 6.dp,
                     shadowElevation = 6.dp,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                        .graphicsLayer {
+                            alpha = (1f - abs(offsetX.value) / (dismissPx * 2.2f)).coerceIn(0f, 1f)
+                        }
+                        .pointerInput(data) {
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    swipeScope.launch { offsetX.snapTo(offsetX.value + dragAmount) }
+                                },
+                                onDragEnd = {
+                                    if (abs(offsetX.value) > dismissPx) {
+                                        swipeScope.launch {
+                                            val target = if (offsetX.value > 0) dismissPx * 4 else -dismissPx * 4
+                                            offsetX.animateTo(target)
+                                            data.dismiss()
+                                        }
+                                    } else {
+                                        swipeScope.launch { offsetX.animateTo(0f) }
+                                    }
+                                },
+                            )
+                        },
                 ) {
                     Row(
                         Modifier.padding(start = 18.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),

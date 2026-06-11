@@ -164,6 +164,9 @@ data class UiState(
     }
 }
 
+/** Minimum time a command control stays locked after firing, to block double-taps. */
+private const val MIN_COMMAND_LOCK_MS = 3000L
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = SessionStore(app)
@@ -1040,6 +1043,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     ) {
         val key = "$vin:$action"
         viewModelScope.launch {
+            val startedAt = System.currentTimeMillis()
             _state.update { it.copy(pending = it.pending + key, message = null) }
             try {
                 // Serialize with status fetches: Hyundai rejects overlapping
@@ -1064,6 +1068,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 AppLog.log("⚠ $msg")
                 _state.update { it.copy(message = msg) }
             } finally {
+                // Keep the control locked for at least MIN_COMMAND_LOCK_MS after a
+                // command so a quick double-tap can't fire an overlapping request
+                // (which Hyundai rejects as "a previous request is pending").
+                val elapsed = System.currentTimeMillis() - startedAt
+                if (elapsed < MIN_COMMAND_LOCK_MS) {
+                    kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
+                }
                 _state.update { it.copy(pending = it.pending - key) }
             }
         }
