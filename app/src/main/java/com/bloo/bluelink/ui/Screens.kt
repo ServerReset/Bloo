@@ -38,6 +38,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -607,18 +608,19 @@ private fun LoginScreen(
 
     if (onCancel != null) BackHandler { onCancel() }
 
+    Box(Modifier.fillMaxSize()) {
+    AuroraBackground(Modifier.matchParentSize())
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Gradient hero with the wordmark.
+        // Wordmark hero over the animated aurora (transparent hero background).
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(heroHeight)
-                .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
+                .height(heroHeight),
             contentAlignment = Alignment.BottomStart,
         ) {
             Column(Modifier.padding(24.dp)) {
@@ -694,6 +696,33 @@ private fun LoginScreen(
             )
         }
     }
+    }
+}
+
+/**
+ * A softly-blurred, slowly-drifting "aurora" of colour blobs — the animated login
+ * backdrop. Three blobs ease back and forth on different periods.
+ */
+@Composable
+private fun AuroraBackground(modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val t = rememberInfiniteTransition(label = "aurora")
+    val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
+    val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
+    val p3 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(11000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
+    fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
+    Box(
+        modifier
+            .blur(90.dp)
+            .drawBehind {
+                drawRect(scheme.surface)
+                fun blob(c: Color, fx: Float, fy: Float, r: Float) =
+                    drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
+                blob(scheme.primary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1), mix(0.2f, 0.45f, p2), 0.6f)
+                blob(scheme.tertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2), mix(0.75f, 0.5f, p3), 0.55f)
+                blob(scheme.secondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3), mix(0.35f, 0.95f, p1), 0.55f)
+            },
+    )
 }
 
 // --- Lock -----------------------------------------------------------------
@@ -816,7 +845,7 @@ private fun EmptyScreen(vm: AppViewModel) {
 // --- Garage (main) --------------------------------------------------------
 
 /** Minimum comfortable width for one car column before we add another. */
-private const val MIN_CARD_DP = 380
+private const val MIN_CARD_DP = 320
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -995,7 +1024,13 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 LocalForceExpanded provides true,
                 LocalPebbleFillHeight provides true,
             ) {
-                Box(Modifier.fillMaxSize().padding(10.dp)) {
+                // Extra end inset clears the vertical page-dots rail on the right.
+                Box(
+                    Modifier.fillMaxSize().padding(
+                        start = 10.dp, top = 10.dp, bottom = 10.dp,
+                        end = if (tiles.size > 1) 22.dp else 10.dp,
+                    ),
+                ) {
                     when (val tile = tiles[i]) {
                         "main" -> CompactMainTile(v, state, vm)
                         "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
@@ -2118,9 +2153,9 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
         shape = RoundedCornerShape(PebbleCornerCollapsed),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        // Extra start inset nudges the "Locked/Unlocked" text in to line up with
-        // the other pebbles' titles.
-        Box(Modifier.padding(start = 26.dp, end = 16.dp)) {
+        // Extra start inset lines the "Locked/Unlocked" text up with the other
+        // pebble titles; a small end inset nudges the button toward the edge.
+        Box(Modifier.padding(start = 26.dp, end = 8.dp)) {
             StateControl(
                 name = "",
                 isOn = status?.doorLock,
