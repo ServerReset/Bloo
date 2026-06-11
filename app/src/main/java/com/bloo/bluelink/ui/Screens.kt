@@ -190,6 +190,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
@@ -1501,6 +1502,12 @@ private fun <T> ReorderColumn(
     onReorder: (List<T>) -> Unit,
     modifier: Modifier = Modifier,
     spacing: Dp = 12.dp,
+    // Optional cross-target drag hooks: [onDragMove] reports the live finger
+    // position (window coords) of the dragged item; [onDragRelease] is called on
+    // drop and, if it returns true, the drop was handled elsewhere (e.g. pinned
+    // to the hot spot) so the normal reorder is skipped.
+    onDragMove: ((key: Any, windowPointer: Offset) -> Unit)? = null,
+    onDragRelease: ((key: Any) -> Boolean)? = null,
     content: @Composable (item: T, dragHandle: Modifier, isDragging: Boolean) -> Unit,
 ) {
     var order by remember { mutableStateOf(items) }
@@ -1532,14 +1539,24 @@ private fun <T> ReorderColumn(
                         }
                         .onSizeChanged { heights[k] = it.height },
                 ) {
-                    val handle = Modifier.pointerInput(k) {
+                    val handleCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
+                    val handle = Modifier
+                        .onGloballyPositioned { handleCoords.value = it }
+                        .pointerInput(k) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { draggingKey = k; offsetY = 0f },
-                        onDragEnd = { draggingKey = null; offsetY = 0f; onReorder(order) },
-                        onDragCancel = { draggingKey = null; offsetY = 0f },
+                        onDragEnd = {
+                            val handled = onDragRelease?.invoke(k) ?: false
+                            draggingKey = null; offsetY = 0f
+                            if (!handled) onReorder(order)
+                        },
+                        onDragCancel = { onDragRelease?.invoke(k); draggingKey = null; offsetY = 0f },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             offsetY += dragAmount.y
+                            handleCoords.value?.takeIf { it.isAttached }?.let {
+                                onDragMove?.invoke(k, it.localToWindow(change.position))
+                            }
                             val cur = order.indexOfFirst { keyOf(it) == k }
                             if (cur >= 0) {
                                 if (offsetY > 0 && cur < order.lastIndex) {
@@ -1766,6 +1783,25 @@ private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modif
 private val LocalBackdrop = staticCompositionLocalOf<GraphicsLayer?> { null }
 
 /**
+ * Shared state for dragging a pebble onto (or off) the dual-column hot spot. The
+ * dragged section and the live finger position (window coords) are tracked here,
+ * and the hot-spot slot publishes its window bounds so we can tell when a drag is
+ * hovering it.
+ */
+private class HotSeatDrag {
+    var section by mutableStateOf<String?>(null)
+    var pointer by mutableStateOf(Offset.Zero)
+    var slotTopLeft by mutableStateOf(Offset.Zero)
+    var slotSize by mutableStateOf(IntSize.Zero)
+    val overSlot: Boolean
+        get() = section != null && slotSize.width > 0 &&
+            pointer.x in slotTopLeft.x..(slotTopLeft.x + slotSize.width) &&
+            pointer.y in slotTopLeft.y..(slotTopLeft.y + slotSize.height)
+}
+
+private val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }
+
+/**
  * Frosted-glass background: draws the blurred [LocalBackdrop] snapshot of the app,
  * aligned to this element's on-screen position and clipped to [shape]. Falls back
  * to nothing (callers layer their own translucent tint on top) if no backdrop is
@@ -1845,6 +1881,7 @@ private fun VehicleDetailContent(
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
     val hotspot = state.hotspotFor(v.vin)
         ?.takeIf { it in state.sectionsFor(v) && !state.isPebbleHidden(v.vin, it) }
+    val hotDrag = remember { HotSeatDrag() }
     val controls: @Composable ColumnScope.() -> Unit = {
         CarHeaderRow(v, state, onExpand = null, reserveEnd = false)
         CriticalContent(v, state, vm)
@@ -1853,6 +1890,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val pebbles: @Composable ColumnScope.() -> Unit = {
         PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
     }
+    CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(v, state, vm) {
         // Animate the swap when the columns are flipped.
         AnimatedContent(
@@ -1887,6 +1925,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             }
         }
     }
+    }
 }
 
 /** A friendly label for a pebble/section id. */
@@ -1911,8 +1950,19 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         // A small header row (not an overlay) so the Unpin control never covers
         // the pinned pebble's own header/actions.
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Long-press + drag this row to unpin (or tap the button).
+            val unpinHaptics = LocalHaptics.current
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier
+                    .fillMaxWidth()
+                    .pointerInput(hotspot) {
+                        var dragged = 0f
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { dragged = 0f; unpinHaptics?.tick() },
+                            onDrag = { change, amt -> change.consume(); dragged += kotlin.math.abs(amt.x) + kotlin.math.abs(amt.y) },
+                            onDragEnd = { if (dragged > 48f) vm.setHotspot(v, null) },
+                        )
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -1923,7 +1973,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "Pinned here",
+                    "Pinned here — drag to unpin",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -1940,8 +1990,23 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         val options = state.sectionsFor(v).filter {
             it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it)
         }
-        Box {
-            OutlinedCard(onClick = { menu = true }, modifier = Modifier.fillMaxWidth()) {
+        val hotDrag = LocalHotSeatDrag.current
+        val hovered = hotDrag?.overSlot == true
+        val border = if (hovered) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        }
+        Box(
+            Modifier.onGloballyPositioned {
+                hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
+            },
+        ) {
+            OutlinedCard(
+                onClick = { menu = true },
+                modifier = Modifier.fillMaxWidth(),
+                border = border,
+            ) {
                 Row(
                     Modifier.fillMaxWidth().padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1949,9 +2014,10 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
                     Icon(Icons.Filled.PushPin, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Pin a pebble here",
+                        if (hovered) "Drop to pin here" else "Drag a pebble here (or tap)",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (hovered) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -2064,6 +2130,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
             !state.isPebbleHidden(v.vin, it) &&
             (it != "ai" || state.aiEnabled)
     }
+    val hotDrag = LocalHotSeatDrag.current
     ReorderColumn(
         items = sections,
         keyOf = { it },
@@ -2078,6 +2145,17 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
                 if (s in visibleSet && queue.isNotEmpty()) queue.removeFirst() else s
             }
             vm.setSectionOrder(v, merged)
+        },
+        // In the dual-column view, dragging a pebble onto the hot-spot slot pins it.
+        onDragMove = hotDrag?.let { d ->
+            { key, pointer -> d.section = key as String; d.pointer = pointer }
+        },
+        onDragRelease = hotDrag?.let { d ->
+            { key ->
+                val pin = d.overSlot
+                d.section = null
+                if (pin) { vm.setHotspot(v, key as String); true } else false
+            }
         },
     ) { section, dragHandle, _ ->
         SinglePebble(section, v, state, vm, dragHandle)
