@@ -302,16 +302,19 @@ fun BlooApp(vm: AppViewModel) {
     )
     // A blurred snapshot of the whole app, recorded each frame, that floating
     // elements sample for a frosted-glass background.
-    val backdrop = rememberGraphicsLayer()
+    val backdropLayer = rememberGraphicsLayer()
+    val backdrop = remember(backdropLayer) { Backdrop(backdropLayer) }
     val blurPx = with(LocalDensity.current) { 24.dp.toPx() }
-    backdrop.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
+    backdropLayer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
     Box(Modifier.fillMaxSize()) {
     Box(
         Modifier
             .fillMaxSize()
             .blur(lockBlur)
             .drawWithContent {
-                backdrop.record { this@drawWithContent.drawContent() }
+                backdrop.recording = true
+                backdropLayer.record { this@drawWithContent.drawContent() }
+                backdrop.recording = false
                 drawContent()
             }
             .background(
@@ -1779,8 +1782,17 @@ private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modif
 
 // --- Backdrop blur (frosted glass behind floating elements) ---------------
 
-/** The captured, blurred snapshot of the app, sampled by floating elements. */
-private val LocalBackdrop = staticCompositionLocalOf<GraphicsLayer?> { null }
+/**
+ * The captured, blurred snapshot of the app, sampled by floating elements. The
+ * [recording] flag is true while the snapshot is being captured; floating elements
+ * must NOT draw the layer then (it's mid-record), which would crash — they draw it
+ * only in the normal pass.
+ */
+private class Backdrop(val layer: GraphicsLayer) {
+    var recording = false
+}
+
+private val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
 /**
  * Shared state for dragging a pebble onto (or off) the dual-column hot spot. The
@@ -1808,13 +1820,17 @@ private val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }
  * available.
  */
 private fun Modifier.backdropBlur(shape: Shape): Modifier = composed {
-    val layer = LocalBackdrop.current ?: return@composed this.clip(shape)
+    val backdrop = LocalBackdrop.current ?: return@composed this.clip(shape)
     var origin by remember { mutableStateOf(Offset.Zero) }
     this
         .onGloballyPositioned { origin = it.localToWindow(Offset.Zero) }
         .clip(shape)
         .drawBehind {
-            translate(left = -origin.x, top = -origin.y) { drawLayer(layer) }
+            // Skip while the snapshot is being recorded (we're inside it) — drawing
+            // a layer mid-record crashes.
+            if (!backdrop.recording) {
+                translate(left = -origin.x, top = -origin.y) { drawLayer(backdrop.layer) }
+            }
         }
 }
 
