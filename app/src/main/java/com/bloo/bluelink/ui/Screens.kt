@@ -2720,7 +2720,6 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val context = LocalContext.current
     val appearance by vm.appearance.collectAsState()
     val inApp = appearance.linksInApp
-    val genesis = v.brand == Brand.GENESIS
     val location = state.locations[v.vin]
     val odo = v.odometer?.trim()?.takeIf { it.isNotBlank() }
     val odoInt = odo?.replace(",", "")?.toDoubleOrNull()?.toInt()
@@ -2782,8 +2781,8 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
             )
         }
 
-        SectionLabel(if (genesis) "Genesis owners" else "Hyundai owners")
-        OwnerLinks(genesis, context, inApp)
+        SectionLabel("${v.brand.label} owners")
+        OwnerLinks(v.brand, context, inApp)
     }
 }
 
@@ -2793,17 +2792,40 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OwnerLinks(genesis: Boolean, context: Context, inApp: Boolean) {
+private fun OwnerLinks(brand: Brand, context: Context, inApp: Boolean) {
     // Manufacturer-specific destinations, defined once and grouped below.
-    val appPkg = if (genesis) "com.stationdm.genesis" else "com.stationdm.bluelink"
-    val appName = if (genesis) "Genesis app" else "Bluelink app"
-    val ownersUrl = if (genesis) "https://owners.genesis.com" else "https://owners.hyundaiusa.com"
-    val dealerLabel = if (genesis) "Find a retailer" else "Find a dealer"
-    val dealerUrl = if (genesis) "https://www.genesis.com/us/en/find-a-retailer.html"
-        else "https://www.hyundaiusa.com/us/en/dealer-locator"
-    val manualsUrl = if (genesis) "https://www.genesis.com/us/en/owners.html"
-        else "https://www.hyundaiusa.com/us/en/owner-resources"
-    val roadside = if (genesis) "8443409741" else "8002437766"
+    val appPkg = when (brand) {
+        Brand.GENESIS -> "com.stationdm.genesis"
+        Brand.KIA -> "com.myuvo.link"
+        else -> "com.stationdm.bluelink"
+    }
+    val appName = when (brand) {
+        Brand.GENESIS -> "Genesis app"
+        Brand.KIA -> "Kia Access app"
+        else -> "Bluelink app"
+    }
+    val ownersUrl = when (brand) {
+        Brand.GENESIS -> "https://owners.genesis.com"
+        Brand.KIA -> "https://owners.kia.com"
+        else -> "https://owners.hyundaiusa.com"
+    }
+    val dealerLabel = if (brand == Brand.GENESIS) "Find a retailer" else "Find a dealer"
+    val dealerUrl = when (brand) {
+        Brand.GENESIS -> "https://www.genesis.com/us/en/find-a-retailer.html"
+        Brand.KIA -> "https://www.kia.com/us/en/find-a-dealer"
+        else -> "https://www.hyundaiusa.com/us/en/dealer-locator"
+    }
+    val manualsUrl = when (brand) {
+        Brand.GENESIS -> "https://www.genesis.com/us/en/owners.html"
+        Brand.KIA -> "https://www.kia.com/us/en/owners"
+        else -> "https://www.hyundaiusa.com/us/en/owner-resources"
+    }
+    // Brand 24/7 roadside / consumer assistance lines.
+    val roadside = when (brand) {
+        Brand.GENESIS -> "8443409741"
+        Brand.KIA -> "8003334542"
+        else -> "8002437766"
+    }
 
     @Composable
     fun group(title: String, content: @Composable FlowRowScope.() -> Unit) {
