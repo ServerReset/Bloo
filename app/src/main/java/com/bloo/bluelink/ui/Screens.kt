@@ -2555,16 +2555,6 @@ private fun ClimatePebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
         summary = if (climateOn) "On" else "Off",
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        headerAction = {
-            PebbleActionButton(
-                label = if (climateOn) "Stop" else "Start",
-                icon = Icons.Filled.AcUnit,
-                onClick = { if (climateOn) vm.stopClimate(v) else startClimate() },
-                pending = pending,
-                container = if (climateOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = if (climateOn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-            )
-        },
     ) {
         StepRow("Temperature", "$tempF°F")
         AnimatedSlider(
@@ -2610,6 +2600,19 @@ private fun ClimatePebble(
                 SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
             }
         }
+
+        // Big Start/Stop control at the bottom of the pebble (same button as the
+        // doors Unlock control).
+        StateControl(
+            name = "Climate",
+            isOn = climateOn,
+            stateOn = "On", stateOff = "Off",
+            turnOn = "Start", turnOff = "Stop",
+            icon = Icons.Filled.AcUnit,
+            pending = pending,
+            onActivate = { startClimate() },
+            onDeactivate = { vm.stopClimate(v) },
+        )
     }
 }
 
@@ -2675,18 +2678,23 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
         summary = summary,
         containerColor = MaterialTheme.colorScheme.primaryContainer,
-        headerAction = {
-            PebbleActionButton(
-                label = if (charging) "Stop" else "Start",
-                icon = Icons.Filled.Bolt,
-                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
-                enabled = plugged,
-                pending = pending,
-                container = if (charging) ChargeGreen else MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = if (charging) Color.White else MaterialTheme.colorScheme.onSurface,
-            )
-        },
     ) {
+        // Big Start/Stop control (same button as the doors Unlock control);
+        // disabled with a "Not plugged in" note when there's no cable.
+        StateControl(
+            name = "Charging",
+            isOn = charging,
+            stateOn = "Charging", stateOff = "Idle",
+            turnOn = "Start", turnOff = "Stop",
+            icon = Icons.Filled.Bolt,
+            pending = pending,
+            enabled = plugged,
+            disabledNote = "Not plugged in",
+            onActivate = { vm.startCharge(v) },
+            onDeactivate = { vm.stopCharge(v) },
+            highlightColor = ChargeGreen,
+            highlightContentColor = Color.White,
+        )
         if (plugged) {
             mins?.let { StatusRow("Time to full", fmtMinutes(it)) }
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
