@@ -989,9 +989,8 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 }
             }
         }
-        // Car-switching dots at top-center on non-main tiles — same minimal indicator
-        // as the regular phone view. No car name; the main tile has that.
-        if (current != 0 && carCount > 1) {
+        // Car-switching dots, always at top-center (every tile, including main).
+        if (carCount > 1) {
             PagerDots(
                 current = carIndex,
                 count = carCount,
@@ -1072,10 +1071,8 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
             Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // Car-switching dots sit just above the (larger) car name.
-                        if (carCount > 1) {
-                            PagerDots(current = carIndex, count = carCount)
-                        }
+                        // The car-switching dots live at top-center of the screen
+                        // (see CompactCar), not here.
                         Text(
                             v.name,
                             style = MaterialTheme.typography.headlineMedium,
@@ -1989,7 +1986,18 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
     ReorderColumn(
         items = sections,
         keyOf = { it },
-        onReorder = { vm.setSectionOrder(v, it) },
+        onReorder = { newVisible ->
+            // Merge the reordered visible items back into the full section order so
+            // excluded ones (the pinned hot-spot, summary, controls, hidden) keep
+            // their slots instead of being dropped.
+            val visibleSet = sections.toSet()
+            val full = (state.sectionsFor(v) + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()
+            val queue = ArrayDeque(newVisible)
+            val merged = full.map { s ->
+                if (s in visibleSet && queue.isNotEmpty()) queue.removeFirst() else s
+            }
+            vm.setSectionOrder(v, merged)
+        },
     ) { section, dragHandle, _ ->
         SinglePebble(section, v, state, vm, dragHandle)
     }
@@ -2824,6 +2832,16 @@ private fun seatTint(level: SeatLevel): Color = when {
  * set limits and see charging info. Long-press to drag-reorder.
  */
 @Composable
+private fun ChargeEta(mins: Int) {
+    Text(
+        "~${fmtMinutes(mins)} to full",
+        style = MaterialTheme.typography.labelSmall,
+        color = LocalContentColor.current.copy(alpha = 0.7f),
+        modifier = Modifier.padding(start = 2.dp, top = 2.dp),
+    )
+}
+
+@Composable
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val targets = status?.evStatus?.reservChargeInfos
     var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
@@ -2871,6 +2889,7 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             valueRange = 50f..100f,
             steps = 4,
         )
+        if (charging && mins != null) ChargeEta(mins)
         StepRow("DC (fast) target", "$dc%")
         AnimatedSlider(
             value = dc.toFloat(),
@@ -2878,6 +2897,7 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             valueRange = 50f..100f,
             steps = 4,
         )
+        if (charging && mins != null) ChargeEta(mins)
         CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
             vm.setChargeLimits(v, ac, dc)
         }
