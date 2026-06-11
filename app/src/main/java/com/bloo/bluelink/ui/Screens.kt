@@ -2060,8 +2060,8 @@ private fun StateControl(
     val corner by animateDpAsState(
         targetValue = when {
             pressed -> 10.dp
-            highlighted -> 20.dp
-            else -> 38.dp
+            highlighted -> 18.dp
+            else -> 34.dp
         },
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "ctrlCorner",
@@ -2262,7 +2262,7 @@ private fun PebbleActionButton(
         enabled = enabled && !pending,
         containerColor = container,
         contentColor = contentColor,
-        restCorner = 100.dp,
+        restCorner = 20.dp,
         pressedCorner = 10.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
