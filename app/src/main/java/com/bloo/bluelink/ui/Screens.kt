@@ -76,6 +76,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -162,6 +163,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -265,9 +267,23 @@ fun BlooApp(vm: AppViewModel) {
     val cfg = LocalConfiguration.current
     val compactCover = state.screen == Screen.Garage &&
         cfg.screenWidthDp < 600 && cfg.screenHeightDp < 520
+    // Biometric lock overlay: blur the whole app behind it and fade the blur
+    // away once unlocked.
+    val lockBlur by animateDpAsState(
+        targetValue = if (state.locked) 22.dp else 0.dp,
+        animationSpec = tween(durationMillis = 450),
+        label = "lockBlur",
+    )
+    val lockAlpha by animateFloatAsState(
+        targetValue = if (state.locked) 1f else 0f,
+        animationSpec = tween(durationMillis = 450),
+        label = "lockAlpha",
+    )
+    Box(Modifier.fillMaxSize()) {
     Box(
         Modifier
             .fillMaxSize()
+            .blur(lockBlur)
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -331,7 +347,8 @@ fun BlooApp(vm: AppViewModel) {
                         onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
                     )
                 }
-                Screen.Locked -> Box(Modifier.padding(padding)) { LockScreen(vm) }
+                // Lock is an overlay (see LockOverlay), not a full screen.
+                Screen.Locked -> Box(Modifier.fillMaxSize())
                 Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
                 Screen.Onboarding -> OnboardingScreen(vm)
                 Screen.Garage -> GarageScreen(state, vm)
@@ -353,6 +370,13 @@ fun BlooApp(vm: AppViewModel) {
                     ),
                 ),
         )
+        }
+    }
+        // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
+        if (lockAlpha > 0.01f) {
+            Box(Modifier.fillMaxSize().alpha(lockAlpha)) {
+                LockOverlay(vm)
+            }
         }
     }
     }
@@ -547,6 +571,10 @@ private fun LoginScreen(
     var pin by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
+    val cfg = LocalConfiguration.current
+    // Shrink the hero on short cover screens; cap form width on tablets.
+    val shortScreen = cfg.screenHeightDp < 520
+    val heroHeight = if (shortScreen) 120.dp else 220.dp
 
     if (onCancel != null) BackHandler { onCancel() }
 
@@ -554,19 +582,20 @@ private fun LoginScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Gradient hero with the wordmark.
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(220.dp)
+                .height(heroHeight)
                 .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
             contentAlignment = Alignment.BottomStart,
         ) {
             Column(Modifier.padding(24.dp)) {
                 Text(
                     "Bloo",
-                    style = MaterialTheme.typography.displayLarge,
+                    style = if (shortScreen) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Black,
                     color = scheme.onPrimary,
                 )
@@ -578,7 +607,10 @@ private fun LoginScreen(
             }
         }
 
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            Modifier.widthIn(max = 480.dp).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Text("Brand", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Brand.entries.forEach { b ->
@@ -637,9 +669,17 @@ private fun LoginScreen(
 
 // --- Lock -----------------------------------------------------------------
 
+/**
+ * The biometric lock, drawn as an overlay on top of the blurred app. High-contrast
+ * white-on-scrim text reads over any wallpaper of cars behind it; a floating back
+ * arrow returns to the login screen. Centered + width-capped so it sits well on
+ * phones, flip-phone cover screens and tablets alike.
+ */
 @Composable
-private fun LockScreen(vm: AppViewModel) {
+private fun LockOverlay(vm: AppViewModel) {
     val context = LocalContext.current
+    val cfg = LocalConfiguration.current
+    val compact = cfg.screenHeightDp < 440
     fun authenticate() {
         context.findFragmentActivity()?.let { activity ->
             showBiometricPrompt(
@@ -653,35 +693,70 @@ private fun LockScreen(vm: AppViewModel) {
     }
     LaunchedEffect(Unit) { authenticate() }
 
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+    val noRipple = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .fillMaxSize()
+            // Darken the blur for legibility, and swallow taps to the app behind.
+            .background(Color.Black.copy(alpha = 0.45f))
+            .clickable(interactionSource = noRipple, indication = null) {},
     ) {
-        Icon(
-            Icons.Filled.Fingerprint,
-            contentDescription = null,
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.height(16.dp))
-        Text("Bloo is locked", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Confirm it's you to reach your vehicles.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(28.dp))
-        // Same dark rounded-rectangle control style as the rest of the app.
-        MorphButton(
-            onClick = { authenticate() },
-            modifier = Modifier.height(ControlHeight),
-            contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+        // Floating back arrow -> login.
+        Surface(
+            onClick = { vm.lockToLogin() },
+            shape = CircleShape,
+            color = Color.White.copy(alpha = 0.16f),
+            contentColor = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(12.dp)
+                .size(46.dp),
         ) {
-            Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(10.dp))
-            Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = "Back to login")
+            }
+        }
+
+        Column(
+            Modifier
+                .align(Alignment.Center)
+                .widthIn(max = 420.dp)
+                .padding(horizontal = 32.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                Icons.Filled.Fingerprint,
+                contentDescription = null,
+                modifier = Modifier.size(if (compact) 44.dp else 72.dp),
+                tint = Color.White,
+            )
+            Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
+            Text(
+                "Bloo is locked",
+                style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Confirm it's you to reach your vehicles.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.85f),
+            )
+            Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
+            // White pill for maximum contrast over the dimmed blur.
+            MorphButton(
+                onClick = { authenticate() },
+                modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
+                containerColor = Color.White,
+                contentColor = Color.Black,
+                contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+            ) {
+                Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -1935,18 +2010,26 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 @Composable
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    // Doors: locked is the calm/grey state; unlocked is highlighted + red text.
-    // No title — the Locked/Unlocked state itself is the (full-height) headline.
-    StateControl(
-        name = "",
-        isOn = status?.doorLock,
-        stateOn = "Locked", stateOff = "Unlocked",
-        turnOn = "Lock", turnOff = "Unlock",
-        icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
-        onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
-        highlightWhenOff = true,
-        offTextColor = MaterialTheme.colorScheme.error,
-    )
+    // Doors sit inside a collapsed-pebble shaped card so the lock/unlock pill has
+    // a "holding" container like every other section.
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(PebbleCornerCollapsed),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Box(Modifier.padding(horizontal = 16.dp)) {
+            StateControl(
+                name = "",
+                isOn = status?.doorLock,
+                stateOn = "Locked", stateOff = "Unlocked",
+                turnOn = "Lock", turnOff = "Unlock",
+                icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
+                onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
+                highlightWhenOff = true,
+                offTextColor = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
 }
 
 /**
@@ -1966,6 +2049,7 @@ private fun MorphButton(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     activeContainerColor: Color = MaterialTheme.colorScheme.primary,
     activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
@@ -1995,6 +2079,7 @@ private fun MorphButton(
             containerColor = bg,
             contentColor = if (active) activeContentColor else contentColor,
         ),
+        border = if (active) null else border,
         contentPadding = contentPadding,
         content = content,
     )
@@ -2115,6 +2200,7 @@ private fun StateControl(
             active = highlighted,
             activeContainerColor = highlightColor,
             activeContentColor = highlightContentColor,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             modifier = Modifier.height(ControlHeight),
         ) {
             MorphButtonLabel(icon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
@@ -2266,6 +2352,9 @@ private fun PebbleActionButton(
         active = active,
         activeContainerColor = activeContainer,
         activeContentColor = activeContent,
+        // A faint outline keeps the inactive pill's shape visible on any pebble
+        // background (e.g. the location pebble's neutral surface).
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         modifier = Modifier.heightIn(min = 50.dp),
     ) {

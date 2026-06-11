@@ -55,6 +55,8 @@ sealed interface Screen {
 
 data class UiState(
     val screen: Screen = Screen.Login,
+    /** Biometric app-lock overlay: the real app renders (blurred) behind it. */
+    val locked: Boolean = false,
     val loading: Boolean = false,
     val refreshing: Boolean = false,
     val vehicles: List<Vehicle> = emptyList(),
@@ -273,11 +275,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             brands.forEach { repoFor(it) }
             _state.update { it.copy(accounts = credentialStore.loadAll()) }
             val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
-            if (locked) {
-                _state.update { it.copy(screen = Screen.Locked) }
-            } else {
-                loadGarage()
-            }
+            // Load the garage either way so it's ready (and visible, blurred)
+            // behind the lock overlay; the overlay just gates interaction.
+            if (locked) _state.update { it.copy(locked = true) }
+            loadGarage()
         }
     }
 
@@ -328,7 +329,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun unlocked() = loadGarage()
+    /** Dismiss the lock overlay (the garage was already loaded behind it). */
+    fun unlocked() {
+        _state.update { it.copy(locked = false) }
+        if (_state.value.vehicles.isEmpty() && !loadingGarage) loadGarage()
+    }
+
+    /** From the lock overlay, back out to the login screen. */
+    fun lockToLogin() = _state.update { it.copy(locked = false, addingAccount = true) }
 
     fun canUseBiometrics(): Boolean =
         BiometricManager.from(getApplication())
