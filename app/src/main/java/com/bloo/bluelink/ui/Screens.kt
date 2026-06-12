@@ -1722,6 +1722,10 @@ private fun AnimatedSlider(
     val scheme = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     val interactionSource = remember { MutableInteractionSource() }
+    val density = LocalDensity.current
+    // Captured so the tap handler can map an x position into a value using the
+    // same inset geometry the track draws with.
+    var widthPx by remember { mutableFloatStateOf(0f) }
 
     // The thumb position is driven continuously so it tracks the finger exactly
     // while dragging (the underlying Slider runs with steps = 0). On release we
@@ -1751,6 +1755,34 @@ private fun AnimatedSlider(
     val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
     val dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f)
 
+    // A tap on the track jumps to that position (in addition to dragging). The
+    // tap detector lives on a wrapping Box so it coexists with the Slider's own
+    // drag handling: detectTapGestures only fires on a true tap and never
+    // consumes the drag, so dragging the thumb is unaffected.
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .onSizeChanged { widthPx = it.width.toFloat() }
+            .pointerInput(valueRange, steps) {
+                detectTapGestures { offset ->
+                    val padPx = with(density) { edgePad.toPx() }
+                    val travel = (widthPx - 2 * padPx).coerceAtLeast(1f)
+                    val frac = ((offset.x - padPx) / travel).coerceIn(0f, 1f)
+                    val raw = valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
+                    val target = snapToStep(raw, valueRange, steps)
+                    prevStep = target
+                    haptics?.click()
+                    onValueChange(target)
+                    // Spring-settle the thumb onto the tapped step, same as on drag release.
+                    scope.launch {
+                        anim.animateTo(
+                            target,
+                            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                        )
+                    }
+                }
+            },
+    ) {
     Slider(
         value = anim.value,
         onValueChange = { v ->
@@ -1854,6 +1886,7 @@ private fun AnimatedSlider(
         },
         modifier = Modifier.fillMaxWidth(),
     )
+    }
 }
 
 private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
