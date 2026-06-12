@@ -54,6 +54,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -105,6 +106,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
@@ -128,6 +130,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -329,7 +332,7 @@ fun BlooApp(vm: AppViewModel) {
                 val offsetX = remember(data) { Animatable(0f) }
                 val swipeScope = rememberCoroutineScope()
                 val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
-                // Themed, rounded, copyable "toast" — used for errors/notices.
+                // Themed, rounded, copyable "toast" - used for errors/notices.
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
@@ -443,7 +446,7 @@ fun BlooApp(vm: AppViewModel) {
 /**
  * First-run welcome. Celebrates the sign-in with on-screen fireworks (plus sound
  * and haptics) and explains how Bloo works, then funnels the user into Settings
- * — the only way forward — so they configure each car before reaching the app.
+ * - the only way forward - so they configure each car before reaching the app.
  */
 @Composable
 private fun OnboardingScreen(vm: AppViewModel) {
@@ -457,7 +460,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
         Fireworks.playSound(context)
         haptics?.fireworks()
     }
-    // There's no way back — you must set up first.
+    // There's no way back - you must set up first.
     BackHandler {}
 
     Box(
@@ -487,10 +490,10 @@ private fun OnboardingScreen(vm: AppViewModel) {
             )
             OnboardingPoint("🚗", "Your cars", "Each car is a screen you swipe between. Pull down to refresh its live status.")
             OnboardingPoint("🧩", "Pebbles", "Tap a pebble to expand it; long-press to drag and reorder. Lock, charge, climate and more live here.")
-            OnboardingPoint("⚙️", "Tell Bloo about each car", "Hyundai's API doesn't report a car's powertrain, seats or heated wheel — set those in Settings so the right controls appear. Add a photo while you're there.")
+            OnboardingPoint("⚙️", "Tell Bloo about each car", "Hyundai's API doesn't report a car's powertrain, seats or heated wheel. Set those in Settings so the right controls appear, and add a photo while you're there.")
             OnboardingPoint("⚡", "Quick access", "Add Quick Settings tiles and long-press app-icon shortcuts for one-tap lock / unlock / climate.")
 
-            // Ask for notifications here, on a tap — not silently on first launch.
+            // Ask for notifications here, on a tap - not silently on first launch.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 var notifGranted by remember {
                     mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context))
@@ -543,7 +546,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
                 Text("Set up your cars", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
             Text(
-                "Takes a minute — you'll land in the app right after.",
+                "Takes a minute. You'll land in the app right after.",
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -792,7 +795,7 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 }
 
 /**
- * A softly-blurred, slowly-drifting "aurora" of colour blobs — the animated login
+ * A softly-blurred, slowly-drifting "aurora" of colour blobs - the animated login
  * backdrop. Three blobs ease back and forth on different periods.
  */
 @Composable
@@ -954,7 +957,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         wasRefreshing = state.refreshing
     }
     // Live pull distance reported by Refreshable, so the overlays react the moment
-    // the user starts pulling — not only once a refresh is in flight.
+    // the user starts pulling - not only once a refresh is in flight.
     val pullFractionState = remember { mutableStateOf(0f) }
     val pullFraction by pullFractionState
     // Hide the page indicator as soon as the pull begins (and through the refresh),
@@ -1174,7 +1177,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                     .alpha(dotsAlpha),
             )
         }
-        // Vertical page dots on the right edge — show which pebble tile is visible.
+        // Vertical page dots on the right edge - show which pebble tile is visible.
         if (tiles.size > 1) {
             VerticalPagerDots(
                 current = current,
@@ -1284,11 +1287,10 @@ private fun FloatingIcon(
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        // Frosted glass: real backdrop blur with a faint tint on top.
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 3.dp,
-        modifier = modifier.padding(12.dp).backdropBlur(CircleShape).size(44.dp),
+        shadowElevation = 2.dp,
+        modifier = modifier.padding(12.dp).size(44.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = description)
@@ -1391,7 +1393,7 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
 @Composable
 private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean, drivingLabel: String? = null) {
     // Primary metric: battery if the car has one, else fuel. Plug-in hybrids show
-    // both — battery as the headline and fuel as a secondary line.
+    // both - battery as the headline and fuel as a secondary line.
     val fuelPct = status?.fuelLevel
     val pct = status?.percentFor(hasBattery)
     val frac = ((pct ?: 0).coerceIn(0, 100)) / 100f
@@ -1427,14 +1429,14 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
         Row(verticalAlignment = Alignment.Bottom) {
             // Roll the headline number when it changes.
             RollingNumber(
-                text = pct?.let { "$it%" } ?: "—",
+                text = pct?.let { "$it%" } ?: "--",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(
-                    text = range?.let { "$it mi" } ?: "—",
+                    text = range?.let { "$it mi" } ?: "--",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1507,18 +1509,18 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
 private val ChargeGreen = Color(0xFF2EBD59)
 private val ChargeGreenDark = Color(0xFF1B8A41)
 
-/** Gentle spring damping — present, but not an aggressive overshoot (0.82). */
+/** Gentle spring damping - present, but not an aggressive overshoot (0.82). */
 private const val SoftDamping = 0.82f
 
 /**
  * When true (cover-screen tiles), pebbles render permanently open with no
- * collapse chevron or drag handle — collapsing a full-screen tile makes no sense.
+ * collapse chevron or drag handle - collapsing a full-screen tile makes no sense.
  */
 private val LocalForceExpanded = staticCompositionLocalOf { false }
 
 /**
  * When true (cover-screen tiles), a pebble stretches to fill the available height
- * and scrolls internally if its content is taller — so each tile fills the screen.
+ * and scrolls internally if its content is taller - so each tile fills the screen.
  */
 private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
 
@@ -1780,7 +1782,7 @@ private fun AnimatedSlider(
         valueRange = valueRange,
         steps = 0,
         interactionSource = interactionSource,
-        // The real thumb is invisible — we draw it ourselves in the track so the
+        // The real thumb is invisible - we draw it ourselves in the track so the
         // thumb, track and ticks all share one inset coordinate space.
         thumb = { Box(Modifier.size(0.dp)) },
         track = { state ->
@@ -1824,7 +1826,7 @@ private fun AnimatedSlider(
                         cornerRadius = radius,
                     )
                 }
-                // Tick dots — evenly spaced across the inset band, skipping any
+                // Tick dots - evenly spaced across the inset band, skipping any
                 // that fall under the thumb.
                 if (steps > 0) {
                     val n = steps + 2
@@ -1840,7 +1842,7 @@ private fun AnimatedSlider(
                         )
                     }
                 }
-                // The thumb — a tall rounded bar centered on its value.
+                // The thumb - a tall rounded bar centered on its value.
                 val twPx = thumbW.toPx()
                 drawRoundRect(
                     accent,
@@ -1897,10 +1899,6 @@ private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modif
         }
     }
 
-// --- Backdrop blur (frosted glass behind floating elements) ---------------
-
-/** Clips to [shape] — the translucent Surface color provides the frosted-glass look. */
-private fun Modifier.backdropBlur(shape: Shape): Modifier = this.clip(shape)
 
 /**
  * Shared state for dragging a pebble onto (or off) the dual-column hot spot. The
@@ -1971,10 +1969,9 @@ private fun VehicleDetailContent(
             Surface(
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                shadowElevation = 3.dp,
-                modifier = Modifier.backdropBlur(CircleShape),
+                shadowElevation = 2.dp,
             ) {
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -2058,7 +2055,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
     if (hotspot != null) {
         val haptics = LocalHaptics.current
         // Drag the pinned pebble away (long-press, then drag past a threshold) to
-        // unpin — the mirror of dragging a pebble onto the slot to pin. The Unpin
+        // unpin - the mirror of dragging a pebble onto the slot to pin. The Unpin
         // button does the same thing for discoverability.
         var lifted by remember(hotspot) { mutableStateOf(false) }
         var dragY by remember(hotspot) { mutableFloatStateOf(0f) }
@@ -2246,7 +2243,7 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
 }
 
 /**
- * The lock/unlock control. Deliberately *not* styled like the other pebbles —
+ * The lock/unlock control. Deliberately *not* styled like the other pebbles -
  * it's just the morphing Lock/Unlock button with its status on the left, with no
  * card, header or expand chevron. It can still be long-pressed and dragged to
  * reorder, like a pebble, even though it doesn't look like one.
@@ -2363,7 +2360,7 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
             )
         }
         Text(
-            "Reflects the last refresh — tap Summarize to update.",
+            "Reflects the last refresh. Tap Summarize to update.",
             style = MaterialTheme.typography.bodySmall,
             color = LocalContentColor.current.copy(alpha = 0.7f),
         )
@@ -2399,7 +2396,7 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
 
 /**
  * The one button style used across the whole app. It rests as a **pill** and
- * becomes a **rounded rectangle** only while [active] (an on/toggled state) — or
+ * becomes a **rounded rectangle** only while [active] (an on/toggled state) - or
  * momentarily while pressed. When [active], it fills with [activeContainerColor].
  * Its width springs (with a little overshoot) whenever the content width changes,
  * e.g. the label flips Start -> Stop.
@@ -2451,7 +2448,7 @@ private fun MorphButton(
 }
 
 /**
- * A text-only [MorphButton] — the app's one button framework, used everywhere a
+ * A text-only [MorphButton] - the app's one button framework, used everywhere a
  * plain labelled button is needed (dialogs, settings, etc.) so they all share
  * the pill-morphs-to-rounded-square press feel.
  */
@@ -2493,7 +2490,7 @@ private fun MorphButtonLabel(
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
     } else {
-        // Always-composed Animatable, but it only runs while spinning — so idle
+        // Always-composed Animatable, but it only runs while spinning - so idle
         // buttons don't each hold a live infinite animation, and we avoid calling
         // remember conditionally.
         val angle = remember { Animatable(0f) }
@@ -2609,7 +2606,7 @@ private fun StateControl(
             )
         }
         val haptics = LocalHaptics.current
-        // Pill when off, rounded rectangle + highlight colour when on — same as
+        // Pill when off, rounded rectangle + highlight colour when on - same as
         // the climate/charge controls.
         MorphButton(
             onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() },
@@ -2630,7 +2627,7 @@ private fun StateControl(
 // --- Pebble (expandable, reorderable section) -----------------------------
 
 /**
- * A collapsible "pebble" — a titled section that springs open/closed with a
+ * A collapsible "pebble" - a titled section that springs open/closed with a
  * playful bounce. Open/closed state lives in the ViewModel (per car + section),
  * and the section order is user-configurable in Settings.
  */
@@ -2752,7 +2749,7 @@ private val PebbleCornerExpanded = 20.dp
 /**
  * A pebble-header action button (climate/charge/locate/AI), shown even when the
  * pebble is collapsed. A pill that becomes a rounded rectangle (in
- * [activeContainer]) when [active] — e.g. climate on, charging. The width is
+ * [activeContainer]) when [active] - e.g. climate on, charging. The width is
  * stable while loading and springs when the label flips Start <-> Stop.
  */
 @Composable
@@ -2847,7 +2844,7 @@ private fun TripRow(trip: EvTrip) {
 /** "2026-06-01 18:22:31.0" -> "Mon Jun 1 · 6:22 PM" (falls back to the raw date). */
 private fun tripDate(raw: String?): String {
     if (raw.isNullOrBlank()) return "Trip"
-    // Drop any fractional seconds — the feed's precision varies (".0" vs ".000000").
+    // Drop any fractional seconds - the feed's precision varies (".0" vs ".000000").
     val trimmed = raw.substringBefore('.').trim()
     return runCatching {
         val parsed = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).parse(trimmed)
@@ -2931,12 +2928,12 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
 /**
  * Owner/assistance destinations as compact labelled buttons that flow 2+ per row
  * where they fit. Each says where it goes; the phone icon dials, others open
- * links. All destinations come from [BrandLinks] — the per-brand single source
- * of truth — so nothing here is defined twice.
+ * links. All destinations come from [BrandLinks] - the per-brand single source
+ * of truth - so nothing here is defined twice.
  *
  * In-car payments (Hyundai Pay) and Plug & Charge are deliberately absent:
  * they live only inside the OEM app with no public web page or documented deep
- * link, so a button could only open an unrelated marketing page — better to
+ * link, so a button could only open an unrelated marketing page - better to
  * omit them than mislead.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -2962,7 +2959,7 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
             }
             LinkButton("Owners site", Icons.Filled.Person) { openUrl(context, links.ownersUrl, inApp) }
             // Features-on-Demand store (themes, lighting patterns…): ccNC-era
-            // head units only — older Gen5W cars have nothing to buy.
+            // head units only - older Gen5W cars have nothing to buy.
             if (v.supportsConnectedStore) {
                 LinkButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
             }
@@ -3159,7 +3156,7 @@ private fun ClimatePebble(
 
     val climateOn = status?.airCtrlOn == true
     // The car rejects remote climate commands while it's moving, so the whole
-    // control goes read-only when driving — and if it's already on, we show
+    // control goes read-only when driving - and if it's already on, we show
     // what it's currently set to at the car instead of editable inputs.
     val driving = state.isDriving(v)
     val startClimate = { vm.startClimate(v, currentReq) }
@@ -3213,74 +3210,6 @@ private fun ClimatePebble(
             return@Pebble
         }
 
-        // Presets: tap a chip to load it; the × removes it. "Save preset" stores
-        // the current sliders/toggles under a name you choose.
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            presets.forEach { preset ->
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier
-                                .clip(CircleShape)
-                                .clickable { applyPreset(preset.request) }
-                                .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
-                        ) {
-                            Text(preset.name, style = MaterialTheme.typography.labelLarge)
-                        }
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription = "Delete ${preset.name}",
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .clickable { vm.deleteClimatePreset(v, preset.id) },
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            MorphChip(
-                selected = false,
-                onClick = { presetName = ""; showAddPreset = true },
-                label = "+ Save preset",
-            )
-        }
-
-        if (showAddPreset) {
-            AlertDialog(
-                onDismissRequest = { showAddPreset = false },
-                title = { Text("Save preset") },
-                text = {
-                    OutlinedTextField(
-                        value = presetName,
-                        onValueChange = { presetName = it },
-                        label = { Text("Preset name") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                },
-                confirmButton = {
-                    MorphTextButton("Save", onClick = {
-                        vm.saveClimatePreset(v, presetName, currentReq)
-                        showAddPreset = false
-                    })
-                },
-                dismissButton = {
-                    MorphTextButton("Cancel", onClick = { showAddPreset = false })
-                },
-            )
-        }
-
         StepRow("Temperature", "$tempF°F")
         AnimatedSlider(
             value = tempF.toFloat(),
@@ -3302,9 +3231,6 @@ private fun ClimatePebble(
             ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
         }
 
-        // Seats are shown only for functions the car actually has (set per car
-        // in Settings, since the API exposes no reliable capability flags). The
-        // remote command addresses four positions only.
         if (seats.any) {
             Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             if (seats.driverHeat || seats.driverCool) {
@@ -3319,6 +3245,46 @@ private fun ClimatePebble(
             if (seats.rearRightHeat || seats.rearRightCool) {
                 SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
             }
+        }
+
+        // Presets section
+        ClimatePresetSection(
+            presets = presets,
+            onApply = applyPreset,
+            onSave = { presetName = ""; showAddPreset = true },
+            onDelete = { vm.deleteClimatePreset(v, it) },
+        )
+
+        if (showAddPreset) {
+            AlertDialog(
+                onDismissRequest = { showAddPreset = false },
+                title = { Text("Save preset") },
+                text = {
+                    OutlinedTextField(
+                        value = presetName,
+                        onValueChange = { presetName = it },
+                        label = { Text("Name") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
+                confirmButton = {
+                    MorphTextButton(
+                        "Save",
+                        onClick = {
+                            if (presetName.isNotBlank()) {
+                                vm.saveClimatePreset(v, presetName.trim(), currentReq)
+                                showAddPreset = false
+                            }
+                        },
+                        enabled = presetName.isNotBlank(),
+                    )
+                },
+                dismissButton = {
+                    MorphTextButton("Cancel", onClick = { showAddPreset = false })
+                },
+            )
         }
     }
 }
@@ -3347,7 +3313,7 @@ private fun SeatControl(
     )
     Column {
         // The level text (e.g. "High cool") wears the slider's colour, so OFF is
-        // neutral, cooling reads blue and heating reads red — no caption needed.
+        // neutral, cooling reads blue and heating reads red - no caption needed.
         StepRow(label, current.label, valueColor = tint)
         AnimatedSlider(
             value = index.toFloat(),
@@ -3369,6 +3335,105 @@ private fun seatTint(level: SeatLevel): Color = when {
         Color(0xFFFF8A80), Color(0xFFC62828), ((level.apiValue - 6) / 2f).coerceIn(0f, 1f),
     )
     else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+// --- Climate presets section ----------------------------------------------
+
+@Composable
+private fun ClimatePresetSection(
+    presets: List<ClimatePreset>,
+    onApply: (ClimateRequest) -> Unit,
+    onSave: () -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            "Presets",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onSave, modifier = Modifier.size(32.dp)) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = "Save current settings as a preset",
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+    if (presets.isEmpty()) {
+        Text(
+            "No presets saved. Tap + to save your current settings.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            presets.forEach { preset ->
+                ClimatePresetChip(
+                    name = preset.name,
+                    onApply = { onApply(preset.request) },
+                    onDelete = { onDelete(preset.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClimatePresetChip(
+    name: String,
+    onApply: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.height(IntrinsicSize.Min),
+        ) {
+            Text(
+                name,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .clickable { haptics?.tick(); onApply() }
+                    .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f)),
+            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
+                    .clickable { haptics?.tick(); onDelete() }
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Remove $name",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                )
+            }
+        }
+    }
 }
 
 // --- Charge limits --------------------------------------------------------
@@ -3462,7 +3527,7 @@ private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         fuelPct != null && range != null -> "$fuelPct% · $range mi"
         fuelPct != null -> "$fuelPct%"
         range != null -> "$range mi"
-        else -> "—"
+        else -> "--"
     }
     Pebble(
         v, "charge", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
@@ -3869,7 +3934,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 Spacer(Modifier.height(12.dp))
                 MorphTextButton("Add another account", onClick = { vm.beginAddAccount() }, modifier = Modifier.fillMaxWidth())
                 Text(
-                    "If commands fail with a locked PIN, fix the Service PIN above — too " +
+                    "If commands fail with a locked PIN, fix the Service PIN above. Too " +
                         "many wrong-PIN attempts lock it for a few minutes server-side.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -3877,7 +3942,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
-            // On-device AI — only when the device supports Gemini Nano.
+            // On-device AI - only when the device supports Gemini Nano.
             if (state.aiSupported) {
                 SettingsCard("AI") {
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
@@ -4135,7 +4200,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             SettingsCard("Sounds & vibration") {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
                 Text(
-                    "Crisp, distinct vibrations across the app — slider notches, a dice-roll on " +
+                    "Crisp, distinct vibrations across the app: slider notches, a dice-roll on " +
                         "pull-to-refresh, and a slot-machine settle when fresh data lands. Intensity " +
                         "follows your system setting.",
                     style = MaterialTheme.typography.bodySmall,
@@ -4167,10 +4232,9 @@ private fun SettingsScreen(vm: AppViewModel) {
             Surface(
                 onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                shadowElevation = 3.dp,
-                modifier = Modifier.backdropBlur(CircleShape),
+                shadowElevation = 2.dp,
             ) {
                 Text(
                     "Settings",
