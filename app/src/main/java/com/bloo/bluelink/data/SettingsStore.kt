@@ -10,6 +10,8 @@ import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 
 private val Context.settingsDataStore by preferencesDataStore(name = "bloo_settings")
 
@@ -430,5 +432,44 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setDynamicColor(enabled: Boolean) {
         context.settingsDataStore.edit { it[Keys.DYNAMIC] = enabled.toString() }
+    }
+
+    // --- Per-car climate settings + presets ------------------------------
+
+    private val climateJson = Json { ignoreUnknownKeys = true }
+    private val presetListSerializer = ListSerializer(ClimatePreset.serializer())
+
+    /** Last-used climate settings for a car, restored when the pebble reopens. */
+    suspend fun savedClimate(vin: String): ClimateRequest? {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("climate_$vin")] ?: return null
+        return runCatching { climateJson.decodeFromString(ClimateRequest.serializer(), raw) }.getOrNull()
+    }
+
+    suspend fun saveClimate(vin: String, req: ClimateRequest) {
+        context.settingsDataStore.edit {
+            it[stringPreferencesKey("climate_$vin")] = climateJson.encodeToString(ClimateRequest.serializer(), req)
+        }
+    }
+
+    /** User-named climate presets for a car. */
+    suspend fun climatePresets(vin: String): List<ClimatePreset> {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("climate_presets_$vin")] ?: return emptyList()
+        return runCatching { climateJson.decodeFromString(presetListSerializer, raw) }.getOrElse { emptyList() }
+    }
+
+    suspend fun saveClimatePreset(vin: String, preset: ClimatePreset) {
+        val existing = climatePresets(vin).toMutableList()
+        val idx = existing.indexOfFirst { it.id == preset.id }
+        if (idx >= 0) existing[idx] = preset else existing.add(preset)
+        context.settingsDataStore.edit {
+            it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, existing)
+        }
+    }
+
+    suspend fun deleteClimatePreset(vin: String, id: String) {
+        val updated = climatePresets(vin).filter { it.id != id }
+        context.settingsDataStore.edit {
+            it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, updated)
+        }
     }
 }

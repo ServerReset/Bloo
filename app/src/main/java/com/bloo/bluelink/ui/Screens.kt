@@ -958,17 +958,27 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         if (wasRefreshing && !state.refreshing) haptics?.slotSettle()
         wasRefreshing = state.refreshing
     }
-    // Fade the page indicator out while refreshing (and during the settle), so the
-    // squiggly indicator has the stage to itself; fade it back in when done.
+    // Live pull distance reported by Refreshable, so the overlays react the moment
+    // the user starts pulling — not only once a refresh is in flight.
+    val pullFractionState = remember { mutableStateOf(0f) }
+    val pullFraction by pullFractionState
+    // Hide the page indicator as soon as the pull begins (and through the refresh),
+    // so the squiggly indicator has the stage to itself; fade it back in when done.
     val dotsAlpha by animateFloatAsState(
-        targetValue = if (state.refreshing) 0f else 1f,
-        animationSpec = tween(durationMillis = 250),
+        targetValue = if (state.refreshing || pullFraction > 0.01f) 0f else 1f,
+        animationSpec = tween(durationMillis = 200),
         label = "dotsFade",
     )
-    // Slide the floating overlays (dots, settings, back/flip) down in step with
-    // the page content during a refresh, so the whole UI pulls down together.
+    // Slide the floating overlays (dots, settings, back/flip) down: in real time as
+    // the user pulls, then settle/spring back up once the refresh completes.
+    val overlayShiftTarget = if (state.refreshing) RefreshPullShift
+        else (RefreshPullShift * pullFraction).coerceIn(0.dp, RefreshPullShift)
     val refreshShift by animateDpAsState(
-        targetValue = if (state.refreshing) RefreshPullShift else 0.dp,
+        targetValue = overlayShiftTarget,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = if (state.refreshing) Spring.StiffnessLow else Spring.StiffnessMedium,
+        ),
         label = "refreshShift",
     )
 
@@ -997,6 +1007,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 
     BackHandler(enabled = expandedByUser != null) { vm.collapse() }
 
+    CompositionLocalProvider(LocalPullFraction provides pullFractionState) {
     BackdropHost {
         AnimatedContent(
             targetState = expandedIdx != null,
@@ -1079,6 +1090,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             onClick = { vm.openSettings() },
             modifier = Modifier.align(Alignment.TopEnd).offset(y = refreshShift).statusBarsPadding(),
         )
+    }
     }
 }
 
@@ -1514,6 +1526,14 @@ private val LocalForceExpanded = staticCompositionLocalOf { false }
  * and scrolls internally if its content is taller — so each tile fills the screen.
  */
 private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
+
+/**
+ * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the
+ * floating overlays in [GarageScreen] (page dots, settings/back/flip buttons)
+ * can track the pull in real time instead of only animating once refresh starts.
+ */
+private val LocalPullFraction =
+    staticCompositionLocalOf<androidx.compose.runtime.MutableState<Float>> { mutableStateOf(0f) }
 
 /** A headline number that cross-fades when it changes. */
 @Composable
@@ -2216,6 +2236,13 @@ private fun Refreshable(
     val haptics = LocalHaptics.current
     // Drop the indicator below the status bar so it sits clear of the notch.
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+    // Publish the pull distance so GarageScreen's overlays track the pull live.
+    val pullFractionState = LocalPullFraction.current
+    LaunchedEffect(ptrState) {
+        snapshotFlow { ptrState.distanceFraction }.collect { pullFractionState.value = it }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -2230,12 +2257,18 @@ private fun Refreshable(
         Box(Modifier.fillMaxSize().offset { IntOffset(0, with(density) { shift.roundToPx() }) }) {
             content()
         }
+        // The indicator starts fully above the status bar and slides down to settle
+        // just below it as you pull; on completion it rides back up off-screen.
+        val indicatorProgress = if (state.refreshing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
+        val offScreenPx = with(density) { -(topInset + 56.dp).roundToPx() }
+        val onScreenPx = with(density) { (topInset + 28.dp).roundToPx() }
+        val indicatorY = offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt()
         PullToRefreshDefaults.LoadingIndicator(
             state = ptrState,
             isRefreshing = state.refreshing,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset { IntOffset(0, with(density) { (topInset + 28.dp).roundToPx() }) },
+                .offset { IntOffset(0, indicatorY) },
         )
     }
 }
@@ -2824,6 +2857,10 @@ private fun PebbleActionButton(
  */
 @Composable
 private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    // The evTripDetails feed is EV-only; older Gen5W (generation 2) gas cars
+    // report nothing, so the pebble is hidden for them rather than always empty.
+    val isGen5W = !v.isEv && v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
+    if (isGen5W) return
     val trips = state.trips[v.vin]
     val loading = state.isPending(v.vin, "trips")
     LaunchedEffect(v.vin) { vm.loadTrips(v) }
@@ -3138,27 +3175,58 @@ private fun ClimatePebble(
     var passenger by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var rearLeft by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var rearRight by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    var settingsLoaded by remember(v.vin) { mutableStateOf(false) }
+
+    // Restore the car's last-used climate settings the first time the pebble shows.
+    LaunchedEffect(v.vin) {
+        vm.loadSavedClimate(v)?.let { r ->
+            tempF = r.tempF
+            duration = r.durationMinutes
+            defrost = r.defrost
+            steeringHeat = r.steeringWheelHeat
+            driver = r.seatFrontLeft
+            passenger = r.seatFrontRight
+            rearLeft = r.seatRearLeft
+            rearRight = r.seatRearRight
+        }
+        settingsLoaded = true
+    }
+
+    val currentReq = ClimateRequest(
+        tempF = tempF,
+        defrost = defrost,
+        durationMinutes = duration,
+        steeringWheelHeat = steeringHeat,
+        seatFrontLeft = driver,
+        seatFrontRight = passenger,
+        seatRearLeft = rearLeft,
+        seatRearRight = rearRight,
+    )
+    // Persist every change so the sliders/toggles are where you left them next open.
+    LaunchedEffect(currentReq) {
+        if (settingsLoaded) vm.saveClimate(v, currentReq)
+    }
+
+    val presets = state.climatePresets[v.vin].orEmpty()
+    var showAddPreset by remember { mutableStateOf(false) }
+    var presetName by remember { mutableStateOf("") }
+    val applyPreset: (ClimateRequest) -> Unit = { r ->
+        tempF = r.tempF
+        duration = r.durationMinutes
+        defrost = r.defrost
+        steeringHeat = r.steeringWheelHeat
+        driver = r.seatFrontLeft
+        passenger = r.seatFrontRight
+        rearLeft = r.seatRearLeft
+        rearRight = r.seatRearRight
+    }
 
     val climateOn = status?.airCtrlOn == true
     // The car rejects remote climate commands while it's moving, so the whole
     // control goes read-only when driving — and if it's already on, we show
     // what it's currently set to at the car instead of editable inputs.
     val driving = state.isDriving(v)
-    val startClimate = {
-        vm.startClimate(
-            v,
-            ClimateRequest(
-                tempF = tempF,
-                defrost = defrost,
-                durationMinutes = duration,
-                steeringWheelHeat = steeringHeat,
-                seatFrontLeft = driver,
-                seatFrontRight = passenger,
-                seatRearLeft = rearLeft,
-                seatRearRight = rearRight,
-            ),
-        )
-    }
+    val startClimate = { vm.startClimate(v, currentReq) }
 
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
@@ -3207,6 +3275,74 @@ private fun ClimatePebble(
                 )
             }
             return@Pebble
+        }
+
+        // Presets: tap a chip to load it; the × removes it. "Save preset" stores
+        // the current sliders/toggles under a name you choose.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            presets.forEach { preset ->
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier
+                                .clip(CircleShape)
+                                .clickable { applyPreset(preset.request) }
+                                .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                        ) {
+                            Text(preset.name, style = MaterialTheme.typography.labelLarge)
+                        }
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Delete ${preset.name}",
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .clickable { vm.deleteClimatePreset(v, preset.id) },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            MorphChip(
+                selected = false,
+                onClick = { presetName = ""; showAddPreset = true },
+                label = "+ Save preset",
+            )
+        }
+
+        if (showAddPreset) {
+            AlertDialog(
+                onDismissRequest = { showAddPreset = false },
+                title = { Text("Save preset") },
+                text = {
+                    OutlinedTextField(
+                        value = presetName,
+                        onValueChange = { presetName = it },
+                        label = { Text("Preset name") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
+                confirmButton = {
+                    MorphTextButton("Save", onClick = {
+                        vm.saveClimatePreset(v, presetName, currentReq)
+                        showAddPreset = false
+                    })
+                },
+                dismissButton = {
+                    MorphTextButton("Cancel", onClick = { showAddPreset = false })
+                },
+            )
         }
 
         StepRow("Temperature", "$tempF°F")

@@ -261,6 +261,7 @@ data class RangeByFuel(
  * Seat heater/ventilation levels for the US Blue Link climate command.
  * Values follow the community-documented encoding.
  */
+@Serializable
 enum class SeatLevel(val apiValue: Int, val label: String) {
     HIGH_COOL(5, "High cool"),
     MED_COOL(4, "Med cool"),
@@ -302,6 +303,7 @@ data class SeatCapability(
 }
 
 /** A full climate-start request assembled by the UI. */
+@Serializable
 data class ClimateRequest(
     val tempF: Int,
     val defrost: Boolean,
@@ -311,6 +313,14 @@ data class ClimateRequest(
     val seatFrontRight: SeatLevel = SeatLevel.OFF,
     val seatRearLeft: SeatLevel = SeatLevel.OFF,
     val seatRearRight: SeatLevel = SeatLevel.OFF,
+)
+
+/** A user-named, saved climate configuration for one car. */
+@Serializable
+data class ClimatePreset(
+    val id: String,
+    val name: String,
+    val request: ClimateRequest,
 )
 
 // --- Location -------------------------------------------------------------

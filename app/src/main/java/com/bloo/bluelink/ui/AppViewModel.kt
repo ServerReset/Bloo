@@ -10,6 +10,7 @@ import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CarAlerts
+import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
@@ -74,6 +75,8 @@ data class UiState(
     val locations: Map<String, GeoLocation> = emptyMap(),
     /** Recent EV trips by VIN (loaded lazily when the Trips pebble is shown). */
     val trips: Map<String, List<EvTrip>> = emptyMap(),
+    /** User-named climate presets by VIN. */
+    val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
     val sectionOrders: Map<String, List<String>> = emptyMap(),
@@ -501,6 +504,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin) }.filterValues { it.isNotBlank() }
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
+        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
         val firstRun = !settingsStore.onboardingSeen()
         // On first open all pebbles start expanded regardless of any stored state.
         val collapsed = if (firstRun) emptySet()
@@ -522,6 +526,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 licensePlates = plates,
                 lastServiceMiles = lastSvc,
                 serviceIntervalMiles = svcInterval,
+                climatePresets = climatePresets,
                 collapsedPebbles = collapsed,
                 hiddenPebbles = hidden,
                 hotspotSections = hotspots,
@@ -1061,6 +1066,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(trips = it.trips + (v.vin to result), pending = it.pending - "${v.vin}:trips")
             }
         }
+    }
+
+    /** Restore the last-used climate settings for a car (null if never saved). */
+    suspend fun loadSavedClimate(v: Vehicle): ClimateRequest? = settingsStore.savedClimate(v.vin)
+
+    /** Persist the current climate slider/toggle state so it survives app restarts. */
+    fun saveClimate(v: Vehicle, req: ClimateRequest) {
+        viewModelScope.launch { settingsStore.saveClimate(v.vin, req) }
+    }
+
+    fun saveClimatePreset(v: Vehicle, name: String, req: ClimateRequest) {
+        val preset = ClimatePreset(
+            id = System.currentTimeMillis().toString(),
+            name = name.trim().ifBlank { "Preset" },
+            request = req,
+        )
+        _state.update {
+            it.copy(climatePresets = it.climatePresets + (v.vin to (it.climatePresets[v.vin].orEmpty() + preset)))
+        }
+        viewModelScope.launch { settingsStore.saveClimatePreset(v.vin, preset) }
+    }
+
+    fun deleteClimatePreset(v: Vehicle, id: String) {
+        _state.update {
+            val updated = it.climatePresets[v.vin].orEmpty().filter { p -> p.id != id }
+            it.copy(climatePresets = it.climatePresets + (v.vin to updated))
+        }
+        viewModelScope.launch { settingsStore.deleteClimatePreset(v.vin, id) }
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
