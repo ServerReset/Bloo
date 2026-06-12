@@ -1763,9 +1763,9 @@ private fun AnimatedSlider(
         val frac = ((x - edgePadPx) / travel).coerceIn(0f, 1f)
         return valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
     }
-    // Move the thumb to a raw position and report the snapped step, ticking on
-    // each new step crossed. Used for both the initial press and every drag move.
-    fun moveTo(x: Float) {
+    // While dragging: track the finger live and report the snapped step, ticking
+    // on each new step crossed.
+    fun trackTo(x: Float) {
         val raw = rawForX(x).coerceIn(valueRange.start, valueRange.endInclusive)
         scope.launch { anim.snapTo(raw) }
         val s = snapToStep(raw, valueRange, steps)
@@ -1775,11 +1775,27 @@ private fun AnimatedSlider(
         }
         onValueChange(s)
     }
+    // On release (or tap): spring the thumb onto a step and report it. One launch,
+    // so there's no race with live tracking.
+    fun settleTo(target: Float) {
+        prevStep = target
+        haptics?.click()
+        onValueChange(target)
+        scope.launch {
+            anim.animateTo(
+                target,
+                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+            )
+        }
+    }
 
-    // One gesture handler drives both tap and drag: press jumps the thumb to the
-    // touch point, drags follow the finger, and release springs onto the nearest
-    // step. A plain tap is simply a press+release with no movement in between, so
-    // it lands exactly where you tapped - no Material Slider gesture host to fight.
+    // One gesture handler disambiguates three intents from a single press:
+    //  - release within touch-slop  -> tap: spring the thumb to the tapped step.
+    //  - horizontal movement first  -> drag: claim it, follow the finger live.
+    //  - vertical movement first    -> scroll: bail without consuming so the
+    //                                  enclosing list scrolls as usual.
+    // Nothing is consumed until a horizontal drag (or the tap's release) is
+    // confirmed, so vertical scrolling over a slider keeps working.
     Box(
         Modifier
             .fillMaxWidth()
@@ -1788,31 +1804,40 @@ private fun AnimatedSlider(
             .pointerInput(valueRange, steps) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    dragging = true
-                    down.consume()
-                    moveTo(down.position.x)
+                    val slop = viewConfiguration.touchSlop
+                    var claimed = false
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) {
-                            change.consume()
+                            // Released. If never claimed as a drag, it's a tap.
+                            if (!claimed) {
+                                change.consume()
+                                settleTo(snapToStep(rawForX(down.position.x), valueRange, steps))
+                            }
                             break
                         }
-                        if (change.positionChanged()) {
-                            moveTo(change.position.x)
+                        if (!claimed) {
+                            val dx = kotlin.math.abs(change.position.x - down.position.x)
+                            val dy = kotlin.math.abs(change.position.y - down.position.y)
+                            when {
+                                dx > slop && dx >= dy -> {
+                                    // Horizontal: claim the gesture as a slider drag.
+                                    claimed = true
+                                    dragging = true
+                                    change.consume()
+                                    trackTo(change.position.x)
+                                }
+                                dy > slop -> break // Vertical: let the parent scroll.
+                            }
+                        } else if (change.positionChanged()) {
+                            trackTo(change.position.x)
                             change.consume()
                         }
                     }
-                    dragging = false
-                    val target = snapToStep(anim.value, valueRange, steps)
-                    prevStep = target
-                    haptics?.click()
-                    onValueChange(target)
-                    scope.launch {
-                        anim.animateTo(
-                            target,
-                            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
-                        )
+                    if (claimed) {
+                        dragging = false
+                        settleTo(snapToStep(anim.value, valueRange, steps))
                     }
                 }
             }
