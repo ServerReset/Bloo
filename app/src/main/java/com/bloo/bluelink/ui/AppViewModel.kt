@@ -163,6 +163,13 @@ data class UiState(
         }
     }
 
+    /** True when the car is moving — used to make climate read-only (the car
+     *  rejects remote climate commands while driving). */
+    fun isDriving(v: Vehicle): Boolean {
+        val speed = locations[v.vin]?.speed ?: statusFor(v)?.vehicleLocation?.speed?.value
+        return speed != null && speed > 0
+    }
+
     /** Powertrain label for the header. */
     fun powertrainLabel(v: Vehicle): String = when (powertrainOf(v)) {
         Powertrain.GAS -> "Gas"

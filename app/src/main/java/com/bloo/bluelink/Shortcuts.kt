@@ -44,14 +44,15 @@ object Shortcuts {
         runCatching {
             val max = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context).coerceAtLeast(4)
             val items = ArrayList<ShortcutInfoCompat>()
+            // "Open the <brand> app" comes first (one per distinct brand) so it's
+            // never the entry dropped when a launcher caps the shortcut count.
+            vehicles.distinctBy { it.brand }.forEach { v ->
+                items += oemShortcut(context, v)
+            }
             vehicles.forEach { v ->
                 ACTIONS.forEach { cmd ->
                     if (enabled == null || id(cmd, v.vin) in enabled) items += carShortcut(context, v, cmd)
                 }
-            }
-            // One "open the OEM app" shortcut per distinct brand present.
-            vehicles.distinctBy { it.brand }.forEach { v ->
-                items += oemShortcut(context, v)
             }
             ShortcutManagerCompat.setDynamicShortcuts(context, items.take(max))
         }

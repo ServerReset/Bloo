@@ -1257,12 +1257,6 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                 Spacer(Modifier.height(6.dp))
                 PrimaryActions(v, state, vm)
                 Spacer(Modifier.weight(1f))
-                Text(
-                    "Swipe up for more",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = scheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
             }
         }
     }
@@ -2831,7 +2825,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary) {
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
-            status == null -> Text("No status yet. Pull down to refresh.")
+            status == null -> Text("No status yet.")
             else -> {
                 SectionLabel("Status")
                 status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
@@ -3008,7 +3002,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         }) else null,
     ) {
         if (rows.isEmpty()) {
-            Text("No diagnostics yet. Pull down to refresh.")
+            Text("No diagnostics yet.")
         }
         rows.forEach { row ->
             if (row.indent) {
@@ -3064,6 +3058,10 @@ private fun ClimatePebble(
     var rearRight by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
 
     val climateOn = status?.airCtrlOn == true
+    // The car rejects remote climate commands while it's moving, so the whole
+    // control goes read-only when driving — and if it's already on, we show
+    // what it's currently set to at the car instead of editable inputs.
+    val driving = state.isDriving(v)
     val startClimate = {
         vm.startClimate(
             v,
@@ -3082,19 +3080,53 @@ private fun ClimatePebble(
 
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
-        summary = if (climateOn) "On" else "Off",
+        summary = when {
+            climateOn && driving -> "On · driving"
+            climateOn -> "On"
+            else -> "Off"
+        },
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
         headerAction = {
             PebbleActionButton(
-                label = if (climateOn) "Stop" else "Start",
+                label = when {
+                    climateOn && driving -> "On"
+                    climateOn -> "Stop"
+                    else -> "Start"
+                },
                 icon = Icons.Filled.AcUnit,
                 onClick = { if (climateOn) vm.stopClimate(v) else startClimate() },
+                // No remote climate commands while driving.
+                enabled = !driving,
                 pending = pending,
                 active = climateOn,
                 spinning = climateOn,
             )
         },
     ) {
+        if (driving) {
+            if (climateOn) {
+                Text(
+                    "Climate is on at the car. It ignores app commands while you're driving, so this is read-only.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalContentColor.current.copy(alpha = 0.7f),
+                )
+                status?.airTemp?.value?.let { StatusRow("Set to", "$it°") }
+                status?.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
+                status?.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
+                status?.seatHeaterVentState?.let { s ->
+                    s.flSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Driver seat", onOff(it)) }
+                    s.frSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Passenger seat", onOff(it)) }
+                }
+            } else {
+                Text(
+                    "Climate can't be started while the car is driving.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalContentColor.current.copy(alpha = 0.7f),
+                )
+            }
+            return@Pebble
+        }
+
         StepRow("Temperature", "$tempF°F")
         AnimatedSlider(
             value = tempF.toFloat(),
@@ -3121,11 +3153,6 @@ private fun ClimatePebble(
         // remote command addresses four positions only.
         if (seats.any) {
             Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "Slide left to cool, right to heat",
-                style = MaterialTheme.typography.bodySmall,
-                color = LocalContentColor.current.copy(alpha = 0.7f),
-            )
             if (seats.driverHeat || seats.driverCool) {
                 SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
             }
@@ -3165,7 +3192,9 @@ private fun SeatControl(
         label = "seatTint",
     )
     Column {
-        StepRow(label, current.label)
+        // The level text (e.g. "High cool") wears the slider's colour, so OFF is
+        // neutral, cooling reads blue and heating reads red — no caption needed.
+        StepRow(label, current.label, valueColor = tint)
         AnimatedSlider(
             value = index.toFloat(),
             onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
@@ -3288,7 +3317,7 @@ private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     ) {
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
-            status == null -> Text("No status yet. Pull down to refresh.")
+            status == null -> Text("No status yet.")
             else -> {
                 fuelPct?.let { StatusRow("Fuel level", "$it%") }
                 range?.let { StatusRow("Range (distance to empty)", "$it mi") }
@@ -3495,7 +3524,6 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
 
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Pinch and drag to frame your photo", color = Color.White, style = MaterialTheme.typography.titleMedium)
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val image = bmp
                 when {
@@ -4497,7 +4525,7 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun StepRow(label: String, value: String) {
+private fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
     Row(Modifier.fillMaxWidth()) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         // Roll the value when it changes (e.g. dragging a slider).
@@ -4507,7 +4535,7 @@ private fun StepRow(label: String, value: String) {
                 (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { -it / 2 })
             },
             label = "stepValue",
-        ) { v -> Text(v, fontWeight = FontWeight.Medium) }
+        ) { v -> Text(v, fontWeight = FontWeight.Medium, color = valueColor) }
     }
 }
 
