@@ -54,7 +54,6 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -3251,7 +3250,7 @@ private fun ClimatePebble(
         // Presets section
         ClimatePresetSection(
             presets = presets,
-            onApply = applyPreset,
+            onStart = { vm.startClimate(v, it) },
             onSave = { presetName = ""; showAddPreset = true },
             onDelete = { vm.deleteClimatePreset(v, it) },
         )
@@ -3343,95 +3342,103 @@ private fun seatTint(level: SeatLevel): Color = when {
 @Composable
 private fun ClimatePresetSection(
     presets: List<ClimatePreset>,
-    onApply: (ClimateRequest) -> Unit,
+    onStart: (ClimateRequest) -> Unit,
     onSave: () -> Unit,
     onDelete: (String) -> Unit,
 ) {
-    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+    if (presets.isNotEmpty()) {
         Text(
             "Presets",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onSave, modifier = Modifier.size(32.dp)) {
-            Icon(
-                Icons.Filled.Add,
-                contentDescription = "Save current settings as a preset",
-                modifier = Modifier.size(18.dp),
-            )
-        }
-    }
-    if (presets.isEmpty()) {
-        Text(
-            "No presets saved. Tap + to save your current settings.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Spacer(Modifier.height(6.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             presets.forEach { preset ->
-                ClimatePresetChip(
+                ClimatePresetRow(
                     name = preset.name,
-                    onApply = { onApply(preset.request) },
+                    onStart = { onStart(preset.request) },
                     onDelete = { onDelete(preset.id) },
                 )
             }
         }
+        Spacer(Modifier.height(4.dp))
+    }
+    MorphButton(
+        onClick = onSave,
+        modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Save as preset")
     }
 }
 
 @Composable
-private fun ClimatePresetChip(
+private fun ClimatePresetRow(
     name: String,
-    onApply: () -> Unit,
+    onStart: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    val containerColor = MaterialTheme.colorScheme.secondaryContainer
+    val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(containerColor),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable { haptics?.click(); onStart() }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            Icon(
+                Icons.Filled.AcUnit,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = contentColor,
+            )
             Text(
                 name,
                 style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier
-                    .clickable { haptics?.tick(); onApply() }
-                    .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+                fontWeight = FontWeight.Medium,
+                color = contentColor,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(
-                Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f)),
+            Text(
+                "Start",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
             )
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
-                    .clickable { haptics?.tick(); onDelete() }
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
-            ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = "Remove $name",
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-                )
-            }
+        }
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(38.dp)
+                .background(contentColor.copy(alpha = 0.12f)),
+        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp))
+                .clickable { haptics?.tick(); onDelete() }
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+        ) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = "Delete $name",
+                modifier = Modifier.size(16.dp),
+                tint = contentColor.copy(alpha = 0.6f),
+            )
         }
     }
 }
