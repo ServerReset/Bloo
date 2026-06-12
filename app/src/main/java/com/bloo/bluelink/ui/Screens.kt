@@ -178,12 +178,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -1904,29 +1899,8 @@ private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modif
 
 // --- Backdrop blur (frosted glass behind floating elements) ---------------
 
-/**
- * The blurred snapshot of the app, sampled by floating elements via [backdropBlur].
- * Updated each frame by [BackdropHost] — always safe to read (never mid-record).
- */
-private class Backdrop(val layer: GraphicsLayer)
-
-private val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
-
-/**
- * Frosted-glass background: draws the blurred [LocalBackdrop] snapshot of the app,
- * aligned to this element's on-screen position and clipped to [shape]. Falls back
- * to a plain clip if no backdrop is available (e.g. below API 31).
- */
-private fun Modifier.backdropBlur(shape: Shape): Modifier = composed {
-    val backdrop = LocalBackdrop.current ?: return@composed this.clip(shape)
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    this
-        .onGloballyPositioned { origin = it.localToWindow(Offset.Zero) }
-        .clip(shape)
-        .drawBehind {
-            translate(left = -origin.x, top = -origin.y) { drawLayer(backdrop.layer) }
-        }
-}
+/** Clips to [shape] — the translucent Surface color provides the frosted-glass look. */
+private fun Modifier.backdropBlur(shape: Shape): Modifier = this.clip(shape)
 
 /**
  * Shared state for dragging a pebble onto (or off) the dual-column hot spot. The
@@ -1947,43 +1921,9 @@ private class HotSeatDrag {
 
 private val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }
 
-/**
- * Hosts the frosted-glass backdrop for its [content]. Each frame:
- *  1. Content is drawn once into a sharp [GraphicsLayer] (one drawContent() call).
- *  2. That sharp layer is copied into a second [GraphicsLayer] with [BlurEffect].
- *  3. The sharp layer is drawn to screen; the blur layer is published via
- *     [LocalBackdrop] so [backdropBlur] elements can sample it.
- *
- * Using two layers avoids the double-drawContent() crash while keeping the main
- * display sharp and the frosted-glass layer always safe to read. (BlurEffect only
- * renders on API 31+; below that [backdropBlur] falls back to a plain clip.)
- */
 @Composable
 private fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
-    val sharpLayer = rememberGraphicsLayer()
-    val blurLayer = rememberGraphicsLayer()
-    val backdrop = remember { Backdrop(blurLayer) }
-    val blurPx = with(LocalDensity.current) { 28.dp.toPx() }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .drawWithContent {
-                // 1. Record sharp content into the sharp layer — single drawContent() call.
-                //    Must be qualified because inside record{} the receiver is DrawScope,
-                //    not ContentDrawScope, so bare drawContent() wouldn't resolve.
-                sharpLayer.record { this@drawWithContent.drawContent() }
-                // 2. Copy the sharp snapshot into the blur layer and apply the blur.
-                blurLayer.record { drawLayer(sharpLayer) }
-                blurLayer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
-                // 3. Draw the sharp version to screen (not the blurred one).
-                drawLayer(sharpLayer)
-            },
-    ) {
-        val boxScope = this
-        CompositionLocalProvider(LocalBackdrop provides backdrop) {
-            with(boxScope) { content() }
-        }
-    }
+    Box(Modifier.fillMaxSize()) { content() }
 }
 
 // --- Full detail ----------------------------------------------------------
