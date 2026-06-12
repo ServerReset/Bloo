@@ -99,7 +99,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -962,6 +961,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         animationSpec = tween(durationMillis = 250),
         label = "dotsFade",
     )
+    // Slide the floating overlays (dots, settings, back/flip) down in step with
+    // the page content during a refresh, so the whole UI pulls down together.
+    val refreshShift by animateDpAsState(
+        targetValue = if (state.refreshing) RefreshPullShift else 0.dp,
+        label = "refreshShift",
+    )
 
     val count = vehicles.size
     val cfg = LocalConfiguration.current
@@ -1009,7 +1014,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         ExpandedCar(vehicles[page], state, vm, flipped = appearance.columnsFlipped)
                     }
                     if (count > 1) {
-                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
+                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).offset(y = refreshShift).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
                     }
                 }
             } else {
@@ -1041,18 +1046,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
-                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
+                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).offset(y = refreshShift).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
                     }
                 }
             }
         }
-        // Floating overlay controls.
+        // Floating overlay controls. They ride the same refresh shift as the page
+        // content so everything slides down together during a pull-to-refresh.
         if (expandedByUser != null) {
             FloatingIcon(
                 icon = Icons.Filled.ArrowBack,
                 description = "Back to all cars",
                 onClick = { vm.collapse() },
-                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
+                modifier = Modifier.align(Alignment.TopStart).offset(y = refreshShift).statusBarsPadding(),
             )
         }
         if (expandedIdx != null) {
@@ -1060,14 +1066,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.SwapHoriz,
                 description = "Flip columns",
                 onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp),
+                modifier = Modifier.align(Alignment.TopEnd).offset(y = refreshShift).statusBarsPadding().padding(end = 52.dp),
             )
         }
         FloatingIcon(
             icon = Icons.Filled.Settings,
             description = "Settings",
             onClick = { vm.openSettings() },
-            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
+            modifier = Modifier.align(Alignment.TopEnd).offset(y = refreshShift).statusBarsPadding(),
         )
     }
 }
@@ -1094,7 +1100,6 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val sections = state.sectionsFor(v).filter {
         it !in listOf("summary", "controls") &&
             (it != "charge" || state.hasBattery(v)) &&
-            (it != "trips" || state.hasBattery(v)) &&
             (it != "ai" || state.aiEnabled) &&
             !state.isPebbleHidden(v.vin, it)
     }
@@ -2104,9 +2109,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
     } else {
         var menu by remember { mutableStateOf(false) }
         val options = state.sectionsFor(v).filter {
-            it !in setOf("summary", "controls") &&
-                (it != "trips" || state.hasBattery(v)) &&
-                !state.isPebbleHidden(v.vin, it)
+            it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it)
         }
         val hotDrag = LocalHotSeatDrag.current
         val hovered = hotDrag?.overSlot == true
@@ -2151,6 +2154,9 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
     }
 }
 
+/** How far content (and the floating overlays) slide down during a refresh. */
+private val RefreshPullShift = 96.dp
+
 /** Wraps content with the pull-to-refresh gesture, offset and squiggly indicator. */
 @Composable
 private fun Refreshable(
@@ -2162,6 +2168,8 @@ private fun Refreshable(
     val ptrState = rememberPullToRefreshState()
     val density = LocalDensity.current
     val haptics = LocalHaptics.current
+    // Drop the indicator below the status bar so it sits clear of the notch.
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(
         Modifier
             .fillMaxSize()
@@ -2171,7 +2179,7 @@ private fun Refreshable(
                 onRefresh = { haptics?.diceRoll(); vm.refreshStatus(v) },
             ),
     ) {
-        val maxShift = 72.dp
+        val maxShift = RefreshPullShift
         val shift = if (state.refreshing) maxShift else (maxShift * ptrState.distanceFraction).coerceIn(0.dp, maxShift)
         Box(Modifier.fillMaxSize().offset { IntOffset(0, with(density) { shift.roundToPx() }) }) {
             content()
@@ -2179,7 +2187,9 @@ private fun Refreshable(
         PullToRefreshDefaults.LoadingIndicator(
             state = ptrState,
             isRefreshing = state.refreshing,
-            modifier = Modifier.align(Alignment.TopCenter),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset { IntOffset(0, with(density) { (topInset + 28.dp).roundToPx() }) },
         )
     }
 }
@@ -2302,7 +2312,7 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
         }
         "location" -> LocationPebble(v, state, vm, dragHandle)
         // Trip history rides on the EV trip-details endpoint, so EVs only.
-        "trips" -> if (state.hasBattery(v)) TripsPebble(v, state, vm, dragHandle) else Spacer(Modifier)
+        "trips" -> TripsPebble(v, state, vm, dragHandle)
         "info" -> InfoPebble(v, status, state, vm, dragHandle)
         "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
         "ai" -> AiPebble(v, state, vm, dragHandle)
@@ -2730,12 +2740,13 @@ private fun PebbleActionButton(
     }
 }
 
-// --- Trips (EV trip history) -----------------------------------------------
+// --- Trips (trip history) --------------------------------------------------
 
 /**
- * Recent drives from the EV trip-details feed (Hyundai/Genesis US), with
- * distance, time, speeds and the energy/regen breakdown. Loaded lazily the
- * first time the pebble is composed, once per session.
+ * Recent drives from the Hyundai/Genesis US trip-details feed, with distance,
+ * time, speeds and (for EVs) the energy/regen breakdown. Loaded lazily the
+ * first time the pebble is composed, once per session. Shown for every car;
+ * cars whose head unit doesn't report trips simply show an empty state.
  */
 @Composable
 private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
@@ -2750,7 +2761,7 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
     Pebble(v, "trips", "Trips", Icons.Filled.Route, state, vm, dragHandle, summary = summary) {
         when {
             trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
-            trips.isEmpty() -> Text("No recent trips reported by the car.")
+            trips.isEmpty() -> Text("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 trips.take(8).forEach { TripRow(it) }
             }
@@ -2866,22 +2877,24 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         }
 
         SectionLabel("${v.brand.label} owners")
-        OwnerLinks(v, isEv = state.hasBattery(v), context, inApp)
+        OwnerLinks(v, context, inApp)
     }
 }
 
 /**
  * Owner/assistance destinations as compact labelled buttons that flow 2+ per row
- * where they fit. Each says where it goes; phone icons dial, others open links.
- * All destinations come from [BrandLinks] — the per-brand single source of
- * truth — so nothing here is defined twice. Payments, Plug & Charge and the
- * connected-car store have no public API (the community telematics clients
- * don't expose them either), so they open the brand's pages in the embedded
- * browser.
+ * where they fit. Each says where it goes; the phone icon dials, others open
+ * links. All destinations come from [BrandLinks] — the per-brand single source
+ * of truth — so nothing here is defined twice.
+ *
+ * In-car payments (Hyundai Pay) and Plug & Charge are deliberately absent:
+ * they live only inside the OEM app with no public web page or documented deep
+ * link, so a button could only open an unrelated marketing page — better to
+ * omit them than mislead.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OwnerLinks(v: Vehicle, isEv: Boolean, context: Context, inApp: Boolean) {
+private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
     val links = v.brand.links
 
     @Composable
@@ -2907,22 +2920,11 @@ private fun OwnerLinks(v: Vehicle, isEv: Boolean, context: Context, inApp: Boole
                 LinkButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
             }
         }
-        group("Charging & payments") {
-            LinkButton(links.payLabel, Icons.Filled.CreditCard) { openUrl(context, links.payUrl, inApp) }
-            // Plug & Charge is an EV-only feature; hide it on gas cars.
-            if (isEv) {
-                LinkButton("Plug & Charge", Icons.Filled.Bolt) { openUrl(context, links.plugChargeUrl, inApp) }
-            }
-        }
         group("Service") {
             LinkButton("Schedule service", Icons.Filled.Build) { openUrl(context, links.serviceScheduleUrl, inApp) }
             LinkButton(links.dealerLabel, Icons.Filled.Place) { openUrl(context, links.dealerUrl, inApp) }
             LinkButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
-        }
-        group("Assistance") {
             LinkButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
-            LinkButton("Call collision", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
-            LinkButton("Collision guide", Icons.Filled.OpenInNew) { openUrl(context, links.manualsUrl, inApp) }
         }
     }
 }
@@ -4182,8 +4184,6 @@ private fun CarSettingsCard(
                         com.bloo.bluelink.data.HIDEABLE_SECTIONS
                             // The AI toggle only matters when AI is enabled for this device.
                             .filter { it != "ai" || state.aiEnabled }
-                            // Trip history is EV-only (the trips feed doesn't exist for gas cars).
-                            .filter { it != "trips" || state.hasBattery(v) }
                             .forEach { sec ->
                                 ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
                                     vm.setSectionHidden(v, sec, !show)

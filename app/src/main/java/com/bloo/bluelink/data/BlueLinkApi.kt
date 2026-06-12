@@ -143,8 +143,9 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         }
 
     /**
-     * Recent EV drives with energy breakdowns (EVs only; the endpoint 404s for
-     * gas cars). Mirrors the community client's _get_ev_trip_details.
+     * Recent drives with (for EVs) energy breakdowns. Mirrors the community
+     * client's _get_ev_trip_details; cars whose head unit doesn't report trips
+     * return an empty list (the caller treats a failure here as "no trips").
      */
     suspend fun tripDetails(token: String, username: String, pin: String, v: Vehicle): List<EvTrip> =
         execute {

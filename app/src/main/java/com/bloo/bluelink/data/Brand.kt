@@ -90,11 +90,6 @@ data class BrandLinks(
     val serviceScheduleUrl: String,
     /** 24/7 roadside-assistance line, digits only. */
     val roadsidePhone: String,
-    /** In-car payments (Hyundai Pay etc.) — managed on the brand's pages; no public API. */
-    val payLabel: String,
-    val payUrl: String,
-    /** Plug & Charge enrollment/management page. */
-    val plugChargeUrl: String,
     /** Connected-car content store (Features on Demand: themes, lighting…). */
     val storeUrl: String,
 ) {
@@ -112,10 +107,7 @@ val Brand.links: BrandLinks
             manualsUrl = "https://owners.hyundaiusa.com/us/en/resources",
             serviceScheduleUrl = "https://owners.hyundaiusa.com/us/en/page/schedule-service",
             roadsidePhone = "8002437766",
-            payLabel = "Hyundai Pay",
-            payUrl = "https://owners.hyundaiusa.com/us/en/resources/blue-link/hyundai-pay-program",
-            plugChargeUrl = "https://owners.hyundaiusa.com/us/en/resources/general-information/ioniq5-ccu-pnc-ota-faqs",
-            storeUrl = "https://owners.hyundaiusa.com/us/en/page/blue-link",
+            storeUrl = "https://commerce.hyundai.com/us/en/commerce/fod",
         )
         Brand.GENESIS -> BrandLinks(
             appPackage = "com.stationdm.genesis",
@@ -126,9 +118,6 @@ val Brand.links: BrandLinks
             manualsUrl = "https://owners.genesis.com/us/en/resources.html",
             serviceScheduleUrl = "https://owners.genesis.com/us/en/page/schedule-service.html",
             roadsidePhone = "8443409741",
-            payLabel = "In-car payments",
-            payUrl = "https://owners.genesis.com/us/en/page/dashboard.html",
-            plugChargeUrl = "https://owners.genesis.com/us/en/resources/genesis-charging-benefit.html",
             storeUrl = "https://owners.genesis.com/us/en/page/connected-services.html",
         )
         Brand.KIA -> BrandLinks(
@@ -140,9 +129,6 @@ val Brand.links: BrandLinks
             manualsUrl = "https://www.kia.com/us/en/owners",
             serviceScheduleUrl = "https://owners.kia.com/us/en/service-page/schedule-service.html",
             roadsidePhone = "8003334542",
-            payLabel = "In-car payments",
-            payUrl = "https://owners.kia.com/us/en/entertainment-data-services.html",
-            plugChargeUrl = "https://owners.kia.com/content/owners/en/kia-electrify.html",
             storeUrl = "https://owners.kia.com/us/en/kiaConnectStore/themes.html",
         )
     }
