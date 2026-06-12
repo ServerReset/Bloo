@@ -1968,12 +1968,14 @@ private fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
         Modifier
             .fillMaxSize()
             .drawWithContent {
-                // 1. Record sharp content — single drawContent() call.
-                sharpLayer.record { drawContent() }
-                // 2. Copy into blur layer and apply the render effect.
+                // 1. Record sharp content into the sharp layer — single drawContent() call.
+                //    Must be qualified because inside record{} the receiver is DrawScope,
+                //    not ContentDrawScope, so bare drawContent() wouldn't resolve.
+                sharpLayer.record { this@drawWithContent.drawContent() }
+                // 2. Copy the sharp snapshot into the blur layer and apply the blur.
                 blurLayer.record { drawLayer(sharpLayer) }
                 blurLayer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
-                // 3. Display sharp to the screen.
+                // 3. Draw the sharp version to screen (not the blurred one).
                 drawLayer(sharpLayer)
             },
     ) {
