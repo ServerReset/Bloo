@@ -134,13 +134,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -505,19 +503,20 @@ private fun OnboardingScreen(vm: AppViewModel) {
                 val notifLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
                 ) { granted -> notifGranted = granted }
-                FilledTonalButton(
+                MorphButton(
                     onClick = { notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
                     enabled = !notifGranted,
                     modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
                 ) {
                     Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (notifGranted) "Notifications enabled" else "Enable notifications")
+                    Text(if (notifGranted) "Notifications enabled" else "Enable notifications", fontWeight = FontWeight.SemiBold)
                 }
             }
 
             if (canBio) {
-                FilledTonalButton(
+                MorphButton(
                     onClick = {
                         context.findFragmentActivity()?.let { activity ->
                             showBiometricPrompt(
@@ -530,10 +529,11 @@ private fun OnboardingScreen(vm: AppViewModel) {
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
                 ) {
                     Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Lock Bloo with fingerprint")
+                    Text("Lock Bloo with fingerprint", fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -721,7 +721,7 @@ private fun LoginScreen(
                 if (loading) LoadingIndicator() else Text("Sign in", fontWeight = FontWeight.SemiBold)
             }
             if (onCancel != null) {
-                TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+                MorphTextButton("Cancel", onCancel, modifier = Modifier.fillMaxWidth())
             }
             Text(
                 "Credentials are sent directly to ${brand.label}'s telematics servers and " +
@@ -781,13 +781,17 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
         },
         confirmButton = {
             if (otp.sentTo != null) {
-                TextButton(onClick = { vm.kiaVerifyOtp(code) }, enabled = !loading && code.isNotBlank()) {
-                    if (loading) LoadingIndicator() else Text("Verify")
+                MorphButton(
+                    onClick = { vm.kiaVerifyOtp(code) },
+                    enabled = !loading && code.isNotBlank(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                ) {
+                    if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = vm::kiaCancelOtp, enabled = !loading) { Text("Cancel") }
+            MorphTextButton("Cancel", vm::kiaCancelOtp, enabled = !loading)
         },
     )
 }
@@ -2062,24 +2066,10 @@ private fun sectionLabel(section: String): String = when (section) {
 @Composable
 private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppViewModel) {
     if (hotspot != null) {
-        // A small header row (not an overlay) so the Unpin control never covers
-        // the pinned pebble's own header/actions.
+        // A clean header row with an explicit Unpin control; the pinned pebble
+        // below can't be collapsed (forced open, no drag handle).
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Long-press + drag this row to unpin (or tap the button).
-            val unpinHaptics = LocalHaptics.current
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .pointerInput(hotspot) {
-                        var dragged = 0f
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { dragged = 0f; unpinHaptics?.tick() },
-                            onDrag = { change, amt -> change.consume(); dragged += kotlin.math.abs(amt.x) + kotlin.math.abs(amt.y) },
-                            onDragEnd = { if (dragged > 48f) vm.setHotspot(v, null) },
-                        )
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.PushPin,
                     contentDescription = null,
@@ -2088,14 +2078,13 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "Pinned here — drag to unpin",
+                    "Pinned",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { vm.setHotspot(v, null) }) { Text("Unpin") }
+                MorphTextButton("Unpin", onClick = { vm.setHotspot(v, null) })
             }
-            // Forced-open + no drag handle: the hot spot pebble can't be collapsed.
             CompositionLocalProvider(LocalForceExpanded provides true) {
                 SinglePebble(hotspot, v, state, vm, Modifier)
             }
@@ -2107,11 +2096,14 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         }
         val hotDrag = LocalHotSeatDrag.current
         val hovered = hotDrag?.overSlot == true
-        val border = if (hovered) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        }
+        // The empty slot is both a drop target (drag any pebble onto it to pin)
+        // and a tap target (tap to pick one from a menu). It highlights while a
+        // dragged pebble hovers over it.
+        val borderWidth by animateDpAsState(if (hovered) 2.dp else 1.dp, label = "slotBorder")
+        val borderColor by androidx.compose.animation.animateColorAsState(
+            if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+            label = "slotBorderColor",
+        )
         Box(
             Modifier.onGloballyPositioned {
                 hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
@@ -2120,16 +2112,21 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
             OutlinedCard(
                 onClick = { menu = true },
                 modifier = Modifier.fillMaxWidth(),
-                border = border,
+                border = BorderStroke(borderWidth, borderColor),
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.PushPin, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Filled.PushPin,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = if (hovered) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        if (hovered) "Drop to pin here" else "Drag a pebble here (or tap)",
+                        if (hovered) "Release to pin" else "Pin a pebble here",
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (hovered) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2427,6 +2424,32 @@ private fun MorphButton(
         contentPadding = contentPadding,
         content = content,
     )
+}
+
+/**
+ * A text-only [MorphButton] — the app's one button framework, used everywhere a
+ * plain labelled button is needed (dialogs, settings, etc.) so they all share
+ * the pill-morphs-to-rounded-square press feel.
+ */
+@Composable
+private fun MorphTextButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    MorphButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        containerColor = containerColor,
+        contentColor = contentColor,
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+    ) {
+        Text(text, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 /**
@@ -2926,14 +2949,14 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
 /** A compact owner-area destination button (sized to its label, not full width). */
 @Composable
 private fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
-    val haptics = LocalHaptics.current
-    FilledTonalButton(
-        onClick = { haptics?.click(); onClick() },
+    // Same morphing pill framework as every other button in the app.
+    MorphButton(
+        onClick = onClick,
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge)
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -2988,12 +3011,10 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         headerAction = if (hasWarning) ({
             // Red warning chip; tapping it just expands the pebble like the arrow.
-            FilledTonalButton(
+            MorphButton(
                 onClick = { vm.togglePebble(v, "diagnostics") },
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 modifier = Modifier.heightIn(min = 42.dp),
             ) {
@@ -3562,10 +3583,10 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
-                Button(
+                MorphTextButton("Cancel", onClick = onCancel, modifier = Modifier.weight(1f))
+                MorphButton(
                     onClick = {
-                        val image = bmp ?: return@Button
+                        val image = bmp ?: return@MorphButton
                         val f = frame
                         scope.launch {
                             val path = withContext(Dispatchers.IO) {
@@ -3606,7 +3627,8 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
                     },
                     enabled = bmp != null,
                     modifier = Modifier.weight(1f),
-                ) { Text("Use photo") }
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                ) { Text("Use photo", fontWeight = FontWeight.SemiBold) }
             }
         }
     }
@@ -3697,21 +3719,22 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!creds.brand.usesOtpLogin) {
-                            TextButton(
+                            MorphTextButton(
+                                "Update PIN",
                                 onClick = { vm.updatePin(creds.brand, pin) },
                                 enabled = pin.isNotBlank() && pin != creds.pin,
-                            ) { Text("Update PIN") }
+                            )
                         }
-                        TextButton(
+                        MorphTextButton(
+                            "Sign out",
                             onClick = { vm.logout(creds.brand) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        ) { Text("Sign out") }
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        )
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = { vm.beginAddAccount() }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Add another account")
-                }
+                MorphTextButton("Add another account", onClick = { vm.beginAddAccount() }, modifier = Modifier.fillMaxWidth())
                 Text(
                     "If commands fail with a locked PIN, fix the Service PIN above — too " +
                         "many wrong-PIN attempts lock it for a few minutes server-side.",
@@ -3979,10 +4002,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    TextButton(onClick = {
+                    MorphTextButton("Copy", onClick = {
                         clipboard.setText(AnnotatedString(logs.joinToString("\n")))
-                    }) { Text("Copy") }
-                    TextButton(onClick = { vm.clearLogs() }) { Text("Clear") }
+                    })
+                    Spacer(Modifier.width(8.dp))
+                    MorphTextButton("Clear", onClick = { vm.clearLogs() })
                 }
                 val logScroll = rememberScrollState()
                 SelectionContainer {
@@ -4160,9 +4184,9 @@ private fun CarSettingsCard(
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = onPickPhoto) { Text("Choose photo") }
+                            MorphTextButton("Choose photo", onClick = onPickPhoto)
                             if (state.imageUrls[v.vin] != null) {
-                                TextButton(onClick = { vm.setVehicleImage(v.vin, "") }) { Text("Clear") }
+                                MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
                             }
                         }
                     }
@@ -4435,7 +4459,7 @@ private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
         Text("Tile ${index + 1}", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.weight(1f))
         Box {
-            OutlinedButton(onClick = { carMenu = true }) { Text(car?.name?.take(10) ?: "Car") }
+            MorphTextButton(car?.name?.take(10) ?: "Car", onClick = { carMenu = true })
             DropdownMenu(expanded = carMenu, onDismissRequest = { carMenu = false }) {
                 DropdownMenuItem(text = { Text("None") }, onClick = {
                     vm.setTileAssignment(index, null, null); carMenu = false
@@ -4448,9 +4472,11 @@ private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
             }
         }
         Box {
-            OutlinedButton(onClick = { actMenu = true }, enabled = car != null) {
-                Text(TileActions.firstOrNull { it.first == action }?.second ?: "Action")
-            }
+            MorphTextButton(
+                TileActions.firstOrNull { it.first == action }?.second ?: "Action",
+                onClick = { actMenu = true },
+                enabled = car != null,
+            )
             DropdownMenu(expanded = actMenu, onDismissRequest = { actMenu = false }) {
                 TileActions.forEach { (cmd, label) ->
                     DropdownMenuItem(text = { Text(label) }, onClick = {
@@ -4482,7 +4508,7 @@ private fun SecretRow(label: String, value: String) {
             if (show) value else "•".repeat(value.length.coerceIn(4, 10)),
             fontWeight = FontWeight.Medium,
         )
-        TextButton(onClick = { show = !show }) { Text(if (show) "Hide" else "Show") }
+        MorphTextButton(if (show) "Hide" else "Show", onClick = { show = !show })
     }
 }
 
