@@ -44,9 +44,11 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -54,6 +56,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -191,6 +194,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -1755,30 +1759,46 @@ private fun AnimatedSlider(
     val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
     val dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f)
 
-    // A tap on the track jumps to that position (in addition to dragging). The
-    // tap detector lives on a wrapping Box so it coexists with the Slider's own
-    // drag handling: detectTapGestures only fires on a true tap and never
-    // consumes the drag, so dragging the thumb is unaffected.
+    // Tap to jump: runs at PointerEventPass.Initial so this Box sees events before
+    // the Slider's internal gesture handlers (which live in a child node and run
+    // at Main pass). A quick press-and-release with sub-touchslop movement fires
+    // the same spring-settle as a drag release; a drag is detected and ignored,
+    // leaving the Slider's own drag handling fully intact.
     Box(
         Modifier
             .fillMaxWidth()
             .onSizeChanged { widthPx = it.width.toFloat() }
             .pointerInput(valueRange, steps) {
-                detectTapGestures { offset ->
-                    val padPx = with(density) { edgePad.toPx() }
-                    val travel = (widthPx - 2 * padPx).coerceAtLeast(1f)
-                    val frac = ((offset.x - padPx) / travel).coerceIn(0f, 1f)
-                    val raw = valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
-                    val target = snapToStep(raw, valueRange, steps)
-                    prevStep = target
-                    haptics?.click()
-                    onValueChange(target)
-                    // Spring-settle the thumb onto the tapped step, same as on drag release.
-                    scope.launch {
-                        anim.animateTo(
-                            target,
-                            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
-                        )
+                awaitEachGesture {
+                    val first = awaitPointerEvent(PointerEventPass.Initial)
+                    val down = first.changes.firstOrNull()?.takeIf { it.pressed }
+                        ?: return@awaitEachGesture
+                    val downPos = down.position
+                    var isTap = true
+                    loop@ while (true) {
+                        val evt = awaitPointerEvent(PointerEventPass.Initial)
+                        for (ch in evt.changes) {
+                            if (!ch.pressed) break@loop
+                            if ((ch.position - downPos).getDistance() > viewConfiguration.touchSlop) {
+                                isTap = false; break@loop
+                            }
+                        }
+                    }
+                    if (isTap) {
+                        val padPx = with(density) { edgePad.toPx() }
+                        val travel = (widthPx - 2 * padPx).coerceAtLeast(1f)
+                        val frac = ((downPos.x - padPx) / travel).coerceIn(0f, 1f)
+                        val raw = valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
+                        val target = snapToStep(raw, valueRange, steps)
+                        prevStep = target
+                        haptics?.click()
+                        onValueChange(target)
+                        scope.launch {
+                            anim.animateTo(
+                                target,
+                                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                            )
+                        }
                     }
                 }
             },
@@ -3201,7 +3221,6 @@ private fun ClimatePebble(
             climateOn -> "On"
             else -> "Off"
         },
-        containerColor = MaterialTheme.colorScheme.secondaryContainer,
         headerAction = {
             PebbleActionButton(
                 label = when {
@@ -3243,12 +3262,25 @@ private fun ClimatePebble(
             return@Pebble
         }
 
-        StepRow("Temperature", "$tempF°F")
+        // Color shifts from blue (cold) through neutral to orange-red (hot),
+        // normalised to the slider range so it adapts if the range ever changes.
+        val tempRange = 62f..82f
+        val tempT = ((tempF - tempRange.start) / (tempRange.endInclusive - tempRange.start)).coerceIn(0f, 1f)
+        val tempColor by androidx.compose.animation.animateColorAsState(
+            targetValue = when {
+                tempT < 0.5f -> androidx.compose.ui.graphics.lerp(Color(0xFF2979FF), Color(0xFF66BB6A), tempT * 2f)
+                else -> androidx.compose.ui.graphics.lerp(Color(0xFF66BB6A), Color(0xFFFF5722), (tempT - 0.5f) * 2f)
+            },
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            label = "tempColor",
+        )
+        StepRow("Temperature", "$tempF°F", valueColor = tempColor)
         AnimatedSlider(
             value = tempF.toFloat(),
             onValueChange = { tempF = it.roundToInt() },
-            valueRange = 62f..82f,
+            valueRange = tempRange,
             steps = 19,
+            accent = tempColor,
         )
 
         StepRow("Run time", "$duration min")
@@ -3407,6 +3439,10 @@ private fun ClimatePresetSection(
     )
 }
 
+// Split-button preset pill: left half starts climate, right half deletes.
+// The two halves share one pill outline but carry different fill colours so
+// each action reads as a distinct target, matching M3 Expressive ButtonGroup
+// style #5 from the component spec.
 @Composable
 private fun PresetPill(
     name: String,
@@ -3414,44 +3450,52 @@ private fun PresetPill(
     onDelete: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    // Mirror the MorphButton pill-to-rounded-rect press animation.
+    val leftInteraction = remember { MutableInteractionSource() }
+    val leftPressed by leftInteraction.collectIsPressedAsState()
     val corner by animateDpAsState(
-        targetValue = if (pressed) 12.dp else 50.dp,
+        targetValue = if (leftPressed) 12.dp else 50.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "presetCorner",
     )
-    Surface(
-        onClick = { haptics?.click(); onStart() },
-        interactionSource = interaction,
-        shape = RoundedCornerShape(corner),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+    val shape = RoundedCornerShape(corner)
+    Row(
+        modifier = Modifier
+            .height(IntrinsicSize.Min)
+            .clip(shape)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)), shape),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        // Left: start climate
+        Surface(
+            onClick = { haptics?.click(); onStart() },
+            interactionSource = leftInteraction,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = RoundedCornerShape(topStart = corner, bottomStart = corner),
+            modifier = Modifier.fillMaxHeight(),
         ) {
-            Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(7.dp))
-            Text(
-                name,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-            )
-            Spacer(Modifier.width(2.dp))
-            IconButton(
-                onClick = { haptics?.tick(); onDelete() },
-                modifier = Modifier.size(28.dp),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 14.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
             ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = "Delete $name",
-                    modifier = Modifier.size(13.dp),
-                    tint = LocalContentColor.current.copy(alpha = 0.55f),
-                )
+                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        // Right: delete
+        Surface(
+            onClick = { haptics?.tick(); onDelete() },
+            color = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+            shape = RoundedCornerShape(topEnd = corner, bottomEnd = corner),
+            modifier = Modifier.fillMaxHeight(),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "Delete $name", modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -3496,7 +3540,6 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     Pebble(
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
         summary = summary,
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
         headerAction = {
             PebbleActionButton(
                 label = if (charging) "Stop" else "Start",
@@ -3553,7 +3596,6 @@ private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     Pebble(
         v, "charge", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
         summary = summary,
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
