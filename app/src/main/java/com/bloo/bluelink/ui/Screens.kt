@@ -3347,98 +3347,79 @@ private fun ClimatePresetSection(
     onDelete: (String) -> Unit,
 ) {
     HorizontalDivider(Modifier.padding(vertical = 6.dp))
-    if (presets.isNotEmpty()) {
-        Text(
-            "Presets",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(6.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            presets.forEach { preset ->
-                ClimatePresetRow(
-                    name = preset.name,
-                    onStart = { onStart(preset.request) },
-                    onDelete = { onDelete(preset.id) },
-                )
-            }
+    Text(
+        "Presets",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        presets.forEach { preset ->
+            PresetPill(
+                name = preset.name,
+                onStart = { onStart(preset.request) },
+                onDelete = { onDelete(preset.id) },
+            )
         }
-        Spacer(Modifier.height(4.dp))
     }
-    MorphButton(
+    if (presets.isNotEmpty()) Spacer(Modifier.height(4.dp))
+    MorphTextButton(
+        text = "Save as preset",
         onClick = onSave,
         modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Save as preset")
-    }
+    )
 }
 
 @Composable
-private fun ClimatePresetRow(
+private fun PresetPill(
     name: String,
     onStart: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    val containerColor = MaterialTheme.colorScheme.secondaryContainer
-    val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(containerColor),
-        verticalAlignment = Alignment.CenterVertically,
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Mirror the MorphButton pill-to-rounded-rect press animation.
+    val corner by animateDpAsState(
+        targetValue = if (pressed) 12.dp else 50.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "presetCorner",
+    )
+    Surface(
+        onClick = { haptics?.click(); onStart() },
+        interactionSource = interaction,
+        shape = RoundedCornerShape(corner),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
     ) {
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .clickable { haptics?.click(); onStart() }
-                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         ) {
-            Icon(
-                Icons.Filled.AcUnit,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = contentColor,
-            )
+            Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(7.dp))
             Text(
                 name,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
-                color = contentColor,
-                modifier = Modifier.weight(1f),
             )
-            Text(
-                "Start",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .height(38.dp)
-                .background(contentColor.copy(alpha = 0.12f)),
-        )
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .clip(RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp))
-                .clickable { haptics?.tick(); onDelete() }
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-        ) {
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = "Delete $name",
-                modifier = Modifier.size(16.dp),
-                tint = contentColor.copy(alpha = 0.6f),
-            )
+            Spacer(Modifier.width(2.dp))
+            IconButton(
+                onClick = { haptics?.tick(); onDelete() },
+                modifier = Modifier.size(28.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Delete $name",
+                    modifier = Modifier.size(13.dp),
+                    tint = LocalContentColor.current.copy(alpha = 0.55f),
+                )
+            }
         }
     }
 }

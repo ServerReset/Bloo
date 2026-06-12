@@ -25,8 +25,9 @@ account, the app shows errors rather than fake values.
 - Remote **lock / unlock**
 - Remote **climate** with sliders for target temperature, run time, defrost,
   steering-wheel heat, and per-seat heating/cooling
-- **Climate presets** - save your favourite climate configurations by name and
-  apply them with one tap; settings are remembered between app opens
+- **Climate presets** - save named climate configurations and start them with
+  one tap; each preset pill starts the climate command immediately with its
+  saved settings; last-used settings are remembered between app opens
 - **Set EV charge limits** (separate AC and DC target state-of-charge)
 - **Find my car** - live GPS location embedded in the status payload, with
   one-tap "Open in Maps"
@@ -43,13 +44,15 @@ account, the app shows errors rather than fake values.
   the top
 - Pin any pebble to a persistent hotspot in the dual-column layout
 - A copy-pasteable **activity log** and credential management in **Settings**
-- **Material 3 Expressive** look: vibrant palette, rounded expressive shapes,
-  bold display type, and Material You dynamic color on Android 12+
+- **Material 3 Expressive** look: vibrant palette, pill-shaped controls that
+  morph to rounded rectangles on press, bold display type, and Material You
+  dynamic color on Android 12+
 - **Appearance settings**: theme (System / Light / Dark / **AMOLED** pure
   black), dynamic-color toggle, and font choice (System /
   **Atkinson Hyperlegible** / Poppins)
 - Expressive haptics: slider notches, pull-to-refresh dice-roll, data-refresh
   slot-machine settle (follows your system vibration intensity)
+- Pull-to-refresh with a full-screen animated aurora background
 
 ### Fonts and licensing
 
