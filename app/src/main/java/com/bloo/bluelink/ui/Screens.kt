@@ -3744,39 +3744,50 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
-            // Security
-            SettingsCard("Security") {
-                if (canBio) {
-                    ToggleRow("Require fingerprint to open", appearance.biometricLock) { enable ->
-                        if (enable) {
-                            context.findFragmentActivity()?.let { activity ->
-                                showBiometricPrompt(
-                                    activity = activity,
-                                    title = "Enable fingerprint lock",
-                                    subtitle = "Confirm to require it on launch",
-                                    onSuccess = { vm.setBiometricLock(true) },
-                                    onError = { },
-                                )
-                            }
-                        } else {
-                            vm.setBiometricLock(false)
-                        }
+            // On-device AI — only when the device supports Gemini Nano.
+            if (state.aiSupported) {
+                SettingsCard("AI") {
+                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
+                    Text(
+                        "Adds an AI summary pebble to each car and lets you ask the search " +
+                            "box plain questions like \"what's the odometer\". Everything runs " +
+                            "privately on your device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (state.aiEnabled) {
+                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
+                        Text(
+                            if (state.aiAuto) {
+                                "Summaries refresh on their own when you open a car, refresh its " +
+                                    "status, or send a command. You can still tap Summarize anytime."
+                            } else {
+                                "Summaries only run when you tap Summarize on a car."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    if (appearance.biometricLock) {
-                        Spacer(Modifier.height(4.dp))
-                        Text("Lock the app", style = MaterialTheme.typography.labelLarge)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LockTiming.entries.forEach { t ->
-                                MorphChip(
-                                    selected = appearance.lockTiming == t,
-                                    onClick = { vm.setLockTiming(t) },
-                                    label = t.label,
-                                )
-                            }
-                        }
+                }
+            }
+
+            // App-icon shortcuts (long-press the launcher icon)
+            SettingsCard("App shortcuts") {
+                Text(
+                    "Pick which long-press app-icon shortcuts appear. Launchers usually show " +
+                        "only the first 4–5.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                state.vehicles.forEach { v ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
+                        ToggleRow(
+                            com.bloo.bluelink.Shortcuts.actionLabel(cmd),
+                            state.isShortcutEnabled(v.vin, cmd),
+                        ) { vm.setShortcutEnabled(v.vin, cmd, it) }
                     }
-                } else {
-                    Text("No fingerprint/biometric is enrolled on this device.")
                 }
             }
 
@@ -3825,19 +3836,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
-            // Theme
-            SettingsCard("Theme") {
-                val labels = mapOf(
-                    ThemeMode.SYSTEM to "Follow system",
-                    ThemeMode.LIGHT to "Light",
-                    ThemeMode.DARK to "Dark",
-                    ThemeMode.AMOLED to "AMOLED (pure black)",
-                )
-                ThemeMode.entries.forEach { mode ->
-                    ChoiceRow(labels.getValue(mode), appearance.themeMode == mode) { vm.setThemeMode(mode) }
-                }
-            }
-
             // Color
             SettingsCard("Color") {
                 ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
@@ -3877,118 +3875,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
-            // Sounds & vibration
-            SettingsCard("Sounds & vibration") {
-                ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
-                Text(
-                    "Crisp, distinct vibrations across the app — slider notches, a dice-roll on " +
-                        "pull-to-refresh, and a slot-machine settle when fresh data lands. Intensity " +
-                        "follows your system setting.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // On-device AI — only when the device supports Gemini Nano.
-            if (state.aiSupported) {
-                SettingsCard("AI") {
-                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
-                    Text(
-                        "Adds an AI summary pebble to each car and lets you ask the search " +
-                            "box plain questions like \"what's the odometer\". Everything runs " +
-                            "privately on your device.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (state.aiEnabled) {
-                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
-                        Text(
-                            if (state.aiAuto) {
-                                "Summaries refresh on their own when you open a car, refresh its " +
-                                    "status, or send a command. You can still tap Summarize anytime."
-                            } else {
-                                "Summaries only run when you tap Summarize on a car."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            // Quick Settings tiles
-            SettingsCard("Quick tiles") {
-                Text(
-                    "Assign each Quick Settings tile to a car and action, then add the tiles " +
-                        "from your notification shade's edit screen.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ToggleRow("Run command in background", state.tileBackground) { vm.setTileBackground(it) }
-                Text(
-                    if (state.tileBackground) "Tiles fire the command directly (no app open)."
-                    else "Tiles open Bloo and run the command there.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
-                for (i in 0 until com.bloo.bluelink.data.TILE_COUNT) {
-                    TileAssignRow(i, state, vm)
-                }
-            }
-
-            // App-icon shortcuts (long-press the launcher icon)
-            SettingsCard("App shortcuts") {
-                Text(
-                    "Pick which long-press app-icon shortcuts appear. Launchers usually show " +
-                        "only the first 4–5.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                state.vehicles.forEach { v ->
-                    Spacer(Modifier.height(4.dp))
-                    Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
-                        ToggleRow(
-                            com.bloo.bluelink.Shortcuts.actionLabel(cmd),
-                            state.isShortcutEnabled(v.vin, cmd),
-                        ) { vm.setShortcutEnabled(v.vin, cmd, it) }
-                    }
-                }
-            }
-
             // Links
             SettingsCard("Links") {
                 ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
                 Text(
                     "On uses an in-app browser tab; off opens your default browser.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // Notifications
-            SettingsCard("Notifications") {
-                ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
-                ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
-                if (notif.doorOpen) {
-                    var minutes by remember(notif.doorOpenMinutes) { mutableStateOf(notif.doorOpenMinutes.toString()) }
-                    OutlinedTextField(
-                        value = minutes,
-                        onValueChange = {
-                            minutes = it.filter(Char::isDigit)
-                            minutes.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setDoorOpenMinutes)
-                        },
-                        label = { Text("Door-open minutes") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
-                }
-                Text(
-                    "Background checks run roughly every 30 minutes, so door alerts may " +
-                        "arrive a little after your set time.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -4020,6 +3911,115 @@ private fun SettingsScreen(vm: AppViewModel) {
                             .fadingEdges(logScroll)
                             .verticalScroll(logScroll),
                     )
+                }
+            }
+
+            // Notifications
+            SettingsCard("Notifications") {
+                ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
+                ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
+                if (notif.doorOpen) {
+                    var minutes by remember(notif.doorOpenMinutes) { mutableStateOf(notif.doorOpenMinutes.toString()) }
+                    OutlinedTextField(
+                        value = minutes,
+                        onValueChange = {
+                            minutes = it.filter(Char::isDigit)
+                            minutes.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setDoorOpenMinutes)
+                        },
+                        label = { Text("Door-open minutes") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
+                Text(
+                    "Background checks run roughly every 30 minutes, so door alerts may " +
+                        "arrive a little after your set time.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Quick Settings tiles
+            SettingsCard("Quick tiles") {
+                Text(
+                    "Assign each Quick Settings tile to a car and action, then add the tiles " +
+                        "from your notification shade's edit screen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ToggleRow("Run command in background", state.tileBackground) { vm.setTileBackground(it) }
+                Text(
+                    if (state.tileBackground) "Tiles fire the command directly (no app open)."
+                    else "Tiles open Bloo and run the command there.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                for (i in 0 until com.bloo.bluelink.data.TILE_COUNT) {
+                    TileAssignRow(i, state, vm)
+                }
+            }
+
+            // Security
+            SettingsCard("Security") {
+                if (canBio) {
+                    ToggleRow("Require fingerprint to open", appearance.biometricLock) { enable ->
+                        if (enable) {
+                            context.findFragmentActivity()?.let { activity ->
+                                showBiometricPrompt(
+                                    activity = activity,
+                                    title = "Enable fingerprint lock",
+                                    subtitle = "Confirm to require it on launch",
+                                    onSuccess = { vm.setBiometricLock(true) },
+                                    onError = { },
+                                )
+                            }
+                        } else {
+                            vm.setBiometricLock(false)
+                        }
+                    }
+                    if (appearance.biometricLock) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Lock the app", style = MaterialTheme.typography.labelLarge)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LockTiming.entries.forEach { t ->
+                                MorphChip(
+                                    selected = appearance.lockTiming == t,
+                                    onClick = { vm.setLockTiming(t) },
+                                    label = t.label,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Text("No fingerprint/biometric is enrolled on this device.")
+                }
+            }
+
+            // Sounds & vibration
+            SettingsCard("Sounds & vibration") {
+                ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
+                Text(
+                    "Crisp, distinct vibrations across the app — slider notches, a dice-roll on " +
+                        "pull-to-refresh, and a slot-machine settle when fresh data lands. Intensity " +
+                        "follows your system setting.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Theme
+            SettingsCard("Theme") {
+                val labels = mapOf(
+                    ThemeMode.SYSTEM to "Follow system",
+                    ThemeMode.LIGHT to "Light",
+                    ThemeMode.DARK to "Dark",
+                    ThemeMode.AMOLED to "AMOLED (pure black)",
+                )
+                ThemeMode.entries.forEach { mode ->
+                    ChoiceRow(labels.getValue(mode), appearance.themeMode == mode) { vm.setThemeMode(mode) }
                 }
             }
             Spacer(Modifier.height(bottomInset + 16.dp))
