@@ -1905,16 +1905,28 @@ private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modif
 // --- Backdrop blur (frosted glass behind floating elements) ---------------
 
 /**
- * The captured, blurred snapshot of the app, sampled by floating elements. The
- * [recording] flag is true while the snapshot is being captured; floating elements
- * must NOT draw the layer then (it's mid-record), which would crash — they draw it
- * only in the normal pass.
+ * The blurred snapshot of the app, sampled by floating elements via [backdropBlur].
+ * Updated each frame by [BackdropHost] — always safe to read (never mid-record).
  */
-private class Backdrop(val layer: GraphicsLayer) {
-    var recording = false
-}
+private class Backdrop(val layer: GraphicsLayer)
 
 private val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+
+/**
+ * Frosted-glass background: draws the blurred [LocalBackdrop] snapshot of the app,
+ * aligned to this element's on-screen position and clipped to [shape]. Falls back
+ * to a plain clip if no backdrop is available (e.g. below API 31).
+ */
+private fun Modifier.backdropBlur(shape: Shape): Modifier = composed {
+    val backdrop = LocalBackdrop.current ?: return@composed this.clip(shape)
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    this
+        .onGloballyPositioned { origin = it.localToWindow(Offset.Zero) }
+        .clip(shape)
+        .drawBehind {
+            translate(left = -origin.x, top = -origin.y) { drawLayer(backdrop.layer) }
+        }
+}
 
 /**
  * Shared state for dragging a pebble onto (or off) the dual-column hot spot. The
@@ -1936,51 +1948,33 @@ private class HotSeatDrag {
 private val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }
 
 /**
- * Frosted-glass background: draws the blurred [LocalBackdrop] snapshot of the app,
- * aligned to this element's on-screen position and clipped to [shape]. Falls back
- * to nothing (callers layer their own translucent tint on top) if no backdrop is
- * available.
- */
-private fun Modifier.backdropBlur(shape: Shape): Modifier = composed {
-    val backdrop = LocalBackdrop.current ?: return@composed this.clip(shape)
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    this
-        .onGloballyPositioned { origin = it.localToWindow(Offset.Zero) }
-        .clip(shape)
-        .drawBehind {
-            // Skip while the snapshot is being recorded (we're inside it) — drawing
-            // a layer mid-record crashes.
-            if (!backdrop.recording) {
-                translate(left = -origin.x, top = -origin.y) { drawLayer(backdrop.layer) }
-            }
-        }
-}
-
-/**
- * Hosts the frosted-glass backdrop for its [content]: every frame it records the
- * UI into a graphics layer (sharp), blurs that layer, and publishes it via
- * [LocalBackdrop] so floating elements ([backdropBlur]) can sample the blurred
- * snapshot behind themselves. The main pass is drawn sharp. (BlurEffect renders
- * on API 31+; below that the elements just show their translucent tint.)
+ * Hosts the frosted-glass backdrop for its [content]. Each frame:
+ *  1. Content is drawn once into a sharp [GraphicsLayer] (one drawContent() call).
+ *  2. That sharp layer is copied into a second [GraphicsLayer] with [BlurEffect].
+ *  3. The sharp layer is drawn to screen; the blur layer is published via
+ *     [LocalBackdrop] so [backdropBlur] elements can sample it.
+ *
+ * Using two layers avoids the double-drawContent() crash while keeping the main
+ * display sharp and the frosted-glass layer always safe to read. (BlurEffect only
+ * renders on API 31+; below that [backdropBlur] falls back to a plain clip.)
  */
 @Composable
 private fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
-    val layer = rememberGraphicsLayer()
-    val backdrop = remember { Backdrop(layer) }
+    val sharpLayer = rememberGraphicsLayer()
+    val blurLayer = rememberGraphicsLayer()
+    val backdrop = remember { Backdrop(blurLayer) }
     val blurPx = with(LocalDensity.current) { 28.dp.toPx() }
     Box(
         Modifier
             .fillMaxSize()
             .drawWithContent {
-                // Capture the UI unblurred; frosted elements skip sampling while
-                // we record (guarded by backdrop.recording) to avoid recursion.
-                backdrop.recording = true
-                layer.record { this@drawWithContent.drawContent() }
-                backdrop.recording = false
-                layer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
-                // The blurred layer is only ever drawn by frosted elements; the
-                // main UI is drawn sharp here.
-                drawContent()
+                // 1. Record sharp content — single drawContent() call.
+                sharpLayer.record { drawContent() }
+                // 2. Copy into blur layer and apply the render effect.
+                blurLayer.record { drawLayer(sharpLayer) }
+                blurLayer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
+                // 3. Display sharp to the screen.
+                drawLayer(sharpLayer)
             },
     ) {
         val boxScope = this
