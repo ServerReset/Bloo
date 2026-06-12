@@ -224,6 +224,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
@@ -3411,9 +3412,8 @@ private fun ClimatePresetChip(
                     .clickable { haptics?.tick(); onApply() }
                     .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
             )
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
+            Spacer(
+                Modifier
                     .fillMaxHeight()
                     .width(1.dp)
                     .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f)),
