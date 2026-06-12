@@ -997,7 +997,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 
     BackHandler(enabled = expandedByUser != null) { vm.collapse() }
 
-    Box(Modifier.fillMaxSize()) {
+    BackdropHost {
         AnimatedContent(
             targetState = expandedIdx != null,
             transitionSpec = {
@@ -1936,6 +1936,40 @@ private fun Modifier.backdropBlur(shape: Shape): Modifier = composed {
         }
 }
 
+/**
+ * Hosts the frosted-glass backdrop for its [content]: every frame it records the
+ * UI into a graphics layer (sharp), blurs that layer, and publishes it via
+ * [LocalBackdrop] so floating elements ([backdropBlur]) can sample the blurred
+ * snapshot behind themselves. The main pass is drawn sharp. (BlurEffect renders
+ * on API 31+; below that the elements just show their translucent tint.)
+ */
+@Composable
+private fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
+    val layer = rememberGraphicsLayer()
+    val backdrop = remember { Backdrop(layer) }
+    val blurPx = with(LocalDensity.current) { 28.dp.toPx() }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawWithContent {
+                // Capture the UI unblurred; frosted elements skip sampling while
+                // we record (guarded by backdrop.recording) to avoid recursion.
+                backdrop.recording = true
+                layer.record { this@drawWithContent.drawContent() }
+                backdrop.recording = false
+                layer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Decal)
+                // The blurred layer is only ever drawn by frosted elements; the
+                // main UI is drawn sharp here.
+                drawContent()
+            },
+    ) {
+        val boxScope = this
+        CompositionLocalProvider(LocalBackdrop provides backdrop) {
+            with(boxScope) { content() }
+        }
+    }
+}
+
 // --- Full detail ----------------------------------------------------------
 
 /** Single-column car view (phones, and each column of the grid). */
@@ -2066,27 +2100,48 @@ private fun sectionLabel(section: String): String = when (section) {
 @Composable
 private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppViewModel) {
     if (hotspot != null) {
-        // A clean header row with an explicit Unpin control; the pinned pebble
-        // below can't be collapsed (forced open, no drag handle).
+        val haptics = LocalHaptics.current
+        // Drag the pinned pebble away (long-press, then drag past a threshold) to
+        // unpin — the mirror of dragging a pebble onto the slot to pin. The Unpin
+        // button does the same thing for discoverability.
+        var lifted by remember(hotspot) { mutableStateOf(false) }
+        var dragY by remember(hotspot) { mutableFloatStateOf(0f) }
+        val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.PushPin,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "Pinned",
+                    if (lifted) "Release to unpin" else "Pinned",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 MorphTextButton("Unpin", onClick = { vm.setHotspot(v, null) })
             }
             CompositionLocalProvider(LocalForceExpanded provides true) {
-                SinglePebble(hotspot, v, state, vm, Modifier)
+                Box(
+                    Modifier
+                        .graphicsLayer { scaleX = lift; scaleY = lift }
+                        .pointerInput(hotspot) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { dragY = 0f; lifted = true; haptics?.tick() },
+                                onDrag = { change, amt -> change.consume(); dragY += abs(amt.x) + abs(amt.y) },
+                                onDragEnd = {
+                                    lifted = false
+                                    if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, null) }
+                                },
+                                onDragCancel = { lifted = false },
+                            )
+                        },
+                ) {
+                    SinglePebble(hotspot, v, state, vm, Modifier)
+                }
             }
         }
     } else {
@@ -2446,6 +2501,8 @@ private fun MorphTextButton(
         enabled = enabled,
         containerColor = containerColor,
         contentColor = contentColor,
+        // A faint outline keeps the pill shape legible on any surface.
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
     ) {
         Text(text, fontWeight = FontWeight.SemiBold)
@@ -2949,9 +3006,13 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
 /** A compact owner-area destination button (sized to its label, not full width). */
 @Composable
 private fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
-    // Same morphing pill framework as every other button in the app.
+    // Same morphing pill framework as every other button, with a tonal fill +
+    // faint outline so the shape reads clearly on the car-info pebble.
     MorphButton(
         onClick = onClick,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -3663,7 +3724,7 @@ private fun SettingsScreen(vm: AppViewModel) {
 
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-  Box(Modifier.fillMaxSize()) {
+  BackdropHost {
         Column(
             Modifier
                 .fillMaxSize()
@@ -4034,9 +4095,10 @@ private fun SettingsScreen(vm: AppViewModel) {
             Surface(
                 onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shadowElevation = 3.dp,
+                modifier = Modifier.backdropBlur(CircleShape),
             ) {
                 Text(
                     "Settings",
