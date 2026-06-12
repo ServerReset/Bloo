@@ -44,11 +44,12 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -155,7 +156,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -194,8 +194,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -1725,15 +1725,12 @@ private fun AnimatedSlider(
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
-    val interactionSource = remember { MutableInteractionSource() }
     val density = LocalDensity.current
-    // Captured so the tap handler can map an x position into a value using the
-    // same inset geometry the track draws with.
     var widthPx by remember { mutableFloatStateOf(0f) }
 
     // The thumb position is driven continuously so it tracks the finger exactly
-    // while dragging (the underlying Slider runs with steps = 0). On release we
-    // spring it to the nearest step, giving a small bounce as it settles.
+    // while interacting. On release we spring it to the nearest step, giving a
+    // small bounce as it settles.
     val anim = remember { Animatable(value) }
     var dragging by remember { mutableStateOf(false) }
     var prevStep by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
@@ -1743,10 +1740,9 @@ private fun AnimatedSlider(
         if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
     }
 
-    // Geometry of the fully custom track + thumb. Drawing it ourselves (thumb
-    // included, so the stock thumb is zero-sized) keeps the rounded ends clean,
-    // lets the thumb sit exactly on its tick, and insets the end ticks from the
-    // track caps so they're not crammed against the edge.
+    // Geometry of the fully custom track + thumb. Drawing it ourselves (no Material
+    // Slider) keeps the rounded ends clean, lets the thumb sit exactly on its tick,
+    // and insets the end ticks from the track caps so they're not crammed at the edge.
     val trackThickness = 14.dp
     val thumbW = 6.dp
     val thumbH = 44.dp
@@ -1754,158 +1750,139 @@ private fun AnimatedSlider(
     val dotR = 2.5.dp
     // How far the thumb travel and the tick row are inset from the track caps.
     val edgePad = 14.dp
+    val edgePadPx = with(density) { edgePad.toPx() }
 
     val inactiveColor = scheme.surfaceContainerHighest
     val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
     val dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f)
 
-    // Tap to jump: runs at PointerEventPass.Initial so this Box sees events before
-    // the Slider's internal gesture handlers (which live in a child node and run
-    // at Main pass). A quick press-and-release with sub-touchslop movement fires
-    // the same spring-settle as a drag release; a drag is detected and ignored,
-    // leaving the Slider's own drag handling fully intact.
+    // Map an x pixel position onto a raw value, using the same inset travel band
+    // the track is drawn with so the thumb lands exactly under the finger.
+    fun rawForX(x: Float): Float {
+        val travel = (widthPx - 2 * edgePadPx).coerceAtLeast(1f)
+        val frac = ((x - edgePadPx) / travel).coerceIn(0f, 1f)
+        return valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
+    }
+    // Move the thumb to a raw position and report the snapped step, ticking on
+    // each new step crossed. Used for both the initial press and every drag move.
+    fun moveTo(x: Float) {
+        val raw = rawForX(x).coerceIn(valueRange.start, valueRange.endInclusive)
+        scope.launch { anim.snapTo(raw) }
+        val s = snapToStep(raw, valueRange, steps)
+        if (steps > 0 && s != prevStep) {
+            haptics?.tick()
+            prevStep = s
+        }
+        onValueChange(s)
+    }
+
+    // One gesture handler drives both tap and drag: press jumps the thumb to the
+    // touch point, drags follow the finger, and release springs onto the nearest
+    // step. A plain tap is simply a press+release with no movement in between, so
+    // it lands exactly where you tapped - no Material Slider gesture host to fight.
     Box(
         Modifier
             .fillMaxWidth()
+            .height(thumbH)
             .onSizeChanged { widthPx = it.width.toFloat() }
             .pointerInput(valueRange, steps) {
                 awaitEachGesture {
-                    val first = awaitPointerEvent(PointerEventPass.Initial)
-                    val down = first.changes.firstOrNull()?.takeIf { it.pressed }
-                        ?: return@awaitEachGesture
-                    val downPos = down.position
-                    var isTap = true
-                    loop@ while (true) {
-                        val evt = awaitPointerEvent(PointerEventPass.Initial)
-                        for (ch in evt.changes) {
-                            if (!ch.pressed) break@loop
-                            if ((ch.position - downPos).getDistance() > viewConfiguration.touchSlop) {
-                                isTap = false; break@loop
-                            }
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    dragging = true
+                    down.consume()
+                    moveTo(down.position.x)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            change.consume()
+                            break
+                        }
+                        if (change.positionChanged()) {
+                            moveTo(change.position.x)
+                            change.consume()
                         }
                     }
-                    if (isTap) {
-                        val padPx = with(density) { edgePad.toPx() }
-                        val travel = (widthPx - 2 * padPx).coerceAtLeast(1f)
-                        val frac = ((downPos.x - padPx) / travel).coerceIn(0f, 1f)
-                        val raw = valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
-                        val target = snapToStep(raw, valueRange, steps)
-                        prevStep = target
-                        haptics?.click()
-                        onValueChange(target)
-                        scope.launch {
-                            anim.animateTo(
-                                target,
-                                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
-                            )
-                        }
-                    }
-                }
-            },
-    ) {
-    Slider(
-        value = anim.value,
-        onValueChange = { v ->
-            dragging = true
-            scope.launch { anim.snapTo(v) }
-            // Haptic tick each time the finger crosses into a new step.
-            val s = snapToStep(v, valueRange, steps)
-            if (steps > 0 && s != prevStep) {
-                haptics?.tick()
-                prevStep = s
-            }
-            // Report the snapped value so the readout label shows real steps.
-            onValueChange(s)
-        },
-        onValueChangeFinished = {
-            dragging = false
-            val target = snapToStep(anim.value, valueRange, steps)
-            prevStep = target
-            haptics?.click()
-            onValueChange(target)
-            // Bounce-settle the thumb onto the nearest step.
-            scope.launch {
-                anim.animateTo(
-                    target,
-                    animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
-                )
-            }
-        },
-        valueRange = valueRange,
-        steps = 0,
-        interactionSource = interactionSource,
-        // The real thumb is invisible - we draw it ourselves in the track so the
-        // thumb, track and ticks all share one inset coordinate space.
-        thumb = { Box(Modifier.size(0.dp)) },
-        track = { state ->
-            val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
-            val frac2 = ((state.value - valueRange.start) / span2).coerceIn(0f, 1f)
-            Canvas(
-                Modifier
-                    .fillMaxWidth()
-                    .height(thumbH),
-            ) {
-                val halfThumb = thumbW.toPx() / 2f
-                val gapPx = gap.toPx()
-                val padPx = edgePad.toPx()
-                // Thumb + ticks travel within the inset band; the track bar itself
-                // still spans the full width with rounded caps at the very edges.
-                val travel = (size.width - 2 * padPx).coerceAtLeast(0f)
-                val thumbX = padPx + travel * frac2
-                val cy = size.height / 2f
-                val th = trackThickness.toPx()
-                val top = cy - th / 2f
-                val radius = androidx.compose.ui.geometry.CornerRadius(th / 2f)
-                val cut = halfThumb + gapPx
-
-                // Inactive segment (right of the thumb, up to the right cap).
-                val inStart = (thumbX + cut).coerceAtMost(size.width)
-                if (inStart < size.width) {
-                    drawRoundRect(
-                        inactiveColor,
-                        topLeft = Offset(inStart, top),
-                        size = androidx.compose.ui.geometry.Size(size.width - inStart, th),
-                        cornerRadius = radius,
-                    )
-                }
-                // Active segment (left cap up to the thumb).
-                val acEnd = (thumbX - cut).coerceAtLeast(0f)
-                if (acEnd > 0f) {
-                    drawRoundRect(
-                        accent,
-                        topLeft = Offset(0f, top),
-                        size = androidx.compose.ui.geometry.Size(acEnd, th),
-                        cornerRadius = radius,
-                    )
-                }
-                // Tick dots - evenly spaced across the inset band, skipping any
-                // that fall under the thumb.
-                if (steps > 0) {
-                    val n = steps + 2
-                    val rPx = dotR.toPx()
-                    for (i in 0 until n) {
-                        val tf = i.toFloat() / (n - 1)
-                        val x = padPx + travel * tf
-                        if (kotlin.math.abs(x - thumbX) < cut) continue
-                        drawCircle(
-                            if (x <= thumbX) dotOnActive else dotOnInactive,
-                            rPx,
-                            Offset(x, cy),
+                    dragging = false
+                    val target = snapToStep(anim.value, valueRange, steps)
+                    prevStep = target
+                    haptics?.click()
+                    onValueChange(target)
+                    scope.launch {
+                        anim.animateTo(
+                            target,
+                            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
                         )
                     }
                 }
-                // The thumb - a tall rounded bar centered on its value.
-                val twPx = thumbW.toPx()
+            }
+            .progressSemantics(anim.value, valueRange, steps),
+    ) {
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(thumbH),
+        ) {
+            val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
+            val frac2 = ((anim.value - valueRange.start) / span2).coerceIn(0f, 1f)
+            val halfThumb = thumbW.toPx() / 2f
+            val gapPx = gap.toPx()
+            val padPx = edgePad.toPx()
+            // Thumb + ticks travel within the inset band; the track bar itself
+            // still spans the full width with rounded caps at the very edges.
+            val travel = (size.width - 2 * padPx).coerceAtLeast(0f)
+            val thumbX = padPx + travel * frac2
+            val cy = size.height / 2f
+            val th = trackThickness.toPx()
+            val top = cy - th / 2f
+            val radius = androidx.compose.ui.geometry.CornerRadius(th / 2f)
+            val cut = halfThumb + gapPx
+
+            // Inactive segment (right of the thumb, up to the right cap).
+            val inStart = (thumbX + cut).coerceAtMost(size.width)
+            if (inStart < size.width) {
                 drawRoundRect(
-                    accent,
-                    topLeft = Offset(thumbX - twPx / 2f, 0f),
-                    size = androidx.compose.ui.geometry.Size(twPx, size.height),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(twPx / 2f),
+                    inactiveColor,
+                    topLeft = Offset(inStart, top),
+                    size = androidx.compose.ui.geometry.Size(size.width - inStart, th),
+                    cornerRadius = radius,
                 )
             }
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
+            // Active segment (left cap up to the thumb).
+            val acEnd = (thumbX - cut).coerceAtLeast(0f)
+            if (acEnd > 0f) {
+                drawRoundRect(
+                    accent,
+                    topLeft = Offset(0f, top),
+                    size = androidx.compose.ui.geometry.Size(acEnd, th),
+                    cornerRadius = radius,
+                )
+            }
+            // Tick dots - evenly spaced across the inset band, skipping any
+            // that fall under the thumb.
+            if (steps > 0) {
+                val n = steps + 2
+                val rPx = dotR.toPx()
+                for (i in 0 until n) {
+                    val tf = i.toFloat() / (n - 1)
+                    val x = padPx + travel * tf
+                    if (kotlin.math.abs(x - thumbX) < cut) continue
+                    drawCircle(
+                        if (x <= thumbX) dotOnActive else dotOnInactive,
+                        rPx,
+                        Offset(x, cy),
+                    )
+                }
+            }
+            // The thumb - a tall rounded bar centered on its value.
+            val twPx = thumbW.toPx()
+            drawRoundRect(
+                accent,
+                topLeft = Offset(thumbX - twPx / 2f, 0f),
+                size = androidx.compose.ui.geometry.Size(twPx, size.height),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(twPx / 2f),
+            )
+        }
     }
 }
 
@@ -2843,9 +2820,11 @@ private fun PebbleActionButton(
  */
 @Composable
 private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    // The evTripDetails feed is EV-only; older Gen5W (generation 2) gas cars
-    // report nothing, so the pebble is hidden for them rather than always empty.
-    val isGen5W = !v.isEv && v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
+    // The evTripDetails feed isn't served by Gen5W (generation 2) head units -
+    // they report nothing, EV or not - so the pebble is hidden for them rather
+    // than sitting permanently empty. Kia US doesn't report a generation, so it's
+    // excluded from the check and keeps the pebble.
+    val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
     if (isGen5W) return
     val trips = state.trips[v.vin]
     val loading = state.isPending(v.vin, "trips")
@@ -3196,6 +3175,10 @@ private fun ClimatePebble(
     val presets = state.climatePresets[v.vin].orEmpty()
     var showAddPreset by remember { mutableStateOf(false) }
     var presetName by remember { mutableStateOf("") }
+    // Which preset (if any) is currently applied: set when you start one, and
+    // cleared automatically once the live settings drift away from it (e.g. you
+    // nudge a slider) so the highlight only marks a true match.
+    var activePresetId by remember(v.vin) { mutableStateOf<String?>(null) }
     val applyPreset: (ClimateRequest) -> Unit = { r ->
         tempF = r.tempF
         duration = r.durationMinutes
@@ -3205,6 +3188,10 @@ private fun ClimatePebble(
         passenger = r.seatFrontRight
         rearLeft = r.seatRearLeft
         rearRight = r.seatRearRight
+    }
+    LaunchedEffect(currentReq, activePresetId, presets) {
+        val active = presets.firstOrNull { it.id == activePresetId }
+        if (active != null && active.request != currentReq) activePresetId = null
     }
 
     val climateOn = status?.airCtrlOn == true
@@ -3229,7 +3216,9 @@ private fun ClimatePebble(
                     else -> "Start"
                 },
                 icon = Icons.Filled.AcUnit,
-                onClick = { if (climateOn) vm.stopClimate(v) else startClimate() },
+                onClick = {
+                    if (climateOn) { vm.stopClimate(v); activePresetId = null } else startClimate()
+                },
                 // No remote climate commands while driving.
                 enabled = !driving,
                 pending = pending,
@@ -3315,9 +3304,19 @@ private fun ClimatePebble(
         // Presets section
         ClimatePresetSection(
             presets = presets,
-            onStart = { vm.startClimate(v, it) },
+            activeId = activePresetId,
+            onStart = { preset ->
+                // Load the preset into the sliders/toggles, fire it, and mark it
+                // as the applied one so its pill shows the running highlight.
+                applyPreset(preset.request)
+                vm.startClimate(v, preset.request)
+                activePresetId = preset.id
+            },
             onSave = { presetName = ""; showAddPreset = true },
-            onDelete = { vm.deleteClimatePreset(v, it) },
+            onDelete = { id ->
+                if (activePresetId == id) activePresetId = null
+                vm.deleteClimatePreset(v, id)
+            },
         )
 
         if (showAddPreset) {
@@ -3407,31 +3406,35 @@ private fun seatTint(level: SeatLevel): Color = when {
 @Composable
 private fun ClimatePresetSection(
     presets: List<ClimatePreset>,
-    onStart: (ClimateRequest) -> Unit,
+    activeId: String?,
+    onStart: (ClimatePreset) -> Unit,
     onSave: () -> Unit,
     onDelete: (String) -> Unit,
 ) {
     HorizontalDivider(Modifier.padding(vertical = 6.dp))
-    Text(
-        "Presets",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(8.dp))
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        presets.forEach { preset ->
-            PresetPill(
-                name = preset.name,
-                onStart = { onStart(preset.request) },
-                onDelete = { onDelete(preset.id) },
-            )
+    if (presets.isNotEmpty()) {
+        Text(
+            "Presets",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            presets.forEach { preset ->
+                PresetPill(
+                    name = preset.name,
+                    active = preset.id == activeId,
+                    onStart = { onStart(preset) },
+                    onDelete = { onDelete(preset.id) },
+                )
+            }
         }
+        Spacer(Modifier.height(4.dp))
     }
-    if (presets.isNotEmpty()) Spacer(Modifier.height(4.dp))
     MorphTextButton(
         text = "Save as preset",
         onClick = onSave,
@@ -3439,63 +3442,85 @@ private fun ClimatePresetSection(
     )
 }
 
-// Split-button preset pill: left half starts climate, right half deletes.
-// The two halves share one pill outline but carry different fill colours so
-// each action reads as a distinct target, matching M3 Expressive ButtonGroup
-// style #5 from the component spec.
+/**
+ * A two-segment split button for a saved preset, styled after M3 Expressive
+ * connected-button group #5: a wider "start" half and a narrow "delete" half,
+ * each a pill on its outer edge with a smaller radius on the inner edge. The two
+ * are separated by a real gap (not a drawn line) so the pebble background shows
+ * through and they read as distinct buttons.
+ *
+ * Tapping the start half loads the preset into the climate controls and fires it;
+ * while it is the [active] (currently applied) preset, that half morphs from a
+ * pill into a rounded rectangle and fills with the running-climate highlight,
+ * exactly like the Start button when climate is on. The delete half removes it.
+ */
 @Composable
 private fun PresetPill(
     name: String,
+    active: Boolean,
     onStart: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
     val leftInteraction = remember { MutableInteractionSource() }
     val leftPressed by leftInteraction.collectIsPressedAsState()
-    val corner by animateDpAsState(
-        targetValue = if (leftPressed) 12.dp else 50.dp,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "presetCorner",
+    val morphed = active || leftPressed
+    // Outer corner: pill when idle, rounded-rectangle when applied/pressed.
+    val outer by animateDpAsState(
+        if (morphed) 16.dp else 22.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "presetOuter",
     )
-    val shape = RoundedCornerShape(corner)
+    // Inner corner (facing the gap): small when idle, growing to match when applied.
+    val inner by animateDpAsState(
+        if (morphed) 16.dp else 8.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "presetInner",
+    )
+    val leftBg by androidx.compose.animation.animateColorAsState(
+        if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "presetLeftBg",
+    )
+    val leftFg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+
     Row(
-        modifier = Modifier
-            .height(IntrinsicSize.Min)
-            .clip(shape)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)), shape),
+        modifier = Modifier.height(IntrinsicSize.Min),
+        // The gap is the "cut" between the two halves - background shows through.
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left: start climate
+        // Start half
         Surface(
             onClick = { haptics?.click(); onStart() },
             interactionSource = leftInteraction,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shape = RoundedCornerShape(topStart = corner, bottomStart = corner),
+            color = leftBg,
+            contentColor = leftFg,
+            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
             modifier = Modifier.fillMaxHeight(),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 14.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 11.dp),
             ) {
-                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(15.dp))
+                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
             }
         }
-        // Right: delete
+        // Delete half (constant shape: small radius on the inner edge, pill outer).
         Surface(
             onClick = { haptics?.tick(); onDelete() },
-            color = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-            shape = RoundedCornerShape(topEnd = corner, bottomEnd = corner),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp),
             modifier = Modifier.fillMaxHeight(),
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 14.dp),
             ) {
-                Icon(Icons.Filled.Close, contentDescription = "Delete $name", modifier = Modifier.size(14.dp))
+                Icon(Icons.Filled.Close, contentDescription = "Delete $name", modifier = Modifier.size(15.dp))
             }
         }
     }
