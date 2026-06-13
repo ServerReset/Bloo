@@ -2906,8 +2906,8 @@ private fun StateControl(
                 // open/closed padlock icon rather than a word.
                 name.isBlank() -> {
                     val stateIcon = when (isOn) {
-                        true -> icon
-                        false -> Icons.Filled.LockOpen
+                        true -> Icons.Filled.LockOpen
+                        false -> Icons.Filled.Lock
                         else -> icon
                     }
                     if (pending) {
