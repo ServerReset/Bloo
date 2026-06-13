@@ -7,6 +7,7 @@
 
 package com.bloo.bluelink.ui
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -3036,30 +3037,42 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
             LinkButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
             LinkButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
         }
-        // Digital Car Key is supported on Gen5W (generation 2) Hyundai/Genesis
-        // head units. Kia uses its own app with no equivalent key sharing.
-        if (v.brand != Brand.KIA) {
-            group("Digital Car Key") {
-                LinkButton("Digital Key app", Icons.Filled.VpnKey) {
-                    openApp(
+        // Digital Car Key: DK1 (BLE/NFC) for Hyundai and Genesis only.
+        // DK2 (UWB) via Google Wallet or Samsung Wallet for all brands.
+        group("Digital Car Key") {
+            when (v.brand) {
+                Brand.HYUNDAI -> LinkButton("Digital Key 1", Icons.Filled.VpnKey) {
+                    openComponent(
                         context,
-                        listOf("com.hyundaiusa.hyundai.digitalcarkey"),
+                        "com.hyundaiusa.hyundai.digitalcarkey",
+                        "com.hyundaiusa.hyundai.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
                         "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
                         inApp,
                     )
                 }
-                LinkButton("Google Wallet", Icons.Filled.AccountBalanceWallet) {
+                Brand.GENESIS -> LinkButton("Digital Key 1", Icons.Filled.VpnKey) {
+                    openComponent(
+                        context,
+                        "com.genesisusa.genesis.digitalcarkey",
+                        "com.genesisusa.genesis.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
+                        "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
+                        inApp,
+                    )
+                }
+                Brand.KIA -> Unit
+            }
+            if (hasSamsungWallet) {
+                LinkButton("Digital Key 2", Icons.Filled.CreditCard) {
+                    openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
+                }
+            } else {
+                LinkButton("Digital Key 2", Icons.Filled.AccountBalanceWallet) {
                     openApp(
                         context,
                         listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
                         "https://pay.google.com/",
                         inApp,
                     )
-                }
-                if (hasSamsungWallet) {
-                    LinkButton("Samsung Wallet", Icons.Filled.CreditCard) {
-                        openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
-                    }
                 }
             }
         }
@@ -3842,6 +3855,23 @@ private fun openApp(context: Context, packages: List<String>, fallbackUrl: Strin
         }
     }
     openUrl(context, fallbackUrl, inApp)
+}
+
+private fun openComponent(
+    context: Context, packageName: String, activityClass: String, fallbackUrl: String, inApp: Boolean,
+) {
+    runCatching {
+        context.startActivity(
+            Intent().apply {
+                component = ComponentName(packageName, activityClass)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+    }.onFailure {
+        context.packageManager.getLaunchIntentForPackage(packageName)
+            ?.let { runCatching { context.startActivity(it) }.onSuccess { return } }
+        openUrl(context, fallbackUrl, inApp)
+    }
 }
 
 private fun dial(context: Context, number: String) {

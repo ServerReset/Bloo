@@ -35,7 +35,8 @@ The table below shows what works for each combination of brand and powertrain. F
 | Set charge limits | PHEV · EV | PHEV · EV | PHEV · EV |
 | Open/close charge port | PHEV · EV | PHEV · EV | — |
 | Trip history | EV (Gen3+) | EV (Gen3+) | — |
-| Digital Car Key links | Gas · Hybrid · PHEV · EV | Gas · Hybrid · PHEV · EV | — |
+| Digital Key 1 (BLE/NFC) | Gas · Hybrid · PHEV · EV | Gas · Hybrid · PHEV · EV | — |
+| Digital Key 2 (UWB) via wallet | Gas · Hybrid · PHEV · EV | Gas · Hybrid · PHEV · EV | Gas · Hybrid · PHEV · EV |
 | Features on Demand store | Gen3+ only | Gen3+ only | Gas · Hybrid · PHEV · EV |
 
 **Gen5W note:** Hyundai and Genesis vehicles with Gen5W head units (generation reported as `"2"`) do not support seat heat via remote climate on EVs (the climate module rejects the payload). Seat controls are hidden for those vehicles. Trip history is also suppressed for Gen5W because the head unit does not serve the trips endpoint.
@@ -105,12 +106,16 @@ Live GPS with a one-tap **Open in Maps** button. Location comes from the status 
 
 ## Digital Car Key
 
-For Hyundai and Genesis vehicles, the Car info pebble shows quick links to:
-- The Hyundai Digital Car Key app
-- Google Wallet (all Android devices)
-- Samsung Wallet (Samsung devices only)
+The Car info pebble shows quick links based on what your brand and device support.
 
-Kia does not support Digital Car Key in the US.
+**Digital Key 1** (BLE/NFC — Hyundai and Genesis only)
+- Deep-links directly to the key management screen in the respective Digital Car Key app
+- Falls back to the Play Store if the app is not installed
+- Kia does not have a Digital Key 1 app in the US
+
+**Digital Key 2** (UWB — all brands)
+- On Samsung devices: opens Samsung Wallet
+- On all other Android devices: opens Google Wallet
 
 ---
 
