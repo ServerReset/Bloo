@@ -123,11 +123,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                 .get()
                 .header("REFRESH", refresh.toString())
                 .build()
-            json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus?.also { st ->
-                // Diagnostic: does the status payload carry GPS? (presence only)
-                val hasLoc = st.vehicleLocation?.coord?.lat != null
-                AppLog.log("status ${v.name}: embedded location ${if (hasLoc) "present" else "absent"}")
-            }
+            json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus
         }
 
     suspend fun location(token: String, username: String, pin: String, v: Vehicle): GeoLocation? =
@@ -161,6 +157,12 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
     suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
+
+    suspend fun openChargePort(token: String, username: String, pin: String, v: Vehicle) =
+        formCommand("/ac/v2/evc/charge/door/open", token, username, pin, v)
+
+    suspend fun closeChargePort(token: String, username: String, pin: String, v: Vehicle) =
+        formCommand("/ac/v2/evc/charge/door/close", token, username, pin, v)
 
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
         // Pure EVs use evc/fatc/stop (no engine). ICE and PHEVs use rcs/rsc/stop

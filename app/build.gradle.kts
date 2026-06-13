@@ -7,13 +7,14 @@ plugins {
 android {
     namespace = "com.bloo.bluelink"
     compileSdk = 37
+    setProperty("archivesBaseName", "Bloo")
 
     defaultConfig {
         applicationId = "com.bloo.bluelink"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 1
+        versionName = "0.1"
         vectorDrawables { useSupportLibrary = true }
     }
 

@@ -481,21 +481,22 @@ private fun OnboardingScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Spacer(Modifier.height(24.dp))
-            Text("🎉", style = MaterialTheme.typography.displayMedium)
+            Text("👋", style = MaterialTheme.typography.displayMedium)
             Text(
-                "You're in!",
+                "Welcome to Bloo",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Black,
             )
             Text(
-                "Welcome to Bloo. A quick tour before you drive off:",
+                "Your Hyundai, Kia, or Genesis in your pocket. Here is what to know:",
                 style = MaterialTheme.typography.titleMedium,
                 color = scheme.onSurfaceVariant,
             )
-            OnboardingPoint("🚗", "Your cars", "Each car is a screen you swipe between. Pull down to refresh its live status.")
-            OnboardingPoint("🧩", "Pebbles", "Tap a pebble to expand it; long-press to drag and reorder. Lock, charge, climate and more live here.")
-            OnboardingPoint("⚙️", "Tell Bloo about each car", "Hyundai's API doesn't report a car's powertrain, seats or heated wheel. Set those in Settings so the right controls appear, and add a photo while you're there.")
-            OnboardingPoint("⚡", "Quick access", "Add Quick Settings tiles and long-press app-icon shortcuts for one-tap lock / unlock / climate.")
+            OnboardingPoint("🚗", "Swipe between cars", "Each car gets its own screen. Swipe left or right to switch. Pull down anywhere to fetch the latest live status straight from Hyundai's servers.")
+            OnboardingPoint("🧩", "Pebbles", "Controls live in pebble cards: lock, charge limits, climate, location and more. Tap to expand, long-press to drag them into the order you like. Pin a pebble to keep it visible at all times in the wide layout.")
+            OnboardingPoint("🌡", "Climate presets", "Set your temperature, defrost, seat heat and steering wheel, then save it as a named preset. One tap starts the climate and loads all your settings.")
+            OnboardingPoint("⚙️", "One-time setup per car", "Bloo cannot detect whether your car has ventilated seats or a heated steering wheel from the API. Open Settings, tap your car, and tick the boxes that match. That unlocks the right controls.")
+            OnboardingPoint("⚡", "Tiles and shortcuts", "Add Bloo's Quick Settings tiles from your notification shade and long-press the app icon for one-tap lock, unlock or climate without even opening the app.")
 
             // Ask for notifications here, on a tap - not silently on first launch.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -547,10 +548,10 @@ private fun OnboardingScreen(vm: AppViewModel) {
             ) {
                 Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Set up your cars", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Set up my cars", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
             Text(
-                "Takes a minute. You'll land in the app right after.",
+                "Takes about a minute. You land straight in the app after.",
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -1031,7 +1032,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         ExpandedCar(vehicles[page], state, vm, flipped = appearance.columnsFlipped)
                     }
                     if (count > 1) {
-                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).offset(y = refreshShift).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
+                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
                     }
                 }
             } else {
@@ -1063,7 +1064,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
-                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).offset(y = refreshShift).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
+                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
                     }
                 }
             }
@@ -1075,7 +1076,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.ArrowBack,
                 description = "Back to all cars",
                 onClick = { vm.collapse() },
-                modifier = Modifier.align(Alignment.TopStart).offset(y = refreshShift).statusBarsPadding(),
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
             )
         }
         if (expandedIdx != null) {
@@ -1083,14 +1084,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.SwapHoriz,
                 description = "Flip columns",
                 onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
-                modifier = Modifier.align(Alignment.TopEnd).offset(y = refreshShift).statusBarsPadding().padding(end = 52.dp),
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp),
             )
         }
         FloatingIcon(
             icon = Icons.Filled.Settings,
             description = "Settings",
             onClick = { vm.openSettings() },
-            modifier = Modifier.align(Alignment.TopEnd).offset(y = refreshShift).statusBarsPadding(),
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
         )
     }
     }
@@ -3009,6 +3010,10 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
         )
     }
 
+    val hasSamsungWallet = remember(context) {
+        context.packageManager.getLaunchIntentForPackage("com.samsung.android.spay") != null
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         group("App & account") {
             LinkButton("${links.appName} app", Icons.Filled.OpenInNew) {
@@ -3026,6 +3031,33 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
             LinkButton(links.dealerLabel, Icons.Filled.Place) { openUrl(context, links.dealerUrl, inApp) }
             LinkButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
             LinkButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
+        }
+        // Digital Car Key is supported on Gen5W (generation 2) Hyundai/Genesis
+        // head units. Kia uses its own app with no equivalent key sharing.
+        if (v.brand != Brand.KIA) {
+            group("Digital Car Key") {
+                LinkButton("Digital Key app", Icons.Filled.VpnKey) {
+                    openApp(
+                        context,
+                        listOf("com.hyundaiusa.hyundai.digitalcarkey"),
+                        "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
+                        inApp,
+                    )
+                }
+                LinkButton("Google Wallet", Icons.Filled.AccountBalanceWallet) {
+                    openApp(
+                        context,
+                        listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
+                        "https://pay.google.com/",
+                        inApp,
+                    )
+                }
+                if (hasSamsungWallet) {
+                    LinkButton("Samsung Wallet", Icons.Filled.CreditCard) {
+                        openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
+                    }
+                }
+            }
         }
     }
 }
@@ -3310,19 +3342,29 @@ private fun ClimatePebble(
             ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
         }
 
+        val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
         if (seats.any) {
             Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            if (seats.driverHeat || seats.driverCool) {
-                SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
-            }
-            if (seats.passHeat || seats.passCool) {
-                SeatControl("Passenger seat", passenger, seats.passCool, seats.passHeat) { passenger = it }
-            }
-            if (seats.rearLeftHeat || seats.rearLeftCool) {
-                SeatControl("Rear left seat", rearLeft, seats.rearLeftCool, seats.rearLeftHeat) { rearLeft = it }
-            }
-            if (seats.rearRightHeat || seats.rearRightCool) {
-                SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
+            if (isGen5W && v.isEv) {
+                Text(
+                    "Seat heat via remote climate is not supported by the Gen5W climate module. " +
+                        "Use the in-car HVAC controls after starting climate.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalContentColor.current.copy(alpha = 0.6f),
+                )
+            } else {
+                if (seats.driverHeat || seats.driverCool) {
+                    SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
+                }
+                if (seats.passHeat || seats.passCool) {
+                    SeatControl("Passenger seat", passenger, seats.passCool, seats.passHeat) { passenger = it }
+                }
+                if (seats.rearLeftHeat || seats.rearLeftCool) {
+                    SeatControl("Rear left seat", rearLeft, seats.rearLeftCool, seats.rearLeftHeat) { rearLeft = it }
+                }
+                if (seats.rearRightHeat || seats.rearRightCool) {
+                    SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
+                }
             }
         }
 
@@ -3490,15 +3532,15 @@ private fun PresetPill(
     val leftInteraction = remember { MutableInteractionSource() }
     val leftPressed by leftInteraction.collectIsPressedAsState()
     val morphed = active || leftPressed
-    // Outer corner: pill when idle, rounded-rectangle when applied/pressed.
+    // Outer corner: full pill when idle, rounded-rectangle when applied/pressed.
     val outer by animateDpAsState(
-        if (morphed) 16.dp else 22.dp,
+        if (morphed) 16.dp else 50.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "presetOuter",
     )
-    // Inner corner (facing the gap): small when idle, growing to match when applied.
+    // Inner corner (facing the gap): small nub when idle, matches outer when applied.
     val inner by animateDpAsState(
-        if (morphed) 16.dp else 8.dp,
+        if (morphed) 16.dp else 10.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "presetInner",
     )
@@ -3533,12 +3575,12 @@ private fun PresetPill(
                 Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
             }
         }
-        // Delete half (constant shape: small radius on the inner edge, pill outer).
+        // Delete half: pill outer, small inner nub that morphs with the left half.
         Surface(
             onClick = { haptics?.tick(); onDelete() },
             color = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp),
+            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
             modifier = Modifier.fillMaxHeight(),
         ) {
             Box(
@@ -3623,8 +3665,17 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             steps = 4,
         )
         if (charging && mins != null) ChargeEta(mins)
-        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
+        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled, outlined = true) {
             vm.setChargeLimits(v, ac, dc)
+        }
+        val portPending = state.isPending(v.vin, "chargePort")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            CommandButton("Open port", Icons.Filled.LockOpen, Modifier.weight(1f), enabled && !portPending, outlined = true) {
+                vm.openChargePort(v)
+            }
+            CommandButton("Close port", Icons.Filled.Lock, Modifier.weight(1f), enabled && !portPending, outlined = true) {
+                vm.closeChargePort(v)
+            }
         }
     }
 }
@@ -4914,12 +4965,14 @@ private fun CommandButton(
     icon: ImageVector,
     modifier: Modifier,
     enabled: Boolean,
+    outlined: Boolean = false,
     onClick: () -> Unit,
 ) {
     MorphButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(64.dp),
+        border = if (outlined) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null,
         contentPadding = PaddingValues(horizontal = 18.dp),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
