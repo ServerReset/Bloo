@@ -1328,7 +1328,7 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                 LastUpdatedLabel(v, state)
                 ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
                 Spacer(Modifier.height(6.dp))
-                PrimaryActions(v, state, vm)
+                PrimaryActions(v, state, vm, showChargePort = false)
                 Spacer(Modifier.weight(1f))
             }
         }
@@ -2484,7 +2484,7 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 }
 
 @Composable
-private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
+private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel, showChargePort: Boolean = true) {
     val status = state.statusFor(v)
     // The charge port lives next to lock/unlock for EVs/PHEVs whose backend
     // supports it (Hyundai/Genesis; Kia has no endpoint).
@@ -2509,7 +2509,7 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
                 onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
                 highlightWhenOff = true,
                 offTextColor = MaterialTheme.colorScheme.error,
-                extraAction = if (supportsPort) {
+                extraAction = if (supportsPort && showChargePort) {
                     { ChargePortSplitButton(v, state, vm) }
                 } else {
                     null
@@ -4628,9 +4628,13 @@ private fun SettingsScreen(vm: AppViewModel) {
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   BackdropHost {
+        // On wide screens (tablets, landscape), cap width and centre so lines
+        // don't stretch wall-to-wall.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
-                .fillMaxSize()
+                .widthIn(max = 640.dp)
+                .fillMaxWidth()
                 .verticalScroll(settingsScroll)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -5063,6 +5067,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
         }
+        } // Box (wide-screen centering)
         // Floating back-arrow + "Settings" label pills over the content.
         Row(
             Modifier.align(Alignment.TopStart).statusBarsPadding(),
