@@ -7,7 +7,6 @@ plugins {
 android {
     namespace = "com.bloo.bluelink"
     compileSdk = 37
-    setProperty("archivesBaseName", "Bloo")
 
     defaultConfig {
         applicationId = "com.bloo.bluelink"
@@ -56,6 +55,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+// Name the output APK "Bloo" (e.g. Bloo-0.1-debug.apk) rather than the module name.
+base {
+    archivesName.set("Bloo")
 }
 
 kotlin {
