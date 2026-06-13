@@ -2496,7 +2496,8 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
                 isOn = status?.doorLock,
                 stateOn = "Locked", stateOff = "Unlocked",
                 turnOn = "Lock", turnOff = "Unlock",
-                icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
+                icon = Icons.Filled.Lock, deactivateIcon = Icons.Filled.LockOpen,
+                pending = state.isPending(v.vin, "doors"),
                 onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
                 highlightWhenOff = true,
                 offTextColor = MaterialTheme.colorScheme.error,
@@ -2865,6 +2866,7 @@ private fun StateControl(
     turnOn: String,
     turnOff: String,
     icon: ImageVector,
+    deactivateIcon: ImageVector? = null,
     pending: Boolean,
     onActivate: () -> Unit,
     onDeactivate: () -> Unit,
@@ -2906,8 +2908,8 @@ private fun StateControl(
                 // open/closed padlock icon rather than a word.
                 name.isBlank() -> {
                     val stateIcon = when (isOn) {
-                        true -> Icons.Filled.LockOpen
-                        false -> Icons.Filled.Lock
+                        true -> icon
+                        false -> Icons.Filled.LockOpen
                         else -> icon
                     }
                     if (pending) {
@@ -2945,7 +2947,8 @@ private fun StateControl(
             // ControlHeight tall, so the button is vertically centred in it).
             modifier = Modifier.heightIn(min = 50.dp),
         ) {
-            MorphButtonLabel(icon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
+            val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+            MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
         }
     }
 }
