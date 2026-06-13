@@ -126,6 +126,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.LocationOn
@@ -2480,67 +2481,88 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     // The charge port lives next to lock/unlock for EVs/PHEVs whose backend
     // supports it (Hyundai/Genesis; Kia has no endpoint).
     val supportsPort = v.brand != Brand.KIA && state.hasBattery(v)
-    // Doors sit inside a collapsed-pebble shaped card so the lock/unlock pill has
-    // a "holding" container like every other section.
+    // Doors sit inside a collapsed-pebble shaped card so the controls have a
+    // "holding" container like every other section.
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(PebbleCornerCollapsed),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        // Extra start inset lines the "Locked/Unlocked" text up with the other
-        // pebble titles; a small end inset nudges the button toward the edge.
-        Box(Modifier.padding(start = 26.dp, end = 8.dp)) {
-            StateControl(
-                name = "",
-                isOn = status?.doorLock,
-                stateOn = "Locked", stateOff = "Unlocked",
-                turnOn = "Lock", turnOff = "Unlock",
-                icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
-                onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
-                highlightWhenOff = true,
-                offTextColor = MaterialTheme.colorScheme.error,
-                extraAction = if (supportsPort) {
-                    { ChargePortButtons(v, state, vm) }
-                } else {
-                    null
-                },
-            )
+        if (supportsPort) {
+            // EV/PHEV: three equal-width buttons - Open, Close, Lock - with no
+            // status caption, so nothing gets squeezed into wrapping.
+            ChargeAndLockRow(v, status, state, vm)
+        } else {
+            // Extra start inset lines the "Locked/Unlocked" text up with the other
+            // pebble titles; a small end inset nudges the button toward the edge.
+            Box(Modifier.padding(start = 26.dp, end = 8.dp)) {
+                StateControl(
+                    name = "",
+                    isOn = status?.doorLock,
+                    stateOn = "Locked", stateOff = "Unlocked",
+                    turnOn = "Lock", turnOff = "Unlock",
+                    icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
+                    onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
+                    highlightWhenOff = true,
+                    offTextColor = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }
 
 /**
- * The charge-port controls: two compact buttons, Open and Close, that sit just
- * left of the lock/unlock action. The API reports no port open/closed state, so
- * we assume the door starts closed; the matching button highlights for a moment
- * after you fire its command so the tap is acknowledged.
+ * EV/PHEV door + charge-port controls as three equal-width buttons: Open, Close
+ * and Lock. The API reports no port open/closed state, so we assume the door
+ * starts closed and highlight whichever port button you tapped last. The Lock
+ * button toggles to Unlock and tints red while the car is unlocked.
  */
 @Composable
-private fun ChargePortButtons(v: Vehicle, state: UiState, vm: AppViewModel) {
-    // Assume closed at start; track the last command so the active button stays
-    // highlighted, mirroring the lock/unlock feel.
+private fun ChargeAndLockRow(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel) {
     var open by remember(v.vin) { mutableStateOf(false) }
-    val pending = state.isPending(v.vin, "chargePort")
+    val portPending = state.isPending(v.vin, "chargePort")
+    val doorsPending = state.isPending(v.vin, "doors")
     val haptics = LocalHaptics.current
-    val enabled = !state.loading && !pending
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val portEnabled = !state.loading && !portPending
+    val locked = status?.doorLock
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         MorphButton(
             onClick = { haptics?.heavy(); vm.openChargePort(v); open = true },
-            enabled = enabled,
+            enabled = portEnabled,
             active = open,
-            modifier = Modifier.heightIn(min = 50.dp),
-            contentPadding = PaddingValues(horizontal = 14.dp),
+            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp),
         ) {
-            MorphButtonLabel(Icons.Filled.EvStation, "Open", pending, iconSize = 20.dp)
+            MorphButtonLabel(Icons.Filled.EvStation, "Open", portPending, iconSize = 20.dp)
         }
         MorphButton(
             onClick = { haptics?.heavy(); vm.closeChargePort(v); open = false },
-            enabled = enabled,
+            enabled = portEnabled,
             active = !open,
-            modifier = Modifier.heightIn(min = 50.dp),
-            contentPadding = PaddingValues(horizontal = 14.dp),
+            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp),
         ) {
-            MorphButtonLabel(Icons.Filled.Close, "Close", pending, iconSize = 20.dp)
+            MorphButtonLabel(Icons.Filled.Close, "Close", portPending, iconSize = 20.dp)
+        }
+        // Lock toggles; tints red (highlight) while the car is unlocked.
+        MorphButton(
+            onClick = { haptics?.heavy(); if (locked == true) vm.unlock(v) else vm.lock(v) },
+            enabled = !state.loading && !doorsPending,
+            active = locked == false,
+            activeContainerColor = MaterialTheme.colorScheme.error,
+            activeContentColor = MaterialTheme.colorScheme.onError,
+            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp),
+        ) {
+            MorphButtonLabel(
+                if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                if (locked == true) "Unlock" else "Lock",
+                doorsPending,
+                iconSize = 20.dp,
+            )
         }
     }
 }
