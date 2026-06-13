@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -16,6 +17,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -139,6 +142,20 @@ private fun expressiveTypography(choice: FontChoice): Typography {
         labelMedium = base.labelMedium.copy(fontFamily = family),
         labelSmall = base.labelSmall.copy(fontFamily = family),
     )
+}
+
+/**
+ * The default button fill. Buttons sit on pebble surfaces (surfaceVariant); in
+ * dark themes the stock surfaceContainerHighest reads muddy and low-contrast
+ * against them, so we lift it toward the foreground for a clearer, lighter grey.
+ * Light themes already have plenty of separation, so they're left unchanged.
+ */
+@Composable
+fun buttonContainer(): Color {
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.surface.luminance() < 0.5f
+    return if (dark) lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.12f)
+    else scheme.surfaceContainerHighest
 }
 
 /** Scale a colour's saturation (HSV) by [factor]; 1 = unchanged. */

@@ -7,7 +7,6 @@
 
 package com.bloo.bluelink.ui
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -105,6 +104,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
@@ -124,7 +124,6 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.LocationOn
@@ -2437,6 +2436,9 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 @Composable
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
+    // The charge port lives next to lock/unlock for EVs/PHEVs whose backend
+    // supports it (Hyundai/Genesis; Kia has no endpoint).
+    val supportsPort = v.brand != Brand.KIA && state.hasBattery(v)
     // Doors sit inside a collapsed-pebble shaped card so the lock/unlock pill has
     // a "holding" container like every other section.
     Card(
@@ -2456,8 +2458,39 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
                 onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
                 highlightWhenOff = true,
                 offTextColor = MaterialTheme.colorScheme.error,
+                extraAction = if (supportsPort) {
+                    { ChargePortButton(v, state, vm) }
+                } else {
+                    null
+                },
             )
         }
+    }
+}
+
+/**
+ * A single charge-port toggle. The API reports no port open/closed state, so the
+ * button tracks its own assumed state: it starts "Open", fires the open command
+ * and flips to "Close", and vice-versa - matching the lock/unlock feel.
+ */
+@Composable
+private fun ChargePortButton(v: Vehicle, state: UiState, vm: AppViewModel) {
+    var open by remember(v.vin) { mutableStateOf(false) }
+    val pending = state.isPending(v.vin, "chargePort")
+    val haptics = LocalHaptics.current
+    MorphButton(
+        onClick = {
+            haptics?.heavy()
+            if (open) vm.closeChargePort(v) else vm.openChargePort(v)
+            open = !open
+        },
+        enabled = !state.loading && !pending,
+        active = open,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        modifier = Modifier.heightIn(min = 50.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        MorphButtonLabel(Icons.Filled.EvStation, if (open) "Close" else "Open", pending, iconSize = 22.dp)
     }
 }
 
@@ -2474,7 +2507,7 @@ private fun MorphButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     active: Boolean = false,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    containerColor: Color = buttonContainer(),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     activeContainerColor: Color = MaterialTheme.colorScheme.primary,
     activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
@@ -2525,7 +2558,7 @@ private fun MorphTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    containerColor: Color = buttonContainer(),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     MorphButton(
@@ -2595,7 +2628,7 @@ private fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, mod
         label = "chipCorner",
     )
     val container by androidx.compose.animation.animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+        if (selected) MaterialTheme.colorScheme.primary else buttonContainer(),
         label = "chipBg",
     )
     val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
@@ -2638,6 +2671,7 @@ private fun StateControl(
     highlightColor: Color = MaterialTheme.colorScheme.primary,
     highlightContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     offTextColor: Color? = null,
+    extraAction: (@Composable () -> Unit)? = null,
 ) {
     // Which state is the "highlighted" (on) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
@@ -2672,6 +2706,9 @@ private fun StateControl(
                 fontWeight = FontWeight.Bold,
             )
         }
+        // An optional secondary control (e.g. the charge-port toggle) sits just
+        // left of the primary action button.
+        if (extraAction != null) extraAction()
         val haptics = LocalHaptics.current
         // Pill when off, rounded rectangle + highlight colour when on - same as
         // the climate/charge controls.
@@ -3049,19 +3086,17 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
             if (isGen5W) {
                 when (v.brand) {
                     Brand.HYUNDAI -> LinkButton("Digital Key", Icons.Filled.VpnKey) {
-                        openComponent(
+                        openApp(
                             context,
-                            "com.hyundaiusa.hyundai.digitalcarkey",
-                            "com.hyundaiusa.hyundai.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
+                            listOf("com.hyundaiusa.hyundai.digitalcarkey"),
                             "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
                             inApp,
                         )
                     }
                     Brand.GENESIS -> LinkButton("Digital Key", Icons.Filled.VpnKey) {
-                        openComponent(
+                        openApp(
                             context,
-                            "com.genesisusa.genesis.digitalcarkey",
-                            "com.genesisusa.genesis.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
+                            listOf("com.genesisusa.genesis.digitalcarkey"),
                             "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
                             inApp,
                         )
@@ -3685,15 +3720,7 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled, outlined = true) {
             vm.setChargeLimits(v, ac, dc)
         }
-        val portPending = state.isPending(v.vin, "chargePort")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            CommandButton("Open port", Icons.Filled.LockOpen, Modifier.weight(1f), enabled && !portPending, outlined = true) {
-                vm.openChargePort(v)
-            }
-            CommandButton("Close port", Icons.Filled.Lock, Modifier.weight(1f), enabled && !portPending, outlined = true) {
-                vm.closeChargePort(v)
-            }
-        }
+        // The charge-port toggle lives in the controls pebble, next to lock/unlock.
     }
 }
 
@@ -3864,23 +3891,6 @@ private fun openApp(context: Context, packages: List<String>, fallbackUrl: Strin
         }
     }
     openUrl(context, fallbackUrl, inApp)
-}
-
-private fun openComponent(
-    context: Context, packageName: String, activityClass: String, fallbackUrl: String, inApp: Boolean,
-) {
-    runCatching {
-        context.startActivity(
-            Intent().apply {
-                component = ComponentName(packageName, activityClass)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-    }.onFailure {
-        context.packageManager.getLaunchIntentForPackage(packageName)
-            ?.let { runCatching { context.startActivity(it) }.onSuccess { return } }
-        openUrl(context, fallbackUrl, inApp)
-    }
 }
 
 private fun dial(context: Context, number: String) {

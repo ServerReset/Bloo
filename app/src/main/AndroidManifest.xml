@@ -6,10 +6,18 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- So we can detect the official apps and open web/dial/custom-tab links. -->
+    <!-- So we can detect the official apps and open web/dial/custom-tab links.
+         Android 11+ hides other packages unless declared here; without these the
+         digital-key and wallet apps can't be launched and we'd fall back to URLs. -->
     <queries>
         <package android:name="com.stationdm.bluelink" />
         <package android:name="com.stationdm.genesis" />
+        <package android:name="com.myuvo.link" />
+        <package android:name="com.hyundaiusa.hyundai.digitalcarkey" />
+        <package android:name="com.genesisusa.genesis.digitalcarkey" />
+        <package android:name="com.google.android.apps.walletnfcrel" />
+        <package android:name="com.google.android.apps.wallet" />
+        <package android:name="com.samsung.android.spay" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
