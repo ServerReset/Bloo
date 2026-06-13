@@ -570,18 +570,19 @@ private fun OnboardingScreen(vm: AppViewModel) {
 
 @Composable
 private fun OnboardingPoint(emoji: String, title: String, body: String) {
+    val scheme = MaterialTheme.colorScheme
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp))
+            .background(scheme.surfaceContainerHighest)
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(emoji, style = MaterialTheme.typography.headlineSmall)
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = scheme.onSurface)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
         }
     }
 }
@@ -668,18 +669,23 @@ private fun LoginScreen(
                     "Bloo",
                     style = if (shortScreen) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Black,
-                    color = scheme.onPrimary,
+                    color = Color.White,
                 )
                 Text(
                     "A better Blue Link · US",
                     style = MaterialTheme.typography.titleMedium,
-                    color = scheme.onPrimary.copy(alpha = 0.85f),
+                    color = Color.White.copy(alpha = 0.85f),
                 )
             }
         }
 
         Column(
-            Modifier.widthIn(max = 480.dp).padding(24.dp),
+            Modifier
+                .fillMaxWidth()
+                .widthIn(max = 480.dp)
+                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                .background(scheme.surface)
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text("Brand", style = MaterialTheme.typography.labelLarge)
