@@ -1282,10 +1282,19 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val scheme = MaterialTheme.colorScheme
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
+
+    // Entrance animation: slide up gently + fade in on first composition.
+    val alpha = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(24f) }
+    LaunchedEffect(Unit) {
+        launch { alpha.animateTo(1f, tween(350)) }
+        launch { offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) }
+    }
+
     // A themed Surface establishes the correct content colour for ALL text inside
     // (otherwise text on the cover screen falls back to the default black).
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().graphicsLayer(alpha = alpha.value, translationY = offsetY.value),
         shape = RoundedCornerShape(18.dp),
         color = scheme.surfaceContainer,
         contentColor = scheme.onSurface,
@@ -2509,8 +2518,12 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel, showCha
                 onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
                 highlightWhenOff = true,
                 offTextColor = MaterialTheme.colorScheme.error,
-                extraAction = if (supportsPort && showChargePort) {
-                    { ChargePortSplitButton(v, state, vm) }
+                extraAction = if (supportsPort) {
+                    if (showChargePort) {
+                        { ChargePortSplitButton(v, state, vm) }
+                    } else {
+                        { CompactChargePortButton(v, state, vm) }
+                    }
                 } else {
                     null
                 },
@@ -2662,6 +2675,56 @@ private fun FlapMenuItem(
 }
 
 /**
+ * A compact circular charge-port toggle for the cover-screen tile where the full
+ * split button is too wide. Taps toggle open/close; the background springs from
+ * neutral to primary when the port is assumed open, mirroring the split button.
+ */
+@Composable
+private fun CompactChargePortButton(v: Vehicle, state: UiState, vm: AppViewModel) {
+    var open by remember(v.vin) { mutableStateOf(false) }
+    val pending = state.isPending(v.vin, "chargePort")
+    val haptics = LocalHaptics.current
+    val enabled = !state.loading && !pending
+
+    val bg by androidx.compose.animation.animateColorAsState(
+        if (open) MaterialTheme.colorScheme.primary else buttonContainer(),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "compactPortBg",
+    )
+    val fg = if (open) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val scale by animateFloatAsState(
+        if (open) 1.08f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "compactPortScale",
+    )
+
+    Surface(
+        onClick = {
+            haptics?.heavy()
+            if (open) vm.closeChargePort(v) else vm.openChargePort(v)
+            open = !open
+        },
+        enabled = enabled,
+        color = bg,
+        contentColor = fg,
+        shape = CircleShape,
+        modifier = Modifier.size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (pending) {
+                LoadingIndicator(Modifier.size(20.dp))
+            } else {
+                Icon(
+                    Icons.Filled.EvStation,
+                    contentDescription = if (open) "Close charge port" else "Open charge port",
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
  * A round colour swatch for the palette picker. Shows the palette's seed colour
  * and a ring + check when selected.
  */
@@ -2722,11 +2785,17 @@ private fun CustomPaletteSwatch(
         spring(stiffness = Spring.StiffnessMediumLow),
         label = "customSwatchRing",
     )
+    val scale by animateFloatAsState(
+        if (selected) 1.12f else 1f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "customSwatchScale",
+    )
     val swatchColor = Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(48.dp)
+                .graphicsLayer(scaleX = scale, scaleY = scale)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.outline)
                 .padding(ring)
@@ -3197,12 +3266,17 @@ private fun StateControl(
                 isOn == false -> stateOff
                 else -> "Unknown"
             }
-            val stateColor = when {
+            val stateColorTarget = when {
                 !enabled -> LocalContentColor.current.copy(alpha = 0.7f)
                 isOn == false && offTextColor != null -> offTextColor
                 highlighted -> highlightColor
                 else -> LocalContentColor.current.copy(alpha = 0.7f)
             }
+            val stateColor by androidx.compose.animation.animateColorAsState(
+                stateColorTarget,
+                animationSpec = tween(250),
+                label = "stateColor",
+            )
             when {
                 // With no title, the lock state is the headline - shown as an
                 // open/closed padlock icon rather than a word.
@@ -3215,20 +3289,34 @@ private fun StateControl(
                     if (pending) {
                         LoadingIndicator(Modifier.size(28.dp))
                     } else {
-                        Icon(
-                            stateIcon,
-                            contentDescription = stateText,
-                            tint = stateColor,
-                            modifier = Modifier.size(28.dp),
-                        )
+                        // Crossfade between lock/unlock icons on state change.
+                        AnimatedContent(
+                            targetState = stateIcon,
+                            transitionSpec = {
+                                (fadeIn(tween(200)) + scaleIn(initialScale = 0.7f, animationSpec = tween(200))) togetherWith
+                                (fadeOut(tween(150)) + scaleOut(targetScale = 1.3f, animationSpec = tween(150)))
+                            },
+                            label = "stateIconAnim",
+                        ) { ic ->
+                            Icon(ic, contentDescription = stateText, tint = stateColor, modifier = Modifier.size(28.dp))
+                        }
                     }
                 }
-                else -> Text(
-                    stateText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = stateColor,
-                    fontWeight = FontWeight.Bold,
-                )
+                else -> AnimatedContent(
+                    targetState = stateText,
+                    transitionSpec = {
+                        fadeIn(tween(200)) + slideInVertically { -it / 3 } togetherWith
+                        fadeOut(tween(150)) + slideOutVertically { it / 3 }
+                    },
+                    label = "stateTextAnim",
+                ) { text ->
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = stateColor,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
         // An optional secondary control (e.g. the charge-port toggle) sits just
@@ -3247,8 +3335,18 @@ private fun StateControl(
             // ControlHeight tall, so the button is vertically centred in it).
             modifier = Modifier.heightIn(min = 50.dp),
         ) {
-            val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-            MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
+            // Crossfade the icon + label when the toggle state flips (lock ↔ unlock).
+            AnimatedContent(
+                targetState = isOn,
+                transitionSpec = {
+                    fadeIn(tween(180)) + scaleIn(initialScale = 0.82f, animationSpec = tween(180)) togetherWith
+                    fadeOut(tween(120)) + scaleOut(targetScale = 1.18f, animationSpec = tween(120))
+                },
+                label = "btnStateAnim",
+            ) { on ->
+                val buttonIcon = if (on == true) (deactivateIcon ?: icon) else icon
+                MorphButtonLabel(buttonIcon, if (on == true) turnOff else turnOn, pending, iconSize = 22.dp)
+            }
         }
     }
 }
