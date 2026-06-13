@@ -3347,28 +3347,19 @@ private fun ClimatePebble(
         }
 
         val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
-        if (seats.any) {
+        if (seats.any && !(isGen5W && v.isEv)) {
             Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            if (isGen5W && v.isEv) {
-                Text(
-                    "Seat heat via remote climate is not supported by the Gen5W climate module. " +
-                        "Use the in-car HVAC controls after starting climate.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LocalContentColor.current.copy(alpha = 0.6f),
-                )
-            } else {
-                if (seats.driverHeat || seats.driverCool) {
-                    SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
-                }
-                if (seats.passHeat || seats.passCool) {
-                    SeatControl("Passenger seat", passenger, seats.passCool, seats.passHeat) { passenger = it }
-                }
-                if (seats.rearLeftHeat || seats.rearLeftCool) {
-                    SeatControl("Rear left seat", rearLeft, seats.rearLeftCool, seats.rearLeftHeat) { rearLeft = it }
-                }
-                if (seats.rearRightHeat || seats.rearRightCool) {
-                    SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
-                }
+            if (seats.driverHeat || seats.driverCool) {
+                SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
+            }
+            if (seats.passHeat || seats.passCool) {
+                SeatControl("Passenger seat", passenger, seats.passCool, seats.passHeat) { passenger = it }
+            }
+            if (seats.rearLeftHeat || seats.rearLeftCool) {
+                SeatControl("Rear left seat", rearLeft, seats.rearLeftCool, seats.rearLeftHeat) { rearLeft = it }
+            }
+            if (seats.rearRightHeat || seats.rearRightCool) {
+                SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
             }
         }
 
