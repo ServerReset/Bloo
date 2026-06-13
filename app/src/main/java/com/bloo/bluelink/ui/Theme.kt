@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
@@ -39,6 +40,48 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED }
  * ships legitimately as the geometric option.
  */
 enum class FontChoice { SYSTEM, ATKINSON, GOOGLE_SANS }
+
+/**
+ * Built-in colour palettes the user can pick from when dynamic colour
+ * (Material You) is off. Each is derived from the hand-tuned Expressive scheme
+ * by rotating its accent hues, so every palette keeps the same expressive
+ * multi-hue structure and tonal balance.
+ */
+enum class ColorPalette(val label: String, val swatch: Color, internal val hue: Float) {
+    BLUE("Bloo", Color(0xFF005AC1), 217f),
+    VIOLET("Violet", Color(0xFF7B4DFF), 255f),
+    TEAL("Teal", Color(0xFF00696E), 184f),
+    GREEN("Forest", Color(0xFF3A6A2E), 107f),
+    AMBER("Amber", Color(0xFFB26A00), 36f),
+    ROSE("Rose", Color(0xFFB02E55), 338f),
+}
+
+/** The Expressive scheme is authored around this primary hue (see [LightExpressive]). */
+private const val BasePaletteHue = 217f
+
+/** Rotate a colour's hue (HSV) by [degrees]; preserves saturation/value/alpha. */
+private fun Color.rotateHue(degrees: Float): Color {
+    if (degrees == 0f) return this
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(toArgb(), hsv)
+    hsv[0] = ((hsv[0] + degrees) % 360f + 360f) % 360f
+    return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
+}
+
+/** Recolour the accent roles of a scheme to match [palette] by rotating their hue. */
+private fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
+    val delta = palette.hue - BasePaletteHue
+    if (delta == 0f) return this
+    fun Color.r() = rotateHue(delta)
+    return copy(
+        primary = primary.r(), onPrimary = onPrimary.r(),
+        primaryContainer = primaryContainer.r(), onPrimaryContainer = onPrimaryContainer.r(),
+        secondary = secondary.r(), onSecondary = onSecondary.r(),
+        secondaryContainer = secondaryContainer.r(), onSecondaryContainer = onSecondaryContainer.r(),
+        tertiary = tertiary.r(), onTertiary = onTertiary.r(),
+        tertiaryContainer = tertiaryContainer.r(), onTertiaryContainer = onTertiaryContainer.r(),
+    )
+}
 
 // --- Expressive color palettes -------------------------------------------
 // A vibrant, high-emphasis Material 3 palette used when dynamic color
@@ -174,6 +217,7 @@ fun BlooTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     fontChoice: FontChoice = FontChoice.SYSTEM,
     dynamicColor: Boolean = true,
+    colorPalette: ColorPalette = ColorPalette.BLUE,
     uiScale: Float = 1f,
     vibrancy: Float = 1f,
     content: @Composable () -> Unit,
@@ -190,8 +234,8 @@ fun BlooTheme(
     val base = when {
         canDynamic && dark -> dynamicDarkColorScheme(context)
         canDynamic && !dark -> dynamicLightColorScheme(context)
-        dark -> DarkExpressive
-        else -> LightExpressive
+        dark -> DarkExpressive.applyPalette(colorPalette)
+        else -> LightExpressive.applyPalette(colorPalette)
     }
 
     val amoled = if (themeMode == ThemeMode.AMOLED) {

@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -67,6 +68,7 @@ class SettingsStore(private val context: Context) {
         val THEME = stringPreferencesKey("theme_mode")
         val FONT = stringPreferencesKey("font_choice")
         val DYNAMIC = stringPreferencesKey("dynamic_color")
+        val PALETTE = stringPreferencesKey("color_palette")
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LOCK_TIMING = stringPreferencesKey("lock_timing")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
@@ -82,6 +84,8 @@ class SettingsStore(private val context: Context) {
         val themeMode: ThemeMode = ThemeMode.SYSTEM,
         val fontChoice: FontChoice = FontChoice.SYSTEM,
         val dynamicColor: Boolean = true,
+        /** Which built-in palette to use when dynamic colour is off. */
+        val colorPalette: ColorPalette = ColorPalette.BLUE,
         val biometricLock: Boolean = false,
         /** When the biometric lock re-engages after leaving the foreground. */
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
@@ -104,6 +108,8 @@ class SettingsStore(private val context: Context) {
             fontChoice = prefs[Keys.FONT]?.let { runCatching { FontChoice.valueOf(it) }.getOrNull() }
                 ?: FontChoice.SYSTEM,
             dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,
+            colorPalette = prefs[Keys.PALETTE]?.let { runCatching { ColorPalette.valueOf(it) }.getOrNull() }
+                ?: ColorPalette.BLUE,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
@@ -432,6 +438,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setDynamicColor(enabled: Boolean) {
         context.settingsDataStore.edit { it[Keys.DYNAMIC] = enabled.toString() }
+    }
+
+    suspend fun setColorPalette(palette: ColorPalette) {
+        context.settingsDataStore.edit { it[Keys.PALETTE] = palette.name }
     }
 
     // --- Per-car climate settings + presets ------------------------------

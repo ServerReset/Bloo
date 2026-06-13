@@ -63,6 +63,7 @@ class MainActivity : FragmentActivity() {
                 themeMode = appearance.themeMode,
                 fontChoice = appearance.fontChoice,
                 dynamicColor = appearance.dynamicColor,
+                colorPalette = appearance.colorPalette,
                 uiScale = appearance.uiScale,
                 vibrancy = appearance.vibrancy,
             ) {

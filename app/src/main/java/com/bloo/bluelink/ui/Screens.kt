@@ -119,6 +119,7 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
@@ -2472,7 +2473,7 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
                 highlightWhenOff = true,
                 offTextColor = MaterialTheme.colorScheme.error,
                 extraAction = if (supportsPort) {
-                    { ChargePortButton(v, state, vm) }
+                    { ChargePortButtons(v, state, vm) }
                 } else {
                     null
                 },
@@ -2482,27 +2483,85 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
 }
 
 /**
- * A single charge-port toggle. The API reports no port open/closed state, so the
- * button tracks its own assumed state: it starts "Open", fires the open command
- * and flips to "Close", and vice-versa - matching the lock/unlock feel.
+ * The charge-port controls: two compact buttons, Open and Close, that sit just
+ * left of the lock/unlock action. The API reports no port open/closed state, so
+ * we assume the door starts closed; the matching button highlights for a moment
+ * after you fire its command so the tap is acknowledged.
  */
 @Composable
-private fun ChargePortButton(v: Vehicle, state: UiState, vm: AppViewModel) {
+private fun ChargePortButtons(v: Vehicle, state: UiState, vm: AppViewModel) {
+    // Assume closed at start; track the last command so the active button stays
+    // highlighted, mirroring the lock/unlock feel.
     var open by remember(v.vin) { mutableStateOf(false) }
     val pending = state.isPending(v.vin, "chargePort")
     val haptics = LocalHaptics.current
-    MorphButton(
-        onClick = {
-            haptics?.heavy()
-            if (open) vm.closeChargePort(v) else vm.openChargePort(v)
-            open = !open
-        },
-        enabled = !state.loading && !pending,
-        active = open,
-        modifier = Modifier.heightIn(min = 50.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-    ) {
-        MorphButtonLabel(Icons.Filled.EvStation, if (open) "Close" else "Open", pending, iconSize = 22.dp)
+    val enabled = !state.loading && !pending
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MorphButton(
+            onClick = { haptics?.heavy(); vm.openChargePort(v); open = true },
+            enabled = enabled,
+            active = open,
+            modifier = Modifier.heightIn(min = 50.dp),
+            contentPadding = PaddingValues(horizontal = 14.dp),
+        ) {
+            MorphButtonLabel(Icons.Filled.EvStation, "Open", pending, iconSize = 20.dp)
+        }
+        MorphButton(
+            onClick = { haptics?.heavy(); vm.closeChargePort(v); open = false },
+            enabled = enabled,
+            active = !open,
+            modifier = Modifier.heightIn(min = 50.dp),
+            contentPadding = PaddingValues(horizontal = 14.dp),
+        ) {
+            MorphButtonLabel(Icons.Filled.Close, "Close", pending, iconSize = 20.dp)
+        }
+    }
+}
+
+/**
+ * A round colour swatch for the palette picker. Shows the palette's seed colour
+ * and a ring + check when selected.
+ */
+@Composable
+private fun PaletteSwatch(
+    palette: ColorPalette,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    val ring by animateDpAsState(
+        if (selected) 3.dp else 0.dp,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "swatchRing",
+    )
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.outline)
+                .padding(ring)
+                .clip(CircleShape)
+                .background(palette.swatch)
+                .clickable { haptics?.click(); onClick() },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            palette.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -4253,10 +4312,33 @@ private fun SettingsScreen(vm: AppViewModel) {
             SettingsCard("Color") {
                 ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
                 Text(
-                    "Uses your wallpaper palette on Android 12+. Turn off for Bloo's " +
-                        "built-in expressive colors.",
+                    "Uses your wallpaper palette on Android 12+. Turn off to pick one of " +
+                        "Bloo's built-in expressive palettes.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                AnimatedVisibility(visible = !appearance.dynamicColor) {
+                    Column {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Palette",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            ColorPalette.entries.forEach { palette ->
+                                PaletteSwatch(
+                                    palette = palette,
+                                    selected = appearance.colorPalette == palette,
+                                    onClick = { vm.setColorPalette(palette) },
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 StepRow("Vibrancy", "${(appearance.vibrancy * 100).roundToInt()}%")
                 AnimatedSlider(
