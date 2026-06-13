@@ -3021,9 +3021,7 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
         )
     }
 
-    val hasSamsungWallet = remember(context) {
-        context.packageManager.getLaunchIntentForPackage("com.samsung.android.spay") != null
-    }
+    val isSamsung = remember { Build.MANUFACTURER.lowercase() == "samsung" }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         group("App & account") {
@@ -3043,42 +3041,47 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
             LinkButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
             LinkButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
         }
-        // Digital Car Key: DK1 (BLE/NFC) for Hyundai and Genesis only.
-        // DK2 (UWB) via Google Wallet or Samsung Wallet for all brands.
+        // Digital Key: Gen5W head units use DK1 (BLE/NFC dedicated app).
+        // Gen3+ and all Kia models use DK2 (UWB via wallet).
+        // Kia has no gen field so isGen5W is always false for them.
+        val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
         group("Digital Car Key") {
-            when (v.brand) {
-                Brand.HYUNDAI -> LinkButton("Digital Key 1", Icons.Filled.VpnKey) {
-                    openComponent(
-                        context,
-                        "com.hyundaiusa.hyundai.digitalcarkey",
-                        "com.hyundaiusa.hyundai.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
-                        "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
-                        inApp,
-                    )
-                }
-                Brand.GENESIS -> LinkButton("Digital Key 1", Icons.Filled.VpnKey) {
-                    openComponent(
-                        context,
-                        "com.genesisusa.genesis.digitalcarkey",
-                        "com.genesisusa.genesis.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
-                        "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
-                        inApp,
-                    )
-                }
-                Brand.KIA -> Unit
-            }
-            if (hasSamsungWallet) {
-                LinkButton("Digital Key 2", Icons.Filled.CreditCard) {
-                    openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
+            if (isGen5W) {
+                when (v.brand) {
+                    Brand.HYUNDAI -> LinkButton("Digital Key", Icons.Filled.VpnKey) {
+                        openComponent(
+                            context,
+                            "com.hyundaiusa.hyundai.digitalcarkey",
+                            "com.hyundaiusa.hyundai.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
+                            "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
+                            inApp,
+                        )
+                    }
+                    Brand.GENESIS -> LinkButton("Digital Key", Icons.Filled.VpnKey) {
+                        openComponent(
+                            context,
+                            "com.genesisusa.genesis.digitalcarkey",
+                            "com.genesisusa.genesis.digitalcarkey.ui.activity.main.VehicleDigitalKeyActivity",
+                            "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
+                            inApp,
+                        )
+                    }
+                    Brand.KIA -> Unit
                 }
             } else {
-                LinkButton("Digital Key 2", Icons.Filled.AccountBalanceWallet) {
-                    openApp(
-                        context,
-                        listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
-                        "https://pay.google.com/",
-                        inApp,
-                    )
+                if (isSamsung) {
+                    LinkButton("Digital Key", Icons.Filled.CreditCard) {
+                        openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
+                    }
+                } else {
+                    LinkButton("Digital Key", Icons.Filled.AccountBalanceWallet) {
+                        openApp(
+                            context,
+                            listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
+                            "https://pay.google.com/",
+                            inApp,
+                        )
+                    }
                 }
             }
         }
@@ -4243,6 +4246,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     value = appearance.vibrancy,
                     onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
                     valueRange = 0.5f..1.6f,
+                    steps = 21,
                 )
             }
 
@@ -4253,6 +4257,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     value = appearance.uiScale,
                     onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
                     valueRange = 0.85f..1.3f,
+                    steps = 8,
                 )
             }
 
@@ -4700,6 +4705,7 @@ private fun SettingsSearchResults(
             value = appearance.uiScale,
             onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
             valueRange = 0.85f..1.3f,
+            steps = 8,
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
@@ -4708,6 +4714,7 @@ private fun SettingsSearchResults(
             value = appearance.vibrancy,
             onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
             valueRange = 0.5f..1.6f,
+            steps = 21,
         )
     }
     add("Open links in app", "browser tab links") {
