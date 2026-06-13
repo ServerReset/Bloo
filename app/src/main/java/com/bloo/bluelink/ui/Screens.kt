@@ -119,6 +119,7 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -511,36 +512,48 @@ private fun OnboardingScreen(vm: AppViewModel) {
                     ActivityResultContracts.RequestPermission(),
                 ) { granted -> notifGranted = granted }
                 MorphButton(
-                    onClick = { notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
-                    enabled = !notifGranted,
+                    onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+                    active = notifGranted,
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
                 ) {
-                    Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(
+                        if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(if (notifGranted) "Notifications enabled" else "Enable notifications", fontWeight = FontWeight.SemiBold)
                 }
             }
 
             if (canBio) {
+                var bioEnabled by remember { mutableStateOf(false) }
                 MorphButton(
                     onClick = {
-                        context.findFragmentActivity()?.let { activity ->
-                            showBiometricPrompt(
-                                activity = activity,
-                                title = "Enable fingerprint lock",
-                                subtitle = "Confirm to require it when opening Bloo",
-                                onSuccess = { vm.setBiometricLock(true) },
-                                onError = { },
-                            )
+                        if (!bioEnabled) {
+                            context.findFragmentActivity()?.let { activity ->
+                                showBiometricPrompt(
+                                    activity = activity,
+                                    title = "Enable fingerprint lock",
+                                    subtitle = "Confirm to require it when opening Bloo",
+                                    onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
+                                    onError = { },
+                                )
+                            }
                         }
                     },
+                    active = bioEnabled,
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
                 ) {
-                    Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(
+                        if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
                     Spacer(Modifier.width(8.dp))
-                    Text("Lock Bloo with fingerprint", fontWeight = FontWeight.SemiBold)
+                    Text(if (bioEnabled) "Fingerprint lock enabled" else "Lock Bloo with fingerprint", fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -2486,7 +2499,6 @@ private fun ChargePortButton(v: Vehicle, state: UiState, vm: AppViewModel) {
         },
         enabled = !state.loading && !pending,
         active = open,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
         modifier = Modifier.heightIn(min = 50.dp),
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
@@ -2567,8 +2579,6 @@ private fun MorphTextButton(
         enabled = enabled,
         containerColor = containerColor,
         contentColor = contentColor,
-        // A faint outline keeps the pill shape legible on any surface.
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
     ) {
         Text(text, fontWeight = FontWeight.SemiBold)
@@ -2718,7 +2728,6 @@ private fun StateControl(
             active = highlighted,
             activeContainerColor = highlightColor,
             activeContentColor = highlightContentColor,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             // Same pill height as the pebble header actions (the row stays
             // ControlHeight tall, so the button is vertically centred in it).
             modifier = Modifier.heightIn(min = 50.dp),
@@ -2874,9 +2883,6 @@ private fun PebbleActionButton(
         active = active,
         activeContainerColor = activeContainer,
         activeContentColor = activeContent,
-        // A faint outline keeps the inactive pill's shape visible on any pebble
-        // background (e.g. the location pebble's neutral surface).
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         modifier = Modifier.heightIn(min = 50.dp),
     ) {
@@ -3126,13 +3132,12 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
 /** A compact owner-area destination button (sized to its label, not full width). */
 @Composable
 private fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
-    // Same morphing pill framework as every other button, with a tonal fill +
-    // faint outline so the shape reads clearly on the car-info pebble.
+    // Same morphing pill framework as every other button, with a tonal fill that
+    // reads clearly on the car-info pebble.
     MorphButton(
         onClick = onClick,
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -3717,7 +3722,7 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             steps = 4,
         )
         if (charging && mins != null) ChargeEta(mins)
-        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled, outlined = true) {
+        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
             vm.setChargeLimits(v, ac, dc)
         }
         // The charge-port toggle lives in the controls pebble, next to lock/unlock.
@@ -4105,38 +4110,40 @@ private fun SettingsScreen(vm: AppViewModel) {
                     Text("Not signed in")
                 }
                 state.accounts.forEachIndexed { i, creds ->
-                    if (i > 0) Spacer(Modifier.height(12.dp))
-                    Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    StatusRow("Email", creds.email)
-                    SecretRow("Password", creds.password)
+                    if (i > 0) Spacer(Modifier.height(16.dp))
                     var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
-                    // Kia US has no service PIN; commands are session-keyed.
-                    if (!creds.brand.usesOtpLogin) {
-                        OutlinedTextField(
-                            value = pin,
-                            onValueChange = { pin = it },
-                            label = { Text("Service PIN") },
-                            singleLine = true,
-                            shape = FieldShape,
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        StatusRow("Email", creds.email)
+                        SecretRow("Password", creds.password)
+                        // Kia US has no service PIN; commands are session-keyed.
                         if (!creds.brand.usesOtpLogin) {
-                            MorphTextButton(
-                                "Update PIN",
-                                onClick = { vm.updatePin(creds.brand, pin) },
-                                enabled = pin.isNotBlank() && pin != creds.pin,
+                            OutlinedTextField(
+                                value = pin,
+                                onValueChange = { pin = it },
+                                label = { Text("Service PIN") },
+                                singleLine = true,
+                                shape = FieldShape,
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        MorphTextButton(
-                            "Sign out",
-                            onClick = { vm.logout(creds.brand) },
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (!creds.brand.usesOtpLogin) {
+                                MorphTextButton(
+                                    "Update PIN",
+                                    onClick = { vm.updatePin(creds.brand, pin) },
+                                    enabled = pin.isNotBlank() && pin != creds.pin,
+                                )
+                            }
+                            MorphTextButton(
+                                "Sign out",
+                                onClick = { vm.logout(creds.brand) },
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -5013,14 +5020,12 @@ private fun CommandButton(
     icon: ImageVector,
     modifier: Modifier,
     enabled: Boolean,
-    outlined: Boolean = false,
     onClick: () -> Unit,
 ) {
     MorphButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(64.dp),
-        border = if (outlined) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null,
         contentPadding = PaddingValues(horizontal = 18.dp),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))

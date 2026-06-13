@@ -145,17 +145,18 @@ private fun expressiveTypography(choice: FontChoice): Typography {
 }
 
 /**
- * The default button fill. Buttons sit on pebble surfaces (surfaceVariant); in
- * dark themes the stock surfaceContainerHighest reads muddy and low-contrast
- * against them, so we lift it toward the foreground for a clearer, lighter grey.
- * Light themes already have plenty of separation, so they're left unchanged.
+ * The default button fill. Buttons carry no outline, so the fill alone has to
+ * read clearly against every surface they sit on (pebbles use surfaceVariant,
+ * cards use surfaceContainer). We push surfaceContainerHighest away from the
+ * background — lighter in dark themes, a touch darker in light themes — so an
+ * idle button is always visible without a border.
  */
 @Composable
 fun buttonContainer(): Color {
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.surface.luminance() < 0.5f
-    return if (dark) lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.12f)
-    else scheme.surfaceContainerHighest
+    return if (dark) lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.18f)
+    else lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.10f)
 }
 
 /** Scale a colour's saturation (HSV) by [factor]; 1 = unchanged. */
