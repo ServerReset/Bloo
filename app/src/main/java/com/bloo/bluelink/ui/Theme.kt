@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
+import kotlinx.serialization.Serializable
 
 /** User-selectable appearance. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED }
@@ -56,6 +57,20 @@ enum class ColorPalette(val label: String, val swatch: Color, internal val hue: 
     ROSE("Rose", Color(0xFFB02E55), 338f),
 }
 
+/**
+ * A user-authored colour palette. Each field stores a packed Android ARGB int
+ * (same encoding as [android.graphics.Color]). Only [primaryArgb] is required;
+ * secondary and tertiary default to the base scheme's relative offsets from primary.
+ */
+@Serializable
+data class CustomPaletteData(
+    val id: String,
+    val name: String,
+    val primaryArgb: Int,
+    val secondaryArgb: Int? = null,
+    val tertiaryArgb: Int? = null,
+)
+
 /** The Expressive scheme is authored around this primary hue (see [LightExpressive]). */
 private const val BasePaletteHue = 217f
 
@@ -66,6 +81,42 @@ private fun Color.rotateHue(degrees: Float): Color {
     android.graphics.Color.colorToHSV(toArgb(), hsv)
     hsv[0] = ((hsv[0] + degrees) % 360f + 360f) % 360f
     return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
+}
+
+private fun Color.extractHue(): Float {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(toArgb(), hsv)
+    return hsv[0]
+}
+
+/**
+ * Recolour a scheme from a [CustomPaletteData]. Primary group rotates by however
+ * much the user's primary hue differs from the base palette hue. Secondary and
+ * tertiary each rotate independently if the user provided an override; otherwise
+ * they follow the same delta as primary (preserving the expressive offset).
+ */
+internal fun ColorScheme.applyCustomPalette(p: CustomPaletteData): ColorScheme {
+    val primaryDelta = Color(p.primaryArgb.toLong() and 0xFFFFFFFFL).extractHue() - BasePaletteHue
+    fun Color.rp() = rotateHue(primaryDelta)
+
+    val secDelta = p.secondaryArgb
+        ?.let { Color(it.toLong() and 0xFFFFFFFFL).extractHue() - secondary.extractHue() }
+        ?: primaryDelta
+    fun Color.rs() = rotateHue(secDelta)
+
+    val tertDelta = p.tertiaryArgb
+        ?.let { Color(it.toLong() and 0xFFFFFFFFL).extractHue() - tertiary.extractHue() }
+        ?: primaryDelta
+    fun Color.rt() = rotateHue(tertDelta)
+
+    return copy(
+        primary = primary.rp(), onPrimary = onPrimary.rp(),
+        primaryContainer = primaryContainer.rp(), onPrimaryContainer = onPrimaryContainer.rp(),
+        secondary = secondary.rs(), onSecondary = onSecondary.rs(),
+        secondaryContainer = secondaryContainer.rs(), onSecondaryContainer = onSecondaryContainer.rs(),
+        tertiary = tertiary.rt(), onTertiary = onTertiary.rt(),
+        tertiaryContainer = tertiaryContainer.rt(), onTertiaryContainer = onTertiaryContainer.rt(),
+    )
 }
 
 /** Recolour the accent roles of a scheme to match [palette] by rotating their hue. */
@@ -218,6 +269,7 @@ fun BlooTheme(
     fontChoice: FontChoice = FontChoice.SYSTEM,
     dynamicColor: Boolean = true,
     colorPalette: ColorPalette = ColorPalette.BLUE,
+    customPalette: CustomPaletteData? = null,
     uiScale: Float = 1f,
     vibrancy: Float = 1f,
     content: @Composable () -> Unit,
@@ -234,6 +286,8 @@ fun BlooTheme(
     val base = when {
         canDynamic && dark -> dynamicDarkColorScheme(context)
         canDynamic && !dark -> dynamicLightColorScheme(context)
+        customPalette != null && dark -> DarkExpressive.applyCustomPalette(customPalette)
+        customPalette != null && !dark -> LightExpressive.applyCustomPalette(customPalette)
         dark -> DarkExpressive.applyPalette(colorPalette)
         else -> LightExpressive.applyPalette(colorPalette)
     }

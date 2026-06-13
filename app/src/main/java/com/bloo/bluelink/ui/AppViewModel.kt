@@ -1279,6 +1279,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
     fun setColorPalette(palette: ColorPalette) = viewModelScope.launch { settingsStore.setColorPalette(palette) }
+    fun saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette) }
+    fun deleteCustomPalette(id: String) = viewModelScope.launch { settingsStore.deleteCustomPalette(id) }
+    fun setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id) }
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
     fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
     fun setUiScale(value: Float) = viewModelScope.launch { settingsStore.setUiScale(value) }

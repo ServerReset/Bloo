@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bloo.bluelink.ui.ColorPalette
+import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -69,6 +70,8 @@ class SettingsStore(private val context: Context) {
         val FONT = stringPreferencesKey("font_choice")
         val DYNAMIC = stringPreferencesKey("dynamic_color")
         val PALETTE = stringPreferencesKey("color_palette")
+        val CUSTOM_PALETTES = stringPreferencesKey("custom_palettes")
+        val ACTIVE_CUSTOM_PALETTE_ID = stringPreferencesKey("active_custom_palette_id")
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LOCK_TIMING = stringPreferencesKey("lock_timing")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
@@ -84,8 +87,12 @@ class SettingsStore(private val context: Context) {
         val themeMode: ThemeMode = ThemeMode.SYSTEM,
         val fontChoice: FontChoice = FontChoice.SYSTEM,
         val dynamicColor: Boolean = true,
-        /** Which built-in palette to use when dynamic colour is off. */
+        /** Which built-in palette to use when dynamic colour is off and no custom palette is active. */
         val colorPalette: ColorPalette = ColorPalette.BLUE,
+        /** User-saved custom colour palettes. */
+        val customPalettes: List<CustomPaletteData> = emptyList(),
+        /** ID of the active custom palette, or null to use a built-in palette. */
+        val activeCustomPaletteId: String? = null,
         val biometricLock: Boolean = false,
         /** When the biometric lock re-engages after leaving the foreground. */
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
@@ -102,6 +109,8 @@ class SettingsStore(private val context: Context) {
     )
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
+        val palJson = Json { ignoreUnknownKeys = true }
+        val palSer = ListSerializer(CustomPaletteData.serializer())
         Appearance(
             themeMode = prefs[Keys.THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
                 ?: ThemeMode.SYSTEM,
@@ -110,6 +119,10 @@ class SettingsStore(private val context: Context) {
             dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,
             colorPalette = prefs[Keys.PALETTE]?.let { runCatching { ColorPalette.valueOf(it) }.getOrNull() }
                 ?: ColorPalette.BLUE,
+            customPalettes = prefs[Keys.CUSTOM_PALETTES]?.let { json ->
+                runCatching { palJson.decodeFromString(palSer, json) }.getOrElse { emptyList() }
+            } ?: emptyList(),
+            activeCustomPaletteId = prefs[Keys.ACTIVE_CUSTOM_PALETTE_ID],
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
@@ -487,6 +500,41 @@ class SettingsStore(private val context: Context) {
     suspend fun setClimatePresets(vin: String, presets: List<ClimatePreset>) {
         context.settingsDataStore.edit {
             it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, presets)
+        }
+    }
+
+    // --- Custom colour palettes ------------------------------------------
+
+    private val paletteJson = Json { ignoreUnknownKeys = true }
+    private val paletteListSerializer = ListSerializer(CustomPaletteData.serializer())
+
+    private suspend fun readCustomPalettes(): List<CustomPaletteData> {
+        val raw = context.settingsDataStore.data.first()[Keys.CUSTOM_PALETTES] ?: return emptyList()
+        return runCatching { paletteJson.decodeFromString(paletteListSerializer, raw) }.getOrElse { emptyList() }
+    }
+
+    /** Insert or replace a custom palette by id. */
+    suspend fun saveCustomPalette(palette: CustomPaletteData) {
+        val updated = readCustomPalettes().filter { it.id != palette.id } + palette
+        context.settingsDataStore.edit {
+            it[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, updated)
+        }
+    }
+
+    /** Remove a custom palette; clears the active id if it matches. */
+    suspend fun deleteCustomPalette(id: String) {
+        val updated = readCustomPalettes().filter { it.id != id }
+        context.settingsDataStore.edit { prefs ->
+            prefs[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, updated)
+            if (prefs[Keys.ACTIVE_CUSTOM_PALETTE_ID] == id) prefs.remove(Keys.ACTIVE_CUSTOM_PALETTE_ID)
+        }
+    }
+
+    /** Set which custom palette is active (null = use a built-in palette). */
+    suspend fun setActiveCustomPaletteId(id: String?) {
+        context.settingsDataStore.edit {
+            if (id == null) it.remove(Keys.ACTIVE_CUSTOM_PALETTE_ID)
+            else it[Keys.ACTIVE_CUSTOM_PALETTE_ID] = id
         }
     }
 }

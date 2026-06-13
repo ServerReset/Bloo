@@ -264,6 +264,8 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.tan
+import java.util.UUID
+import androidx.compose.ui.graphics.toArgb
 
 @Composable
 fun BlooApp(vm: AppViewModel) {
@@ -2123,18 +2125,24 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             // the leading spacer also clears the floating overlay buttons.
             val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + 52.dp)) }
             val trail: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(bottomInset + 16.dp)) }
-            Row(
-                Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) { lead(); leftCol(); trail() }
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) { lead(); rightCol(); trail() }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Row(
+                    Modifier
+                        .fillMaxHeight()
+                        .widthIn(max = 960.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) { lead(); leftCol(); trail() }
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) { lead(); rightCol(); trail() }
+                }
             }
         }
     }
@@ -2698,6 +2706,298 @@ private fun PaletteSwatch(
             else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/** Like [PaletteSwatch] but for user-created [CustomPaletteData] entries. */
+@Composable
+private fun CustomPaletteSwatch(
+    palette: CustomPaletteData,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    val ring by animateDpAsState(
+        if (selected) 3.dp else 0.dp,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "customSwatchRing",
+    )
+    val swatchColor = Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.outline)
+                .padding(ring)
+                .clip(CircleShape)
+                .background(swatchColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clickable { haptics?.click(); onClick() },
+                )
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clickable { haptics?.click(); onClick() }
+                )
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                palette.name,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(
+                Icons.Filled.Settings,
+                contentDescription = "Edit",
+                modifier = Modifier.size(10.dp).clickable { haptics?.click(); onEdit() },
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Canvas-based colour picker: hue bar + saturation/value square. */
+@Composable
+private fun ColorPickerCanvas(
+    color: Color,
+    onColorChange: (Color) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Internal HSV state initialised from the incoming colour once.
+    var hue by remember {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+        mutableFloatStateOf(hsv[0])
+    }
+    var sat by remember {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+        mutableFloatStateOf(hsv[1].coerceAtLeast(0.05f))
+    }
+    var value by remember {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+        mutableFloatStateOf(hsv[2].coerceAtLeast(0.3f))
+    }
+
+    fun update() {
+        onColorChange(Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value))))
+    }
+
+    val pureHue = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+    val picked = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
+    val hueGradient = remember(Unit) {
+        (0..12).map { i -> Color(android.graphics.Color.HSVToColor(floatArrayOf(i * 30f, 1f, 1f))) }
+    }
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Saturation × Value square
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        down.consume()
+                        sat = (down.position.x / size.width).coerceIn(0.02f, 1f)
+                        value = 1f - (down.position.y / size.height).coerceIn(0f, 0.98f)
+                        update()
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            val ch = ev.changes.firstOrNull() ?: break
+                            if (!ch.pressed) break
+                            ch.consume()
+                            sat = (ch.position.x / size.width).coerceIn(0.02f, 1f)
+                            value = 1f - (ch.position.y / size.height).coerceIn(0f, 0.98f)
+                            update()
+                        }
+                    }
+                }
+        ) {
+            drawRect(Brush.horizontalGradient(listOf(Color.White, pureHue)))
+            drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
+            val cx = sat * size.width
+            val cy = (1f - value) * size.height
+            drawCircle(Color.White, 11.dp.toPx(), Offset(cx, cy))
+            drawCircle(picked, 8.dp.toPx(), Offset(cx, cy))
+        }
+
+        // Hue bar
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(34.dp)
+                .clip(CircleShape)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        down.consume()
+                        hue = ((down.position.x / size.width) * 360f).coerceIn(0f, 359.9f)
+                        update()
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            val ch = ev.changes.firstOrNull() ?: break
+                            if (!ch.pressed) break
+                            ch.consume()
+                            hue = ((ch.position.x / size.width) * 360f).coerceIn(0f, 359.9f)
+                            update()
+                        }
+                    }
+                }
+        ) {
+            drawRect(Brush.horizontalGradient(hueGradient))
+            val tx = (hue / 360f) * size.width
+            drawCircle(Color.White, 14.dp.toPx(), Offset(tx, size.height / 2f))
+            drawCircle(pureHue, 11.dp.toPx(), Offset(tx, size.height / 2f))
+        }
+
+        // Preview swatch
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(picked)
+        )
+    }
+}
+
+/** Dialog to create or edit a [CustomPaletteData]. */
+@Composable
+private fun PaletteEditorDialog(
+    editing: CustomPaletteData?,
+    onSave: (CustomPaletteData) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val paletteId = remember(editing) { editing?.id ?: UUID.randomUUID().toString() }
+    var name by remember(editing) { mutableStateOf(editing?.name ?: "Custom") }
+    var primaryColor by remember(editing) {
+        mutableStateOf(editing?.primaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: Color(0xFF005AC1))
+    }
+    var useSecondary by remember(editing) { mutableStateOf(editing?.secondaryArgb != null) }
+    var secondaryColor by remember(editing) {
+        mutableStateOf(editing?.secondaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: Color(0xFF7B4DFF))
+    }
+    var useTertiary by remember(editing) { mutableStateOf(editing?.tertiaryArgb != null) }
+    var tertiaryColor by remember(editing) {
+        mutableStateOf(editing?.tertiaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: Color(0xFF00696E))
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (editing == null) "New palette" else "Edit \"${editing.name}\"",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (editing != null) {
+                    IconButton(onClick = { onDelete(paletteId); onDismiss() }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Delete palette")
+                    }
+                }
+            }
+        },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+
+                // Primary colour picker
+                Text(
+                    "Primary colour",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ColorPickerCanvas(primaryColor, { primaryColor = it })
+
+                // Secondary colour (optional)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Custom secondary", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = useSecondary, onCheckedChange = { useSecondary = it })
+                }
+                AnimatedVisibility(useSecondary) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Secondary colour",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        ColorPickerCanvas(secondaryColor, { secondaryColor = it })
+                    }
+                }
+
+                // Tertiary colour (optional)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Custom tertiary", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = useTertiary, onCheckedChange = { useTertiary = it })
+                }
+                AnimatedVisibility(useTertiary) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Tertiary colour",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        ColorPickerCanvas(tertiaryColor, { tertiaryColor = it })
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            MorphButton(
+                onClick = {
+                    onSave(
+                        CustomPaletteData(
+                            id = paletteId,
+                            name = name.ifBlank { "Custom" },
+                            primaryArgb = primaryColor.toArgb(),
+                            secondaryArgb = if (useSecondary) secondaryColor.toArgb() else null,
+                            tertiaryArgb = if (useTertiary) tertiaryColor.toArgb() else null,
+                        )
+                    )
+                    onDismiss()
+                },
+                active = true,
+            ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false, iconSize = 18.dp) }
+        },
+        dismissButton = {
+            MorphTextButton("Cancel", onDismiss)
+        },
+    )
 }
 
 /**
@@ -4504,17 +4804,20 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Color
             SettingsCard("Color") {
+                // editingPalette: null = no dialog; non-null id but missing in list = new
+                var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
+                var showEditor by remember { mutableStateOf(false) }
+
                 ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
                 Text(
-                    "Uses your wallpaper palette on Android 12+. Turn off to pick one of " +
-                        "Bloo's built-in expressive palettes.",
+                    "Uses your wallpaper palette on Android 12+. Turn off to choose or design your own palette.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 AnimatedVisibility(visible = !appearance.dynamicColor) {
                     Column {
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "Palette",
+                            "Built-in palettes",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -4526,11 +4829,43 @@ private fun SettingsScreen(vm: AppViewModel) {
                             ColorPalette.entries.forEach { palette ->
                                 PaletteSwatch(
                                     palette = palette,
-                                    selected = appearance.colorPalette == palette,
-                                    onClick = { vm.setColorPalette(palette) },
+                                    selected = appearance.activeCustomPaletteId == null &&
+                                        appearance.colorPalette == palette,
+                                    onClick = {
+                                        vm.setColorPalette(palette)
+                                        vm.setActiveCustomPaletteId(null)
+                                    },
                                 )
                             }
                         }
+                        if (appearance.customPalettes.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "Custom palettes",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                appearance.customPalettes.forEach { custom ->
+                                    CustomPaletteSwatch(
+                                        palette = custom,
+                                        selected = appearance.activeCustomPaletteId == custom.id,
+                                        onClick = { vm.setActiveCustomPaletteId(custom.id) },
+                                        onEdit = { editingPalette = custom; showEditor = true },
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        MorphTextButton(
+                            "Add custom palette",
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { editingPalette = null; showEditor = true },
+                        )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -4541,6 +4876,18 @@ private fun SettingsScreen(vm: AppViewModel) {
                     valueRange = 0.5f..1.6f,
                     steps = 21,
                 )
+
+                if (showEditor) {
+                    PaletteEditorDialog(
+                        editing = editingPalette,
+                        onSave = { palette ->
+                            vm.saveCustomPalette(palette)
+                            vm.setActiveCustomPaletteId(palette.id)
+                        },
+                        onDelete = { id -> vm.deleteCustomPalette(id) },
+                        onDismiss = { showEditor = false; editingPalette = null },
+                    )
+                }
             }
 
             // Display scale

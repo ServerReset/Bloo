@@ -59,11 +59,15 @@ class MainActivity : FragmentActivity() {
         handleShortcutIntent(intent)
         setContent {
             val appearance by viewModel.appearance.collectAsState()
+            val activeCustom = if (!appearance.dynamicColor)
+                appearance.customPalettes.find { it.id == appearance.activeCustomPaletteId }
+            else null
             BlooTheme(
                 themeMode = appearance.themeMode,
                 fontChoice = appearance.fontChoice,
                 dynamicColor = appearance.dynamicColor,
                 colorPalette = appearance.colorPalette,
+                customPalette = activeCustom,
                 uiScale = appearance.uiScale,
                 vibrancy = appearance.vibrancy,
             ) {
