@@ -152,6 +152,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
@@ -692,16 +693,31 @@ private fun LoginScreen(
             }
         }
 
+        // No sheet/frame: the form floats directly over the aurora. Inputs and
+        // buttons carry their own fills so they stay legible and high-contrast.
         Column(
             Modifier
                 .fillMaxWidth()
                 .widthIn(max = 480.dp)
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                .background(scheme.surface)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp)
+                .padding(top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Brand", style = MaterialTheme.typography.labelLarge)
+            // Opaque, filled fields so each input reads as a floating rounded
+            // card over the aurora rather than a faint outline.
+            val fieldColors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = scheme.surface,
+                unfocusedContainerColor = scheme.surface,
+                disabledContainerColor = scheme.surface,
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+            )
+
+            Text(
+                "Brand",
+                style = MaterialTheme.typography.labelLarge,
+                color = scheme.onSurface,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Brand.entries.forEach { b ->
                     MorphChip(selected = brand == b, onClick = { brand = b }, label = b.label)
@@ -714,6 +730,7 @@ private fun LoginScreen(
                 label = { Text(if (brand == Brand.KIA) "Kia Connect email" else "Blue Link email") },
                 singleLine = true,
                 shape = FieldShape,
+                colors = fieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -723,6 +740,7 @@ private fun LoginScreen(
                 label = { Text("Password") },
                 singleLine = true,
                 shape = FieldShape,
+                colors = fieldColors,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
@@ -735,26 +753,35 @@ private fun LoginScreen(
                     label = { Text("Service PIN") },
                     singleLine = true,
                     shape = FieldShape,
+                    colors = fieldColors,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            // High-contrast primary call-to-action, floating over the aurora.
             MorphButton(
                 onClick = { onLogin(email, password, pin, brand) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 enabled = !loading,
+                containerColor = scheme.primary,
+                contentColor = scheme.onPrimary,
             ) {
                 if (loading) LoadingIndicator() else Text("Sign in", fontWeight = FontWeight.SemiBold)
             }
             if (onCancel != null) {
-                MorphTextButton("Cancel", onCancel, modifier = Modifier.fillMaxWidth())
+                MorphButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = scheme.secondaryContainer,
+                    contentColor = scheme.onSecondaryContainer,
+                ) { Text("Cancel", fontWeight = FontWeight.SemiBold) }
             }
             Text(
                 "Credentials are sent directly to ${brand.label}'s telematics servers and " +
                     "stored encrypted on this device.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = scheme.onSurfaceVariant,
             )
         }
     }
@@ -3060,7 +3087,16 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 if (status.acc == true) StatusRow("Accessory power", "On")
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                 if (status.defrost == true) StatusRow("Defrost", "On")
+                status.airTemp?.value?.let { StatusRow("Climate setpoint", "$it°") }
+                status.percentFor(v.isEv)?.let {
+                    StatusRow(if (v.isEv) "Charge" else "Fuel", "$it%")
+                }
+                status.rangeMiFor(v.isEv)?.let { StatusRow("Range", "$it mi") }
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
+                // Comfort heaters (read-only; mirror/rear-window heat track defrost).
+                status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
+                status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }
+                status.sideBackWindowHeat?.takeIf { it != 0 }?.let { StatusRow("Rear defroster", "On") }
                 location?.let { StatusRow("Coordinates", it.coordString()) }
                 rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
 
@@ -3219,12 +3255,15 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             tp.rearLeft?.let { add(DiagRow("Rear left", warn(it), indent = true)) }
             tp.rearRight?.let { add(DiagRow("Rear right", warn(it), indent = true)) }
         }
+        status?.tirePressure?.all?.takeIf { it > 0 }?.let { add(DiagRow("Avg tire pressure", "$it psi")) }
         status?.battery?.let { b ->
             b.batSoc?.let { soc ->
                 add(DiagRow("12V battery", "$soc%" + (b.health?.let { " · $it" } ?: "")))
             }
         }
         status?.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
+        status?.rangeMiFor(v.isEv)?.let { add(DiagRow("Range", "$it mi")) }
+        status?.airTemp?.value?.let { add(DiagRow("Climate setpoint", "$it°")) }
         status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
         status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
         status?.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
