@@ -482,4 +482,11 @@ class SettingsStore(private val context: Context) {
             it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, updated)
         }
     }
+
+    /** Persist a full, reordered preset list for a car. */
+    suspend fun setClimatePresets(vin: String, presets: List<ClimatePreset>) {
+        context.settingsDataStore.edit {
+            it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, presets)
+        }
+    }
 }

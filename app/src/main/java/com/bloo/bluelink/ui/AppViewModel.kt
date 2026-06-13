@@ -1105,6 +1105,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.deleteClimatePreset(v.vin, id) }
     }
 
+    fun reorderClimatePresets(v: Vehicle, ordered: List<ClimatePreset>) {
+        _state.update { it.copy(climatePresets = it.climatePresets + (v.vin to ordered)) }
+        viewModelScope.launch { settingsStore.setClimatePresets(v.vin, ordered) }
+    }
+
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
         // The GPS rides along with a status refresh (this is what the official app
         // uses); prefer it over the heavily rate-limited findMyCar, which is the

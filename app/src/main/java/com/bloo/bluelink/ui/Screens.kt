@@ -2591,20 +2591,65 @@ private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) 
                     )
                 }
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text("Open flap") },
-                    onClick = { haptics?.heavy(); vm.openChargePort(v); open = true; menuOpen = false },
-                    leadingIcon = { Icon(Icons.Filled.EvStation, contentDescription = null) },
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                shape = RoundedCornerShape(20.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 2.dp,
+                shadowElevation = 8.dp,
+                modifier = Modifier.widthIn(min = 210.dp),
+            ) {
+                Text(
+                    "Charge flap",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp),
                 )
-                DropdownMenuItem(
-                    text = { Text("Close flap") },
+                FlapMenuItem(
+                    label = "Open flap",
+                    icon = Icons.Filled.EvStation,
+                    selected = open,
+                    onClick = { haptics?.heavy(); vm.openChargePort(v); open = true; menuOpen = false },
+                )
+                FlapMenuItem(
+                    label = "Close flap",
+                    icon = Icons.Filled.Close,
+                    selected = !open,
                     onClick = { haptics?.heavy(); vm.closeChargePort(v); open = false; menuOpen = false },
-                    leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
                 )
             }
         }
     }
+}
+
+/**
+ * A styled row in the charge-flap menu: a leading icon, the label, and a trailing
+ * check on the currently-assumed state. The selected row is tinted so the assumed
+ * state reads at a glance.
+ */
+@Composable
+private fun FlapMenuItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+    DropdownMenuItem(
+        text = {
+            Text(
+                label,
+                color = tint,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        },
+        onClick = onClick,
+        leadingIcon = { Icon(icon, contentDescription = null, tint = tint) },
+        trailingIcon = {
+            if (selected) Icon(Icons.Filled.Check, contentDescription = "Current", tint = tint)
+        },
+    )
 }
 
 /**
@@ -3621,6 +3666,7 @@ private fun ClimatePebble(
                 if (activePresetId == id) activePresetId = null
                 vm.deleteClimatePreset(v, id)
             },
+            onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
         if (showAddPreset) {
@@ -3714,6 +3760,7 @@ private fun ClimatePresetSection(
     onStart: (ClimatePreset) -> Unit,
     onSave: () -> Unit,
     onDelete: (String) -> Unit,
+    onReorder: (List<ClimatePreset>) -> Unit,
 ) {
     HorizontalDivider(Modifier.padding(vertical = 6.dp))
     if (presets.isNotEmpty()) {
@@ -3722,20 +3769,29 @@ private fun ClimatePresetSection(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (presets.size > 1) {
+            Text(
+                "Long-press the handle to drag a preset into a new order.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        // Full-width reorderable rows: drag from the handle to re-rank, tap to apply.
+        ReorderColumn(
+            items = presets,
+            keyOf = { it.id },
+            onReorder = onReorder,
+            spacing = 8.dp,
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            presets.forEach { preset ->
-                PresetPill(
-                    name = preset.name,
-                    active = preset.id == activeId,
-                    onStart = { onStart(preset) },
-                    onDelete = { onDelete(preset.id) },
-                )
-            }
+        ) { preset, dragHandle, _ ->
+            PresetPill(
+                name = preset.name,
+                active = preset.id == activeId,
+                onStart = { onStart(preset) },
+                onDelete = { onDelete(preset.id) },
+                dragHandle = dragHandle,
+            )
         }
         Spacer(Modifier.height(4.dp))
     }
@@ -3764,6 +3820,7 @@ private fun PresetPill(
     active: Boolean,
     onStart: () -> Unit,
     onDelete: () -> Unit,
+    dragHandle: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
     val leftInteraction = remember { MutableInteractionSource() }
@@ -3789,19 +3846,32 @@ private fun PresetPill(
     val leftFg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
 
     Row(
-        modifier = Modifier.height(IntrinsicSize.Min),
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
         // The gap is the "cut" between the two halves - background shows through.
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Start half
+        // Drag handle - the only spot that starts a long-press reorder, so tapping
+        // the rest of the row still applies/deletes the preset.
+        Box(
+            dragHandle.fillMaxHeight().padding(end = 6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.DragHandle,
+                contentDescription = "Drag to reorder",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        // Start half (fills the available width)
         Surface(
             onClick = { haptics?.click(); onStart() },
             interactionSource = leftInteraction,
             color = leftBg,
             contentColor = leftFg,
             shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
-            modifier = Modifier.fillMaxHeight(),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
