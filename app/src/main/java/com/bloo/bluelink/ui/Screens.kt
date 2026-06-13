@@ -126,7 +126,6 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.LocationOn
@@ -2488,81 +2487,121 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
         shape = RoundedCornerShape(PebbleCornerCollapsed),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (supportsPort) {
-            // EV/PHEV: three equal-width buttons - Open, Close, Lock - with no
-            // status caption, so nothing gets squeezed into wrapping.
-            ChargeAndLockRow(v, status, state, vm)
-        } else {
-            // Extra start inset lines the "Locked/Unlocked" text up with the other
-            // pebble titles; a small end inset nudges the button toward the edge.
-            Box(Modifier.padding(start = 26.dp, end = 8.dp)) {
-                StateControl(
-                    name = "",
-                    isOn = status?.doorLock,
-                    stateOn = "Locked", stateOff = "Unlocked",
-                    turnOn = "Lock", turnOff = "Unlock",
-                    icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
-                    onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
-                    highlightWhenOff = true,
-                    offTextColor = MaterialTheme.colorScheme.error,
-                )
-            }
+        // Extra start inset lines the "Locked/Unlocked" text up with the other
+        // pebble titles; a small end inset nudges the button toward the edge.
+        Box(Modifier.padding(start = 26.dp, end = 8.dp)) {
+            StateControl(
+                name = "",
+                isOn = status?.doorLock,
+                stateOn = "Locked", stateOff = "Unlocked",
+                turnOn = "Lock", turnOff = "Unlock",
+                icon = Icons.Filled.Lock, pending = state.isPending(v.vin, "doors"),
+                onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
+                highlightWhenOff = true,
+                offTextColor = MaterialTheme.colorScheme.error,
+                extraAction = if (supportsPort) {
+                    { ChargePortSplitButton(v, state, vm) }
+                } else {
+                    null
+                },
+            )
         }
     }
 }
 
 /**
- * EV/PHEV door + charge-port controls as three equal-width buttons: Open, Close
- * and Lock. The API reports no port open/closed state, so we assume the door
- * starts closed and highlight whichever port button you tapped last. The Lock
- * button toggles to Unlock and tints red while the car is unlocked.
+ * The charge-port flap as a single split button, styled like the climate preset
+ * pill: a wide left half that toggles the flap open/closed (assuming it starts
+ * closed, since the API reports no flap state), and a narrow right half - a down
+ * arrow - that drops a menu to force Open or Close explicitly, for when the
+ * assumed state is wrong. The left half morphs into a rounded box and fills with
+ * the primary colour once you've opened the flap, mirroring lock/unlock.
  */
 @Composable
-private fun ChargeAndLockRow(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel) {
+private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) {
     var open by remember(v.vin) { mutableStateOf(false) }
-    val portPending = state.isPending(v.vin, "chargePort")
-    val doorsPending = state.isPending(v.vin, "doors")
+    var menuOpen by remember { mutableStateOf(false) }
+    val pending = state.isPending(v.vin, "chargePort")
     val haptics = LocalHaptics.current
-    val portEnabled = !state.loading && !portPending
-    val locked = status?.doorLock
+    val enabled = !state.loading && !pending
+
+    val outer by animateDpAsState(
+        if (open) 16.dp else 25.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "portOuter",
+    )
+    val inner = 8.dp
+    val mainBg by androidx.compose.animation.animateColorAsState(
+        if (open) MaterialTheme.colorScheme.primary else buttonContainer(),
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "portMainBg",
+    )
+    val mainFg = if (open) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.height(50.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        MorphButton(
-            onClick = { haptics?.heavy(); vm.openChargePort(v); open = true },
-            enabled = portEnabled,
-            active = open,
-            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp),
+        // Left half: the open/close toggle.
+        Surface(
+            onClick = {
+                haptics?.heavy()
+                if (open) vm.closeChargePort(v) else vm.openChargePort(v)
+                open = !open
+            },
+            enabled = enabled,
+            color = mainBg,
+            contentColor = mainFg,
+            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+            modifier = Modifier.fillMaxHeight(),
         ) {
-            MorphButtonLabel(Icons.Filled.EvStation, "Open", portPending, iconSize = 20.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 14.dp),
+            ) {
+                if (pending) {
+                    LoadingIndicator(Modifier.size(20.dp))
+                } else {
+                    Icon(Icons.Filled.EvStation, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(if (open) "Close" else "Open", fontWeight = FontWeight.SemiBold)
+            }
         }
-        MorphButton(
-            onClick = { haptics?.heavy(); vm.closeChargePort(v); open = false },
-            enabled = portEnabled,
-            active = !open,
-            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp),
-        ) {
-            MorphButtonLabel(Icons.Filled.Close, "Close", portPending, iconSize = 20.dp)
-        }
-        // Lock toggles; tints red (highlight) while the car is unlocked.
-        MorphButton(
-            onClick = { haptics?.heavy(); if (locked == true) vm.unlock(v) else vm.lock(v) },
-            enabled = !state.loading && !doorsPending,
-            active = locked == false,
-            activeContainerColor = MaterialTheme.colorScheme.error,
-            activeContentColor = MaterialTheme.colorScheme.onError,
-            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp),
-        ) {
-            MorphButtonLabel(
-                if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock,
-                if (locked == true) "Unlock" else "Lock",
-                doorsPending,
-                iconSize = 20.dp,
-            )
+        // Right half: a down-arrow that drops a menu to force either state.
+        Box {
+            Surface(
+                onClick = { haptics?.tick(); menuOpen = true },
+                enabled = enabled,
+                color = buttonContainer(),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+                modifier = Modifier.fillMaxHeight(),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxHeight().padding(horizontal = 8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Choose charge flap state",
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("Open flap") },
+                    onClick = { haptics?.heavy(); vm.openChargePort(v); open = true; menuOpen = false },
+                    leadingIcon = { Icon(Icons.Filled.EvStation, contentDescription = null) },
+                )
+                DropdownMenuItem(
+                    text = { Text("Close flap") },
+                    onClick = { haptics?.heavy(); vm.closeChargePort(v); open = false; menuOpen = false },
+                    leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
+                )
+            }
         }
     }
 }
