@@ -208,15 +208,34 @@ fun BlooTheme(
         base
     }
 
-    // Vibrancy: scale the saturation of the accent colours + containers.
-    val scheme = if (vibrancy == 1f) amoled else amoled.copy(
-        primary = amoled.primary.saturate(vibrancy),
-        secondary = amoled.secondary.saturate(vibrancy),
-        tertiary = amoled.tertiary.saturate(vibrancy),
-        primaryContainer = amoled.primaryContainer.saturate(vibrancy),
-        secondaryContainer = amoled.secondaryContainer.saturate(vibrancy),
-        tertiaryContainer = amoled.tertiaryContainer.saturate(vibrancy),
-    )
+    // Vibrancy: scale the saturation of every tinted colour role. This covers
+    // accent colours, their on-colours, containers, and the surface-variant /
+    // outline roles so pebble backgrounds and borders also respond visibly.
+    val scheme = if (vibrancy == 1f) amoled else {
+        fun Color.v() = saturate(vibrancy)
+        amoled.copy(
+            primary = amoled.primary.v(),
+            onPrimary = amoled.onPrimary.v(),
+            primaryContainer = amoled.primaryContainer.v(),
+            onPrimaryContainer = amoled.onPrimaryContainer.v(),
+            secondary = amoled.secondary.v(),
+            onSecondary = amoled.onSecondary.v(),
+            secondaryContainer = amoled.secondaryContainer.v(),
+            onSecondaryContainer = amoled.onSecondaryContainer.v(),
+            tertiary = amoled.tertiary.v(),
+            onTertiary = amoled.onTertiary.v(),
+            tertiaryContainer = amoled.tertiaryContainer.v(),
+            onTertiaryContainer = amoled.onTertiaryContainer.v(),
+            surfaceVariant = amoled.surfaceVariant.v(),
+            onSurfaceVariant = amoled.onSurfaceVariant.v(),
+            outline = amoled.outline.v(),
+            outlineVariant = amoled.outlineVariant.v(),
+            error = amoled.error.v(),
+            onError = amoled.onError.v(),
+            errorContainer = amoled.errorContainer.v(),
+            onErrorContainer = amoled.onErrorContainer.v(),
+        )
+    }
 
     val density = LocalDensity.current
     val scaledDensity = Density(density.density, density.fontScale * uiScale)

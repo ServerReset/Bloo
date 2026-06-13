@@ -114,6 +114,9 @@ data class UiState(
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */
     val addingAccount: Boolean = false,
+    /** True when the user backed out of the biometric prompt to the login screen.
+     *  Cancelling in this state must re-lock rather than navigate to the garage. */
+    val lockedToLogin: Boolean = false,
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
     val message: String? = null,
@@ -396,7 +399,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun beginAddAccount() = _state.update { it.copy(addingAccount = true) }
-    fun cancelAddAccount() = _state.update { it.copy(addingAccount = false) }
+    fun cancelAddAccount() = _state.update { s ->
+        // If the user arrived here by backing out of the biometric prompt, "Cancel"
+        // must re-lock the app — not silently return them to the already-loaded garage.
+        if (s.lockedToLogin) s.copy(addingAccount = false, locked = true, lockedToLogin = false)
+        else s.copy(addingAccount = false)
+    }
 
     fun logout(brand: Brand) {
         viewModelScope.launch {
@@ -427,12 +435,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Dismiss the lock overlay (the garage was already loaded behind it). */
     fun unlocked() {
-        _state.update { it.copy(locked = false) }
+        _state.update { it.copy(locked = false, lockedToLogin = false) }
         if (_state.value.vehicles.isEmpty() && !loadingGarage) loadGarage()
     }
 
-    /** From the lock overlay, back out to the login screen. */
-    fun lockToLogin() = _state.update { it.copy(locked = false, addingAccount = true) }
+    /** From the lock overlay, back out to the login screen.
+     *  Sets lockedToLogin so Cancel on the login form re-locks instead of bypassing auth. */
+    fun lockToLogin() = _state.update { it.copy(locked = false, addingAccount = true, lockedToLogin = true) }
 
     fun setLockTiming(value: LockTiming) {
         viewModelScope.launch { settingsStore.setLockTiming(value) }
