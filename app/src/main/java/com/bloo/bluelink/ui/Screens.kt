@@ -126,6 +126,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.LocationOn
@@ -2855,13 +2856,33 @@ private fun StateControl(
                 highlighted -> highlightColor
                 else -> LocalContentColor.current.copy(alpha = 0.7f)
             }
-            // With no title, the state itself is the headline (fills the height).
-            Text(
-                stateText,
-                style = if (name.isBlank()) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium,
-                color = stateColor,
-                fontWeight = FontWeight.Bold,
-            )
+            when {
+                // With no title, the lock state is the headline - shown as an
+                // open/closed padlock icon rather than a word.
+                name.isBlank() -> {
+                    val stateIcon = when (isOn) {
+                        true -> icon
+                        false -> Icons.Filled.LockOpen
+                        else -> icon
+                    }
+                    if (pending) {
+                        LoadingIndicator(Modifier.size(28.dp))
+                    } else {
+                        Icon(
+                            stateIcon,
+                            contentDescription = stateText,
+                            tint = stateColor,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                }
+                else -> Text(
+                    stateText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = stateColor,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
         // An optional secondary control (e.g. the charge-port toggle) sits just
         // left of the primary action button.
