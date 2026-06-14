@@ -584,6 +584,11 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** Clear all per-car palette overrides at once (e.g. when reverting to dynamic color). */
+    suspend fun clearAllCarPaletteIds() {
+        context.settingsDataStore.edit { it.remove(Keys.CAR_PALETTE_IDS) }
+    }
+
     /** Serialise all custom palettes to a JSON string for export/share. */
     suspend fun exportPalettesJson(): String =
         context.settingsDataStore.data.first()[Keys.CUSTOM_PALETTES] ?: "[]"

@@ -1400,9 +1400,8 @@ private fun FloatingIcon(
     Surface(
         onClick = { haptics?.click(); onClick() },
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 2.dp,
         interactionSource = interaction,
         modifier = modifier.padding(12.dp).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
     ) {
@@ -2158,10 +2157,9 @@ private fun VehicleDetailContent(
             // Tap to jump back to the top (the main car-info pebble).
             Surface(
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                shadowElevation = 2.dp,
             ) {
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -2958,10 +2956,10 @@ private fun MorphButton(
     activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable RowScope.() -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
+    val pressed by interactionSource.collectIsPressedAsState()
     val haptics = LocalHaptics.current
     // 50% = a true pill; a lower percent = a rounded rectangle.
     val pct by animateFloatAsState(
@@ -2981,7 +2979,7 @@ private fun MorphButton(
         ),
         enabled = enabled,
         shape = RoundedCornerShape(percent = pct.roundToInt()),
-        interactionSource = interaction,
+        interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
             containerColor = bg,
             contentColor = if (active) activeContentColor else contentColor,
@@ -3401,9 +3399,17 @@ private fun PebbleActionButton(
     pending: Boolean = false,
     active: Boolean = false,
     spinning: Boolean = false,
+    bounceIcon: Boolean = false,
     activeContainer: Color = MaterialTheme.colorScheme.primary,
     activeContent: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
+    val bounceInteraction = remember { MutableInteractionSource() }
+    val pressed by bounceInteraction.collectIsPressedAsState()
+    val bounceY by animateFloatAsState(
+        targetValue = if (bounceIcon && pressed) -7f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "iconBounce",
+    )
     MorphButton(
         onClick = onClick,
         enabled = enabled && !pending,
@@ -3412,8 +3418,11 @@ private fun PebbleActionButton(
         activeContentColor = activeContent,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         modifier = Modifier.heightIn(min = 50.dp),
+        interactionSource = bounceInteraction,
     ) {
-        MorphButtonLabel(icon, label, pending, spinning = spinning)
+        Box(Modifier.graphicsLayer { translationY = bounceY }) {
+            MorphButtonLabel(icon, label, pending, spinning = spinning)
+        }
     }
 }
 
@@ -4464,6 +4473,7 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
                 onClick = { vm.locate(v) },
                 enabled = !locating,
                 pending = locating,
+                bounceIcon = true,
             )
         },
     ) {
@@ -4567,9 +4577,14 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
     val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
     val fahrenheit = appearance.useFahrenheit
     val w = state.homeWeather
+    var weatherSpinning by remember { mutableStateOf(false) }
     // Refresh on first show (the VM throttles to a 15-minute TTL).
     LaunchedEffect(appearance.weatherLat, appearance.weatherLon) {
         if (hasLocation) vm.loadHomeWeather()
+    }
+    // Stop the spinner as soon as new weather data arrives (fetchedAt changes).
+    LaunchedEffect(state.homeWeather?.fetchedAt) {
+        weatherSpinning = false
     }
     val summary = when {
         !hasLocation -> "Set a location"
@@ -4582,8 +4597,9 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
             PebbleActionButton(
                 label = "Refresh",
                 icon = Icons.Filled.Refresh,
-                onClick = { vm.loadHomeWeather(force = true) },
+                onClick = { weatherSpinning = true; vm.loadHomeWeather(force = true) },
                 enabled = hasLocation,
+                spinning = weatherSpinning,
             )
         },
     ) {
@@ -5506,10 +5522,9 @@ private fun SettingsScreen(vm: AppViewModel) {
             FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
             Surface(
                 onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                shadowElevation = 2.dp,
             ) {
                 Text(
                     "Settings",
