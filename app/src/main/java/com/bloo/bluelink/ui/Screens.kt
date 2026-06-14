@@ -4185,6 +4185,25 @@ private fun ClimatePebble(
             return@Pebble
         }
 
+        // Presets first - the quickest way to fire a saved configuration.
+        ClimatePresetSection(
+            presets = presets,
+            activeId = activePresetId,
+            onStart = { preset ->
+                // Load the preset into the sliders/toggles, fire it, and mark it
+                // as the applied one so its pill shows the running highlight.
+                applyPreset(preset.request)
+                vm.startClimate(v, preset.request)
+                activePresetId = preset.id
+            },
+            onSave = { presetName = ""; showAddPreset = true },
+            onDelete = { id ->
+                if (activePresetId == id) activePresetId = null
+                vm.deleteClimatePreset(v, id)
+            },
+            onReorder = { vm.reorderClimatePresets(v, it) },
+        )
+
         // Color shifts from blue (cold) through neutral to orange-red (hot),
         // normalised to the slider range so it adapts if the range ever changes.
         val tempRange = 62f..82f
@@ -4249,25 +4268,6 @@ private fun ClimatePebble(
                 SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
             }
         }
-
-        // Presets section
-        ClimatePresetSection(
-            presets = presets,
-            activeId = activePresetId,
-            onStart = { preset ->
-                // Load the preset into the sliders/toggles, fire it, and mark it
-                // as the applied one so its pill shows the running highlight.
-                applyPreset(preset.request)
-                vm.startClimate(v, preset.request)
-                activePresetId = preset.id
-            },
-            onSave = { presetName = ""; showAddPreset = true },
-            onDelete = { id ->
-                if (activePresetId == id) activePresetId = null
-                vm.deleteClimatePreset(v, id)
-            },
-            onReorder = { vm.reorderClimatePresets(v, it) },
-        )
 
         if (showAddPreset) {
             AlertDialog(

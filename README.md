@@ -1,5 +1,7 @@
 # Bloo
 
+I was annoyed with the stock app, so I made one that looks like a Google engineer might have designed it.
+
 A third-party Android app for controlling **Hyundai**, **Genesis**, and **Kia** vehicles through their US telematics services. Built with Jetpack Compose and Material 3 Expressive.
 
 No simulated data — every screen talks to live servers.
