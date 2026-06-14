@@ -3417,12 +3417,12 @@ private fun PebbleActionButton(
         activeContainerColor = activeContainer,
         activeContentColor = activeContent,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-        modifier = Modifier.heightIn(min = 50.dp),
+        modifier = Modifier
+            .heightIn(min = 50.dp)
+            .graphicsLayer { translationY = bounceY },
         interactionSource = bounceInteraction,
     ) {
-        Box(Modifier.graphicsLayer { translationY = bounceY }) {
-            MorphButtonLabel(icon, label, pending, spinning = spinning)
-        }
+        MorphButtonLabel(icon, label, pending, spinning = spinning)
     }
 }
 
