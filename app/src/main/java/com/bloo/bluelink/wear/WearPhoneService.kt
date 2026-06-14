@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Receives the watch's messages on the phone. Bound by the system whenever a
- * Data Layer message arrives on a `/bloo/*` path, even if the phone app's UI
+ * Data Layer message arrives on a `/bloo` path, even if the phone app's UI
  * isn't running — so "lock from my watch" works with the phone in your pocket.
  */
 class WearPhoneService : WearableListenerService() {

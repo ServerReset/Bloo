@@ -298,7 +298,7 @@ private fun WatchAction(
     Button(
         onClick = onClick,
         enabled = !pending,
-        shape = RoundedCornerShape(if (active) 14.dp else 50),
+        shape = RoundedCornerShape(if (active) 28 else 50),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (active) activeColor else MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
