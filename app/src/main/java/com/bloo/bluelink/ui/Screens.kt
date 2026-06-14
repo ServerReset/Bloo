@@ -1657,7 +1657,11 @@ private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
 private val LocalPullFraction =
     staticCompositionLocalOf<androidx.compose.runtime.MutableState<Float>> { mutableStateOf(0f) }
 
-/** A headline number that cross-fades when it changes. */
+/**
+ * A headline number that rolls when it changes: it slides up when the value
+ * grows and down when it shrinks (digits extracted from [text] decide the
+ * direction), falling back to a cross-fade when there's no number to compare.
+ */
 @Composable
 private fun RollingNumber(
     text: String,
@@ -1665,9 +1669,18 @@ private fun RollingNumber(
     fontWeight: FontWeight,
     color: Color = Color.Unspecified,
 ) {
+    // Track the previous numeric value so we can roll in the right direction.
+    val current = text.filter { it.isDigit() }.toIntOrNull()
+    var previous by remember { mutableStateOf(current) }
+    val goingUp = (current ?: 0) >= (previous ?: 0)
+    LaunchedEffect(current) { previous = current }
     AnimatedContent(
         targetState = text,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        transitionSpec = {
+            val dir = if (goingUp) 1 else -1
+            (fadeIn(tween(180)) + slideInVertically { dir * it / 2 }) togetherWith
+                (fadeOut(tween(120)) + slideOutVertically { -dir * it / 2 })
+        },
         label = "num",
     ) { t -> Text(t, style = style, fontWeight = fontWeight, color = color) }
 }
@@ -4307,8 +4320,8 @@ private fun ChargeLimitPill(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
                     )
-                    Text(
-                        "$limit%",
+                    RollingNumber(
+                        text = "$limit%",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                     )
