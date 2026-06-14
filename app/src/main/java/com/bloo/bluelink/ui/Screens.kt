@@ -39,6 +39,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -3272,18 +3274,22 @@ private fun MorphButtonLabel(
         val angle = remember { Animatable(0f) }
         LaunchedEffect(spinning) {
             if (spinning) {
-                // Spin one revolution at a time so that when spinning stops we can
-                // finish the current turn cleanly (no abrupt snap mid-rotation).
+                // Ramp up: the first revolution accelerates from rest...
+                angle.animateTo(
+                    targetValue = angle.value + 360f,
+                    animationSpec = tween(durationMillis = 850, easing = FastOutLinearInEasing),
+                )
+                // ...then hold a steady, fast linear spin.
                 while (true) {
                     angle.animateTo(
                         targetValue = angle.value + 360f,
-                        animationSpec = tween(durationMillis = 900, easing = LinearEasing),
+                        animationSpec = tween(durationMillis = 600, easing = LinearEasing),
                     )
                 }
             } else if (angle.value != 0f) {
-                // Coast to the next full turn, then reset to 0 for next time.
+                // Ramp down: decelerate to the next full turn, then reset.
                 val target = kotlin.math.ceil(angle.value / 360f) * 360f
-                angle.animateTo(target, tween(durationMillis = 350, easing = LinearEasing))
+                angle.animateTo(target, tween(durationMillis = 700, easing = LinearOutSlowInEasing))
                 angle.snapTo(0f)
             }
         }
@@ -3650,14 +3656,20 @@ private fun PebbleActionButton(
     // jump is always visible regardless of how briefly the button is pressed.
     val bounceY = remember { Animatable(0f) }
     val bounceScope = rememberCoroutineScope()
+    // While the bounce is mid-flight, keep showing the (bouncing) icon and hold
+    // off the loading indicator - otherwise pending=true swaps the icon for the
+    // spinner the instant you click and the hop is never seen.
+    var bouncing by remember { mutableStateOf(false) }
     MorphButton(
         onClick = {
             if (bounceIcon) bounceScope.launch {
+                bouncing = true
                 bounceY.animateTo(-9f, spring(stiffness = Spring.StiffnessHigh))
                 bounceY.animateTo(
                     0f,
                     spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                 )
+                bouncing = false
             }
             onClick()
         },
@@ -3671,7 +3683,7 @@ private fun PebbleActionButton(
             .graphicsLayer { translationY = bounceY.value },
         interactionSource = bounceInteraction,
     ) {
-        MorphButtonLabel(icon, label, pending, spinning = spinning)
+        MorphButtonLabel(icon, label, pending = pending && !bouncing, spinning = spinning)
     }
 }
 
