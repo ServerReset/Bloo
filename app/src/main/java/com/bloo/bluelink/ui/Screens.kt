@@ -1375,7 +1375,7 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                 LastUpdatedLabel(v, state)
                 ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
                 Spacer(Modifier.height(6.dp))
-                PrimaryActions(v, state, vm, showChargePort = false)
+                PrimaryActions(v, state, vm, showChargePort = true)
                 Spacer(Modifier.weight(1f))
             }
         }
@@ -2593,6 +2593,7 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel, showCha
  * chevron) drops a small floating container of two buttons to force Open or Close
  * explicitly, for when the assumed state is wrong.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) {
     var open by remember(v.vin) { mutableStateOf(false) }
@@ -4322,6 +4323,110 @@ private fun PresetPill(
 // --- Charge limits --------------------------------------------------------
 
 /**
+ * Two-segment split pill for the charge-limit control, styled like the climate
+ * presets: wide left half shows the current value and hosts the inline slider;
+ * narrow right half ("Set ⚡") sends the command. Morphs from pill to rounded
+ * rectangle when pressed, identical motion to [PresetPill].
+ */
+@Composable
+private fun ChargeLimitPill(
+    limit: Int,
+    pending: Boolean,
+    enabled: Boolean,
+    onValueChange: (Int) -> Unit,
+    onApply: () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    val leftInteraction = remember { MutableInteractionSource() }
+    val leftPressed by leftInteraction.collectIsPressedAsState()
+
+    val outer by animateDpAsState(
+        if (leftPressed) 16.dp else 50.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "limitOuter",
+    )
+    val inner by animateDpAsState(
+        if (leftPressed) 16.dp else 10.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "limitInner",
+    )
+    val rightBg by androidx.compose.animation.animateColorAsState(
+        if (pending) MaterialTheme.colorScheme.primary else buttonContainer(),
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "limitRightBg",
+    )
+    val rightFg = if (pending) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            // Left half — label. Tapping bumps the limit up by one step, wrapping
+            // back to 50% after 100%, for quick keyboard-free adjustment.
+            Surface(
+                onClick = {
+                    haptics?.tick()
+                    onValueChange(if (limit >= 100) 50 else limit + 10)
+                },
+                interactionSource = leftInteraction,
+                enabled = enabled,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                ) {
+                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Charge limit",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "$limit%",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            // Right half — apply button, same nub style as the delete half in PresetPill.
+            Surface(
+                onClick = { haptics?.heavy(); onApply() },
+                enabled = enabled && !pending,
+                color = rightBg,
+                contentColor = rightFg,
+                shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+                modifier = Modifier.fillMaxHeight(),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxHeight().padding(horizontal = 18.dp),
+                ) {
+                    if (pending) {
+                        LoadingIndicator(Modifier.size(18.dp))
+                    } else {
+                        Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+        // Slider sits directly under the pill with zero gap so it reads as one unit.
+        AnimatedSlider(
+            value = limit.toFloat(),
+            onValueChange = { onValueChange((it / 10f).roundToInt() * 10) },
+            valueRange = 50f..100f,
+            steps = 4,
+        )
+    }
+}
+
+/**
  * Charge pebble: collapsed shows just the charge start/stop control; expand to
  * set the charge limit and see charging info. Long-press to drag-reorder.
  */
@@ -4361,16 +4466,13 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         if (plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
-        StepRow("Charge limit", "$limit%")
-        AnimatedSlider(
-            value = limit.toFloat(),
-            onValueChange = { limit = (it / 10f).roundToInt() * 10 },
-            valueRange = 50f..100f,
-            steps = 4,
+        ChargeLimitPill(
+            limit = limit,
+            pending = limitPending,
+            enabled = enabled,
+            onValueChange = { limit = it },
+            onApply = { vm.setChargeLimits(v, limit, limit) },
         )
-        CommandButton("Set limit", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled && !limitPending) {
-            vm.setChargeLimits(v, limit, limit)
-        }
         // The charge-port toggle lives in the controls pebble, next to lock/unlock.
     }
 }
