@@ -1227,14 +1227,22 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val isGen5W = remember(v.brand, v.generation) {
         v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
     }
-    val sections = state.sectionsFor(v).filter {
-        it in CompactKnownTiles &&
-            (it != "charge" || state.hasBattery(v)) &&
-            (it != "ai" || state.aiEnabled) &&
-            (it != "trips" || !isGen5W) &&
-            !state.isPebbleHidden(v.vin, it)
-    }
-    val tiles = listOf("main") + sections
+    // Cover-screen tiles follow the same order the user arranged the pebbles in
+    // (state.sectionsFor). "summary" maps to the always-present "main" tile;
+    // "controls" has no cover tile so it falls away. If summary was somehow
+    // dropped, "main" is prepended so the cover screen always has a home tile.
+    val tiles = state.sectionsFor(v).mapNotNull { section ->
+        when (section) {
+            "summary" -> "main"
+            else -> section.takeIf {
+                it in CompactKnownTiles &&
+                    (it != "charge" || state.hasBattery(v)) &&
+                    (it != "ai" || state.aiEnabled) &&
+                    (it != "trips" || !isGen5W) &&
+                    !state.isPebbleHidden(v.vin, it)
+            }
+        }
+    }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
     // Infinite wrap-around: start in the middle of a huge virtual range and map
     // each virtual page back onto a real tile with modulo.
     val loop = tiles.size > 1
