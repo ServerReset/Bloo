@@ -4228,10 +4228,31 @@ private fun ClimatePebble(
             onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 4.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-        )
+        val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .padding(horizontal = 24.dp),
+        ) {
+            val strokePx = 2.dp.toPx()
+            val cy = size.height / 2f
+            val radius = cy
+            val dashPx = 6.dp.toPx()
+            val gapPx = 4.dp.toPx()
+            drawRoundRect(
+                color = dividerColor,
+                topLeft = androidx.compose.ui.geometry.Offset(0f, cy - radius),
+                size = androidx.compose.ui.geometry.Size(size.width, radius * 2),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = strokePx,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                        floatArrayOf(dashPx, gapPx),
+                    ),
+                ),
+            )
+        }
 
         // Color shifts from blue (cold) through neutral to orange-red (hot),
         // normalised to the slider range so it adapts if the range ever changes.
@@ -4391,13 +4412,7 @@ private fun ClimatePresetSection(
     onDelete: (String) -> Unit,
     onReorder: (List<ClimatePreset>) -> Unit,
 ) {
-    HorizontalDivider(Modifier.padding(vertical = 6.dp))
     if (presets.isNotEmpty()) {
-        Text(
-            "Presets",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (presets.size > 1) {
             Text(
                 "Long-press the handle to drag a preset into a new order.",
