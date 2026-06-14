@@ -2670,11 +2670,10 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
                 v.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 "${v.model} · ${state.powertrainLabel(v)}",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LastUpdatedLabel(v, state, Modifier.padding(top = 2.dp))
@@ -3126,7 +3125,7 @@ private fun PaletteEditorDialog(
                 // Primary colour picker
                 Text(
                     "Primary colour",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 ColorPickerCanvas(primaryColor, { primaryColor = it })
@@ -3144,7 +3143,7 @@ private fun PaletteEditorDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "Secondary colour",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         ColorPickerCanvas(secondaryColor, { secondaryColor = it })
@@ -3164,7 +3163,7 @@ private fun PaletteEditorDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "Tertiary colour",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         ColorPickerCanvas(tertiaryColor, { tertiaryColor = it })
@@ -4046,7 +4045,11 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         }) else null,
     ) {
         if (rows.isEmpty()) {
-            Text("No diagnostics yet.")
+            Text(
+                "No diagnostics yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         rows.forEach { row ->
             if (row.indent) {
@@ -4228,28 +4231,7 @@ private fun ClimatePebble(
             onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
-        val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp),
-        ) {
-            val pillW = 12.dp.toPx()
-            val pillH = 4.dp.toPx()
-            val gap = 5.dp.toPx()
-            val cy = size.height / 2f
-            val total = pillW + gap
-            val count = ((size.width + gap) / total).toInt()
-            val startX = (size.width - count * total + gap) / 2f
-            repeat(count) { i ->
-                drawRoundRect(
-                    color = dividerColor,
-                    topLeft = androidx.compose.ui.geometry.Offset(startX + i * total, cy - pillH / 2f),
-                    size = androidx.compose.ui.geometry.Size(pillW, pillH),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(pillH / 2f),
-                )
-            }
-        }
+        SectionLabel("Temperature")
 
         // Color shifts from blue (cold) through neutral to orange-red (hot),
         // normalised to the slider range so it adapts if the range ever changes.
@@ -4301,7 +4283,7 @@ private fun ClimatePebble(
 
         val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
         if (seats.any && !(isGen5W && v.isEv)) {
-            Text("Seats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SectionLabel("Seats")
             if (seats.driverHeat || seats.driverCool) {
                 SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
             }
@@ -5253,7 +5235,11 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
                 if (state.accounts.isEmpty()) {
-                    Text("Not signed in")
+                    Text(
+                        "Not signed in",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 state.accounts.forEachIndexed { i, creds ->
                     if (i > 0) Spacer(Modifier.height(16.dp))
@@ -5741,7 +5727,12 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                     if (appearance.biometricLock) {
                         Spacer(Modifier.height(4.dp))
-                        Text("Lock the app", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            "Lock the app",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             LockTiming.entries.forEach { t ->
                                 MorphChip(
@@ -5753,7 +5744,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                         }
                     }
                 } else {
-                    Text("No fingerprint/biometric is enrolled on this device.")
+                    Text(
+                        "No fingerprint/biometric is enrolled on this device.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
