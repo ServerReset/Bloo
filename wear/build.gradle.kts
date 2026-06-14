@@ -75,8 +75,6 @@ kotlin {
 }
 
 dependencies {
-    val composeUi = "1.12.0-alpha03"
-
     implementation(project(":shared"))
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
@@ -85,13 +83,21 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
-    // The watch UI is plain Compose (same versions as the phone app) styled for
-    // round screens, so the design system matches the flip-phone cover screen.
-    implementation("androidx.compose.ui:ui:$composeUi")
-    implementation("androidx.compose.ui:ui-graphics:$composeUi")
-    implementation("androidx.compose.ui:ui-tooling-preview:$composeUi")
-    debugImplementation("androidx.compose.ui:ui-tooling:$composeUi")
-    implementation("androidx.compose.foundation:foundation:$composeUi")
-    implementation("androidx.compose.material3:material3:1.5.0-alpha21")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    // Google's Wear OS Compose stack (Material 3 Expressive for watches).
+    val wear = "1.5.1"
+    implementation("androidx.wear.compose:compose-material3:$wear")
+    implementation("androidx.wear.compose:compose-foundation:$wear")
+    implementation("androidx.wear.compose:compose-navigation:$wear")
+    implementation("androidx.wear:wear-input:1.1.0")
+
+    // Regular Compose primitives (Box/Column/Canvas/pager) + icons, aligned via
+    // the Compose BOM so the versions match what Wear Compose is built against.
+    val composeBom = platform("androidx.compose:compose-bom:2025.04.01")
+    implementation(composeBom)
+    debugImplementation(composeBom)
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.compose.material:material-icons-extended")
 }
