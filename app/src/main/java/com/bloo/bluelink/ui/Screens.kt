@@ -4228,30 +4228,27 @@ private fun ClimatePebble(
             onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
-        val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(12.dp)
-                .padding(horizontal = 24.dp),
+                .height(8.dp),
         ) {
-            val strokePx = 2.dp.toPx()
+            val pillW = 12.dp.toPx()
+            val pillH = 4.dp.toPx()
+            val gap = 5.dp.toPx()
             val cy = size.height / 2f
-            val radius = cy
-            val dashPx = 6.dp.toPx()
-            val gapPx = 4.dp.toPx()
-            drawRoundRect(
-                color = dividerColor,
-                topLeft = androidx.compose.ui.geometry.Offset(0f, cy - radius),
-                size = androidx.compose.ui.geometry.Size(size.width, radius * 2),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = strokePx,
-                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                        floatArrayOf(dashPx, gapPx),
-                    ),
-                ),
-            )
+            val total = pillW + gap
+            val count = ((size.width + gap) / total).toInt()
+            val startX = (size.width - count * total + gap) / 2f
+            repeat(count) { i ->
+                drawRoundRect(
+                    color = dividerColor,
+                    topLeft = androidx.compose.ui.geometry.Offset(startX + i * total, cy - pillH / 2f),
+                    size = androidx.compose.ui.geometry.Size(pillW, pillH),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(pillH / 2f),
+                )
+            }
         }
 
         // Color shifts from blue (cold) through neutral to orange-red (hot),
@@ -4413,13 +4410,6 @@ private fun ClimatePresetSection(
     onReorder: (List<ClimatePreset>) -> Unit,
 ) {
     if (presets.isNotEmpty()) {
-        if (presets.size > 1) {
-            Text(
-                "Long-press the handle to drag a preset into a new order.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         Spacer(Modifier.height(8.dp))
         // Full-width reorderable rows: drag from the handle to re-rank, tap to apply.
         ReorderColumn(
