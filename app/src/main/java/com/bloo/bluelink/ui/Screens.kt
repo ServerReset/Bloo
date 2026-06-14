@@ -1298,11 +1298,19 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 LocalCoverScrollState provides tileScroll,
             ) {
                 // Gesture handler is inside each page so it lives below the HorizontalPager
-                // in the pointer-input tree, giving it priority over car-switching swipes.
-                // DOWN = next tile / UP = previous tile (consistent with the scrubber).
-                // Triggers only at the scroll edge (or when content has no scroll at all).
-                // Horizontal bias check uses a 2:1 threshold so slight diagonal swipes still
-                // register as vertical.
+                // in the pointer-input tree. It reads on the Initial pass so it can claim a
+                // vertical swipe before the car-switching HorizontalPager (which scrolls on
+                // the Main pass) ever sees it.
+                //
+                // Direction (natural physics): swipe UP → next tile slides up from below;
+                // swipe DOWN → previous tile slides down from above.
+                //
+                // We commit to a vertical tile-switch as soon as the drag is vertical past
+                // the touch slop (for a tile with no scroll, or when the tile's own scroll is
+                // already at the matching edge). We only *yield* to the horizontal car pager
+                // when horizontal motion clearly dominates (2:1) AND has itself crossed the
+                // slop — so the slight horizontal jitter at the start of a real vertical
+                // swipe no longer gets mistaken for a left/right car swipe.
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -1311,8 +1319,9 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                                 awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                                 var totalDy = 0f
                                 var totalDx = 0f
-                                var decided = false
                                 var switching = false
+                                var yielded = false
+                                val noContent = tileScroll.maxValue == 0
                                 while (true) {
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
                                     val change = event.changes.firstOrNull() ?: break
@@ -1320,21 +1329,21 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                                     val d = change.position - change.previousPosition
                                     totalDy += d.y
                                     totalDx += d.x
-                                    if (!decided && (abs(totalDy) > viewConfiguration.touchSlop || abs(totalDx) > viewConfiguration.touchSlop)) {
-                                        decided = true
-                                        // Require 2× horizontal dominance before yielding to
-                                        // HorizontalPager, so a slightly diagonal upward swipe
-                                        // still registers as vertical.
-                                        if (abs(totalDx) > abs(totalDy) * 2f) break
-                                        val noContent = tileScroll.maxValue == 0
-                                        val atTop = tileScroll.value <= 0
-                                        val atBottom = tileScroll.value >= tileScroll.maxValue
-                                        // Natural physics: finger drags content with it.
-                                        // Swipe DOWN (totalDy > 0) at top → previous tile slides in from above.
-                                        // Swipe UP  (totalDy < 0) at bottom → next tile slides in from below.
-                                        switching = noContent ||
-                                            (totalDy > 0 && atTop) ||
-                                            (totalDy < 0 && atBottom)
+                                    if (!switching && !yielded) {
+                                        val slop = viewConfiguration.touchSlop
+                                        if (abs(totalDx) > slop && abs(totalDx) > abs(totalDy) * 2f) {
+                                            // Clearly horizontal → hand off to the car pager.
+                                            yielded = true
+                                        } else if (abs(totalDy) > slop) {
+                                            val atTop = tileScroll.value <= 0
+                                            val atBottom = tileScroll.value >= tileScroll.maxValue
+                                            // Switch when there's nothing to scroll, or the
+                                            // tile is already at the edge the swipe pushes past.
+                                            // Otherwise let the tile's own content scroll.
+                                            switching = noContent ||
+                                                (totalDy > 0 && atTop) ||
+                                                (totalDy < 0 && atBottom)
+                                        }
                                     }
                                     if (switching) change.consume()
                                 }
