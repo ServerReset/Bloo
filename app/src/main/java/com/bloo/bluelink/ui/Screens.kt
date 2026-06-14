@@ -4231,7 +4231,7 @@ private fun ClimatePebble(
             onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
-        SectionLabel("Temperature")
+        SectionLabel("Controls")
 
         // Color shifts from blue (cold) through neutral to orange-red (hot),
         // normalised to the slider range so it adapts if the range ever changes.
@@ -4391,8 +4391,9 @@ private fun ClimatePresetSection(
     onDelete: (String) -> Unit,
     onReorder: (List<ClimatePreset>) -> Unit,
 ) {
+    SectionLabel("Presets")
     if (presets.isNotEmpty()) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         // Full-width reorderable rows: drag from the handle to re-rank, tap to apply.
         ReorderColumn(
             items = presets,
