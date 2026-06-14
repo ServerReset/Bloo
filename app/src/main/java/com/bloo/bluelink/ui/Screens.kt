@@ -1822,17 +1822,20 @@ private fun AnimatedSlider(
 
     // Map an x pixel position onto a raw value, using the same inset travel band
     // the track is drawn with so the thumb lands exactly under the finger.
+    // The fraction is NOT clamped here so the thumb can visually overshoot the edges
+    // during a drag — it snaps back via spring when released.
     fun rawForX(x: Float): Float {
         val travel = (widthPx - 2 * edgePadPx).coerceAtLeast(1f)
-        val frac = ((x - edgePadPx) / travel).coerceIn(0f, 1f)
+        val frac = (x - edgePadPx) / travel
         return valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
     }
-    // While dragging: track the finger live and report the snapped step, ticking
-    // on each new step crossed.
+    // While dragging: track the finger live and let the thumb overshoot visually.
+    // Only the clamped value is reported and snapped to a step.
     fun trackTo(x: Float) {
-        val raw = rawForX(x).coerceIn(valueRange.start, valueRange.endInclusive)
-        scope.launch { anim.snapTo(raw) }
-        val s = snapToStep(raw, valueRange, steps)
+        val raw = rawForX(x)
+        scope.launch { anim.snapTo(raw) }  // unclamped → allows overshoot
+        val clamped = raw.coerceIn(valueRange.start, valueRange.endInclusive)
+        val s = snapToStep(clamped, valueRange, steps)
         if (steps > 0 && s != prevStep) {
             haptics?.tick()
             prevStep = s
@@ -1848,7 +1851,8 @@ private fun AnimatedSlider(
         scope.launch {
             anim.animateTo(
                 target,
-                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow),
+                // More energetic spring so the bounce from the edge is felt.
+                animationSpec = spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMedium),
             )
         }
     }
@@ -1913,7 +1917,10 @@ private fun AnimatedSlider(
                 .height(thumbH),
         ) {
             val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
-            val frac2 = ((anim.value - valueRange.start) / span2).coerceIn(0f, 1f)
+            // Raw (unclamped) fraction drives the thumb position so it can overshoot the
+            // edges during a drag; the track fill is clamped separately.
+            val frac2 = (anim.value - valueRange.start) / span2
+            val fillFrac = frac2.coerceIn(0f, 1f)
             val halfThumb = thumbW.toPx() / 2f
             val gapPx = gap.toPx()
             val padPx = edgePad.toPx()
@@ -3335,18 +3342,8 @@ private fun StateControl(
             // ControlHeight tall, so the button is vertically centred in it).
             modifier = Modifier.heightIn(min = 50.dp),
         ) {
-            // Crossfade the icon + label when the toggle state flips (lock ↔ unlock).
-            AnimatedContent(
-                targetState = isOn,
-                transitionSpec = {
-                    fadeIn(tween(180)) + scaleIn(initialScale = 0.82f, animationSpec = tween(180)) togetherWith
-                    fadeOut(tween(120)) + scaleOut(targetScale = 1.18f, animationSpec = tween(120))
-                },
-                label = "btnStateAnim",
-            ) { on ->
-                val buttonIcon = if (on == true) (deactivateIcon ?: icon) else icon
-                MorphButtonLabel(buttonIcon, if (on == true) turnOff else turnOn, pending, iconSize = 22.dp)
-            }
+            val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+            MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
         }
     }
 }
@@ -4319,13 +4316,6 @@ private fun ChargeEta(mins: Int) {
 
 @Composable
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val targets = status?.evStatus?.reservChargeInfos
-    var ac by remember(v.vin) { mutableIntStateOf(targets?.level(1) ?: 80) }
-    var dc by remember(v.vin) { mutableIntStateOf(targets?.level(0) ?: 80) }
-    // Track freshly-fetched targets (the initial remember is keyed only on VIN,
-    // so a later refresh wouldn't otherwise move the sliders).
-    LaunchedEffect(targets?.level(1)) { targets?.level(1)?.let { ac = it } }
-    LaunchedEffect(targets?.level(0)) { targets?.level(0)?.let { dc = it } }
     val ev = status?.evStatus
     val charging = ev?.batteryCharge == true
     val plugged = (ev?.batteryPlugin != null && ev.batteryPlugin != 0) || charging
@@ -4357,25 +4347,7 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             mins?.let { StatusRow("Time to full", fmtMinutes(it)) }
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
-        StepRow("AC (home) target", "$ac%")
-        AnimatedSlider(
-            value = ac.toFloat(),
-            onValueChange = { ac = (it / 10f).roundToInt() * 10 },
-            valueRange = 50f..100f,
-            steps = 4,
-        )
         if (charging && mins != null) ChargeEta(mins)
-        StepRow("DC (fast) target", "$dc%")
-        AnimatedSlider(
-            value = dc.toFloat(),
-            onValueChange = { dc = (it / 10f).roundToInt() * 10 },
-            valueRange = 50f..100f,
-            steps = 4,
-        )
-        if (charging && mins != null) ChargeEta(mins)
-        CommandButton("Set limits", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled) {
-            vm.setChargeLimits(v, ac, dc)
-        }
         // The charge-port toggle lives in the controls pebble, next to lock/unlock.
     }
 }
