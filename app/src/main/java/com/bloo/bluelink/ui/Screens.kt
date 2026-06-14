@@ -2972,6 +2972,7 @@ private fun MorphButton(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "morphBg",
     )
+    val resolvedContent = if (active) activeContentColor else contentColor
     Button(
         onClick = { haptics?.click(); onClick() },
         modifier = modifier.animateContentSize(
@@ -2982,7 +2983,12 @@ private fun MorphButton(
         interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
             containerColor = bg,
-            contentColor = if (active) activeContentColor else contentColor,
+            contentColor = resolvedContent,
+            // Keep the button's full background when disabled (only the label
+            // fades) instead of M3's default onSurface@12%, which is invisible
+            // against light cards and made disabled buttons look backgroundless.
+            disabledContainerColor = bg,
+            disabledContentColor = resolvedContent.copy(alpha = 0.38f),
         ),
         border = if (active) null else border,
         contentPadding = contentPadding,
@@ -4190,7 +4196,7 @@ private fun PresetPill(
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Apply half — pure color chip, no text or handle icon.
+        // Apply half — snowflake icon plus the preset name.
         Surface(
             onClick = { haptics?.click(); onStart() },
             interactionSource = leftInteraction,
@@ -4199,11 +4205,18 @@ private fun PresetPill(
             shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
             modifier = Modifier.weight(1f).fillMaxHeight(),
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.padding(vertical = 11.dp),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
             ) {
-                Icon(Icons.Filled.AcUnit, contentDescription = name, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    name,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
             }
         }
         // Delete nub.
