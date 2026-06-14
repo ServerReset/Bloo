@@ -1275,45 +1275,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     // Decorative ring color — subtle outline that acknowledges the camera hole.
     val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
 
-    // Single gesture handler on the outer Box — one instance regardless of how
-    // many pages the VerticalPager pre-renders, so there's no risk of adjacent
-    // pages' handlers racing each other and cancelling navigation.
-    Box(Modifier.fillMaxSize().pointerInput(tiles.size) {
-        awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            var totalDy = 0f
-            var totalDx = 0f
-            var decided = false
-            var switching = false
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                val change = event.changes.firstOrNull() ?: break
-                if (!change.pressed) break
-                val delta = change.position - change.previousPosition
-                totalDy += delta.y
-                totalDx += delta.x
-                if (!decided && (abs(totalDy) > viewConfiguration.touchSlop || abs(totalDx) > viewConfiguration.touchSlop)) {
-                    decided = true
-                    // Horizontal gesture → yield to the HorizontalPager (car switching).
-                    if (abs(totalDx) >= abs(totalDy)) break
-                    val ci = ((vPager.currentPage % tiles.size) + tiles.size) % tiles.size
-                    val ts = tileScrollStates[ci]
-                    val noContent = ts.maxValue == 0
-                    val atTop = ts.value <= 0
-                    val atBottom = ts.value >= ts.maxValue
-                    switching = noContent || (totalDy > 0 && atTop) || (totalDy < 0 && atBottom)
-                }
-                if (switching) change.consume()
-            }
-            if (switching) {
-                val curPage = vPager.currentPage
-                val delta = if (totalDy < 0) 1 else -1
-                scope.launch {
-                    vPager.animateScrollToPage((curPage + delta).coerceIn(0, virtualCount - 1))
-                }
-            }
-        }
-    }) {
+    Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize(), userScrollEnabled = false) { page ->
             val i = ((page % tiles.size) + tiles.size) % tiles.size
             val tileScroll = tileScrollStates[i]
@@ -1323,9 +1285,56 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 LocalCameraHolePx provides cameraHole,
                 LocalCoverScrollState provides tileScroll,
             ) {
+                // Gesture handler is inside each page so it lives below the HorizontalPager
+                // in the pointer-input tree, giving it priority over car-switching swipes.
+                // DOWN = next tile / UP = previous tile (consistent with the scrubber).
+                // Triggers only at the scroll edge (or when content has no scroll at all).
+                // Horizontal bias check uses a 2:1 threshold so slight diagonal swipes still
+                // register as vertical.
                 Box(
                     Modifier
                         .fillMaxSize()
+                        .pointerInput(tileScroll, page) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                var totalDy = 0f
+                                var totalDx = 0f
+                                var decided = false
+                                var switching = false
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull() ?: break
+                                    if (!change.pressed) break
+                                    val d = change.position - change.previousPosition
+                                    totalDy += d.y
+                                    totalDx += d.x
+                                    if (!decided && (abs(totalDy) > viewConfiguration.touchSlop || abs(totalDx) > viewConfiguration.touchSlop)) {
+                                        decided = true
+                                        // Require 2× horizontal dominance before yielding to
+                                        // HorizontalPager, so a slightly diagonal upward swipe
+                                        // still registers as vertical.
+                                        if (abs(totalDx) > abs(totalDy) * 2f) break
+                                        val noContent = tileScroll.maxValue == 0
+                                        val atTop = tileScroll.value <= 0
+                                        val atBottom = tileScroll.value >= tileScroll.maxValue
+                                        // DOWN = next tile (swipe toward the tile below);
+                                        // UP   = previous tile (swipe toward the tile above).
+                                        switching = noContent ||
+                                            (totalDy > 0 && atBottom) ||
+                                            (totalDy < 0 && atTop)
+                                    }
+                                    if (switching) change.consume()
+                                }
+                                if (switching) {
+                                    val delta = if (totalDy > 0) 1 else -1
+                                    scope.launch {
+                                        vPager.animateScrollToPage(
+                                            (page + delta).coerceIn(0, virtualCount - 1)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         .padding(
                             start = 10.dp, top = tileTopPadding, bottom = 10.dp,
                             end = if (tiles.size > 1) 22.dp else 10.dp,
