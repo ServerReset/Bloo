@@ -167,7 +167,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -6162,7 +6161,6 @@ private fun StepRow(label: String, value: String, valueColor: Color = Color.Unsp
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val haptics = LocalHaptics.current
-    val interaction = remember { MutableInteractionSource() }
     val scale by animateFloatAsState(
         if (checked) 1.04f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
@@ -6172,7 +6170,7 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
         Modifier
             .fillMaxWidth()
             .clickable(
-                interactionSource = interaction,
+                interactionSource = remember { MutableInteractionSource() },
                 indication = null,
             ) {
                 val next = !checked
@@ -6185,7 +6183,6 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
         Switch(
             checked = checked,
             onCheckedChange = { if (it) haptics?.toggleOn() else haptics?.toggleOff(); onChange(it) },
-            interactionSource = interaction,
             modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale),
         )
     }
