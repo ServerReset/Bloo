@@ -1317,16 +1317,17 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                                         val noContent = tileScroll.maxValue == 0
                                         val atTop = tileScroll.value <= 0
                                         val atBottom = tileScroll.value >= tileScroll.maxValue
-                                        // DOWN = next tile (swipe toward the tile below);
-                                        // UP   = previous tile (swipe toward the tile above).
+                                        // Natural physics: finger drags content with it.
+                                        // Swipe DOWN (totalDy > 0) at top → previous tile slides in from above.
+                                        // Swipe UP  (totalDy < 0) at bottom → next tile slides in from below.
                                         switching = noContent ||
-                                            (totalDy > 0 && atBottom) ||
-                                            (totalDy < 0 && atTop)
+                                            (totalDy > 0 && atTop) ||
+                                            (totalDy < 0 && atBottom)
                                     }
                                     if (switching) change.consume()
                                 }
                                 if (switching) {
-                                    val delta = if (totalDy > 0) 1 else -1
+                                    val delta = if (totalDy < 0) 1 else -1
                                     scope.launch {
                                         vPager.animateScrollToPage(
                                             (page + delta).coerceIn(0, virtualCount - 1)
