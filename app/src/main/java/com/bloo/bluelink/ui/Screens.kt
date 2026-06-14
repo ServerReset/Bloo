@@ -4197,11 +4197,11 @@ private fun PresetPill(
         label = "presetInner",
     )
     val leftBg by androidx.compose.animation.animateColorAsState(
-        if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+        if (active) MaterialTheme.colorScheme.primary else buttonContainer(),
         spring(stiffness = Spring.StiffnessMediumLow),
         label = "presetLeftBg",
     )
-    val leftFg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+    val leftFg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
     Row(
@@ -4235,8 +4235,8 @@ private fun PresetPill(
         // Delete nub.
         Surface(
             onClick = { haptics?.tick(); onDelete() },
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = buttonContainer(),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
             modifier = Modifier.fillMaxHeight(),
         ) {
@@ -4303,8 +4303,8 @@ private fun ChargeLimitPill(
                 },
                 interactionSource = leftInteraction,
                 enabled = enabled,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = buttonContainer(),
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
