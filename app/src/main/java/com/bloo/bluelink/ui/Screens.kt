@@ -127,6 +127,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -1916,9 +1917,9 @@ private fun AnimatedSlider(
         scope.launch {
             anim.animateTo(
                 target,
-                // A little bounce as it settles onto the step — enough to feel
-                // springy without overshooting far past the edge.
-                animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMedium),
+                // A slow, gentle settle onto the step — a touch of bounce, but it
+                // glides rather than snapping.
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
             )
         }
     }
@@ -2646,7 +2647,10 @@ private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) 
             contentColor = fg,
             shape = RoundedCornerShape(percent = pct.roundToInt()),
             modifier = Modifier
-                .heightIn(min = 50.dp)
+                // Fixed 50dp height matches the lock/unlock button beside it, so it
+                // reads as a clean pill rather than a tall ellipse (it sits in a
+                // 76dp row; without a fixed height fillMaxHeight stretched it).
+                .height(50.dp)
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = LocalIndication.current,
@@ -4381,9 +4385,11 @@ private fun PresetPill(
  */
 @Composable
 private fun ChargeLimitPill(
+    label: String,
     limit: Int,
     pending: Boolean,
     enabled: Boolean,
+    icon: ImageVector = Icons.Filled.Bolt,
     onValueChange: (Int) -> Unit,
     onApply: () -> Unit,
 ) {
@@ -4431,10 +4437,10 @@ private fun ChargeLimitPill(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
                 ) {
-                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Charge limit",
+                        label,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
@@ -4494,9 +4500,10 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         else -> "Not plugged in"
     }
 
-    // A single charge-limit target, applied to both AC and DC. Defaults to 80%
-    // (a healthy daily ceiling) until the user picks one.
-    var limit by remember(v.vin) { mutableIntStateOf(80) }
+    // Separate AC (home / level-2) and DC (fast) charge-limit targets, each
+    // defaulting to 80% (a healthy daily ceiling) until the user picks one.
+    var acLimit by remember(v.vin) { mutableIntStateOf(80) }
+    var dcLimit by remember(v.vin) { mutableIntStateOf(80) }
 
     Pebble(
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
@@ -4518,11 +4525,22 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
         ChargeLimitPill(
-            limit = limit,
+            label = "AC (home) limit",
+            icon = Icons.Filled.Power,
+            limit = acLimit,
             pending = limitPending,
             enabled = enabled,
-            onValueChange = { limit = it },
-            onApply = { vm.setChargeLimits(v, limit, limit) },
+            onValueChange = { acLimit = it },
+            onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
+        )
+        ChargeLimitPill(
+            label = "DC (fast) limit",
+            icon = Icons.Filled.Bolt,
+            limit = dcLimit,
+            pending = limitPending,
+            enabled = enabled,
+            onValueChange = { dcLimit = it },
+            onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
         )
         // The charge-port toggle lives in the controls pebble, next to lock/unlock.
     }
@@ -5413,8 +5431,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
                     FontChoice.GOOGLE_SANS to "Google Sans",
                 )
-                FontChoice.entries.forEach { choice ->
-                    ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FontChoice.entries.forEach { choice ->
+                        ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
+                    }
                 }
             }
 
@@ -5549,8 +5569,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ThemeMode.DARK to "Dark",
                     ThemeMode.AMOLED to "AMOLED (pure black)",
                 )
-                ThemeMode.entries.forEach { mode ->
-                    ChoiceRow(labels.getValue(mode), appearance.themeMode == mode) { vm.setThemeMode(mode) }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ThemeMode.entries.forEach { mode ->
+                        ChoiceRow(labels.getValue(mode), appearance.themeMode == mode) { vm.setThemeMode(mode) }
+                    }
                 }
             }
 
