@@ -187,6 +187,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -1197,7 +1198,14 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.collect { vm.selectIndex(it) }
     }
-    HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+    // True while the page scrubber is active; suspends car-switching swipes so a
+    // scrub gesture can't be hijacked into flipping to the next car.
+    val scrubbing = remember { mutableStateOf(false) }
+    HorizontalPager(
+        state = pager,
+        modifier = Modifier.fillMaxSize(),
+        userScrollEnabled = !scrubbing.value,
+    ) { page ->
         val v = vehicles[page]
         CarThemeOverride(
             paletteId = appearance.carCustomPaletteIds[v.vin],
@@ -1205,7 +1213,9 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             themeMode = appearance.themeMode,
             vibrancy = appearance.vibrancy,
         ) {
-            CompactCar(v, state, vm)
+            CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
+                CompactCar(v, state, vm)
+            }
         }
     }
 }
@@ -1411,7 +1421,10 @@ private fun VerticalPagerDots(
     var scrubStartPage by remember { mutableIntStateOf(0) }
     var scrubAccumY by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
-    val pxPerPage = with(density) { 40.dp.toPx() }
+    // Shorter travel per page = a more sensitive scrub.
+    val pxPerPage = with(density) { 24.dp.toPx() }
+    // Shared flag so the parent HorizontalPager can lock car-switching swipes.
+    val coverScrubbing = LocalCoverScrubbing.current
 
     // Drag down → higher page index (later tiles); drag up → lower index (earlier tiles).
     val scrubTargetPage by remember {
@@ -1446,13 +1459,20 @@ private fun VerticalPagerDots(
                     val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
                     longPress.consume()
                     scrubbing = true
+                    coverScrubbing?.value = true
                     scrubStartPage = current
                     scrubAccumY = 0f
-                    verticalDrag(longPress.id) { change ->
-                        change.consume()
-                        scrubAccumY += (change.position - change.previousPosition).y
+                    try {
+                        verticalDrag(longPress.id) { change ->
+                            change.consume()
+                            scrubAccumY += (change.position - change.previousPosition).y
+                        }
+                    } finally {
+                        // Always clear, even if the gesture is cancelled, so the
+                        // parent never gets stuck with car-switching disabled.
+                        scrubbing = false
+                        coverScrubbing?.value = false
                     }
-                    scrubbing = false
                 }
             },
         shape = RoundedCornerShape(cornerRadius),
@@ -1865,6 +1885,13 @@ private val LocalCameraHolePx = staticCompositionLocalOf<android.graphics.Rect?>
  * to decide whether to switch pager pages or scroll tile content.
  */
 private val LocalCoverScrollState = compositionLocalOf<ScrollState?> { null }
+
+/**
+ * Shared flag set true while the cover-screen page scrubber is active, so the
+ * parent [CompactGarage] can suspend horizontal car-switching swipes during a
+ * scrub. Provided around the HorizontalPager content.
+ */
+private val LocalCoverScrubbing = staticCompositionLocalOf<MutableState<Boolean>?> { null }
 
 /**
  * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the
