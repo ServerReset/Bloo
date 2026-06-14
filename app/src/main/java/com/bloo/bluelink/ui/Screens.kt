@@ -1212,10 +1212,14 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
 @Composable
 private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
+    val isGen5W = remember(v.brand, v.generation) {
+        v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
+    }
     val sections = state.sectionsFor(v).filter {
         it in CompactKnownTiles &&
             (it != "charge" || state.hasBattery(v)) &&
             (it != "ai" || state.aiEnabled) &&
+            (it != "trips" || !isGen5W) &&
             !state.isPebbleHidden(v.vin, it)
     }
     val tiles = listOf("main") + sections
@@ -1283,15 +1287,21 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                             awaitEachGesture {
                                 awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                                 var totalDy = 0f
+                                var totalDx = 0f
                                 var decided = false
                                 var switching = false
                                 while (true) {
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
                                     val change = event.changes.firstOrNull() ?: break
                                     if (!change.pressed) break
-                                    totalDy += (change.position - change.previousPosition).y
-                                    if (!decided && abs(totalDy) > viewConfiguration.touchSlop) {
+                                    val delta = change.position - change.previousPosition
+                                    totalDy += delta.y
+                                    totalDx += delta.x
+                                    if (!decided && (abs(totalDy) > viewConfiguration.touchSlop || abs(totalDx) > viewConfiguration.touchSlop)) {
                                         decided = true
+                                        // If the gesture is more horizontal than vertical,
+                                        // yield to the HorizontalPager (car switching).
+                                        if (abs(totalDx) >= abs(totalDy)) break
                                         val noContent = tileScroll.maxValue == 0
                                         val atTop = tileScroll.value <= 0
                                         val atBottom = tileScroll.value >= tileScroll.maxValue
@@ -1422,6 +1432,8 @@ private fun VerticalPagerDots(
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubVPad")
     val itemSpacing by animateDpAsState(if (scrubbing) 14.dp else 6.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubSpacing")
+    val cornerRadius by animateDpAsState(if (scrubbing) 20.dp else 100.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubCorner")
     val surfaceAlpha by animateFloatAsState(if (scrubbing) 0.92f else 0.7f, label = "scrubAlpha")
 
     Surface(
@@ -1441,7 +1453,7 @@ private fun VerticalPagerDots(
                     scrubbing = false
                 }
             },
-        shape = CircleShape,
+        shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp).copy(alpha = surfaceAlpha),
         shadowElevation = if (scrubbing) 8.dp else 2.dp,
     ) {
@@ -2676,7 +2688,8 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 /** The reorderable pebble stack for a car. */
 @Composable
 private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Set<String> = emptySet()) {
-    val sections = state.sectionsFor(v).filter {
+    val allSections = state.sectionsFor(v)
+    val sections = allSections.filter {
         it !in exclude &&
             !state.isPebbleHidden(v.vin, it) &&
             (it != "ai" || state.aiEnabled)
@@ -2690,7 +2703,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
             // excluded ones (the pinned hot-spot, summary, controls, hidden) keep
             // their slots instead of being dropped.
             val visibleSet = sections.toSet()
-            val full = (state.sectionsFor(v) + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()
+            val full = (allSections + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()
             val queue = ArrayDeque(newVisible)
             val merged = full.map { s ->
                 if (s in visibleSet && queue.isNotEmpty()) queue.removeFirst() else s
