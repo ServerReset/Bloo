@@ -1250,8 +1250,12 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val start = if (loop) virtualCount / 2 else 0
     val vPager = rememberPagerState(initialPage = start) { virtualCount }
     val current = ((vPager.currentPage % tiles.size) + tiles.size) % tiles.size
-    // Per-tile scroll states so position persists across pager recycling.
-    val tileScrollStates = remember(tiles.size) { Array(tiles.size) { ScrollState(0) } }
+    // Per-tile scroll states, keyed by tile name so position persists across
+    // pager recycling AND reordering. (A size-keyed array would let a tile
+    // inherit another's stale scroll position when the order changes — e.g. the
+    // non-scrolling main tile picking up a pebble's bottomed-out state, which
+    // breaks the edge-detection that drives vertical tile switching.)
+    val tileScrollStates = remember { mutableMapOf<String, ScrollState>() }
     val scope = rememberCoroutineScope()
 
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
@@ -1286,7 +1290,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize(), userScrollEnabled = false) { page ->
             val i = ((page % tiles.size) + tiles.size) % tiles.size
-            val tileScroll = tileScrollStates[i]
+            val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }
             CompositionLocalProvider(
                 LocalForceExpanded provides true,
                 LocalPebbleFillHeight provides true,
@@ -2683,6 +2687,7 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
                 v.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 "${v.model} · ${state.powertrainLabel(v)}",
