@@ -1230,6 +1230,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val current = ((vPager.currentPage % tiles.size) + tiles.size) % tiles.size
     // Per-tile scroll states so position persists across pager recycling.
     val tileScrollStates = remember(tiles.size) { Array(tiles.size) { ScrollState(0) } }
+    val scope = rememberCoroutineScope()
 
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
@@ -1290,7 +1291,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
                                     val change = event.changes.firstOrNull() ?: break
                                     if (!change.pressed) break
-                                    totalDy += change.positionChange().y
+                                    totalDy += (change.position - change.previousPosition).y
                                     if (!decided && abs(totalDy) > viewConfiguration.touchSlop) {
                                         decided = true
                                         val noContent = tileScroll.maxValue == 0
@@ -1302,9 +1303,11 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                                 }
                                 if (switching) {
                                     val delta = if (totalDy < 0) 1 else -1
-                                    vPager.animateScrollToPage(
-                                        (page + delta).coerceIn(0, virtualCount - 1)
-                                    )
+                                    scope.launch {
+                                        vPager.animateScrollToPage(
+                                            (page + delta).coerceIn(0, virtualCount - 1)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1426,7 +1429,7 @@ private fun VerticalPagerDots(
                     scrubAccumY = 0f
                     verticalDrag(longPress.id) { change ->
                         change.consume()
-                        scrubAccumY += change.positionChange().y
+                        scrubAccumY += (change.position - change.previousPosition).y
                     }
                     scrubbing = false
                 }
