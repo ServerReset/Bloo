@@ -53,6 +53,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Wear OS Data Layer: receives the watch's remote commands and sync
+             requests. Bound on-demand by Play Services when a /bloo message
+             arrives, so it works even with the phone app closed. -->
+        <service
+            android:name=".wear.WearPhoneService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/bloo" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".tiles.BlooTile1"
             android:exported="true"

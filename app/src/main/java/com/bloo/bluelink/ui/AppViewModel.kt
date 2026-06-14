@@ -724,6 +724,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin]) })
+        // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
+        com.bloo.bluelink.wear.WearBridge.publish(getApplication())
     }
 
     private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {

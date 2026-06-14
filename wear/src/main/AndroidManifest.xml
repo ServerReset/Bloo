@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_bloo"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_bloo"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BlooWear">
+
+        <!-- This watch app works without the phone app installed. -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
+        <uses-library
+            android:name="com.google.android.wearable"
+            android:required="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.BlooWear">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Receives car snapshots + sessions from the phone, and command
+             results, even when the watch UI is closed. -->
+        <service
+            android:name=".WearListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/bloo" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

@@ -21,3 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Bloo"
 include(":app")
+include(":shared")
+include(":wear")
