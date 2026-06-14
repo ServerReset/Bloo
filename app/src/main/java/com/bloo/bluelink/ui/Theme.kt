@@ -250,7 +250,7 @@ fun buttonContainer(): Color {
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.surface.luminance() < 0.5f
     return if (dark) lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.18f)
-    else lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.10f)
+    else lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.16f)
 }
 
 /** Scale a colour's saturation (HSV) by [factor]; 1 = unchanged. */
