@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 private val Context.settingsDataStore by preferencesDataStore(name = "bloo_settings")
@@ -54,10 +56,10 @@ enum class LockTiming(val label: String) {
 }
 
 /** Reorderable detail sections (pebbles), in their default order. */
-val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", "info", "location", "trips", "diagnostics")
+val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", "info", "location", "weather", "trips", "diagnostics")
 
 /** Pebbles the user may hide (the others are essential). */
-val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "trips", "info", "diagnostics", "ai")
+val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trips", "info", "diagnostics", "ai")
 
 /** Number of configurable Quick Settings tiles. */
 const val TILE_COUNT = 4
@@ -72,6 +74,11 @@ class SettingsStore(private val context: Context) {
         val PALETTE = stringPreferencesKey("color_palette")
         val CUSTOM_PALETTES = stringPreferencesKey("custom_palettes")
         val ACTIVE_CUSTOM_PALETTE_ID = stringPreferencesKey("active_custom_palette_id")
+        val CAR_PALETTE_IDS = stringPreferencesKey("car_palette_ids")
+        val WEATHER_LAT = stringPreferencesKey("weather_lat")
+        val WEATHER_LON = stringPreferencesKey("weather_lon")
+        val WEATHER_LABEL = stringPreferencesKey("weather_label")
+        val WEATHER_FAHRENHEIT = stringPreferencesKey("weather_fahrenheit")
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LOCK_TIMING = stringPreferencesKey("lock_timing")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
@@ -93,6 +100,14 @@ class SettingsStore(private val context: Context) {
         val customPalettes: List<CustomPaletteData> = emptyList(),
         /** ID of the active custom palette, or null to use a built-in palette. */
         val activeCustomPaletteId: String? = null,
+        /** Per-vehicle custom palette overrides: VIN → customPaletteId (absent = use global). */
+        val carCustomPaletteIds: Map<String, String> = emptyMap(),
+        /** User-set weather location (latitude/longitude/place label), or null if unset. */
+        val weatherLat: Double? = null,
+        val weatherLon: Double? = null,
+        val weatherLabel: String? = null,
+        /** Show temperatures in Fahrenheit (defaults to true for US locale). */
+        val weatherFahrenheit: Boolean = true,
         val biometricLock: Boolean = false,
         /** When the biometric lock re-engages after leaving the foreground. */
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
@@ -123,6 +138,15 @@ class SettingsStore(private val context: Context) {
                 runCatching { palJson.decodeFromString(palSer, json) }.getOrElse { emptyList() }
             } ?: emptyList(),
             activeCustomPaletteId = prefs[Keys.ACTIVE_CUSTOM_PALETTE_ID],
+            carCustomPaletteIds = prefs[Keys.CAR_PALETTE_IDS]?.let { json ->
+                runCatching {
+                    palJson.decodeFromString(MapSerializer(String.serializer(), String.serializer()), json)
+                }.getOrElse { emptyMap() }
+            } ?: emptyMap(),
+            weatherLat = prefs[Keys.WEATHER_LAT]?.toDoubleOrNull(),
+            weatherLon = prefs[Keys.WEATHER_LON]?.toDoubleOrNull(),
+            weatherLabel = prefs[Keys.WEATHER_LABEL],
+            weatherFahrenheit = prefs[Keys.WEATHER_FAHRENHEIT]?.toBooleanStrictOrNull() ?: true,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
@@ -536,5 +560,59 @@ class SettingsStore(private val context: Context) {
             if (id == null) it.remove(Keys.ACTIVE_CUSTOM_PALETTE_ID)
             else it[Keys.ACTIVE_CUSTOM_PALETTE_ID] = id
         }
+    }
+
+    private val carPaletteSerializer = MapSerializer(String.serializer(), String.serializer())
+
+    /** Set or clear a per-car custom palette override (null clears it → use global). */
+    suspend fun setCarPaletteId(vin: String, paletteId: String?) {
+        val current = context.settingsDataStore.data.first()[Keys.CAR_PALETTE_IDS]?.let { json ->
+            runCatching { paletteJson.decodeFromString(carPaletteSerializer, json) }.getOrElse { emptyMap() }
+        } ?: emptyMap()
+        val updated = if (paletteId == null) current - vin else current + (vin to paletteId)
+        context.settingsDataStore.edit {
+            if (updated.isEmpty()) it.remove(Keys.CAR_PALETTE_IDS)
+            else it[Keys.CAR_PALETTE_IDS] = paletteJson.encodeToString(carPaletteSerializer, updated)
+        }
+    }
+
+    /** Serialise all custom palettes to a JSON string for export/share. */
+    suspend fun exportPalettesJson(): String =
+        context.settingsDataStore.data.first()[Keys.CUSTOM_PALETTES] ?: "[]"
+
+    /**
+     * Merge custom palettes parsed from [json] into the saved set (new ids only).
+     * Returns an error message on failure, or null on success.
+     */
+    suspend fun importPalettesJson(json: String): String? {
+        val parsed = runCatching { paletteJson.decodeFromString(paletteListSerializer, json) }
+            .getOrElse { return "Invalid palette file" }
+        val existing = readCustomPalettes()
+        val merged = existing + parsed.filter { new -> existing.none { it.id == new.id } }
+        context.settingsDataStore.edit {
+            it[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, merged)
+        }
+        return null
+    }
+
+    // --- Weather ---------------------------------------------------------
+
+    /** Set or clear the weather location. Passing null lat/lon clears it. */
+    suspend fun setWeatherLocation(lat: Double?, lon: Double?, label: String?) {
+        context.settingsDataStore.edit {
+            if (lat == null || lon == null) {
+                it.remove(Keys.WEATHER_LAT)
+                it.remove(Keys.WEATHER_LON)
+                it.remove(Keys.WEATHER_LABEL)
+            } else {
+                it[Keys.WEATHER_LAT] = lat.toString()
+                it[Keys.WEATHER_LON] = lon.toString()
+                if (label.isNullOrBlank()) it.remove(Keys.WEATHER_LABEL) else it[Keys.WEATHER_LABEL] = label
+            }
+        }
+    }
+
+    suspend fun setWeatherFahrenheit(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.WEATHER_FAHRENHEIT] = value.toString() }
     }
 }

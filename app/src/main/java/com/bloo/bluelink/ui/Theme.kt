@@ -348,3 +348,43 @@ fun BlooTheme(
         CompositionLocalProvider(LocalDensity provides scaledDensity, content = content)
     }
 }
+
+/**
+ * Overrides only the colour scheme for a per-car custom palette, inheriting
+ * typography, shapes and motion from the surrounding [BlooTheme]. When
+ * [paletteId] is null or unknown, [content] renders unchanged so cars without an
+ * override keep the global theme.
+ */
+@Composable
+internal fun CarThemeOverride(
+    paletteId: String?,
+    customPalettes: List<CustomPaletteData>,
+    themeMode: ThemeMode,
+    vibrancy: Float,
+    content: @Composable () -> Unit,
+) {
+    val palette = paletteId?.let { id -> customPalettes.find { it.id == id } }
+    if (palette == null) {
+        content()
+        return
+    }
+    val dark = when (themeMode) {
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+    val base = if (dark) DarkExpressive.applyCustomPalette(palette)
+        else LightExpressive.applyCustomPalette(palette)
+    val scheme = if (vibrancy == 1f) base else {
+        fun Color.v() = saturate(vibrancy)
+        base.copy(
+            primary = base.primary.v(), onPrimary = base.onPrimary.v(),
+            primaryContainer = base.primaryContainer.v(), onPrimaryContainer = base.onPrimaryContainer.v(),
+            secondary = base.secondary.v(), onSecondary = base.onSecondary.v(),
+            secondaryContainer = base.secondaryContainer.v(), onSecondaryContainer = base.onSecondaryContainer.v(),
+            tertiary = base.tertiary.v(), onTertiary = base.onTertiary.v(),
+            tertiaryContainer = base.tertiaryContainer.v(), onTertiaryContainer = base.onTertiaryContainer.v(),
+        )
+    }
+    MaterialTheme(colorScheme = scheme, content = content)
+}

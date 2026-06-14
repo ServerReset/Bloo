@@ -34,6 +34,8 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.Weather
+import com.bloo.bluelink.data.WeatherApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +48,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Locale
+
+/** How long a cached weather reading is considered fresh (15 minutes). */
+private const val WEATHER_TTL_MS = 15 * 60 * 1000L
 
 sealed interface Screen {
     data object Login : Screen
@@ -82,6 +87,10 @@ data class UiState(
     val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
+    /** Current weather at the user's configured "home" location, if loaded. */
+    val homeWeather: Weather? = null,
+    /** Current weather at each car's last-known location, keyed by VIN. */
+    val carWeather: Map<String, Weather> = emptyMap(),
     val licensePlates: Map<String, String> = emptyMap(),
     val lastServiceMiles: Map<String, Int> = emptyMap(),
     val serviceIntervalMiles: Map<String, Int> = emptyMap(),
@@ -1138,6 +1147,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 reverseGeocode(loc)?.let { place ->
                     _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
                 }
+                loadCarWeather(v, force = true)
                 persistCache()
             }
             hadCached -> _state.update {
@@ -1282,6 +1292,122 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette) }
     fun deleteCustomPalette(id: String) = viewModelScope.launch { settingsStore.deleteCustomPalette(id) }
     fun setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id) }
+    fun setCarPaletteId(vin: String, paletteId: String?) = viewModelScope.launch { settingsStore.setCarPaletteId(vin, paletteId) }
+
+    /** Share all custom palettes as a JSON document via the system share sheet. */
+    fun exportPalettes(context: android.content.Context) = viewModelScope.launch {
+        val json = settingsStore.exportPalettesJson()
+        runCatching {
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(android.content.Intent.EXTRA_TEXT, json)
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "Bloo colour palettes")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(
+                android.content.Intent.createChooser(intent, "Export palettes")
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.onFailure { _state.update { s -> s.copy(message = "Couldn't open the share sheet") } }
+    }
+
+    /** Import custom palettes from a user-picked JSON file. */
+    fun importPalettes(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
+        val json = withContext(Dispatchers.IO) {
+            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
+        }
+        if (json == null) {
+            _state.update { it.copy(message = "Couldn't read that file") }
+            return@launch
+        }
+        val error = settingsStore.importPalettesJson(json)
+        _state.update { it.copy(message = error ?: "Palettes imported") }
+    }
+
+    // --- Weather ---------------------------------------------------------
+
+    fun setWeatherFahrenheit(value: Boolean) = viewModelScope.launch { settingsStore.setWeatherFahrenheit(value) }
+
+    fun clearWeatherLocation() = viewModelScope.launch {
+        settingsStore.setWeatherLocation(null, null, null)
+        _state.update { it.copy(homeWeather = null) }
+    }
+
+    /** Forward-geocode a place name and save it as the weather location. */
+    fun setWeatherPlace(query: String) = viewModelScope.launch {
+        val q = query.trim()
+        if (q.isBlank()) return@launch
+        val hit = withContext(Dispatchers.IO) {
+            runCatching {
+                Geocoder(getApplication(), Locale.getDefault()).getFromLocationName(q, 1)?.firstOrNull()
+            }.getOrNull()
+        }
+        if (hit == null) {
+            _state.update { it.copy(message = "Couldn't find \"$q\"") }
+            return@launch
+        }
+        val label = listOfNotNull(hit.locality ?: hit.subAdminArea, hit.adminArea)
+            .distinct().joinToString(", ").ifBlank { q }
+        settingsStore.setWeatherLocation(hit.latitude, hit.longitude, label)
+        loadHomeWeather(force = true)
+    }
+
+    /** Use the device's last-known location as the weather location (needs permission). */
+    fun useDeviceLocationForWeather() = viewModelScope.launch {
+        val loc = withContext(Dispatchers.IO) {
+            runCatching {
+                val lm = getApplication<Application>()
+                    .getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+                val providers = listOf(
+                    android.location.LocationManager.GPS_PROVIDER,
+                    android.location.LocationManager.NETWORK_PROVIDER,
+                    android.location.LocationManager.PASSIVE_PROVIDER,
+                )
+                providers.firstNotNullOfOrNull { p ->
+                    runCatching { lm.getLastKnownLocation(p) }.getOrNull()
+                }
+            }.getOrNull()
+        }
+        if (loc == null) {
+            _state.update { it.copy(message = "No device location available — try setting a place instead") }
+            return@launch
+        }
+        val label = withContext(Dispatchers.IO) {
+            runCatching {
+                Geocoder(getApplication(), Locale.getDefault())
+                    .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->
+                        listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct().joinToString(", ")
+                    }
+            }.getOrNull()
+        } ?: "My location"
+        settingsStore.setWeatherLocation(loc.latitude, loc.longitude, label)
+        loadHomeWeather(force = true)
+    }
+
+    /** Fetch weather for the configured home location. Skips if a recent reading exists. */
+    fun loadHomeWeather(force: Boolean = false) = viewModelScope.launch {
+        val appearance = settingsStore.appearance.first()
+        val lat = appearance.weatherLat
+        val lon = appearance.weatherLon
+        if (lat == null || lon == null) {
+            _state.update { it.copy(homeWeather = null) }
+            return@launch
+        }
+        val cached = _state.value.homeWeather
+        if (!force && cached != null && System.currentTimeMillis() - cached.fetchedAt < WEATHER_TTL_MS) return@launch
+        WeatherApi.fetch(lat, lon)?.let { w -> _state.update { it.copy(homeWeather = w) } }
+    }
+
+    /** Fetch weather at a car's last-known location, if any. */
+    fun loadCarWeather(v: Vehicle, force: Boolean = false) = viewModelScope.launch {
+        val loc = _state.value.locations[v.vin] ?: return@launch
+        val cached = _state.value.carWeather[v.vin]
+        if (!force && cached != null && System.currentTimeMillis() - cached.fetchedAt < WEATHER_TTL_MS) return@launch
+        WeatherApi.fetch(loc.latitude, loc.longitude)?.let { w ->
+            _state.update { it.copy(carWeather = it.carWeather + (v.vin to w)) }
+        }
+    }
+
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
     fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
     fun setUiScale(value: Float) = viewModelScope.launch { settingsStore.setUiScale(value) }

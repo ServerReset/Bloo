@@ -137,6 +137,15 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.WbCloudy
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Grain
+import androidx.compose.material.icons.filled.Umbrella
+import androidx.compose.material.icons.filled.Thunderstorm
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -246,6 +255,8 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.Weather
+import com.bloo.bluelink.data.WeatherCode
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.openLabels
@@ -1050,7 +1061,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     if (compact) {
         // The cover screen hosts Settings (and refresh) inside the main tile, so
         // there is no floating overlay here.
-        CompactGarage(state, vm)
+        CompactGarage(state, vm, appearance)
         return
     }
     // How many full-height cards fit side by side; pages advance by this many.
@@ -1083,7 +1094,15 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(state = exPager, modifier = Modifier.fillMaxSize()) { page ->
-                        ExpandedCar(vehicles[page], state, vm, flipped = appearance.columnsFlipped)
+                        val pv = vehicles[page]
+                        CarThemeOverride(
+                            paletteId = appearance.carCustomPaletteIds[pv.vin],
+                            customPalettes = appearance.customPalettes,
+                            themeMode = appearance.themeMode,
+                            vibrancy = appearance.vibrancy,
+                        ) {
+                            ExpandedCar(pv, state, vm, flipped = appearance.columnsFlipped)
+                        }
                     }
                     if (count > 1) {
                         PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
@@ -1105,12 +1124,20 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val end = minOf(start + perPage, count)
                         Row(Modifier.fillMaxSize()) {
                             for (i in start until end) {
+                                val gv = vehicles[i]
                                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                                    VehicleDetailContent(
-                                        vehicles[i], state, vm,
-                                        onExpand = if (canExpand) ({ vm.expand(i) }) else null,
-                                        reserveHeaderEnd = canExpand && i == end - 1,
-                                    )
+                                    CarThemeOverride(
+                                        paletteId = appearance.carCustomPaletteIds[gv.vin],
+                                        customPalettes = appearance.customPalettes,
+                                        themeMode = appearance.themeMode,
+                                        vibrancy = appearance.vibrancy,
+                                    ) {
+                                        VehicleDetailContent(
+                                            gv, state, vm,
+                                            onExpand = if (canExpand) ({ vm.expand(i) }) else null,
+                                            reserveHeaderEnd = canExpand && i == end - 1,
+                                        )
+                                    }
                                 }
                             }
                             repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
@@ -1154,7 +1181,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 /** Cover-screen layout: swipe left/right for cars, up/down for section tiles. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CompactGarage(state: UiState, vm: AppViewModel) {
+private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance) {
     val vehicles = state.vehicles
     val count = vehicles.size
     val pager = rememberPagerState(initialPage = state.currentIndex.coerceIn(0, count - 1)) { count }
@@ -1162,7 +1189,15 @@ private fun CompactGarage(state: UiState, vm: AppViewModel) {
         snapshotFlow { pager.settledPage }.collect { vm.selectIndex(it) }
     }
     HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-        CompactCar(vehicles[page], state, vm)
+        val v = vehicles[page]
+        CarThemeOverride(
+            paletteId = appearance.carCustomPaletteIds[v.vin],
+            customPalettes = appearance.customPalettes,
+            themeMode = appearance.themeMode,
+            vibrancy = appearance.vibrancy,
+        ) {
+            CompactCar(v, state, vm)
+        }
     }
 }
 
@@ -1216,6 +1251,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                         "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
                         "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
                         "location" -> LocationPebble(v, state, vm, Modifier)
+                        "weather" -> WeatherPebble(v, state, vm, Modifier)
                         "trips" -> TripsPebble(v, state, vm, Modifier)
                         "info" -> InfoPebble(v, status, state, vm, Modifier)
                         "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
@@ -2170,6 +2206,7 @@ private fun sectionLabel(section: String): String = when (section) {
     "charge" -> "Charge / fuel"
     "climate" -> "Climate"
     "location" -> "Location"
+    "weather" -> "Weather"
     "trips" -> "Trips"
     "info" -> "Car info"
     "diagnostics" -> "Diagnostics"
@@ -2455,6 +2492,7 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
             FuelPebble(v, status, state, vm, dragHandle)
         }
         "location" -> LocationPebble(v, state, vm, dragHandle)
+        "weather" -> WeatherPebble(v, state, vm, dragHandle)
         // Trip history rides on the EV trip-details endpoint, so EVs only.
         "trips" -> TripsPebble(v, state, vm, dragHandle)
         "info" -> InfoPebble(v, status, state, vm, dragHandle)
@@ -3002,6 +3040,7 @@ private fun PaletteEditorDialog(
                     label = { Text("Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    shape = FieldShape,
                 )
 
                 // Primary colour picker
@@ -4390,11 +4429,22 @@ private fun chargerLabel(plugin: Int?): String? = when (plugin) {
 
 private fun fmtMinutes(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
+/** A descriptive name for a vibrancy multiplier (0 = greyscale, 1 = default, 2 = ultra). */
+private fun vibrancyLabel(v: Float): String = when {
+    v < 0.2f -> "Greyscale"
+    v < 0.6f -> "Muted"
+    v < 0.9f -> "Subdued"
+    v < 1.15f -> "Default"
+    v < 1.6f -> "Vivid"
+    else -> "Ultra"
+}
+
 // --- Location -------------------------------------------------------------
 
 @Composable
 private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val context = LocalContext.current
+    val fahrenheit = vm.appearance.collectAsState().value.weatherFahrenheit
     val location = state.locations[v.vin]
     val place = state.placeNames[v.vin]
     val locating = state.isPending(v.vin, "locate")
@@ -4424,6 +4474,11 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
                     .clip(RoundedCornerShape(18.dp)),
             )
             StatusRow("Coordinates", loc.coordString())
+            // Weather where the car is parked. Fetched lazily once we have a fix.
+            LaunchedEffect(loc.latitude, loc.longitude) { vm.loadCarWeather(v) }
+            state.carWeather[v.vin]?.let { w ->
+                WeatherStripe(w, fahrenheit, place ?: "At the car")
+            }
             CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
                 val uri = Uri.parse(
                     "geo:${loc.latitude},${loc.longitude}" +
@@ -4434,6 +4489,136 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
                         Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
                     )
                 }
+            }
+        }
+    }
+}
+
+// --- Weather --------------------------------------------------------------
+
+/** The icon for a condition, picking a sun/moon variant by day vs night. */
+private fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector = when (code) {
+    WeatherCode.CLEAR -> if (isDay) Icons.Filled.WbSunny else Icons.Filled.Nightlight
+    WeatherCode.PARTLY_CLOUDY -> Icons.Filled.WbCloudy
+    WeatherCode.CLOUDY -> Icons.Filled.Cloud
+    WeatherCode.FOG -> Icons.Filled.BlurOn
+    WeatherCode.DRIZZLE -> Icons.Filled.Grain
+    WeatherCode.RAIN, WeatherCode.SHOWERS -> Icons.Filled.Umbrella
+    WeatherCode.SNOW -> Icons.Filled.AcUnit
+    WeatherCode.THUNDERSTORM -> Icons.Filled.Thunderstorm
+    WeatherCode.UNKNOWN -> Icons.Filled.Cloud
+}
+
+/** A condition-appropriate accent colour for the weather icon. */
+@Composable
+private fun weatherTint(code: WeatherCode, isDay: Boolean): Color = when (code) {
+    WeatherCode.CLEAR -> if (isDay) Color(0xFFFFB300) else Color(0xFFB0BEC5)
+    WeatherCode.PARTLY_CLOUDY -> Color(0xFF90A4AE)
+    WeatherCode.CLOUDY, WeatherCode.FOG -> MaterialTheme.colorScheme.onSurfaceVariant
+    WeatherCode.DRIZZLE, WeatherCode.RAIN, WeatherCode.SHOWERS -> Color(0xFF4FC3F7)
+    WeatherCode.SNOW -> Color(0xFF81D4FA)
+    WeatherCode.THUNDERSTORM -> Color(0xFF9575CD)
+    WeatherCode.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+/**
+ * A compact one-line weather readout: icon, temperature and condition, with a
+ * small caption (place name) underneath. Used inside the Location pebble.
+ */
+@Composable
+private fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String) {
+    val tint = weatherTint(weather.condition, weather.isDay)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(weatherIcon(weather.condition, weather.isDay), contentDescription = null, tint = tint, modifier = Modifier.size(30.dp))
+        Column(Modifier.weight(1f)) {
+            Text(weather.condition.label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
+            Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        RollingNumber(
+            text = weather.tempLabel(fahrenheit),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+/**
+ * The Weather pebble: current conditions at the user's configured "home"
+ * location, with a big temperature, condition icon and a few detail rows. Shown
+ * identically on every car (it's a global readout). If no location is set it
+ * nudges the user to Settings.
+ */
+@Composable
+private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val appearance by vm.appearance.collectAsState()
+    val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
+    val fahrenheit = appearance.weatherFahrenheit
+    val w = state.homeWeather
+    // Refresh on first show (the VM throttles to a 15-minute TTL).
+    LaunchedEffect(appearance.weatherLat, appearance.weatherLon) {
+        if (hasLocation) vm.loadHomeWeather()
+    }
+    val summary = when {
+        !hasLocation -> "Set a location"
+        w != null -> "${w.tempLabel(fahrenheit)} · ${w.condition.label}"
+        else -> "Loading…"
+    }
+    Pebble(
+        v, "weather", "Weather", Icons.Filled.WbSunny, state, vm, dragHandle, summary = summary,
+        headerAction = {
+            PebbleActionButton(
+                label = "Refresh",
+                icon = Icons.Filled.Refresh,
+                onClick = { vm.loadHomeWeather(force = true) },
+                enabled = hasLocation,
+            )
+        },
+    ) {
+        when {
+            !hasLocation -> Text(
+                "Set your weather location in Settings → Weather to see local conditions here.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            w == null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                LoadingIndicator(Modifier.size(22.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Fetching current conditions…")
+            }
+            else -> {
+                val tint = weatherTint(w.condition, w.isDay)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Icon(
+                        weatherIcon(w.condition, w.isDay),
+                        contentDescription = w.condition.label,
+                        tint = tint,
+                        modifier = Modifier.size(64.dp),
+                    )
+                    Column(Modifier.weight(1f)) {
+                        RollingNumber(
+                            text = w.tempLabel(fahrenheit),
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(w.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        appearance.weatherLabel?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                StatusRow("Feels like", w.feelsLikeLabel(fahrenheit))
+                w.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
+                w.humidity?.let { StatusRow("Humidity", "$it%") }
+                StatusRow("Wind", "${w.windKph.toInt()} km/h")
             }
         }
     }
@@ -4881,6 +5066,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                 // editingPalette: null = no dialog; non-null id but missing in list = new
                 var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
                 var showEditor by remember { mutableStateOf(false) }
+                val haptics = LocalHaptics.current
+                val paletteImportLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.GetContent(),
+                ) { uri -> uri?.let { vm.importPalettes(context, it) } }
 
                 ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
                 Text(
@@ -4940,15 +5129,88 @@ private fun SettingsScreen(vm: AppViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { editingPalette = null; showEditor = true },
                         )
+                        // Export / import the user's custom palettes.
+                        Spacer(Modifier.height(4.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MorphTextButton(
+                                "Export",
+                                modifier = Modifier.weight(1f),
+                                enabled = appearance.customPalettes.isNotEmpty(),
+                                onClick = { vm.exportPalettes(context) },
+                            )
+                            MorphTextButton(
+                                "Import",
+                                modifier = Modifier.weight(1f),
+                                onClick = { paletteImportLauncher.launch("application/json") },
+                            )
+                        }
+                        // Per-car theme overrides: each car can run its own custom palette.
+                        if (appearance.customPalettes.isNotEmpty() && state.vehicles.isNotEmpty()) {
+                            Spacer(Modifier.height(14.dp))
+                            Text(
+                                "Per-car theme",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                "Override the global palette for individual cars.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            state.vehicles.forEach { car ->
+                                val carPaletteId = appearance.carCustomPaletteIds[car.vin]
+                                Row(
+                                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        car.name,
+                                        Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    MorphChip(
+                                        selected = carPaletteId == null,
+                                        onClick = { haptics?.tick(); vm.setCarPaletteId(car.vin, null) },
+                                        label = "Global",
+                                    )
+                                    appearance.customPalettes.forEach { pal ->
+                                        val selected = carPaletteId == pal.id
+                                        val swatchColor = Color(pal.primaryArgb.toLong() and 0xFFFFFFFFL)
+                                        val palScale by animateFloatAsState(
+                                            if (selected) 1.18f else 1f,
+                                            spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                                            label = "carPalScale",
+                                        )
+                                        Box(
+                                            Modifier
+                                                .size(30.dp)
+                                                .graphicsLayer(scaleX = palScale, scaleY = palScale)
+                                                .clip(CircleShape)
+                                                .background(if (selected) MaterialTheme.colorScheme.outline else Color.Transparent)
+                                                .padding(if (selected) 2.dp else 0.dp)
+                                                .clip(CircleShape)
+                                                .background(swatchColor)
+                                                .clickable { haptics?.tick(); vm.setCarPaletteId(car.vin, pal.id) },
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (selected) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                StepRow("Vibrancy", "${(appearance.vibrancy * 100).roundToInt()}%")
+                StepRow("Vibrancy", vibrancyLabel(appearance.vibrancy))
                 AnimatedSlider(
                     value = appearance.vibrancy,
-                    onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
-                    valueRange = 0.5f..1.6f,
-                    steps = 21,
+                    onValueChange = { vm.setVibrancy((it * 10).roundToInt() / 10f) },
+                    valueRange = 0f..2f,
+                    steps = 19,
                 )
 
                 if (showEditor) {
@@ -4962,6 +5224,62 @@ private fun SettingsScreen(vm: AppViewModel) {
                         onDismiss = { showEditor = false; editingPalette = null },
                     )
                 }
+            }
+
+            // Weather
+            SettingsCard("Weather") {
+                var weatherQuery by remember { mutableStateOf("") }
+                val locationPermission = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    if (granted) vm.useDeviceLocationForWeather()
+                    else vm.reportError("Location permission denied — type a place instead")
+                }
+                Text(
+                    "Show local weather in a pebble (and at the car's location). " +
+                        "Set a place or use your current location.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                appearance.weatherLabel?.let { label ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(label, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        MorphTextButton("Clear", onClick = { vm.clearWeatherLocation() })
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+                OutlinedTextField(
+                    value = weatherQuery,
+                    onValueChange = { weatherQuery = it },
+                    label = { Text("City or place") },
+                    singleLine = true,
+                    shape = FieldShape,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton(
+                        "Set place",
+                        modifier = Modifier.weight(1f),
+                        enabled = weatherQuery.isNotBlank(),
+                        onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
+                    )
+                    MorphButton(
+                        onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("My location", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                ToggleRow("Use Fahrenheit", appearance.weatherFahrenheit) { vm.setWeatherFahrenheit(it) }
             }
 
             // Display scale
@@ -5341,6 +5659,7 @@ private fun CarSettingsCard(
                             "charge" to "Charge / fuel",
                             "climate" to "Climate",
                             "location" to "Location",
+                            "weather" to "Weather",
                             "trips" to "Trips",
                             "info" to "Car info",
                             "diagnostics" to "Diagnostics",
@@ -5424,12 +5743,12 @@ private fun SettingsSearchResults(
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
-        StepRow("Vibrancy", "${(appearance.vibrancy * 100).roundToInt()}%")
+        StepRow("Vibrancy", vibrancyLabel(appearance.vibrancy))
         AnimatedSlider(
             value = appearance.vibrancy,
-            onValueChange = { vm.setVibrancy((it * 20).roundToInt() / 20f) },
-            valueRange = 0.5f..1.6f,
-            steps = 21,
+            onValueChange = { vm.setVibrancy((it * 10).roundToInt() / 10f) },
+            valueRange = 0f..2f,
+            steps = 19,
         )
     }
     add("Open links in app", "browser tab links") {
