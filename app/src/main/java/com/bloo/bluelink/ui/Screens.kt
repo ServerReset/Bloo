@@ -2661,32 +2661,32 @@ private fun CustomPaletteSwatch(
     )
     val swatchColor = Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Outer container is sized to accommodate the 1.12x scale without clipping.
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .graphicsLayer(scaleX = scale, scaleY = scale)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.outline)
-                .padding(ring)
-                .clip(CircleShape)
-                .background(swatchColor),
+                .size(58.dp)
+                .clickable { haptics?.click(); onClick() },
             contentAlignment = Alignment.Center,
         ) {
-            if (selected) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clickable { haptics?.click(); onClick() },
-                )
-            } else {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .clickable { haptics?.click(); onClick() }
-                )
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.outline)
+                    .padding(ring)
+                    .clip(CircleShape)
+                    .background(swatchColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
         }
         Spacer(Modifier.height(2.dp))
@@ -3065,13 +3065,16 @@ private fun MorphButtonLabel(
 @Composable
 private fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, modifier: Modifier = Modifier) {
     val haptics = LocalHaptics.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     val corner by animateDpAsState(
-        targetValue = if (selected) 12.dp else 22.dp,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        targetValue = if (selected || pressed) 12.dp else 22.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "chipCorner",
     )
     val container by androidx.compose.animation.animateColorAsState(
         if (selected) MaterialTheme.colorScheme.primary else buttonContainer(),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "chipBg",
     )
     val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
@@ -3080,6 +3083,7 @@ private fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, mod
         shape = RoundedCornerShape(corner),
         color = container,
         contentColor = content,
+        interactionSource = interaction,
         modifier = modifier,
     ) {
         Text(
@@ -3148,8 +3152,7 @@ private fun StateControl(
                 label = "stateColor",
             )
             when {
-                // With no title, the lock state is the headline - shown as an
-                // open/closed padlock icon rather than a word.
+                // With no title, the lock state is the headline — icon AND word, side by side.
                 name.isBlank() -> {
                     val stateIcon = when (isOn) {
                         true -> icon
@@ -3157,18 +3160,39 @@ private fun StateControl(
                         else -> icon
                     }
                     if (pending) {
-                        LoadingIndicator(Modifier.size(28.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            LoadingIndicator(Modifier.size(22.dp))
+                            Text(
+                                "Sending…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = stateColor,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     } else {
-                        // Crossfade between lock/unlock icons on state change.
                         AnimatedContent(
-                            targetState = stateIcon,
+                            targetState = Pair(stateIcon, stateText),
                             transitionSpec = {
-                                (fadeIn(tween(200)) + scaleIn(initialScale = 0.7f, animationSpec = tween(200))) togetherWith
-                                (fadeOut(tween(150)) + scaleOut(targetScale = 1.3f, animationSpec = tween(150)))
+                                (fadeIn(tween(200)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200))) togetherWith
+                                (fadeOut(tween(150)) + scaleOut(targetScale = 1.1f, animationSpec = tween(150)))
                             },
-                            label = "stateIconAnim",
-                        ) { ic ->
-                            Icon(ic, contentDescription = stateText, tint = stateColor, modifier = Modifier.size(28.dp))
+                            label = "lockStateAnim",
+                        ) { (ic, label) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(ic, contentDescription = label, tint = stateColor, modifier = Modifier.size(22.dp))
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = stateColor,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
                         }
                     }
                 }
@@ -4151,26 +4175,13 @@ private fun PresetPill(
     )
     val leftFg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
 
+    // The drag handle wraps the whole pill so long-press anywhere reorders.
     Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        // The gap is the "cut" between the two halves - background shows through.
+        modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Drag handle - the only spot that starts a long-press reorder, so tapping
-        // the rest of the row still applies/deletes the preset.
-        Box(
-            dragHandle.fillMaxHeight().padding(end = 6.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.DragHandle,
-                contentDescription = "Drag to reorder",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        // Start half (fills the available width)
+        // Apply half — pure color chip, no text or handle icon.
         Surface(
             onClick = { haptics?.click(); onStart() },
             interactionSource = leftInteraction,
@@ -4179,16 +4190,14 @@ private fun PresetPill(
             shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
             modifier = Modifier.weight(1f).fillMaxHeight(),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 11.dp),
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(vertical = 11.dp),
             ) {
-                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Filled.AcUnit, contentDescription = name, modifier = Modifier.size(18.dp))
             }
         }
-        // Delete half: pill outer, small inner nub that morphs with the left half.
+        // Delete nub.
         Surface(
             onClick = { haptics?.tick(); onDelete() },
             color = MaterialTheme.colorScheme.secondaryContainer,
@@ -4245,7 +4254,7 @@ private fun ChargeLimitPill(
     )
     val rightFg = if (pending) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -4304,13 +4313,14 @@ private fun ChargeLimitPill(
                 }
             }
         }
-        // Slider sits directly under the pill with zero gap so it reads as one unit.
+        Spacer(Modifier.height(10.dp))
         AnimatedSlider(
             value = limit.toFloat(),
             onValueChange = { onValueChange((it / 10f).roundToInt() * 10) },
             valueRange = 50f..100f,
             steps = 4,
         )
+        Spacer(Modifier.height(6.dp))
     }
 }
 
@@ -5055,9 +5065,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ActivityResultContracts.GetContent(),
                 ) { uri -> uri?.let { vm.importSettings(context, it) } }
                 Text(
-                    "Save every preference — theme, colours, palettes, weather and " +
-                        "more — to a file you can restore later or on another device. " +
-                        "Account sign-ins are never included.",
+                    "Export your theme, palettes and preferences to a file — " +
+                        "restore anytime or move to a new device. " +
+                        "Sign-in credentials are never saved.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -5199,19 +5209,26 @@ private fun SettingsScreen(vm: AppViewModel) {
                                             spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                                             label = "carPalScale",
                                         )
+                                        // Outer box gives room for 1.18x scale so the circle never clips.
                                         Box(
-                                            Modifier
-                                                .size(30.dp)
-                                                .graphicsLayer(scaleX = palScale, scaleY = palScale)
-                                                .clip(CircleShape)
-                                                .background(if (selected) MaterialTheme.colorScheme.outline else Color.Transparent)
-                                                .padding(if (selected) 2.dp else 0.dp)
-                                                .clip(CircleShape)
-                                                .background(swatchColor)
+                                            modifier = Modifier
+                                                .size(38.dp)
                                                 .clickable { haptics?.tick(); vm.setCarPaletteId(car.vin, pal.id) },
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            if (selected) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                            Box(
+                                                Modifier
+                                                    .size(30.dp)
+                                                    .graphicsLayer(scaleX = palScale, scaleY = palScale)
+                                                    .clip(CircleShape)
+                                                    .background(if (selected) MaterialTheme.colorScheme.outline else Color.Transparent)
+                                                    .padding(if (selected) 2.dp else 0.dp)
+                                                    .clip(CircleShape)
+                                                    .background(swatchColor),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                if (selected) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                            }
                                         }
                                     }
                                 }
@@ -5276,30 +5293,54 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Logs
             SettingsCard("Logs") {
+                var logsExpanded by remember { mutableStateOf(false) }
+                val logsChevron by animateFloatAsState(
+                    if (logsExpanded) 180f else 0f,
+                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                    label = "logsChevron",
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "Activity log",
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    MorphTextButton("Copy", onClick = {
-                        clipboard.setText(AnnotatedString(logs.joinToString("\n")))
-                    })
-                    Spacer(Modifier.width(8.dp))
-                    MorphTextButton("Clear", onClick = { vm.clearLogs() })
+                    AnimatedVisibility(logsExpanded) {
+                        Row {
+                            MorphTextButton("Copy", onClick = {
+                                clipboard.setText(AnnotatedString(logs.joinToString("\n")))
+                            })
+                            Spacer(Modifier.width(8.dp))
+                            MorphTextButton("Clear", onClick = { vm.clearLogs() })
+                            Spacer(Modifier.width(4.dp))
+                        }
+                    }
+                    IconButton(onClick = { logsExpanded = !logsExpanded }) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (logsExpanded) "Collapse" else "Expand",
+                            modifier = Modifier.rotate(logsChevron),
+                        )
+                    }
                 }
-                val logScroll = rememberScrollState()
-                SelectionContainer {
-                    Text(
-                        text = logs.joinToString("\n").ifBlank { "No activity yet." },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp)
-                            .fadingEdges(logScroll)
-                            .verticalScroll(logScroll),
-                    )
+                AnimatedVisibility(
+                    visible = logsExpanded,
+                    enter = fadeIn(tween(200)) + expandVertically(),
+                    exit = fadeOut(tween(150)) + shrinkVertically(),
+                ) {
+                    val logScroll = rememberScrollState()
+                    SelectionContainer {
+                        Text(
+                            text = logs.joinToString("\n").ifBlank { "No activity yet." },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 280.dp)
+                                .fadingEdges(logScroll)
+                                .verticalScroll(logScroll),
+                        )
+                    }
                 }
             }
 
