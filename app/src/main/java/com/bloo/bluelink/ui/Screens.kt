@@ -209,6 +209,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
@@ -1231,6 +1232,25 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
         label = "coverDotsFade",
     )
 
+    // ---- Camera cutout detection ----
+    // Read the front camera's bounding rect from the display cutout API.
+    // boundingRects are in screen pixels (display coordinate system), which
+    // aligns with the edge-to-edge Canvas coordinate space used below.
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val cameraHole: android.graphics.Rect? = remember(view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            view.rootWindowInsets?.displayCutout?.boundingRects?.firstOrNull()
+        else null
+    }
+    // Top padding for tile content: push below the camera + comfortable gap.
+    // Falls back to the standard 10 dp when there is no cutout.
+    val tileTopPadding: Dp = cameraHole?.let { r ->
+        with(density) { r.bottom.toDp() + 12.dp }
+    } ?: 10.dp
+    // Decorative ring color — subtle outline that acknowledges the camera hole.
+    val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
             val i = ((page % tiles.size) + tiles.size) % tiles.size
@@ -1239,11 +1259,12 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             CompositionLocalProvider(
                 LocalForceExpanded provides true,
                 LocalPebbleFillHeight provides true,
+                LocalCameraHolePx provides cameraHole,
             ) {
                 // Extra end inset clears the vertical page-dots rail on the right.
                 Box(
                     Modifier.fillMaxSize().padding(
-                        start = 10.dp, top = 10.dp, bottom = 10.dp,
+                        start = 10.dp, top = tileTopPadding, bottom = 10.dp,
                         end = if (tiles.size > 1) 22.dp else 10.dp,
                     ),
                 ) {
@@ -1259,6 +1280,30 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                         "ai" -> AiPebble(v, state, vm, Modifier)
                     }
                 }
+            }
+        }
+        // Decorative camera ring — drawn over the tile content so it's always
+        // visible regardless of which tile is showing. Only rendered when a
+        // display cutout was detected (flip-phone cover screen with punch-hole).
+        if (cameraHole != null) {
+            Canvas(Modifier.fillMaxSize()) {
+                val cx = cameraHole.exactCenterX()
+                val cy = cameraHole.exactCenterY()
+                val holeRadius = cameraHole.width() / 2f
+                // Inner circle: clear (transparent) punch matching the camera size.
+                drawCircle(
+                    color = ringColor,
+                    radius = holeRadius + with(density) { 2.dp.toPx() },
+                    center = androidx.compose.ui.geometry.Offset(cx, cy),
+                    style = Stroke(width = with(density) { 1.5.dp.toPx() }),
+                )
+                // Outer glow ring — slightly larger, very faint, for depth.
+                drawCircle(
+                    color = ringColor.copy(alpha = ringColor.alpha * 0.4f),
+                    radius = holeRadius + with(density) { 5.dp.toPx() },
+                    center = androidx.compose.ui.geometry.Offset(cx, cy),
+                    style = Stroke(width = with(density) { 1.dp.toPx() }),
+                )
             }
         }
         // Car-switching dots, always at top-center (every tile, including main).
@@ -1319,6 +1364,10 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val scheme = MaterialTheme.colorScheme
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
+    // If the camera is at the top-center, nudge the car name row to the right so
+    // it doesn't try to render behind the hole area. The tile-level padding already
+    // cleared the camera vertically; this avoids horizontal crowding on the title row.
+    val cameraHole = LocalCameraHolePx.current
 
     // Entrance animation: slide up gently + fade in on first composition.
     val alpha = remember { Animatable(0f) }
@@ -1648,6 +1697,13 @@ private val LocalForceExpanded = staticCompositionLocalOf { false }
  * and scrolls internally if its content is taller - so each tile fills the screen.
  */
 private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
+
+/**
+ * The front-facing camera cutout rect for the current display, in raw screen
+ * pixels (display coordinate system), or null when there is no cutout. Provided
+ * by [CompactCar] so every cover-screen tile can react to the camera hole.
+ */
+private val LocalCameraHolePx = staticCompositionLocalOf<android.graphics.Rect?> { null }
 
 /**
  * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the
