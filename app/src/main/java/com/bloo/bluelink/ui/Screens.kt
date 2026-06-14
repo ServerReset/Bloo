@@ -4212,13 +4212,10 @@ private fun ClimatePebble(
             return@Pebble
         }
 
-        // Presets first - the quickest way to fire a saved configuration.
         ClimatePresetSection(
             presets = presets,
             activeId = activePresetId,
             onStart = { preset ->
-                // Load the preset into the sliders/toggles, fire it, and mark it
-                // as the applied one so its pill shows the running highlight.
                 applyPreset(preset.request)
                 vm.startClimate(v, preset.request)
                 activePresetId = preset.id
@@ -4229,6 +4226,11 @@ private fun ClimatePebble(
                 vm.deleteClimatePreset(v, id)
             },
             onReorder = { vm.reorderClimatePresets(v, it) },
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         )
 
         // Color shifts from blue (cold) through neutral to orange-red (hot),
