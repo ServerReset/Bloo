@@ -1212,10 +1212,8 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
 @Composable
 private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    // Only include tile names that CompactCar's when-block knows how to render.
-    val knownTiles = setOf("climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai")
     val sections = state.sectionsFor(v).filter {
-        it in knownTiles &&
+        it in CompactKnownTiles &&
             (it != "charge" || state.hasBattery(v)) &&
             (it != "ai" || state.aiEnabled) &&
             !state.isPebbleHidden(v.vin, it)
@@ -1403,9 +1401,10 @@ private fun VerticalPagerDots(
     val density = LocalDensity.current
     val pxPerPage = with(density) { 40.dp.toPx() }
 
+    // Drag down → higher page index (later tiles); drag up → lower index (earlier tiles).
     val scrubTargetPage by remember {
         derivedStateOf {
-            (scrubStartPage + (-scrubAccumY / pxPerPage).roundToInt()).coerceIn(0, count - 1)
+            (scrubStartPage + (scrubAccumY / pxPerPage).roundToInt()).coerceIn(0, count - 1)
         }
     }
     LaunchedEffect(scrubTargetPage, scrubbing) {
@@ -1416,6 +1415,14 @@ private fun VerticalPagerDots(
         "main" -> "Car"
         else -> t.replaceFirstChar { it.uppercase() }
     }
+
+    val hPad by animateDpAsState(if (scrubbing) 18.dp else 6.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubHPad")
+    val vPad by animateDpAsState(if (scrubbing) 18.dp else 10.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubVPad")
+    val itemSpacing by animateDpAsState(if (scrubbing) 14.dp else 6.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubSpacing")
+    val surfaceAlpha by animateFloatAsState(if (scrubbing) 0.92f else 0.7f, label = "scrubAlpha")
 
     Surface(
         modifier = modifier
@@ -1435,22 +1442,27 @@ private fun VerticalPagerDots(
                 }
             },
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
-        shadowElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp).copy(alpha = surfaceAlpha),
+        shadowElevation = if (scrubbing) 8.dp else 2.dp,
     ) {
         Column(
-            Modifier
-                .padding(horizontal = if (scrubbing) 12.dp else 6.dp, vertical = 10.dp)
-                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)),
-            verticalArrangement = Arrangement.spacedBy(if (scrubbing) 8.dp else 6.dp),
+            Modifier.padding(horizontal = hPad, vertical = vPad),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
             horizontalAlignment = Alignment.End,
         ) {
             repeat(count) { i ->
                 val selected = i == current
                 val scrubSelected = scrubbing && i == scrubTargetPage
-                val h by animateDpAsState(
-                    if (selected || scrubSelected) 20.dp else 7.dp,
+                val highlight = selected || scrubSelected
+                val dotH by animateDpAsState(
+                    if (highlight) 28.dp else 7.dp,
+                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                     label = "vdotH",
+                )
+                val dotW by animateDpAsState(
+                    if (scrubbing) 10.dp else 7.dp,
+                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                    label = "vdotW",
                 )
                 val color by androidx.compose.animation.animateColorAsState(
                     when {
@@ -1462,17 +1474,17 @@ private fun VerticalPagerDots(
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (scrubbing) {
                         Text(
                             tileName(tiles[i]),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (selected || scrubSelected) FontWeight.Bold else FontWeight.Normal,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
                             color = color,
                         )
                     }
-                    Box(Modifier.width(7.dp).height(h).clip(CircleShape).background(color))
+                    Box(Modifier.width(dotW).height(dotH).clip(CircleShape).background(color))
                 }
             }
         }
@@ -1820,6 +1832,11 @@ private val LocalForceExpanded = staticCompositionLocalOf { false }
  * and scrolls internally if its content is taller - so each tile fills the screen.
  */
 private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
+
+/** Tile names that [CompactCar] can render — unknown sections are excluded. */
+private val CompactKnownTiles = setOf(
+    "climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai"
+)
 
 /**
  * The front-facing camera cutout rect for the current display, in raw screen
