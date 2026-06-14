@@ -1215,12 +1215,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repoFor(v).setChargeTargets(electric(v), acPercent, dcPercent)
         }
 
-    fun openChargePort(v: Vehicle) =
-        runCommand(v.vin, "chargePort", "Charge port opened", null) { repoFor(v).openChargePort(electric(v)) }
-
-    fun closeChargePort(v: Vehicle) =
-        runCommand(v.vin, "chargePort", "Charge port closed", null) { repoFor(v).closeChargePort(electric(v)) }
-
     /**
      * Runs a command tracking a per-action spinner. On success it logs, shows a
      * message, and optimistically flips the cached status so the toggle updates.

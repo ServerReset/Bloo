@@ -49,8 +49,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -108,7 +106,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
@@ -1377,7 +1374,7 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                 LastUpdatedLabel(v, state)
                 ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
                 Spacer(Modifier.height(6.dp))
-                PrimaryActions(v, state, vm, showChargePort = true)
+                PrimaryActions(v, state, vm)
                 Spacer(Modifier.weight(1f))
             }
         }
@@ -2569,11 +2566,8 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 }
 
 @Composable
-private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel, showChargePort: Boolean = true) {
+private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    // The charge port lives next to lock/unlock for EVs/PHEVs whose backend
-    // supports it (Hyundai/Genesis; Kia has no endpoint).
-    val supportsPort = v.brand != Brand.KIA && state.hasBattery(v)
     // Doors sit inside a collapsed-pebble shaped card so the controls have a
     // "holding" container like every other section.
     Card(
@@ -2594,170 +2588,7 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel, showCha
                 onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
                 highlightWhenOff = true,
                 offTextColor = MaterialTheme.colorScheme.error,
-                extraAction = if (supportsPort) {
-                    if (showChargePort) {
-                        { ChargePortSplitButton(v, state, vm) }
-                    } else {
-                        { CompactChargePortButton(v, state, vm) }
-                    }
-                } else {
-                    null
-                },
             )
-        }
-    }
-}
-
-/**
- * The charge-port flap as a single **full pill** (the app's MorphButton look): a
- * tap toggles the flap open/closed (assumed closed at first, since the API reports
- * no flap state), morphing from a calm pill into a rounded box that fills with the
- * primary colour once opened, mirroring lock/unlock. Long-press (or the trailing
- * chevron) drops a small floating container of two buttons to force Open or Close
- * explicitly, for when the assumed state is wrong.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) {
-    var open by remember(v.vin) { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
-    val pending = state.isPending(v.vin, "chargePort")
-    val haptics = LocalHaptics.current
-    val enabled = !state.loading && !pending
-
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    // 50% = a true pill; lower = a rounded rectangle, matching MorphButton.
-    val pct by animateFloatAsState(
-        targetValue = if (open || pressed) 28f else 50f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "portCorner",
-    )
-    val bg by androidx.compose.animation.animateColorAsState(
-        if (open) MaterialTheme.colorScheme.primary else buttonContainer(),
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "portBg",
-    )
-    val fg = if (open) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-    val chevron by animateFloatAsState(if (menuOpen) 180f else 0f, label = "portChevron")
-
-    Box {
-        Surface(
-            color = bg,
-            contentColor = fg,
-            shape = RoundedCornerShape(percent = pct.roundToInt()),
-            modifier = Modifier
-                // Fixed 50dp height matches the lock/unlock button beside it, so it
-                // reads as a clean pill rather than a tall ellipse (it sits in a
-                // 76dp row; without a fixed height fillMaxHeight stretched it).
-                .height(50.dp)
-                .combinedClickable(
-                    interactionSource = interaction,
-                    indication = LocalIndication.current,
-                    enabled = enabled,
-                    onClick = {
-                        haptics?.heavy()
-                        if (open) vm.closeChargePort(v) else vm.openChargePort(v)
-                        open = !open
-                    },
-                    onLongClick = { haptics?.tick(); menuOpen = true },
-                ),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxHeight().padding(start = 16.dp, end = 12.dp),
-            ) {
-                if (pending) {
-                    LoadingIndicator(Modifier.size(20.dp))
-                } else {
-                    Icon(Icons.Filled.EvStation, contentDescription = null, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(if (open) "Close" else "Open", fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(4.dp))
-                // Trailing chevron: a hint that long-press reveals the explicit
-                // open/close container.
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = "Choose charge flap state",
-                    modifier = Modifier.size(18.dp).rotate(chevron),
-                )
-            }
-        }
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-            shape = RoundedCornerShape(24.dp),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 2.dp,
-            shadowElevation = 10.dp,
-        ) {
-            // Two floating buttons in a container — the universal MorphButton.
-            Column(
-                Modifier.padding(12.dp).widthIn(min = 200.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                MorphButton(
-                    onClick = { haptics?.heavy(); vm.openChargePort(v); open = true; menuOpen = false },
-                    active = open,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { MorphButtonLabel(Icons.Filled.EvStation, "Open flap", pending = false, iconSize = 20.dp) }
-                MorphButton(
-                    onClick = { haptics?.heavy(); vm.closeChargePort(v); open = false; menuOpen = false },
-                    active = !open,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { MorphButtonLabel(Icons.Filled.Close, "Close flap", pending = false, iconSize = 20.dp) }
-            }
-        }
-    }
-}
-
-/**
- * A compact circular charge-port toggle for the cover-screen tile where the full
- * split button is too wide. Taps toggle open/close; the background springs from
- * neutral to primary when the port is assumed open, mirroring the split button.
- */
-@Composable
-private fun CompactChargePortButton(v: Vehicle, state: UiState, vm: AppViewModel) {
-    var open by remember(v.vin) { mutableStateOf(false) }
-    val pending = state.isPending(v.vin, "chargePort")
-    val haptics = LocalHaptics.current
-    val enabled = !state.loading && !pending
-
-    val bg by androidx.compose.animation.animateColorAsState(
-        if (open) MaterialTheme.colorScheme.primary else buttonContainer(),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "compactPortBg",
-    )
-    val fg = if (open) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-    val scale by animateFloatAsState(
-        if (open) 1.08f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "compactPortScale",
-    )
-
-    Surface(
-        onClick = {
-            haptics?.heavy()
-            if (open) vm.closeChargePort(v) else vm.openChargePort(v)
-            open = !open
-        },
-        enabled = enabled,
-        color = bg,
-        contentColor = fg,
-        shape = CircleShape,
-        modifier = Modifier.size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (pending) {
-                LoadingIndicator(Modifier.size(20.dp))
-            } else {
-                Icon(
-                    Icons.Filled.EvStation,
-                    contentDescription = if (open) "Close charge port" else "Open charge port",
-                    modifier = Modifier.size(20.dp),
-                )
-            }
         }
     }
 }

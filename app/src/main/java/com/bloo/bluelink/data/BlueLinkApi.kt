@@ -158,12 +158,6 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
-    suspend fun openChargePort(token: String, username: String, pin: String, v: Vehicle) =
-        formCommand("/ac/v2/evc/charge/door/open", token, username, pin, v)
-
-    suspend fun closeChargePort(token: String, username: String, pin: String, v: Vehicle) =
-        formCommand("/ac/v2/evc/charge/door/close", token, username, pin, v)
-
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
         // Pure EVs use evc/fatc/stop (no engine). ICE and PHEVs use rcs/rsc/stop
         // (remote engine start can be cancelled). The v.isEv flag comes from the

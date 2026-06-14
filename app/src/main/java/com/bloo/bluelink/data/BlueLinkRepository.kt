@@ -21,8 +21,6 @@ interface VehicleRepository {
     suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int)
     suspend fun startCharge(v: Vehicle)
     suspend fun stopCharge(v: Vehicle)
-    suspend fun openChargePort(v: Vehicle): Unit = throw UnsupportedOperationException("Charge port not supported")
-    suspend fun closeChargePort(v: Vehicle): Unit = throw UnsupportedOperationException("Charge port not supported")
 }
 
 /**
@@ -100,14 +98,6 @@ class BlueLinkRepository(
 
     override suspend fun stopCharge(v: Vehicle) {
         withSession { s -> api.stopCharge(s.accessToken, s.username, s.pin, v) }
-    }
-
-    override suspend fun openChargePort(v: Vehicle) {
-        withSession { s -> api.openChargePort(s.accessToken, s.username, s.pin, v) }
-    }
-
-    override suspend fun closeChargePort(v: Vehicle) {
-        withSession { s -> api.closeChargePort(s.accessToken, s.username, s.pin, v) }
     }
 
     /** Runs [block] with this brand's session, refreshing the token once on 401/403. */
