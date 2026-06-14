@@ -47,6 +47,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -1869,7 +1871,12 @@ private fun AnimatedSlider(
     // Only the clamped value is reported and snapped to a step.
     fun trackTo(x: Float) {
         val raw = rawForX(x)
-        scope.launch { anim.snapTo(raw) }  // unclamped → allows overshoot
+        // Allow only a small overshoot past the ends so the thumb gives a gentle
+        // nudge off the edge rather than flying far past it.
+        val span = (valueRange.endInclusive - valueRange.start)
+        val overshoot = span * 0.045f
+        val visual = raw.coerceIn(valueRange.start - overshoot, valueRange.endInclusive + overshoot)
+        scope.launch { anim.snapTo(visual) }
         val clamped = raw.coerceIn(valueRange.start, valueRange.endInclusive)
         val s = snapToStep(clamped, valueRange, steps)
         if (steps > 0 && s != prevStep) {
@@ -1887,8 +1894,9 @@ private fun AnimatedSlider(
         scope.launch {
             anim.animateTo(
                 target,
-                // More energetic spring so the bounce from the edge is felt.
-                animationSpec = spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMedium),
+                // A little bounce as it settles onto the step — enough to feel
+                // springy without overshooting far past the edge.
+                animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMedium),
             )
         }
     }
@@ -2578,12 +2586,12 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel, showCha
 }
 
 /**
- * The charge-port flap as a single split button, styled like the climate preset
- * pill: a wide left half that toggles the flap open/closed (assuming it starts
- * closed, since the API reports no flap state), and a narrow right half - a down
- * arrow - that drops a menu to force Open or Close explicitly, for when the
- * assumed state is wrong. The left half morphs into a rounded box and fills with
- * the primary colour once you've opened the flap, mirroring lock/unlock.
+ * The charge-port flap as a single **full pill** (the app's MorphButton look): a
+ * tap toggles the flap open/closed (assumed closed at first, since the API reports
+ * no flap state), morphing from a calm pill into a rounded box that fills with the
+ * primary colour once opened, mirroring lock/unlock. Long-press (or the trailing
+ * chevron) drops a small floating container of two buttons to force Open or Close
+ * explicitly, for when the assumed state is wrong.
  */
 @Composable
 private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) {
@@ -2593,40 +2601,44 @@ private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) 
     val haptics = LocalHaptics.current
     val enabled = !state.loading && !pending
 
-    val outer by animateDpAsState(
-        if (open) 16.dp else 25.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "portOuter",
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // 50% = a true pill; lower = a rounded rectangle, matching MorphButton.
+    val pct by animateFloatAsState(
+        targetValue = if (open || pressed) 28f else 50f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "portCorner",
     )
-    val inner = 8.dp
-    val mainBg by androidx.compose.animation.animateColorAsState(
+    val bg by androidx.compose.animation.animateColorAsState(
         if (open) MaterialTheme.colorScheme.primary else buttonContainer(),
         spring(stiffness = Spring.StiffnessMediumLow),
-        label = "portMainBg",
+        label = "portBg",
     )
-    val mainFg = if (open) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val fg = if (open) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val chevron by animateFloatAsState(if (menuOpen) 180f else 0f, label = "portChevron")
 
-    Row(
-        Modifier.height(50.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Left half: the open/close toggle.
+    Box {
         Surface(
-            onClick = {
-                haptics?.heavy()
-                if (open) vm.closeChargePort(v) else vm.openChargePort(v)
-                open = !open
-            },
-            enabled = enabled,
-            color = mainBg,
-            contentColor = mainFg,
-            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
-            modifier = Modifier.fillMaxHeight(),
+            color = bg,
+            contentColor = fg,
+            shape = RoundedCornerShape(percent = pct.roundToInt()),
+            modifier = Modifier
+                .heightIn(min = 50.dp)
+                .combinedClickable(
+                    interactionSource = interaction,
+                    indication = LocalIndication.current,
+                    enabled = enabled,
+                    onClick = {
+                        haptics?.heavy()
+                        if (open) vm.closeChargePort(v) else vm.openChargePort(v)
+                        open = !open
+                    },
+                    onLongClick = { haptics?.tick(); menuOpen = true },
+                ),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxHeight().padding(horizontal = 14.dp),
+                modifier = Modifier.fillMaxHeight().padding(start = 16.dp, end = 12.dp),
             ) {
                 if (pending) {
                     LoadingIndicator(Modifier.size(20.dp))
@@ -2635,88 +2647,42 @@ private fun ChargePortSplitButton(v: Vehicle, state: UiState, vm: AppViewModel) 
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(if (open) "Close" else "Open", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(4.dp))
+                // Trailing chevron: a hint that long-press reveals the explicit
+                // open/close container.
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = "Choose charge flap state",
+                    modifier = Modifier.size(18.dp).rotate(chevron),
+                )
             }
         }
-        // Right half: a down-arrow that drops a menu to force either state.
-        Box {
-            Surface(
-                onClick = { haptics?.tick(); menuOpen = true },
-                enabled = enabled,
-                color = buttonContainer(),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
-                modifier = Modifier.fillMaxHeight(),
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 2.dp,
+            shadowElevation = 10.dp,
+        ) {
+            // Two floating buttons in a container — the universal MorphButton.
+            Column(
+                Modifier.padding(12.dp).widthIn(min = 200.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxHeight().padding(horizontal = 8.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Choose charge flap state",
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-            DropdownMenu(
-                expanded = menuOpen,
-                onDismissRequest = { menuOpen = false },
-                shape = RoundedCornerShape(20.dp),
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 2.dp,
-                shadowElevation = 8.dp,
-                modifier = Modifier.widthIn(min = 210.dp),
-            ) {
-                Text(
-                    "Charge flap",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp),
-                )
-                FlapMenuItem(
-                    label = "Open flap",
-                    icon = Icons.Filled.EvStation,
-                    selected = open,
+                MorphButton(
                     onClick = { haptics?.heavy(); vm.openChargePort(v); open = true; menuOpen = false },
-                )
-                FlapMenuItem(
-                    label = "Close flap",
-                    icon = Icons.Filled.Close,
-                    selected = !open,
+                    active = open,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { MorphButtonLabel(Icons.Filled.EvStation, "Open flap", pending = false, iconSize = 20.dp) }
+                MorphButton(
                     onClick = { haptics?.heavy(); vm.closeChargePort(v); open = false; menuOpen = false },
-                )
+                    active = !open,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { MorphButtonLabel(Icons.Filled.Close, "Close flap", pending = false, iconSize = 20.dp) }
             }
         }
     }
-}
-
-/**
- * A styled row in the charge-flap menu: a leading icon, the label, and a trailing
- * check on the currently-assumed state. The selected row is tinted so the assumed
- * state reads at a glance.
- */
-@Composable
-private fun FlapMenuItem(
-    label: String,
-    icon: ImageVector,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-    DropdownMenuItem(
-        text = {
-            Text(
-                label,
-                color = tint,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-        },
-        onClick = onClick,
-        leadingIcon = { Icon(icon, contentDescription = null, tint = tint) },
-        trailingIcon = {
-            if (selected) Icon(Icons.Filled.Check, contentDescription = "Current", tint = tint)
-        },
-    )
 }
 
 /**
@@ -3651,7 +3617,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 if (status.acc == true) StatusRow("Accessory power", "On")
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                 if (status.defrost == true) StatusRow("Defrost", "On")
-                status.airTemp?.value?.let { StatusRow("Climate setpoint", "$it°") }
+                status.airTemp?.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit)) }
                 status.percentFor(v.isEv)?.let {
                     StatusRow(if (v.isEv) "Charge" else "Fuel", "$it%")
                 }
@@ -3811,6 +3777,7 @@ private data class DiagRow(val label: String, val value: String, val indent: Boo
 
 @Composable
 private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
     val rows = buildList {
         status?.tirePressureLamp?.let { tp ->
             add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning" else "OK"))
@@ -3822,12 +3789,12 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         status?.tirePressure?.all?.takeIf { it > 0 }?.let { add(DiagRow("Avg tire pressure", "$it psi")) }
         status?.battery?.let { b ->
             b.batSoc?.let { soc ->
-                add(DiagRow("12V battery", "$soc%" + (b.health?.let { " · $it" } ?: "")))
+                add(DiagRow("12V battery", "$soc%"))
             }
         }
         status?.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
         status?.rangeMiFor(v.isEv)?.let { add(DiagRow("Range", "$it mi")) }
-        status?.airTemp?.value?.let { add(DiagRow("Climate setpoint", "$it°")) }
+        status?.airTemp?.value?.let { add(DiagRow("Climate setpoint", degLabel(it, fahrenheit))) }
         status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
         status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
         status?.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
@@ -3917,6 +3884,7 @@ private fun ClimatePebble(
     dragHandle: Modifier,
 ) {
     val pending = state.isPending(v.vin, "climate")
+    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
     var tempF by remember(v.vin) { mutableIntStateOf(72) }
     var duration by remember(v.vin) { mutableIntStateOf(10) }
     var defrost by remember(v.vin) { mutableStateOf(false) }
@@ -4019,7 +3987,7 @@ private fun ClimatePebble(
                     style = MaterialTheme.typography.bodySmall,
                     color = LocalContentColor.current.copy(alpha = 0.7f),
                 )
-                status?.airTemp?.value?.let { StatusRow("Set to", "$it°") }
+                status?.airTemp?.value?.let { StatusRow("Set to", degLabel(it, fahrenheit)) }
                 status?.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
                 status?.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
                 status?.seatHeaterVentState?.let { s ->
@@ -4048,14 +4016,28 @@ private fun ClimatePebble(
             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
             label = "tempColor",
         )
-        StepRow("Temperature", "$tempF°F", valueColor = tempColor)
-        AnimatedSlider(
-            value = tempF.toFloat(),
-            onValueChange = { tempF = it.roundToInt() },
-            valueRange = tempRange,
-            steps = 19,
-            accent = tempColor,
-        )
+        if (fahrenheit) {
+            StepRow("Temperature", "$tempF°F", valueColor = tempColor)
+            AnimatedSlider(
+                value = tempF.toFloat(),
+                onValueChange = { tempF = it.roundToInt() },
+                valueRange = tempRange,
+                steps = 19,
+                accent = tempColor,
+            )
+        } else {
+            // Celsius: drive the slider in whole °C but keep tempF canonical for
+            // the command, converting on each side.
+            val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
+            StepRow("Temperature", "$tempC°C", valueColor = tempColor)
+            AnimatedSlider(
+                value = tempC.toFloat(),
+                onValueChange = { tempF = (it * 9 / 5f + 32).roundToInt() },
+                valueRange = 17f..28f,
+                steps = 10,
+                accent = tempColor,
+            )
+        }
 
         StepRow("Run time", "$duration min")
         AnimatedSlider(
@@ -4341,30 +4323,24 @@ private fun PresetPill(
 
 /**
  * Charge pebble: collapsed shows just the charge start/stop control; expand to
- * set limits and see charging info. Long-press to drag-reorder.
+ * set the charge limit and see charging info. Long-press to drag-reorder.
  */
-@Composable
-private fun ChargeEta(mins: Int) {
-    Text(
-        "~${fmtMinutes(mins)} to full",
-        style = MaterialTheme.typography.labelSmall,
-        color = LocalContentColor.current.copy(alpha = 0.7f),
-        modifier = Modifier.padding(start = 2.dp, top = 2.dp),
-    )
-}
-
 @Composable
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val ev = status?.evStatus
     val charging = ev?.batteryCharge == true
     val plugged = (ev?.batteryPlugin != null && ev.batteryPlugin != 0) || charging
     val pending = state.isPending(v.vin, "charge")
-    val mins = ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+    val limitPending = state.isPending(v.vin, "chargeLimit")
     val summary = when {
-        charging -> "Charging" + (mins?.let { " · ${fmtMinutes(it)} to full" } ?: "")
+        charging -> "Charging"
         plugged -> "Plugged in · idle"
         else -> "Not plugged in"
     }
+
+    // A single charge-limit target, applied to both AC and DC. Defaults to 80%
+    // (a healthy daily ceiling) until the user picks one.
+    var limit by remember(v.vin) { mutableIntStateOf(80) }
 
     Pebble(
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
@@ -4383,10 +4359,18 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         },
     ) {
         if (plugged) {
-            mins?.let { StatusRow("Time to full", fmtMinutes(it)) }
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
-        if (charging && mins != null) ChargeEta(mins)
+        StepRow("Charge limit", "$limit%")
+        AnimatedSlider(
+            value = limit.toFloat(),
+            onValueChange = { limit = (it / 10f).roundToInt() * 10 },
+            valueRange = 50f..100f,
+            steps = 4,
+        )
+        CommandButton("Set limit", Icons.Filled.Bolt, Modifier.fillMaxWidth(), enabled && !limitPending) {
+            vm.setChargeLimits(v, limit, limit)
+        }
         // The charge-port toggle lives in the controls pebble, next to lock/unlock.
     }
 }
@@ -4429,6 +4413,10 @@ private fun chargerLabel(plugin: Int?): String? = when (plugin) {
 
 private fun fmtMinutes(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
+/** A setpoint (stored in °F) rendered in the user's chosen unit. */
+private fun degLabel(valueF: Int, fahrenheit: Boolean): String =
+    if (fahrenheit) "$valueF°F" else "${((valueF - 32) * 5 / 9.0).roundToInt()}°C"
+
 /** A descriptive name for a vibrancy multiplier (0 = greyscale, 1 = default, 2 = ultra). */
 private fun vibrancyLabel(v: Float): String = when {
     v < 0.2f -> "Greyscale"
@@ -4444,7 +4432,7 @@ private fun vibrancyLabel(v: Float): String = when {
 @Composable
 private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val context = LocalContext.current
-    val fahrenheit = vm.appearance.collectAsState().value.weatherFahrenheit
+    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
     val location = state.locations[v.vin]
     val place = state.placeNames[v.vin]
     val locating = state.isPending(v.vin, "locate")
@@ -4560,7 +4548,7 @@ private fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String
 private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val appearance by vm.appearance.collectAsState()
     val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
-    val fahrenheit = appearance.weatherFahrenheit
+    val fahrenheit = appearance.useFahrenheit
     val w = state.homeWeather
     // Refresh on first show (the VM throttles to a 15-minute TTL).
     LaunchedEffect(appearance.weatherLat, appearance.weatherLon) {
@@ -5037,13 +5025,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                             onToggle = {}, onPickPhoto = { pick(v.vin) },
                         )
                     } else {
-                        Text(
-                            "Long-press a car to drag it into a new order. Tap one to set its " +
-                                "powertrain, seats, steering wheel and photo.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
                         ReorderColumn(
                             items = state.vehicles,
                             keyOf = { it.vin },
@@ -5226,62 +5207,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
-            // Weather
-            SettingsCard("Weather") {
-                var weatherQuery by remember { mutableStateOf("") }
-                val locationPermission = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission(),
-                ) { granted ->
-                    if (granted) vm.useDeviceLocationForWeather()
-                    else vm.reportError("Location permission denied — type a place instead")
-                }
-                Text(
-                    "Show local weather in a pebble (and at the car's location). " +
-                        "Set a place or use your current location.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(10.dp))
-                appearance.weatherLabel?.let { label ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(label, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                        MorphTextButton("Clear", onClick = { vm.clearWeatherLocation() })
-                    }
-                    Spacer(Modifier.height(10.dp))
-                }
-                OutlinedTextField(
-                    value = weatherQuery,
-                    onValueChange = { weatherQuery = it },
-                    label = { Text("City or place") },
-                    singleLine = true,
-                    shape = FieldShape,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphTextButton(
-                        "Set place",
-                        modifier = Modifier.weight(1f),
-                        enabled = weatherQuery.isNotBlank(),
-                        onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
-                    )
-                    MorphButton(
-                        onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                    ) {
-                        Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("My location", fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                ToggleRow("Use Fahrenheit", appearance.weatherFahrenheit) { vm.setWeatherFahrenheit(it) }
-            }
-
             // Display scale
             SettingsCard("Display") {
                 StepRow("Text & layout scale", "${(appearance.uiScale * 100).roundToInt()}%")
@@ -5291,6 +5216,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                     valueRange = 0.85f..1.3f,
                     steps = 8,
                 )
+                Spacer(Modifier.height(8.dp))
+                // Global temperature unit, applied everywhere temperatures show.
+                ToggleRow("Use Fahrenheit", appearance.useFahrenheit) { vm.setUseFahrenheit(it) }
             }
 
             // Font
@@ -5308,11 +5236,6 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Links
             SettingsCard("Links") {
                 ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
-                Text(
-                    "On uses an in-app browser tab; off opens your default browser.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
 
             // Logs
@@ -5431,13 +5354,6 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Sounds & vibration
             SettingsCard("Sounds & vibration") {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
-                Text(
-                    "Crisp, distinct vibrations across the app: slider notches, a dice-roll on " +
-                        "pull-to-refresh, and a slot-machine settle when fresh data lands. Intensity " +
-                        "follows your system setting.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
 
             // Theme
@@ -5450,6 +5366,53 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
                 ThemeMode.entries.forEach { mode ->
                     ChoiceRow(labels.getValue(mode), appearance.themeMode == mode) { vm.setThemeMode(mode) }
+                }
+            }
+
+            // Weather
+            SettingsCard("Weather") {
+                var weatherQuery by remember { mutableStateOf("") }
+                val locationPermission = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    if (granted) vm.useDeviceLocationForWeather()
+                    else vm.reportError("Location permission denied — type a place instead")
+                }
+                appearance.weatherLabel?.let { label ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(label, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        MorphTextButton("Clear", onClick = { vm.clearWeatherLocation() })
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+                OutlinedTextField(
+                    value = weatherQuery,
+                    onValueChange = { weatherQuery = it },
+                    label = { Text("City or place") },
+                    singleLine = true,
+                    shape = FieldShape,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton(
+                        "Set place",
+                        modifier = Modifier.weight(1f),
+                        enabled = weatherQuery.isNotBlank(),
+                        onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
+                    )
+                    MorphButton(
+                        onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("My location", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
             Spacer(Modifier.height(bottomInset + 16.dp))

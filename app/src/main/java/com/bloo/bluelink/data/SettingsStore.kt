@@ -106,8 +106,8 @@ class SettingsStore(private val context: Context) {
         val weatherLat: Double? = null,
         val weatherLon: Double? = null,
         val weatherLabel: String? = null,
-        /** Show temperatures in Fahrenheit (defaults to true for US locale). */
-        val weatherFahrenheit: Boolean = true,
+        /** Show all temperatures across the app in Fahrenheit (defaults to true for US locale). */
+        val useFahrenheit: Boolean = true,
         val biometricLock: Boolean = false,
         /** When the biometric lock re-engages after leaving the foreground. */
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
@@ -146,7 +146,7 @@ class SettingsStore(private val context: Context) {
             weatherLat = prefs[Keys.WEATHER_LAT]?.toDoubleOrNull(),
             weatherLon = prefs[Keys.WEATHER_LON]?.toDoubleOrNull(),
             weatherLabel = prefs[Keys.WEATHER_LABEL],
-            weatherFahrenheit = prefs[Keys.WEATHER_FAHRENHEIT]?.toBooleanStrictOrNull() ?: true,
+            useFahrenheit = prefs[Keys.WEATHER_FAHRENHEIT]?.toBooleanStrictOrNull() ?: true,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
@@ -612,7 +612,7 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun setWeatherFahrenheit(value: Boolean) {
+    suspend fun setUseFahrenheit(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.WEATHER_FAHRENHEIT] = value.toString() }
     }
 }

@@ -1326,7 +1326,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Weather ---------------------------------------------------------
 
-    fun setWeatherFahrenheit(value: Boolean) = viewModelScope.launch { settingsStore.setWeatherFahrenheit(value) }
+    fun setUseFahrenheit(value: Boolean) = viewModelScope.launch { settingsStore.setUseFahrenheit(value) }
 
     fun clearWeatherLocation() = viewModelScope.launch {
         settingsStore.setWeatherLocation(null, null, null)
