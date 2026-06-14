@@ -1321,7 +1321,11 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                                     }
                                     if (switching) change.consume()
                                 }
-                                if (switching) {
+                                // Only the visible page's handler should drive navigation.
+                                // Adjacent pre-rendered pages have the same gesture handler
+                                // and would otherwise fire competing animateScrollToPage calls
+                                // that cancel each other (notably causing swipe-down to do nothing).
+                                if (switching && page == vPager.currentPage) {
                                     val delta = if (totalDy < 0) 1 else -1
                                     scope.launch {
                                         vPager.animateScrollToPage(
