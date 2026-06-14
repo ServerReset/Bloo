@@ -191,6 +191,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -228,6 +229,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -1208,8 +1212,10 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
 @Composable
 private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
+    // Only include tile names that CompactCar's when-block knows how to render.
+    val knownTiles = setOf("climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai")
     val sections = state.sectionsFor(v).filter {
-        it !in listOf("summary", "controls") &&
+        it in knownTiles &&
             (it != "charge" || state.hasBattery(v)) &&
             (it != "ai" || state.aiEnabled) &&
             !state.isPebbleHidden(v.vin, it)
@@ -1222,6 +1228,8 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val start = if (loop) virtualCount / 2 else 0
     val vPager = rememberPagerState(initialPage = start) { virtualCount }
     val current = ((vPager.currentPage % tiles.size) + tiles.size) % tiles.size
+    // Per-tile scroll states so position persists across pager recycling.
+    val tileScrollStates = remember(tiles.size) { Array(tiles.size) { ScrollState(0) } }
 
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
@@ -1253,21 +1261,57 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
 
     Box(Modifier.fillMaxSize()) {
-        VerticalPager(state = vPager, modifier = Modifier.fillMaxSize()) { page ->
+        VerticalPager(state = vPager, modifier = Modifier.fillMaxSize(), userScrollEnabled = false) { page ->
             val i = ((page % tiles.size) + tiles.size) % tiles.size
+            val tileScroll = tileScrollStates[i]
             // Cover-screen tiles are always open (no collapsing) and fill the
             // screen height (scrolling internally only if taller).
             CompositionLocalProvider(
                 LocalForceExpanded provides true,
                 LocalPebbleFillHeight provides true,
                 LocalCameraHolePx provides cameraHole,
+                LocalCoverScrollState provides tileScroll,
             ) {
                 // Extra end inset clears the vertical page-dots rail on the right.
+                // The pointerInput intercepts vertical gestures in Initial pass (before the
+                // inner verticalScroll sees them). On gesture start it checks whether the
+                // tile content is already at the relevant edge; if so it consumes the swipe
+                // and animates to the next/previous pager page instead of scrolling.
                 Box(
-                    Modifier.fillMaxSize().padding(
-                        start = 10.dp, top = tileTopPadding, bottom = 10.dp,
-                        end = if (tiles.size > 1) 22.dp else 10.dp,
-                    ),
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(tileScroll, page) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                var totalDy = 0f
+                                var decided = false
+                                var switching = false
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull() ?: break
+                                    if (!change.pressed) break
+                                    totalDy += change.positionChange().y
+                                    if (!decided && abs(totalDy) > viewConfiguration.touchSlop) {
+                                        decided = true
+                                        val noContent = tileScroll.maxValue == 0
+                                        val atTop = tileScroll.value <= 0
+                                        val atBottom = tileScroll.value >= tileScroll.maxValue
+                                        switching = noContent || (totalDy > 0 && atTop) || (totalDy < 0 && atBottom)
+                                    }
+                                    if (switching) change.consume()
+                                }
+                                if (switching) {
+                                    val delta = if (totalDy < 0) 1 else -1
+                                    vPager.animateScrollToPage(
+                                        (page + delta).coerceIn(0, virtualCount - 1)
+                                    )
+                                }
+                            }
+                        }
+                        .padding(
+                            start = 10.dp, top = tileTopPadding, bottom = 10.dp,
+                            end = if (tiles.size > 1) 22.dp else 10.dp,
+                        ),
                 ) {
                     when (val tile = tiles[i]) {
                         "main" -> CompactMainTile(v, state, vm)
@@ -1324,34 +1368,109 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             VerticalPagerDots(
                 current = current,
                 count = tiles.size,
+                tiles = tiles,
+                onPageJump = { targetTile ->
+                    val currPage = vPager.currentPage
+                    val currTile = ((currPage % tiles.size) + tiles.size) % tiles.size
+                    val delta = targetTile - currTile
+                    vPager.scrollToPage((currPage + delta).coerceIn(0, virtualCount - 1))
+                },
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp).alpha(dotsAlpha),
             )
         }
     }
 }
 
-/** Vertical sibling of [PagerDots] for the cover-screen tile stack. */
+/** Vertical sibling of [PagerDots] for the cover-screen tile stack.
+ *
+ * Long-pressing the indicator expands it into a scrubber: slide finger up/down
+ * to jump between pages quickly. Each 40 dp of drag moves one page.
+ */
 @Composable
-private fun VerticalPagerDots(current: Int, count: Int, modifier: Modifier = Modifier) {
+private fun VerticalPagerDots(
+    current: Int,
+    count: Int,
+    tiles: List<String>,
+    onPageJump: suspend (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var scrubbing by remember { mutableStateOf(false) }
+    var scrubStartPage by remember { mutableIntStateOf(0) }
+    var scrubAccumY by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val pxPerPage = with(density) { 40.dp.toPx() }
+
+    val scrubTargetPage by remember {
+        derivedStateOf {
+            (scrubStartPage + (-scrubAccumY / pxPerPage).roundToInt()).coerceIn(0, count - 1)
+        }
+    }
+    LaunchedEffect(scrubTargetPage, scrubbing) {
+        if (scrubbing) onPageJump(scrubTargetPage)
+    }
+
+    fun tileName(t: String) = when (t) {
+        "main" -> "Car"
+        else -> t.replaceFirstChar { it.uppercase() }
+    }
+
     Surface(
-        modifier = modifier,
+        modifier = modifier
+            .pointerInput(count) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                    longPress.consume()
+                    scrubbing = true
+                    scrubStartPage = current
+                    scrubAccumY = 0f
+                    verticalDrag(longPress.id) { change ->
+                        change.consume()
+                        scrubAccumY += change.positionChange().y
+                    }
+                    scrubbing = false
+                }
+            },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
         shadowElevation = 2.dp,
     ) {
         Column(
-            Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            Modifier
+                .padding(horizontal = if (scrubbing) 12.dp else 6.dp, vertical = 10.dp)
+                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)),
+            verticalArrangement = Arrangement.spacedBy(if (scrubbing) 8.dp else 6.dp),
+            horizontalAlignment = Alignment.End,
         ) {
             repeat(count) { i ->
                 val selected = i == current
-                val h by animateDpAsState(if (selected) 20.dp else 7.dp, label = "vdotH")
+                val scrubSelected = scrubbing && i == scrubTargetPage
+                val h by animateDpAsState(
+                    if (selected || scrubSelected) 20.dp else 7.dp,
+                    label = "vdotH",
+                )
                 val color by androidx.compose.animation.animateColorAsState(
-                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    when {
+                        selected -> MaterialTheme.colorScheme.primary
+                        scrubSelected -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.outlineVariant
+                    },
                     label = "vdotC",
                 )
-                Box(Modifier.width(7.dp).height(h).clip(CircleShape).background(color))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (scrubbing) {
+                        Text(
+                            tileName(tiles[i]),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (selected || scrubSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = color,
+                        )
+                    }
+                    Box(Modifier.width(7.dp).height(h).clip(CircleShape).background(color))
+                }
             }
         }
     }
@@ -1705,6 +1824,13 @@ private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
  * by [CompactCar] so every cover-screen tile can react to the camera hole.
  */
 private val LocalCameraHolePx = staticCompositionLocalOf<android.graphics.Rect?> { null }
+
+/**
+ * When set, [Pebble] in fill-height cover-screen mode uses this scroll state
+ * instead of creating a local one — lets the parent observe scroll position
+ * to decide whether to switch pager pages or scroll tile content.
+ */
+private val LocalCoverScrollState = compositionLocalOf<ScrollState?> { null }
 
 /**
  * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the
@@ -3420,7 +3546,7 @@ private fun Pebble(
                 // remaining height, so the body is a direct weighted child of the
                 // Column (no AnimatedVisibility, which would break weight()).
                 if (expanded) {
-                    val bodyScroll = rememberScrollState()
+                    val bodyScroll = LocalCoverScrollState.current ?: rememberScrollState()
                     Column(
                         Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
                             .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
