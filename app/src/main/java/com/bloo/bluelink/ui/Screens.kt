@@ -4566,9 +4566,14 @@ private fun chargerLabel(plugin: Int?): String? = when (plugin) {
 
 private fun fmtMinutes(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
-/** A setpoint (stored in °F) rendered in the user's chosen unit. */
-private fun degLabel(valueF: Int, fahrenheit: Boolean): String =
-    if (fahrenheit) "$valueF°F" else "${((valueF - 32) * 5 / 9.0).roundToInt()}°C"
+/**
+ * A climate setpoint (the API reports it as a °F string) rendered in the user's
+ * chosen unit. Non-numeric values pass through with a bare degree sign.
+ */
+private fun degLabel(valueF: String, fahrenheit: Boolean): String {
+    val f = valueF.toDoubleOrNull() ?: return "$valueF°"
+    return if (fahrenheit) "${f.roundToInt()}°F" else "${((f - 32) * 5 / 9.0).roundToInt()}°C"
+}
 
 /** A descriptive name for a vibrancy multiplier (0 = greyscale, 1 = default, 2 = ultra). */
 private fun vibrancyLabel(v: Float): String = when {
