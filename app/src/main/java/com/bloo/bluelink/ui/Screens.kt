@@ -1422,7 +1422,7 @@ private fun VerticalPagerDots(
     var scrubAccumY by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     // Shorter travel per page = a more sensitive scrub.
-    val pxPerPage = with(density) { 24.dp.toPx() }
+    val pxPerPage = with(density) { 14.dp.toPx() }
     // Shared flag so the parent HorizontalPager can lock car-switching swipes.
     val coverScrubbing = LocalCoverScrubbing.current
 
