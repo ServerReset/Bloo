@@ -1245,6 +1245,9 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     // Per-tile scroll states so position persists across pager recycling.
     val tileScrollStates = remember(tiles.size) { Array(tiles.size) { ScrollState(0) } }
     val scope = rememberCoroutineScope()
+    // Prevents competing gesture handlers on pre-rendered adjacent pages from
+    // all firing simultaneously and cancelling each other's navigation.
+    val navigating = remember { mutableStateOf(false) }
 
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
@@ -1321,16 +1324,17 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                                     }
                                     if (switching) change.consume()
                                 }
-                                // Only the visible page's handler should drive navigation.
-                                // Adjacent pre-rendered pages have the same gesture handler
-                                // and would otherwise fire competing animateScrollToPage calls
-                                // that cancel each other (notably causing swipe-down to do nothing).
-                                if (switching && page == vPager.currentPage) {
+                                if (switching && !navigating.value) {
+                                    navigating.value = true
                                     val delta = if (totalDy < 0) 1 else -1
                                     scope.launch {
-                                        vPager.animateScrollToPage(
-                                            (page + delta).coerceIn(0, virtualCount - 1)
-                                        )
+                                        try {
+                                            vPager.animateScrollToPage(
+                                                (page + delta).coerceIn(0, virtualCount - 1)
+                                            )
+                                        } finally {
+                                            navigating.value = false
+                                        }
                                     }
                                 }
                             }

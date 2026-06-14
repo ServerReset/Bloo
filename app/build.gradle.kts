@@ -57,9 +57,14 @@ android {
     }
 }
 
-// Name the output APK "Bloo" (e.g. Bloo-0.1-debug.apk) rather than the module name.
-base {
-    archivesName.set("Bloo")
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                output.outputFileName = "Bloo.apk"
+            }
+        }
+    }
 }
 
 kotlin {
