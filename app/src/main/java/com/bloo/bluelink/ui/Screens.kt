@@ -3272,11 +3272,18 @@ private fun MorphButtonLabel(
         val angle = remember { Animatable(0f) }
         LaunchedEffect(spinning) {
             if (spinning) {
-                angle.animateTo(
-                    targetValue = angle.value + 360f,
-                    animationSpec = infiniteRepeatable(tween(durationMillis = 2200, easing = LinearEasing)),
-                )
-            } else {
+                // Spin one revolution at a time so that when spinning stops we can
+                // finish the current turn cleanly (no abrupt snap mid-rotation).
+                while (true) {
+                    angle.animateTo(
+                        targetValue = angle.value + 360f,
+                        animationSpec = tween(durationMillis = 900, easing = LinearEasing),
+                    )
+                }
+            } else if (angle.value != 0f) {
+                // Coast to the next full turn, then reset to 0 for next time.
+                val target = kotlin.math.ceil(angle.value / 360f) * 360f
+                angle.animateTo(target, tween(durationMillis = 350, easing = LinearEasing))
                 angle.snapTo(0f)
             }
         }
@@ -3639,14 +3646,21 @@ private fun PebbleActionButton(
     activeContent: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
     val bounceInteraction = remember { MutableInteractionSource() }
-    val pressed by bounceInteraction.collectIsPressedAsState()
-    val bounceY by animateFloatAsState(
-        targetValue = if (bounceIcon && pressed) -7f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "iconBounce",
-    )
+    // One-shot bounce: a tap fires a quick hop up that springs back down, so the
+    // jump is always visible regardless of how briefly the button is pressed.
+    val bounceY = remember { Animatable(0f) }
+    val bounceScope = rememberCoroutineScope()
     MorphButton(
-        onClick = onClick,
+        onClick = {
+            if (bounceIcon) bounceScope.launch {
+                bounceY.animateTo(-9f, spring(stiffness = Spring.StiffnessHigh))
+                bounceY.animateTo(
+                    0f,
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                )
+            }
+            onClick()
+        },
         enabled = enabled && !pending,
         active = active,
         activeContainerColor = activeContainer,
@@ -3654,7 +3668,7 @@ private fun PebbleActionButton(
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         modifier = Modifier
             .heightIn(min = 50.dp)
-            .graphicsLayer { translationY = bounceY },
+            .graphicsLayer { translationY = bounceY.value },
         interactionSource = bounceInteraction,
     ) {
         MorphButtonLabel(icon, label, pending, spinning = spinning)
@@ -4820,13 +4834,20 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
     val fahrenheit = appearance.useFahrenheit
     val w = state.homeWeather
     var weatherSpinning by remember { mutableStateOf(false) }
+    var spinStartedAt by remember { mutableLongStateOf(0L) }
     // Refresh on first show (the VM throttles to a 15-minute TTL).
     LaunchedEffect(appearance.weatherLat, appearance.weatherLon) {
         if (hasLocation) vm.loadHomeWeather()
     }
-    // Stop the spinner as soon as new weather data arrives (fetchedAt changes).
+    // Stop the spinner once new weather data arrives, but keep it visible for a
+    // minimum duration so a cached/instant response still shows the animation.
     LaunchedEffect(state.homeWeather?.fetchedAt) {
-        weatherSpinning = false
+        if (weatherSpinning) {
+            val elapsed = System.currentTimeMillis() - spinStartedAt
+            val minSpin = 900L
+            if (elapsed < minSpin) delay(minSpin - elapsed)
+            weatherSpinning = false
+        }
     }
     val summary = when {
         !hasLocation -> "Set a location"
@@ -4839,7 +4860,11 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
             PebbleActionButton(
                 label = "Refresh",
                 icon = Icons.Filled.Refresh,
-                onClick = { weatherSpinning = true; vm.loadHomeWeather(force = true) },
+                onClick = {
+                    weatherSpinning = true
+                    spinStartedAt = System.currentTimeMillis()
+                    vm.loadHomeWeather(force = true)
+                },
                 enabled = hasLocation,
                 spinning = weatherSpinning,
             )
