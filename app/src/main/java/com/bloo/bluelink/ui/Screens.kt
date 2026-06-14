@@ -23,6 +23,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
@@ -1390,13 +1392,22 @@ private fun FloatingIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = LocalHaptics.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "floatIconScale",
+    )
     Surface(
-        onClick = onClick,
+        onClick = { haptics?.click(); onClick() },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 2.dp,
-        modifier = modifier.padding(12.dp).size(44.dp),
+        interactionSource = interaction,
+        modifier = modifier.padding(12.dp).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = description)
@@ -1546,12 +1557,24 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Text(
-                    statusLine,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = statusColor,
-                    fontWeight = if (charging || drivingLabel == "Driving") FontWeight.Bold else FontWeight.Normal,
+                val animatedStatusColor by androidx.compose.animation.animateColorAsState(
+                    statusColor, animationSpec = tween(300), label = "statusLineColor",
                 )
+                AnimatedContent(
+                    targetState = statusLine,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + slideInVertically { it / 2 }) togetherWith
+                        (fadeOut(tween(120)) + slideOutVertically { -it / 2 })
+                    },
+                    label = "statusLine",
+                ) { line ->
+                    Text(
+                        line,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = animatedStatusColor,
+                        fontWeight = if (charging || drivingLabel == "Driving") FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
             }
         }
         // Plug-in hybrid: surface the fuel tank too.
@@ -3431,12 +3454,21 @@ private fun Pebble(
                         fontWeight = FontWeight.Bold,
                     )
                     if (summary != null) {
-                        Text(
-                            summary,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = LocalContentColor.current.copy(alpha = 0.7f),
-                            maxLines = 1,
-                        )
+                        AnimatedContent(
+                            targetState = summary,
+                            transitionSpec = {
+                                (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                                (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                            },
+                            label = "pebbleSummary",
+                        ) { s ->
+                            Text(
+                                s,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = LocalContentColor.current.copy(alpha = 0.7f),
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
                 if (headerAction != null) {
@@ -3451,7 +3483,17 @@ private fun Pebble(
                     )
                 }
             }
-            if (expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(180)) + expandVertically(
+                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                    expandFrom = Alignment.Top,
+                ),
+                exit = fadeOut(tween(130)) + shrinkVertically(
+                    tween(160),
+                    shrinkTowards = Alignment.Top,
+                ),
+            ) {
                 val bodyScroll = rememberScrollState()
                 val bodyMod = if (fillHeight) {
                     Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
@@ -5595,14 +5637,22 @@ private fun CarSettingsCard(
     showHandle: Boolean = true,
 ) {
     val seats = state.seatConfigs[v.vin] ?: SeatConfig()
+    val chevronAngle by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "carCardChevron",
+    )
+    val cardBg by androidx.compose.animation.animateColorAsState(
+        if (dragging) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+        animationSpec = tween(200),
+        label = "carCardBg",
+    )
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (dragging) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-        ),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(12.dp).animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))) {
             Row(
                 Modifier.fillMaxWidth()
                     .then(if (collapsible) Modifier.clickable { onToggle() } else Modifier)
@@ -5627,8 +5677,9 @@ private fun CarSettingsCard(
                 }
                 if (collapsible) {
                     Icon(
-                        if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        Icons.Filled.KeyboardArrowDown,
                         contentDescription = if (expanded) "Collapse" else "Expand",
+                        modifier = Modifier.rotate(chevronAngle),
                     )
                 }
             }
@@ -5990,7 +6041,11 @@ private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
 @Composable
 private fun SettingsCard(title: String, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
+        Column(
+            Modifier
+                .padding(16.dp)
+                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+        ) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             content()
@@ -6013,12 +6068,45 @@ private fun SecretRow(label: String, value: String) {
 
 @Composable
 private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val haptics = LocalHaptics.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val corner by animateDpAsState(
+        targetValue = if (selected || pressed) 14.dp else 24.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
+        label = "choiceCorner",
+    )
+    val bg by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primaryContainer else buttonContainer(),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "choiceBg",
+    )
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    Surface(
+        onClick = { haptics?.click(); onSelect() },
+        shape = RoundedCornerShape(corner),
+        color = bg,
+        contentColor = fg,
+        interactionSource = interaction,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        RadioButton(selected = selected, onClick = onSelect)
-        Text(label, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyLarge)
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            AnimatedVisibility(
+                visible = selected,
+                enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+                exit = scaleOut() + fadeOut(),
+            ) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 
@@ -6033,7 +6121,14 @@ private fun StatusRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = LocalContentColor.current.copy(alpha = 0.7f),
         )
-        Text(value, fontWeight = FontWeight.Medium)
+        AnimatedContent(
+            targetState = value,
+            transitionSpec = {
+                (fadeIn(tween(160)) + slideInVertically { it / 2 }) togetherWith
+                (fadeOut(tween(100)) + slideOutVertically { -it / 2 })
+            },
+            label = "statusVal",
+        ) { v -> Text(v, fontWeight = FontWeight.Medium) }
     }
 }
 
@@ -6067,11 +6162,31 @@ private fun StepRow(label: String, value: String, valueColor: Color = Color.Unsp
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val haptics = LocalHaptics.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val interaction = remember { MutableInteractionSource() }
+    val scale by animateFloatAsState(
+        if (checked) 1.04f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "toggleScale",
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+            ) {
+                val next = !checked
+                if (next) haptics?.toggleOn() else haptics?.toggleOff()
+                onChange(next)
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Switch(
             checked = checked,
             onCheckedChange = { if (it) haptics?.toggleOn() else haptics?.toggleOff(); onChange(it) },
+            interactionSource = interaction,
+            modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale),
         )
     }
 }
