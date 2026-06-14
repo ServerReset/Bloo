@@ -1324,6 +1324,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(message = error ?: "Palettes imported") }
     }
 
+    /** Share a full settings backup (includes colours and palettes) via the share sheet. */
+    fun exportSettings(context: android.content.Context) = viewModelScope.launch {
+        val json = settingsStore.exportSettingsJson()
+        runCatching {
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(android.content.Intent.EXTRA_TEXT, json)
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "Bloo settings backup")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(
+                android.content.Intent.createChooser(intent, "Export settings")
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.onFailure { _state.update { s -> s.copy(message = "Couldn't open the share sheet") } }
+    }
+
+    /** Restore a full settings backup from a user-picked JSON file. */
+    fun importSettings(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
+        val json = withContext(Dispatchers.IO) {
+            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
+        }
+        if (json == null) {
+            _state.update { it.copy(message = "Couldn't read that file") }
+            return@launch
+        }
+        val error = settingsStore.importSettingsJson(json)
+        _state.update { it.copy(message = error ?: "Settings restored") }
+    }
+
     // --- Weather ---------------------------------------------------------
 
     fun setUseFahrenheit(value: Boolean) = viewModelScope.launch { settingsStore.setUseFahrenheit(value) }

@@ -16,6 +16,14 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 private val Context.settingsDataStore by preferencesDataStore(name = "bloo_settings")
 
@@ -591,6 +599,63 @@ class SettingsStore(private val context: Context) {
         val merged = existing + parsed.filter { new -> existing.none { it.id == new.id } }
         context.settingsDataStore.edit {
             it[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, merged)
+        }
+        return null
+    }
+
+    // --- Full settings backup --------------------------------------------
+
+    private val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
+
+    /**
+     * Export every app preference (theme, colours and custom palettes, weather,
+     * notifications, tiles, per-car config…) as one portable JSON backup. Values
+     * keep their type (string or boolean) so a re-import restores them exactly.
+     * Note: account credentials live in a separate store and are never included.
+     */
+    suspend fun exportSettingsJson(): String {
+        val prefs = context.settingsDataStore.data.first()
+        val entries = buildJsonObject {
+            prefs.asMap().forEach { (key, value) ->
+                when (value) {
+                    is Boolean -> put(key.name, JsonPrimitive(value))
+                    is String -> put(key.name, JsonPrimitive(value))
+                    else -> put(key.name, JsonPrimitive(value.toString()))
+                }
+            }
+        }
+        val root = buildJsonObject {
+            put("_format", JsonPrimitive("bloo-settings"))
+            put("_version", JsonPrimitive(1))
+            put("prefs", entries)
+        }
+        return backupJson.encodeToString(JsonObject.serializer(), root)
+    }
+
+    /**
+     * Restore settings from a backup produced by [exportSettingsJson], overwriting
+     * any matching keys. Returns an error message on failure, or null on success.
+     */
+    suspend fun importSettingsJson(json: String): String? {
+        val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }
+            .getOrElse { return "Invalid settings file" }
+        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") {
+            return "Not a Bloo settings backup"
+        }
+        val prefs = root["prefs"]?.jsonObject ?: return "Settings file has no data"
+        context.settingsDataStore.edit { mut ->
+            prefs.forEach { (name, element) ->
+                val prim = (element as? JsonPrimitive) ?: return@forEach
+                when {
+                    // A real JSON string (e.g. "DARK", "true") → keep as a string pref.
+                    prim.isString -> mut[stringPreferencesKey(name)] = prim.content
+                    // A bare JSON boolean → a boolean pref (notifications, alerts, …).
+                    prim.booleanOrNull != null -> mut[booleanPreferencesKey(name)] = prim.booleanOrNull!!
+                    // Anything else (a bare number) — every numeric pref here is
+                    // stored as a string, so coerce it back to one.
+                    else -> mut[stringPreferencesKey(name)] = prim.content
+                }
+            }
         }
         return null
     }

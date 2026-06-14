@@ -3482,28 +3482,38 @@ private fun Pebble(
                     )
                 }
             }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(tween(180)) + expandVertically(
-                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                    expandFrom = Alignment.Top,
-                ),
-                exit = fadeOut(tween(130)) + shrinkVertically(
-                    tween(160),
-                    shrinkTowards = Alignment.Top,
-                ),
-            ) {
-                val bodyScroll = rememberScrollState()
-                val bodyMod = if (fillHeight) {
-                    Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
-                } else {
-                    Modifier
+            if (fillHeight) {
+                // Cover-screen tiles are always force-expanded and must fill the
+                // remaining height, so the body is a direct weighted child of the
+                // Column (no AnimatedVisibility, which would break weight()).
+                if (expanded) {
+                    val bodyScroll = rememberScrollState()
+                    Column(
+                        Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
+                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        content = content,
+                    )
                 }
-                Column(
-                    bodyMod.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    content = content,
-                )
+            } else {
+                // Normal pebbles: animate the body fading + sliding open/closed.
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = fadeIn(tween(180)) + expandVertically(
+                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        expandFrom = Alignment.Top,
+                    ),
+                    exit = fadeOut(tween(130)) + shrinkVertically(
+                        tween(160),
+                        shrinkTowards = Alignment.Top,
+                    ),
+                ) {
+                    Column(
+                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        content = content,
+                    )
+                }
             }
         }
     }
@@ -5182,6 +5192,33 @@ private fun SettingsScreen(vm: AppViewModel) {
                             )
                         }
                     }
+                }
+            }
+
+            // Backup
+            SettingsCard("Backup") {
+                val settingsImportLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.GetContent(),
+                ) { uri -> uri?.let { vm.importSettings(context, it) } }
+                Text(
+                    "Save every preference — theme, colours, palettes, weather and " +
+                        "more — to a file you can restore later or on another device. " +
+                        "Account sign-ins are never included.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton(
+                        "Export all",
+                        modifier = Modifier.weight(1f),
+                        onClick = { vm.exportSettings(context) },
+                    )
+                    MorphTextButton(
+                        "Restore",
+                        modifier = Modifier.weight(1f),
+                        onClick = { settingsImportLauncher.launch("application/json") },
+                    )
                 }
             }
 
