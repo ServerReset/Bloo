@@ -37,7 +37,10 @@ fun WatchApp(vm: WearViewModel) {
                         )
                     }
                     composable("settings") {
-                        SettingsScreen(vm, ui)
+                        SettingsScreen(vm, ui, onAddAccount = { nav.navigate("login") })
+                    }
+                    composable("login") {
+                        LoginScreen(vm, ui)
                     }
                     composable("trips/{vin}") { entry ->
                         TripsScreen(vm, ui, entry.arguments?.getString("vin") ?: "")

@@ -63,6 +63,25 @@ data class CarView(
     val odometer: String?,
     val lat: Double?,
     val lon: Double?,
+    val tripsSupported: Boolean,
+    val engineOn: Boolean,
+    val accessoryOn: Boolean,
+    val defrostOn: Boolean,
+    val tempSetting: String?,
+    val tireAll: Int?,
+    val tireFl: Boolean,
+    val tireFr: Boolean,
+    val tireRl: Boolean,
+    val tireRr: Boolean,
+    val steerHeat: Boolean,
+    val mirrorHeat: Boolean,
+    val rearDefrost: Boolean,
+    val seatFl: Int?,
+    val seatFr: Int?,
+    val seatRl: Int?,
+    val seatRr: Int?,
+    val battery12vHealth: String?,
+    val fuelLevel: Int?,
     val hasLiveStatus: Boolean,
 )
 
@@ -225,6 +244,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         refreshConnection()
     }
 
+    /** Re-pull snapshots, sessions and settings the phone has published. */
+    fun resync() {
+        viewModelScope.launch {
+            runCatching { WearComms.pullLatest(ctx) }
+            snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
+            refreshConnection()
+            if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
+        }
+    }
+
     fun refreshStatus(vin: String, surface: Boolean = true) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:refresh") {
@@ -371,6 +400,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val hasBattery = v.isEv
         val ev = s?.evStatus
         val coord = s?.vehicleLocation?.coord
+        val lamp = s?.tirePressureLamp
+        val gen = v.generation.trim().toIntOrNull() ?: 3
+        val gen5w = v.brand != Brand.KIA && gen < 3
+        val seats = s?.seatHeaterVentState
         return CarView(
             vin = v.vin,
             name = v.name,
@@ -400,6 +433,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             odometer = v.odometer,
             lat = coord?.lat,
             lon = coord?.lon,
+            tripsSupported = !gen5w,
+            engineOn = s?.engine == true,
+            accessoryOn = s?.acc == true,
+            defrostOn = s?.defrost == true,
+            tempSetting = s?.airTemp?.value,
+            tireAll = s?.tirePressure?.all,
+            tireFl = (lamp?.frontLeft ?: 0) != 0,
+            tireFr = (lamp?.frontRight ?: 0) != 0,
+            tireRl = (lamp?.rearLeft ?: 0) != 0,
+            tireRr = (lamp?.rearRight ?: 0) != 0,
+            steerHeat = (s?.steerWheelHeat ?: 0) != 0,
+            mirrorHeat = (s?.sideMirrorHeat ?: 0) != 0,
+            rearDefrost = (s?.sideBackWindowHeat ?: 0) != 0,
+            seatFl = seats?.flSeatHeatState,
+            seatFr = seats?.frSeatHeatState,
+            seatRl = seats?.rlSeatHeatState,
+            seatRr = seats?.rrSeatHeatState,
+            battery12vHealth = s?.battery?.health,
+            fuelLevel = s?.fuelLevel,
             hasLiveStatus = s != null,
         )
     }

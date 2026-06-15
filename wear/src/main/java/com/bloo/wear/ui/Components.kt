@@ -33,6 +33,16 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.Icon
 import kotlin.math.roundToInt
 
 /**
@@ -118,8 +128,10 @@ fun SliderRow(
     min: Int,
     max: Int,
     step: Int,
+    accent: Color? = null,
     onValue: (Int) -> Unit,
 ) {
+    val fill = accent ?: MaterialTheme.colorScheme.primary
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -128,21 +140,66 @@ fun SliderRow(
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             MiniButton("–") { onValue(value - step) }
-            SliderTrack(value, min, max, step, Modifier.weight(1f), onValue)
+            SliderTrack(value, min, max, step, fill, Modifier.weight(1f), onValue)
             MiniButton("+") { onValue(value + step) }
         }
     }
 }
 
+/** Map a 62–82°F setpoint to the phone's blue→green→warm slider colour. */
+@Composable
+fun tempColor(tempF: Int): Color {
+    val t = ((tempF - 62) / 20f).coerceIn(0f, 1f)
+    val cool = Color(0xFF2E78FF)
+    val mid = Color(0xFF2EBD59)
+    val warm = Color(0xFFE5484D)
+    return if (t < 0.5f) lerp(cool, mid, t * 2f) else lerp(mid, warm, (t - 0.5f) * 2f)
+}
+
+/** A small circular –/+ control, matching the phone's round buttons. */
 @Composable
 private fun MiniButton(text: String, onClick: () -> Unit) {
-    FilledTonalButton(onClick = onClick, modifier = Modifier.size(36.dp), label = { Text(text) })
+    Button(
+        onClick = onClick,
+        modifier = Modifier.size(40.dp),
+        shape = CircleShape,
+        colors = ButtonDefaults.filledTonalButtonColors(),
+        label = { Text(text) },
+    )
+}
+
+/** The app's pill→rounded-square morphing button, for Wear. */
+@Composable
+fun MorphButton(
+    label: String,
+    icon: ImageVector,
+    active: Boolean,
+    activeColor: Color,
+    pending: Boolean,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val corner by animateIntAsState(if (active || pressed) 30 else 50, label = "morphCorner")
+    Button(
+        onClick = onClick,
+        enabled = !pending,
+        interactionSource = interaction,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(percent = corner),
+        colors = if (active) {
+            ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
+        } else {
+            ButtonDefaults.filledTonalButtonColors()
+        },
+        label = { Text(if (pending) "Sending…" else label, maxLines = 1) },
+        icon = { Icon(icon, contentDescription = null) },
+    )
 }
 
 @Composable
-private fun SliderTrack(value: Int, min: Int, max: Int, step: Int, modifier: Modifier, onValue: (Int) -> Unit) {
+private fun SliderTrack(value: Int, min: Int, max: Int, step: Int, fillColor: Color, modifier: Modifier, onValue: (Int) -> Unit) {
     val trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val fillColor = MaterialTheme.colorScheme.primary
     val range = (max - min).coerceAtLeast(1)
     var width by remember { mutableIntStateOf(1) }
     Canvas(
