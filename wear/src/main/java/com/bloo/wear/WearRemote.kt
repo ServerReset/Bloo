@@ -15,4 +15,14 @@ object WearRemote {
             RemoteActivityHelper(context).startRemoteActivity(intent)
         }
     }
+
+    /** Open the phone dialer pre-filled with [number] (digits only). */
+    fun dialOnPhone(context: Context, number: String) {
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW)
+                .addCategory(Intent.CATEGORY_BROWSABLE)
+                .setData(Uri.parse("tel:$number"))
+            RemoteActivityHelper(context).startRemoteActivity(intent)
+        }
+    }
 }

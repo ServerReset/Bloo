@@ -104,4 +104,10 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     // Small static map thumbnail on the Location tile.
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Wear OS Tile (the swipeable tile outside the app) via ProtoLayout.
+    implementation("androidx.wear.tiles:tiles:1.4.1")
+    implementation("androidx.wear.protolayout:protolayout:1.2.1")
+    implementation("androidx.wear.protolayout:protolayout-material:1.2.1")
+    implementation("com.google.guava:guava:33.0.0-android")
 }

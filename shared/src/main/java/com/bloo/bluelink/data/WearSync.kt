@@ -213,6 +213,8 @@ data class WearSettingsPayload(
     val useFahrenheit: Boolean = true,
     val uiScale: Float = 1f,
     val colors: WearColorRoles? = null,
+    /** Per-VIN resolved colours for cars with a custom palette override. */
+    val carColors: Map<String, WearColorRoles> = emptyMap(),
 )
 
 /** Saved climate presets per VIN, mirrored to the watch. */

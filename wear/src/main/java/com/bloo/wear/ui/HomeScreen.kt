@@ -20,7 +20,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Refresh
@@ -58,6 +61,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.links
 import kotlinx.coroutines.launch
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
@@ -86,7 +90,16 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
 
     Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = carPager, modifier = Modifier.fillMaxSize()) { page ->
-            CarTiles(vm, ui, ui.cars[wrap(page, count)], onSettings, onTrips)
+            val car = ui.cars[wrap(page, count)]
+            val carRoles = ui.settings?.carColors?.get(car.vin)
+            if (carRoles != null) {
+                // This car has a custom palette on the phone — theme its page to match.
+                MaterialTheme(colorScheme = schemeFrom(carRoles)) {
+                    CarTiles(vm, ui, car, onSettings, onTrips)
+                }
+            } else {
+                CarTiles(vm, ui, car, onSettings, onTrips)
+            }
         }
         if (count > 1) {
             Row(
@@ -113,6 +126,7 @@ private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
             add("info")
             if (car.hasLiveStatus) add("diagnostics")
             if (hasAi) add("ai")
+            add("assist")
             add("more")
         }
     }
@@ -154,6 +168,7 @@ private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
                 "info" -> InfoTile(car)
                 "diagnostics" -> DiagnosticsTile(car)
                 "ai" -> AiTile(ui, car)
+                "assist" -> AssistTile(car)
                 "more" -> MoreTile(vm, ui, car, onSettings, onTrips)
             }
         }
@@ -223,6 +238,32 @@ private fun WeatherTile(ui: WearUi, car: CarView) = TileFrame("Weather") {
     StatusRow("Feels", weatherTemp(w.feelsLikeC, f))
     w.humidity?.let { StatusRow("Humidity", "$it%") }
     StatusRow("Wind", "${w.windKph.toInt()} km/h")
+}
+
+@Composable
+private fun AssistTile(car: CarView) = TileFrame("Assist") {
+    val context = LocalContext.current
+    val links = car.brand.links
+    FilledTonalButton(
+        onClick = { WearRemote.dialOnPhone(context, links.roadsidePhone) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text("Roadside", maxLines = 1) },
+        icon = { Icon(Icons.Filled.Call, contentDescription = null) },
+    )
+    Spacer(Modifier.height(6.dp))
+    FilledTonalButton(
+        onClick = { WearRemote.openOnPhone(context, links.serviceScheduleUrl) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text("Schedule service", maxLines = 1) },
+        icon = { Icon(Icons.Filled.Build, contentDescription = null) },
+    )
+    Spacer(Modifier.height(6.dp))
+    FilledTonalButton(
+        onClick = { WearRemote.openOnPhone(context, links.ownersUrl) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text("Owner site", maxLines = 1) },
+        icon = { Icon(Icons.Filled.OpenInNew, contentDescription = null) },
+    )
 }
 
 @Composable

@@ -114,43 +114,58 @@ object WearBridge {
             customPalette = custom,
             vibrancy = appearance.vibrancy,
         )
+        // Per-car custom-palette overrides resolved to colours, so each car page
+        // on the watch can wear its own theme like the phone.
+        val carColors = appearance.carCustomPaletteIds.mapNotNull { (vin, paletteId) ->
+            val palette = appearance.customPalettes.find { it.id == paletteId } ?: return@mapNotNull null
+            val carScheme = blooColorScheme(
+                context = context, dark = dark, themeMode = appearance.themeMode,
+                dynamicColor = false, colorPalette = appearance.colorPalette,
+                customPalette = palette, vibrancy = appearance.vibrancy,
+            )
+            vin to rolesOf(carScheme)
+        }.toMap()
+
         val payload = WearSettingsPayload(
             dark = dark,
             useFahrenheit = appearance.useFahrenheit,
             uiScale = appearance.uiScale,
-            colors = WearColorRoles(
-                primary = s.primary.toArgb(),
-                onPrimary = s.onPrimary.toArgb(),
-                primaryContainer = s.primaryContainer.toArgb(),
-                onPrimaryContainer = s.onPrimaryContainer.toArgb(),
-                secondary = s.secondary.toArgb(),
-                onSecondary = s.onSecondary.toArgb(),
-                secondaryContainer = s.secondaryContainer.toArgb(),
-                onSecondaryContainer = s.onSecondaryContainer.toArgb(),
-                tertiary = s.tertiary.toArgb(),
-                onTertiary = s.onTertiary.toArgb(),
-                tertiaryContainer = s.tertiaryContainer.toArgb(),
-                onTertiaryContainer = s.onTertiaryContainer.toArgb(),
-                background = s.background.toArgb(),
-                onBackground = s.onBackground.toArgb(),
-                onSurface = s.onSurface.toArgb(),
-                onSurfaceVariant = s.onSurfaceVariant.toArgb(),
-                surfaceContainerLow = s.surfaceContainerLow.toArgb(),
-                surfaceContainer = s.surfaceContainer.toArgb(),
-                surfaceContainerHigh = s.surfaceContainerHigh.toArgb(),
-                outline = s.outline.toArgb(),
-                outlineVariant = s.outlineVariant.toArgb(),
-                error = s.error.toArgb(),
-                onError = s.onError.toArgb(),
-                errorContainer = s.errorContainer.toArgb(),
-                onErrorContainer = s.onErrorContainer.toArgb(),
-            ),
+            colors = rolesOf(s),
+            carColors = carColors,
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))
         }.asPutDataRequest().setUrgent()
         runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
     }
+
+    private fun rolesOf(s: androidx.compose.material3.ColorScheme) = WearColorRoles(
+        primary = s.primary.toArgb(),
+        onPrimary = s.onPrimary.toArgb(),
+        primaryContainer = s.primaryContainer.toArgb(),
+        onPrimaryContainer = s.onPrimaryContainer.toArgb(),
+        secondary = s.secondary.toArgb(),
+        onSecondary = s.onSecondary.toArgb(),
+        secondaryContainer = s.secondaryContainer.toArgb(),
+        onSecondaryContainer = s.onSecondaryContainer.toArgb(),
+        tertiary = s.tertiary.toArgb(),
+        onTertiary = s.onTertiary.toArgb(),
+        tertiaryContainer = s.tertiaryContainer.toArgb(),
+        onTertiaryContainer = s.onTertiaryContainer.toArgb(),
+        background = s.background.toArgb(),
+        onBackground = s.onBackground.toArgb(),
+        onSurface = s.onSurface.toArgb(),
+        onSurfaceVariant = s.onSurfaceVariant.toArgb(),
+        surfaceContainerLow = s.surfaceContainerLow.toArgb(),
+        surfaceContainer = s.surfaceContainer.toArgb(),
+        surfaceContainerHigh = s.surfaceContainerHigh.toArgb(),
+        outline = s.outline.toArgb(),
+        outlineVariant = s.outlineVariant.toArgb(),
+        error = s.error.toArgb(),
+        onError = s.onError.toArgb(),
+        errorContainer = s.errorContainer.toArgb(),
+        onErrorContainer = s.onErrorContainer.toArgb(),
+    )
 
     private fun isSystemDark(context: Context): Boolean =
         (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==

@@ -37,6 +37,22 @@
             </intent-filter>
         </activity>
 
+        <!-- Glanceable Wear OS Tile (outside the app): charge + lock at a glance,
+             with Lock/Unlock and Open actions. -->
+        <service
+            android:name=".tile.BlooTileService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@drawable/ic_bloo"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/ic_bloo" />
+        </service>
+
         <!-- Receives car snapshots + sessions from the phone, and command
              results, even when the watch UI is closed. -->
         <service

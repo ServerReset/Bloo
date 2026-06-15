@@ -15,7 +15,7 @@ object WearColors {
 }
 
 /** Build a Wear M3 [ColorScheme] from the phone's resolved role colours. */
-private fun schemeFrom(c: WearColorRoles): ColorScheme = ColorScheme(
+fun schemeFrom(c: WearColorRoles): ColorScheme = ColorScheme(
     primary = Color(c.primary),
     onPrimary = Color(c.onPrimary),
     primaryContainer = Color(c.primaryContainer),
