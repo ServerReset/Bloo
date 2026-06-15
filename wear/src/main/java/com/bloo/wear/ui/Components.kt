@@ -74,6 +74,15 @@ import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import kotlin.math.roundToInt
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.text.TextStyle
 
 /**
  * The Wear text-entry pattern: tapping launches the system input overlay
@@ -107,11 +116,16 @@ fun ChargeRing(percent: Int?, modifier: Modifier = Modifier, size: Dp = 88.dp) {
             progress = { (percent ?: 0).coerceIn(0, 100) / 100f },
             modifier = Modifier.size(size),
         )
-        Text(
-            percent?.let { "$it%" } ?: "—",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        AnimatedContent(
+            targetState = percent?.let { "$it%" } ?: "—",
+            transitionSpec = {
+                (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 3 }) togetherWith
+                (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 })
+            },
+            label = "pct",
+        ) { v ->
+            Text(v, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -407,6 +421,7 @@ fun MorphButton(
         } else {
             ButtonDefaults.filledTonalButtonColors()
         },
+        border = if (!active && !pending) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)) else null,
         label = { Text(if (pending) "Sending…" else label, maxLines = 1) },
         icon = { Icon(icon, contentDescription = null) },
     )
@@ -439,3 +454,23 @@ fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
 
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     if (fahrenheit) "${(tempC * 9 / 5 + 32).toInt()}°F" else "${tempC.toInt()}°C"
+
+@Composable
+fun AnimatedValue(
+    value: String,
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+    color: Color = Color.Unspecified,
+    fontWeight: FontWeight? = null,
+    maxLines: Int = 1,
+) {
+    AnimatedContent(
+        targetState = value,
+        transitionSpec = {
+            (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 3 }) togetherWith
+            (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 })
+        },
+        label = "animVal",
+    ) { v ->
+        Text(v, style = style, color = color, fontWeight = fontWeight, maxLines = maxLines)
+    }
+}

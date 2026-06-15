@@ -5,9 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
+import androidx.glance.LocalSize
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -50,7 +52,9 @@ import com.bloo.bluelink.data.VehicleSnapshot
  */
 class BlooWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Exact
+    override val sizeMode = SizeMode.Responsive(
+        setOf(DpSize(100.dp, 40.dp), DpSize(250.dp, 80.dp))
+    )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val widgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
@@ -61,10 +65,13 @@ class BlooWidget : GlanceAppWidget() {
 
         provideContent {
             GlanceTheme {
+                val size = LocalSize.current
+                val compact = size.height < 60.dp
                 if (snap == null) {
-                    UnconfiguredView(widgetId)
+                    if (compact) UnconfiguredCompact() else UnconfiguredView(widgetId)
                 } else {
-                    WidgetBody(widgetId, snap, actions)
+                    if (compact) CompactWidgetBody(widgetId, snap.vin, actions)
+                    else WidgetBody(widgetId, snap, actions)
                 }
             }
         }
@@ -187,6 +194,41 @@ class BlooWidget : GlanceAppWidget() {
                 colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
                 modifier = GlanceModifier.size(20.dp),
             )
+        }
+    }
+
+    @Composable
+    private fun UnconfiguredCompact() {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(GlanceTheme.colors.widgetBackground)
+                .cornerRadius(20.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "Tap to set up",
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Medium, fontSize = 12.sp),
+            )
+        }
+    }
+
+    @Composable
+    private fun CompactWidgetBody(widgetId: Int, vin: String, actions: List<WidgetAction>) {
+        Row(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(GlanceTheme.colors.widgetBackground)
+                .cornerRadius(20.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            for (i in 0 until 4) {
+                if (i > 0) Spacer(GlanceModifier.width(4.dp))
+                Pill(widgetId, vin, actions.getOrNull(i), GlanceModifier.defaultWeight().fillMaxHeight())
+            }
         }
     }
 

@@ -21,11 +21,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val ui by viewModel.ui.collectAsState()
             BlooWearTheme(ui.settings) {
-                // Honour the phone's UI scale by adjusting the font scale.
+                // Combine phone-synced scale with local watch override.
                 val density = LocalDensity.current
-                val scale = ui.settings?.uiScale ?: 1f
+                val phoneScale = ui.settings?.uiScale ?: 1f
+                val localScale = ui.localSettings.fontScale
+                val effectiveScale = phoneScale * localScale
                 CompositionLocalProvider(
-                    LocalDensity provides Density(density.density, density.fontScale * scale)
+                    LocalDensity provides Density(density.density, density.fontScale * effectiveScale)
                 ) {
                     WatchApp(viewModel)
                 }

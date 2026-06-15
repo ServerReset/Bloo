@@ -114,6 +114,7 @@ data class WearUi(
     val acLimitDraft: Int? = null,
     val dcLimitDraft: Int? = null,
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
+    val localSettings: WearLocalSettings = WearLocalSettings(),
 )
 
 private fun seatLevelOf(step: Int): SeatLevel = when (step) {
@@ -132,6 +133,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val credentialStore = CredentialStore(ctx)
     private val snapshotStore = SnapshotStore(ctx)
     private val statusCache = StatusCache(ctx)
+    private val localStore = WearLocalStore(ctx)
     private val repos = mutableMapOf<Brand, VehicleRepository>()
 
     private var vehicles: List<Vehicle> = emptyList()
@@ -162,6 +164,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             WearExtrasStore(ctx).flow.collect { e -> _ui.update { it.copy(extras = e) } }
+        }
+        viewModelScope.launch {
+            WearLocalStore(ctx).flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
         }
         bootstrap()
     }
@@ -374,7 +379,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setClimateTemp(value: Int) { _ui.update { it.copy(climateTempF = value.coerceIn(62, 82)) } }
-    fun setClimateDuration(value: Int) { _ui.update { it.copy(climateDuration = value.coerceIn(1, 30)) } }
+    fun setClimateDuration(value: Int) { _ui.update { it.copy(climateDuration = value.coerceIn(1, 10)) } }
     fun toggleDefrost() { _ui.update { it.copy(climateDefrost = !it.climateDefrost) } }
     fun toggleSteering() { _ui.update { it.copy(climateSteering = !it.climateSteering) } }
     fun setSeatDriver(step: Int) { _ui.update { it.copy(seatDriver = step.coerceIn(0, 3)) } }
@@ -384,6 +389,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setAcLimit(value: Int) { _ui.update { it.copy(acLimitDraft = value.coerceIn(50, 100)) } }
     fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
     fun dismissMessage() { _ui.update { it.copy(message = null) } }
+    fun setFontScale(scale: Float) { viewModelScope.launch { localStore.setFontScale(scale) } }
+    fun moveTileUp(key: String) {
+        val order = _ui.value.localSettings.tileOrder.toMutableList()
+        val idx = order.indexOf(key).takeIf { it > 0 } ?: return
+        order.add(idx - 1, order.removeAt(idx))
+        viewModelScope.launch { localStore.setTileOrder(order) }
+    }
+    fun moveTileDown(key: String) {
+        val order = _ui.value.localSettings.tileOrder.toMutableList()
+        val idx = order.indexOf(key).takeIf { it >= 0 && it < order.size - 1 } ?: return
+        order.add(idx + 1, order.removeAt(idx))
+        viewModelScope.launch { localStore.setTileOrder(order) }
+    }
 
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return

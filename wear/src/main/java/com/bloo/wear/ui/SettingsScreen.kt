@@ -4,13 +4,14 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -29,14 +31,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.Text
+import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import kotlinx.coroutines.launch
@@ -103,6 +108,26 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
+        // ---- Local font scale override ----
+        item {
+            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                Text("Watch text size", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "Local override · ${"%.2f".format(ui.localSettings.fontScale)}×",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SliderRow(
+                    label = "Scale",
+                    valueLabel = "${"%.1f".format(ui.localSettings.fontScale)}×",
+                    value = ((ui.localSettings.fontScale - 0.8f) / 0.1f).toInt(),
+                    min = 0,
+                    max = 6,
+                    step = 1,
+                ) { step -> vm.setFontScale(0.8f + step * 0.1f) }
+            }
+        }
+
         item {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
                 StatusRow(
@@ -136,6 +161,40 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 label = { Text("Refresh all cars") },
                 icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
             )
+        }
+
+        // ---- Tile order ----
+        item { ListHeader { Text("Tile order", textAlign = TextAlign.Center) } }
+
+        val tileOrder = ui.localSettings.tileOrder
+        items(tileOrder, key = { it }) { key ->
+            val label = WearTiles.LABELS[key] ?: key
+            val idx = tileOrder.indexOf(key)
+            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(
+                        onClick = { vm.moveTileUp(key) },
+                        enabled = idx > 0,
+                    ) {
+                        Icon(Icons.Filled.ArrowUpward, contentDescription = "Move up")
+                    }
+                    IconButton(
+                        onClick = { vm.moveTileDown(key) },
+                        enabled = idx < tileOrder.size - 1,
+                    ) {
+                        Icon(Icons.Filled.ArrowDownward, contentDescription = "Move down")
+                    }
+                }
+            }
         }
 
         item {
