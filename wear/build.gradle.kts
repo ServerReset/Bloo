@@ -90,6 +90,7 @@ dependencies {
     implementation("androidx.wear.compose:compose-foundation:$wear")
     implementation("androidx.wear.compose:compose-navigation:$wear")
     implementation("androidx.wear:wear-input:1.1.0")
+    implementation("androidx.wear:wear-remote-interactions:1.1.0")
 
     // Regular Compose primitives (Box/Column/Canvas/pager) + icons, aligned via
     // the Compose BOM so the versions match what Wear Compose is built against.

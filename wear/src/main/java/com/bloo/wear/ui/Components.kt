@@ -58,6 +58,21 @@ fun ChargeRing(percent: Int?, modifier: Modifier = Modifier) {
     }
 }
 
+/** Relative "x min ago" for a wall-clock timestamp. */
+fun relativeLabel(ms: Long?): String {
+    if (ms == null || ms <= 0) return ""
+    val d = System.currentTimeMillis() - ms
+    return when {
+        d < 60_000 -> "just now"
+        d < 3_600_000 -> "${d / 60_000} min ago"
+        d < 86_400_000 -> "${d / 3_600_000} hr ago"
+        else -> "${d / 86_400_000} d ago"
+    }
+}
+
+/** "1h 20m" / "45 min". */
+fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
+
 /** A label → value row used in the details card. */
 @Composable
 fun StatusRow(label: String, value: String, valueColor: Color? = null) {

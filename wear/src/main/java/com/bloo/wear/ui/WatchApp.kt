@@ -30,10 +30,17 @@ fun WatchApp(vm: WearViewModel) {
                 val nav = rememberSwipeDismissableNavController()
                 SwipeDismissableNavHost(navController = nav, startDestination = "home") {
                     composable("home") {
-                        HomeScreen(vm, ui, onSettings = { nav.navigate("settings") })
+                        HomeScreen(
+                            vm, ui,
+                            onSettings = { nav.navigate("settings") },
+                            onTrips = { vin -> nav.navigate("trips/$vin") },
+                        )
                     }
                     composable("settings") {
                         SettingsScreen(vm, ui)
+                    }
+                    composable("trips/{vin}") { entry ->
+                        TripsScreen(vm, ui, entry.arguments?.getString("vin") ?: "")
                     }
                 }
             }

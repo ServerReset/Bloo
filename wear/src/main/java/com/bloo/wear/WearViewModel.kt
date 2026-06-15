@@ -11,6 +11,7 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.DoorOpen
+import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.StatusCache
@@ -43,25 +44,38 @@ data class CarView(
     val climateOn: Boolean?,
     val charging: Boolean?,
     val pluggedIn: Boolean?,
-    val tempSetting: String?,
+    val chargerLabel: String?,
+    val timeToFullMin: Int?,
+    val acLimit: Int?,
+    val dcLimit: Int?,
     val fetchedAt: Long?,
     val doorsOpen: List<String>,
     val windowsOpen: List<String>,
+    val trunkOpen: Boolean,
+    val hoodOpen: Boolean,
     val tireWarning: Boolean,
     val battery12v: Int?,
+    val lowFuel: Boolean,
+    val washerLow: Boolean,
+    val brakeLow: Boolean,
+    val keyFobLow: Boolean,
     val odometer: String?,
+    val lat: Double?,
+    val lon: Double?,
     val hasLiveStatus: Boolean,
 )
 
 data class WearUi(
     val screen: WearScreen = WearScreen.Loading,
     val cars: List<CarView> = emptyList(),
+    val trips: Map<String, List<EvTrip>> = emptyMap(),
     val pending: Set<String> = emptySet(),
     val busy: Boolean = false,
     val message: String? = null,
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     val climateTempF: Int = 72,
+    val climateDefrost: Boolean = false,
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
 )
 
@@ -74,12 +88,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val statusCache = StatusCache(ctx)
     private val repos = mutableMapOf<Brand, VehicleRepository>()
 
-    // Raw state; the published [WearUi.cars] is derived from these.
     private var vehicles: List<Vehicle> = emptyList()
     private var statuses: Map<String, VehicleStatus> = emptyMap()
     private var snapshots: Map<String, com.bloo.bluelink.data.VehicleSnapshot> = emptyMap()
     private var fetchedAt: Map<String, Long> = emptyMap()
+    private var trips: Map<String, List<EvTrip>> = emptyMap()
     private var pending: Set<String> = emptySet()
+
+    // Cars whose status we've already fetched this session, so paging back and
+    // forth doesn't re-hit the (rate-limited, battery-hungry) network each time.
+    private val sessionFetched = mutableSetOf<String>()
+    private val tripsFetched = mutableSetOf<String>()
 
     private val _ui = MutableStateFlow(WearUi())
     val ui = _ui.asStateFlow()
@@ -88,7 +107,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         repos.getOrPut(brand) { repositoryFor(brand, sessionStore, credentialStore) }
 
     init {
-        // Keep the watch theme + preferences in lockstep with the phone.
         viewModelScope.launch {
             WearSettingsStore(ctx).flow.collect { s -> _ui.update { it.copy(settings = s) } }
         }
@@ -108,7 +126,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.update { it.copy(screen = WearScreen.SignedOut) }
             } else {
                 _ui.update { it.copy(accounts = credentialStore.loadAll().map { c -> c.email }) }
-                publish(WearScreen.Ready)
                 loadGarage()
             }
         }
@@ -155,8 +172,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching { credentialStore.clear(b) }
             }
             repos.clear()
-            vehicles = emptyList(); statuses = emptyMap()
-            _ui.update { it.copy(screen = WearScreen.SignedOut, cars = emptyList(), accounts = emptyList()) }
+            sessionFetched.clear(); tripsFetched.clear()
+            vehicles = emptyList(); statuses = emptyMap(); trips = emptyMap()
+            _ui.update { it.copy(screen = WearScreen.SignedOut, cars = emptyList(), trips = emptyMap(), accounts = emptyList()) }
         }
     }
 
@@ -167,21 +185,27 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val fetched = brands.flatMap { b ->
             runCatching { BlueLinkGate.statusMutex.withLock { repoFor(b).vehicles() } }.getOrElse { emptyList() }
         }
-        if (fetched.isNotEmpty()) {
-            vehicles = fetched
-            publish(WearScreen.Ready)
-            fetched.forEach { refreshStatus(it.vin, surface = false) }
-        } else if (snapshots.isNotEmpty()) {
+        vehicles = when {
+            fetched.isNotEmpty() -> fetched
             // No network but the phone already synced cars — show those.
-            vehicles = snapshots.values.map { it.toVehicle() }
-            publish(WearScreen.Ready)
-        } else {
-            publish(WearScreen.Ready)
+            snapshots.isNotEmpty() -> snapshots.values.map { it.toVehicle() }
+            else -> emptyList()
         }
+        publish(WearScreen.Ready)
+        // Status is fetched lazily, per car, as pages are shown (see onCarShown).
+    }
+
+    /** Called when a car page becomes visible — fetch its status once per session. */
+    fun onCarShown(vin: String) {
+        if (vin in sessionFetched) return
+        if (vehicles.none { it.vin == vin }) return
+        sessionFetched.add(vin)
+        refreshStatus(vin, surface = false)
     }
 
     fun refreshAll() {
-        vehicles.forEach { refreshStatus(it.vin, surface = false) }
+        sessionFetched.clear()
+        vehicles.firstOrNull()?.let { onCarShown(it.vin) }
         refreshConnection()
     }
 
@@ -198,9 +222,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     publish()
                 }
             }.onFailure { e ->
+                sessionFetched.remove(vin) // allow a retry
                 if (surface) _ui.update { it.copy(message = "Couldn't refresh") }
                 AppLog.log("Watch refresh failed: ${e.message}")
             }
+        }
+    }
+
+    /** Recent EV trips, fetched lazily the first time the Trips screen opens. */
+    fun loadTrips(vin: String) {
+        if (vin in tripsFetched) return
+        val v = vehicles.firstOrNull { it.vin == vin } ?: return
+        tripsFetched.add(vin)
+        mark("$vin:trips") {
+            runCatching { BlueLinkGate.statusMutex.withLock { repoFor(v.brand).trips(v) } }
+                .onSuccess { list -> trips = trips + (vin to list); publish() }
+                .onFailure { tripsFetched.remove(vin); AppLog.log("Watch trips failed: ${it.message}") }
         }
     }
 
@@ -214,17 +251,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
         if (st?.airCtrlOn == true) { repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) } }
         else {
-            repo.startClimate(v, ClimateRequest(tempF = _ui.value.climateTempF, defrost = false, durationMinutes = 10))
+            repo.startClimate(v, ClimateRequest(
+                tempF = _ui.value.climateTempF,
+                defrost = _ui.value.climateDefrost,
+                durationMinutes = 10,
+            ))
             flip(vin) { it.copy(airCtrlOn = true) }
         }
     }
 
     fun toggleCharge(vin: String) = command(vin, "charge") { v, repo, st ->
-        if (st?.evStatus?.batteryCharge == true) { repo.stopCharge(v) } else { repo.startCharge(v) }
+        if (st?.evStatus?.batteryCharge == true) repo.stopCharge(v) else repo.startCharge(v)
     }
 
     fun setClimateTemp(delta: Int) {
         _ui.update { it.copy(climateTempF = (it.climateTempF + delta).coerceIn(62, 82)) }
+    }
+
+    fun toggleDefrost() {
+        _ui.update { it.copy(climateDefrost = !it.climateDefrost) }
     }
 
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
@@ -234,12 +279,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 BlueLinkGate.statusMutex.withLock { block(v, repoFor(v.brand), statuses[vin]) }
             }.onSuccess {
                 publish()
+                sessionFetched.remove(vin)
                 refreshStatus(vin, surface = false)
             }.onFailure { e ->
-                // No watch connectivity? Let the phone run it instead.
                 val relayed = runCatching { WearComms.send(ctx, toWearCommand(vin, action)) }.isSuccess
                 if (!relayed) _ui.update { it.copy(message = e.message ?: "Command failed") }
-                AppLog.log("Watch command ${action} failed: ${e.message}")
+                AppLog.log("Watch command $action failed: ${e.message}")
             }
         }
     }
@@ -253,6 +298,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             else -> com.bloo.bluelink.data.WearAction.REFRESH
         },
         tempF = _ui.value.climateTempF,
+        defrost = _ui.value.climateDefrost,
     )
 
     private fun flip(vin: String, change: (VehicleStatus) -> VehicleStatus) {
@@ -282,6 +328,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             cur.copy(
                 screen = screen ?: cur.screen,
                 cars = vehicles.map { buildCarView(it) },
+                trips = trips,
                 pending = pending,
             )
         }
@@ -291,7 +338,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val s = statuses[v.vin]
         val snap = snapshots[v.vin]
         val hasBattery = v.isEv
-        val tire = s?.tirePressureLamp?.hasWarning == true
+        val ev = s?.evStatus
+        val coord = s?.vehicleLocation?.coord
         return CarView(
             vin = v.vin,
             name = v.name,
@@ -301,15 +349,26 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             rangeMi = s?.rangeMiFor(hasBattery) ?: snap?.rangeMi,
             locked = s?.doorLock ?: snap?.locked,
             climateOn = s?.airCtrlOn ?: snap?.climateOn,
-            charging = s?.evStatus?.batteryCharge ?: snap?.charging,
-            pluggedIn = s?.evStatus?.batteryPlugin?.let { it != 0 },
-            tempSetting = s?.airTemp?.value,
+            charging = ev?.batteryCharge ?: snap?.charging,
+            pluggedIn = ev?.batteryPlugin?.let { it != 0 },
+            chargerLabel = when (ev?.batteryPlugin) { 1 -> "DC fast"; 2 -> "AC"; else -> null },
+            timeToFullMin = ev?.remainTime2?.atc?.value?.toInt(),
+            acLimit = ev?.reservChargeInfos?.level(1),
+            dcLimit = ev?.reservChargeInfos?.level(0),
             fetchedAt = fetchedAt[v.vin],
             doorsOpen = (s?.doorOpen ?: DoorOpen()).openLabels(),
             windowsOpen = (s?.windowOpen ?: WindowOpen()).openLabels(),
-            tireWarning = tire,
+            trunkOpen = s?.trunkOpen == true,
+            hoodOpen = s?.hoodOpen == true,
+            tireWarning = s?.tirePressureLamp?.hasWarning == true,
             battery12v = s?.battery?.batSoc,
+            lowFuel = s?.lowFuelLight == true,
+            washerLow = s?.washerFluidStatus == true,
+            brakeLow = s?.breakOilStatus == true,
+            keyFobLow = s?.smartKeyBatteryWarning == true,
             odometer = v.odometer,
+            lat = coord?.lat,
+            lon = coord?.lon,
             hasLiveStatus = s != null,
         )
     }
