@@ -3,8 +3,10 @@ package com.bloo.wear.ui
 import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,21 +17,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
@@ -119,11 +129,13 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val mx = (xf - xt).toFloat()
     val my = (yf - yt).toFloat()
     val marker = MaterialTheme.colorScheme.error
+    val context = androidx.compose.ui.platform.LocalContext.current
     Box(modifier.size(116.dp).clip(RoundedCornerShape(18.dp))) {
         AsyncImage(
             model = url,
             contentDescription = "Map",
             contentScale = ContentScale.Crop,
+            imageLoader = com.bloo.wear.WearImage.loader(context),
             modifier = Modifier.matchParentSize(),
         )
         Canvas(Modifier.matchParentSize()) {
@@ -166,8 +178,7 @@ fun StatusRow(label: String, value: String, valueColor: Color? = null) {
     }
 }
 
-/** A labelled value + draggable slider + fine –/+ buttons. The slider consumes
- *  horizontal drags, so dragging it never switches cars in the pager. */
+/** A labelled value + the phone's exact custom slider (ported). */
 @Composable
 fun SliderRow(
     label: String,
@@ -180,17 +191,20 @@ fun SliderRow(
     onValue: (Int) -> Unit,
 ) {
     val fill = accent ?: MaterialTheme.colorScheme.primary
+    val steps = ((max - min) / step - 1).coerceAtLeast(0)
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(valueLabel, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            MiniButton("–") { onValue(value - step) }
-            SliderTrack(value, min, max, step, fill, Modifier.weight(1f), onValue)
-            MiniButton("+") { onValue(value + step) }
-        }
+        Spacer(Modifier.height(2.dp))
+        AnimatedSlider(
+            value = value.toFloat(),
+            onValueChange = { onValue(it.roundToInt()) },
+            valueRange = min.toFloat()..max.toFloat(),
+            steps = steps,
+            accent = fill,
+        )
     }
 }
 
@@ -204,16 +218,162 @@ fun tempColor(tempF: Int): Color {
     return if (t < 0.5f) lerp(cool, mid, t * 2f) else lerp(mid, warm, (t - 0.5f) * 2f)
 }
 
-/** A small circular –/+ control, matching the phone's round buttons. */
+/**
+ * The phone app's fully custom slider (ported verbatim from Screens.kt's
+ * AnimatedSlider): hand-drawn track + tall thumb + tick dots, live finger
+ * tracking with a small overshoot, and a soft spring settle onto the nearest
+ * step. Claims only horizontal drags, so vertical scrolling/paging still works.
+ */
 @Composable
-private fun MiniButton(text: String, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.size(40.dp),
-        shape = CircleShape,
-        colors = ButtonDefaults.filledTonalButtonColors(),
-        label = { Text(text) },
-    )
+fun AnimatedSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int = 0,
+    accent: Color = MaterialTheme.colorScheme.primary,
+) {
+    val haptics = LocalHapticFeedback.current
+    val scheme = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var widthPx by remember { mutableFloatStateOf(0f) }
+
+    val anim = remember { Animatable(value) }
+    var dragging by remember { mutableStateOf(false) }
+    var prevStep by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
+
+    LaunchedEffect(value) {
+        if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
+    }
+
+    val trackThickness = 14.dp
+    val thumbW = 6.dp
+    val thumbH = 44.dp
+    val gap = 6.dp
+    val dotR = 2.5.dp
+    val edgePad = 14.dp
+    val edgePadPx = with(density) { edgePad.toPx() }
+
+    val inactiveColor = scheme.surfaceContainerHigh
+    val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
+    val dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f)
+
+    fun rawForX(x: Float): Float {
+        val travel = (widthPx - 2 * edgePadPx).coerceAtLeast(1f)
+        val frac = (x - edgePadPx) / travel
+        return valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
+    }
+    fun trackTo(x: Float) {
+        val raw = rawForX(x)
+        val span = (valueRange.endInclusive - valueRange.start)
+        val overshoot = span * 0.045f
+        val visual = raw.coerceIn(valueRange.start - overshoot, valueRange.endInclusive + overshoot)
+        scope.launch { anim.snapTo(visual) }
+        val clamped = raw.coerceIn(valueRange.start, valueRange.endInclusive)
+        val s = snapToStep(clamped, valueRange, steps)
+        if (steps > 0 && s != prevStep) {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            prevStep = s
+        }
+        onValueChange(s)
+    }
+    fun settleTo(target: Float) {
+        prevStep = target
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        onValueChange(target)
+        scope.launch {
+            anim.animateTo(target, animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow))
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(thumbH)
+            .onSizeChanged { widthPx = it.width.toFloat() }
+            .pointerInput(valueRange, steps) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val slop = viewConfiguration.touchSlop
+                    var claimed = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            if (!claimed) {
+                                change.consume()
+                                settleTo(snapToStep(rawForX(down.position.x), valueRange, steps))
+                            }
+                            break
+                        }
+                        if (!claimed) {
+                            val dx = kotlin.math.abs(change.position.x - down.position.x)
+                            val dy = kotlin.math.abs(change.position.y - down.position.y)
+                            when {
+                                dx > slop && dx >= dy -> {
+                                    claimed = true
+                                    dragging = true
+                                    change.consume()
+                                    trackTo(change.position.x)
+                                }
+                                dy > slop -> break
+                            }
+                        } else if (change.positionChanged()) {
+                            trackTo(change.position.x)
+                            change.consume()
+                        }
+                    }
+                    if (claimed) {
+                        dragging = false
+                        settleTo(snapToStep(anim.value, valueRange, steps))
+                    }
+                }
+            }
+            .progressSemantics(anim.value, valueRange, steps),
+    ) {
+        Canvas(Modifier.fillMaxWidth().height(thumbH)) {
+            val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
+            val frac2 = (anim.value - valueRange.start) / span2
+            val halfThumb = thumbW.toPx() / 2f
+            val gapPx = gap.toPx()
+            val padPx = edgePad.toPx()
+            val travel = (size.width - 2 * padPx).coerceAtLeast(0f)
+            val thumbX = padPx + travel * frac2
+            val cy = size.height / 2f
+            val th = trackThickness.toPx()
+            val top = cy - th / 2f
+            val radius = CornerRadius(th / 2f)
+            val cut = halfThumb + gapPx
+
+            val inStart = (thumbX + cut).coerceAtMost(size.width)
+            if (inStart < size.width) {
+                drawRoundRect(inactiveColor, topLeft = Offset(inStart, top), size = Size(size.width - inStart, th), cornerRadius = radius)
+            }
+            val acEnd = (thumbX - cut).coerceAtLeast(0f)
+            if (acEnd > 0f) {
+                drawRoundRect(accent, topLeft = Offset(0f, top), size = Size(acEnd, th), cornerRadius = radius)
+            }
+            if (steps > 0) {
+                val n = steps + 2
+                val rPx = dotR.toPx()
+                for (i in 0 until n) {
+                    val tf = i.toFloat() / (n - 1)
+                    val x = padPx + travel * tf
+                    if (kotlin.math.abs(x - thumbX) < cut) continue
+                    drawCircle(if (x <= thumbX) dotOnActive else dotOnInactive, rPx, Offset(x, cy))
+                }
+            }
+            val twPx = thumbW.toPx()
+            drawRoundRect(accent, topLeft = Offset(thumbX - twPx / 2f, 0f), size = Size(twPx, size.height), cornerRadius = CornerRadius(twPx / 2f))
+        }
+    }
+}
+
+private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
+    if (steps <= 0) return v.coerceIn(range.start, range.endInclusive)
+    val inc = (range.endInclusive - range.start) / (steps + 1)
+    val snapped = range.start + Math.round((v - range.start) / inc) * inc
+    return snapped.coerceIn(range.start, range.endInclusive)
 }
 
 /** The app's pill→rounded-square morphing button, for Wear. */
@@ -250,35 +410,6 @@ fun MorphButton(
         label = { Text(if (pending) "Sending…" else label, maxLines = 1) },
         icon = { Icon(icon, contentDescription = null) },
     )
-}
-
-@Composable
-private fun SliderTrack(value: Int, min: Int, max: Int, step: Int, fillColor: Color, modifier: Modifier, onValue: (Int) -> Unit) {
-    val trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val range = (max - min).coerceAtLeast(1)
-    var width by remember { mutableIntStateOf(1) }
-    Canvas(
-        modifier
-            .height(26.dp)
-            .onSizeChanged { width = it.width.coerceAtLeast(1) }
-            .pointerInput(min, max, step) {
-                detectHorizontalDragGestures { change, _ ->
-                    change.consume()
-                    val frac = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
-                    val raw = min + frac * range
-                    onValue(((raw / step).roundToInt() * step).coerceIn(min, max))
-                }
-            }
-    ) {
-        val cy = size.height / 2f
-        val r = size.height / 2f
-        val thickness = size.height * 0.5f
-        drawLine(trackColor, Offset(r, cy), Offset(size.width - r, cy), strokeWidth = thickness, cap = StrokeCap.Round)
-        val frac = (value - min).toFloat() / range
-        val x = r + (size.width - 2 * r) * frac
-        drawLine(fillColor, Offset(r, cy), Offset(x, cy), strokeWidth = thickness, cap = StrokeCap.Round)
-        drawCircle(fillColor, radius = size.height * 0.45f, center = Offset(x, cy))
-    }
 }
 
 // ---- Weather helpers (mirror the phone's WeatherCode mapping) -------------

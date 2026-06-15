@@ -53,6 +53,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.AnchorType
+import androidx.wear.compose.foundation.CurvedLayout
+import androidx.wear.compose.foundation.curvedComposable
+import androidx.wear.compose.foundation.curvedRow
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.FilledTonalButton
@@ -101,12 +105,8 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                 CarTiles(vm, ui, car, onSettings, onTrips)
             }
         }
-        if (count > 1) {
-            Row(
-                Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) { repeat(count) { Dot(it == wrap(carPager.currentPage, count)) } }
-        }
+        // Curved car indicator along the bottom arc.
+        CurvedIndicator(count, wrap(carPager.currentPage, count), anchor = 90f)
     }
 }
 
@@ -172,13 +172,8 @@ private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
                 "more" -> MoreTile(vm, ui, car, onSettings, onTrips)
             }
         }
-        if (count > 1) {
-            Column(
-                Modifier.align(Alignment.CenterEnd).padding(end = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) { repeat(count) { Dot(it == wrap(vPager.currentPage, count)) } }
-        }
+        // Curved tile indicator along the right arc.
+        CurvedIndicator(count, wrap(vPager.currentPage, count), anchor = 0f)
     }
 }
 
@@ -484,10 +479,25 @@ private fun TileFrame(title: String, content: @Composable ColumnScope.() -> Unit
     }
 }
 
+/** A page indicator whose dots curve along the round screen's edge. */
 @Composable
-private fun Dot(selected: Boolean) {
-    Box(
-        Modifier.size(if (selected) 7.dp else 5.dp).clip(CircleShape)
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
-    )
+private fun CurvedIndicator(count: Int, current: Int, anchor: Float) {
+    if (count <= 1) return
+    val selected = MaterialTheme.colorScheme.primary
+    val unselected = MaterialTheme.colorScheme.outlineVariant
+    CurvedLayout(modifier = Modifier.fillMaxSize(), anchor = anchor, anchorType = AnchorType.Center) {
+        curvedRow {
+            repeat(count) { i ->
+                curvedComposable {
+                    Box(
+                        Modifier
+                            .padding(1.5.dp)
+                            .size(if (i == current) 7.dp else 5.dp)
+                            .clip(CircleShape)
+                            .background(if (i == current) selected else unselected)
+                    )
+                }
+            }
+        }
+    }
 }
