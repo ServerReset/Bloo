@@ -109,6 +109,8 @@ data class WearUi(
     val climateSteering: Boolean = false,
     val seatDriver: Int = 0,   // 0 off, 1 low, 2 med, 3 high (heat)
     val seatPassenger: Int = 0,
+    val seatRearLeft: Int = 0,
+    val seatRearRight: Int = 0,
     val acLimitDraft: Int? = null,
     val dcLimitDraft: Int? = null,
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
@@ -328,6 +330,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 steeringWheelHeat = u.climateSteering,
                 seatFrontLeft = seatLevelOf(u.seatDriver),
                 seatFrontRight = seatLevelOf(u.seatPassenger),
+                seatRearLeft = seatLevelOf(u.seatRearLeft),
+                seatRearRight = seatLevelOf(u.seatRearRight),
             ))
             flip(vin) { it.copy(airCtrlOn = true) }
         }
@@ -375,8 +379,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleSteering() { _ui.update { it.copy(climateSteering = !it.climateSteering) } }
     fun setSeatDriver(step: Int) { _ui.update { it.copy(seatDriver = step.coerceIn(0, 3)) } }
     fun setSeatPassenger(step: Int) { _ui.update { it.copy(seatPassenger = step.coerceIn(0, 3)) } }
+    fun setSeatRearLeft(step: Int) { _ui.update { it.copy(seatRearLeft = step.coerceIn(0, 3)) } }
+    fun setSeatRearRight(step: Int) { _ui.update { it.copy(seatRearRight = step.coerceIn(0, 3)) } }
     fun setAcLimit(value: Int) { _ui.update { it.copy(acLimitDraft = value.coerceIn(50, 100)) } }
     fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
+    fun dismissMessage() { _ui.update { it.copy(message = null) } }
 
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return

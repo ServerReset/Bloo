@@ -110,4 +110,7 @@ dependencies {
     implementation("androidx.wear.protolayout:protolayout:1.2.1")
     implementation("androidx.wear.protolayout:protolayout-material:1.2.1")
     implementation("com.google.guava:guava:33.0.0-android")
+
+    // Watch-face complications (charge % slot, ranged value slot).
+    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
 }

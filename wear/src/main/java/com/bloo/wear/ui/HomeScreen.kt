@@ -1,6 +1,12 @@
 package com.bloo.wear.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -18,10 +24,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -30,8 +40,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -40,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +80,7 @@ import com.bloo.wear.WearRemote
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import com.bloo.wear.seatStepLabels
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private fun wrap(index: Int, count: Int) = ((index % count) + count) % count
@@ -103,9 +117,9 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
 }
 
 /**
- * One car's content as a Wear [ScalingLazyColumn]: cards size to the screen width
- * and scale/fade toward the top & bottom edges as you scroll, the classic Wear
- * morphing-scroll. Rotary (bezel / crown) scrolls it.
+ * One car's content as a morphing-scroll [ScalingLazyColumn]. Cards scale/fade
+ * at the edges. Rotary (bezel / crown) scrolls; at the very top a strong upward
+ * flick triggers a network refresh.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -116,45 +130,92 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
     LaunchedEffect(car.vin) { runCatching { focusRequester.requestFocus() } }
 
     val round = LocalConfiguration.current.isScreenRound
-    ScalingLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .onRotaryScrollEvent { e ->
-                scope.launch { state.scrollBy(e.verticalScrollPixels) }
-                true
+    val refreshing = "${car.vin}:refresh" in ui.pending
+
+    // FloatArray is stable across recompositions — mutate the slot, no State needed.
+    val overscrollAccum = remember { floatArrayOf(0f) }
+
+    Box(Modifier.fillMaxSize()) {
+        ScalingLazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { e ->
+                    val atTop = state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0
+                    if (atTop && e.verticalScrollPixels < 0) {
+                        overscrollAccum[0] += e.verticalScrollPixels
+                        if (overscrollAccum[0] < -120f && !refreshing) {
+                            overscrollAccum[0] = 0f
+                            scope.launch { vm.refreshStatus(car.vin) }
+                        }
+                    } else {
+                        overscrollAccum[0] = 0f
+                        scope.launch { state.scrollBy(e.verticalScrollPixels) }
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
+            state = state,
+            contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            item { CarHeader(car, refreshing) }
+            item { AlertsCard(car) }
+            item { SummaryCard(car, ui) }
+            item {
+                MorphButton(
+                    label = if (car.locked == true) "Locked" else "Unlocked",
+                    icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    active = car.locked == true,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = "${car.vin}:doors" in ui.pending,
+                    onClick = { vm.toggleLock(car.vin) },
+                )
             }
-            .focusRequester(focusRequester)
-            .focusable(),
-        state = state,
-        contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        item { Text(car.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1) }
-        item { SummaryCard(car) }
-        item {
-            MorphButton(
-                label = if (car.locked == true) "Locked" else "Unlocked",
-                icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                active = car.locked == true,
-                activeColor = MaterialTheme.colorScheme.primary,
-                pending = "${car.vin}:doors" in ui.pending,
-                onClick = { vm.toggleLock(car.vin) },
-            )
+            item { ClimateCard(vm, ui, car) }
+            item { ComfortCard(vm, ui, car) }
+            if (ui.presets[car.vin]?.isNotEmpty() == true) item { PresetsCard(vm, ui, car) }
+            if (car.hasBattery) {
+                item { ChargeCard(vm, ui, car) }
+                item { LimitsCard(vm, ui, car) }
+            }
+            if (car.lat != null && car.lon != null) item { LocationCard(vm, ui, car) }
+            if (ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null) item { WeatherCard(ui, car) }
+            item { InfoCard(car) }
+            if (car.hasLiveStatus) item { DiagnosticsCard(car) }
+            if (!ui.extras.ai[car.vin].isNullOrBlank()) item { AiCard(ui, car) }
+            item { AssistCard(car) }
+            item { MoreCard(vm, ui, car, onSettings, onTrips) }
         }
-        item { ClimateCard(vm, ui, car) }
-        item { ComfortCard(vm, ui) }
-        if (ui.presets[car.vin]?.isNotEmpty() == true) item { PresetsCard(vm, ui, car) }
-        if (car.hasBattery) {
-            item { ChargeCard(vm, ui, car) }
-            item { LimitsCard(vm, ui, car) }
+
+        // Auto-dismissing message snackbar at the bottom.
+        if (ui.message != null) {
+            LaunchedEffect(ui.message) {
+                delay(3500)
+                vm.dismissMessage()
+            }
         }
-        if (car.lat != null && car.lon != null) item { LocationCard(vm, ui, car) }
-        if (ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null) item { WeatherCard(ui, car) }
-        item { InfoCard(car) }
-        if (car.hasLiveStatus) item { DiagnosticsCard(car) }
-        if (!ui.extras.ai[car.vin].isNullOrBlank()) item { AiCard(ui, car) }
-        item { AssistCard(car) }
-        item { MoreCard(vm, ui, car, onSettings, onTrips) }
+        AnimatedVisibility(
+            visible = ui.message != null,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut(),
+        ) {
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable { vm.dismissMessage() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    ui.message ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                )
+            }
+        }
     }
 }
 
@@ -171,17 +232,84 @@ private fun SectionCard(title: String?, content: @Composable ColumnScope.() -> U
     }
 }
 
+/** Car name + live status icon badges. */
 @Composable
-private fun SummaryCard(car: CarView) = SectionCard(null) {
+private fun CarHeader(car: CarView, refreshing: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            car.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        if (refreshing) {
+            Icon(Icons.Filled.Refresh, contentDescription = "Refreshing", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+        }
+        if (car.engineOn) {
+            Icon(Icons.Filled.DirectionsCar, contentDescription = "Engine on", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(14.dp))
+        }
+        if (car.charging == true) {
+            Icon(Icons.Filled.Bolt, contentDescription = "Charging", tint = WearColors.chargeGreen, modifier = Modifier.size(14.dp))
+        }
+        val hasAlert = car.doorsOpen.isNotEmpty() || car.trunkOpen || car.hoodOpen || car.tireWarning || car.lowFuel || car.brakeLow || car.washerLow || car.keyFobLow
+        if (hasAlert) {
+            Icon(Icons.Filled.Warning, contentDescription = "Alert", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+/** Alert card — shown only when there are open doors/windows/warnings. */
+@Composable
+private fun AlertsCard(car: CarView) {
+    val warnings = buildList {
+        if (car.doorsOpen.isNotEmpty()) add("Doors" to car.doorsOpen.joinToString(", "))
+        if (car.windowsOpen.isNotEmpty()) add("Windows" to car.windowsOpen.joinToString(", "))
+        if (car.trunkOpen) add("Trunk" to "Open")
+        if (car.hoodOpen) add("Hood" to "Open")
+        if (car.tireWarning) add("Tires" to "Check")
+        if (car.lowFuel) add("Fuel" to "Low")
+        if (car.washerLow) add("Washer fluid" to "Low")
+        if (car.brakeLow) add("Brake fluid" to "Low")
+        if (car.keyFobLow) add("Key fob" to "Low battery")
+    }
+    if (warnings.isEmpty()) return
+    val errColor = MaterialTheme.colorScheme.error
+    SectionCard(null) {
+        warnings.forEach { (label, value) -> StatusRow(label, value, valueColor = errColor) }
+    }
+}
+
+@Composable
+private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ChargeRing(car.percent, size = 60.dp)
         Column {
-            Text(car.rangeMi?.let { "$it mi" } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            car.rangeMi?.let {
+                Text("$it mi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            } ?: Text("—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(if (car.hasBattery) "Battery" else "Fuel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (car.charging == true) Text("Charging", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
+            when {
+                car.charging == true && car.timeToFullMin != null && car.timeToFullMin > 0 ->
+                    Text("${fmtMinutes(car.timeToFullMin)} to full", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
+                car.charging == true ->
+                    Text("Charging", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
+                car.pluggedIn == true ->
+                    Text("Plugged in", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             val rel = relativeLabel(car.fetchedAt)
             if (rel.isNotBlank()) Text(rel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+    // 12V battery hint row
+    car.battery12v?.let { v12 ->
+        Spacer(Modifier.height(4.dp))
+        val c = if (v12 < 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+        StatusRow("12V battery", "$v12%", valueColor = c)
     }
 }
 
@@ -203,11 +331,18 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 }
 
 @Composable
-private fun ComfortCard(vm: WearViewModel, ui: WearUi) = SectionCard("Comfort") {
+private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort") {
     SwitchButton(checked = ui.climateSteering, onCheckedChange = { vm.toggleSteering() }, modifier = Modifier.fillMaxWidth(), label = { Text("Steering heat") })
     Spacer(Modifier.height(4.dp))
     SliderRow("Driver seat", seatStepLabels[ui.seatDriver], ui.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(it) }
     SliderRow("Passenger", seatStepLabels[ui.seatPassenger], ui.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(it) }
+    // Rear seats only when the live status shows they exist (non-null seatRl/Rr from a fetch).
+    if (car.seatRl != null || car.seatRr != null) {
+        Spacer(Modifier.height(2.dp))
+        SliderRow("Rear left", seatStepLabels[ui.seatRearLeft], ui.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(it) }
+        SliderRow("Rear right", seatStepLabels[ui.seatRearRight], ui.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(it) }
+    }
+    Spacer(Modifier.height(2.dp))
     Text("Applied when you start climate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
@@ -302,11 +437,18 @@ private fun WeatherCard(ui: WearUi, car: CarView) = SectionCard("Weather") {
             Text(weatherTemp(w.tempC, f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(weatherLabel(w.code), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        // High / low column
+        if (w.highC != null || w.lowC != null) {
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
+                w.highC?.let { Text("H: ${weatherTemp(it, f)}", style = MaterialTheme.typography.labelSmall) }
+                w.lowC?.let { Text("L: ${weatherTemp(it, f)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
     }
     Spacer(Modifier.height(2.dp))
     StatusRow("Feels", weatherTemp(w.feelsLikeC, f))
     w.humidity?.let { StatusRow("Humidity", "$it%") }
-    StatusRow("Wind", "${w.windKph.toInt()} km/h")
+    if (w.windKph > 0) StatusRow("Wind", "${w.windKph.toInt()} km/h")
 }
 
 @Composable
@@ -316,8 +458,18 @@ private fun InfoCard(car: CarView) = SectionCard("Info") {
     StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
     StatusRow("Defrost", if (car.defrostOn) "On" else "Off")
     StatusRow("Accessory", if (car.accessoryOn) "On" else "Off")
-    StatusRow("Doors", if (car.doorsOpen.isEmpty()) "Closed" else car.doorsOpen.joinToString())
-    StatusRow("Windows", if (car.windowsOpen.isEmpty()) "Closed" else car.windowsOpen.joinToString())
+    val doorsLabel = when {
+        car.doorsOpen.isEmpty() -> "All closed"
+        car.doorsOpen.size == 1 -> car.doorsOpen.first()
+        else -> "${car.doorsOpen.size} open"
+    }
+    StatusRow("Doors", doorsLabel, valueColor = if (car.doorsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
+    val winsLabel = when {
+        car.windowsOpen.isEmpty() -> "All closed"
+        car.windowsOpen.size == 1 -> car.windowsOpen.first()
+        else -> "${car.windowsOpen.size} open"
+    }
+    StatusRow("Windows", winsLabel, valueColor = if (car.windowsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
     if (car.trunkOpen) StatusRow("Trunk", "Open", valueColor = MaterialTheme.colorScheme.error)
     if (car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
     StatusRow("VIN", car.vin.takeLast(6))
@@ -327,9 +479,6 @@ private fun InfoCard(car: CarView) = SectionCard("Info") {
 @Composable
 private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics") {
     val err = MaterialTheme.colorScheme.error
-    car.tempSetting?.let { StatusRow("Set temp", "$it°") }
-    if (car.hasBattery) car.rangeMi?.let { StatusRow("Range", "$it mi") }
-    StatusRow("Plug", car.chargerLabel ?: (if (car.pluggedIn == true) "Plugged in" else "Unplugged"))
     car.tireAll?.let { StatusRow("Tire avg", "$it psi") }
     if (car.tireFl) StatusRow("Tire FL", "Check", valueColor = err)
     if (car.tireFr) StatusRow("Tire FR", "Check", valueColor = err)
@@ -338,20 +487,23 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics") {
     if (!car.tireFl && !car.tireFr && !car.tireRl && !car.tireRr && car.tireAll == null) {
         StatusRow("Tires", if (car.tireWarning) "Check" else "OK", valueColor = if (car.tireWarning) err else null)
     }
-    car.battery12v?.let { StatusRow("12V", "$it%" + (car.battery12vHealth?.let { h -> " · $h" } ?: "")) }
-    car.fuelLevel?.let { StatusRow("Fuel", "$it%") }
-    if (car.lowFuel) StatusRow("Fuel", "Low", valueColor = err)
+    car.battery12v?.let { v12 ->
+        val h = car.battery12vHealth?.let { " · $it" } ?: ""
+        StatusRow("12V", "$v12%$h", valueColor = if (v12 < 20) err else null)
+    }
+    car.fuelLevel?.let { StatusRow("Fuel", "$it%", valueColor = if (car.lowFuel) err else null) }
     if (car.washerLow) StatusRow("Washer", "Low", valueColor = err)
     if (car.brakeLow) StatusRow("Brake fluid", "Low", valueColor = err)
     if (car.keyFobLow) StatusRow("Key fob", "Low battery", valueColor = err)
-    if (car.steerHeat) StatusRow("Steering", "Heating")
-    if (car.mirrorHeat) StatusRow("Mirrors", "Heating")
+    if (car.steerHeat) StatusRow("Steering", "Heating", valueColor = WearColors.heat)
+    if (car.mirrorHeat) StatusRow("Mirrors", "Heating", valueColor = WearColors.heat)
     if (car.rearDefrost) StatusRow("Rear defrost", "On")
     seatLabel(car.seatFl)?.let { StatusRow("Seat FL", it) }
     seatLabel(car.seatFr)?.let { StatusRow("Seat FR", it) }
     seatLabel(car.seatRl)?.let { StatusRow("Seat RL", it) }
     seatLabel(car.seatRr)?.let { StatusRow("Seat RR", it) }
     car.timeToFullMin?.takeIf { it > 0 }?.let { StatusRow("Time to full", fmtMinutes(it)) }
+    if (car.chargerLabel != null) StatusRow("Charger", car.chargerLabel)
 }
 
 @Composable
@@ -396,7 +548,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         onClick = { vm.refreshStatus(car.vin) },
         enabled = "${car.vin}:refresh" !in ui.pending,
         modifier = Modifier.fillMaxWidth(),
-        label = { Text("Refresh") },
+        label = { Text(if ("${car.vin}:refresh" in ui.pending) "Refreshing…" else "Refresh") },
         icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
     )
     if (car.hasBattery && car.tripsSupported) {
