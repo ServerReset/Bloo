@@ -1,6 +1,8 @@
 package com.bloo.wear
 
+import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.WearSync
+import com.bloo.wear.tile.BlooTileService
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
@@ -26,16 +28,25 @@ class WearListenerService : WearableListenerService() {
             item.uri.path to raw
         }
         if (updates.isEmpty()) return
+        var tileNeedsRefresh = false
         runBlocking {
             updates.forEach { (path, raw) ->
                 when (path) {
-                    WearSync.PATH_STATE -> WearStateWriter.persistState(applicationContext, raw)
+                    WearSync.PATH_STATE -> {
+                        WearStateWriter.persistState(applicationContext, raw)
+                        tileNeedsRefresh = true
+                    }
                     WearSync.PATH_AUTH -> WearStateWriter.persistAuth(applicationContext, raw)
                     WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(applicationContext, raw)
                     WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(applicationContext, raw)
                     WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(applicationContext, raw)
                 }
             }
+        }
+        // Push a tile refresh so the glanceable tile updates immediately when the
+        // phone publishes new vehicle state.
+        if (tileNeedsRefresh) {
+            TileService.getUpdater(applicationContext).requestUpdate(BlooTileService::class.java)
         }
     }
 }

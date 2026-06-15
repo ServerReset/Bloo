@@ -140,8 +140,9 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
             modifier = Modifier
                 .fillMaxSize()
                 .onRotaryScrollEvent { e ->
-                    val atTop = state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0
-                    if (atTop && e.verticalScrollPixels < 0) {
+                    if (e.verticalScrollPixels < 0) {
+                        // Scrolling up: accumulate until we've overscrolled 120 px past
+                        // where the list can go, then trigger a refresh.
                         overscrollAccum[0] += e.verticalScrollPixels
                         if (overscrollAccum[0] < -120f && !refreshing) {
                             overscrollAccum[0] = 0f
@@ -149,8 +150,8 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
                         }
                     } else {
                         overscrollAccum[0] = 0f
-                        scope.launch { state.scrollBy(e.verticalScrollPixels) }
                     }
+                    scope.launch { state.scrollBy(e.verticalScrollPixels) }
                     true
                 }
                 .focusRequester(focusRequester)

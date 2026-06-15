@@ -1,5 +1,7 @@
 package com.bloo.wear.ui
 
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,12 +9,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -27,7 +35,9 @@ import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.Brand
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LoginScreen(vm: WearViewModel, ui: WearUi) {
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
@@ -45,8 +55,19 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
     }
 
     val state = rememberScalingLazyListState()
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
     ScalingLazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .onRotaryScrollEvent { e ->
+                scope.launch { state.scrollBy(e.verticalScrollPixels) }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
         state = state,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),

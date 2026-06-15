@@ -108,7 +108,13 @@ class BlooTileService : TileService() {
         val arc = CircularProgressIndicator.Builder()
             .setProgress(pct.coerceIn(0, 100) / 100f)
             .setCircularProgressIndicatorColors(
-                ProgressIndicatorColors.progressIndicatorColors(argb(arcColor), argb(CLR_TRACK))
+                ProgressIndicatorColors.progressIndicatorColors(
+                    // Colors(primary, onPrimary, surface, onSurface):
+                    // primary → arc fill, surface → track background.
+                    androidx.wear.protolayout.material.Colors(
+                        arcColor, CLR_WHITE, CLR_TRACK, CLR_WHITE
+                    )
+                )
             )
             .build()
 
