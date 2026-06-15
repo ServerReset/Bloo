@@ -24,7 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.Thunderstorm
+import androidx.compose.material.icons.filled.Umbrella
+import androidx.compose.material.icons.filled.WbCloudy
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
@@ -218,6 +228,7 @@ fun MorphButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val haptics = LocalHapticFeedback.current
     // Match the phone's MorphButton: pill (50%) ↔ rounded square (28%) with a
     // soft expressive spring.
     val pct by animateFloatAsState(
@@ -226,7 +237,7 @@ fun MorphButton(
         label = "morphCorner",
     )
     Button(
-        onClick = onClick,
+        onClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onClick() },
         enabled = !pending,
         interactionSource = interaction,
         modifier = Modifier.fillMaxWidth(),
@@ -269,3 +280,31 @@ private fun SliderTrack(value: Int, min: Int, max: Int, step: Int, fillColor: Co
         drawCircle(fillColor, radius = size.height * 0.45f, center = Offset(x, cy))
     }
 }
+
+// ---- Weather helpers (mirror the phone's WeatherCode mapping) -------------
+
+fun weatherLabel(code: Int): String = when (code) {
+    0 -> "Clear"
+    1, 2 -> "Partly cloudy"
+    3 -> "Cloudy"
+    45, 48 -> "Fog"
+    51, 53, 55, 56, 57 -> "Drizzle"
+    61, 63, 65, 66, 67 -> "Rain"
+    71, 73, 75, 77, 85, 86 -> "Snow"
+    80, 81, 82 -> "Showers"
+    95, 96, 99 -> "Thunderstorm"
+    else -> "—"
+}
+
+fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
+    0 -> if (isDay) Icons.Filled.WbSunny else Icons.Filled.Nightlight
+    1, 2 -> Icons.Filled.WbCloudy
+    3, 45, 48 -> Icons.Filled.Cloud
+    51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> Icons.Filled.Umbrella
+    71, 73, 75, 77, 85, 86 -> Icons.Filled.AcUnit
+    95, 96, 99 -> Icons.Filled.Thunderstorm
+    else -> Icons.Filled.Cloud
+}
+
+fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
+    if (fahrenheit) "${(tempC * 9 / 5 + 32).toInt()}°F" else "${tempC.toInt()}°C"

@@ -12,6 +12,10 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +35,7 @@ import com.bloo.wear.WearViewModel
 @Composable
 fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     val state = rememberScalingLazyListState()
+    var confirmSignOut by remember { mutableStateOf(false) }
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = state,
@@ -112,9 +117,9 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             OutlinedButton(
-                onClick = { vm.signOutAll() },
+                onClick = { if (confirmSignOut) vm.signOutAll() else confirmSignOut = true },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Sign out") },
+                label = { Text(if (confirmSignOut) "Tap again to confirm" else "Sign out") },
                 icon = { Icon(Icons.Filled.Logout, contentDescription = null) },
             )
         }

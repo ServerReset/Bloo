@@ -172,6 +172,19 @@ object WearBridge {
         }
     }
 
+    /** Mirror weather / car photos / AI summaries to the watch. */
+    fun publishExtras(context: Context, extras: com.bloo.bluelink.data.WearExtras) {
+        val app = context.applicationContext
+        scope.launch {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_EXTRAS).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeExtras(extras))
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(app).putDataItem(request))
+            }
+        }
+    }
+
     suspend fun execute(context: Context, command: WearCommand): WearCommandResult =
         WearCommandRunner.execute(context, command)
 

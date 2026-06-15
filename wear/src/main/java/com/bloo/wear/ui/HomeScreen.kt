@@ -38,7 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
@@ -98,14 +101,18 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
 @Composable
 private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit) {
     val hasPresets = (ui.presets[car.vin]?.isNotEmpty() == true)
-    val tiles = remember(car.vin, car.hasBattery, car.lat, car.hasLiveStatus, car.tripsSupported, hasPresets) {
+    val hasWeather = ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null
+    val hasAi = !ui.extras.ai[car.vin].isNullOrBlank()
+    val tiles = remember(car.vin, car.hasBattery, car.lat, car.hasLiveStatus, car.tripsSupported, hasPresets, hasWeather, hasAi) {
         buildList {
             add("summary"); add("climate"); add("comfort")
             if (hasPresets) add("presets")
             if (car.hasBattery) { add("charge"); add("limits") }
             if (car.lat != null && car.lon != null) add("location")
+            if (hasWeather) add("weather")
             add("info")
             if (car.hasLiveStatus) add("diagnostics")
+            if (hasAi) add("ai")
             add("more")
         }
     }
@@ -143,8 +150,10 @@ private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
                 "charge" -> ChargeTile(vm, ui, car)
                 "limits" -> LimitsTile(vm, ui, car)
                 "location" -> LocationTile(vm, ui, car)
+                "weather" -> WeatherTile(ui, car)
                 "info" -> InfoTile(car)
                 "diagnostics" -> DiagnosticsTile(car)
+                "ai" -> AiTile(ui, car)
                 "more" -> MoreTile(vm, ui, car, onSettings, onTrips)
             }
         }
@@ -161,25 +170,69 @@ private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
 // ---- Tiles ---------------------------------------------------------------
 
 @Composable
-private fun SummaryTile(vm: WearViewModel, ui: WearUi, car: CarView) = TileFrame(car.name) {
-    // Compact: ring + range side by side so lock/unlock is always on screen.
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChargeRing(car.percent, size = 60.dp)
-        Column {
-            Text(car.rangeMi?.let { "$it mi" } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(if (car.hasBattery) "Battery" else "Fuel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (car.charging == true) Text("Charging", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
+private fun SummaryTile(vm: WearViewModel, ui: WearUi, car: CarView) {
+    val img = ui.extras.images[car.vin]
+    Box(Modifier.fillMaxSize()) {
+        if (!img.isNullOrBlank()) {
+            AsyncImage(
+                model = img,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize().alpha(0.16f),
+            )
+        }
+        TileFrame(car.name) {
+            // Compact: ring + range side by side so lock/unlock is always on screen.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ChargeRing(car.percent, size = 60.dp)
+                Column {
+                    Text(car.rangeMi?.let { "$it mi" } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(if (car.hasBattery) "Battery" else "Fuel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (car.charging == true) Text("Charging", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
+                }
+            }
+            val rel = relativeLabel(car.fetchedAt)
+            if (rel.isNotBlank()) {
+                Text("Updated $rel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(6.dp))
+            MorphButton(
+                label = if (car.locked == true) "Locked" else "Unlocked",
+                icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                active = car.locked == true,
+                activeColor = MaterialTheme.colorScheme.primary,
+                pending = "${car.vin}:doors" in ui.pending,
+                onClick = { vm.toggleLock(car.vin) },
+            )
         }
     }
-    Spacer(Modifier.height(6.dp))
-    MorphButton(
-        label = if (car.locked == true) "Locked" else "Unlocked",
-        icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
-        active = car.locked == true,
-        activeColor = MaterialTheme.colorScheme.primary,
-        pending = "${car.vin}:doors" in ui.pending,
-        onClick = { vm.toggleLock(car.vin) },
-    )
+}
+
+@Composable
+private fun WeatherTile(ui: WearUi, car: CarView) = TileFrame("Weather") {
+    val w = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
+    if (w == null) {
+        Text("No weather", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return@TileFrame
+    }
+    val f = ui.settings?.useFahrenheit != false
+    Icon(weatherIcon(w.code, w.isDay), contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(30.dp))
+    Text(weatherTemp(w.tempC, f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text(weatherLabel(w.code), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(2.dp))
+    StatusRow("Feels", weatherTemp(w.feelsLikeC, f))
+    w.humidity?.let { StatusRow("Humidity", "$it%") }
+    StatusRow("Wind", "${w.windKph.toInt()} km/h")
+}
+
+@Composable
+private fun AiTile(ui: WearUi, car: CarView) = TileFrame("AI summary") {
+    val text = ui.extras.ai[car.vin]
+    if (text.isNullOrBlank()) {
+        Text("No summary yet — generate one on your phone", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    } else {
+        Text(text, style = MaterialTheme.typography.bodySmall)
+    }
 }
 
 @Composable

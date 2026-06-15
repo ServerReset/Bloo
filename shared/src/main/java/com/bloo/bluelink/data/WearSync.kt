@@ -37,6 +37,10 @@ object WearSync {
     /** DataItem path: phone → watch saved climate presets, keyed by VIN. */
     const val PATH_PRESETS = "/bloo/presets"
 
+    /** DataItem path: phone → watch extras (weather, car photo URLs, AI
+     *  summaries) so the watch reaches fuller parity with the phone. */
+    const val PATH_EXTRAS = "/bloo/extras"
+
     /** Message path: watch → phone, "run this command". */
     const val PATH_COMMAND = "/bloo/command"
 
@@ -85,6 +89,13 @@ object WearSync {
     fun decodePresets(raw: String?): WearPresets =
         raw?.let { runCatching { json.decodeFromString(WearPresets.serializer(), it) }.getOrNull() }
             ?: WearPresets()
+
+    fun encodeExtras(extras: WearExtras): String =
+        json.encodeToString(WearExtras.serializer(), extras)
+
+    fun decodeExtras(raw: String?): WearExtras =
+        raw?.let { runCatching { json.decodeFromString(WearExtras.serializer(), it) }.getOrNull() }
+            ?: WearExtras()
 
     fun encodeCommand(command: WearCommand): String =
         json.encodeToString(WearCommand.serializer(), command)
@@ -208,4 +219,27 @@ data class WearSettingsPayload(
 @Serializable
 data class WearPresets(
     val byVin: Map<String, List<ClimatePreset>> = emptyMap(),
+)
+
+/** Compact current-conditions snapshot mirrored to the watch (Celsius like the
+ *  phone's Weather; the watch converts using the synced unit). */
+@Serializable
+data class WearWeather(
+    val tempC: Double,
+    val feelsLikeC: Double,
+    val highC: Double? = null,
+    val lowC: Double? = null,
+    val windKph: Double = 0.0,
+    val humidity: Int? = null,
+    val isDay: Boolean = true,
+    val code: Int = -1,
+)
+
+/** Richer per-car content mirrored to the watch for phone parity. */
+@Serializable
+data class WearExtras(
+    val homeWeather: WearWeather? = null,
+    val carWeather: Map<String, WearWeather> = emptyMap(),
+    val images: Map<String, String> = emptyMap(),
+    val ai: Map<String, String> = emptyMap(),
 )

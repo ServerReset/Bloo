@@ -301,6 +301,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 com.bloo.bluelink.wear.WearBridge.publishPresets(getApplication(), presets)
             }
         }
+        // Mirror weather / car photos / AI summaries to the watch.
+        viewModelScope.launch {
+            _state.map { s ->
+                com.bloo.bluelink.data.WearExtras(
+                    homeWeather = s.homeWeather?.toWear(),
+                    carWeather = s.carWeather.mapValues { it.value.toWear() },
+                    images = s.imageUrls,
+                    ai = s.aiSummaries,
+                )
+            }.distinctUntilChanged().collect { extras ->
+                com.bloo.bluelink.wear.WearBridge.publishExtras(getApplication(), extras)
+            }
+        }
         // Probe on-device Gemini Nano once; the AI toggle only appears if present.
         viewModelScope.launch {
             val supported = ai.isSupported()
@@ -742,6 +755,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
     }
+
+    private fun com.bloo.bluelink.data.Weather.toWear() = com.bloo.bluelink.data.WearWeather(
+        tempC = tempC, feelsLikeC = feelsLikeC, highC = highC, lowC = lowC,
+        windKph = windKph, humidity = humidity, isDay = isDay, code = code,
+    )
 
     private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {
         // Use the effective powertrain (a PHEV reads battery %, not fuel %).

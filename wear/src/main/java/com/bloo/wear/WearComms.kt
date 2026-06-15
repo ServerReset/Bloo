@@ -92,6 +92,7 @@ object WearComms {
                             WearSync.PATH_AUTH -> WearStateWriter.persistAuth(context, raw)
                             WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(context, raw)
                             WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(context, raw)
+                            WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(context, raw)
                         }
                     }
                 } finally {

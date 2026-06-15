@@ -99,6 +99,7 @@ data class WearUi(
     val busy: Boolean = false,
     val message: String? = null,
     val presets: Map<String, List<ClimatePreset>> = emptyMap(),
+    val extras: com.bloo.bluelink.data.WearExtras = com.bloo.bluelink.data.WearExtras(),
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     val climateTempF: Int = 72,
@@ -155,6 +156,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             WearPresetsStore(ctx).flow.collect { p -> _ui.update { it.copy(presets = p.byVin) } }
+        }
+        viewModelScope.launch {
+            WearExtrasStore(ctx).flow.collect { e -> _ui.update { it.copy(extras = e) } }
         }
         bootstrap()
     }
