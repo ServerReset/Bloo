@@ -12,6 +12,7 @@ import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.DoorOpen
 import com.bloo.bluelink.data.EvTrip
+import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.StatusCache
@@ -75,9 +76,24 @@ data class WearUi(
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     val climateTempF: Int = 72,
+    val climateDuration: Int = 10,
     val climateDefrost: Boolean = false,
+    val climateSteering: Boolean = false,
+    val seatDriver: Int = 0,   // 0 off, 1 low, 2 med, 3 high (heat)
+    val seatPassenger: Int = 0,
+    val acLimitDraft: Int? = null,
+    val dcLimitDraft: Int? = null,
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
 )
+
+private fun seatLevelOf(step: Int): SeatLevel = when (step) {
+    1 -> SeatLevel.LOW_HEAT
+    2 -> SeatLevel.MED_HEAT
+    3 -> SeatLevel.HIGH_HEAT
+    else -> SeatLevel.OFF
+}
+
+val seatStepLabels = listOf("Off", "Low", "Med", "High")
 
 class WearViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -218,6 +234,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 if (s != null) {
                     statuses = statuses + (vin to s)
                     fetchedAt = fetchedAt + (vin to System.currentTimeMillis())
+                    // Seed the charge-limit sliders from the car's current targets.
+                    val ac = s.evStatus?.reservChargeInfos?.level(1)
+                    val dc = s.evStatus?.reservChargeInfos?.level(0)
+                    _ui.update { u -> u.copy(acLimitDraft = u.acLimitDraft ?: ac, dcLimitDraft = u.dcLimitDraft ?: dc) }
                     persistCache()
                     publish()
                 }
@@ -251,10 +271,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
         if (st?.airCtrlOn == true) { repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) } }
         else {
+            val u = _ui.value
             repo.startClimate(v, ClimateRequest(
-                tempF = _ui.value.climateTempF,
-                defrost = _ui.value.climateDefrost,
-                durationMinutes = 10,
+                tempF = u.climateTempF,
+                defrost = u.climateDefrost,
+                durationMinutes = u.climateDuration,
+                steeringWheelHeat = u.climateSteering,
+                seatFrontLeft = seatLevelOf(u.seatDriver),
+                seatFrontRight = seatLevelOf(u.seatPassenger),
             ))
             flip(vin) { it.copy(airCtrlOn = true) }
         }
@@ -264,13 +288,20 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (st?.evStatus?.batteryCharge == true) repo.stopCharge(v) else repo.startCharge(v)
     }
 
-    fun setClimateTemp(delta: Int) {
-        _ui.update { it.copy(climateTempF = (it.climateTempF + delta).coerceIn(62, 82)) }
+    /** Push the AC/DC charge-limit sliders to the car. */
+    fun applyChargeLimits(vin: String) = command(vin, "chargeLimit") { v, repo, _ ->
+        val u = _ui.value
+        repo.setChargeTargets(v, u.acLimitDraft ?: 80, u.dcLimitDraft ?: 90)
     }
 
-    fun toggleDefrost() {
-        _ui.update { it.copy(climateDefrost = !it.climateDefrost) }
-    }
+    fun setClimateTemp(value: Int) { _ui.update { it.copy(climateTempF = value.coerceIn(62, 82)) } }
+    fun setClimateDuration(value: Int) { _ui.update { it.copy(climateDuration = value.coerceIn(1, 30)) } }
+    fun toggleDefrost() { _ui.update { it.copy(climateDefrost = !it.climateDefrost) } }
+    fun toggleSteering() { _ui.update { it.copy(climateSteering = !it.climateSteering) } }
+    fun setSeatDriver(step: Int) { _ui.update { it.copy(seatDriver = step.coerceIn(0, 3)) } }
+    fun setSeatPassenger(step: Int) { _ui.update { it.copy(seatPassenger = step.coerceIn(0, 3)) } }
+    fun setAcLimit(value: Int) { _ui.update { it.copy(acLimitDraft = value.coerceIn(50, 100)) } }
+    fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
 
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
