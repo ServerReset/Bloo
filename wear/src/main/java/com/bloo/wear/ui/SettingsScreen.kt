@@ -1,5 +1,7 @@
 package com.bloo.wear.ui
 
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,11 +14,17 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,13 +39,26 @@ import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     val state = rememberScalingLazyListState()
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     var confirmSignOut by remember { mutableStateOf(false) }
+
     ScalingLazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .onRotaryScrollEvent { e ->
+                scope.launch { state.scrollBy(e.verticalScrollPixels) }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
         state = state,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 30.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -64,12 +85,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             )
         }
 
-        // Appearance is owned by the phone and synced down.
         item {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
                 Text("Appearance", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "Theme: synced from phone",
+                    "Theme and units synced from phone",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -85,15 +105,18 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Icon(
-                    if (ui.phoneConnected) Icons.Filled.PhoneAndroid else Icons.Filled.CloudOff,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                StatusRow(
+                    label = "Phone",
+                    value = if (ui.phoneConnected) "Connected" else "Standalone",
+                    valueColor = if (ui.phoneConnected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    if (ui.phoneConnected) "Phone connected" else "Standalone",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                if (!ui.phoneConnected) {
+                    Text(
+                        "Commands run directly on the watch",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
@@ -117,7 +140,9 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             OutlinedButton(
-                onClick = { if (confirmSignOut) vm.signOutAll() else confirmSignOut = true },
+                onClick = {
+                    if (confirmSignOut) vm.signOutAll() else confirmSignOut = true
+                },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(if (confirmSignOut) "Tap again to confirm" else "Sign out") },
                 icon = { Icon(Icons.Filled.Logout, contentDescription = null) },

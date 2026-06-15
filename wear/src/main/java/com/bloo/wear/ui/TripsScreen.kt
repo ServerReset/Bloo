@@ -1,5 +1,7 @@
 package com.bloo.wear.ui
 
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,8 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,7 +29,9 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     LaunchedEffect(vin) { vm.loadTrips(vin) }
@@ -34,8 +44,19 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     }
 
     val state = rememberScalingLazyListState()
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
     ScalingLazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .onRotaryScrollEvent { e ->
+                scope.launch { state.scrollBy(e.verticalScrollPixels) }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
         state = state,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 30.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -45,7 +66,7 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         if (trips.isNullOrEmpty()) {
             item {
                 Text(
-                    "No recent trips reported",
+                    if (loading) "Loading…" else "No recent trips reported",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -64,6 +85,14 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                         t.idleMinutes?.takeIf { it > 0 }?.let { StatusRow("Idle", fmtMinutes(it)) }
                         t.usedKwh?.let { StatusRow("Used", "$it kWh") }
                         t.regenKwh?.takeIf { it > 0 }?.let { StatusRow("Regen", "$it kWh") }
+                        t.distance?.let { d ->
+                            t.usedKwh?.let { k ->
+                                if (k > 0) {
+                                    val miPerKwh = d / k
+                                    StatusRow("Efficiency", "${"%.1f".format(miPerKwh)} mi/kWh")
+                                }
+                            }
+                        }
                     }
                 }
             }
