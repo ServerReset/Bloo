@@ -13,6 +13,7 @@ import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearCommandRunner
+import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

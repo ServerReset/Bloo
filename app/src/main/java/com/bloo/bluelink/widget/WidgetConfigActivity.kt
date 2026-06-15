@@ -46,6 +46,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.ui.BlooTheme
 import kotlinx.coroutines.launch
 
