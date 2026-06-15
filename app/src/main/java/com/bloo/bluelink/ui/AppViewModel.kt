@@ -286,6 +286,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        // Mirror appearance/preferences to a paired watch whenever they change,
+        // so the watch theme + settings always match the phone live.
+        viewModelScope.launch {
+            settingsStore.appearance.collect { a ->
+                com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), a)
+            }
+        }
         // Probe on-device Gemini Nano once; the AI toggle only appears if present.
         viewModelScope.launch {
             val supported = ai.isSupported()

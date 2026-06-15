@@ -1,6 +1,13 @@
 package com.bloo.bluelink.wear
 
 import android.content.Context
+import android.content.res.Configuration
+import androidx.compose.ui.graphics.toArgb
+import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.WearColorRoles
+import com.bloo.bluelink.data.WearSettingsPayload
+import com.bloo.bluelink.ui.ThemeMode
+import com.bloo.bluelink.ui.blooColorScheme
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAuthBundle
@@ -78,6 +85,76 @@ object WearBridge {
         }.asPutDataRequest().setUrgent()
         runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
     }
+
+    /**
+     * Mirror the phone's appearance + preferences to the watch: the *resolved*
+     * Material 3 role colours (so the watch theme matches exactly), the
+     * temperature unit and the UI scale. Republished whenever they change.
+     */
+    fun publishSettings(context: Context, appearance: SettingsStore.Appearance) {
+        val app = context.applicationContext
+        scope.launch { runCatching { publishSettingsNow(app, appearance) } }
+    }
+
+    suspend fun publishSettingsNow(context: Context, appearance: SettingsStore.Appearance) {
+        val dark = when (appearance.themeMode) {
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK, ThemeMode.AMOLED -> true
+            ThemeMode.SYSTEM -> isSystemDark(context)
+        }
+        val custom = if (!appearance.dynamicColor) {
+            appearance.customPalettes.find { it.id == appearance.activeCustomPaletteId }
+        } else null
+        val s = blooColorScheme(
+            context = context,
+            dark = dark,
+            themeMode = appearance.themeMode,
+            dynamicColor = appearance.dynamicColor,
+            colorPalette = appearance.colorPalette,
+            customPalette = custom,
+            vibrancy = appearance.vibrancy,
+        )
+        val payload = WearSettingsPayload(
+            dark = dark,
+            useFahrenheit = appearance.useFahrenheit,
+            uiScale = appearance.uiScale,
+            colors = WearColorRoles(
+                primary = s.primary.toArgb(),
+                onPrimary = s.onPrimary.toArgb(),
+                primaryContainer = s.primaryContainer.toArgb(),
+                onPrimaryContainer = s.onPrimaryContainer.toArgb(),
+                secondary = s.secondary.toArgb(),
+                onSecondary = s.onSecondary.toArgb(),
+                secondaryContainer = s.secondaryContainer.toArgb(),
+                onSecondaryContainer = s.onSecondaryContainer.toArgb(),
+                tertiary = s.tertiary.toArgb(),
+                onTertiary = s.onTertiary.toArgb(),
+                tertiaryContainer = s.tertiaryContainer.toArgb(),
+                onTertiaryContainer = s.onTertiaryContainer.toArgb(),
+                background = s.background.toArgb(),
+                onBackground = s.onBackground.toArgb(),
+                onSurface = s.onSurface.toArgb(),
+                onSurfaceVariant = s.onSurfaceVariant.toArgb(),
+                surfaceContainerLow = s.surfaceContainerLow.toArgb(),
+                surfaceContainer = s.surfaceContainer.toArgb(),
+                surfaceContainerHigh = s.surfaceContainerHigh.toArgb(),
+                outline = s.outline.toArgb(),
+                outlineVariant = s.outlineVariant.toArgb(),
+                error = s.error.toArgb(),
+                onError = s.onError.toArgb(),
+                errorContainer = s.errorContainer.toArgb(),
+                onErrorContainer = s.onErrorContainer.toArgb(),
+            ),
+        )
+        val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
+            dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))
+        }.asPutDataRequest().setUrgent()
+        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
+    }
+
+    private fun isSystemDark(context: Context): Boolean =
+        (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
 
     suspend fun execute(context: Context, command: WearCommand): WearCommandResult =
         WearCommandRunner.execute(context, command)

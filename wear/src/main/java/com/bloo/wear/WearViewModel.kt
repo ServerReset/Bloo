@@ -62,6 +62,7 @@ data class WearUi(
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     val climateTempF: Int = 72,
+    val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
 )
 
 class WearViewModel(app: Application) : AndroidViewModel(app) {
@@ -86,7 +87,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private fun repoFor(brand: Brand) =
         repos.getOrPut(brand) { repositoryFor(brand, sessionStore, credentialStore) }
 
-    init { bootstrap() }
+    init {
+        // Keep the watch theme + preferences in lockstep with the phone.
+        viewModelScope.launch {
+            WearSettingsStore(ctx).flow.collect { s -> _ui.update { it.copy(settings = s) } }
+        }
+        bootstrap()
+    }
 
     private fun bootstrap() {
         viewModelScope.launch {

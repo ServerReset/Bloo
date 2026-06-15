@@ -31,6 +31,7 @@ class WearListenerService : WearableListenerService() {
                 when (path) {
                     WearSync.PATH_STATE -> WearStateWriter.persistState(applicationContext, raw)
                     WearSync.PATH_AUTH -> WearStateWriter.persistAuth(applicationContext, raw)
+                    WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(applicationContext, raw)
                 }
             }
         }

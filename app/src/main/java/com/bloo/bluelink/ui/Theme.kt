@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CutCornerShape
@@ -262,25 +263,20 @@ private fun Color.saturate(factor: Float): Color {
     return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun BlooTheme(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
-    fontChoice: FontChoice = FontChoice.SYSTEM,
-    dynamicColor: Boolean = true,
-    colorPalette: ColorPalette = ColorPalette.BLUE,
-    customPalette: CustomPaletteData? = null,
-    uiScale: Float = 1f,
-    vibrancy: Float = 1f,
-    content: @Composable () -> Unit,
-) {
-    val dark = when (themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-    }
-
-    val context = LocalContext.current
+/**
+ * Resolve the final Material 3 [ColorScheme] for the given appearance, outside
+ * composition. [BlooTheme] uses it, and so does the Wear sync (to mirror the
+ * exact resolved colours to the watch).
+ */
+fun blooColorScheme(
+    context: Context,
+    dark: Boolean,
+    themeMode: ThemeMode,
+    dynamicColor: Boolean,
+    colorPalette: ColorPalette,
+    customPalette: CustomPaletteData?,
+    vibrancy: Float,
+): ColorScheme {
     val canDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     val base = when {
@@ -307,10 +303,8 @@ fun BlooTheme(
         base
     }
 
-    // Vibrancy: scale the saturation of every tinted colour role. This covers
-    // accent colours, their on-colours, containers, and the surface-variant /
-    // outline roles so pebble backgrounds and borders also respond visibly.
-    val scheme = if (vibrancy == 1f) amoled else {
+    // Vibrancy: scale the saturation of every tinted colour role.
+    return if (vibrancy == 1f) amoled else {
         fun Color.v() = saturate(vibrancy)
         amoled.copy(
             primary = amoled.primary.v(),
@@ -335,6 +329,36 @@ fun BlooTheme(
             onErrorContainer = amoled.onErrorContainer.v(),
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun BlooTheme(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    fontChoice: FontChoice = FontChoice.SYSTEM,
+    dynamicColor: Boolean = true,
+    colorPalette: ColorPalette = ColorPalette.BLUE,
+    customPalette: CustomPaletteData? = null,
+    uiScale: Float = 1f,
+    vibrancy: Float = 1f,
+    content: @Composable () -> Unit,
+) {
+    val dark = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+
+    val context = LocalContext.current
+    val scheme = blooColorScheme(
+        context = context,
+        dark = dark,
+        themeMode = themeMode,
+        dynamicColor = dynamicColor,
+        colorPalette = colorPalette,
+        customPalette = customPalette,
+        vibrancy = vibrancy,
+    )
 
     val density = LocalDensity.current
     val scaledDensity = Density(density.density, density.fontScale * uiScale)

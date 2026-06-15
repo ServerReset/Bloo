@@ -90,6 +90,7 @@ object WearComms {
                         when (item.uri.path) {
                             WearSync.PATH_STATE -> WearStateWriter.persistState(context, raw)
                             WearSync.PATH_AUTH -> WearStateWriter.persistAuth(context, raw)
+                            WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(context, raw)
                         }
                     }
                 } finally {

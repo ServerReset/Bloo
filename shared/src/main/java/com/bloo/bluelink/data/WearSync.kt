@@ -29,6 +29,11 @@ object WearSync {
      *  separate, rarely-changing item so it isn't re-published on every refresh. */
     const val PATH_AUTH = "/bloo/auth"
 
+    /** DataItem path: phone → watch appearance + preferences (resolved theme
+     *  colours, temperature unit, UI scale), so the watch mirrors the phone's
+     *  look and settings and updates live when they change. */
+    const val PATH_SETTINGS = "/bloo/settings"
+
     /** Message path: watch → phone, "run this command". */
     const val PATH_COMMAND = "/bloo/command"
 
@@ -64,6 +69,12 @@ object WearSync {
     fun decodeAuth(raw: String?): WearAuthBundle =
         raw?.let { runCatching { json.decodeFromString(WearAuthBundle.serializer(), it) }.getOrNull() }
             ?: WearAuthBundle()
+
+    fun encodeSettings(settings: WearSettingsPayload): String =
+        json.encodeToString(WearSettingsPayload.serializer(), settings)
+
+    fun decodeSettings(raw: String?): WearSettingsPayload? =
+        raw?.let { runCatching { json.decodeFromString(WearSettingsPayload.serializer(), it) }.getOrNull() }
 
     fun encodeCommand(command: WearCommand): String =
         json.encodeToString(WearCommand.serializer(), command)
@@ -139,4 +150,46 @@ data class WearSessionDto(
 @Serializable
 data class WearAuthBundle(
     val sessions: List<WearSessionDto> = emptyList(),
+)
+
+/**
+ * The phone's *resolved* Material 3 role colours (packed ARGB ints), so the watch
+ * mirrors the exact theme without re-running the phone's palette/vibrancy maths.
+ */
+@Serializable
+data class WearColorRoles(
+    val primary: Int,
+    val onPrimary: Int,
+    val primaryContainer: Int,
+    val onPrimaryContainer: Int,
+    val secondary: Int,
+    val onSecondary: Int,
+    val secondaryContainer: Int,
+    val onSecondaryContainer: Int,
+    val tertiary: Int,
+    val onTertiary: Int,
+    val tertiaryContainer: Int,
+    val onTertiaryContainer: Int,
+    val background: Int,
+    val onBackground: Int,
+    val onSurface: Int,
+    val onSurfaceVariant: Int,
+    val surfaceContainerLow: Int,
+    val surfaceContainer: Int,
+    val surfaceContainerHigh: Int,
+    val outline: Int,
+    val outlineVariant: Int,
+    val error: Int,
+    val onError: Int,
+    val errorContainer: Int,
+    val onErrorContainer: Int,
+)
+
+/** Appearance + preferences mirrored to the watch. */
+@Serializable
+data class WearSettingsPayload(
+    val dark: Boolean = true,
+    val useFahrenheit: Boolean = true,
+    val uiScale: Float = 1f,
+    val colors: WearColorRoles? = null,
 )

@@ -19,6 +19,10 @@ object WearStateWriter {
         SnapshotStore(context).saveVehicles(payload.vehicles)
     }
 
+    suspend fun persistSettings(context: Context, raw: String) {
+        WearSettingsStore(context).save(raw)
+    }
+
     suspend fun persistAuth(context: Context, raw: String) {
         val bundle = WearSync.decodeAuth(raw)
         val store = SessionStore(context)
