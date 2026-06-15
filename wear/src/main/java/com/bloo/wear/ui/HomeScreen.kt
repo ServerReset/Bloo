@@ -1,6 +1,7 @@
 package com.bloo.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,9 +30,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -70,6 +74,8 @@ import androidx.wear.compose.foundation.curvedRow
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
@@ -103,9 +109,8 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     val loop = count > 1
     val virtual = if (loop) count * 50 else count
 
-    // key() resets the pager state whenever the set of VINs changes.
-    val vinKey = ui.cars.map { it.vin }
-    key(vinKey) {
+    // key() resets the pager when the VIN list changes (e.g. cars added/removed).
+    key(ui.cars.map { it.vin }) {
         val carPager = rememberPagerState(initialPage = if (loop) virtual / 2 else 0) { virtual }
 
         LaunchedEffect(carPager.settledPage, count) {
@@ -143,15 +148,20 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
     val round = LocalConfiguration.current.isScreenRound
     val refreshing = "${car.vin}:refresh" in ui.pending
 
+    // FloatArray is stable across recompositions — mutate the slot, no State needed.
     val overscrollAccum = remember { floatArrayOf(0f) }
 
-    // Snap to nearest item when scroll comes to rest.
+    // Snapping guard to avoid re-entrant snap animations.
     var isSnapping by remember { mutableStateOf(false) }
+
+    // Snap to nearest item when scroll stops.
     LaunchedEffect(state.isScrollInProgress) {
         if (!state.isScrollInProgress && !isSnapping) {
             val info = state.layoutInfo
-            val viewportCenter = info.viewportSize.height / 2f
-            val centerItem = info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - viewportCenter) }
+            val viewportCenter = info.viewportSize.height / 2
+            val centerItem = info.visibleItemsInfo.minByOrNull {
+                abs(it.offset + it.size / 2 - viewportCenter)
+            }
             if (centerItem != null) {
                 isSnapping = true
                 state.animateScrollToItem(centerItem.index)
@@ -160,29 +170,49 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
         }
     }
 
+    // Derived center item index for the vertical dot indicator.
+    val centerItemIndex by remember {
+        derivedStateOf {
+            val info = state.layoutInfo
+            val viewportCenter = info.viewportSize.height / 2
+            info.visibleItemsInfo.minByOrNull {
+                abs(it.offset + it.size / 2 - viewportCenter)
+            }?.index ?: 0
+        }
+    }
+    val totalItems by remember { derivedStateOf { state.layoutInfo.totalItemsCount } }
+
     Box(Modifier.fillMaxSize()) {
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .onRotaryScrollEvent { e ->
                     val info = state.layoutInfo
-                    val viewportCenter = info.viewportSize.height / 2f
-                    val centerItem = info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - viewportCenter) }
-                    val centerIndex = centerItem?.index ?: 0
+                    val viewportCenter = info.viewportSize.height / 2
+                    val centerItem = info.visibleItemsInfo.minByOrNull {
+                        abs(it.offset + it.size / 2 - viewportCenter)
+                    }
                     if (e.verticalScrollPixels < 0) {
-                        // Scrolling up.
-                        if (centerIndex == 0) {
+                        // Scrolling up: accumulate overscroll only at the very first item.
+                        val atTop = centerItem?.index == 0
+                        if (atTop) {
                             overscrollAccum[0] += e.verticalScrollPixels
                             if (overscrollAccum[0] < -120f && !refreshing) {
                                 overscrollAccum[0] = 0f
                                 scope.launch { vm.refreshStatus(car.vin) }
                             }
+                        } else {
+                            overscrollAccum[0] = 0f
                         }
-                        scope.launch { state.animateScrollToItem((centerIndex - 1).coerceAtLeast(0)) }
+                        // Snap to previous item
+                        val target = (centerItem?.index ?: 0) - 1
+                        if (target >= 0) scope.launch { state.animateScrollToItem(target) }
                     } else {
                         overscrollAccum[0] = 0f
-                        val maxIndex = info.totalItemsCount - 1
-                        scope.launch { state.animateScrollToItem((centerIndex + 1).coerceAtMost(maxIndex)) }
+                        // Snap to next item
+                        val target = (centerItem?.index ?: 0) + 1
+                        val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                        if (target <= maxIdx) scope.launch { state.animateScrollToItem(target) }
                     }
                     true
                 }
@@ -193,19 +223,21 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             item(key = "header") { CarHeader(car, refreshing) }
-
             val hasAlerts = car.doorsOpen.isNotEmpty() || car.windowsOpen.isNotEmpty() ||
-                car.trunkOpen || car.hoodOpen || car.tireWarning || car.lowFuel ||
-                car.washerLow || car.brakeLow || car.keyFobLow
+                car.trunkOpen || car.hoodOpen || car.tireWarning ||
+                car.lowFuel || car.brakeLow || car.washerLow || car.keyFobLow
             if (hasAlerts) item(key = "alerts") { AlertsCard(car) }
-
             for (tileKey in ui.localSettings.tileOrder) {
                 renderTile(tileKey, vm, ui, car, onSettings, onTrips)
             }
         }
 
-        // Vertical dot indicator at center-end.
-        VerticalDotIndicator(state = state, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 2.dp))
+        // Vertical dot indicator at the end of the screen.
+        VerticalDotIndicator(
+            totalItems = totalItems,
+            centerIndex = centerItemIndex,
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp),
+        )
 
         // Auto-dismissing message snackbar at the bottom.
         if (ui.message != null) {
@@ -238,6 +270,7 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
     }
 }
 
+/** Dispatch a tile key to its composable card. Conditionally skipped based on key. */
 private fun ScalingLazyListScope.renderTile(
     key: String,
     vm: WearViewModel,
@@ -291,50 +324,47 @@ private fun ScalingLazyListScope.renderTile(
     }
 }
 
-// ---- Vertical dot indicator ----------------------------------------------
-
+/** Vertical dot indicator showing position in the list, up to 10 dots. */
 @Composable
 private fun VerticalDotIndicator(
-    state: androidx.wear.compose.foundation.lazy.ScalingLazyListState,
+    totalItems: Int,
+    centerIndex: Int,
     modifier: Modifier = Modifier,
 ) {
-    val totalItems by remember { derivedStateOf { state.layoutInfo.totalItemsCount } }
-    val currentIndex by remember {
-        derivedStateOf {
-            val info = state.layoutInfo
-            val viewportCenter = info.viewportSize.height / 2f
-            info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - viewportCenter) }?.index ?: 0
-        }
+    if (totalItems <= 1) return
+    val dotCount = min(totalItems, 10)
+    // Map centerIndex into the visible dot range.
+    val activeDot = if (totalItems <= 10) {
+        centerIndex.coerceIn(0, dotCount - 1)
+    } else {
+        ((centerIndex.toFloat() / (totalItems - 1)) * (dotCount - 1)).toInt().coerceIn(0, dotCount - 1)
     }
-
-    val maxDots = 10
-    val dotCount = min(totalItems, maxDots)
-    if (dotCount <= 1) return
-
     val selected = MaterialTheme.colorScheme.primary
     val unselected = MaterialTheme.colorScheme.outlineVariant
 
     Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = modifier.fillMaxHeight(),
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val startIndex = if (totalItems <= maxDots) 0
-        else (currentIndex - maxDots / 2).coerceIn(0, totalItems - maxDots)
-
-        for (i in 0 until dotCount) {
-            val itemIndex = startIndex + i
-            val isActive = itemIndex == currentIndex
-            val dotSize by animateDpAsState(
-                targetValue = if (isActive) 6.dp else 4.dp,
+        repeat(dotCount) { i ->
+            val isActive = i == activeDot
+            val size by animateDpAsState(
+                targetValue = if (isActive) 7.dp else 4.dp,
                 animationSpec = tween(150),
                 label = "dotSize$i",
             )
+            val color by animateColorAsState(
+                targetValue = if (isActive) selected else unselected,
+                animationSpec = tween(150),
+                label = "dotColor$i",
+            )
             Box(
                 Modifier
-                    .size(dotSize)
+                    .padding(vertical = 2.dp)
+                    .size(size)
                     .clip(CircleShape)
-                    .background(if (isActive) selected else unselected)
+                    .background(color)
             )
         }
     }

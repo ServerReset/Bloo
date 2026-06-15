@@ -9,13 +9,13 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
-import androidx.glance.LocalSize
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -66,12 +66,19 @@ class BlooWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 val size = LocalSize.current
-                val compact = size.height < 60.dp
-                if (snap == null) {
-                    if (compact) UnconfiguredCompact() else UnconfiguredView(widgetId)
+                if (size.height < 60.dp) {
+                    // Compact mode
+                    if (snap == null) {
+                        UnconfiguredCompact(widgetId)
+                    } else {
+                        CompactWidgetBody(widgetId, snap, actions)
+                    }
                 } else {
-                    if (compact) CompactWidgetBody(widgetId, snap.vin, actions)
-                    else WidgetBody(widgetId, snap, actions)
+                    if (snap == null) {
+                        UnconfiguredView(widgetId)
+                    } else {
+                        WidgetBody(widgetId, snap, actions)
+                    }
                 }
             }
         }
@@ -198,37 +205,56 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun UnconfiguredCompact() {
-        Box(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .background(GlanceTheme.colors.widgetBackground)
-                .cornerRadius(20.dp)
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "Tap to set up",
-                style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Medium, fontSize = 12.sp),
-            )
-        }
-    }
-
-    @Composable
-    private fun CompactWidgetBody(widgetId: Int, vin: String, actions: List<WidgetAction>) {
+    private fun CompactWidgetBody(widgetId: Int, snap: VehicleSnapshot, actions: List<WidgetAction>) {
+        val context = LocalContext.current
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
                 .cornerRadius(20.dp)
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            for (i in 0 until 4) {
+            actions.take(4).forEachIndexed { i, action ->
                 if (i > 0) Spacer(GlanceModifier.width(4.dp))
-                Pill(widgetId, vin, actions.getOrNull(i), GlanceModifier.defaultWeight().fillMaxHeight())
+                Row(
+                    modifier = GlanceModifier
+                        .defaultWeight()
+                        .fillMaxHeight()
+                        .background(GlanceTheme.colors.secondaryContainer)
+                        .cornerRadius(20.dp)
+                        .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Image(
+                        provider = ImageProvider(action.icon),
+                        contentDescription = action.label,
+                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
+                        modifier = GlanceModifier.size(16.dp),
+                    )
+                }
             }
+        }
+    }
+
+    @Composable
+    private fun UnconfiguredCompact(widgetId: Int) {
+        val context = LocalContext.current
+        Box(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(GlanceTheme.colors.widgetBackground)
+                .cornerRadius(20.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .clickable(actionStartActivity(configIntent(context, widgetId))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "Tap to set up",
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Medium),
+            )
         }
     }
 

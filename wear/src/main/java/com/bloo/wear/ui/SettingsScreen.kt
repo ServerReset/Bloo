@@ -5,13 +5,17 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
@@ -31,12 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
-import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.OutlinedButton
@@ -108,23 +110,57 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
-        // ---- Local font scale override ----
         item {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
                 Text("Watch text size", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "Local override · ${"%.2f".format(ui.localSettings.fontScale)}×",
+                    "${"%.1f".format(ui.localSettings.fontScale)}×",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.height(4.dp))
                 SliderRow(
                     label = "Scale",
                     valueLabel = "${"%.1f".format(ui.localSettings.fontScale)}×",
-                    value = ((ui.localSettings.fontScale - 0.8f) / 0.1f).toInt(),
+                    value = ((ui.localSettings.fontScale - 0.8f) / 0.05f).toInt(),
                     min = 0,
-                    max = 6,
+                    max = 12,
                     step = 1,
-                ) { step -> vm.setFontScale(0.8f + step * 0.1f) }
+                ) { step -> vm.setFontScale(0.8f + step * 0.05f) }
+            }
+        }
+
+        item {
+            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                Text("Tile order", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                ui.localSettings.tileOrder.forEachIndexed { idx, key ->
+                    val label = WearTiles.LABELS[key] ?: key
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        Row {
+                            if (idx > 0) {
+                                FilledTonalButton(
+                                    onClick = { vm.moveTileUp(key) },
+                                    modifier = Modifier.size(32.dp),
+                                    label = { Text("↑", style = MaterialTheme.typography.labelSmall) },
+                                )
+                            }
+                            if (idx < ui.localSettings.tileOrder.size - 1) {
+                                Spacer(Modifier.width(4.dp))
+                                FilledTonalButton(
+                                    onClick = { vm.moveTileDown(key) },
+                                    modifier = Modifier.size(32.dp),
+                                    label = { Text("↓", style = MaterialTheme.typography.labelSmall) },
+                                )
+                            }
+                        }
+                    }
+                    if (idx < ui.localSettings.tileOrder.size - 1) Spacer(Modifier.height(2.dp))
+                }
             }
         }
 
@@ -161,40 +197,6 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 label = { Text("Refresh all cars") },
                 icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
             )
-        }
-
-        // ---- Tile order ----
-        item { ListHeader { Text("Tile order", textAlign = TextAlign.Center) } }
-
-        val tileOrder = ui.localSettings.tileOrder
-        items(tileOrder, key = { it }) { key ->
-            val label = WearTiles.LABELS[key] ?: key
-            val idx = tileOrder.indexOf(key)
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(
-                        onClick = { vm.moveTileUp(key) },
-                        enabled = idx > 0,
-                    ) {
-                        Icon(Icons.Filled.ArrowUpward, contentDescription = "Move up")
-                    }
-                    IconButton(
-                        onClick = { vm.moveTileDown(key) },
-                        enabled = idx < tileOrder.size - 1,
-                    ) {
-                        Icon(Icons.Filled.ArrowDownward, contentDescription = "Move down")
-                    }
-                }
-            }
         }
 
         item {

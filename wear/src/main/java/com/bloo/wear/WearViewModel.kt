@@ -133,8 +133,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val credentialStore = CredentialStore(ctx)
     private val snapshotStore = SnapshotStore(ctx)
     private val statusCache = StatusCache(ctx)
-    private val localStore = WearLocalStore(ctx)
     private val repos = mutableMapOf<Brand, VehicleRepository>()
+    private val localStore = WearLocalStore(ctx)
 
     private var vehicles: List<Vehicle> = emptyList()
     private var statuses: Map<String, VehicleStatus> = emptyMap()
@@ -166,7 +166,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             WearExtrasStore(ctx).flow.collect { e -> _ui.update { it.copy(extras = e) } }
         }
         viewModelScope.launch {
-            WearLocalStore(ctx).flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
+            localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
         }
         bootstrap()
     }
@@ -389,13 +389,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setAcLimit(value: Int) { _ui.update { it.copy(acLimitDraft = value.coerceIn(50, 100)) } }
     fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
     fun dismissMessage() { _ui.update { it.copy(message = null) } }
+
     fun setFontScale(scale: Float) { viewModelScope.launch { localStore.setFontScale(scale) } }
+
     fun moveTileUp(key: String) {
         val order = _ui.value.localSettings.tileOrder.toMutableList()
         val idx = order.indexOf(key).takeIf { it > 0 } ?: return
         order.add(idx - 1, order.removeAt(idx))
         viewModelScope.launch { localStore.setTileOrder(order) }
     }
+
     fun moveTileDown(key: String) {
         val order = _ui.value.localSettings.tileOrder.toMutableList()
         val idx = order.indexOf(key).takeIf { it >= 0 && it < order.size - 1 } ?: return

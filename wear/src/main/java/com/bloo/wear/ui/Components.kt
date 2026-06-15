@@ -3,7 +3,15 @@ package com.bloo.wear.ui
 import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -37,6 +45,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -74,15 +83,6 @@ import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import kotlin.math.roundToInt
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.text.TextStyle
 
 /**
  * The Wear text-entry pattern: tapping launches the system input overlay
@@ -118,14 +118,9 @@ fun ChargeRing(percent: Int?, modifier: Modifier = Modifier, size: Dp = 88.dp) {
         )
         AnimatedContent(
             targetState = percent?.let { "$it%" } ?: "—",
-            transitionSpec = {
-                (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 3 }) togetherWith
-                (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 })
-            },
+            transitionSpec = { (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it/3 }) togetherWith (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it/3 }) },
             label = "pct",
-        ) { v ->
-            Text(v, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        }
+        ) { v -> Text(v, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -470,7 +465,5 @@ fun AnimatedValue(
             (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 })
         },
         label = "animVal",
-    ) { v ->
-        Text(v, style = style, color = color, fontWeight = fontWeight, maxLines = maxLines)
-    }
+    ) { v -> Text(v, style = style, color = color, fontWeight = fontWeight, maxLines = maxLines) }
 }

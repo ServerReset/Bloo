@@ -33,17 +33,17 @@ object WearTiles {
 
     val LABELS = mapOf(
         SUMMARY to "Summary",
-        LOCK to "Lock",
+        LOCK to "Lock / Unlock",
         CLIMATE to "Climate",
         COMFORT to "Comfort",
         PRESETS to "Presets",
         CHARGE to "Charge",
-        LIMITS to "Charge limits",
+        LIMITS to "Charge Limits",
         LOCATION to "Location",
         WEATHER to "Weather",
         INFO to "Info",
         DIAGNOSTICS to "Diagnostics",
-        AI to "AI summary",
+        AI to "AI Summary",
         ASSIST to "Assist",
         MORE to "More",
     )
@@ -60,14 +60,13 @@ class WearLocalStore(private val context: Context) {
     private val keyTileOrder = stringPreferencesKey("tile_order")
 
     val flow: Flow<WearLocalSettings> = context.wearLocalStore.data.map { prefs ->
-        val fontScale = prefs[keyFontScale]?.coerceIn(0.8f, 1.4f) ?: 1f
+        val fontScale = (prefs[keyFontScale] ?: 1f).coerceIn(0.8f, 1.4f)
         val savedOrder = prefs[keyTileOrder]
             ?.split(",")
             ?.filter { it.isNotBlank() }
             ?: WearTiles.DEFAULT_ORDER
-        // Merge: keep saved order, append any new keys that aren't in it yet.
-        val knownKeys = WearTiles.DEFAULT_ORDER.toSet()
-        val merged = savedOrder.filter { it in knownKeys } +
+        // Merge: keep saved order, append any new keys not yet in the saved list.
+        val merged = savedOrder.filter { it in WearTiles.DEFAULT_ORDER } +
             WearTiles.DEFAULT_ORDER.filter { it !in savedOrder }
         WearLocalSettings(fontScale = fontScale, tileOrder = merged)
     }
