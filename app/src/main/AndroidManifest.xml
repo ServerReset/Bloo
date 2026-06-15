@@ -106,6 +106,36 @@
             </intent-filter>
         </service>
 
+        <!-- Home-screen widget: pinned car status + four assignable pill buttons. -->
+        <receiver
+            android:name=".widget.BlooWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/bloo_widget_info" />
+        </receiver>
+
+        <!-- Widget setup (on first drop AND launcher long-press → settings). -->
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Bloo">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- Transparent biometric/PIN gate for widget button taps. -->
+        <activity
+            android:name=".widget.WidgetAuthActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Bloo.Transparent" />
+
     </application>
 
 </manifest>

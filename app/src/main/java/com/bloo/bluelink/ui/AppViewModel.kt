@@ -754,6 +754,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin]) })
         // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
+        // Refresh any home-screen widgets so their status reflects the new data.
+        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
     }
 
     private fun com.bloo.bluelink.data.Weather.toWear() = com.bloo.bluelink.data.WearWeather(
@@ -779,6 +781,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             locked = status?.doorLock,
             charging = status?.evStatus?.batteryCharge,
             climateOn = status?.airCtrlOn,
+            engineOn = status?.engine,
+            lat = status?.vehicleLocation?.coord?.lat,
+            lon = status?.vehicleLocation?.coord?.lon,
             updated = status?.dateTime,
         )
     }

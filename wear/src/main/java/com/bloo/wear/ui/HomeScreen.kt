@@ -295,6 +295,8 @@ private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
             } ?: Text("—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(if (car.hasBattery) "Battery" else "Fuel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
+                car.engineOn ->
+                    Text("Driving", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
                 car.charging == true && car.timeToFullMin != null && car.timeToFullMin > 0 ->
                     Text("${fmtMinutes(car.timeToFullMin)} to full", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
                 car.charging == true ->

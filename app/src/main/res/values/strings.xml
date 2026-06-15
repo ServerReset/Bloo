@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Bloo</string>
+    <string name="widget_description">Car status with quick lock, climate, charge and more.</string>
 </resources>

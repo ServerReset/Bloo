@@ -451,6 +451,31 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("tile_background")] = value }
     }
 
+    // --- Home-screen widgets -------------------------------------------------
+
+    /** Per-widget assignment: (pinned vin, ordered action keys) or null. */
+    suspend fun widgetConfig(widgetId: Int): Pair<String, List<String>>? {
+        val p = context.settingsDataStore.data.first()
+        val vin = p[stringPreferencesKey("widget_${widgetId}_vin")]?.takeIf { it.isNotBlank() } ?: return null
+        val actions = p[stringPreferencesKey("widget_${widgetId}_actions")]
+            ?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        return vin to actions
+    }
+
+    suspend fun setWidgetConfig(widgetId: Int, vin: String, actions: List<String>) {
+        context.settingsDataStore.edit {
+            it[stringPreferencesKey("widget_${widgetId}_vin")] = vin
+            it[stringPreferencesKey("widget_${widgetId}_actions")] = actions.joinToString(",")
+        }
+    }
+
+    suspend fun clearWidgetConfig(widgetId: Int) {
+        context.settingsDataStore.edit {
+            it.remove(stringPreferencesKey("widget_${widgetId}_vin"))
+            it.remove(stringPreferencesKey("widget_${widgetId}_actions"))
+        }
+    }
+
     // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
 
     suspend fun hotspot(vin: String): String? =
