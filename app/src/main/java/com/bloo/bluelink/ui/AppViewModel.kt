@@ -40,7 +40,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
@@ -291,6 +293,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             settingsStore.appearance.collect { a ->
                 com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), a)
+            }
+        }
+        // Mirror saved climate presets to the watch whenever they change.
+        viewModelScope.launch {
+            _state.map { it.climatePresets }.distinctUntilChanged().collect { presets ->
+                com.bloo.bluelink.wear.WearBridge.publishPresets(getApplication(), presets)
             }
         }
         // Probe on-device Gemini Nano once; the AI toggle only appears if present.

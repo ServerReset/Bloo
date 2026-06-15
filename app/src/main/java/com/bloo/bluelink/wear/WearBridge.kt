@@ -156,6 +156,22 @@ object WearBridge {
         (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
 
+    /** Mirror saved climate presets (keyed by VIN) to the watch. */
+    fun publishPresets(context: Context, byVin: Map<String, List<com.bloo.bluelink.data.ClimatePreset>>) {
+        val app = context.applicationContext
+        scope.launch {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_PRESETS).apply {
+                    dataMap.putString(
+                        WearSync.KEY_PAYLOAD,
+                        WearSync.encodePresets(com.bloo.bluelink.data.WearPresets(byVin)),
+                    )
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(app).putDataItem(request))
+            }
+        }
+    }
+
     suspend fun execute(context: Context, command: WearCommand): WearCommandResult =
         WearCommandRunner.execute(context, command)
 

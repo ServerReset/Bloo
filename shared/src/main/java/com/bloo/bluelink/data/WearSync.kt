@@ -34,6 +34,9 @@ object WearSync {
      *  look and settings and updates live when they change. */
     const val PATH_SETTINGS = "/bloo/settings"
 
+    /** DataItem path: phone → watch saved climate presets, keyed by VIN. */
+    const val PATH_PRESETS = "/bloo/presets"
+
     /** Message path: watch → phone, "run this command". */
     const val PATH_COMMAND = "/bloo/command"
 
@@ -75,6 +78,13 @@ object WearSync {
 
     fun decodeSettings(raw: String?): WearSettingsPayload? =
         raw?.let { runCatching { json.decodeFromString(WearSettingsPayload.serializer(), it) }.getOrNull() }
+
+    fun encodePresets(presets: WearPresets): String =
+        json.encodeToString(WearPresets.serializer(), presets)
+
+    fun decodePresets(raw: String?): WearPresets =
+        raw?.let { runCatching { json.decodeFromString(WearPresets.serializer(), it) }.getOrNull() }
+            ?: WearPresets()
 
     fun encodeCommand(command: WearCommand): String =
         json.encodeToString(WearCommand.serializer(), command)
@@ -192,4 +202,10 @@ data class WearSettingsPayload(
     val useFahrenheit: Boolean = true,
     val uiScale: Float = 1f,
     val colors: WearColorRoles? = null,
+)
+
+/** Saved climate presets per VIN, mirrored to the watch. */
+@Serializable
+data class WearPresets(
+    val byVin: Map<String, List<ClimatePreset>> = emptyMap(),
 )

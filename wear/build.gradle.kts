@@ -102,4 +102,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.material:material-icons-extended")
+    // Small static map thumbnail on the Location tile.
+    implementation("io.coil-kt:coil-compose:2.7.0")
 }

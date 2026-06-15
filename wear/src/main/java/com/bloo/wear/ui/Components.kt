@@ -33,7 +33,17 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
-import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
+import coil.compose.AsyncImage
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.ln
+import kotlin.math.tan
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.CircleShape
@@ -71,16 +81,44 @@ private const val KEY = "bloo_input"
 
 /** Charge/fuel percentage as a ring with the value centred. */
 @Composable
-fun ChargeRing(percent: Int?, modifier: Modifier = Modifier) {
-    Box(contentAlignment = Alignment.Center, modifier = modifier.size(88.dp)) {
+fun ChargeRing(percent: Int?, modifier: Modifier = Modifier, size: Dp = 88.dp) {
+    Box(contentAlignment = Alignment.Center, modifier = modifier.size(size)) {
         CircularProgressIndicator(
             progress = { (percent ?: 0).coerceIn(0, 100) / 100f },
-            modifier = Modifier.fillMaxWidth().size(88.dp),
+            modifier = Modifier.size(size),
         )
         Text(
             percent?.let { "$it%" } ?: "—",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
         )
+    }
+}
+
+/** A small OSM map thumbnail centred on the car, with a marker. */
+@Composable
+fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
+    val z = 15
+    val n = (1 shl z).toDouble()
+    val latRad = Math.toRadians(lat)
+    val xf = (lon + 180.0) / 360.0 * n
+    val yf = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * n
+    val xt = xf.toInt()
+    val yt = yf.toInt()
+    val url = "https://tile.openstreetmap.org/$z/$xt/$yt.png"
+    val mx = (xf - xt).toFloat()
+    val my = (yf - yt).toFloat()
+    val marker = MaterialTheme.colorScheme.error
+    Box(modifier.size(116.dp).clip(RoundedCornerShape(18.dp))) {
+        AsyncImage(
+            model = url,
+            contentDescription = "Map",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize(),
+        )
+        Canvas(Modifier.matchParentSize()) {
+            drawCircle(marker, radius = 6.dp.toPx(), center = Offset(mx * size.width, my * size.height))
+        }
     }
 }
 
@@ -180,13 +218,19 @@ fun MorphButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val corner by animateIntAsState(if (active || pressed) 30 else 50, label = "morphCorner")
+    // Match the phone's MorphButton: pill (50%) ↔ rounded square (28%) with a
+    // soft expressive spring.
+    val pct by animateFloatAsState(
+        targetValue = if (active || pressed) 28f else 50f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow),
+        label = "morphCorner",
+    )
     Button(
         onClick = onClick,
         enabled = !pending,
         interactionSource = interaction,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(percent = corner),
+        shape = RoundedCornerShape(percent = pct.roundToInt()),
         colors = if (active) {
             ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
         } else {

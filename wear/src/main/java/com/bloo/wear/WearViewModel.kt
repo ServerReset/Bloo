@@ -1,9 +1,11 @@
 package com.bloo.wear
 
 import android.app.Application
+import android.location.Geocoder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
@@ -25,11 +27,14 @@ import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.repositoryFor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 enum class WearScreen { Loading, SignedOut, Ready }
 
@@ -63,6 +68,7 @@ data class CarView(
     val odometer: String?,
     val lat: Double?,
     val lon: Double?,
+    val locationName: String?,
     val tripsSupported: Boolean,
     val engineOn: Boolean,
     val accessoryOn: Boolean,
@@ -92,6 +98,7 @@ data class WearUi(
     val pending: Set<String> = emptySet(),
     val busy: Boolean = false,
     val message: String? = null,
+    val presets: Map<String, List<ClimatePreset>> = emptyMap(),
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     val climateTempF: Int = 72,
@@ -128,6 +135,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private var snapshots: Map<String, com.bloo.bluelink.data.VehicleSnapshot> = emptyMap()
     private var fetchedAt: Map<String, Long> = emptyMap()
     private var trips: Map<String, List<EvTrip>> = emptyMap()
+    private var placeNames: Map<String, String> = emptyMap()
     private var pending: Set<String> = emptySet()
 
     // Cars whose status we've already fetched this session, so paging back and
@@ -144,6 +152,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             WearSettingsStore(ctx).flow.collect { s -> _ui.update { it.copy(settings = s) } }
+        }
+        viewModelScope.launch {
+            WearPresetsStore(ctx).flow.collect { p -> _ui.update { it.copy(presets = p.byVin) } }
         }
         bootstrap()
     }
@@ -267,6 +278,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     val ac = s.evStatus?.reservChargeInfos?.level(1)
                     val dc = s.evStatus?.reservChargeInfos?.level(0)
                     _ui.update { u -> u.copy(acLimitDraft = u.acLimitDraft ?: ac, dcLimitDraft = u.dcLimitDraft ?: dc) }
+                    s.vehicleLocation?.coord?.let { c ->
+                        val la = c.lat; val lo = c.lon
+                        if (la != null && lo != null) geocode(vin, la, lo)
+                    }
                     persistCache()
                     publish()
                 }
@@ -315,6 +330,32 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleCharge(vin: String) = command(vin, "charge") { v, repo, st ->
         if (st?.evStatus?.batteryCharge == true) repo.stopCharge(v) else repo.startCharge(v)
+    }
+
+    /** Apply a saved climate preset (start climate with its exact settings). */
+    fun applyPreset(vin: String, preset: ClimatePreset) = command(vin, "climate") { v, repo, _ ->
+        repo.startClimate(v, preset.request)
+        flip(vin) { it.copy(airCtrlOn = true) }
+    }
+
+    /** Reverse-geocode the car's coordinates to a human place name. */
+    private fun geocode(vin: String, lat: Double, lon: Double) {
+        viewModelScope.launch {
+            val name = withContext(Dispatchers.IO) {
+                runCatching {
+                    @Suppress("DEPRECATION")
+                    val a = Geocoder(ctx, Locale.getDefault()).getFromLocation(lat, lon, 1)?.firstOrNull()
+                    a?.let {
+                        listOfNotNull(it.locality ?: it.subAdminArea, it.adminArea)
+                            .joinToString(", ").ifBlank { it.getAddressLine(0) }
+                    }
+                }.getOrNull()
+            }
+            if (!name.isNullOrBlank()) {
+                placeNames = placeNames + (vin to name)
+                publish()
+            }
+        }
     }
 
     /** Push the AC/DC charge-limit sliders to the car. */
@@ -433,6 +474,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             odometer = v.odometer,
             lat = coord?.lat,
             lon = coord?.lon,
+            locationName = placeNames[v.vin],
             tripsSupported = !gen5w,
             engineOn = s?.engine == true,
             accessoryOn = s?.acc == true,

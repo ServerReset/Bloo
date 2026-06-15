@@ -27,20 +27,26 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.foundation.focusable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
-import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.FilledTonalButton
@@ -49,6 +55,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.SeatLevel
+import kotlinx.coroutines.launch
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
 import com.bloo.wear.WearUi
@@ -87,11 +94,14 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit) {
-    val tiles = remember(car.vin, car.hasBattery, car.lat, car.hasLiveStatus, car.tripsSupported) {
+    val hasPresets = (ui.presets[car.vin]?.isNotEmpty() == true)
+    val tiles = remember(car.vin, car.hasBattery, car.lat, car.hasLiveStatus, car.tripsSupported, hasPresets) {
         buildList {
             add("summary"); add("climate"); add("comfort")
+            if (hasPresets) add("presets")
             if (car.hasBattery) { add("charge"); add("limits") }
             if (car.lat != null && car.lon != null) add("location")
             add("info")
@@ -104,23 +114,35 @@ private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
     val virtual = if (loop) count * 1000 else count
     val vPager = rememberPagerState(initialPage = if (loop) virtual / 2 else 0) { virtual }
 
-    // Bezel / digital-crown scrolling drives the tile pager.
+    // Bezel / digital-crown scrolling, page by page.
     val focusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    var accum by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(car.vin) { runCatching { focusRequester.requestFocus() } }
 
     Box(Modifier.fillMaxSize()) {
         VerticalPager(
             state = vPager,
             modifier = Modifier.fillMaxSize()
-                .rotaryScrollable(RotaryScrollableDefaults.behavior(vPager), focusRequester),
+                .onRotaryScrollEvent { e ->
+                    accum += e.verticalScrollPixels
+                    when {
+                        accum >= 40f -> { scope.launch { vPager.animateScrollToPage(vPager.currentPage + 1) }; accum = 0f }
+                        accum <= -40f -> { scope.launch { vPager.animateScrollToPage(vPager.currentPage - 1) }; accum = 0f }
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
         ) { i ->
             when (tiles[wrap(i, count)]) {
                 "summary" -> SummaryTile(vm, ui, car)
                 "climate" -> ClimateTile(vm, ui, car)
                 "comfort" -> ComfortTile(vm, ui)
+                "presets" -> PresetsTile(vm, ui, car)
                 "charge" -> ChargeTile(vm, ui, car)
                 "limits" -> LimitsTile(vm, ui, car)
-                "location" -> LocationTile(car)
+                "location" -> LocationTile(vm, ui, car)
                 "info" -> InfoTile(car)
                 "diagnostics" -> DiagnosticsTile(car)
                 "more" -> MoreTile(vm, ui, car, onSettings, onTrips)
@@ -140,12 +162,15 @@ private fun CarTiles(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
 
 @Composable
 private fun SummaryTile(vm: WearViewModel, ui: WearUi, car: CarView) = TileFrame(car.name) {
-    ChargeRing(car.percent)
-    Spacer(Modifier.height(2.dp))
-    Text(car.rangeMi?.let { "$it mi" } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    if (car.charging == true) Text("Charging", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
-    val rel = relativeLabel(car.fetchedAt)
-    if (rel.isNotBlank()) Text("Updated $rel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Compact: ring + range side by side so lock/unlock is always on screen.
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ChargeRing(car.percent, size = 60.dp)
+        Column {
+            Text(car.rangeMi?.let { "$it mi" } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(if (car.hasBattery) "Battery" else "Fuel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (car.charging == true) Text("Charging", style = MaterialTheme.typography.labelSmall, color = WearColors.chargeGreen)
+        }
+    }
     Spacer(Modifier.height(6.dp))
     MorphButton(
         label = if (car.locked == true) "Locked" else "Unlocked",
@@ -155,6 +180,26 @@ private fun SummaryTile(vm: WearViewModel, ui: WearUi, car: CarView) = TileFrame
         pending = "${car.vin}:doors" in ui.pending,
         onClick = { vm.toggleLock(car.vin) },
     )
+}
+
+@Composable
+private fun PresetsTile(vm: WearViewModel, ui: WearUi, car: CarView) = TileFrame("Presets") {
+    val presets = ui.presets[car.vin].orEmpty()
+    if (presets.isEmpty()) {
+        Text("No presets — save one on your phone", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    } else {
+        presets.forEach { preset ->
+            MorphButton(
+                label = preset.name,
+                icon = Icons.Filled.Thermostat,
+                active = false,
+                activeColor = MaterialTheme.colorScheme.tertiary,
+                pending = "${car.vin}:climate" in ui.pending,
+                onClick = { vm.applyPreset(car.vin, preset) },
+            )
+            Spacer(Modifier.height(6.dp))
+        }
+    }
 }
 
 @Composable
@@ -208,23 +253,39 @@ private fun LimitsTile(vm: WearViewModel, ui: WearUi, car: CarView) = TileFrame(
     val ac = ui.acLimitDraft ?: car.acLimit ?: 80
     val dc = ui.dcLimitDraft ?: car.dcLimit ?: 90
     SliderRow("AC", "$ac%", ac, 50, 100, 5) { vm.setAcLimit(it) }
-    Spacer(Modifier.height(4.dp))
     SliderRow("DC", "$dc%", dc, 50, 100, 5) { vm.setDcLimit(it) }
-    Spacer(Modifier.height(6.dp))
-    Button(
+    MorphButton(
+        label = "Apply limits",
+        icon = Icons.Filled.Bolt,
+        active = false,
+        activeColor = WearColors.chargeGreen,
+        pending = "${car.vin}:chargeLimit" in ui.pending,
         onClick = { vm.applyChargeLimits(car.vin) },
-        enabled = "${car.vin}:chargeLimit" !in ui.pending,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(if ("${car.vin}:chargeLimit" in ui.pending) "Sending…" else "Apply limits", maxLines = 1) },
     )
 }
 
 @Composable
-private fun LocationTile(car: CarView) = TileFrame("Location") {
+private fun LocationTile(vm: WearViewModel, ui: WearUi, car: CarView) = TileFrame("Location") {
     val lat = car.lat ?: 0.0
     val lon = car.lon ?: 0.0
-    Text("%.4f".format(lat), style = MaterialTheme.typography.bodyMedium)
-    Text("%.4f".format(lon), style = MaterialTheme.typography.bodyMedium)
+    MapThumbnail(lat, lon)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        car.locationName ?: "%.4f, %.4f".format(lat, lon),
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = FontWeight.Medium,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+    )
+    Spacer(Modifier.height(6.dp))
+    MorphButton(
+        label = "Locate",
+        icon = Icons.Filled.LocationOn,
+        active = false,
+        activeColor = MaterialTheme.colorScheme.primary,
+        pending = "${car.vin}:refresh" in ui.pending,
+        onClick = { vm.refreshStatus(car.vin) },
+    )
     Spacer(Modifier.height(6.dp))
     val context = LocalContext.current
     FilledTonalButton(
@@ -253,6 +314,9 @@ private fun InfoTile(car: CarView) = TileFrame("Info") {
 @Composable
 private fun DiagnosticsTile(car: CarView) = TileFrame("Diagnostics") {
     val err = MaterialTheme.colorScheme.error
+    car.tempSetting?.let { StatusRow("Set temp", "$it°") }
+    if (car.hasBattery) car.rangeMi?.let { StatusRow("Range", "$it mi") }
+    StatusRow("Plug", car.chargerLabel ?: (if (car.pluggedIn == true) "Plugged in" else "Unplugged"))
     car.tireAll?.let { StatusRow("Tire avg", "$it psi") }
     if (car.tireFl) StatusRow("Tire FL", "Check", valueColor = err)
     if (car.tireFr) StatusRow("Tire FR", "Check", valueColor = err)
@@ -310,12 +374,13 @@ private fun seatLabel(v: Int?): String? = v?.takeIf { it != 0 }?.let { SeatLevel
 @Composable
 private fun TileFrame(title: String, content: @Composable ColumnScope.() -> Unit) {
     val round = LocalConfiguration.current.isScreenRound
-    val hPad = if (round) 24.dp else 12.dp
+    // Extra inset on round screens so full-width buttons sit inside the circle.
+    val hPad = if (round) 30.dp else 12.dp
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = hPad, vertical = if (round) 26.dp else 14.dp),
+            .padding(horizontal = hPad, vertical = if (round) 32.dp else 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

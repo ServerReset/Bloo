@@ -23,6 +23,10 @@ object WearStateWriter {
         WearSettingsStore(context).save(raw)
     }
 
+    suspend fun persistPresets(context: Context, raw: String) {
+        WearPresetsStore(context).save(raw)
+    }
+
     suspend fun persistAuth(context: Context, raw: String) {
         val bundle = WearSync.decodeAuth(raw)
         val store = SessionStore(context)
