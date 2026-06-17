@@ -95,6 +95,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.WearWeather
 import com.bloo.bluelink.data.links
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
@@ -174,7 +175,7 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
             WearTiles.PRESETS -> true
             WearTiles.CHARGE, WearTiles.LIMITS -> car.hasBattery
             WearTiles.LOCATION -> car.lat != null && car.lon != null
-            WearTiles.WEATHER -> ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null
+            WearTiles.WEATHER, WearTiles.SMART_CLIMATE -> ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null
             WearTiles.DIAGNOSTICS -> car.hasLiveStatus
             else -> true // summary, lock, climate, comfort, info, ai, assist, more
         }
@@ -216,7 +217,10 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, active: Boole
     var isSnapping by remember { mutableStateOf(false) }
 
     // Snap to the nearest tile when a finger fling settles — tile-by-tile feel.
-    LaunchedEffect(state.isScrollInProgress) {
+    // Guard: only snap on the active (visible) page to avoid stray haptics when
+    // the car pager swipes between cars and off-screen columns lose/gain focus.
+    LaunchedEffect(state.isScrollInProgress, active) {
+        if (!active) return@LaunchedEffect
         if (!state.isScrollInProgress && !isSnapping) {
             val info = state.layoutInfo
             val viewportCenter = info.viewportSize.height / 2
@@ -337,6 +341,7 @@ private fun TileContent(
             onClick = { vm.toggleLock(car.vin) },
         )
         WearTiles.CLIMATE -> ClimateCard(vm, ui, car)
+        WearTiles.SMART_CLIMATE -> SmartClimateCard(vm, ui, car)
         WearTiles.COMFORT -> ComfortCard(vm, ui, car)
         WearTiles.PRESETS -> PresetsCard(vm, ui, car)
         WearTiles.CHARGE -> ChargeCard(vm, ui, car)
@@ -487,6 +492,36 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
     SwitchButton(checked = d.defrost, onCheckedChange = { vm.toggleDefrost(car.vin) }, modifier = Modifier.fillMaxWidth(), label = { Text("Defrost") })
+}
+
+@Composable
+private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate") {
+    val weather: WearWeather? = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
+    val ambientF = weather?.let { ((it.tempC * 9.0 / 5.0) + 32).toInt() }
+    val label = if (ambientF != null) {
+        val action = if (ambientF >= 70) "Cool" else "Heat"
+        if (car.climateOn == true) "Smart climate on" else "$action to ~${
+            if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85) else (ambientF + 10).coerceIn(60, 85)
+        }°F"
+    } else {
+        "No weather data"
+    }
+    MorphButton(
+        label = label,
+        icon = Icons.Filled.Thermostat,
+        active = car.climateOn == true,
+        activeColor = MaterialTheme.colorScheme.tertiary,
+        pending = "${car.vin}:climate" in ui.pending || weather == null,
+        onClick = { if (weather != null) vm.smartClimate(car.vin) },
+    )
+    if (ambientF != null) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Ambient: $ambientF°F · adjusts ±10°F",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable

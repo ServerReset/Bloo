@@ -538,6 +538,42 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveTileOrder(order: List<String>) { viewModelScope.launch { localStore.setTileOrder(order) } }
 
+    /**
+     * Smart climate: reads the weather at the car's location (or home weather as
+     * fallback), then starts climate at [offset]°F cooler than ambient on a hot
+     * day or [offset]°F warmer than ambient on a cold day. Threshold is 70°F.
+     */
+    fun smartClimate(vin: String, offset: Int = 10) {
+        val extras = _ui.value.extras
+        val weather = extras.carWeather[vin] ?: extras.homeWeather ?: run {
+            _ui.update { it.copy(message = "No weather data — can't run smart climate") }
+            return
+        }
+        val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).toInt()
+        val targetF = if (ambientF >= 70) (ambientF - offset).coerceIn(60, 85)
+                      else (ambientF + offset).coerceIn(60, 85)
+        command(vin, "climate") { v, repo, st ->
+            if (st?.airCtrlOn == true) {
+                repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
+                updateDraft(vin) { it.copy(activePresetId = null) }
+            } else {
+                val d = _ui.value.draftFor(vin)
+                repo.startClimate(v, ClimateRequest(
+                    tempF = targetF,
+                    defrost = false,
+                    durationMinutes = d.duration,
+                    steeringWheelHeat = d.steering,
+                    seatFrontLeft = seatLevelOf(d.seatDriver),
+                    seatFrontRight = seatLevelOf(d.seatPassenger),
+                    seatRearLeft = seatLevelOf(d.seatRearLeft),
+                    seatRearRight = seatLevelOf(d.seatRearRight),
+                ))
+                flip(vin) { it.copy(airCtrlOn = true) }
+                updateDraft(vin) { it.copy(tempF = targetF, activePresetId = null) }
+            }
+        }
+    }
+
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {

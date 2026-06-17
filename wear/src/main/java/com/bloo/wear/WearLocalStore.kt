@@ -26,8 +26,10 @@ object WearTiles {
     const val ASSIST = "assist"
     const val MORE = "more"
 
+    const val SMART_CLIMATE = "smart_climate"
+
     val DEFAULT_ORDER = listOf(
-        SUMMARY, LOCK, CLIMATE, COMFORT, PRESETS, CHARGE, LIMITS,
+        SUMMARY, LOCK, CLIMATE, SMART_CLIMATE, COMFORT, PRESETS, CHARGE, LIMITS,
         LOCATION, WEATHER, INFO, DIAGNOSTICS, AI, ASSIST, MORE,
     )
 
@@ -35,6 +37,7 @@ object WearTiles {
         SUMMARY to "Summary",
         LOCK to "Lock / Unlock",
         CLIMATE to "Climate",
+        SMART_CLIMATE to "Smart Climate",
         COMFORT to "Comfort",
         PRESETS to "Presets",
         CHARGE to "Charge",
