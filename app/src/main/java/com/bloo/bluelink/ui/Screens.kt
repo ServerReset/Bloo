@@ -1009,7 +1009,7 @@ private fun WizardFinishPage(
     }
 
     Text(
-        "Tap "Enter Bloo" below — you can fine-tune everything later in Settings.",
+        "Tap Enter Bloo below — you can fine-tune everything later in Settings.",
         style = MaterialTheme.typography.bodySmall,
         color = scheme.onSurfaceVariant,
     )
