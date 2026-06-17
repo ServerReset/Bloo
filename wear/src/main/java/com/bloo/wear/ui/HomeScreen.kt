@@ -459,6 +459,7 @@ private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
 
 @Composable
 private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Climate") {
+    val d = ui.draftFor(car.vin)
     MorphButton(
         label = if (car.climateOn == true) "Climate on" else "Start climate",
         icon = Icons.Filled.Thermostat,
@@ -468,23 +469,24 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         onClick = { vm.toggleClimate(car.vin) },
     )
     Spacer(Modifier.height(6.dp))
-    SliderRow("Temp", "${ui.climateTempF}°F", ui.climateTempF, 62, 82, 1, accent = tempColor(ui.climateTempF)) { vm.setClimateTemp(it) }
-    SliderRow("Run", "${ui.climateDuration} min", ui.climateDuration, 1, 10, 1) { vm.setClimateDuration(it) }
+    SliderRow("Temp", "${d.tempF}°F", d.tempF, 62, 82, 1, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
+    SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
-    SwitchButton(checked = ui.climateDefrost, onCheckedChange = { vm.toggleDefrost() }, modifier = Modifier.fillMaxWidth(), label = { Text("Defrost") })
+    SwitchButton(checked = d.defrost, onCheckedChange = { vm.toggleDefrost(car.vin) }, modifier = Modifier.fillMaxWidth(), label = { Text("Defrost") })
 }
 
 @Composable
 private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort") {
-    SwitchButton(checked = ui.climateSteering, onCheckedChange = { vm.toggleSteering() }, modifier = Modifier.fillMaxWidth(), label = { Text("Steering heat") })
+    val d = ui.draftFor(car.vin)
+    SwitchButton(checked = d.steering, onCheckedChange = { vm.toggleSteering(car.vin) }, modifier = Modifier.fillMaxWidth(), label = { Text("Steering heat") })
     Spacer(Modifier.height(4.dp))
-    SliderRow("Driver seat", seatStepLabels[ui.seatDriver], ui.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(it) }
-    SliderRow("Passenger", seatStepLabels[ui.seatPassenger], ui.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(it) }
+    SliderRow("Driver seat", seatStepLabels[d.seatDriver], d.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(car.vin, it) }
+    SliderRow("Passenger", seatStepLabels[d.seatPassenger], d.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(car.vin, it) }
     // Rear seats only when the live status shows they exist (non-null seatRl/Rr from a fetch).
     if (car.seatRl != null || car.seatRr != null) {
         Spacer(Modifier.height(2.dp))
-        SliderRow("Rear left", seatStepLabels[ui.seatRearLeft], ui.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(it) }
-        SliderRow("Rear right", seatStepLabels[ui.seatRearRight], ui.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(it) }
+        SliderRow("Rear left", seatStepLabels[d.seatRearLeft], d.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(car.vin, it) }
+        SliderRow("Rear right", seatStepLabels[d.seatRearRight], d.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(car.vin, it) }
     }
     Spacer(Modifier.height(2.dp))
     Text("Applied when you start climate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -493,7 +495,7 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 @Composable
 private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets") {
     ui.presets[car.vin].orEmpty().forEach { preset ->
-        val isActive = ui.activePresetId == preset.id && car.climateOn == true
+        val isActive = ui.draftFor(car.vin).activePresetId == preset.id && car.climateOn == true
         MorphButton(
             label = preset.name,
             icon = Icons.Filled.Thermostat,
