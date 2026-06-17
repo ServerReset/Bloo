@@ -100,6 +100,7 @@ import com.bloo.bluelink.data.WearWeather
 import com.bloo.bluelink.data.links
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
+import com.bloo.wear.WearPebbles
 import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
@@ -116,7 +117,7 @@ private fun wrap(index: Int, count: Int) = ((index % count) + count) % count
 private const val TILE_ALERTS = "alerts"
 
 @Composable
-fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit = {}) {
+fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit = {}) {
     if (ui.cars.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No cars yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -203,7 +204,9 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
         car.lowFuel || car.brakeLow || car.washerLow || car.keyFobLow
     val out = ArrayList<String>()
     if (hasAlerts) out.add(TILE_ALERTS)
-    for (key in ui.localSettings.tileOrder) {
+    // Tile order is derived from this car's pebble order, kept in sync with the
+    // phone (one pebble can expand into several tiles).
+    for (key in WearPebbles.tilesFor(ui.pebbleOrderFor(car.vin))) {
         val show = when (key) {
             // Always shown so you can save the first preset from the watch.
             WearTiles.PRESETS -> true
@@ -233,13 +236,13 @@ private fun CarColumn(
     listStates: MutableMap<String, ScalingLazyListState>,
     onSettings: () -> Unit,
     onTrips: (String) -> Unit,
-    onReorder: () -> Unit,
+    onReorder: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val round = LocalConfiguration.current.isScreenRound
 
-    val tiles = remember(ui.localSettings.tileOrder, ui.presets, ui.extras, car) { visibleTiles(ui, car) }
+    val tiles = remember(ui.pebbleOverride, ui.settings, ui.presets, ui.extras, car) { visibleTiles(ui, car) }
     val tileCount = tiles.size
     // Wrap-around (endless) scrolling once there's more than one tile.
     val infinite = tileCount > 1
@@ -381,7 +384,7 @@ private fun TileContent(
     car: CarView,
     onSettings: () -> Unit,
     onTrips: (String) -> Unit,
-    onReorder: () -> Unit,
+    onReorder: (String) -> Unit,
 ) {
     when (key) {
         TILE_ALERTS -> AlertsCard(car)
@@ -823,7 +826,7 @@ private fun AssistCard(car: CarView) = SectionCard("Assist") {
 }
 
 @Composable
-private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit) = SectionCard("More") {
+private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit) = SectionCard("More") {
     val accent = MaterialTheme.colorScheme.primary
     MorphButton(
         label = "Refresh",
@@ -860,7 +863,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         active = false,
         activeColor = accent,
         pending = false,
-        onClick = onReorder,
+        onClick = { onReorder(car.vin) },
     )
 }
 
@@ -891,21 +894,32 @@ private fun CurvedIndicator(count: Int, current: Int, anchor: Float) {
     }
 }
 
+/**
+ * Reorder this car's pebble *groups* (so the multiple watch tiles a pebble owns
+ * always move as one unit). Long-press a row and drag. On drop, the new order is
+ * applied instantly and pushed to the phone as this car's section order, keeping
+ * both devices in lock-step. Summary is pinned first, like the phone.
+ */
 @Composable
-fun TileReorderScreen(vm: WearViewModel, ui: WearUi) {
-    var order by remember { mutableStateOf(ui.localSettings.tileOrder) }
+fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
+    val synced = WearPebbles.reorderable(ui.pebbleOrderFor(vin))
+    var order by remember(vin) { mutableStateOf(synced) }
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<String, Int>() }
 
-    LaunchedEffect(ui.localSettings.tileOrder) {
-        if (draggingKey == null) order = ui.localSettings.tileOrder
+    // Adopt incoming changes from the phone unless the user is mid-drag.
+    LaunchedEffect(synced) {
+        if (draggingKey == null) order = synced
     }
 
     val state = rememberScalingLazyListState()
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    // Persist (summary first) to the car's pebble order, synced to the phone.
+    fun commit() = vm.savePebbleOrder(vin, listOf("summary") + order)
 
     ScalingLazyColumn(
         modifier = Modifier
@@ -940,7 +954,7 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi) {
                         .pointerInput(key) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = { draggingKey = key; offsetY = 0f },
-                                onDragEnd = { draggingKey = null; offsetY = 0f; vm.saveTileOrder(order) },
+                                onDragEnd = { draggingKey = null; offsetY = 0f; commit() },
                                 onDragCancel = { draggingKey = null; offsetY = 0f },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
@@ -977,7 +991,7 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi) {
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            WearTiles.LABELS[key] ?: key,
+                            WearPebbles.LABELS[key] ?: key,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.weight(1f),
                         )

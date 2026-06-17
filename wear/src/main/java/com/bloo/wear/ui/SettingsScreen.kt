@@ -43,7 +43,6 @@ import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.Text
-import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import kotlinx.coroutines.launch
@@ -133,34 +132,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
                 Text("Tile order", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
-                ui.localSettings.tileOrder.forEachIndexed { idx, key ->
-                    val label = WearTiles.LABELS[key] ?: key
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                        Row {
-                            if (idx > 0) {
-                                FilledTonalButton(
-                                    onClick = { vm.moveTileUp(key) },
-                                    modifier = Modifier.size(32.dp),
-                                    label = { Text("↑", style = MaterialTheme.typography.labelSmall) },
-                                )
-                            }
-                            if (idx < ui.localSettings.tileOrder.size - 1) {
-                                Spacer(Modifier.width(4.dp))
-                                FilledTonalButton(
-                                    onClick = { vm.moveTileDown(key) },
-                                    modifier = Modifier.size(32.dp),
-                                    label = { Text("↓", style = MaterialTheme.typography.labelSmall) },
-                                )
-                            }
-                        }
-                    }
-                    if (idx < ui.localSettings.tileOrder.size - 1) Spacer(Modifier.height(2.dp))
-                }
+                Text(
+                    "Reorder a car's tiles from its More tile → Reorder tiles. The order stays in sync with that car on your phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 

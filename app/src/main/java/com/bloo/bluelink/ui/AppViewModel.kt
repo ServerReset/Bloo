@@ -298,6 +298,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), a)
             }
         }
+        // Re-publish settings (which carry each car's pebble order) whenever the
+        // user reorders pebbles, so the watch's tile layout follows the phone.
+        viewModelScope.launch {
+            _state.map { it.sectionOrders }.distinctUntilChanged().collect {
+                com.bloo.bluelink.wear.WearBridge.publishSettings(
+                    getApplication(), settingsStore.appearance.first(),
+                )
+            }
+        }
         // Mirror saved climate presets to the watch whenever they change.
         viewModelScope.launch {
             _state.map { it.climatePresets }.distinctUntilChanged().collect { presets ->

@@ -107,6 +107,21 @@ object WearComms {
         }
     }
 
+    /** Publish a car's reordered pebble order so the phone saves it as that car's
+     *  section order and mirrors it back to every device. */
+    suspend fun publishPebbleOrder(context: Context, vin: String, order: List<String>) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val payload = com.bloo.bluelink.data.WearPebbleOrder(vin, order)
+                val request = PutDataMapRequest.create(WearSync.PATH_PEBBLE_ORDER).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodePebbleOrder(payload))
+                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+            }
+        }
+    }
+
     /** On launch, pull whatever the phone already published so the UI isn't empty
      *  while waiting for the next DataChanged callback. */
     suspend fun pullLatest(context: Context) {

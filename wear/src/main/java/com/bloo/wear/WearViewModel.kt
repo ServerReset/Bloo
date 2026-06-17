@@ -125,8 +125,16 @@ data class WearUi(
     val dcLimitDraft: Int? = null,
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
     val localSettings: WearLocalSettings = WearLocalSettings(),
+    /** Optimistic per-car pebble orders the watch just set, held until the phone
+     *  echoes the same order back via [settings]. */
+    val pebbleOverride: Map<String, List<String>> = emptyMap(),
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
+
+    /** This car's effective pebble order: a pending local change wins, else the
+     *  phone-synced order, else the default. */
+    fun pebbleOrderFor(vin: String): List<String> =
+        pebbleOverride[vin] ?: settings?.pebbleOrders?.get(vin) ?: WearPebbles.DEFAULT_ORDER
 }
 
 private fun seatLevelOf(step: Int): SeatLevel = when (step) {
@@ -178,7 +186,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            WearSettingsStore(ctx).flow.collect { s -> _ui.update { it.copy(settings = s) } }
+            WearSettingsStore(ctx).flow.collect { s ->
+                _ui.update { u ->
+                    // Drop any optimistic override once the phone has echoed the
+                    // same order back, so the synced value takes over cleanly.
+                    val stillPending = u.pebbleOverride.filterKeys { vin ->
+                        WearPebbles.normalize(s?.pebbleOrders?.get(vin) ?: emptyList()) != u.pebbleOverride[vin]
+                    }
+                    u.copy(settings = s, pebbleOverride = stillPending)
+                }
+            }
         }
         viewModelScope.launch {
             WearPresetsStore(ctx).flow.collect { p -> _ui.update { it.copy(presets = p.byVin) } }
@@ -522,21 +539,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFontScale(scale: Float) { viewModelScope.launch { localStore.setFontScale(scale) } }
 
-    fun moveTileUp(key: String) {
-        val order = _ui.value.localSettings.tileOrder.toMutableList()
-        val idx = order.indexOf(key).takeIf { it > 0 } ?: return
-        order.add(idx - 1, order.removeAt(idx))
-        viewModelScope.launch { localStore.setTileOrder(order) }
+    /**
+     * Persist a car's reordered pebble order: apply it optimistically so the
+     * tiles rearrange instantly, then push it to the phone, which saves it as
+     * that car's section order and mirrors it back to every device.
+     */
+    fun savePebbleOrder(vin: String, order: List<String>) {
+        val normalized = WearPebbles.normalize(order)
+        _ui.update { it.copy(pebbleOverride = it.pebbleOverride + (vin to normalized)) }
+        viewModelScope.launch {
+            runCatching { WearComms.publishPebbleOrder(ctx, vin, normalized) }
+        }
     }
-
-    fun moveTileDown(key: String) {
-        val order = _ui.value.localSettings.tileOrder.toMutableList()
-        val idx = order.indexOf(key).takeIf { it >= 0 && it < order.size - 1 } ?: return
-        order.add(idx + 1, order.removeAt(idx))
-        viewModelScope.launch { localStore.setTileOrder(order) }
-    }
-
-    fun saveTileOrder(order: List<String>) { viewModelScope.launch { localStore.setTileOrder(order) } }
 
     /**
      * Smart climate: reads the weather at the car's location (or home weather as

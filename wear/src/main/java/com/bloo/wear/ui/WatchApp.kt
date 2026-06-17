@@ -75,7 +75,7 @@ fun WatchApp(vm: WearViewModel) {
                             vm, ui,
                             onSettings = { nav.navigate("settings") },
                             onTrips = { vin -> nav.navigate("trips/$vin") },
-                            onReorder = { nav.navigate("reorder") },
+                            onReorder = { vin -> nav.navigate("reorder/$vin") },
                         )
                     }
                     composable("settings") {
@@ -87,8 +87,8 @@ fun WatchApp(vm: WearViewModel) {
                     composable("trips/{vin}") { entry ->
                         TripsScreen(vm, ui, entry.arguments?.getString("vin") ?: "")
                     }
-                    composable("reorder") {
-                        TileReorderScreen(vm, ui)
+                    composable("reorder/{vin}") { entry ->
+                        TileReorderScreen(vm, ui, entry.arguments?.getString("vin") ?: "")
                     }
                 }
             }

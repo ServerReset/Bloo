@@ -46,6 +46,11 @@ object WearSync {
      *  summaries) so the watch reaches fuller parity with the phone. */
     const val PATH_EXTRAS = "/bloo/extras"
 
+    /** DataItem path: watch → phone, a car's reordered pebble order. The watch
+     *  reorders by pebble group; the phone persists it as that car's section
+     *  order (and re-publishes it back in [PATH_SETTINGS]). */
+    const val PATH_PEBBLE_ORDER = "/bloo/pebble_order"
+
     /** Message path: watch → phone, "run this command". */
     const val PATH_COMMAND = "/bloo/command"
 
@@ -108,6 +113,12 @@ object WearSync {
     fun decodeExtras(raw: String?): WearExtras =
         raw?.let { runCatching { json.decodeFromString(WearExtras.serializer(), it) }.getOrNull() }
             ?: WearExtras()
+
+    fun encodePebbleOrder(order: WearPebbleOrder): String =
+        json.encodeToString(WearPebbleOrder.serializer(), order)
+
+    fun decodePebbleOrder(raw: String?): WearPebbleOrder? =
+        raw?.let { runCatching { json.decodeFromString(WearPebbleOrder.serializer(), it) }.getOrNull() }
 
     fun encodeCommand(command: WearCommand): String =
         json.encodeToString(WearCommand.serializer(), command)
@@ -227,6 +238,16 @@ data class WearSettingsPayload(
     val colors: WearColorRoles? = null,
     /** Per-VIN resolved colours for cars with a custom palette override. */
     val carColors: Map<String, WearColorRoles> = emptyMap(),
+    /** Per-VIN pebble (detail-section) order, so the watch lays its tiles out in
+     *  the same order as each car on the phone. */
+    val pebbleOrders: Map<String, List<String>> = emptyMap(),
+)
+
+/** A single car's reordered pebble order, sent watch → phone. */
+@Serializable
+data class WearPebbleOrder(
+    val vin: String,
+    val order: List<String> = emptyList(),
 )
 
 /** Saved climate presets per VIN, mirrored to the watch. */

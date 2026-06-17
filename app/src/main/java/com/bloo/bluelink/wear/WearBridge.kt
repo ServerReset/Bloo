@@ -126,12 +126,18 @@ object WearBridge {
             vin to rolesOf(carScheme)
         }.toMap()
 
+        // Each car's pebble order so the watch lays its tiles out to match.
+        val store = SettingsStore(context)
+        val pebbleOrders = SnapshotStore(context).current().vehicles
+            .associate { it.vin to store.sectionOrder(it.vin) }
+
         val payload = WearSettingsPayload(
             dark = dark,
             useFahrenheit = appearance.useFahrenheit,
             uiScale = appearance.uiScale,
             colors = rolesOf(s),
             carColors = carColors,
+            pebbleOrders = pebbleOrders,
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))

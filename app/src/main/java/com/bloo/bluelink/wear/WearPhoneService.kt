@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -68,7 +69,9 @@ class WearPhoneService : WearableListenerService() {
             if (event.type != DataEvent.TYPE_CHANGED) return@mapNotNull null
             val item = event.dataItem
             val path = item.uri.path
-            if (path != WearSync.PATH_CLIMATE && path != WearSync.PATH_PRESETS) return@mapNotNull null
+            if (path != WearSync.PATH_CLIMATE && path != WearSync.PATH_PRESETS &&
+                path != WearSync.PATH_PEBBLE_ORDER
+            ) return@mapNotNull null
             val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
                 ?: return@mapNotNull null
             path to raw
@@ -82,6 +85,18 @@ class WearPhoneService : WearableListenerService() {
                         val store = SettingsStore(applicationContext)
                         WearSync.decodePresets(raw).byVin.forEach { (vin, list) ->
                             store.setClimatePresets(vin, list)
+                        }
+                    }
+                    WearSync.PATH_PEBBLE_ORDER -> {
+                        val po = WearSync.decodePebbleOrder(raw) ?: return@forEach
+                        if (po.vin.isNotBlank() && po.order.isNotEmpty()) {
+                            SettingsStore(applicationContext).setSectionOrder(po.vin, po.order)
+                            // Mirror the saved order straight back so every device
+                            // (and the watch's optimistic override) lines up.
+                            runCatching {
+                                val appearance = SettingsStore(applicationContext).appearance.first()
+                                WearBridge.publishSettingsNow(applicationContext, appearance)
+                            }
                         }
                     }
                 }
