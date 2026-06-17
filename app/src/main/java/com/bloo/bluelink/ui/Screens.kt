@@ -4279,6 +4279,39 @@ private fun ClimatePebble(
             onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
+        // Smart climate: read the weather where the car is (falling back to home)
+        // and pre-cool/pre-heat to ~10°F off ambient, then start.
+        val weather = state.carWeather[v.vin] ?: state.homeWeather
+        if (weather != null) {
+            val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+            val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
+                              else (ambientF + 10).coerceIn(60, 85)
+            val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
+            val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
+            val smartLabel = if (ambientF >= 70) "Cool to $targetLabel" else "Heat to $targetLabel"
+            SectionLabel("Smart climate")
+            MorphButton(
+                onClick = {
+                    tempF = smartTarget
+                    defrost = false
+                    activePresetId = null
+                    vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                },
+                enabled = !pending && !climateOn,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 12.dp),
+            ) {
+                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(smartLabel, fontWeight = FontWeight.SemiBold)
+            }
+            Text(
+                "It's $ambientLabel where your car is — Smart climate runs 10° ${if (ambientF >= 70) "cooler" else "warmer"}.",
+                style = MaterialTheme.typography.bodySmall,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
+            )
+        }
+
         SectionLabel("Controls")
 
         // Color shifts from blue (cold) through neutral to orange-red (hot),

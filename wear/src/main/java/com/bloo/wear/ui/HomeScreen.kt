@@ -130,11 +130,17 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     key(ui.cars.map { it.vin }) {
         val carPager = rememberPagerState(initialPage = if (loop) virtual / 2 else 0) { virtual }
 
+        // The one car the user is actually on. Driven by settledPage so it only
+        // changes once a swipe comes to rest — never mid-gesture.
+        val activeCarIndex by remember {
+            derivedStateOf { wrap(carPager.settledPage, count) }
+        }
+
         // Only fetch a car's status once it actually settles on a *new* VIN, so a
         // swipe doesn't churn through cars or re-trigger fetches mid-gesture.
         var lastShownVin by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(carPager.settledPage) {
-            val vin = ui.cars.getOrNull(wrap(carPager.settledPage, count))?.vin
+        LaunchedEffect(activeCarIndex) {
+            val vin = ui.cars.getOrNull(activeCarIndex)?.vin
             if (vin != null && vin != lastShownVin) {
                 lastShownVin = vin
                 vm.onCarShown(vin)
@@ -144,20 +150,42 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
         Box(Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = carPager,
-                beyondViewportPageCount = 1,
+                // No off-screen pages: composing one heavy focusable list at a
+                // time is what keeps the bezel and swipe stable.
+                beyondViewportPageCount = 0,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val car = ui.cars[wrap(page, count)]
-                // Only the settled page owns rotary focus.
-                val active = wrap(carPager.settledPage, count) == wrap(page, count)
+                // Only the settled page gets the full interactive column (rotary
+                // focus, endless scroll). Pages being swiped past render a cheap,
+                // non-focusable preview so nothing fights for rotary input.
+                val active = wrap(page, count) == activeCarIndex && !carPager.isScrollInProgress
                 val carRoles = ui.settings?.carColors?.get(car.vin)
+                val body: @Composable () -> Unit = {
+                    if (active) {
+                        CarColumn(vm, ui, car, onSettings, onTrips, onReorder)
+                    } else {
+                        CarPreview(car, ui)
+                    }
+                }
                 if (carRoles != null) {
-                    MaterialTheme(colorScheme = schemeFrom(carRoles)) { CarColumn(vm, ui, car, active, onSettings, onTrips, onReorder) }
+                    MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
                 } else {
-                    CarColumn(vm, ui, car, active, onSettings, onTrips, onReorder)
+                    body()
                 }
             }
             CurvedIndicator(count, wrap(carPager.currentPage, count), anchor = 90f)
+        }
+    }
+}
+
+/** A cheap, non-focusable snapshot of a car shown while the pager is mid-swipe.
+ *  Keeps swiping smooth by not composing the full endless-scroll tile list. */
+@Composable
+private fun CarPreview(car: CarView, ui: WearUi) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(Modifier.padding(horizontal = 16.dp)) {
+            SummaryCard(car, ui)
         }
     }
 }
@@ -192,7 +220,7 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, active: Boolean, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit) {
+private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val round = LocalConfiguration.current.isScreenRound
@@ -208,19 +236,20 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, active: Boole
 
     val state = rememberScalingLazyListState(initialCenterItemIndex = initialIndex)
 
-    // Only the on-screen page requests focus, otherwise off-screen pages steal
-    // rotary input and the bezel appears to do nothing.
-    LaunchedEffect(active, car.vin) {
-        if (active) runCatching { focusRequester.requestFocus() }
+    // This column is only composed for the active car, so it always claims rotary
+    // focus on entry. Retry briefly in case the list isn't laid out yet — that's
+    // what made the bezel "do nothing" on freshly-swiped pages.
+    LaunchedEffect(car.vin) {
+        repeat(5) {
+            if (runCatching { focusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(60)
+        }
     }
 
     var isSnapping by remember { mutableStateOf(false) }
 
     // Snap to the nearest tile when a finger fling settles — tile-by-tile feel.
-    // Guard: only snap on the active (visible) page to avoid stray haptics when
-    // the car pager swipes between cars and off-screen columns lose/gain focus.
-    LaunchedEffect(state.isScrollInProgress, active) {
-        if (!active) return@LaunchedEffect
+    LaunchedEffect(state.isScrollInProgress) {
         if (!state.isScrollInProgress && !isSnapping) {
             val info = state.layoutInfo
             val viewportCenter = info.viewportSize.height / 2
@@ -383,12 +412,14 @@ private fun CurvedDotIndicator(total: Int, activeIndex: Int) {
     }
 }
 
-/** A small pill at the top naming the car you're currently looking at. */
+/** A small pill naming the car you're currently looking at. Sits below the
+ *  system clock (Wear's TimeText owns the very top center) so the two don't
+ *  overlap. */
 @Composable
 private fun BoxScope.CarNameOverlay(name: String, visible: Boolean) {
     AnimatedVisibility(
         visible = visible,
-        modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp),
+        modifier = Modifier.align(Alignment.TopCenter).padding(top = 26.dp),
         enter = fadeIn() + slideInVertically { -it },
         exit = fadeOut() + slideOutVertically { -it },
     ) {
