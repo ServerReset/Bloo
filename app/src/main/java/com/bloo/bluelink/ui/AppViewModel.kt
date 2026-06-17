@@ -124,6 +124,9 @@ data class UiState(
     val aiSearchReply: String? = null,
     /** First-run coach mark on the Settings screen (points at the back arrow). */
     val showSettingsCoach: Boolean = false,
+    /** Gentle hint shown on the garage right after onboarding, nudging the user
+     *  toward Settings to fine-tune each car. */
+    val showSettingsHint: Boolean = false,
     /** All signed-in accounts (one per brand). */
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */
@@ -922,6 +925,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(screen = Screen.Settings, showSettingsCoach = true) }
     }
 
+    /**
+     * Finish first-run onboarding and land straight in the app. The car feature
+     * setup now happens inline during onboarding, so there's no forced detour
+     * into Settings — just a gentle coach mark once the garage opens.
+     */
+    fun finishOnboarding() {
+        viewModelScope.launch { settingsStore.setOnboardingSeen() }
+        _state.update {
+            it.copy(
+                screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage,
+                showSettingsHint = true,
+            )
+        }
+    }
+
+    fun dismissSettingsHint() = _state.update { it.copy(showSettingsHint = false) }
+
     fun dismissSettingsCoach() = _state.update { it.copy(showSettingsCoach = false) }
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {
@@ -1529,6 +1549,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Surface (and log) an error raised by the UI layer. */
     fun reportError(msg: String) {
         AppLog.log("⚠ $msg")
+        _state.update { it.copy(message = msg) }
+    }
+
+    /** A neutral, non-error snackbar message (e.g. a setup nudge). */
+    fun reportInfo(msg: String) {
         _state.update { it.copy(message = msg) }
     }
 

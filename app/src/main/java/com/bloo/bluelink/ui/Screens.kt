@@ -489,6 +489,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
     val canBio = remember { vm.canUseBiometrics() }
+    val state by vm.state.collectAsState()
 
     // Congratulations: fire the works once on entry.
     LaunchedEffect(Unit) {
@@ -497,6 +498,24 @@ private fun OnboardingScreen(vm: AppViewModel) {
     }
     // There's no way back - you must set up first.
     BackHandler {}
+
+    // A short reading timer so the guide is actually read before the user can
+    // dive in. The "Enter Bloo" button unlocks once it elapses.
+    var secondsLeft by remember { mutableStateOf(15) }
+    LaunchedEffect(Unit) {
+        while (secondsLeft > 0) { delay(1000); secondsLeft-- }
+    }
+
+    // Inline car photo picker (same flow as Settings): system picker → crop.
+    var pickTarget by remember { mutableStateOf<String?>(null) }
+    var cropUri by remember { mutableStateOf<Uri?>(null) }
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null && pickTarget != null) cropUri = uri }
+    val pickPhoto: (String) -> Unit = { vin ->
+        pickTarget = vin
+        photoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
 
     Box(
         Modifier
@@ -526,8 +545,32 @@ private fun OnboardingScreen(vm: AppViewModel) {
             OnboardingPoint("🚗", "Swipe between cars", "Each car gets its own screen. Swipe left or right to switch. Pull down anywhere to fetch the latest live status straight from Hyundai's servers.")
             OnboardingPoint("🧩", "Pebbles", "Controls live in pebble cards: lock, charge limits, climate, location and more. Tap to expand, long-press to drag them into the order you like. Pin a pebble to keep it visible at all times in the wide layout.")
             OnboardingPoint("🌡", "Climate presets", "Set your temperature, defrost, seat heat and steering wheel, then save it as a named preset. One tap starts the climate and loads all your settings.")
-            OnboardingPoint("⚙️", "One-time setup per car", "Bloo cannot detect whether your car has ventilated seats or a heated steering wheel from the API. Open Settings, tap your car, and tick the boxes that match. That unlocks the right controls.")
             OnboardingPoint("⚡", "Tiles and shortcuts", "Add Bloo's Quick Settings tiles from your notification shade and long-press the app icon for one-tap lock, unlock or climate without even opening the app.")
+
+            // ---- Inline per-car setup (no detour into Settings) ----
+            if (state.vehicles.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Set up your ${if (state.vehicles.size == 1) "car" else "cars"}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Bloo can't tell from the API whether your car has ventilated seats " +
+                        "or a heated steering wheel. Tick what it actually has so the right " +
+                        "controls show up. You can change this anytime in Settings.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                )
+                state.vehicles.forEach { v ->
+                    CarSettingsCard(
+                        v = v, state = state, vm = vm,
+                        expanded = true, dragging = false, dragHandle = Modifier,
+                        collapsible = false, showHandle = false,
+                        onToggle = {}, onPickPhoto = { pickPhoto(v.vin) },
+                    )
+                }
+            }
 
             // Ask for notifications here, on a tap - not silently on first launch.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -584,17 +627,27 @@ private fun OnboardingScreen(vm: AppViewModel) {
             }
 
             Spacer(Modifier.height(8.dp))
+            val ready = secondsLeft <= 0
             MorphButton(
-                onClick = { vm.startSetup() },
-                modifier = Modifier.fillMaxWidth(),
+                onClick = { if (ready) vm.finishOnboarding() },
+                active = ready,
+                modifier = Modifier.fillMaxWidth().alpha(if (ready) 1f else 0.6f),
                 contentPadding = PaddingValues(vertical = 18.dp),
             ) {
-                Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp))
+                Icon(
+                    if (ready) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                )
                 Spacer(Modifier.width(10.dp))
-                Text("Set up my cars", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (ready) "Enter Bloo" else "Have a read… ${secondsLeft}s",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             Text(
-                "Takes about a minute. You land straight in the app after.",
+                "You land straight in the app. Fine-tune anything later in Settings.",
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -603,6 +656,19 @@ private fun OnboardingScreen(vm: AppViewModel) {
         }
         // Fireworks burst over everything.
         FireworksOverlay(Modifier.fillMaxSize())
+
+        // Inline photo crop step, mirroring Settings.
+        cropUri?.let { uri ->
+            val target = pickTarget
+            if (target != null) {
+                CropScreen(
+                    vin = target,
+                    uriString = uri.toString(),
+                    onCancel = { cropUri = null; pickTarget = null },
+                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
+                )
+            }
+        }
     }
 }
 
@@ -1061,6 +1127,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
         if (currentFetchedAt != null && System.currentTimeMillis() - currentFetchedAt > 15 * 60 * 1000L) {
             vm.reportError("Data is over 15 min old — pull down to refresh")
+        }
+    }
+
+    // Gentle one-time nudge after onboarding, encouraging a Settings visit.
+    LaunchedEffect(state.showSettingsHint) {
+        if (state.showSettingsHint) {
+            vm.reportInfo("Tip: fine-tune each car's seats, photo and pebble order in Settings")
+            vm.dismissSettingsHint()
         }
     }
 
