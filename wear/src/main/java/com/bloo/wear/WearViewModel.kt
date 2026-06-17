@@ -115,6 +115,9 @@ data class WearUi(
     val dcLimitDraft: Int? = null,
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
     val localSettings: WearLocalSettings = WearLocalSettings(),
+    /** Which saved preset (if any) is currently applied; cleared once the live
+     *  climate settings drift away from it. */
+    val activePresetId: String? = null,
 )
 
 private fun seatLevelOf(step: Int): SeatLevel = when (step) {
@@ -122,6 +125,15 @@ private fun seatLevelOf(step: Int): SeatLevel = when (step) {
     2 -> SeatLevel.MED_HEAT
     3 -> SeatLevel.HIGH_HEAT
     else -> SeatLevel.OFF
+}
+
+/** Inverse of [seatLevelOf]: map a seat level back to the watch's 0–3 heat step
+ *  (the watch UI is heat-only, so cooling collapses to off). */
+private fun seatStepOf(level: SeatLevel): Int = when (level) {
+    SeatLevel.LOW_HEAT -> 1
+    SeatLevel.MED_HEAT -> 2
+    SeatLevel.HIGH_HEAT -> 3
+    else -> 0
 }
 
 val seatStepLabels = listOf("Off", "Low", "Med", "High")
@@ -325,8 +337,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
-        if (st?.airCtrlOn == true) { repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) } }
-        else {
+        if (st?.airCtrlOn == true) {
+            repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
+            _ui.update { it.copy(activePresetId = null) }
+        } else {
             val u = _ui.value
             repo.startClimate(v, ClimateRequest(
                 tempF = u.climateTempF,
@@ -338,7 +352,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 seatRearLeft = seatLevelOf(u.seatRearLeft),
                 seatRearRight = seatLevelOf(u.seatRearRight),
             ))
+            // A manual start isn't a saved preset.
             flip(vin) { it.copy(airCtrlOn = true) }
+            _ui.update { it.copy(activePresetId = null) }
         }
     }
 
@@ -346,10 +362,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (st?.evStatus?.batteryCharge == true) repo.stopCharge(v) else repo.startCharge(v)
     }
 
-    /** Apply a saved climate preset (start climate with its exact settings). */
+    /** Apply a saved climate preset (start climate with its exact settings). Also
+     *  seeds the sliders so the controls reflect what's running. */
     fun applyPreset(vin: String, preset: ClimatePreset) = command(vin, "climate") { v, repo, _ ->
         repo.startClimate(v, preset.request)
         flip(vin) { it.copy(airCtrlOn = true) }
+        val r = preset.request
+        _ui.update {
+            it.copy(
+                activePresetId = preset.id,
+                climateTempF = r.tempF,
+                climateDuration = r.durationMinutes,
+                climateDefrost = r.defrost,
+                climateSteering = r.steeringWheelHeat,
+                seatDriver = seatStepOf(r.seatFrontLeft),
+                seatPassenger = seatStepOf(r.seatFrontRight),
+                seatRearLeft = seatStepOf(r.seatRearLeft),
+                seatRearRight = seatStepOf(r.seatRearRight),
+            )
+        }
     }
 
     /** Reverse-geocode the car's coordinates to a human place name. */
@@ -378,14 +409,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         repo.setChargeTargets(v, u.acLimitDraft ?: 80, u.dcLimitDraft ?: 90)
     }
 
-    fun setClimateTemp(value: Int) { _ui.update { it.copy(climateTempF = value.coerceIn(62, 82)) } }
-    fun setClimateDuration(value: Int) { _ui.update { it.copy(climateDuration = value.coerceIn(1, 10)) } }
-    fun toggleDefrost() { _ui.update { it.copy(climateDefrost = !it.climateDefrost) } }
-    fun toggleSteering() { _ui.update { it.copy(climateSteering = !it.climateSteering) } }
-    fun setSeatDriver(step: Int) { _ui.update { it.copy(seatDriver = step.coerceIn(0, 3)) } }
-    fun setSeatPassenger(step: Int) { _ui.update { it.copy(seatPassenger = step.coerceIn(0, 3)) } }
-    fun setSeatRearLeft(step: Int) { _ui.update { it.copy(seatRearLeft = step.coerceIn(0, 3)) } }
-    fun setSeatRearRight(step: Int) { _ui.update { it.copy(seatRearRight = step.coerceIn(0, 3)) } }
+    fun setClimateTemp(value: Int) { _ui.update { it.copy(climateTempF = value.coerceIn(62, 82), activePresetId = null) } }
+    fun setClimateDuration(value: Int) { _ui.update { it.copy(climateDuration = value.coerceIn(1, 10), activePresetId = null) } }
+    fun toggleDefrost() { _ui.update { it.copy(climateDefrost = !it.climateDefrost, activePresetId = null) } }
+    fun toggleSteering() { _ui.update { it.copy(climateSteering = !it.climateSteering, activePresetId = null) } }
+    fun setSeatDriver(step: Int) { _ui.update { it.copy(seatDriver = step.coerceIn(0, 3), activePresetId = null) } }
+    fun setSeatPassenger(step: Int) { _ui.update { it.copy(seatPassenger = step.coerceIn(0, 3), activePresetId = null) } }
+    fun setSeatRearLeft(step: Int) { _ui.update { it.copy(seatRearLeft = step.coerceIn(0, 3), activePresetId = null) } }
+    fun setSeatRearRight(step: Int) { _ui.update { it.copy(seatRearRight = step.coerceIn(0, 3), activePresetId = null) } }
     fun setAcLimit(value: Int) { _ui.update { it.copy(acLimitDraft = value.coerceIn(50, 100)) } }
     fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
     fun dismissMessage() { _ui.update { it.copy(message = null) } }

@@ -493,13 +493,15 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 @Composable
 private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets") {
     ui.presets[car.vin].orEmpty().forEach { preset ->
+        val isActive = ui.activePresetId == preset.id && car.climateOn == true
         MorphButton(
             label = preset.name,
             icon = Icons.Filled.Thermostat,
-            active = false,
+            active = isActive,
             activeColor = MaterialTheme.colorScheme.tertiary,
             pending = "${car.vin}:climate" in ui.pending,
-            onClick = { vm.applyPreset(car.vin, preset) },
+            // Tapping the running preset turns climate off, like the phone.
+            onClick = { if (isActive) vm.toggleClimate(car.vin) else vm.applyPreset(car.vin, preset) },
         )
         Spacer(Modifier.height(6.dp))
     }

@@ -4199,10 +4199,17 @@ private fun ClimatePebble(
         ClimatePresetSection(
             presets = presets,
             activeId = activePresetId,
+            fahrenheit = fahrenheit,
             onStart = { preset ->
-                applyPreset(preset.request)
-                vm.startClimate(v, preset.request)
-                activePresetId = preset.id
+                // Tapping the running preset turns climate back off.
+                if (activePresetId == preset.id && climateOn) {
+                    vm.stopClimate(v)
+                    activePresetId = null
+                } else {
+                    applyPreset(preset.request)
+                    vm.startClimate(v, preset.request)
+                    activePresetId = preset.id
+                }
             },
             onSave = { presetName = ""; showAddPreset = true },
             onDelete = { id ->
@@ -4367,6 +4374,7 @@ private fun seatTint(level: SeatLevel): Color = when {
 private fun ClimatePresetSection(
     presets: List<ClimatePreset>,
     activeId: String?,
+    fahrenheit: Boolean,
     onStart: (ClimatePreset) -> Unit,
     onSave: () -> Unit,
     onDelete: (String) -> Unit,
@@ -4385,6 +4393,7 @@ private fun ClimatePresetSection(
         ) { preset, dragHandle, _ ->
             PresetPill(
                 name = preset.name,
+                detail = presetDetail(preset.request, fahrenheit),
                 active = preset.id == activeId,
                 onStart = { onStart(preset) },
                 onDelete = { onDelete(preset.id) },
@@ -4398,6 +4407,18 @@ private fun ClimatePresetSection(
         onClick = onSave,
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/** A compact "79° · Defrost · Heat" summary of what a preset will set. */
+private fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
+    val parts = mutableListOf<String>()
+    parts += if (fahrenheit) "${req.tempF}°" else "${Math.round((req.tempF - 32) * 5 / 9.0)}°"
+    if (req.defrost) parts += "Defrost"
+    val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
+    if (seats.any { it.isHeat }) parts += "Heat"
+    if (seats.any { it.isCool }) parts += "Cool"
+    if (req.steeringWheelHeat) parts += "Wheel"
+    return parts.joinToString(" · ")
 }
 
 /**
@@ -4415,6 +4436,7 @@ private fun ClimatePresetSection(
 @Composable
 private fun PresetPill(
     name: String,
+    detail: String,
     active: Boolean,
     onStart: () -> Unit,
     onDelete: () -> Unit,
@@ -4464,12 +4486,22 @@ private fun PresetPill(
             ) {
                 Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text(
-                    name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
+                Column {
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                    if (detail.isNotBlank()) {
+                        Text(
+                            detail,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LocalContentColor.current.copy(alpha = 0.7f),
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
         // Delete nub.
