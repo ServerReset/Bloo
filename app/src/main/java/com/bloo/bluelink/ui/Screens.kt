@@ -683,7 +683,7 @@ private fun LoginScreen(
     val cfg = LocalConfiguration.current
     // Shrink the hero on short cover screens; cap form width on tablets.
     val shortScreen = cfg.screenHeightDp < 520
-    val heroHeight = if (shortScreen) 72.dp else 110.dp
+    val heroHeight = if (shortScreen) 96.dp else 150.dp
 
     if (onCancel != null) BackHandler { onCancel() }
 
@@ -705,7 +705,7 @@ private fun LoginScreen(
             Column(Modifier.padding(24.dp)) {
                 Text(
                     "Bloo",
-                    style = if (shortScreen) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge,
+                    style = if (shortScreen) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Black,
                     color = Color.White,
                 )

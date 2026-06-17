@@ -84,6 +84,7 @@ import androidx.wear.compose.foundation.CurvedLayout
 import androidx.wear.compose.foundation.curvedComposable
 import androidx.wear.compose.foundation.curvedRow
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
@@ -130,6 +131,11 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     key(ui.cars.map { it.vin }) {
         val carPager = rememberPagerState(initialPage = if (loop) virtual / 2 else 0) { virtual }
 
+        // Per-car scroll state, hoisted above the pager so it survives a page
+        // being disposed (swiped away) or toggled to its cheap preview. Without
+        // this the list reset to the summary tile on every recomposition.
+        val listStates = remember { mutableStateMapOf<String, ScalingLazyListState>() }
+
         // The one car the user is actually on. Driven by settledPage so it only
         // changes once a swipe comes to rest — never mid-gesture.
         val activeCarIndex by remember {
@@ -163,7 +169,7 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                 val carRoles = ui.settings?.carColors?.get(car.vin)
                 val body: @Composable () -> Unit = {
                     if (active) {
-                        CarColumn(vm, ui, car, onSettings, onTrips, onReorder)
+                        CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder)
                     } else {
                         CarPreview(car, ui)
                     }
@@ -220,7 +226,15 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit) {
+private fun CarColumn(
+    vm: WearViewModel,
+    ui: WearUi,
+    car: CarView,
+    listStates: MutableMap<String, ScalingLazyListState>,
+    onSettings: () -> Unit,
+    onTrips: (String) -> Unit,
+    onReorder: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val round = LocalConfiguration.current.isScreenRound
@@ -234,7 +248,9 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
     val summaryIdx = tiles.indexOf(WearTiles.SUMMARY).coerceAtLeast(0)
     val initialIndex = if (infinite) (cycles / 2) * tileCount + summaryIdx else summaryIdx
 
-    val state = rememberScalingLazyListState(initialCenterItemIndex = initialIndex)
+    // One scroll state per car, kept alive in the hoisted map so the user's tile
+    // position is preserved across recompositions and page preview swaps.
+    val state = listStates.getOrPut(car.vin) { ScalingLazyListState(initialIndex) }
 
     // This column is only composed for the active car, so it always claims rotary
     // focus on entry. Retry briefly in case the list isn't laid out yet — that's
@@ -249,6 +265,9 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
     var isSnapping by remember { mutableStateOf(false) }
 
     // Snap to the nearest tile when a finger fling settles — tile-by-tile feel.
+    // When the settled tile is near either end of the (large but finite) virtual
+    // list, instantly jump to the identical tile in the middle band so we never
+    // hit a hard boundary — that boundary is what caused the top↔bottom loop jank.
     LaunchedEffect(state.isScrollInProgress) {
         if (!state.isScrollInProgress && !isSnapping) {
             val info = state.layoutInfo
@@ -258,7 +277,13 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
             }
             if (centerItem != null) {
                 isSnapping = true
-                state.animateScrollToItem(centerItem.index)
+                val idx = centerItem.index
+                if (infinite && (idx < tileCount * 2 || idx > total - tileCount * 2)) {
+                    val phase = wrap(idx, tileCount)
+                    state.scrollToItem((cycles / 2) * tileCount + phase)
+                } else {
+                    state.animateScrollToItem(idx)
+                }
                 isSnapping = false
             }
         }
