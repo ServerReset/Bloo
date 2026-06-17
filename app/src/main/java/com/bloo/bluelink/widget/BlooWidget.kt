@@ -204,6 +204,11 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    /**
+     * One-row layout for a short (≈40 dp tall) widget: a compact status read-out
+     * on the left — percent + lock/drive state on a single line so nothing is
+     * clipped — beside fixed-size circular action buttons on the right.
+     */
     @Composable
     private fun CompactWidgetBody(widgetId: Int, snap: VehicleSnapshot, actions: List<WidgetAction>) {
         val context = LocalContext.current
@@ -212,21 +217,40 @@ class BlooWidget : GlanceAppWidget() {
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
                 .cornerRadius(20.dp)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            actions.take(4).forEachIndexed { i, action ->
-                if (i > 0) Spacer(GlanceModifier.width(4.dp))
-                Row(
+            // Compact status: one line keeps it inside the short height.
+            Row(
+                modifier = GlanceModifier.defaultWeight(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    snap.percent?.let { "$it%" } ?: "—",
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSurface,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    ),
+                )
+                Spacer(GlanceModifier.width(6.dp))
+                val (stateLabel, stateColor) = stateOf(snap)
+                Text(
+                    stateLabel,
+                    maxLines = 1,
+                    style = TextStyle(color = stateColor, fontWeight = FontWeight.Medium, fontSize = 12.sp),
+                )
+            }
+            actions.take(4).forEach { action ->
+                Spacer(GlanceModifier.width(6.dp))
+                Box(
                     modifier = GlanceModifier
-                        .defaultWeight()
-                        .fillMaxHeight()
+                        .size(32.dp)
                         .background(GlanceTheme.colors.secondaryContainer)
-                        .cornerRadius(20.dp)
+                        .cornerRadius(16.dp)
                         .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    contentAlignment = Alignment.Center,
                 ) {
                     Image(
                         provider = ImageProvider(action.icon),
