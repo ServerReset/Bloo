@@ -324,12 +324,6 @@ fun BlooApp(vm: AppViewModel) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
     // status/navigation bars; screen content draws on top of it.
     val scheme = MaterialTheme.colorScheme
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // The cover-screen (flip-phone) layout draws its own tiles edge-to-edge and
-    // needs no status-bar scrim; only the regular garage scroll wants one.
-    val cfg = LocalConfiguration.current
-    val compactCover = state.screen == Screen.Garage &&
-        cfg.screenWidthDp < 600 && cfg.screenHeightDp < 520
     // Biometric lock overlay: blur the whole app behind it and fade the blur
     // away once unlocked.
     val lockBlur by animateDpAsState(
@@ -449,21 +443,6 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-        // Fade-to-black scrim over the status bar so content stays legible as it
-        // scrolls underneath. Skipped on the cover screen, which is self-contained.
-        if (!compactCover) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(topInset + 22.dp)
-                .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent),
-                    ),
-                ),
-        )
-        }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         if (lockAlpha > 0.01f) {
