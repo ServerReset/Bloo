@@ -438,6 +438,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Locked -> Box(Modifier.fillMaxSize())
                 Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
                 Screen.Onboarding -> OnboardingScreen(vm)
+                is Screen.CarSetup -> CarSetupWizardScreen(vm, screen.vins)
                 Screen.Garage -> GarageScreen(state, vm)
                 Screen.Settings -> SettingsScreen(vm)
             }
@@ -455,45 +456,102 @@ fun BlooApp(vm: AppViewModel) {
 
 }
 
-// --- Onboarding (first run) -----------------------------------------------
+// --- Onboarding wizard (first run + new-car detection) --------------------
 
-/**
- * First-run welcome. Celebrates the sign-in with on-screen fireworks (plus sound
- * and haptics) and explains how Bloo works, then funnels the user into Settings
- * - the only way forward - so they configure each car before reaching the app.
- */
+private enum class WizardStepKind { WELCOME, POWERTRAIN, SEATS, STEERING, FINISH }
+
+private data class WizardPage(
+    val kind: WizardStepKind,
+    val vin: String? = null,
+    val carLabel: String = "",
+    val carIndex: Int = 0,
+    val totalCars: Int = 1,
+)
+
+private fun buildOnboardingPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
+    add(WizardPage(WizardStepKind.WELCOME))
+    vehicles.forEachIndexed { i, v ->
+        val lbl = if (vehicles.size > 1) "${v.name} (${i + 1}/${vehicles.size})" else v.name
+        add(WizardPage(WizardStepKind.POWERTRAIN, v.vin, lbl, i, vehicles.size))
+        add(WizardPage(WizardStepKind.SEATS, v.vin, lbl, i, vehicles.size))
+        add(WizardPage(WizardStepKind.STEERING, v.vin, lbl, i, vehicles.size))
+    }
+    add(WizardPage(WizardStepKind.FINISH))
+}
+
+private fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
+    vehicles.forEachIndexed { i, v ->
+        val lbl = if (vehicles.size > 1) "${v.name} (${i + 1}/${vehicles.size})" else v.name
+        add(WizardPage(WizardStepKind.POWERTRAIN, v.vin, lbl, i, vehicles.size))
+        add(WizardPage(WizardStepKind.SEATS, v.vin, lbl, i, vehicles.size))
+        add(WizardPage(WizardStepKind.STEERING, v.vin, lbl, i, vehicles.size))
+    }
+}
+
+/** First-run: welcome + per-car feature wizard + permissions + enter. */
 @Composable
 private fun OnboardingScreen(vm: AppViewModel) {
     val context = LocalContext.current
     val haptics = LocalHaptics.current
-    val scheme = MaterialTheme.colorScheme
-    val canBio = remember { vm.canUseBiometrics() }
     val state by vm.state.collectAsState()
+    val pages = remember(state.vehicles) { buildOnboardingPages(state.vehicles) }
 
-    // Congratulations: fire the works once on entry.
     LaunchedEffect(Unit) {
         Fireworks.playSound(context)
         haptics?.fireworks()
     }
-    // There's no way back - you must set up first.
     BackHandler {}
 
-    // A short reading timer so the guide is actually read before the user can
-    // dive in. The "Enter Bloo" button unlocks once it elapses.
-    var secondsLeft by remember { mutableStateOf(15) }
-    LaunchedEffect(Unit) {
-        while (secondsLeft > 0) { delay(1000); secondsLeft-- }
-    }
+    CarFeatureWizard(
+        vm = vm,
+        pages = pages,
+        showFireworks = true,
+        onComplete = { vm.finishOnboarding() },
+    )
+}
 
-    // Inline car photo picker (same flow as Settings): system picker → crop.
-    var pickTarget by remember { mutableStateOf<String?>(null) }
-    var cropUri by remember { mutableStateOf<Uri?>(null) }
-    val photoLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri -> if (uri != null && pickTarget != null) cropUri = uri }
-    val pickPhoto: (String) -> Unit = { vin ->
-        pickTarget = vin
-        photoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+/**
+ * Standalone wizard shown when a new car is detected after first-run onboarding.
+ * Mandatory — navigates to the garage only when every car in [vins] is configured.
+ */
+@Composable
+private fun CarSetupWizardScreen(vm: AppViewModel, vins: List<String>) {
+    val state by vm.state.collectAsState()
+    BackHandler {}
+    val vehicles = remember(state.vehicles, vins) { state.vehicles.filter { it.vin in vins } }
+    val pages = remember(vehicles) { buildSetupPages(vehicles) }
+    CarFeatureWizard(
+        vm = vm,
+        pages = pages,
+        showFireworks = false,
+        onComplete = { vm.finishCarSetup(vins) },
+    )
+}
+
+@Composable
+private fun CarFeatureWizard(
+    vm: AppViewModel,
+    pages: List<WizardPage>,
+    showFireworks: Boolean,
+    onComplete: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    val state by vm.state.collectAsState()
+    val canBio = remember { vm.canUseBiometrics() }
+
+    var pageIndex by remember { mutableIntStateOf(0) }
+
+    if (pages.isEmpty()) return
+    fun goNext() {
+        if (pageIndex < pages.lastIndex) {
+            pageIndex++
+        } else {
+            onComplete()
+        }
+    }
+    fun goBack() {
+        if (pageIndex > 0) pageIndex--
     }
 
     Box(
@@ -501,173 +559,460 @@ private fun OnboardingScreen(vm: AppViewModel) {
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(scheme.surfaceContainerHigh, scheme.surface))),
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Spacer(Modifier.height(24.dp))
-            Text("👋", style = MaterialTheme.typography.displayMedium)
-            Text(
-                "Welcome to Bloo",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Black,
-            )
-            Text(
-                "Your Hyundai, Kia, or Genesis in your pocket. Here is what to know:",
-                style = MaterialTheme.typography.titleMedium,
-                color = scheme.onSurfaceVariant,
-            )
-            OnboardingPoint("🚗", "Swipe between cars", "Each car gets its own screen. Swipe left or right to switch. Pull down anywhere to fetch the latest live status straight from Hyundai's servers.")
-            OnboardingPoint("🧩", "Pebbles", "Controls live in pebble cards: lock, charge limits, climate, location and more. Tap to expand, long-press to drag them into the order you like. Pin a pebble to keep it visible at all times in the wide layout.")
-            OnboardingPoint("🌡", "Climate presets", "Set your temperature, defrost, seat heat and steering wheel, then save it as a named preset. One tap starts the climate and loads all your settings.")
-            OnboardingPoint("⚡", "Tiles and shortcuts", "Add Bloo's Quick Settings tiles from your notification shade and long-press the app icon for one-tap lock, unlock or climate without even opening the app.")
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
 
-            // ---- Inline per-car setup (no detour into Settings) ----
-            if (state.vehicles.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Set up your ${if (state.vehicles.size == 1) "car" else "cars"}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    "Bloo can't tell from the API whether your car has ventilated seats " +
-                        "or a heated steering wheel. Tick what it actually has so the right " +
-                        "controls show up. You can change this anytime in Settings.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant,
-                )
-                state.vehicles.forEach { v ->
-                    CarSettingsCard(
-                        v = v, state = state, vm = vm,
-                        expanded = true, dragging = false, dragHandle = Modifier,
-                        collapsible = false, showHandle = false,
-                        onToggle = {}, onPickPhoto = { pickPhoto(v.vin) },
-                    )
-                }
-            }
-
-            // Ask for notifications here, on a tap - not silently on first launch.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                var notifGranted by remember {
-                    mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context))
-                }
-                val notifLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission(),
-                ) { granted -> notifGranted = granted }
-                MorphButton(
-                    onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
-                    active = notifGranted,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                ) {
-                    Icon(
-                        if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (notifGranted) "Notifications enabled" else "Enable notifications", fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            if (canBio) {
-                var bioEnabled by remember { mutableStateOf(false) }
-                MorphButton(
-                    onClick = {
-                        if (!bioEnabled) {
-                            context.findFragmentActivity()?.let { activity ->
-                                showBiometricPrompt(
-                                    activity = activity,
-                                    title = "Enable fingerprint lock",
-                                    subtitle = "Confirm to require it when opening Bloo",
-                                    onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
-                                    onError = { },
-                                )
-                            }
-                        }
-                    },
-                    active = bioEnabled,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                ) {
-                    Icon(
-                        if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (bioEnabled) "Fingerprint lock enabled" else "Lock Bloo with fingerprint", fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            val ready = secondsLeft <= 0
-            MorphButton(
-                onClick = { if (ready) vm.finishOnboarding() },
-                active = ready,
-                modifier = Modifier.fillMaxWidth().alpha(if (ready) 1f else 0.6f),
-                contentPadding = PaddingValues(vertical = 18.dp),
+            // Progress bar across the top.
+            val progress = if (pages.size > 1) pageIndex.toFloat() / (pages.lastIndex.toFloat()) else 1f
+            val animatedProgress by animateFloatAsState(progress, tween(300), label = "wizProgress")
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .background(scheme.surfaceContainerHighest),
             ) {
-                Icon(
-                    if (ready) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    if (ready) "Enter Bloo" else "Have a read… ${secondsLeft}s",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                Box(
+                    Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .height(4.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(scheme.primary, scheme.tertiary),
+                            ),
+                        ),
                 )
             }
-            Text(
-                "You land straight in the app. Fine-tune anything later in Settings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
-            Spacer(Modifier.height(24.dp))
-        }
-        // Fireworks burst over everything.
-        FireworksOverlay(Modifier.fillMaxSize())
 
-        // Inline photo crop step, mirroring Settings.
-        cropUri?.let { uri ->
-            val target = pickTarget
-            if (target != null) {
-                CropScreen(
-                    vin = target,
-                    uriString = uri.toString(),
-                    onCancel = { cropUri = null; pickTarget = null },
-                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
-                )
+            // Slide-animated page content.
+            AnimatedContent(
+                targetState = pageIndex,
+                transitionSpec = {
+                    val dir = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally { it * dir } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally { -it * dir } + fadeOut(tween(180)))
+                },
+                modifier = Modifier.weight(1f),
+                label = "wizPage",
+            ) { idx ->
+                val pg = pages.getOrNull(idx) ?: return@AnimatedContent
+                val veh = pg.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
+                val sc = veh?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
+                Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(bottom = 100.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        when (pg.kind) {
+                            WizardStepKind.WELCOME -> WizardWelcomePage()
+                            WizardStepKind.POWERTRAIN -> WizardPowertrainPage(veh, state, vm)
+                            WizardStepKind.SEATS -> WizardSeatsPage(veh, sc, vm)
+                            WizardStepKind.STEERING -> WizardSteeringPage(veh, sc, vm)
+                            WizardStepKind.FINISH -> WizardFinishPage(
+                                vm = vm,
+                                canBio = canBio,
+                                context = context,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Back / Next navigation strip.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (pageIndex > 0) {
+                    OutlinedCard(
+                        onClick = ::goBack,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
+                            Text("Back", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+                MorphButton(
+                    onClick = ::goNext,
+                    active = true,
+                    modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
+                    contentPadding = PaddingValues(vertical = 14.dp),
+                ) {
+                    val isLast = pageIndex == pages.lastIndex
+                    val lastLabel = if (pages.lastOrNull()?.kind == WizardStepKind.FINISH) "Enter Bloo" else "Done"
+                    Icon(
+                        if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (isLast) lastLabel else "Next",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+
+        if (showFireworks) FireworksOverlay(Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+private fun WizardWelcomePage() {
+    val scheme = MaterialTheme.colorScheme
+    Spacer(Modifier.height(16.dp))
+    Text("👋", style = MaterialTheme.typography.displayMedium)
+    Text(
+        "Welcome to Bloo",
+        style = MaterialTheme.typography.displaySmall,
+        fontWeight = FontWeight.Black,
+    )
+    Text(
+        "Your Hyundai, Kia, or Genesis in your pocket.",
+        style = MaterialTheme.typography.titleMedium,
+        color = scheme.onSurfaceVariant,
+    )
+    WizardFeatureRow("🚗", "Swipe between cars", "Each car gets its own screen. Pull down to fetch live status.")
+    WizardFeatureRow("🧩", "Pebbles", "Controls live in cards: lock, charge limits, climate, location and more.")
+    WizardFeatureRow("🌡", "Climate presets", "Save temperature, defrost, seat heat and steering wheel as a named preset.")
+    WizardFeatureRow("⚡", "Tiles and shortcuts", "Quick Settings tiles and long-press shortcuts for one-tap control.")
+    Text(
+        "Next: tell Bloo what features your car has — it can't read this from the API.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = scheme.primary,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+@Composable
+private fun WizardFeatureRow(emoji: String, title: String, body: String) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(scheme.surfaceContainerHighest)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(emoji, style = MaterialTheme.typography.titleLarge)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun WizardPowertrainPage(
+    vehicle: com.bloo.bluelink.data.Vehicle?,
+    state: UiState,
+    vm: AppViewModel,
+) {
+    val scheme = MaterialTheme.colorScheme
+    if (vehicle == null) return
+    Text(
+        "Powertrain",
+        style = MaterialTheme.typography.labelLarge,
+        color = scheme.primary,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        "What powers the ${vehicle.name}?",
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Black,
+    )
+    Text(
+        "Bloo uses this to show the right status tiles — battery percentage for EVs, " +
+            "fuel level for gas, or both for plug-in hybrids.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = scheme.onSurfaceVariant,
+    )
+    val current = state.powertrainOf(vehicle)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        com.bloo.bluelink.data.Powertrain.entries.forEach { pt ->
+            val selected = current == pt
+            val (icon, label, desc) = when (pt) {
+                com.bloo.bluelink.data.Powertrain.GAS -> Triple("⛽", "Gasoline", "Combustion engine only")
+                com.bloo.bluelink.data.Powertrain.HYBRID -> Triple("🔋", "Hybrid", "Gas + small electric motor (no plug)")
+                com.bloo.bluelink.data.Powertrain.PHEV -> Triple("🔌", "Plug-in Hybrid", "Gas + large battery you can charge")
+                com.bloo.bluelink.data.Powertrain.EV -> Triple("⚡", "Electric", "Battery-only, no fuel tank")
+            }
+            Surface(
+                onClick = { vm.setPowertrain(vehicle, pt) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHigh,
+                contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+                border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+            ) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Text(icon, style = MaterialTheme.typography.headlineSmall)
+                    Column(Modifier.weight(1f)) {
+                        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
+                    }
+                    if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun OnboardingPoint(emoji: String, title: String, body: String) {
+private fun WizardSeatsPage(
+    vehicle: com.bloo.bluelink.data.Vehicle?,
+    seats: com.bloo.bluelink.data.SeatConfig,
+    vm: AppViewModel,
+) {
+    val scheme = MaterialTheme.colorScheme
+    if (vehicle == null) return
+    Text(
+        "Seat comfort",
+        style = MaterialTheme.typography.labelLarge,
+        color = scheme.primary,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        "What does the ${vehicle.name} have?",
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Black,
+    )
+    Text(
+        "Bloo shows only the controls your car actually supports. Skip any seats you don't have.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = scheme.onSurfaceVariant,
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(scheme.surfaceContainerHigh)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        WizardSeatRow("Driver", seats.driverHeat, seats.driverCool,
+            { vm.setSeatFlag(vehicle, "dh", it) }, { vm.setSeatFlag(vehicle, "dc", it) })
+        HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+        WizardSeatRow("Front passenger", seats.passHeat, seats.passCool,
+            { vm.setSeatFlag(vehicle, "ph", it) }, { vm.setSeatFlag(vehicle, "pc", it) })
+        HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+        WizardSeatRow("Rear left", seats.rearLeftHeat, seats.rearLeftCool,
+            { vm.setSeatFlag(vehicle, "rlh", it) }, { vm.setSeatFlag(vehicle, "rlc", it) })
+        HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+        WizardSeatRow("Rear right", seats.rearRightHeat, seats.rearRightCool,
+            { vm.setSeatFlag(vehicle, "rrh", it) }, { vm.setSeatFlag(vehicle, "rrc", it) })
+    }
+    Text(
+        "💡 You can change these any time in Settings → car card.",
+        style = MaterialTheme.typography.bodySmall,
+        color = scheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun WizardSeatRow(
+    label: String,
+    heat: Boolean,
+    cool: Boolean,
+    onHeat: (Boolean) -> Unit,
+    onCool: (Boolean) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WizardToggleChip(label = "Heat 🔥", selected = heat, onClick = { onHeat(!heat) })
+            WizardToggleChip(label = "Cool ❄️", selected = cool, onClick = { onCool(!cool) })
+        }
+    }
+}
+
+@Composable
+private fun WizardToggleChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) scheme.secondaryContainer else scheme.surfaceContainerHighest,
+        contentColor = if (selected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+        border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+    ) {
+        Text(
+            label,
+            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
+private fun WizardSteeringPage(
+    vehicle: com.bloo.bluelink.data.Vehicle?,
+    seats: com.bloo.bluelink.data.SeatConfig,
+    vm: AppViewModel,
+) {
+    val scheme = MaterialTheme.colorScheme
+    if (vehicle == null) return
+    Text(
+        "Climate features",
+        style = MaterialTheme.typography.labelLarge,
+        color = scheme.primary,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        "Any extras on the ${vehicle.name}?",
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Black,
+    )
+    Text(
+        "Enable what the car actually has. These control which options appear in the climate command.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = scheme.onSurfaceVariant,
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(scheme.surfaceContainerHigh)
+            .padding(vertical = 8.dp),
+    ) {
+        WizardFeatureToggle(
+            emoji = "🌡",
+            title = "Heated steering wheel",
+            body = "Warm the steering wheel via the remote climate command",
+            checked = seats.steeringWheel,
+            onChecked = { vm.setSeatFlag(vehicle, "sw", it) },
+        )
+    }
+    Text(
+        "That's it for ${vehicle.name}. Tap Next to continue.",
+        style = MaterialTheme.typography.bodySmall,
+        color = scheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun WizardFeatureToggle(
+    emoji: String,
+    title: String,
+    body: String,
+    checked: Boolean,
+    onChecked: (Boolean) -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(scheme.surfaceContainerHighest)
-            .padding(14.dp),
+            .clickable { onChecked(!checked) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(emoji, style = MaterialTheme.typography.headlineSmall)
+        Text(emoji, style = MaterialTheme.typography.titleLarge)
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = scheme.onSurface)
-            Text(body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChecked)
+    }
+}
+
+@Composable
+private fun WizardFinishPage(
+    vm: AppViewModel,
+    canBio: Boolean,
+    context: Context,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Text("✅", style = MaterialTheme.typography.displaySmall)
+    Text(
+        "All set!",
+        style = MaterialTheme.typography.headlineLarge,
+        fontWeight = FontWeight.Black,
+    )
+    Text(
+        "A couple of optional extras before you dive in:",
+        style = MaterialTheme.typography.bodyLarge,
+        color = scheme.onSurfaceVariant,
+    )
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        var notifGranted by remember {
+            mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context))
+        }
+        val notifLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted -> notifGranted = granted }
+        MorphButton(
+            onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+            active = notifGranted,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (notifGranted) "Notifications enabled" else "Enable notifications",
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
+
+    if (canBio) {
+        var bioEnabled by remember { mutableStateOf(false) }
+        MorphButton(
+            onClick = {
+                if (!bioEnabled) {
+                    context.findFragmentActivity()?.let { activity ->
+                        showBiometricPrompt(
+                            activity = activity,
+                            title = "Enable fingerprint lock",
+                            subtitle = "Confirm to require it when opening Bloo",
+                            onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
+                            onError = {},
+                        )
+                    }
+                }
+            },
+            active = bioEnabled,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (bioEnabled) "Fingerprint lock enabled" else "Lock with fingerprint",
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+
+    Text(
+        "Tap "Enter Bloo" below — you can fine-tune everything later in Settings.",
+        style = MaterialTheme.typography.bodySmall,
+        color = scheme.onSurfaceVariant,
+    )
 }
 
 private class Burst(val x: Float, val y: Float, val start: Float, val life: Float, val hue: Float, val count: Int, val maxR: Float)

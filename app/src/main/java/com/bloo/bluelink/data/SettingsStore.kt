@@ -342,6 +342,14 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("onboarding_seen")] = true }
     }
 
+    /** True once a car has been through the feature-setup wizard. */
+    suspend fun isCarConfigured(vin: String): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("car_configured_$vin")] ?: false
+
+    suspend fun setCarConfigured(vin: String) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("car_configured_$vin")] = true }
+    }
+
     // --- Per-car section order -------------------------------------------
 
     suspend fun sectionOrder(vin: String): List<String> {

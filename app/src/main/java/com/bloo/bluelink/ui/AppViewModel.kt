@@ -60,8 +60,10 @@ sealed interface Screen {
     data object Locked : Screen
     /** No vehicles enrolled (or still loading the first time). */
     data object Empty : Screen
-    /** First-run welcome that funnels the user into Settings before the app. */
+    /** First-run welcome wizard that sets up car features before reaching the app. */
     data object Onboarding : Screen
+    /** Feature-setup wizard for one or more newly-detected cars (post-first-run). */
+    data class CarSetup(val vins: List<String>) : Screen
     /** Main screen: the car carousel/grid. */
     data object Garage : Screen
     data object Settings : Screen
@@ -572,6 +574,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
         val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
         val firstRun = !settingsStore.onboardingSeen()
+        val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin) }.map { it.vin }
         // On first open all pebbles start expanded regardless of any stored state.
         val collapsed = if (firstRun) emptySet()
         else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
@@ -582,6 +585,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
+        val screen = when {
+            firstRun -> Screen.Onboarding
+            unconfiguredVins.isNotEmpty() -> Screen.CarSetup(unconfiguredVins)
+            else -> Screen.Garage
+        }
         _state.update {
             it.copy(
                 vehicles = vehicles,
@@ -600,8 +608,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 tileBackground = tileBackground,
                 shortcutSet = shortcutSet,
                 currentIndex = index,
-                // First run funnels through the onboarding screen → Settings.
-                screen = if (firstRun) Screen.Onboarding else Screen.Garage,
+                screen = screen,
             )
         }
         // Keep the app-icon long-press shortcuts in sync with the current cars.
@@ -919,24 +926,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setSectionHidden(v.vin, section, hidden) }
     }
 
-    /** Finish first-run onboarding by going (required) into Settings. */
-    fun startSetup() {
-        viewModelScope.launch { settingsStore.setOnboardingSeen() }
-        _state.update { it.copy(screen = Screen.Settings, showSettingsCoach = true) }
+    /** Finish first-run onboarding (wizard complete) and land in the app. */
+    fun finishOnboarding() {
+        val vins = _state.value.vehicles.map { it.vin }
+        viewModelScope.launch {
+            settingsStore.setOnboardingSeen()
+            vins.forEach { settingsStore.setCarConfigured(it) }
+        }
+        _state.update {
+            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage)
+        }
     }
 
-    /**
-     * Finish first-run onboarding and land straight in the app. The car feature
-     * setup now happens inline during onboarding, so there's no forced detour
-     * into Settings — just a gentle coach mark once the garage opens.
-     */
-    fun finishOnboarding() {
-        viewModelScope.launch { settingsStore.setOnboardingSeen() }
+    /** Mark newly-detected cars as configured and return to the garage. */
+    fun finishCarSetup(vins: List<String>) {
+        viewModelScope.launch { vins.forEach { settingsStore.setCarConfigured(it) } }
         _state.update {
-            it.copy(
-                screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage,
-                showSettingsHint = true,
-            )
+            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage)
         }
     }
 
