@@ -21,6 +21,7 @@ import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.WearClimateState
 import com.bloo.bluelink.data.WindowOpen
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.openLabels
@@ -187,6 +188,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
+        }
+        viewModelScope.launch {
+            WearClimateStore(ctx).flow.collect { remote -> mergeRemoteClimate(remote) }
         }
         bootstrap()
     }
@@ -419,6 +423,47 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun updateDraft(vin: String, f: (ClimateDraft) -> ClimateDraft) {
         _ui.update { u -> u.copy(climateDrafts = u.climateDrafts + (vin to f(u.draftFor(vin)))) }
+        publishClimateDrafts()
+    }
+
+    /** Mirror the phone's climate draft in, without re-publishing (no echo). */
+    private fun mergeRemoteClimate(remote: WearClimateState) {
+        if (remote.byVin.isEmpty()) return
+        _ui.update { u ->
+            val merged = u.climateDrafts.toMutableMap()
+            remote.byVin.forEach { (vin, cs) ->
+                merged[vin] = ClimateDraft(
+                    tempF = cs.tempF,
+                    duration = cs.durationMinutes,
+                    defrost = cs.defrost,
+                    steering = cs.steering,
+                    seatDriver = seatStepOf(SeatLevel.fromApi(cs.seatFrontLeft)),
+                    seatPassenger = seatStepOf(SeatLevel.fromApi(cs.seatFrontRight)),
+                    seatRearLeft = seatStepOf(SeatLevel.fromApi(cs.seatRearLeft)),
+                    seatRearRight = seatStepOf(SeatLevel.fromApi(cs.seatRearRight)),
+                    activePresetId = cs.activePresetId,
+                )
+            }
+            u.copy(climateDrafts = merged)
+        }
+    }
+
+    /** Push every car's draft to the phone over the shared climate channel. */
+    private fun publishClimateDrafts() {
+        val byVin = _ui.value.climateDrafts.mapValues { (_, d) ->
+            com.bloo.bluelink.data.ClimateSync(
+                activePresetId = d.activePresetId,
+                tempF = d.tempF,
+                durationMinutes = d.duration,
+                defrost = d.defrost,
+                steering = d.steering,
+                seatFrontLeft = seatLevelOf(d.seatDriver).apiValue,
+                seatFrontRight = seatLevelOf(d.seatPassenger).apiValue,
+                seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,
+                seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
+            )
+        }
+        viewModelScope.launch { runCatching { WearComms.publishClimate(ctx, WearClimateState(byVin)) } }
     }
 
     fun setClimateTemp(vin: String, value: Int) = updateDraft(vin) { it.copy(tempF = value.coerceIn(62, 82), activePresetId = null) }

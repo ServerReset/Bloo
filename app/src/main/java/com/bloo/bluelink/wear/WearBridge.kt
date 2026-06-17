@@ -187,6 +187,21 @@ object WearBridge {
         }
     }
 
+    /** Mirror the phone's live climate draft (sliders + active preset) to the
+     *  watch over the shared bidirectional climate channel. */
+    fun publishClimate(context: Context, state: com.bloo.bluelink.data.WearClimateState) {
+        val app = context.applicationContext
+        scope.launch {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_CLIMATE).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeClimate(state))
+                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(app).putDataItem(request))
+            }
+        }
+    }
+
     /** Mirror weather / car photos / AI summaries to the watch. */
     fun publishExtras(context: Context, extras: com.bloo.bluelink.data.WearExtras) {
         val app = context.applicationContext

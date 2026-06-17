@@ -4,10 +4,12 @@ import android.content.Context
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearCommand
+import com.bloo.bluelink.data.WearClimateState
 import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.data.WearSync
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -77,6 +79,20 @@ object WearComms {
         }
     }
 
+    /** Publish the watch's live climate draft so the phone mirrors it. Written as
+     *  a DataItem on the shared [WearSync.PATH_CLIMATE] channel. */
+    suspend fun publishClimate(context: Context, state: WearClimateState) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_CLIMATE).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeClimate(state))
+                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+            }
+        }
+    }
+
     /** On launch, pull whatever the phone already published so the UI isn't empty
      *  while waiting for the next DataChanged callback. */
     suspend fun pullLatest(context: Context) {
@@ -92,6 +108,7 @@ object WearComms {
                             WearSync.PATH_AUTH -> WearStateWriter.persistAuth(context, raw)
                             WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(context, raw)
                             WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(context, raw)
+                            WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(context, raw)
                             WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(context, raw)
                         }
                     }

@@ -4139,6 +4139,26 @@ private fun ClimatePebble(
         if (active != null && active.request != currentReq) activePresetId = null
     }
 
+    // --- Two-way climate sync with the watch ----------------------------------
+    // Reflect whatever the watch (or another session) set: sliders + active preset.
+    val remoteClimate = state.climateSync[v.vin]
+    LaunchedEffect(remoteClimate) {
+        val r = remoteClimate ?: return@LaunchedEffect
+        tempF = r.tempF
+        duration = r.durationMinutes
+        defrost = r.defrost
+        steeringHeat = r.steering
+        driver = SeatLevel.fromApi(r.seatFrontLeft)
+        passenger = SeatLevel.fromApi(r.seatFrontRight)
+        rearLeft = SeatLevel.fromApi(r.seatRearLeft)
+        rearRight = SeatLevel.fromApi(r.seatRearRight)
+        activePresetId = r.activePresetId
+    }
+    // Publish our draft so the watch mirrors it (no-ops when unchanged).
+    LaunchedEffect(currentReq, activePresetId) {
+        if (settingsLoaded) vm.publishClimateState(v.vin, activePresetId, currentReq)
+    }
+
     val climateOn = status?.airCtrlOn == true
     // The car rejects remote climate commands while it's moving, so the whole
     // control goes read-only when driving - and if it's already on, we show

@@ -37,6 +37,11 @@ object WearSync {
     /** DataItem path: phone → watch saved climate presets, keyed by VIN. */
     const val PATH_PRESETS = "/bloo/presets"
 
+    /** DataItem path: *bidirectional* live climate draft (slider positions, the
+     *  active preset) keyed by VIN. Either side writes it when the user changes a
+     *  control or applies/toggles a preset, and both mirror the other's. */
+    const val PATH_CLIMATE = "/bloo/climate"
+
     /** DataItem path: phone → watch extras (weather, car photo URLs, AI
      *  summaries) so the watch reaches fuller parity with the phone. */
     const val PATH_EXTRAS = "/bloo/extras"
@@ -89,6 +94,13 @@ object WearSync {
     fun decodePresets(raw: String?): WearPresets =
         raw?.let { runCatching { json.decodeFromString(WearPresets.serializer(), it) }.getOrNull() }
             ?: WearPresets()
+
+    fun encodeClimate(state: WearClimateState): String =
+        json.encodeToString(WearClimateState.serializer(), state)
+
+    fun decodeClimate(raw: String?): WearClimateState =
+        raw?.let { runCatching { json.decodeFromString(WearClimateState.serializer(), it) }.getOrNull() }
+            ?: WearClimateState()
 
     fun encodeExtras(extras: WearExtras): String =
         json.encodeToString(WearExtras.serializer(), extras)
@@ -221,6 +233,28 @@ data class WearSettingsPayload(
 @Serializable
 data class WearPresets(
     val byVin: Map<String, List<ClimatePreset>> = emptyMap(),
+)
+
+/** The live climate draft for one car, shared both ways. Seat values are
+ *  [SeatLevel.apiValue] so the format is platform-neutral (the phone also has
+ *  cooling levels; the watch collapses cooling to off). */
+@Serializable
+data class ClimateSync(
+    val activePresetId: String? = null,
+    val tempF: Int = 72,
+    val durationMinutes: Int = 10,
+    val defrost: Boolean = false,
+    val steering: Boolean = false,
+    val seatFrontLeft: Int = 0,
+    val seatFrontRight: Int = 0,
+    val seatRearLeft: Int = 0,
+    val seatRearRight: Int = 0,
+)
+
+/** Per-VIN live climate drafts mirrored between phone and watch. */
+@Serializable
+data class WearClimateState(
+    val byVin: Map<String, ClimateSync> = emptyMap(),
 )
 
 /** Compact current-conditions snapshot mirrored to the watch (Celsius like the

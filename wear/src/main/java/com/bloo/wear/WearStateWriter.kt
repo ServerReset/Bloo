@@ -27,6 +27,10 @@ object WearStateWriter {
         WearPresetsStore(context).save(raw)
     }
 
+    suspend fun persistClimate(context: Context, raw: String) {
+        WearClimateStore(context).save(raw)
+    }
+
     suspend fun persistExtras(context: Context, raw: String) {
         WearExtrasStore(context).save(raw)
     }

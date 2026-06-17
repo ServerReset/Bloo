@@ -1,8 +1,12 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.ClimateSyncStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearSync
 import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
@@ -50,6 +54,21 @@ class WearPhoneService : WearableListenerService() {
                     WearBridge.publishNow(applicationContext)
                 }
             }
+        }
+    }
+
+    /** The watch writes its live climate draft on [WearSync.PATH_CLIMATE]; persist
+     *  it so the AppViewModel can mirror it into the phone UI. */
+    override fun onDataChanged(events: DataEventBuffer) {
+        val payloads = events.mapNotNull { event ->
+            if (event.type != DataEvent.TYPE_CHANGED) return@mapNotNull null
+            val item = event.dataItem
+            if (item.uri.path != WearSync.PATH_CLIMATE) return@mapNotNull null
+            DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
+        }
+        if (payloads.isEmpty()) return
+        scope.launch {
+            payloads.forEach { raw -> ClimateSyncStore(applicationContext).save(raw) }
         }
     }
 

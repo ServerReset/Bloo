@@ -85,6 +85,8 @@ data class UiState(
     val trips: Map<String, List<EvTrip>> = emptyMap(),
     /** User-named climate presets by VIN. */
     val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
+    /** Live climate draft mirrored from the watch, by VIN (two-way climate sync). */
+    val climateSync: Map<String, com.bloo.bluelink.data.ClimateSync> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
     val sectionOrders: Map<String, List<String>> = emptyMap(),
@@ -301,6 +303,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.map { it.climatePresets }.distinctUntilChanged().collect { presets ->
                 com.bloo.bluelink.wear.WearBridge.publishPresets(getApplication(), presets)
             }
+        }
+        // Mirror the watch's live climate draft (sliders, active preset) into state.
+        viewModelScope.launch {
+            com.bloo.bluelink.data.ClimateSyncStore(getApplication()).flow
+                .collect { s -> _state.update { it.copy(climateSync = s.byVin) } }
         }
         // Mirror weather / car photos / AI summaries to the watch.
         viewModelScope.launch {
@@ -1158,6 +1165,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun reorderClimatePresets(v: Vehicle, ordered: List<ClimatePreset>) {
         _state.update { it.copy(climatePresets = it.climatePresets + (v.vin to ordered)) }
         viewModelScope.launch { settingsStore.setClimatePresets(v.vin, ordered) }
+    }
+
+    /**
+     * Mirror this car's live climate draft + active preset to the watch. Skips the
+     * write when nothing changed, so state received *from* the watch doesn't echo
+     * straight back and loop.
+     */
+    fun publishClimateState(vin: String, presetId: String?, req: ClimateRequest) {
+        val cs = com.bloo.bluelink.data.ClimateSync(
+            activePresetId = presetId,
+            tempF = req.tempF,
+            durationMinutes = req.durationMinutes,
+            defrost = req.defrost,
+            steering = req.steeringWheelHeat,
+            seatFrontLeft = req.seatFrontLeft.apiValue,
+            seatFrontRight = req.seatFrontRight.apiValue,
+            seatRearLeft = req.seatRearLeft.apiValue,
+            seatRearRight = req.seatRearRight.apiValue,
+        )
+        if (_state.value.climateSync[vin] == cs) return
+        val merged = _state.value.climateSync + (vin to cs)
+        _state.update { it.copy(climateSync = merged) }
+        com.bloo.bluelink.wear.WearBridge.publishClimate(
+            getApplication(), com.bloo.bluelink.data.WearClimateState(merged),
+        )
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
