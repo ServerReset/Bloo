@@ -30,6 +30,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
@@ -158,7 +159,8 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
     if (hasAlerts) out.add(TILE_ALERTS)
     for (key in ui.localSettings.tileOrder) {
         val show = when (key) {
-            WearTiles.PRESETS -> ui.presets[car.vin]?.isNotEmpty() == true
+            // Always shown so you can save the first preset from the watch.
+            WearTiles.PRESETS -> true
             WearTiles.CHARGE, WearTiles.LIMITS -> car.hasBattery
             WearTiles.LOCATION -> car.lat != null && car.lon != null
             WearTiles.WEATHER -> ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null
@@ -494,7 +496,16 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 
 @Composable
 private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets") {
-    ui.presets[car.vin].orEmpty().forEach { preset ->
+    val list = ui.presets[car.vin].orEmpty()
+    if (list.isEmpty()) {
+        Text(
+            "Save the current climate settings as a preset.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+    }
+    list.forEach { preset ->
         val isActive = ui.draftFor(car.vin).activePresetId == preset.id && car.climateOn == true
         MorphButton(
             label = preset.name,
@@ -507,6 +518,15 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         )
         Spacer(Modifier.height(6.dp))
     }
+    val saveInput = rememberWearTextInput("Preset name") { name -> vm.saveCurrentAsPreset(car.vin, name) }
+    MorphButton(
+        label = "Save preset",
+        icon = Icons.Filled.Add,
+        active = false,
+        activeColor = MaterialTheme.colorScheme.primary,
+        pending = false,
+        onClick = saveInput,
+    )
 }
 
 @Composable

@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import com.bloo.bluelink.data.ClimateSyncStore
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearSync
 import com.google.android.gms.tasks.Tasks
@@ -57,18 +58,34 @@ class WearPhoneService : WearableListenerService() {
         }
     }
 
-    /** The watch writes its live climate draft on [WearSync.PATH_CLIMATE]; persist
-     *  it so the AppViewModel can mirror it into the phone UI. */
+    /**
+     * The watch writes data items too: its live climate draft on
+     * [WearSync.PATH_CLIMATE] and presets it created/edited on
+     * [WearSync.PATH_PRESETS]. Persist both so the phone reflects them.
+     */
     override fun onDataChanged(events: DataEventBuffer) {
-        val payloads = events.mapNotNull { event ->
+        val updates = events.mapNotNull { event ->
             if (event.type != DataEvent.TYPE_CHANGED) return@mapNotNull null
             val item = event.dataItem
-            if (item.uri.path != WearSync.PATH_CLIMATE) return@mapNotNull null
-            DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
+            val path = item.uri.path
+            if (path != WearSync.PATH_CLIMATE && path != WearSync.PATH_PRESETS) return@mapNotNull null
+            val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
+                ?: return@mapNotNull null
+            path to raw
         }
-        if (payloads.isEmpty()) return
+        if (updates.isEmpty()) return
         scope.launch {
-            payloads.forEach { raw -> ClimateSyncStore(applicationContext).save(raw) }
+            updates.forEach { (path, raw) ->
+                when (path) {
+                    WearSync.PATH_CLIMATE -> ClimateSyncStore(applicationContext).save(raw)
+                    WearSync.PATH_PRESETS -> {
+                        val store = SettingsStore(applicationContext)
+                        WearSync.decodePresets(raw).byVin.forEach { (vin, list) ->
+                            store.setClimatePresets(vin, list)
+                        }
+                    }
+                }
+            }
         }
     }
 

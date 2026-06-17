@@ -5,6 +5,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearClimateState
+import com.bloo.bluelink.data.WearPresets
 import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.data.WearSync
 import com.google.android.gms.tasks.Tasks
@@ -86,6 +87,19 @@ object WearComms {
             runCatching {
                 val request = PutDataMapRequest.create(WearSync.PATH_CLIMATE).apply {
                     dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeClimate(state))
+                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+            }
+        }
+    }
+
+    /** Publish presets the watch created/edited so the phone saves + mirrors them. */
+    suspend fun publishPresets(context: Context, presets: WearPresets) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_PRESETS).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodePresets(presets))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request))

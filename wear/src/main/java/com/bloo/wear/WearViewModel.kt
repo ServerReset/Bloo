@@ -448,6 +448,48 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Save the current draft as a new named preset, then sync it to the phone. */
+    fun saveCurrentAsPreset(vin: String, name: String) {
+        val d = _ui.value.draftFor(vin)
+        val preset = ClimatePreset(
+            id = java.util.UUID.randomUUID().toString(),
+            name = name.trim().ifBlank { "Preset" },
+            request = ClimateRequest(
+                tempF = d.tempF,
+                defrost = d.defrost,
+                durationMinutes = d.duration,
+                steeringWheelHeat = d.steering,
+                seatFrontLeft = seatLevelOf(d.seatDriver),
+                seatFrontRight = seatLevelOf(d.seatPassenger),
+                seatRearLeft = seatLevelOf(d.seatRearLeft),
+                seatRearRight = seatLevelOf(d.seatRearRight),
+            ),
+        )
+        val updated = _ui.value.presets + (vin to (_ui.value.presets[vin].orEmpty() + preset))
+        _ui.update { it.copy(presets = updated) }
+        persistAndPublishPresets(updated)
+    }
+
+    fun deletePreset(vin: String, id: String) {
+        val updated = _ui.value.presets + (vin to _ui.value.presets[vin].orEmpty().filter { it.id != id })
+        _ui.update { it.copy(presets = updated) }
+        persistAndPublishPresets(updated)
+    }
+
+    fun reorderPresets(vin: String, ordered: List<ClimatePreset>) {
+        val updated = _ui.value.presets + (vin to ordered)
+        _ui.update { it.copy(presets = updated) }
+        persistAndPublishPresets(updated)
+    }
+
+    private fun persistAndPublishPresets(byVin: Map<String, List<ClimatePreset>>) {
+        val wp = com.bloo.bluelink.data.WearPresets(byVin)
+        viewModelScope.launch {
+            runCatching { WearPresetsStore(ctx).save(com.bloo.bluelink.data.WearSync.encodePresets(wp)) }
+            runCatching { WearComms.publishPresets(ctx, wp) }
+        }
+    }
+
     /** Push every car's draft to the phone over the shared climate channel. */
     private fun publishClimateDrafts() {
         val byVin = _ui.value.climateDrafts.mapValues { (_, d) ->
