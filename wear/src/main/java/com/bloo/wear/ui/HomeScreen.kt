@@ -13,12 +13,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -72,7 +72,7 @@ import androidx.wear.compose.foundation.CurvedLayout
 import androidx.wear.compose.foundation.curvedComposable
 import androidx.wear.compose.foundation.curvedRow
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
+import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
@@ -94,8 +94,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private fun wrap(index: Int, count: Int) = ((index % count) + count) % count
+
+/** Synthetic tile key for the alerts card (not part of the user-orderable set). */
+private const val TILE_ALERTS = "alerts"
 
 @Composable
 fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit) {
@@ -113,18 +117,31 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     key(ui.cars.map { it.vin }) {
         val carPager = rememberPagerState(initialPage = if (loop) virtual / 2 else 0) { virtual }
 
-        LaunchedEffect(carPager.settledPage, count) {
-            ui.cars.getOrNull(wrap(carPager.settledPage, count))?.let { vm.onCarShown(it.vin) }
+        // Only fetch a car's status once it actually settles on a *new* VIN, so a
+        // swipe doesn't churn through cars or re-trigger fetches mid-gesture.
+        var lastShownVin by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(carPager.settledPage) {
+            val vin = ui.cars.getOrNull(wrap(carPager.settledPage, count))?.vin
+            if (vin != null && vin != lastShownVin) {
+                lastShownVin = vin
+                vm.onCarShown(vin)
+            }
         }
 
         Box(Modifier.fillMaxSize()) {
-            HorizontalPager(state = carPager, modifier = Modifier.fillMaxSize()) { page ->
+            HorizontalPager(
+                state = carPager,
+                beyondViewportPageCount = 1,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
                 val car = ui.cars[wrap(page, count)]
+                // Only the settled page owns rotary focus.
+                val active = wrap(carPager.settledPage, count) == wrap(page, count)
                 val carRoles = ui.settings?.carColors?.get(car.vin)
                 if (carRoles != null) {
-                    MaterialTheme(colorScheme = schemeFrom(carRoles)) { CarColumn(vm, ui, car, onSettings, onTrips) }
+                    MaterialTheme(colorScheme = schemeFrom(carRoles)) { CarColumn(vm, ui, car, active, onSettings, onTrips) }
                 } else {
-                    CarColumn(vm, ui, car, onSettings, onTrips)
+                    CarColumn(vm, ui, car, active, onSettings, onTrips)
                 }
             }
             CurvedIndicator(count, wrap(carPager.currentPage, count), anchor = 90f)
@@ -132,29 +149,60 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     }
 }
 
+/** The ordered tiles actually shown for this car (conditions resolved once). */
+private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
+    val hasAlerts = car.doorsOpen.isNotEmpty() || car.windowsOpen.isNotEmpty() ||
+        car.trunkOpen || car.hoodOpen || car.tireWarning ||
+        car.lowFuel || car.brakeLow || car.washerLow || car.keyFobLow
+    val out = ArrayList<String>()
+    if (hasAlerts) out.add(TILE_ALERTS)
+    for (key in ui.localSettings.tileOrder) {
+        val show = when (key) {
+            WearTiles.PRESETS -> ui.presets[car.vin]?.isNotEmpty() == true
+            WearTiles.CHARGE, WearTiles.LIMITS -> car.hasBattery
+            WearTiles.LOCATION -> car.lat != null && car.lon != null
+            WearTiles.WEATHER -> ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null
+            WearTiles.DIAGNOSTICS -> car.hasLiveStatus
+            else -> true // summary, lock, climate, comfort, info, ai, assist, more
+        }
+        if (show) out.add(key)
+    }
+    return out
+}
+
 /**
  * One car's content as a morphing-scroll [ScalingLazyColumn]. Cards scale/fade
- * at the edges. Rotary (bezel / crown) snaps per item; at the very top a strong
- * upward flick triggers a network refresh.
+ * at the edges, the list wraps around for endless vertical scroll, and rotary
+ * (bezel / crown) snaps exactly one tile per detent. The screen names the car
+ * once you scroll away from its summary.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit) {
-    val state = rememberScalingLazyListState()
+private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, active: Boolean, onSettings: () -> Unit, onTrips: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(car.vin) { runCatching { focusRequester.requestFocus() } }
-
     val round = LocalConfiguration.current.isScreenRound
-    val refreshing = "${car.vin}:refresh" in ui.pending
 
-    // FloatArray is stable across recompositions — mutate the slot, no State needed.
-    val overscrollAccum = remember { floatArrayOf(0f) }
+    val tiles = remember(ui.localSettings.tileOrder, ui.presets, ui.extras, car) { visibleTiles(ui, car) }
+    val tileCount = tiles.size
+    // Wrap-around (endless) scrolling once there's more than one tile.
+    val infinite = tileCount > 1
+    val cycles = if (infinite) 200 else 1
+    val total = tileCount * cycles
+    val summaryIdx = tiles.indexOf(WearTiles.SUMMARY).coerceAtLeast(0)
+    val initialIndex = if (infinite) (cycles / 2) * tileCount + summaryIdx else summaryIdx
 
-    // Snapping guard to avoid re-entrant snap animations.
+    val state = rememberScalingLazyListState(initialCenterItemIndex = initialIndex)
+
+    // Only the on-screen page requests focus, otherwise off-screen pages steal
+    // rotary input and the bezel appears to do nothing.
+    LaunchedEffect(active, car.vin) {
+        if (active) runCatching { focusRequester.requestFocus() }
+    }
+
     var isSnapping by remember { mutableStateOf(false) }
 
-    // Snap to nearest item when scroll stops.
+    // Snap to the nearest tile when a finger fling settles — tile-by-tile feel.
     LaunchedEffect(state.isScrollInProgress) {
         if (!state.isScrollInProgress && !isSnapping) {
             val info = state.layoutInfo
@@ -170,7 +218,6 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
         }
     }
 
-    // Derived center item index for the vertical dot indicator.
     val centerItemIndex by remember {
         derivedStateOf {
             val info = state.layoutInfo
@@ -180,7 +227,7 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
             }?.index ?: 0
         }
     }
-    val totalItems by remember { derivedStateOf { state.layoutInfo.totalItemsCount } }
+    val centerTile = if (tileCount > 0) tiles[wrap(centerItemIndex, tileCount)] else ""
 
     Box(Modifier.fillMaxSize()) {
         ScalingLazyColumn(
@@ -189,54 +236,38 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
                 .onRotaryScrollEvent { e ->
                     val info = state.layoutInfo
                     val viewportCenter = info.viewportSize.height / 2
-                    val centerItem = info.visibleItemsInfo.minByOrNull {
+                    val center = info.visibleItemsInfo.minByOrNull {
                         abs(it.offset + it.size / 2 - viewportCenter)
-                    }
-                    if (e.verticalScrollPixels < 0) {
-                        // Scrolling up: accumulate overscroll only at the very first item.
-                        val atTop = centerItem?.index == 0
-                        if (atTop) {
-                            overscrollAccum[0] += e.verticalScrollPixels
-                            if (overscrollAccum[0] < -120f && !refreshing) {
-                                overscrollAccum[0] = 0f
-                                scope.launch { vm.refreshStatus(car.vin) }
-                            }
-                        } else {
-                            overscrollAccum[0] = 0f
-                        }
-                        // Snap to previous item
-                        val target = (centerItem?.index ?: 0) - 1
-                        if (target >= 0) scope.launch { state.animateScrollToItem(target) }
-                    } else {
-                        overscrollAccum[0] = 0f
-                        // Snap to next item
-                        val target = (centerItem?.index ?: 0) + 1
-                        val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                        if (target <= maxIdx) scope.launch { state.animateScrollToItem(target) }
-                    }
+                    }?.index ?: 0
+                    // One detent → one tile, in the direction of the turn.
+                    val dir = if (e.verticalScrollPixels > 0) 1 else -1
+                    val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                    val target = (center + dir).coerceIn(0, maxIdx)
+                    scope.launch { state.animateScrollToItem(target) }
                     true
                 }
                 .focusRequester(focusRequester)
                 .focusable(),
             state = state,
-            contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 32.dp),
+            contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            item(key = "header") { CarHeader(car, refreshing) }
-            val hasAlerts = car.doorsOpen.isNotEmpty() || car.windowsOpen.isNotEmpty() ||
-                car.trunkOpen || car.hoodOpen || car.tireWarning ||
-                car.lowFuel || car.brakeLow || car.washerLow || car.keyFobLow
-            if (hasAlerts) item(key = "alerts") { AlertsCard(car) }
-            for (tileKey in ui.localSettings.tileOrder) {
-                renderTile(tileKey, vm, ui, car, onSettings, onTrips)
+            items(count = total, key = { it }) { i ->
+                TileContent(tiles[wrap(i, tileCount)], vm, ui, car, onSettings, onTrips)
             }
         }
 
-        // Vertical dot indicator at the end of the screen.
-        VerticalDotIndicator(
-            totalItems = totalItems,
-            centerIndex = centerItemIndex,
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp),
+        // Tile-progress dots that curve along the right bezel so the round face
+        // never clips them.
+        CurvedDotIndicator(
+            total = tileCount,
+            activeIndex = wrap(centerItemIndex, tileCount.coerceAtLeast(1)),
+        )
+
+        // Name the car once you leave its summary tile.
+        CarNameOverlay(
+            name = car.name,
+            visible = centerTile.isNotEmpty() && centerTile != WearTiles.SUMMARY,
         )
 
         // Auto-dismissing message snackbar at the bottom.
@@ -270,8 +301,9 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: (
     }
 }
 
-/** Dispatch a tile key to its composable card. Conditionally skipped based on key. */
-private fun ScalingLazyListScope.renderTile(
+/** Render a single tile by key. Plain composable so it can repeat for wrap-around. */
+@Composable
+private fun TileContent(
     key: String,
     vm: WearViewModel,
     ui: WearUi,
@@ -280,91 +312,79 @@ private fun ScalingLazyListScope.renderTile(
     onTrips: (String) -> Unit,
 ) {
     when (key) {
-        WearTiles.SUMMARY -> item(key = "summary") { SummaryCard(car, ui) }
-        WearTiles.LOCK -> item(key = "lock") {
-            MorphButton(
-                label = if (car.locked == true) "Locked" else "Unlocked",
-                icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                active = car.locked == true,
-                activeColor = MaterialTheme.colorScheme.primary,
-                pending = "${car.vin}:doors" in ui.pending,
-                onClick = { vm.toggleLock(car.vin) },
-            )
-        }
-        WearTiles.CLIMATE -> item(key = "climate") { ClimateCard(vm, ui, car) }
-        WearTiles.COMFORT -> item(key = "comfort") { ComfortCard(vm, ui, car) }
-        WearTiles.PRESETS -> {
-            if (ui.presets[car.vin]?.isNotEmpty() == true) {
-                item(key = "presets") { PresetsCard(vm, ui, car) }
-            }
-        }
-        WearTiles.CHARGE -> {
-            if (car.hasBattery) item(key = "charge") { ChargeCard(vm, ui, car) }
-        }
-        WearTiles.LIMITS -> {
-            if (car.hasBattery) item(key = "limits") { LimitsCard(vm, ui, car) }
-        }
-        WearTiles.LOCATION -> {
-            if (car.lat != null && car.lon != null) item(key = "location") { LocationCard(vm, ui, car) }
-        }
-        WearTiles.WEATHER -> {
-            if (ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null) {
-                item(key = "weather") { WeatherCard(ui, car) }
-            }
-        }
-        WearTiles.INFO -> item(key = "info") { InfoCard(car) }
-        WearTiles.DIAGNOSTICS -> {
-            if (car.hasLiveStatus) item(key = "diagnostics") { DiagnosticsCard(car) }
-        }
-        WearTiles.AI -> {
-            if (!ui.extras.ai[car.vin].isNullOrBlank()) item(key = "ai") { AiCard(ui, car) }
-        }
-        WearTiles.ASSIST -> item(key = "assist") { AssistCard(car) }
-        WearTiles.MORE -> item(key = "more") { MoreCard(vm, ui, car, onSettings, onTrips) }
+        TILE_ALERTS -> AlertsCard(car)
+        WearTiles.SUMMARY -> SummaryCard(car, ui)
+        WearTiles.LOCK -> MorphButton(
+            label = if (car.locked == true) "Locked" else "Unlocked",
+            icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
+            active = car.locked == true,
+            activeColor = MaterialTheme.colorScheme.primary,
+            pending = "${car.vin}:doors" in ui.pending,
+            onClick = { vm.toggleLock(car.vin) },
+        )
+        WearTiles.CLIMATE -> ClimateCard(vm, ui, car)
+        WearTiles.COMFORT -> ComfortCard(vm, ui, car)
+        WearTiles.PRESETS -> PresetsCard(vm, ui, car)
+        WearTiles.CHARGE -> ChargeCard(vm, ui, car)
+        WearTiles.LIMITS -> LimitsCard(vm, ui, car)
+        WearTiles.LOCATION -> LocationCard(vm, ui, car)
+        WearTiles.WEATHER -> WeatherCard(ui, car)
+        WearTiles.INFO -> InfoCard(car)
+        WearTiles.DIAGNOSTICS -> DiagnosticsCard(car)
+        WearTiles.AI -> AiCard(ui, car)
+        WearTiles.ASSIST -> AssistCard(car)
+        WearTiles.MORE -> MoreCard(vm, ui, car, onSettings, onTrips)
     }
 }
 
-/** Vertical dot indicator showing position in the list, up to 10 dots. */
+/** Tile-progress dots laid along the right-hand arc of the (round) screen. */
 @Composable
-private fun VerticalDotIndicator(
-    totalItems: Int,
-    centerIndex: Int,
-    modifier: Modifier = Modifier,
-) {
-    if (totalItems <= 1) return
-    val dotCount = min(totalItems, 10)
-    // Map centerIndex into the visible dot range.
-    val activeDot = if (totalItems <= 10) {
-        centerIndex.coerceIn(0, dotCount - 1)
+private fun CurvedDotIndicator(total: Int, activeIndex: Int) {
+    if (total <= 1) return
+    val shown = min(total, 12)
+    val active = if (total <= shown) {
+        activeIndex.coerceIn(0, shown - 1)
     } else {
-        ((centerIndex.toFloat() / (totalItems - 1)) * (dotCount - 1)).toInt().coerceIn(0, dotCount - 1)
+        ((activeIndex.toFloat() / (total - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
     }
     val selected = MaterialTheme.colorScheme.primary
     val unselected = MaterialTheme.colorScheme.outlineVariant
+    // anchor 0° = 3 o'clock; dots hug the right bezel and follow the curve.
+    CurvedLayout(modifier = Modifier.fillMaxSize(), anchor = 0f, anchorType = AnchorType.Center) {
+        curvedRow {
+            repeat(shown) { i ->
+                curvedComposable {
+                    val isOn = i == active
+                    val sz by animateDpAsState(if (isOn) 7.dp else 4.dp, tween(150), label = "cd$i")
+                    val c by animateColorAsState(if (isOn) selected else unselected, tween(150), label = "cc$i")
+                    Box(Modifier.padding(1.5.dp).size(sz).clip(CircleShape).background(c))
+                }
+            }
+        }
+    }
+}
 
-    Column(
-        modifier = modifier.fillMaxHeight(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+/** A small pill at the top naming the car you're currently looking at. */
+@Composable
+private fun BoxScope.CarNameOverlay(name: String, visible: Boolean) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp),
+        enter = fadeIn() + slideInVertically { -it },
+        exit = fadeOut() + slideOutVertically { -it },
     ) {
-        repeat(dotCount) { i ->
-            val isActive = i == activeDot
-            val size by animateDpAsState(
-                targetValue = if (isActive) 7.dp else 4.dp,
-                animationSpec = tween(150),
-                label = "dotSize$i",
-            )
-            val color by animateColorAsState(
-                targetValue = if (isActive) selected else unselected,
-                animationSpec = tween(150),
-                label = "dotColor$i",
-            )
-            Box(
-                Modifier
-                    .padding(vertical = 2.dp)
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(color)
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f))
+                .padding(horizontal = 12.dp, vertical = 3.dp),
+        ) {
+            Text(
+                name,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -380,37 +400,6 @@ private fun SectionCard(title: String?, content: @Composable ColumnScope.() -> U
             Spacer(Modifier.height(2.dp))
         }
         content()
-    }
-}
-
-/** Car name + live status icon badges. */
-@Composable
-private fun CarHeader(car: CarView, refreshing: Boolean) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            car.name,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        if (refreshing) {
-            Icon(Icons.Filled.Refresh, contentDescription = "Refreshing", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-        }
-        if (car.engineOn) {
-            Icon(Icons.Filled.DirectionsCar, contentDescription = "Engine on", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(14.dp))
-        }
-        if (car.charging == true) {
-            Icon(Icons.Filled.Bolt, contentDescription = "Charging", tint = WearColors.chargeGreen, modifier = Modifier.size(14.dp))
-        }
-        val hasAlert = car.doorsOpen.isNotEmpty() || car.trunkOpen || car.hoodOpen || car.tireWarning || car.lowFuel || car.brakeLow || car.washerLow || car.keyFobLow
-        if (hasAlert) {
-            Icon(Icons.Filled.Warning, contentDescription = "Alert", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
-        }
     }
 }
 
@@ -574,11 +563,13 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
         onClick = { vm.refreshStatus(car.vin) },
     )
     Spacer(Modifier.height(6.dp))
-    FilledTonalButton(
+    MorphButton(
+        label = "Open on phone",
+        icon = Icons.Filled.OpenInNew,
+        active = false,
+        activeColor = MaterialTheme.colorScheme.primary,
+        pending = false,
         onClick = { WearRemote.openOnPhone(context, "https://www.google.com/maps/search/?api=1&query=$lat,$lon") },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Open on phone", maxLines = 1) },
-        icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
     )
 }
 
@@ -675,52 +666,65 @@ private fun AiCard(ui: WearUi, car: CarView) = SectionCard("AI summary") {
 private fun AssistCard(car: CarView) = SectionCard("Assist") {
     val context = LocalContext.current
     val links = car.brand.links
-    FilledTonalButton(
+    val accent = MaterialTheme.colorScheme.primary
+    MorphButton(
+        label = "Roadside",
+        icon = Icons.Filled.Call,
+        active = false,
+        activeColor = accent,
+        pending = false,
         onClick = { WearRemote.dialOnPhone(context, links.roadsidePhone) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Roadside", maxLines = 1) },
-        icon = { Icon(Icons.Filled.Call, contentDescription = null) },
     )
     Spacer(Modifier.height(6.dp))
-    FilledTonalButton(
+    MorphButton(
+        label = "Schedule service",
+        icon = Icons.Filled.Build,
+        active = false,
+        activeColor = accent,
+        pending = false,
         onClick = { WearRemote.openOnPhone(context, links.serviceScheduleUrl) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Schedule service", maxLines = 1) },
-        icon = { Icon(Icons.Filled.Build, contentDescription = null) },
     )
     Spacer(Modifier.height(6.dp))
-    FilledTonalButton(
+    MorphButton(
+        label = "Owner site",
+        icon = Icons.Filled.OpenInNew,
+        active = false,
+        activeColor = accent,
+        pending = false,
         onClick = { WearRemote.openOnPhone(context, links.ownersUrl) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Owner site", maxLines = 1) },
-        icon = { Icon(Icons.Filled.OpenInNew, contentDescription = null) },
     )
 }
 
 @Composable
 private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit) = SectionCard("More") {
-    FilledTonalButton(
+    val accent = MaterialTheme.colorScheme.primary
+    MorphButton(
+        label = "Refresh",
+        icon = Icons.Filled.Refresh,
+        active = false,
+        activeColor = accent,
+        pending = "${car.vin}:refresh" in ui.pending,
         onClick = { vm.refreshStatus(car.vin) },
-        enabled = "${car.vin}:refresh" !in ui.pending,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(if ("${car.vin}:refresh" in ui.pending) "Refreshing…" else "Refresh") },
-        icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
     )
     if (car.hasBattery && car.tripsSupported) {
         Spacer(Modifier.height(6.dp))
-        FilledTonalButton(
+        MorphButton(
+            label = "Trips",
+            icon = Icons.Filled.Route,
+            active = false,
+            activeColor = accent,
+            pending = false,
             onClick = { onTrips(car.vin) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Trips") },
-            icon = { Icon(Icons.Filled.Route, contentDescription = null) },
         )
     }
     Spacer(Modifier.height(6.dp))
-    FilledTonalButton(
+    MorphButton(
+        label = "Settings",
+        icon = Icons.Filled.Settings,
+        active = false,
+        activeColor = accent,
+        pending = false,
         onClick = onSettings,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Settings") },
-        icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
     )
 }
 
