@@ -536,6 +536,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { localStore.setTileOrder(order) }
     }
 
+    fun saveTileOrder(order: List<String>) { viewModelScope.launch { localStore.setTileOrder(order) } }
+
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {

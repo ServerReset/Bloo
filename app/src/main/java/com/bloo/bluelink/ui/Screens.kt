@@ -683,7 +683,7 @@ private fun LoginScreen(
     val cfg = LocalConfiguration.current
     // Shrink the hero on short cover screens; cap form width on tablets.
     val shortScreen = cfg.screenHeightDp < 520
-    val heroHeight = if (shortScreen) 90.dp else 140.dp
+    val heroHeight = if (shortScreen) 72.dp else 110.dp
 
     if (onCancel != null) BackHandler { onCancel() }
 
@@ -705,7 +705,7 @@ private fun LoginScreen(
             Column(Modifier.padding(24.dp)) {
                 Text(
                     "Bloo",
-                    style = if (shortScreen) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
+                    style = if (shortScreen) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Black,
                     color = Color.White,
                 )
@@ -748,20 +748,30 @@ private fun LoginScreen(
                 }
             }
 
+            Text(
+                if (brand == Brand.KIA) "Kia Connect email" else "Blue Link email",
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text(if (brand == Brand.KIA) "Kia Connect email" else "Blue Link email") },
+                placeholder = { Text(if (brand == Brand.KIA) "Kia Connect email" else "Blue Link email") },
                 singleLine = true,
                 shape = FieldShape,
                 colors = fieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth(),
             )
+            Text(
+                "Password",
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                placeholder = { Text("Password") },
                 singleLine = true,
                 shape = FieldShape,
                 colors = fieldColors,
@@ -771,10 +781,15 @@ private fun LoginScreen(
             )
             // Kia US doesn't use a service PIN; commands are session-keyed.
             if (!brand.usesOtpLogin) {
+                Text(
+                    "Service PIN",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                )
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { pin = it },
-                    label = { Text("Service PIN") },
+                    placeholder = { Text("Service PIN") },
                     singleLine = true,
                     shape = FieldShape,
                     colors = fieldColors,
@@ -800,6 +815,18 @@ private fun LoginScreen(
                     containerColor = scheme.secondaryContainer,
                     contentColor = scheme.onSecondaryContainer,
                 ) { Text("Cancel", fontWeight = FontWeight.SemiBold) }
+            }
+            val context = LocalContext.current
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TextButton(onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://owners.hyundaiusa.com/us/en/forgotPassword.html")))
+                }) {
+                    Text(
+                        "Forgot password?",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
             }
             Text(
                 "Credentials are sent directly to ${brand.label}'s telematics servers and " +
@@ -1028,6 +1055,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val vehicles = state.vehicles
     if (vehicles.isEmpty()) return
     val appearance by vm.appearance.collectAsState()
+
+    val currentVehicle = vehicles.getOrNull(state.currentIndex.coerceIn(0, vehicles.lastIndex))
+    val currentFetchedAt = currentVehicle?.let { state.fetchedAt(it) }
+    LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
+        if (currentFetchedAt != null && System.currentTimeMillis() - currentFetchedAt > 15 * 60 * 1000L) {
+            vm.reportError("Data is over 15 min old — pull down to refresh")
+        }
+    }
 
     // Settle haptic when a refresh lands.
     val haptics = LocalHaptics.current
@@ -3968,13 +4003,13 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
     val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
     val rows = buildList {
         status?.tirePressureLamp?.let { tp ->
-            add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning" else "OK"))
+            val psiSuffix = status.tirePressure?.all?.takeIf { it > 0 }?.let { " · $it psi" } ?: ""
+            add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning$psiSuffix" else "OK$psiSuffix"))
             tp.frontLeft?.let { add(DiagRow("Front left", warn(it), indent = true)) }
             tp.frontRight?.let { add(DiagRow("Front right", warn(it), indent = true)) }
             tp.rearLeft?.let { add(DiagRow("Rear left", warn(it), indent = true)) }
             tp.rearRight?.let { add(DiagRow("Rear right", warn(it), indent = true)) }
         }
-        status?.tirePressure?.all?.takeIf { it > 0 }?.let { add(DiagRow("Avg tire pressure", "$it psi")) }
         status?.battery?.let { b ->
             b.batSoc?.let { soc ->
                 add(DiagRow("12V battery", "$soc%"))
@@ -4002,6 +4037,11 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         }
         status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
         status?.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
+        status?.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
+            ?.let { add(DiagRow("Doors open", it.joinToString(", "))) }
+        if (status?.trunkOpen == true) add(DiagRow("Trunk", "Open"))
+        if (status?.hoodOpen == true) add(DiagRow("Hood", "Open"))
+        if (status?.doorLock == false && status.engine != true) add(DiagRow("Lock", "Car is unlocked while parked"))
     }
     // Surface a warning affordance if any diagnostic reports a problem.
     val hasWarning = (status?.tirePressureLamp?.hasWarning == true) ||

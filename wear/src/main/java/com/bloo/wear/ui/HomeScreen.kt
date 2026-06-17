@@ -45,16 +45,22 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -62,12 +68,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.foundation.AnchorType
 import androidx.wear.compose.foundation.CurvedLayout
 import androidx.wear.compose.foundation.curvedComposable
@@ -103,7 +114,7 @@ private fun wrap(index: Int, count: Int) = ((index % count) + count) % count
 private const val TILE_ALERTS = "alerts"
 
 @Composable
-fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit) {
+fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit = {}) {
     if (ui.cars.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No cars yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -140,9 +151,9 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                 val active = wrap(carPager.settledPage, count) == wrap(page, count)
                 val carRoles = ui.settings?.carColors?.get(car.vin)
                 if (carRoles != null) {
-                    MaterialTheme(colorScheme = schemeFrom(carRoles)) { CarColumn(vm, ui, car, active, onSettings, onTrips) }
+                    MaterialTheme(colorScheme = schemeFrom(carRoles)) { CarColumn(vm, ui, car, active, onSettings, onTrips, onReorder) }
                 } else {
-                    CarColumn(vm, ui, car, active, onSettings, onTrips)
+                    CarColumn(vm, ui, car, active, onSettings, onTrips, onReorder)
                 }
             }
             CurvedIndicator(count, wrap(carPager.currentPage, count), anchor = 90f)
@@ -180,7 +191,7 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, active: Boolean, onSettings: () -> Unit, onTrips: (String) -> Unit) {
+private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, active: Boolean, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val round = LocalConfiguration.current.isScreenRound
@@ -255,7 +266,7 @@ private fun CarColumn(vm: WearViewModel, ui: WearUi, car: CarView, active: Boole
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(count = total, key = { it }) { i ->
-                TileContent(tiles[wrap(i, tileCount)], vm, ui, car, onSettings, onTrips)
+                TileContent(tiles[wrap(i, tileCount)], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
 
@@ -312,6 +323,7 @@ private fun TileContent(
     car: CarView,
     onSettings: () -> Unit,
     onTrips: (String) -> Unit,
+    onReorder: () -> Unit,
 ) {
     when (key) {
         TILE_ALERTS -> AlertsCard(car)
@@ -335,7 +347,7 @@ private fun TileContent(
         WearTiles.DIAGNOSTICS -> DiagnosticsCard(car)
         WearTiles.AI -> AiCard(ui, car)
         WearTiles.ASSIST -> AssistCard(car)
-        WearTiles.MORE -> MoreCard(vm, ui, car, onSettings, onTrips)
+        WearTiles.MORE -> MoreCard(vm, ui, car, onSettings, onTrips, onReorder)
     }
 }
 
@@ -720,7 +732,7 @@ private fun AssistCard(car: CarView) = SectionCard("Assist") {
 }
 
 @Composable
-private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit) = SectionCard("More") {
+private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: () -> Unit) = SectionCard("More") {
     val accent = MaterialTheme.colorScheme.primary
     MorphButton(
         label = "Refresh",
@@ -750,6 +762,15 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         pending = false,
         onClick = onSettings,
     )
+    Spacer(Modifier.height(6.dp))
+    MorphButton(
+        label = "Reorder tiles",
+        icon = Icons.Filled.DragHandle,
+        active = false,
+        activeColor = accent,
+        pending = false,
+        onClick = onReorder,
+    )
 }
 
 // ---- Shared bits ---------------------------------------------------------
@@ -773,6 +794,103 @@ private fun CurvedIndicator(count: Int, current: Int, anchor: Float) {
                             .clip(CircleShape)
                             .background(if (i == current) selected else unselected)
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TileReorderScreen(vm: WearViewModel, ui: WearUi) {
+    var order by remember { mutableStateOf(ui.localSettings.tileOrder) }
+    var draggingKey by remember { mutableStateOf<String?>(null) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    val heights = remember { mutableStateMapOf<String, Int>() }
+
+    LaunchedEffect(ui.localSettings.tileOrder) {
+        if (draggingKey == null) order = ui.localSettings.tileOrder
+    }
+
+    val state = rememberScalingLazyListState()
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    ScalingLazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .onRotaryScrollEvent { e ->
+                scope.launch { state.scrollBy(e.verticalScrollPixels) }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
+        state = state,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        item { ListHeader { Text("Reorder Tiles", textAlign = TextAlign.Center) } }
+        items(order, key = { it }) { key ->
+            val dragging = draggingKey == key
+            val lift by animateFloatAsState(if (dragging) 1.04f else 1f, label = "lift")
+            Box(
+                Modifier
+                    .zIndex(if (dragging) 1f else 0f)
+                    .graphicsLayer {
+                        translationY = if (dragging) offsetY else 0f
+                        scaleX = lift; scaleY = lift
+                    }
+                    .onSizeChanged { heights[key] = it.height }
+            ) {
+                Card(
+                    onClick = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(key) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { draggingKey = key; offsetY = 0f },
+                                onDragEnd = { draggingKey = null; offsetY = 0f; vm.saveTileOrder(order) },
+                                onDragCancel = { draggingKey = null; offsetY = 0f },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    offsetY += dragAmount.y
+                                    val cur = order.indexOf(key)
+                                    if (cur >= 0) {
+                                        if (offsetY > 0 && cur < order.lastIndex) {
+                                            val nextH = heights[order[cur + 1]] ?: 0
+                                            if (nextH > 0 && offsetY > nextH / 2f) {
+                                                order = order.toMutableList().also { it.add(cur + 1, it.removeAt(cur)) }
+                                                offsetY -= nextH
+                                            }
+                                        } else if (offsetY < 0 && cur > 0) {
+                                            val prevH = heights[order[cur - 1]] ?: 0
+                                            if (prevH > 0 && -offsetY > prevH / 2f) {
+                                                order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
+                                                offsetY += prevH
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                        },
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.DragHandle,
+                            contentDescription = "Drag to reorder",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            WearTiles.LABELS[key] ?: key,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
         }
