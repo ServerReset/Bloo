@@ -5,6 +5,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearClimateState
+import com.bloo.bluelink.data.WearLocalPayload
 import com.bloo.bluelink.data.WearPresets
 import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.data.WearSync
@@ -115,6 +116,20 @@ object WearComms {
                 val payload = com.bloo.bluelink.data.WearPebbleOrder(vin, order)
                 val request = PutDataMapRequest.create(WearSync.PATH_PEBBLE_ORDER).apply {
                     dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodePebbleOrder(payload))
+                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+            }
+        }
+    }
+
+    /** Push the watch's local display scale back to the phone so the phone's
+     *  Settings → Text scale slider stays in sync when changed on the watch. */
+    suspend fun publishLocalSettings(context: Context, uiScale: Float) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_LOCAL).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeLocal(WearLocalPayload(uiScale)))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request))

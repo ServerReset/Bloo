@@ -106,6 +106,7 @@ import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import com.bloo.wear.seatStepLabels
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -158,23 +159,19 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
         Box(Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = carPager,
-                // No off-screen pages: composing one heavy focusable list at a
-                // time is what keeps the bezel and swipe stable.
-                beyondViewportPageCount = 0,
+                // Pre-compose adjacent pages so the swipe starts against an
+                // already-measured layout — no first-frame stutter.
+                beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val car = ui.cars[wrap(page, count)]
-                // Only the settled page gets the full interactive column (rotary
-                // focus, endless scroll). Pages being swiped past render a cheap,
-                // non-focusable preview so nothing fights for rotary input.
+                // active = settled on this car AND finger is off the pager.
+                // Adjacent pages stay in composition (for instant swipe) but
+                // their CarColumn is non-focusable → no bezel conflict.
                 val active = wrap(page, count) == activeCarIndex && !carPager.isScrollInProgress
                 val carRoles = ui.settings?.carColors?.get(car.vin)
                 val body: @Composable () -> Unit = {
-                    if (active) {
-                        CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder)
-                    } else {
-                        CarPreview(car, ui)
-                    }
+                    CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
                 }
                 if (carRoles != null) {
                     MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
@@ -238,6 +235,7 @@ private fun CarColumn(
     onSettings: () -> Unit,
     onTrips: (String) -> Unit,
     onReorder: (String) -> Unit,
+    active: Boolean = true,
 ) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
@@ -256,26 +254,30 @@ private fun CarColumn(
     // position is preserved across recompositions and page preview swaps.
     val state = listStates.getOrPut(car.vin) { ScalingLazyListState(initialIndex) }
 
-    // This column is only composed for the active car, so it always claims rotary
-    // focus on entry. Retry briefly in case the list isn't laid out yet — that's
-    // what made the bezel "do nothing" on freshly-swiped pages.
-    LaunchedEffect(car.vin) {
-        delay(150)
+    // Claim rotary focus when this page becomes active. Adjacent pre-composed
+    // pages skip this so only the settled page owns the crown/bezel.
+    LaunchedEffect(car.vin, active) {
+        if (!active) return@LaunchedEffect
+        delay(60)
         repeat(5) {
             if (runCatching { focusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
-            delay(60)
+            delay(40)
         }
     }
 
     var isSnapping by remember { mutableStateOf(false) }
+    // Holds the currently-running bezel animation job so we can cancel it on the
+    // next bezel event and skip the post-scroll snap while it's in flight.
+    val bezelJobRef = remember { arrayOf<Job?>(null) }
 
     // Snap to the nearest tile when a finger fling settles — tile-by-tile feel.
-    // When the settled tile is near either end of the (large but finite) virtual
-    // list, instantly jump to the identical tile in the middle band so we never
-    // hit a hard boundary — that boundary is what caused the top↔bottom loop jank.
+    // Skipped while a bezel animation is in progress (bezelJobRef[0].isActive)
+    // to prevent snap from fighting the crown and causing double-scroll jank.
+    // When near either end of the virtual list, instantly jump to the middle band
+    // so we never hit the hard boundary.
     LaunchedEffect(Unit) {
         snapshotFlow { state.isScrollInProgress }.collect { scrolling ->
-            if (!scrolling && !isSnapping) {
+            if (!scrolling && !isSnapping && bezelJobRef[0]?.isActive != true) {
                 val info = state.layoutInfo
                 val viewportCenter = info.viewportSize.height / 2
                 val centerItem = info.visibleItemsInfo.minByOrNull {
@@ -315,20 +317,29 @@ private fun CarColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .onRotaryScrollEvent { e ->
+                    // Non-active (pre-composed adjacent) pages ignore rotary events.
+                    if (!active) return@onRotaryScrollEvent false
                     val info = state.layoutInfo
                     val viewportCenter = info.viewportSize.height / 2
                     val center = info.visibleItemsInfo.minByOrNull {
                         abs(it.offset + it.size / 2 - viewportCenter)
                     }?.index ?: return@onRotaryScrollEvent true
-                    // One detent → one tile, in the direction of the turn.
+                    // One detent → one tile. In infinite mode the virtual list is
+                    // large enough that a plain +/- never hits a hard wall; in
+                    // finite mode coerce to valid bounds.
                     val dir = if (e.verticalScrollPixels > 0) 1 else -1
-                    val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                    val target = (center + dir).coerceIn(0, maxIdx)
-                    scope.launch { state.animateScrollToItem(target) }
+                    val maxIdx = (info.totalItemsCount - 1).coerceAtLeast(0)
+                    val target = if (infinite) center + dir
+                                 else (center + dir).coerceIn(0, maxIdx)
+                    if (target < 0 || target > maxIdx) return@onRotaryScrollEvent true
+                    // Cancel the previous animation so rapid crown turns don't
+                    // queue up and fight each other, then start the new one.
+                    bezelJobRef[0]?.cancel()
+                    bezelJobRef[0] = scope.launch { state.animateScrollToItem(target) }
                     true
                 }
                 .focusRequester(focusRequester)
-                .focusable(),
+                .focusable(active),
             state = state,
             contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),

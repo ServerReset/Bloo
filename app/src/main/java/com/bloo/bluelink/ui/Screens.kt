@@ -1869,15 +1869,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.animateContentSize(
-                                    spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)
+                                    spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)
                                 ),
                             ) {
                                 AnimatedContent(
                                     targetState = state.currentIndex,
                                     transitionSpec = {
                                         val dir = if (targetState > initialState) 1 else -1
-                                        (slideInHorizontally(tween(200)) { it * dir } + fadeIn(tween(200))) togetherWith
-                                            (slideOutHorizontally(tween(160)) { -it * dir } + fadeOut(tween(160)))
+                                        (slideInHorizontally(tween(110)) { it * dir / 2 } +
+                                            scaleIn(tween(110), initialScale = 0.88f) +
+                                            fadeIn(tween(110))) togetherWith
+                                        (slideOutHorizontally(tween(80)) { -it * dir / 2 } +
+                                            scaleOut(tween(80), targetScale = 0.88f) +
+                                            fadeOut(tween(80)))
                                     },
                                     label = "carNamePill",
                                 ) { idx ->

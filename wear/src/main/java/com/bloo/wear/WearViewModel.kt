@@ -537,7 +537,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
     fun dismissMessage() { _ui.update { it.copy(message = null) } }
 
-    fun setFontScale(scale: Float) { viewModelScope.launch { localStore.setFontScale(scale) } }
+    fun setFontScale(scale: Float) {
+        viewModelScope.launch {
+            val clamped = scale.coerceIn(0.8f, 1.4f)
+            localStore.setFontScale(clamped)
+            // Push back to phone so its Settings slider stays in sync.
+            WearComms.publishLocalSettings(ctx, clamped)
+        }
+    }
 
     /**
      * Persist a car's reordered pebble order: apply it optimistically so the

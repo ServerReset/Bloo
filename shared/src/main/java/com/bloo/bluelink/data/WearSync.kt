@@ -60,6 +60,10 @@ object WearSync {
     /** Message path: phone → watch, "I just executed a command, here's the result". */
     const val PATH_COMMAND_RESULT = "/bloo/command_result"
 
+    /** DataItem path: watch → phone, local display preferences (font/UI scale)
+     *  so a change made on the watch syncs back to the phone immediately. */
+    const val PATH_LOCAL = "/bloo/local"
+
     /** DataMap / message key holding the JSON body. */
     const val KEY_PAYLOAD = "payload"
 
@@ -119,6 +123,12 @@ object WearSync {
 
     fun decodePebbleOrder(raw: String?): WearPebbleOrder? =
         raw?.let { runCatching { json.decodeFromString(WearPebbleOrder.serializer(), it) }.getOrNull() }
+
+    fun encodeLocal(payload: WearLocalPayload): String =
+        json.encodeToString(WearLocalPayload.serializer(), payload)
+
+    fun decodeLocal(raw: String?): WearLocalPayload? =
+        raw?.let { runCatching { json.decodeFromString(WearLocalPayload.serializer(), it) }.getOrNull() }
 
     fun encodeCommand(command: WearCommand): String =
         json.encodeToString(WearCommand.serializer(), command)
@@ -241,6 +251,12 @@ data class WearSettingsPayload(
     /** Per-VIN pebble (detail-section) order, so the watch lays its tiles out in
      *  the same order as each car on the phone. */
     val pebbleOrders: Map<String, List<String>> = emptyMap(),
+)
+
+/** Watch-local display preferences synced back to the phone (watch → phone). */
+@Serializable
+data class WearLocalPayload(
+    val uiScale: Float = 1f,
 )
 
 /** A single car's reordered pebble order, sent watch → phone. */

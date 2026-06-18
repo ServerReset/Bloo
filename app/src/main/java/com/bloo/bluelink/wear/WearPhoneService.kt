@@ -70,7 +70,7 @@ class WearPhoneService : WearableListenerService() {
             val item = event.dataItem
             val path = item.uri.path
             if (path != WearSync.PATH_CLIMATE && path != WearSync.PATH_PRESETS &&
-                path != WearSync.PATH_PEBBLE_ORDER
+                path != WearSync.PATH_PEBBLE_ORDER && path != WearSync.PATH_LOCAL
             ) return@mapNotNull null
             val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
                 ?: return@mapNotNull null
@@ -98,6 +98,10 @@ class WearPhoneService : WearableListenerService() {
                                 WearBridge.publishSettingsNow(applicationContext, appearance)
                             }
                         }
+                    }
+                    WearSync.PATH_LOCAL -> {
+                        val payload = WearSync.decodeLocal(raw) ?: return@forEach
+                        SettingsStore(applicationContext).setUiScale(payload.uiScale.coerceIn(0.8f, 1.4f))
                     }
                 }
             }

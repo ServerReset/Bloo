@@ -194,9 +194,9 @@ class BlooWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.width(5.dp))
                 Box(
                     modifier = GlanceModifier
-                        .size(30.dp)
+                        .size(34.dp)
                         .background(GlanceTheme.colors.secondaryContainer)
-                        .cornerRadius(15.dp)
+                        .cornerRadius(17.dp)
                         .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -204,7 +204,7 @@ class BlooWidget : GlanceAppWidget() {
                         provider = ImageProvider(action.icon),
                         contentDescription = action.label,
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
-                        modifier = GlanceModifier.size(15.dp),
+                        modifier = GlanceModifier.size(17.dp),
                     )
                 }
             }
@@ -235,14 +235,10 @@ class BlooWidget : GlanceAppWidget() {
             else -> 11.dp
         }
         val corner = (w / 4).coerceIn(18.dp, 32.dp)
-        val gap = 6.dp
-        val cols = if (w >= 120.dp) 2 else 1
-
-        // Pill height derived from available column width so pills look natural.
-        val pillW = (w - pad * 2 - gap * (cols - 1)) / cols
-        val pillH = (pillW * 0.52f).coerceIn(30.dp, 54.dp)
-        val gridH = pillH * 2 + gap
-
+        val gap = 7.dp
+        // 4 full-width stacked pills; height derived from available space with generous floor
+        val pillH = ((h - pad * 2 - gap * 3) / 5.2f).coerceIn(36.dp, 60.dp)
+        val gridH = pillH * 4 + gap * 3
         val statusH = h - pad * 2 - gridH - gap
         val showStatus = statusH >= 28.dp
 
@@ -286,7 +282,6 @@ class BlooWidget : GlanceAppWidget() {
                     widgetId = widgetId,
                     vin = snap.vin,
                     actions = actions,
-                    cols = cols,
                     pillH = pillH,
                     gap = gap,
                 )
@@ -364,7 +359,6 @@ class BlooWidget : GlanceAppWidget() {
         widgetId: Int,
         vin: String,
         actions: List<WidgetAction>,
-        cols: Int,
         pillH: Dp,
         gap: Dp,
     ) {
@@ -372,9 +366,10 @@ class BlooWidget : GlanceAppWidget() {
             modifier = GlanceModifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            GridRow(widgetId, vin, actions.getOrNull(0), actions.getOrNull(1), cols, pillH, gap)
-            Spacer(GlanceModifier.height(gap))
-            GridRow(widgetId, vin, actions.getOrNull(2), actions.getOrNull(3), cols, pillH, gap)
+            repeat(4) { i ->
+                if (i > 0) Spacer(GlanceModifier.height(gap))
+                ActionPill(widgetId, vin, actions.getOrNull(i), pillH, GlanceModifier.fillMaxWidth())
+            }
         }
     }
 
