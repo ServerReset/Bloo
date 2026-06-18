@@ -57,6 +57,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -259,6 +260,7 @@ private fun CarColumn(
     // focus on entry. Retry briefly in case the list isn't laid out yet — that's
     // what made the bezel "do nothing" on freshly-swiped pages.
     LaunchedEffect(car.vin) {
+        delay(150)
         repeat(5) {
             if (runCatching { focusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
             delay(60)
@@ -271,23 +273,28 @@ private fun CarColumn(
     // When the settled tile is near either end of the (large but finite) virtual
     // list, instantly jump to the identical tile in the middle band so we never
     // hit a hard boundary — that boundary is what caused the top↔bottom loop jank.
-    LaunchedEffect(state.isScrollInProgress) {
-        if (!state.isScrollInProgress && !isSnapping) {
-            val info = state.layoutInfo
-            val viewportCenter = info.viewportSize.height / 2
-            val centerItem = info.visibleItemsInfo.minByOrNull {
-                abs(it.offset + it.size / 2 - viewportCenter)
-            }
-            if (centerItem != null) {
-                isSnapping = true
-                val idx = centerItem.index
-                if (infinite && (idx < tileCount * 2 || idx > total - tileCount * 2)) {
-                    val phase = wrap(idx, tileCount)
-                    state.scrollToItem((cycles / 2) * tileCount + phase)
-                } else {
-                    state.animateScrollToItem(idx)
+    LaunchedEffect(Unit) {
+        snapshotFlow { state.isScrollInProgress }.collect { scrolling ->
+            if (!scrolling && !isSnapping) {
+                val info = state.layoutInfo
+                val viewportCenter = info.viewportSize.height / 2
+                val centerItem = info.visibleItemsInfo.minByOrNull {
+                    abs(it.offset + it.size / 2 - viewportCenter)
                 }
-                isSnapping = false
+                if (centerItem != null) {
+                    try {
+                        isSnapping = true
+                        val idx = centerItem.index
+                        if (infinite && (idx < tileCount * 2 || idx > total - tileCount * 2)) {
+                            val phase = wrap(idx, tileCount)
+                            state.scrollToItem((cycles / 2) * tileCount + phase)
+                        } else {
+                            state.animateScrollToItem(idx)
+                        }
+                    } finally {
+                        isSnapping = false
+                    }
+                }
             }
         }
     }
@@ -312,7 +319,7 @@ private fun CarColumn(
                     val viewportCenter = info.viewportSize.height / 2
                     val center = info.visibleItemsInfo.minByOrNull {
                         abs(it.offset + it.size / 2 - viewportCenter)
-                    }?.index ?: 0
+                    }?.index ?: return@onRotaryScrollEvent true
                     // One detent → one tile, in the direction of the turn.
                     val dir = if (e.verticalScrollPixels > 0) 1 else -1
                     val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)

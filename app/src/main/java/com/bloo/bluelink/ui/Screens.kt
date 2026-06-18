@@ -203,6 +203,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -488,13 +489,14 @@ private fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): Lis
     }
 }
 
-/** First-run: welcome + per-car feature wizard + permissions + enter. */
+/** First-run: one scrollable page with welcome, per-car config, and permissions. */
 @Composable
 private fun OnboardingScreen(vm: AppViewModel) {
     val context = LocalContext.current
     val haptics = LocalHaptics.current
     val state by vm.state.collectAsState()
-    val pages = remember(state.vehicles) { buildOnboardingPages(state.vehicles) }
+    val canBio = remember { vm.canUseBiometrics() }
+    val scheme = MaterialTheme.colorScheme
 
     LaunchedEffect(Unit) {
         Fireworks.playSound(context)
@@ -502,12 +504,264 @@ private fun OnboardingScreen(vm: AppViewModel) {
     }
     BackHandler {}
 
-    CarFeatureWizard(
-        vm = vm,
-        pages = pages,
-        showFireworks = true,
-        onComplete = { vm.finishOnboarding() },
-    )
+    Box(Modifier.fillMaxSize()) {
+        AuroraBackground(Modifier.matchParentSize())
+        FireworksOverlay(Modifier.fillMaxSize())
+
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            Spacer(Modifier.height(24.dp))
+
+            // --- Welcome header ---
+            Text("👋", style = MaterialTheme.typography.displayMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Welcome to Bloo",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Black,
+                color = scheme.onSurface,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Your Hyundai, Kia, or Genesis in your pocket. Let's get you set up.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = scheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(28.dp))
+
+            // --- Per-car configuration ---
+            if (state.vehicles.isNotEmpty()) {
+                Text(
+                    "Your car${if (state.vehicles.size > 1) "s" else ""}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onSurface,
+                )
+                Text(
+                    "Bloo can't read powertrain or feature info from the API — tell it once so the right controls appear.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                state.vehicles.forEach { vehicle ->
+                    val sc = state.seatConfigs[vehicle.vin] ?: com.bloo.bluelink.data.SeatConfig()
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = scheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            Text(
+                                vehicle.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = scheme.onSurface,
+                            )
+                            // Powertrain
+                            Text(
+                                "Powertrain",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = scheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            val currentPt = state.powertrainOf(vehicle)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                com.bloo.bluelink.data.Powertrain.entries.forEach { pt ->
+                                    val selected = currentPt == pt
+                                    val (icon, label) = when (pt) {
+                                        com.bloo.bluelink.data.Powertrain.GAS -> "⛽" to "Gas"
+                                        com.bloo.bluelink.data.Powertrain.HYBRID -> "🔋" to "Hybrid"
+                                        com.bloo.bluelink.data.Powertrain.PHEV -> "🔌" to "Plug-in"
+                                        com.bloo.bluelink.data.Powertrain.EV -> "⚡" to "Electric"
+                                    }
+                                    Surface(
+                                        onClick = { vm.setPowertrain(vehicle, pt) },
+                                        shape = RoundedCornerShape(50),
+                                        color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHighest,
+                                        contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+                                        border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+                                    ) {
+                                        Row(
+                                            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            Text(icon, style = MaterialTheme.typography.bodyMedium)
+                                            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+                                        }
+                                    }
+                                }
+                            }
+                            // Seats
+                            val hasSeatFeature = sc.driverHeat || sc.driverCool || sc.passHeat || sc.passCool ||
+                                sc.rearLeftHeat || sc.rearLeftCool || sc.rearRightHeat || sc.rearRightCool
+                            Text(
+                                "Seats",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = scheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                data class SeatChip(val label: String, val on: Boolean, val toggle: () -> Unit)
+                                listOf(
+                                    SeatChip("Driver heat", sc.driverHeat) { vm.setSeatFlag(vehicle, "dh", !sc.driverHeat) },
+                                    SeatChip("Driver cool", sc.driverCool) { vm.setSeatFlag(vehicle, "dc", !sc.driverCool) },
+                                    SeatChip("Pass heat", sc.passHeat) { vm.setSeatFlag(vehicle, "ph", !sc.passHeat) },
+                                    SeatChip("Pass cool", sc.passCool) { vm.setSeatFlag(vehicle, "pc", !sc.passCool) },
+                                    SeatChip("Rear heat", sc.rearLeftHeat) { vm.setSeatFlag(vehicle, "rlh", !sc.rearLeftHeat); vm.setSeatFlag(vehicle, "rrh", !sc.rearLeftHeat) },
+                                    SeatChip("Rear cool", sc.rearLeftCool) { vm.setSeatFlag(vehicle, "rlc", !sc.rearLeftCool); vm.setSeatFlag(vehicle, "rrc", !sc.rearLeftCool) },
+                                ).forEach { chip ->
+                                    Surface(
+                                        onClick = chip.toggle,
+                                        shape = RoundedCornerShape(50),
+                                        color = if (chip.on) scheme.secondaryContainer else scheme.surfaceContainerHighest,
+                                        contentColor = if (chip.on) scheme.onSecondaryContainer else scheme.onSurface,
+                                        border = if (chip.on) null else BorderStroke(1.dp, scheme.outlineVariant),
+                                    ) {
+                                        Row(
+                                            Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                        ) {
+                                            if (chip.on) {
+                                                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            }
+                                            Text(chip.label, style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+                                }
+                            }
+                            // Steering wheel heat
+                            Text(
+                                "Extras",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = scheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Surface(
+                                onClick = { vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
+                                shape = RoundedCornerShape(50),
+                                color = if (sc.steeringWheel) scheme.secondaryContainer else scheme.surfaceContainerHighest,
+                                contentColor = if (sc.steeringWheel) scheme.onSecondaryContainer else scheme.onSurface,
+                                border = if (sc.steeringWheel) null else BorderStroke(1.dp, scheme.outlineVariant),
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                ) {
+                                    if (sc.steeringWheel) {
+                                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
+                                    Text("Steering wheel heat", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // --- Permissions ---
+            Text(
+                "Optional setup",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = scheme.onSurface,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                var notifGranted by remember {
+                    mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context))
+                }
+                val notifLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted -> notifGranted = granted }
+                MorphButton(
+                    onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+                    active = notifGranted,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+                ) {
+                    Icon(
+                        if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (notifGranted) "Notifications enabled" else "Enable notifications",
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+
+            if (canBio) {
+                var bioEnabled by remember { mutableStateOf(false) }
+                MorphButton(
+                    onClick = {
+                        if (!bioEnabled) {
+                            context.findFragmentActivity()?.let { activity ->
+                                showBiometricPrompt(
+                                    activity = activity,
+                                    title = "Enable fingerprint lock",
+                                    subtitle = "Confirm to require it when opening Bloo",
+                                    onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
+                                    onError = {},
+                                )
+                            }
+                        }
+                    },
+                    active = bioEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+                ) {
+                    Icon(
+                        if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (bioEnabled) "Fingerprint lock enabled" else "Enable fingerprint lock",
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // --- Enter Bloo CTA ---
+            MorphButton(
+                onClick = { vm.finishOnboarding() },
+                active = true,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 16.dp),
+            ) {
+                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Enter Bloo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(Modifier.height(32.dp))
+        }
+    }
 }
 
 /**
@@ -1305,7 +1559,7 @@ private fun AuroraBackground(modifier: Modifier = Modifier) {
     fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
     Box(
         modifier
-            .blur(90.dp)
+            .blur(90.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
@@ -1448,8 +1702,11 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 
     val currentVehicle = vehicles.getOrNull(state.currentIndex.coerceIn(0, vehicles.lastIndex))
     val currentFetchedAt = currentVehicle?.let { state.fetchedAt(it) }
+    val sessionStartMs = remember { System.currentTimeMillis() }
     LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
-        if (currentFetchedAt != null && System.currentTimeMillis() - currentFetchedAt > 15 * 60 * 1000L) {
+        if (currentFetchedAt != null &&
+            currentFetchedAt < sessionStartMs &&
+            System.currentTimeMillis() - currentFetchedAt > 15 * 60 * 1000L) {
             vm.reportError("Data is over 15 min old — pull down to refresh")
         }
     }
@@ -1561,6 +1818,10 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         vm.selectIndex((page * perPage).coerceIn(0, count - 1))
                     }
                 }
+                // Hoisted pill state for single-car-per-page (perPage == 1) mode.
+                var carNameVisible by remember { mutableStateOf(false) }
+                var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+                val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                         val start = page * perPage
@@ -1579,6 +1840,10 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             gv, state, vm,
                                             onExpand = if (canExpand) ({ vm.expand(i) }) else null,
                                             reserveHeaderEnd = canExpand && i == end - 1,
+                                            onNameHiddenChanged = if (perPage == 1) { hidden, scrollFn ->
+                                                carNameVisible = hidden
+                                                scrollToTopFn = scrollFn
+                                            } else null,
                                         )
                                     }
                                 }
@@ -1589,6 +1854,44 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
                         PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
+                    }
+                    // Hoisted car-name pill with wipe + bouncy resize (single car per page only).
+                    if (perPage == 1) {
+                        AnimatedVisibility(
+                            visible = carNameVisible,
+                            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it },
+                            exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it },
+                            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
+                        ) {
+                            Surface(
+                                onClick = { pillScope.launch { scrollToTopFn?.invoke() } },
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.animateContentSize(
+                                    spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)
+                                ),
+                            ) {
+                                AnimatedContent(
+                                    targetState = state.currentIndex,
+                                    transitionSpec = {
+                                        val dir = if (targetState > initialState) 1 else -1
+                                        (slideInHorizontally(tween(200)) { it * dir } + fadeIn(tween(200))) togetherWith
+                                            (slideOutHorizontally(tween(160)) { -it * dir } + fadeOut(tween(160)))
+                                    },
+                                    label = "carNamePill",
+                                ) { idx ->
+                                    Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                                        Text(
+                                            vehicles.getOrNull(idx)?.name ?: "",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2793,6 +3096,7 @@ private fun VehicleDetailContent(
     vm: AppViewModel,
     onExpand: (() -> Unit)? = null,
     reserveHeaderEnd: Boolean = false,
+    onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -2802,6 +3106,12 @@ private fun VehicleDetailContent(
     // Show the floating name pill once the car name has scrolled out of view.
     val nameHidden by remember {
         derivedStateOf { scroll.value > with(density) { (topInset + 56.dp).toPx() } }
+    }
+    // Propagate nameHidden to the parent when a callback is supplied (hoisted pill).
+    if (onNameHiddenChanged != null) {
+        LaunchedEffect(nameHidden) {
+            onNameHiddenChanged(nameHidden) { scroll.animateScrollTo(0) }
+        }
     }
     Refreshable(v, state, vm) {
         Column(
@@ -2818,21 +3128,23 @@ private fun VehicleDetailContent(
             PebbleList(v, state, vm)
             Spacer(Modifier.height(bottomInset + 16.dp))
         }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = nameHidden,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
-        ) {
-            // Tap to jump back to the top (the main car-info pebble).
-            Surface(
-                onClick = { scope.launch { scroll.animateScrollTo(0) } },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
-                contentColor = MaterialTheme.colorScheme.onSurface,
+        // Only show the inline pill when no parent is managing it.
+        if (onNameHiddenChanged == null) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = nameHidden,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
             ) {
-                Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                    Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Surface(
+                    onClick = { scope.launch { scroll.animateScrollTo(0) } },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
+                    Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                        Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -4669,7 +4981,6 @@ private fun ClimatePebble(
                     activePresetId = preset.id
                 }
             },
-            onSave = { presetName = ""; showAddPreset = true },
             onDelete = { id ->
                 if (activePresetId == id) activePresetId = null
                 vm.deleteClimatePreset(v, id)
@@ -4777,6 +5088,13 @@ private fun ClimatePebble(
             }
         }
 
+        SectionLabel("Save")
+        MorphTextButton(
+            text = "Save as preset",
+            onClick = { presetName = ""; showAddPreset = true },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         if (showAddPreset) {
             AlertDialog(
                 onDismissRequest = { showAddPreset = false },
@@ -4867,7 +5185,6 @@ private fun ClimatePresetSection(
     activeId: String?,
     fahrenheit: Boolean,
     onStart: (ClimatePreset) -> Unit,
-    onSave: () -> Unit,
     onDelete: (String) -> Unit,
     onReorder: (List<ClimatePreset>) -> Unit,
 ) {
@@ -4893,11 +5210,6 @@ private fun ClimatePresetSection(
         }
         Spacer(Modifier.height(4.dp))
     }
-    MorphTextButton(
-        text = "Save as preset",
-        onClick = onSave,
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 /** A compact "79° · Defrost · Heat" summary of what a preset will set. */
@@ -5000,7 +5312,7 @@ private fun PresetPill(
             onClick = { haptics?.tick(); onDelete() },
             color = buttonContainer(),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+            shape = RoundedCornerShape(outer),
             modifier = Modifier.fillMaxHeight(),
         ) {
             Box(
