@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -49,19 +49,16 @@ import com.bloo.bluelink.data.VehicleSnapshot
  * left — name, lock/drive state, charge/fuel percentage and range — beside a 2×2
  * grid of pill-shaped, user-assignable action buttons. Each button taps through a
  * biometric/PIN gate before running (see [WidgetAuthActivity]).
+ *
+ * Layout is fully fluid: [SizeMode.Exact] recomposes the content at the widget's
+ * *actual* pixel size on every resize (unlike Responsive, which snaps to a fixed
+ * set of breakpoints and stretches), and every dimension below — pane split, pill
+ * height, icon and text sizes, padding — is derived from [LocalSize]. Buttons sit
+ * in weight-distributed cells so they can never overflow or clip at the edge.
  */
 class BlooWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Responsive(
-        setOf(
-            DpSize(110.dp, 40.dp),
-            DpSize(180.dp, 40.dp),
-            DpSize(110.dp, 80.dp),
-            DpSize(180.dp, 80.dp),
-            DpSize(260.dp, 80.dp),
-            DpSize(320.dp, 110.dp),
-        )
-    )
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val widgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
@@ -73,19 +70,16 @@ class BlooWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 val size = LocalSize.current
-                val isCompact = size.height < 60.dp
-                if (isCompact) {
-                    if (snap == null) {
-                        UnconfiguredCompact(widgetId)
-                    } else {
-                        CompactWidgetBody(widgetId, snap, actions, size.width)
-                    }
+                val w = size.width
+                val h = size.height
+                // Short widgets get the single-row compact layout; taller ones the
+                // status + 2×2 grid layout.
+                if (h < 64.dp) {
+                    if (snap == null) UnconfiguredCompact(widgetId)
+                    else CompactWidgetBody(widgetId, snap, actions, w)
                 } else {
-                    if (snap == null) {
-                        UnconfiguredView(widgetId)
-                    } else {
-                        WidgetBody(widgetId, snap, actions, size.width, size.height)
-                    }
+                    if (snap == null) UnconfiguredView(widgetId)
+                    else WidgetBody(widgetId, snap, actions, w, h)
                 }
             }
         }
@@ -110,49 +104,70 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    /**
+     * Status read-out beside a 2×2 action grid. Everything scales with [w]/[h]:
+     * the status pane shrinks to a sliver on narrow widgets, the grid drops to a
+     * single column when there's no room for two, and pill height fills the
+     * available vertical space so the buttons grow with the widget.
+     */
     @Composable
     private fun WidgetBody(
         widgetId: Int,
         snap: VehicleSnapshot,
         actions: List<WidgetAction>,
-        widthDp: androidx.compose.ui.unit.Dp,
-        heightDp: androidx.compose.ui.unit.Dp,
+        w: Dp,
+        h: Dp,
     ) {
-        val isWide = widthDp >= 240.dp
-        val isTall = heightDp >= 100.dp
-        val cornerDp = 28.dp
+        val pad = if (h >= 120.dp) 16.dp else if (h >= 88.dp) 13.dp else 11.dp
+        val corner = (h / 4).coerceIn(18.dp, 32.dp)
+        // Two grid columns once there's comfortable width; otherwise a single one.
+        val gridCols = if (w >= 150.dp) 2 else 1
+        // The grid needs roughly 56 dp per column plus gaps; the rest is status.
+        val gridMinWidth = (gridCols * 52).dp + 12.dp
+        val contentW = w - pad * 2
+        // Hide the status pane entirely on very narrow widgets so the buttons fit.
+        val showStatus = contentW > gridMinWidth + 40.dp
+
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
-                .cornerRadius(cornerDp)
-                .padding(if (isTall) 16.dp else 12.dp),
+                .cornerRadius(corner)
+                .padding(pad),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val statusWeight = if (isWide) 0.52f else 0.6f
-            StatusColumn(snap, heightDp, GlanceModifier.defaultWeight().fillMaxHeight())
-            Spacer(GlanceModifier.width(8.dp))
+            if (showStatus) {
+                StatusColumn(snap, h, GlanceModifier.defaultWeight().fillMaxHeight())
+                Spacer(GlanceModifier.width(10.dp))
+            }
             ButtonGrid(
                 widgetId = widgetId,
                 vin = snap.vin,
                 actions = actions,
-                widthDp = widthDp * (1f - statusWeight) - 24.dp,
-                heightDp = heightDp - (if (isTall) 32.dp else 24.dp),
-                showLabels = isWide && isTall,
-                modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
+                columns = gridCols,
+                contentHeight = h - pad * 2,
+                modifier = if (showStatus) {
+                    GlanceModifier.defaultWeight().fillMaxHeight()
+                } else {
+                    GlanceModifier.fillMaxWidth().fillMaxHeight()
+                },
             )
         }
     }
 
     @Composable
-    private fun StatusColumn(
-        snap: VehicleSnapshot,
-        heightDp: androidx.compose.ui.unit.Dp,
-        modifier: GlanceModifier,
-    ) {
-        val isTall = heightDp >= 100.dp
+    private fun StatusColumn(snap: VehicleSnapshot, h: Dp, modifier: GlanceModifier) {
+        // Reveal more detail as the widget grows taller.
+        val showName = h >= 96.dp
+        val showKind = h >= 84.dp
+        val percentSize = when {
+            h >= 130.dp -> 30.sp
+            h >= 104.dp -> 26.sp
+            h >= 84.dp -> 22.sp
+            else -> 19.sp
+        }
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-            if (isTall) {
+            if (showName) {
                 Text(
                     snap.name,
                     maxLines = 1,
@@ -169,54 +184,71 @@ class BlooWidget : GlanceAppWidget() {
                 maxLines = 1,
                 style = TextStyle(color = stateColor, fontWeight = FontWeight.Medium, fontSize = 12.sp),
             )
-            Spacer(GlanceModifier.height(2.dp))
-            val percentSize = if (isTall) 26.sp else 20.sp
+            Spacer(GlanceModifier.height(1.dp))
             Text(
                 snap.percent?.let { "$it%" } ?: "—",
+                maxLines = 1,
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = percentSize,
                 ),
             )
-            if (isTall) {
-                val kindLabel = if (snap.isEv) "battery" else "fuel"
+            if (showKind) {
                 Text(
-                    kindLabel,
+                    if (snap.isEv) "battery" else "fuel",
+                    maxLines = 1,
                     style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
                 )
             }
             snap.rangeMi?.let {
                 Text(
                     "$it mi",
+                    maxLines = 1,
                     style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
                 )
             }
         }
     }
 
+    /**
+     * 2×2 (or 2×1 when narrow) action grid. Each cell is a weight-distributed
+     * column/row so it can never overflow; pill height is the exact share of the
+     * available height, keeping a true pill shape at any widget size.
+     */
     @Composable
     private fun ButtonGrid(
         widgetId: Int,
         vin: String,
         actions: List<WidgetAction>,
-        widthDp: androidx.compose.ui.unit.Dp,
-        heightDp: androidx.compose.ui.unit.Dp,
-        showLabels: Boolean,
+        columns: Int,
+        contentHeight: Dp,
         modifier: GlanceModifier,
     ) {
-        val pillH = ((heightDp - 6.dp) / 2).coerceIn(28.dp, 52.dp)
+        val gap = 6.dp
+        val pillH = ((contentHeight - gap) / 2).coerceIn(26.dp, 56.dp)
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-            Row(modifier = GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                ActionPill(widgetId, vin, actions.getOrNull(0), pillH, showLabels, GlanceModifier.defaultWeight())
-                Spacer(GlanceModifier.width(5.dp))
-                ActionPill(widgetId, vin, actions.getOrNull(1), pillH, showLabels, GlanceModifier.defaultWeight())
-            }
-            Spacer(GlanceModifier.height(5.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                ActionPill(widgetId, vin, actions.getOrNull(2), pillH, showLabels, GlanceModifier.defaultWeight())
-                Spacer(GlanceModifier.width(5.dp))
-                ActionPill(widgetId, vin, actions.getOrNull(3), pillH, showLabels, GlanceModifier.defaultWeight())
+            GridRow(widgetId, vin, actions.getOrNull(0), actions.getOrNull(1), columns, pillH, gap)
+            Spacer(GlanceModifier.height(gap))
+            GridRow(widgetId, vin, actions.getOrNull(2), actions.getOrNull(3), columns, pillH, gap)
+        }
+    }
+
+    @Composable
+    private fun GridRow(
+        widgetId: Int,
+        vin: String,
+        first: WidgetAction?,
+        second: WidgetAction?,
+        columns: Int,
+        pillH: Dp,
+        gap: Dp,
+    ) {
+        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            ActionPill(widgetId, vin, first, pillH, GlanceModifier.defaultWeight())
+            if (columns >= 2) {
+                Spacer(GlanceModifier.width(gap))
+                ActionPill(widgetId, vin, second, pillH, GlanceModifier.defaultWeight())
             }
         }
     }
@@ -226,71 +258,48 @@ class BlooWidget : GlanceAppWidget() {
         widgetId: Int,
         vin: String,
         action: WidgetAction?,
-        heightDp: androidx.compose.ui.unit.Dp,
-        showLabel: Boolean,
+        pillH: Dp,
         modifier: GlanceModifier,
     ) {
         val context = LocalContext.current
         if (action == null) {
-            Box(modifier.height(heightDp)) {}
+            Box(modifier.height(pillH)) {}
             return
         }
-        val cornerR = heightDp / 2
+        val iconSize = (pillH * 0.46f).coerceIn(15.dp, 24.dp)
         Box(
             modifier = modifier
-                .height(heightDp)
+                .height(pillH)
                 .background(GlanceTheme.colors.secondaryContainer)
-                .cornerRadius(cornerR)
+                .cornerRadius(pillH / 2)
                 .clickable(actionStartActivity(authIntent(context, widgetId, vin, action))),
             contentAlignment = Alignment.Center,
         ) {
-            val iconSize = (heightDp * 0.44f).coerceIn(14.dp, 22.dp)
-            if (showLabel) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(
-                        provider = ImageProvider(action.icon),
-                        contentDescription = action.label,
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
-                        modifier = GlanceModifier.size(iconSize),
-                    )
-                    Text(
-                        action.label,
-                        maxLines = 1,
-                        style = TextStyle(
-                            color = GlanceTheme.colors.onSecondaryContainer,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                    )
-                }
-            } else {
-                Image(
-                    provider = ImageProvider(action.icon),
-                    contentDescription = action.label,
-                    colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
-                    modifier = GlanceModifier.size(iconSize),
-                )
-            }
+            Image(
+                provider = ImageProvider(action.icon),
+                contentDescription = action.label,
+                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
+                modifier = GlanceModifier.size(iconSize),
+            )
         }
     }
 
     /**
-     * One-row layout for a short (≈40 dp tall) widget.
+     * One-row layout for a short (≈40 dp tall) widget: percent + state on the left,
+     * as many circular action buttons as the width comfortably allows on the right.
      */
     @Composable
     private fun CompactWidgetBody(
         widgetId: Int,
         snap: VehicleSnapshot,
         actions: List<WidgetAction>,
-        widthDp: androidx.compose.ui.unit.Dp,
+        w: Dp,
     ) {
         val context = LocalContext.current
-        val maxButtons = when {
-            widthDp >= 260.dp -> 4
-            widthDp >= 200.dp -> 3
-            widthDp >= 160.dp -> 2
-            else -> 1
-        }
+        // Reserve ~110 dp for the status read-out, then ~38 dp per button.
+        val room = ((w - 110.dp) / 38.dp).toInt().coerceAtLeast(0)
+        val maxButtons = room.coerceIn(0, 4)
+        val showState = w >= 140.dp
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -312,21 +321,23 @@ class BlooWidget : GlanceAppWidget() {
                         fontSize = 16.sp,
                     ),
                 )
-                Spacer(GlanceModifier.width(6.dp))
-                val (stateLabel, stateColor) = stateOf(snap)
-                Text(
-                    stateLabel,
-                    maxLines = 1,
-                    style = TextStyle(color = stateColor, fontWeight = FontWeight.Medium, fontSize = 12.sp),
-                )
+                if (showState) {
+                    Spacer(GlanceModifier.width(6.dp))
+                    val (stateLabel, stateColor) = stateOf(snap)
+                    Text(
+                        stateLabel,
+                        maxLines = 1,
+                        style = TextStyle(color = stateColor, fontWeight = FontWeight.Medium, fontSize = 12.sp),
+                    )
+                }
             }
             actions.take(maxButtons).forEach { action ->
                 Spacer(GlanceModifier.width(5.dp))
                 Box(
                     modifier = GlanceModifier
-                        .size(30.dp)
+                        .size(32.dp)
                         .background(GlanceTheme.colors.secondaryContainer)
-                        .cornerRadius(15.dp)
+                        .cornerRadius(16.dp)
                         .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -334,7 +345,7 @@ class BlooWidget : GlanceAppWidget() {
                         provider = ImageProvider(action.icon),
                         contentDescription = action.label,
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
-                        modifier = GlanceModifier.size(15.dp),
+                        modifier = GlanceModifier.size(16.dp),
                     )
                 }
             }
