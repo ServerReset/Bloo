@@ -3,7 +3,10 @@ package com.bloo.bluelink.widget
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -27,6 +30,7 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxHeight
@@ -40,6 +44,8 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.bloo.bluelink.MainActivity
+import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleSnapshot
@@ -55,6 +61,9 @@ import com.bloo.bluelink.data.VehicleSnapshot
  * set of breakpoints and stretches), and every dimension below — pane split, pill
  * height, icon and text sizes, padding — is derived from [LocalSize]. Buttons sit
  * in weight-distributed cells so they can never overflow or clip at the edge.
+ *
+ * When the widget is tall enough (≥160 dp) and the car has a saved photo, the
+ * photo fills the background with a dark scrim for readability.
  */
 class BlooWidget : GlanceAppWidget() {
 
@@ -66,6 +75,18 @@ class BlooWidget : GlanceAppWidget() {
         val snapshots = SnapshotStore(context).current().vehicles
         val snap = cfg?.let { c -> snapshots.firstOrNull { it.vin == c.first } }
         val actions = cfg?.second.orEmpty().mapNotNull { WidgetAction.fromKey(it) }
+
+        // Load the car photo as a bitmap so it can be used as a Glance ImageProvider.
+        // Only file-path photos are supported here (remote URLs would need network I/O).
+        val photoBitmap: Bitmap? = snap?.let { s ->
+            val path = SettingsStore(context).imageUrl(s.vin)
+            if (path != null && path.startsWith("/")) {
+                try {
+                    val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                    BitmapFactory.decodeFile(path, opts)
+                } catch (_: Exception) { null }
+            } else null
+        }
 
         provideContent {
             GlanceTheme {
@@ -79,7 +100,7 @@ class BlooWidget : GlanceAppWidget() {
                     else CompactWidgetBody(widgetId, snap, actions, w)
                 } else {
                     if (snap == null) UnconfiguredView(widgetId)
-                    else WidgetBody(widgetId, snap, actions, w, h)
+                    else WidgetBody(widgetId, snap, actions, w, h, photoBitmap)
                 }
             }
         }
@@ -109,6 +130,9 @@ class BlooWidget : GlanceAppWidget() {
      * the status pane shrinks to a sliver on narrow widgets, the grid drops to a
      * single column when there's no room for two, and pill height fills the
      * available vertical space so the buttons grow with the widget.
+     *
+     * When [h] ≥ 160 dp and [photoBitmap] is non-null, the car photo fills the
+     * background behind a dark scrim and text colours flip to white.
      */
     @Composable
     private fun WidgetBody(
@@ -117,8 +141,16 @@ class BlooWidget : GlanceAppWidget() {
         actions: List<WidgetAction>,
         w: Dp,
         h: Dp,
+        photoBitmap: Bitmap?,
     ) {
-        val pad = if (h >= 120.dp) 16.dp else if (h >= 88.dp) 13.dp else 11.dp
+        val context = LocalContext.current
+        val showPhoto = photoBitmap != null && h >= 160.dp
+        val pad = when {
+            h >= 160.dp -> 20.dp
+            h >= 120.dp -> 16.dp
+            h >= 88.dp -> 13.dp
+            else -> 11.dp
+        }
         val corner = (h / 4).coerceIn(18.dp, 32.dp)
         // Two grid columns once there's comfortable width; otherwise a single one.
         val gridCols = if (w >= 150.dp) 2 else 1
@@ -128,57 +160,111 @@ class BlooWidget : GlanceAppWidget() {
         // Hide the status pane entirely on very narrow widgets so the buttons fit.
         val showStatus = contentW > gridMinWidth + 40.dp
 
-        Row(
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            action = Shortcuts.ACTION
+            putExtra(Shortcuts.EXTRA_VIN, snap.vin)
+            putExtra(Shortcuts.EXTRA_CMD, "open")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+
+        Box(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
-                .cornerRadius(corner)
-                .padding(pad),
-            verticalAlignment = Alignment.CenterVertically,
+                .cornerRadius(corner),
         ) {
-            if (showStatus) {
-                StatusColumn(snap, h, GlanceModifier.defaultWeight().fillMaxHeight())
-                Spacer(GlanceModifier.width(10.dp))
+            // Car photo backdrop layers: photo → dark scrim → content.
+            if (showPhoto) {
+                Image(
+                    provider = ImageProvider(photoBitmap!!),
+                    contentDescription = null,
+                    modifier = GlanceModifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(
+                    modifier = GlanceModifier
+                        .fillMaxSize()
+                        .background(ColorProvider(Color(0f, 0f, 0f, 0.45f))),
+                ) {}
             }
-            ButtonGrid(
-                widgetId = widgetId,
-                vin = snap.vin,
-                actions = actions,
-                columns = gridCols,
-                contentHeight = h - pad * 2,
-                modifier = if (showStatus) {
-                    GlanceModifier.defaultWeight().fillMaxHeight()
-                } else {
-                    GlanceModifier.fillMaxWidth().fillMaxHeight()
-                },
-            )
+
+            Row(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(pad),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (showStatus) {
+                    StatusColumn(
+                        snap = snap,
+                        h = h,
+                        hasPhoto = showPhoto,
+                        modifier = GlanceModifier
+                            .defaultWeight()
+                            .fillMaxHeight()
+                            .clickable(actionStartActivity(openIntent)),
+                    )
+                    Spacer(GlanceModifier.width(10.dp))
+                }
+                ButtonGrid(
+                    widgetId = widgetId,
+                    vin = snap.vin,
+                    actions = actions,
+                    columns = gridCols,
+                    contentHeight = h - pad * 2,
+                    modifier = if (showStatus) {
+                        GlanceModifier.defaultWeight().fillMaxHeight()
+                    } else {
+                        GlanceModifier.fillMaxWidth().fillMaxHeight()
+                    },
+                )
+            }
         }
     }
 
+    /**
+     * Progressively reveals detail as the widget grows taller:
+     *  64–76 dp  → percent + state
+     *  76–84 dp  → + range
+     *  84–96 dp  → + fuel/battery kind label
+     *  96 dp+    → + car name
+     *  160 dp+   → photo backdrop, all text switches to white
+     */
     @Composable
-    private fun StatusColumn(snap: VehicleSnapshot, h: Dp, modifier: GlanceModifier) {
-        // Reveal more detail as the widget grows taller.
+    private fun StatusColumn(
+        snap: VehicleSnapshot,
+        h: Dp,
+        hasPhoto: Boolean,
+        modifier: GlanceModifier,
+    ) {
+        val onSurface = if (hasPhoto) ColorProvider(Color.White) else GlanceTheme.colors.onSurface
+        val onSurfaceVariant = if (hasPhoto) ColorProvider(Color(1f, 1f, 1f, 0.72f)) else GlanceTheme.colors.onSurfaceVariant
+
         val showName = h >= 96.dp
         val showKind = h >= 84.dp
+        val showRange = h >= 76.dp
         val percentSize = when {
-            h >= 130.dp -> 30.sp
-            h >= 104.dp -> 26.sp
-            h >= 84.dp -> 22.sp
-            else -> 19.sp
+            h >= 180.dp -> 36.sp
+            h >= 160.dp -> 32.sp
+            h >= 130.dp -> 28.sp
+            h >= 104.dp -> 24.sp
+            h >= 84.dp -> 20.sp
+            else -> 18.sp
         }
+
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
             if (showName) {
                 Text(
                     snap.name,
                     maxLines = 1,
                     style = TextStyle(
-                        color = GlanceTheme.colors.onSurface,
+                        color = onSurface,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                     ),
                 )
             }
-            val (stateLabel, stateColor) = stateOf(snap)
+            val (stateLabel, stateColor) = stateOf(snap, hasPhoto)
             Text(
                 stateLabel,
                 maxLines = 1,
@@ -189,7 +275,7 @@ class BlooWidget : GlanceAppWidget() {
                 snap.percent?.let { "$it%" } ?: "—",
                 maxLines = 1,
                 style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
+                    color = onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = percentSize,
                 ),
@@ -198,15 +284,17 @@ class BlooWidget : GlanceAppWidget() {
                 Text(
                     if (snap.isEv) "battery" else "fuel",
                     maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
+                    style = TextStyle(color = onSurfaceVariant, fontSize = 11.sp),
                 )
             }
-            snap.rangeMi?.let {
-                Text(
-                    "$it mi",
-                    maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
-                )
+            if (showRange) {
+                snap.rangeMi?.let {
+                    Text(
+                        "$it mi",
+                        maxLines = 1,
+                        style = TextStyle(color = onSurfaceVariant, fontSize = 12.sp),
+                    )
+                }
             }
         }
     }
@@ -373,11 +461,11 @@ class BlooWidget : GlanceAppWidget() {
 
     /** Lock / unlock / driving state, with a colour cue. */
     @Composable
-    private fun stateOf(snap: VehicleSnapshot): Pair<String, ColorProvider> = when {
-        snap.engineOn == true -> "Driving" to GlanceTheme.colors.tertiary
-        snap.locked == true -> "Locked" to GlanceTheme.colors.onSurfaceVariant
-        snap.locked == false -> "Unlocked" to GlanceTheme.colors.error
-        else -> "—" to GlanceTheme.colors.onSurfaceVariant
+    private fun stateOf(snap: VehicleSnapshot, hasPhoto: Boolean = false): Pair<String, ColorProvider> = when {
+        snap.engineOn == true -> "Driving" to if (hasPhoto) ColorProvider(Color(0.4f, 0.95f, 0.5f, 1f)) else GlanceTheme.colors.tertiary
+        snap.locked == true -> "Locked" to if (hasPhoto) ColorProvider(Color(1f, 1f, 1f, 0.72f)) else GlanceTheme.colors.onSurfaceVariant
+        snap.locked == false -> "Unlocked" to if (hasPhoto) ColorProvider(Color(1f, 0.45f, 0.45f, 1f)) else GlanceTheme.colors.error
+        else -> "—" to if (hasPhoto) ColorProvider(Color(1f, 1f, 1f, 0.6f)) else GlanceTheme.colors.onSurfaceVariant
     }
 
     private fun authIntent(context: Context, widgetId: Int, vin: String, action: WidgetAction): Intent =

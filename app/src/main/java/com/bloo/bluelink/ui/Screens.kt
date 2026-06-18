@@ -5408,7 +5408,7 @@ private fun ChargeLimitPill(
                 enabled = enabled && !pending,
                 color = rightBg,
                 contentColor = rightFg,
-                shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+                shape = RoundedCornerShape(outer),
                 modifier = Modifier.fillMaxHeight(),
             ) {
                 Box(
