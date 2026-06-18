@@ -79,6 +79,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -604,8 +605,6 @@ private fun OnboardingScreen(vm: AppViewModel) {
                                 }
                             }
                             // Seats
-                            val hasSeatFeature = sc.driverHeat || sc.driverCool || sc.passHeat || sc.passCool ||
-                                sc.rearLeftHeat || sc.rearLeftCool || sc.rearRightHeat || sc.rearRightCool
                             Text(
                                 "Seats",
                                 style = MaterialTheme.typography.labelMedium,
@@ -613,31 +612,32 @@ private fun OnboardingScreen(vm: AppViewModel) {
                                 fontWeight = FontWeight.SemiBold,
                             )
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                data class SeatChip(val label: String, val on: Boolean, val toggle: () -> Unit)
-                                listOf(
-                                    SeatChip("Driver heat", sc.driverHeat) { vm.setSeatFlag(vehicle, "dh", !sc.driverHeat) },
-                                    SeatChip("Driver cool", sc.driverCool) { vm.setSeatFlag(vehicle, "dc", !sc.driverCool) },
-                                    SeatChip("Pass heat", sc.passHeat) { vm.setSeatFlag(vehicle, "ph", !sc.passHeat) },
-                                    SeatChip("Pass cool", sc.passCool) { vm.setSeatFlag(vehicle, "pc", !sc.passCool) },
-                                    SeatChip("Rear heat", sc.rearLeftHeat) { vm.setSeatFlag(vehicle, "rlh", !sc.rearLeftHeat); vm.setSeatFlag(vehicle, "rrh", !sc.rearLeftHeat) },
-                                    SeatChip("Rear cool", sc.rearLeftCool) { vm.setSeatFlag(vehicle, "rlc", !sc.rearLeftCool); vm.setSeatFlag(vehicle, "rrc", !sc.rearLeftCool) },
-                                ).forEach { chip ->
+                                // label, isOn, onClick
+                                val seatChips: List<Triple<String, Boolean, () -> Unit>> = listOf(
+                                    Triple("Driver heat", sc.driverHeat) { vm.setSeatFlag(vehicle, "dh", !sc.driverHeat) },
+                                    Triple("Driver cool", sc.driverCool) { vm.setSeatFlag(vehicle, "dc", !sc.driverCool) },
+                                    Triple("Pass heat", sc.passHeat) { vm.setSeatFlag(vehicle, "ph", !sc.passHeat) },
+                                    Triple("Pass cool", sc.passCool) { vm.setSeatFlag(vehicle, "pc", !sc.passCool) },
+                                    Triple("Rear heat", sc.rearLeftHeat) { vm.setSeatFlag(vehicle, "rlh", !sc.rearLeftHeat); vm.setSeatFlag(vehicle, "rrh", !sc.rearLeftHeat) },
+                                    Triple("Rear cool", sc.rearLeftCool) { vm.setSeatFlag(vehicle, "rlc", !sc.rearLeftCool); vm.setSeatFlag(vehicle, "rrc", !sc.rearLeftCool) },
+                                )
+                                seatChips.forEach { (chipLabel, chipOn, chipToggle) ->
                                     Surface(
-                                        onClick = chip.toggle,
+                                        onClick = chipToggle,
                                         shape = RoundedCornerShape(50),
-                                        color = if (chip.on) scheme.secondaryContainer else scheme.surfaceContainerHighest,
-                                        contentColor = if (chip.on) scheme.onSecondaryContainer else scheme.onSurface,
-                                        border = if (chip.on) null else BorderStroke(1.dp, scheme.outlineVariant),
+                                        color = if (chipOn) scheme.secondaryContainer else scheme.surfaceContainerHighest,
+                                        contentColor = if (chipOn) scheme.onSecondaryContainer else scheme.onSurface,
+                                        border = if (chipOn) null else BorderStroke(1.dp, scheme.outlineVariant),
                                     ) {
                                         Row(
                                             Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                                         ) {
-                                            if (chip.on) {
+                                            if (chipOn) {
                                                 Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
                                             }
-                                            Text(chip.label, style = MaterialTheme.typography.labelMedium)
+                                            Text(chipLabel, style = MaterialTheme.typography.labelMedium)
                                         }
                                     }
                                 }
