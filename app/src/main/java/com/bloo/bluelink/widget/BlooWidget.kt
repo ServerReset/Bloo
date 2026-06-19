@@ -133,22 +133,14 @@ class BlooWidget : GlanceAppWidget() {
             val sat = hsv[1]
             // Accent: a medium-value tone that reads on both light and dark surfaces.
             val accentV = if (hsv[2] < 0.35f) 0.62f else hsv[2].coerceAtMost(0.85f)
-            val accentColor = Color(
-                (android.graphics.Color.HSVToColor(floatArrayOf(hue, sat.coerceAtLeast(0.55f), accentV)).toLong()
-                    and 0xFFFFFFFFL)
-            )
+            // HSVToColor returns an ARGB Int — use Color(Int) not Color(Long) to avoid
+            // the packed-64-bit colour-space misinterpretation.
+            val accentColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat.coerceAtLeast(0.55f), accentV)))
             // Pending: a dimmed, desaturated accent so in-flight buttons read as muted.
-            val pendingColor = Color(
-                (android.graphics.Color.HSVToColor(floatArrayOf(hue, (sat * 0.4f).coerceIn(0.08f, 0.3f), 0.55f)).toLong()
-                    and 0xFFFFFFFFL)
-            )
+            val pendingColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, (sat * 0.4f).coerceIn(0.08f, 0.3f), 0.55f)))
             // Surface: a subtly palette-tinted background that adapts day vs night.
-            val darkSurface = Color(
-                (android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.16f, 0.13f)).toLong() and 0xFFFFFFFFL)
-            )
-            val lightSurface = Color(
-                (android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.06f, 0.97f)).toLong() and 0xFFFFFFFFL)
-            )
+            val darkSurface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.16f, 0.13f)))
+            val lightSurface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.06f, 0.97f)))
             WidgetTheme(
                 accent = ColorProvider(accentColor),
                 onAccent = ColorProvider(Color.White),
@@ -998,6 +990,16 @@ class BlooWidget : GlanceAppWidget() {
             contentAlignment = Alignment.Center,
         ) {
             if (showLabel) {
+                // For the combined lock/unlock button use a short state-aware label
+                // so it never truncates inside narrow portrait grid cells.
+                val displayLabel = when (action.key) {
+                    "doors" -> when (snap?.locked) {
+                        true  -> "Locked"
+                        false -> "Unlocked"
+                        else  -> "Doors"
+                    }
+                    else -> action.label
+                }
                 Column(
                     modifier = GlanceModifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1011,7 +1013,7 @@ class BlooWidget : GlanceAppWidget() {
                     )
                     Spacer(GlanceModifier.height(3.dp))
                     Text(
-                        action.label,
+                        displayLabel,
                         maxLines = 1,
                         style = TextStyle(color = fg, fontSize = 10.sp, fontWeight = FontWeight.Medium),
                     )
