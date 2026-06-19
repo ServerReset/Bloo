@@ -10,6 +10,8 @@ import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.WearCommandRunner
 import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.launch
 
@@ -55,7 +57,7 @@ class WidgetAuthActivity : FragmentActivity() {
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    finish()
+                    finishNoAnim()
                 }
             },
         )
@@ -70,18 +72,34 @@ class WidgetAuthActivity : FragmentActivity() {
     private fun run(action: WidgetAction, vin: String) {
         if (action.kind == WidgetAction.Kind.OPEN) {
             openApp(vin)
-            finish()
+            finishNoAnim()
             return
         }
         lifecycleScope.launch {
             val ctx = applicationContext
-            // Save pending action so the widget shows a loading state immediately.
+            // Optimistic snapshot update so the widget immediately shows the expected
+            // new state (behind the loading icon) once the home screen comes forward.
+            if (action.wearAction != null) {
+                runCatching {
+                    val store = SnapshotStore(ctx)
+                    val snap = store.current().vehicles.firstOrNull { it.vin == vin }
+                    if (snap != null) store.updateVehicle(WearCommandRunner.optimistic(snap, action.wearAction))
+                }
+            }
+            // Mark pending so the widget overlays the refresh spinner.
             SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key)
             runCatching { BlooWidget().updateAll(ctx) }
             // Queue the actual work; finish right away so the home screen is unblocked.
             WidgetCommandWorker.enqueue(ctx, widgetId, vin, action)
-            finish()
+            finishNoAnim()
         }
+    }
+
+    /** Finish without any window animation (prevents the opaque task-switch flash). */
+    private fun finishNoAnim() {
+        finish()
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
     }
 
     private fun openApp(vin: String) {

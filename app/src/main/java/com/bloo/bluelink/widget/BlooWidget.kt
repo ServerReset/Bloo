@@ -107,18 +107,34 @@ class BlooWidget : GlanceAppWidget() {
                 val h = LocalSize.current.height
                 val isPortrait = h > w * 1.2f
                 // Layout tier selection — order matters: NarrowTall must precede WideRow/Portrait.
+                // cfg==null means truly unconfigured; cfg!=null but snap==null means data
+                // unavailable (e.g. app not signed in), so show a softer placeholder.
                 when {
-                    h < 60.dp -> if (snap == null) UnconfiguredCompact(widgetId)
-                                 else CompactBody(widgetId, snap, actions, w, showBackground, widgetShape, pendingAction)
-                    isPortrait && (w < 110.dp || h > w * 2.5f) ->
-                                 if (snap == null) UnconfiguredFull(widgetId)
-                                 else NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
-                    !isPortrait && w > h * 2.2f -> if (snap == null) UnconfiguredCompact(widgetId)
-                                               else WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
-                    isPortrait -> if (snap == null) UnconfiguredFull(widgetId)
-                                  else PortraitBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
-                    else       -> if (snap == null) UnconfiguredFull(widgetId)
-                                  else LandscapeBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
+                    h < 60.dp -> when {
+                        snap != null -> CompactBody(widgetId, snap, actions, w, showBackground, widgetShape, pendingAction)
+                        cfg == null  -> UnconfiguredCompact(widgetId)
+                        else         -> UnavailableCompact(showBackground, widgetShape)
+                    }
+                    isPortrait && (w < 110.dp || h > w * 2.5f) -> when {
+                        snap != null -> NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
+                        cfg == null  -> UnconfiguredFull(widgetId)
+                        else         -> UnavailableFull(showBackground, widgetShape)
+                    }
+                    !isPortrait && w > h * 2.2f -> when {
+                        snap != null -> WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
+                        cfg == null  -> UnconfiguredCompact(widgetId)
+                        else         -> UnavailableCompact(showBackground, widgetShape)
+                    }
+                    isPortrait -> when {
+                        snap != null -> PortraitBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
+                        cfg == null  -> UnconfiguredFull(widgetId)
+                        else         -> UnavailableFull(showBackground, widgetShape)
+                    }
+                    else -> when {
+                        snap != null -> LandscapeBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
+                        cfg == null  -> UnconfiguredFull(widgetId)
+                        else         -> UnavailableFull(showBackground, widgetShape)
+                    }
                 }
             }
         }
@@ -160,6 +176,28 @@ class BlooWidget : GlanceAppWidget() {
                 "Tap to set up",
                 style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Medium),
             )
+        }
+    }
+
+    // ── Data-unavailable placeholders (widget configured, snapshot missing) ─────
+
+    @Composable
+    private fun UnavailableFull(showBackground: Boolean, widgetShape: String) {
+        val corner = if (widgetShape == "pill") 28.dp else 20.dp
+        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+                  else GlanceModifier.fillMaxSize().cornerRadius(corner)
+        Box(modifier = mod, contentAlignment = Alignment.Center) {
+            Text("Sign in to Bloo", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
+        }
+    }
+
+    @Composable
+    private fun UnavailableCompact(showBackground: Boolean, widgetShape: String) {
+        val corner = if (widgetShape == "pill") 28.dp else 20.dp
+        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
+                  else GlanceModifier.fillMaxSize().cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
+        Box(modifier = mod, contentAlignment = Alignment.Center) {
+            Text("Sign in", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
         }
     }
 
@@ -941,7 +979,7 @@ class BlooWidget : GlanceAppWidget() {
             putExtra(WidgetAuthActivity.EXTRA_WIDGET_ID, widgetId)
             putExtra(WidgetAuthActivity.EXTRA_VIN, vin)
             putExtra(WidgetAuthActivity.EXTRA_ACTION, action.key)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
         }
 
     private fun configIntent(context: Context, widgetId: Int): Intent =
