@@ -79,7 +79,8 @@ class BlooWidget : GlanceAppWidget() {
         val pending: ColorProvider,       // in-flight command fill
         val charge: ColorProvider,        // charging (semantic green)
         val unlocked: ColorProvider,      // unlocked (semantic red)
-        val surface: ColorProvider,       // widget background (palette-tinted, day/night)
+        // background is NOT stored here — callers use GlanceTheme.colors.widgetBackground
+        // so the system handles dark/light adaptation automatically.
     )
 
     private val chargeGreen = Color(0xFF2EBD59)
@@ -115,39 +116,32 @@ class BlooWidget : GlanceAppWidget() {
             if (mapFile.exists()) runCatching { BitmapFactory.decodeFile(mapFile.absolutePath) }.getOrNull() else null
         } else null
 
-        // ── Derive the full widget palette from the app's selected colours ──
+        // ── Pull the widget accent directly from the app's active colour palette ──
+        // Use swatch / custom-palette primary as-is — the same colour the app uses
+        // for its own containers.  Only pending needs a derived tint (muted variant).
         val theme: WidgetTheme = run {
             val appearance = SettingsStore(context).appearance.first()
             val vin = snap?.vin
             val customPalettes = appearance.customPalettes
-            val swatchArgb: Int = (
+            val accentColor: Color = (
                 vin?.let { appearance.carCustomPaletteIds[it] }
-                    ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb }
+                    ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb?.let { Color(it) } }
                     ?: appearance.activeCustomPaletteId
-                        ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb }
-                    ?: appearance.colorPalette.swatch.toArgb()
+                        ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb?.let { Color(it) } }
+                    ?: appearance.colorPalette.swatch
             )
             val hsv = FloatArray(3)
-            android.graphics.Color.colorToHSV(swatchArgb, hsv)
-            val hue = hsv[0]
-            val sat = hsv[1]
-            // Accent: a medium-value tone that reads on both light and dark surfaces.
-            val accentV = if (hsv[2] < 0.35f) 0.62f else hsv[2].coerceAtMost(0.85f)
-            // HSVToColor returns an ARGB Int — use Color(Int) not Color(Long) to avoid
-            // the packed-64-bit colour-space misinterpretation.
-            val accentColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat.coerceAtLeast(0.55f), accentV)))
-            // Pending: a dimmed, desaturated accent so in-flight buttons read as muted.
-            val pendingColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, (sat * 0.4f).coerceIn(0.08f, 0.3f), 0.55f)))
-            // Surface: a subtly palette-tinted background that adapts day vs night.
-            val darkSurface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.16f, 0.13f)))
-            val lightSurface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.06f, 0.97f)))
+            android.graphics.Color.colorToHSV(accentColor.toArgb(), hsv)
+            // Pending: desaturated + dimmed so in-flight buttons read as muted.
+            val pendingColor = Color(android.graphics.Color.HSVToColor(
+                floatArrayOf(hsv[0], (hsv[1] * 0.4f).coerceIn(0.08f, 0.3f), 0.55f)
+            ))
             WidgetTheme(
                 accent = ColorProvider(accentColor),
                 onAccent = ColorProvider(Color.White),
                 pending = ColorProvider(pendingColor),
                 charge = ColorProvider(chargeGreen),
                 unlocked = ColorProvider(unlockedRed),
-                surface = ColorProvider(day = lightSurface, night = darkSurface),
             )
         }
 
@@ -229,7 +223,7 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun UnavailableFull(showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
         val corner = if (widgetShape == "pill") 28.dp else 22.dp
-        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(theme.surface).cornerRadius(corner)
+        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
                   else GlanceModifier.fillMaxSize().cornerRadius(corner)
         Box(modifier = mod, contentAlignment = Alignment.Center) {
             Text("Sign in to Bloo", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
@@ -239,7 +233,7 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun UnavailableCompact(showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
         val corner = if (widgetShape == "pill") 28.dp else 22.dp
-        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(theme.surface).cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
+        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
                   else GlanceModifier.fillMaxSize().cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
         Box(modifier = mod, contentAlignment = Alignment.Center) {
             Text("Sign in", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
@@ -297,7 +291,7 @@ class BlooWidget : GlanceAppWidget() {
         val showState = w >= 150.dp
 
         val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(theme.surface).cornerRadius(corner)
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
         } else {
             GlanceModifier.fillMaxSize().cornerRadius(corner)
         }
@@ -414,7 +408,7 @@ class BlooWidget : GlanceAppWidget() {
         val (stateLabel, stateColor) = stateOf(snap, theme)
 
         val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(theme.surface).cornerRadius(corner)
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
         } else {
             GlanceModifier.fillMaxSize().cornerRadius(corner)
         }
@@ -499,7 +493,7 @@ class BlooWidget : GlanceAppWidget() {
         val (stateLabel, stateColor) = stateOf(snap, theme)
 
         val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(theme.surface).cornerRadius(corner)
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
         } else {
             GlanceModifier.fillMaxSize().cornerRadius(corner)
         }
@@ -587,7 +581,7 @@ class BlooWidget : GlanceAppWidget() {
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
 
         val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(theme.surface).cornerRadius(corner)
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
         } else {
             GlanceModifier.fillMaxSize().cornerRadius(corner)
         }
@@ -794,7 +788,7 @@ class BlooWidget : GlanceAppWidget() {
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
 
         val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(theme.surface).cornerRadius(corner)
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
         } else {
             GlanceModifier.fillMaxSize().cornerRadius(corner)
         }
