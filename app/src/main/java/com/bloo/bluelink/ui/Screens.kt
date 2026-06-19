@@ -5330,26 +5330,52 @@ private fun ClimatePresetSection(
     onReorder: (List<ClimatePreset>) -> Unit,
 ) {
     SectionLabel("Presets")
-    if (presets.isNotEmpty()) {
-        Spacer(Modifier.height(4.dp))
-        // Full-width reorderable rows: drag from the handle to re-rank, tap to apply.
-        ReorderColumn(
-            items = presets,
-            keyOf = { it.id },
-            onReorder = onReorder,
-            spacing = 8.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) { preset, dragHandle, _ ->
-            PresetPill(
-                name = preset.name,
-                detail = presetDetail(preset.request, fahrenheit),
-                active = preset.id == activeId,
-                onStart = { onStart(preset) },
-                onDelete = { onDelete(preset.id) },
-                dragHandle = dragHandle,
-            )
+    // Track IDs mid-exit so the item stays visible until its shrink animation ends.
+    var deletingIds by remember { mutableStateOf(setOf<String>()) }
+    val scope = rememberCoroutineScope()
+
+    AnimatedVisibility(
+        visible = presets.isNotEmpty(),
+        enter = expandVertically(tween(280)) + fadeIn(tween(220)),
+        exit = shrinkVertically(tween(240)) + fadeOut(tween(180)),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.height(4.dp))
+            // Full-width reorderable rows: drag handle to re-rank, tap to apply.
+            ReorderColumn(
+                items = presets,
+                keyOf = { it.id },
+                onReorder = onReorder,
+                spacing = 8.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) { preset, dragHandle, _ ->
+                AnimatedVisibility(
+                    visible = preset.id !in deletingIds,
+                    enter = scaleIn(tween(240, easing = LinearOutSlowInEasing), initialScale = 0.88f) +
+                        expandVertically(tween(260)) + fadeIn(tween(200)),
+                    exit = scaleOut(tween(180, easing = FastOutLinearInEasing), targetScale = 0.88f) +
+                        shrinkVertically(tween(220)) + fadeOut(tween(160)),
+                ) {
+                    PresetPill(
+                        name = preset.name,
+                        detail = presetDetail(preset.request, fahrenheit),
+                        active = preset.id == activeId,
+                        onStart = { onStart(preset) },
+                        onDelete = {
+                            val id = preset.id
+                            scope.launch {
+                                deletingIds = deletingIds + id
+                                delay(240)
+                                onDelete(id)
+                                deletingIds = deletingIds - id
+                            }
+                        },
+                        dragHandle = dragHandle,
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.height(4.dp))
     }
 }
 

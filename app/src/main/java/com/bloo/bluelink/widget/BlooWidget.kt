@@ -51,10 +51,14 @@ import com.bloo.bluelink.data.VehicleSnapshot
 /**
  * The Bloo home-screen widget (Jetpack Glance).
  *
- * Four layout tiers, chosen by aspect ratio and height:
+ * Five layout tiers, chosen by aspect ratio and dimensions:
  *
- *  • Compact (h < 60 dp): Single row — percent + state + circular action buttons.
- *  • WideRow (h < 80 dp, w > h × 3): Compact status + 4 pills in a single row.
+ *  • Compact (h < 60 dp): Single row — car name (when wide enough) + percent +
+ *    state + circular action buttons.
+ *  • NarrowTall (w < 90 dp, portrait): Single-column stack — car name, percent,
+ *    state, range/battery, then action buttons stacked vertically. Ideal for 1-cell-
+ *    wide placements (≈ 74 dp on most launchers).
+ *  • WideRow (!portrait, w > h × 2.2): Compact status + 4 action pills in a row.
  *  • Portrait (h ≥ 60 dp, h > w × 1.2): Status info stacked above a 2-row button
  *    grid; photo backdrop when h ≥ 200 dp.
  *  • Landscape (h ≥ 60 dp, h ≤ w × 1.2): Status column beside the button grid;
@@ -100,12 +104,12 @@ class BlooWidget : GlanceAppWidget() {
                 val w = LocalSize.current.width
                 val h = LocalSize.current.height
                 val isPortrait = h > w * 1.2f
-                // "Wide row" triggers whenever the widget is strongly landscape (w > 2.2×h),
-                // giving a compact status + 4 pills in a single row. This covers both the
-                // classic h<80dp banner and taller-but-very-wide placements (e.g. 4×2 cells).
+                // Layout tier selection — order matters: NarrowTall must precede WideRow/Portrait.
                 when {
                     h < 60.dp -> if (snap == null) UnconfiguredCompact(widgetId)
                                  else CompactBody(widgetId, snap, actions, w)
+                    w < 90.dp && isPortrait -> if (snap == null) UnconfiguredFull(widgetId)
+                                 else NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape)
                     !isPortrait && w > h * 2.2f -> if (snap == null) UnconfiguredCompact(widgetId)
                                                else WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape)
                     isPortrait -> if (snap == null) UnconfiguredFull(widgetId)
@@ -170,34 +174,48 @@ class BlooWidget : GlanceAppWidget() {
         w: Dp,
     ) {
         val context = LocalContext.current
-        // How many 34 dp buttons fit after reserving 100 dp for status.
-        val maxButtons = ((w - 100.dp) / 34.dp).toInt().coerceIn(0, 4)
-        val showState = w >= 150.dp
+        // Reserve ~100dp for the status cluster + 5dp gap per button at 34dp each.
+        val maxButtons = ((w - 110.dp) / 39.dp).toInt().coerceIn(0, 4)
+        val showName = w >= 200.dp
+        val showState = w >= 145.dp
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
                 .cornerRadius(20.dp)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+                .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
+            Column(
                 modifier = GlanceModifier.defaultWeight(),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    snap.percent?.let { "$it%" } ?: "—",
-                    maxLines = 1,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                    ),
-                )
-                if (showState) {
-                    Spacer(GlanceModifier.width(7.dp))
-                    val (label, color) = stateOf(snap)
-                    Text(label, maxLines = 1, style = TextStyle(color = color, fontWeight = FontWeight.Medium, fontSize = 12.sp))
+                if (showName) {
+                    Text(
+                        snap.name,
+                        maxLines = 1,
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 10.sp,
+                        ),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        snap.percent?.let { "$it%" } ?: "—",
+                        maxLines = 1,
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                        ),
+                    )
+                    if (showState) {
+                        Spacer(GlanceModifier.width(7.dp))
+                        val (label, color) = stateOf(snap)
+                        Text(label, maxLines = 1, style = TextStyle(color = color, fontWeight = FontWeight.Medium, fontSize = 12.sp))
+                    }
                 }
             }
             actions.take(maxButtons).forEach { action ->
@@ -221,10 +239,137 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    // ── Narrow-tall layout ────────────────────────────────────────────────────
+
+    /**
+     * Single-column layout for very narrow portrait placements (w < 90 dp) —
+     * a 1-cell-wide widget stacked several cells tall. From top to bottom:
+     *   • car name
+     *   • large percentage
+     *   • state label
+     *   • battery/fuel kind + range (when h allows)
+     *   • up to four action buttons stacked vertically
+     */
+    @Composable
+    private fun NarrowTallBody(
+        widgetId: Int,
+        snap: VehicleSnapshot,
+        actions: List<WidgetAction>,
+        w: Dp,
+        h: Dp,
+        showBackground: Boolean,
+        widgetShape: String,
+    ) {
+        val context = LocalContext.current
+        val isPill = widgetShape == "pill"
+        val corner = if (isPill) w / 2 else (w / 4).coerceIn(14.dp, 28.dp)
+        val pad = if (isPill) (w / 5).coerceIn(6.dp, 14.dp) else 8.dp
+        val gap = 5.dp
+
+        // Vertical space reserved for action buttons (each ~34dp + gap).
+        val maxButtons = actions.size.coerceAtMost(4)
+        val buttonAreaH = if (maxButtons > 0) (34.dp * maxButtons + gap * (maxButtons - 1)) else 0.dp
+        val statusH = h - pad * 2 - buttonAreaH - (if (maxButtons > 0) gap else 0.dp)
+        val showKind = statusH >= 80.dp
+        val showRange = statusH >= 70.dp
+        val showState = statusH >= 48.dp
+        val percentSize = when {
+            statusH >= 130.dp -> 34.sp
+            statusH >= 100.dp -> 28.sp
+            statusH >= 80.dp  -> 22.sp
+            statusH >= 55.dp  -> 18.sp
+            else              -> 14.sp
+        }
+
+        val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
+        val (stateLabel, stateColor) = stateOf(snap)
+
+        val boxMod = if (showBackground) {
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        } else {
+            GlanceModifier.fillMaxSize().cornerRadius(corner)
+        }
+
+        Box(modifier = boxMod) {
+            Column(
+                modifier = GlanceModifier.fillMaxSize().padding(pad),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // Status block — clickable to open the app.
+                Column(
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .height(statusH)
+                        .clickable(openAction),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        snap.name,
+                        maxLines = 1,
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        ),
+                    )
+                    Spacer(GlanceModifier.height(2.dp))
+                    Text(
+                        snap.percent?.let { "$it%" } ?: "—",
+                        maxLines = 1,
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = percentSize,
+                        ),
+                    )
+                    if (showState) {
+                        Text(stateLabel, maxLines = 1, style = TextStyle(color = stateColor, fontSize = 10.sp))
+                    }
+                    if (showKind) {
+                        Text(
+                            if (snap.isEv) "Battery" else "Fuel",
+                            maxLines = 1,
+                            style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
+                        )
+                    }
+                    if (showRange) {
+                        snap.rangeMi?.let {
+                            Text("$it mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp))
+                        }
+                    }
+                }
+                // Action buttons stacked vertically.
+                if (maxButtons > 0) {
+                    Spacer(GlanceModifier.height(gap))
+                    actions.take(maxButtons).forEachIndexed { i, action ->
+                        if (i > 0) Spacer(GlanceModifier.height(gap))
+                        Box(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .height(34.dp)
+                                .background(GlanceTheme.colors.secondaryContainer)
+                                .cornerRadius(17.dp)
+                                .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Image(
+                                provider = ImageProvider(action.icon),
+                                contentDescription = action.label,
+                                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
+                                modifier = GlanceModifier.size(17.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ── Wide-row layout ───────────────────────────────────────────────────────
 
     /**
-     * Ultra-wide short layout (h < 80 dp, w > h × 3): compact status on the left,
+     * Ultra-wide short layout (!portrait, w > h × 2.2): compact status on the left,
      * four action pills in a single row on the right.
      */
     @Composable

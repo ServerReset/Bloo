@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -23,6 +24,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -41,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
@@ -130,18 +133,18 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        Text("Bloo widget", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("Widget setup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(2.dp))
         Text(
-            "Pick a car and what each of the four buttons does.",
+            "Choose which car to show and what each button does.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
         if (loaded && cars.isEmpty()) {
             Text(
-                "No cars yet — open Bloo and sign in first, then add the widget.",
+                "No cars yet — sign in to Bloo first, then come back to configure the widget.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(16.dp))
@@ -149,23 +152,22 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             return@Column
         }
 
-        // ---- Car selection ----
-        Text("Car", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
+        // ── Car ────────────────────────────────────────────────────────────────
+        SectionHeader("Car")
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(vertical = 4.dp)) {
+            Column(Modifier.padding(vertical = 6.dp)) {
                 cars.forEach { car ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .selectable(selected = car.vin == selectedVin, onClick = { selectedVin = car.vin })
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = car.vin == selectedVin, onClick = { selectedVin = car.vin })
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(10.dp))
                         Column {
-                            Text(car.name, fontWeight = FontWeight.Medium)
+                            Text(car.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
                             Text(
                                 car.model,
                                 style = MaterialTheme.typography.bodySmall,
@@ -177,20 +179,26 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             }
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // ---- Button assignment ----
-        Text("Buttons", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
+        // ── Buttons ────────────────────────────────────────────────────────────
+        SectionHeader("Buttons")
+        Text(
+            "Buttons appear on the widget based on the layout. Assign up to four actions.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (i in 0 until 4) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "Button ${i + 1}",
-                            modifier = Modifier.width(84.dp),
-                            style = MaterialTheme.typography.bodyMedium,
+                            "${i + 1}",
+                            modifier = Modifier.width(24.dp),
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
                         )
                         Spacer(Modifier.width(8.dp))
                         ActionPicker(
@@ -203,21 +211,29 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             }
         }
 
-        Spacer(Modifier.height(18.dp))
-        Text("Appearance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(20.dp))
+
+        // ── Appearance ─────────────────────────────────────────────────────────
+        SectionHeader("Appearance")
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Show background", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Column(Modifier.weight(1f)) {
+                        Text("Background", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Show the system widget background tint",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Switch(checked = showBackground, onCheckedChange = { showBackground = it })
                 }
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Shape", modifier = Modifier.width(84.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(8.dp))
+                Column {
+                    Text("Shape", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("rect" to "Rounded", "pill" to "Pill").forEach { (key, label) ->
                             FilterChip(
@@ -231,7 +247,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             }
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
         Button(
             onClick = {
                 val vin = selectedVin ?: return@Button
@@ -244,10 +260,17 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             },
             enabled = selectedVin != null,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Save widget") }
+        ) { Text("Save", fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+        Spacer(Modifier.height(16.dp))
     }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Spacer(Modifier.height(6.dp))
 }
 
 @Composable
@@ -255,13 +278,33 @@ private fun ActionPicker(currentKey: String, onPick: (String) -> Unit, modifier:
     var open by remember { mutableStateOf(false) }
     val current = WidgetAction.fromKey(currentKey) ?: WidgetAction.OPEN
     Box(modifier) {
-        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(current.label, maxLines = 1)
+        OutlinedButton(
+            onClick = { open = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(
+                painter = painterResource(current.icon),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(current.label, maxLines = 1, modifier = Modifier.weight(1f))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             WidgetAction.ALL.forEach { action ->
                 DropdownMenuItem(
-                    text = { Text(action.label) },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(action.icon),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(action.label)
+                        }
+                    },
                     onClick = { onPick(action.key); open = false },
                 )
             }
