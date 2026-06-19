@@ -121,6 +121,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Check

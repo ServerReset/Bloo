@@ -113,8 +113,8 @@ import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import com.bloo.wear.seatStepLabels
-import Job
-import delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
