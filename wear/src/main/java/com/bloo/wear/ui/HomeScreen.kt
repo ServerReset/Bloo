@@ -53,7 +53,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -270,15 +269,15 @@ private fun CarColumn(
 
     val state = listStates.getOrPut(car.vin) { ScalingLazyListState(initialIndex) }
 
-    // When the tile list changes (reorder or alerts appearing/disappearing), scroll
-    // back to summary so the new order is immediately visible. The version counter
-    // skips the first composition (state was just initialised to initialIndex).
-    var tileListVersion by remember(car.vin) { mutableIntStateOf(0) }
-    LaunchedEffect(tiles) {
-        if (tileListVersion > 0) {
+    // When tiles reorder or alerts appear/disappear, scroll back to summary so the
+    // new order is immediately visible. `initialised` skips the first composition
+    // (state was just initialised to initialIndex). Keys are stable primitives.
+    var initialised by remember(car.vin) { mutableStateOf(false) }
+    LaunchedEffect(ui.pebbleOverride, tileCount) {
+        if (initialised) {
             state.scrollToItem((cycles / 2) * tileCount + summaryIdx)
         }
-        tileListVersion++
+        initialised = true
     }
 
     // Claim rotary focus when this page becomes active. Adjacent pre-composed
