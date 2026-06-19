@@ -10,6 +10,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.Shortcuts
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearCommandRunner
@@ -26,8 +27,11 @@ import kotlinx.coroutines.withContext
  */
 class WidgetAuthActivity : FragmentActivity() {
 
+    private var widgetId: Int = -1
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
         val vin = intent.getStringExtra(EXTRA_VIN)
         val action = WidgetAction.fromKey(intent.getStringExtra(EXTRA_ACTION))
         if (vin == null || action == null) { finish(); return }
@@ -86,7 +90,23 @@ class WidgetAuthActivity : FragmentActivity() {
                 val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
                 val lat = snap?.lat
                 val lon = snap?.lon
-                if (lat != null && lon != null) openMaps(lat, lon) else openApp(vin)
+                if (lat != null && lon != null) {
+                    // Geocode and save the address so the widget can display it.
+                    runCatching {
+                        val results = android.location.Geocoder(ctx, java.util.Locale.getDefault())
+                            .getFromLocation(lat, lon, 1)
+                        val addr = results?.firstOrNull()?.let { a ->
+                            buildString {
+                                if (!a.thoroughfare.isNullOrBlank()) append(a.thoroughfare)
+                                if (!a.subThoroughfare.isNullOrBlank()) { if (isNotEmpty()) insert(0, "${a.subThoroughfare} ") }
+                                if (!a.locality.isNullOrBlank()) { if (isNotEmpty()) append(", "); append(a.locality) }
+                            }.takeIf { it.isNotBlank() } ?: a.getAddressLine(0)
+                        }
+                        if (!addr.isNullOrBlank()) {
+                            SettingsStore(ctx).setWidgetLocationAddress(widgetId, addr)
+                        }
+                    }
+                }
             }
 
             WidgetAction.Kind.OPEN -> openApp(vin)

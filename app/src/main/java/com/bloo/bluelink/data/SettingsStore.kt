@@ -484,6 +484,31 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    suspend fun widgetShowBackground(widgetId: Int): Boolean =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_bg")]?.toBooleanStrictOrNull() ?: true
+
+    suspend fun setWidgetShowBackground(widgetId: Int, show: Boolean) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_bg")] = show.toString() }
+    }
+
+    // "rect" = standard rounded rect, "pill" = max corner radius
+    suspend fun widgetShape(widgetId: Int): String =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_shape")] ?: "rect"
+
+    suspend fun setWidgetShape(widgetId: Int, shape: String) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_shape")] = shape }
+    }
+
+    suspend fun widgetLocationAddress(widgetId: Int): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_addr")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setWidgetLocationAddress(widgetId: Int, address: String?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("widget_${widgetId}_addr")
+            if (address.isNullOrBlank()) it.remove(key) else it[key] = address
+        }
+    }
+
     // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
 
     suspend fun hotspot(vin: String): String? =

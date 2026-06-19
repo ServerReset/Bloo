@@ -153,6 +153,9 @@ import androidx.compose.material.icons.filled.Thunderstorm
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CardDefaults
@@ -1670,6 +1673,7 @@ private fun LockOverlay(vm: AppViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EmptyScreen(vm: AppViewModel) {
+    val state by vm.state.collectAsState()
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Bloo") },
@@ -1682,8 +1686,55 @@ private fun EmptyScreen(vm: AppViewModel) {
                 }
             },
         )
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No enrolled vehicles found on this account.")
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Icon(
+                    if (state.accounts.isEmpty()) Icons.Filled.CloudOff else Icons.Filled.DirectionsCar,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                )
+                Text(
+                    if (state.accounts.isEmpty()) "Not signed in" else "No vehicles found",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    if (state.accounts.isEmpty())
+                        "Sign in to your Hyundai, Kia, or Genesis account in Settings to get started."
+                    else
+                        "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then tap Reload.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(8.dp))
+                if (state.accounts.isEmpty()) {
+                    FilledTonalButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Open Settings")
+                    }
+                } else {
+                    FilledTonalButton(onClick = { vm.loadGarage() }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reload")
+                    }
+                }
+                OutlinedButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Account Settings")
+                }
+            }
         }
     }
 }
@@ -1707,6 +1758,10 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         if (currentFetchedAt != null &&
             currentFetchedAt < sessionStartMs &&
             System.currentTimeMillis() - currentFetchedAt > 15 * 60 * 1000L) {
+            // Give the automatic background fetch time to land. If it returns fresh
+            // data, currentFetchedAt changes → this effect restarts → delay is
+            // cancelled → user never sees a spurious "stale" toast.
+            delay(25_000)
             vm.reportError("Data is over 15 min old — pull down to refresh")
         }
     }
@@ -5311,12 +5366,12 @@ private fun PresetPill(
                 }
             }
         }
-        // Delete nub.
+        // Delete nub — inner (left) corners match the gap, outer (right) corners are pill-rounded.
         Surface(
             onClick = { haptics?.tick(); onDelete() },
             color = buttonContainer(),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(outer),
+            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
             modifier = Modifier.fillMaxHeight(),
         ) {
             Box(
@@ -5406,13 +5461,13 @@ private fun ChargeLimitPill(
                     )
                 }
             }
-            // Right half — apply button, same nub style as the delete half in PresetPill.
+            // Right half — "Set" nub. Inner (left) corners match the gap; outer (right) are pill-rounded.
             Surface(
                 onClick = { haptics?.heavy(); onApply() },
                 enabled = enabled && !pending,
                 color = rightBg,
                 contentColor = rightFg,
-                shape = RoundedCornerShape(outer),
+                shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
                 modifier = Modifier.fillMaxHeight(),
             ) {
                 Box(

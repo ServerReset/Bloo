@@ -59,9 +59,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -85,6 +91,7 @@ import androidx.wear.compose.foundation.CurvedLayout
 import androidx.wear.compose.foundation.curvedComposable
 import androidx.wear.compose.foundation.curvedRow
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -106,8 +113,8 @@ import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import com.bloo.wear.seatStepLabels
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import Job
+import delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
@@ -122,7 +129,30 @@ private const val TILE_ALERTS = "alerts"
 fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit = {}) {
     if (ui.cars.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No cars yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 20.dp),
+            ) {
+                Icon(
+                    Icons.Filled.DirectionsCar,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                )
+                Text(
+                    "No cars yet",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    "Open Bloo on your phone to sign in.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         return
     }
@@ -265,41 +295,8 @@ private fun CarColumn(
         }
     }
 
-    var isSnapping by remember { mutableStateOf(false) }
-    // Holds the currently-running bezel animation job so we can cancel it on the
-    // next bezel event and skip the post-scroll snap while it's in flight.
-    val bezelJobRef = remember { arrayOf<Job?>(null) }
-
-    // Snap to the nearest tile when a finger fling settles — tile-by-tile feel.
-    // Skipped while a bezel animation is in progress (bezelJobRef[0].isActive)
-    // to prevent snap from fighting the crown and causing double-scroll jank.
-    // When near either end of the virtual list, instantly jump to the middle band
-    // so we never hit the hard boundary.
-    LaunchedEffect(Unit) {
-        snapshotFlow { state.isScrollInProgress }.collect { scrolling ->
-            if (!scrolling && !isSnapping && bezelJobRef[0]?.isActive != true) {
-                val info = state.layoutInfo
-                val viewportCenter = info.viewportSize.height / 2
-                val centerItem = info.visibleItemsInfo.minByOrNull {
-                    abs(it.offset + it.size / 2 - viewportCenter)
-                }
-                if (centerItem != null) {
-                    try {
-                        isSnapping = true
-                        val idx = centerItem.index
-                        if (infinite && (idx < tileCount * 2 || idx > total - tileCount * 2)) {
-                            val phase = wrap(idx, tileCount)
-                            state.scrollToItem((cycles / 2) * tileCount + phase)
-                        } else {
-                            state.animateScrollToItem(idx)
-                        }
-                    } finally {
-                        isSnapping = false
-                    }
-                }
-            }
-        }
-    }
+    var rotaryJob: Job? by remember { mutableStateOf(null) }
+    val snapFling = ScalingLazyColumnDefaults.snapFlingBehavior(state)
 
     val centerItemIndex by remember {
         derivedStateOf {
@@ -312,35 +309,43 @@ private fun CarColumn(
     }
     val centerTile = if (tileCount > 0) tiles[wrap(centerItemIndex, tileCount)] else ""
 
+    // Wrap-around guardian: when near either end of the virtual list, instantly
+    // jump to the middle band so we never hit the hard boundary.
+    LaunchedEffect(Unit) {
+        snapshotFlow { centerItemIndex to state.isScrollInProgress }
+            .collect { (idx, scrolling) ->
+                if (infinite && !scrolling && rotaryJob?.isActive != true) {
+                    if (idx < tileCount * 2 || idx > total - tileCount * 2) {
+                        val phase = wrap(idx, tileCount)
+                        state.scrollToItem((cycles / 2) * tileCount + phase)
+                    }
+                }
+            }
+    }
+
     Box(Modifier.fillMaxSize()) {
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .onRotaryScrollEvent { e ->
-                    // Non-active (pre-composed adjacent) pages ignore rotary events.
                     if (!active) return@onRotaryScrollEvent false
                     val info = state.layoutInfo
                     val viewportCenter = info.viewportSize.height / 2
                     val center = info.visibleItemsInfo.minByOrNull {
                         abs(it.offset + it.size / 2 - viewportCenter)
                     }?.index ?: return@onRotaryScrollEvent true
-                    // One detent → one tile. In infinite mode the virtual list is
-                    // large enough that a plain +/- never hits a hard wall; in
-                    // finite mode coerce to valid bounds.
                     val dir = if (e.verticalScrollPixels > 0) 1 else -1
                     val maxIdx = (info.totalItemsCount - 1).coerceAtLeast(0)
-                    val target = if (infinite) center + dir
-                                 else (center + dir).coerceIn(0, maxIdx)
+                    val target = if (infinite) center + dir else (center + dir).coerceIn(0, maxIdx)
                     if (target < 0 || target > maxIdx) return@onRotaryScrollEvent true
-                    // Cancel the previous animation so rapid crown turns don't
-                    // queue up and fight each other, then start the new one.
-                    bezelJobRef[0]?.cancel()
-                    bezelJobRef[0] = scope.launch { state.animateScrollToItem(target) }
+                    rotaryJob?.cancel()
+                    rotaryJob = scope.launch { state.animateScrollToItem(target) }
                     true
                 }
                 .focusRequester(focusRequester)
                 .focusable(active),
             state = state,
+            flingBehavior = snapFling,
             contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -360,6 +365,7 @@ private fun CarColumn(
         CarNameOverlay(
             name = car.name,
             visible = centerTile.isNotEmpty() && centerTile != WearTiles.SUMMARY,
+            onRefresh = { vm.refreshStatus(car.vin) },
         )
 
         // Auto-dismissing message snackbar at the bottom.
@@ -460,9 +466,30 @@ private fun CurvedDotIndicator(total: Int, activeIndex: Int) {
 
 /** A small pill naming the car you're currently looking at. Sits below the
  *  system clock (Wear's TimeText owns the very top center) so the two don't
- *  overlap. */
+ *  overlap. Long-press to trigger a status refresh with an expanding animation. */
 @Composable
-private fun BoxScope.CarNameOverlay(name: String, visible: Boolean) {
+private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: () -> Unit = {}) {
+    val scope = rememberCoroutineScope()
+    // 0f = pill only, 1f = full screen filled
+    val expandProgress = remember { Animatable(0f) }
+
+    // Expanding circle: starts as a tiny point at the pill, grows to fill the screen.
+    // Only composed while the hold is active (saves a layer at rest).
+    if (expandProgress.value > 0.001f) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val s = expandProgress.value
+                    scaleX = s
+                    scaleY = s
+                    transformOrigin = TransformOrigin(0.5f, 0.08f)
+                    alpha = (s * 4f).coerceIn(0f, 1f)
+                }
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+        )
+    }
+
     AnimatedVisibility(
         visible = visible,
         modifier = Modifier.align(Alignment.TopCenter).padding(top = 26.dp),
@@ -473,6 +500,41 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean) {
             Modifier
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f))
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        var holdJob: Job? = null
+                        var completed = false
+                        holdJob = scope.launch {
+                            // Animate to full screen over 2 seconds
+                            expandProgress.animateTo(
+                                1f,
+                                tween(2000, easing = LinearEasing)
+                            )
+                            completed = true
+                            // Trigger the refresh
+                            onRefresh()
+                            // Brief hold at full, then collapse
+                            delay(600)
+                            expandProgress.animateTo(0f, tween(400))
+                        }
+                        // Wait for finger up or cancellation
+                        try {
+                            waitForUpOrCancellation()
+                        } finally {
+                            if (!completed) {
+                                holdJob?.cancel()
+                                scope.launch {
+                                    expandProgress.animateTo(
+                                        0f,
+                                        tween(300)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 .padding(horizontal = 12.dp, vertical = 3.dp),
         ) {
             Text(

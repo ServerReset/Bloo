@@ -716,7 +716,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         synchronized(statusInFlight) {
             if (!statusInFlight.add(v.vin)) return
         }
-        _state.update { it.copy(refreshing = true) }
+        // Only show the spinner/settle-haptic for user-triggered refreshes; silent
+        // background fetches (ensureStatus) run without touching refreshing so the
+        // UI stays still and no settle haptic fires when they complete.
+        if (surfaceErrors) _state.update { it.copy(refreshing = true) }
         viewModelScope.launch {
             try {
                 statusMutex.withLock {

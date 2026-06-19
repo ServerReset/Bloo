@@ -22,10 +22,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -100,6 +102,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var loaded by remember { mutableStateOf(false) }
     var selectedVin by remember { mutableStateOf<String?>(null) }
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
+    var showBackground by remember { mutableStateOf(true) }
+    var widgetShape by remember { mutableStateOf("rect") }
 
     LaunchedEffect(Unit) {
         cars = SnapshotStore(context).current().vehicles
@@ -114,6 +118,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         } else {
             selectedVin = cars.firstOrNull()?.vin
         }
+        showBackground = SettingsStore(context).widgetShowBackground(widgetId)
+        widgetShape = SettingsStore(context).widgetShape(widgetId)
         loaded = true
     }
 
@@ -197,12 +203,42 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             }
         }
 
+        Spacer(Modifier.height(18.dp))
+        Text("Appearance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Show background", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = showBackground, onCheckedChange = { showBackground = it })
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Shape", modifier = Modifier.width(84.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("rect" to "Rounded", "pill" to "Pill").forEach { (key, label) ->
+                            FilterChip(
+                                selected = widgetShape == key,
+                                onClick = { widgetShape = key },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = {
                 val vin = selectedVin ?: return@Button
                 scope.launch {
                     SettingsStore(context).setWidgetConfig(widgetId, vin, actions.toList())
+                    SettingsStore(context).setWidgetShowBackground(widgetId, showBackground)
+                    SettingsStore(context).setWidgetShape(widgetId, widgetShape)
                     onDone()
                 }
             },
