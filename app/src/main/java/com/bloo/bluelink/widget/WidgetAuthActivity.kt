@@ -35,10 +35,13 @@ class WidgetAuthActivity : FragmentActivity() {
         val canAuth = BiometricManager.from(this)
             .canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
 
-        if (action.requiresAuth && canAuth) {
-            promptThenRun(action, vin, authenticators)
-        } else {
-            run(action, vin)
+        lifecycleScope.launch {
+            val requireAuth = SettingsStore(applicationContext).widgetRequireAuth(widgetId)
+            if (action.requiresAuth && canAuth && requireAuth) {
+                promptThenRun(action, vin, authenticators)
+            } else {
+                run(action, vin)
+            }
         }
     }
 

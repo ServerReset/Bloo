@@ -4393,11 +4393,6 @@ private fun Pebble(
     val forceExpanded = LocalForceExpanded.current
     val expanded = forceExpanded || state.isPebbleExpanded(v.vin, section)
     val haptics = LocalHaptics.current
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "pebbleChevron",
-    )
     // Collapsed = pill-soft corners; expanded morphs to a tighter rounded square.
     val corner by animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
@@ -4463,16 +4458,19 @@ private fun Pebble(
                         }
                     }
                 }
-                if (headerAction != null) {
-                    headerAction()
-                    Spacer(Modifier.width(4.dp))
-                }
                 if (!forceExpanded) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
-                        modifier = Modifier.rotate(rotation),
-                    )
+                    if (headerAction != null) {
+                        SplitExpandButton(
+                            action = headerAction,
+                            expanded = expanded,
+                            onToggle = { vm.togglePebble(v, section) },
+                        )
+                    } else {
+                        MorphExpandButton(
+                            expanded = expanded,
+                            onToggle = { vm.togglePebble(v, section) },
+                        )
+                    }
                 }
             }
             if (fillHeight) {
@@ -4572,6 +4570,76 @@ private fun PebbleActionButton(
         interactionSource = bounceInteraction,
     ) {
         MorphButtonLabel(icon, label, pending = pending && !bouncing, spinning = spinning)
+    }
+}
+
+/**
+ * Right-side expand control for pebbles that also have an action button.
+ * The action (PebbleActionButton) sits on the left with a 3dp gap, then a
+ * chevron-only pill button on the right that morphs to a rounded-square when
+ * the section is expanded.
+ */
+@Composable
+private fun SplitExpandButton(
+    action: @Composable () -> Unit,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "splitChevron",
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        action()
+        MorphButton(
+            onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
+            active = expanded,
+            activeContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            activeContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                modifier = Modifier.size(20.dp).rotate(rotation),
+            )
+        }
+    }
+}
+
+/**
+ * Right-side expand control for pebbles with no action button — the whole
+ * right handle is a pill that morphs to a rounded-square when the section is
+ * open, giving a clear visual indicator of state.
+ */
+@Composable
+private fun MorphExpandButton(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "morphChevron",
+    )
+    MorphButton(
+        onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
+        active = expanded,
+        activeContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        activeContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Icon(
+            Icons.Filled.KeyboardArrowDown,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            modifier = Modifier.size(20.dp).rotate(rotation),
+        )
     }
 }
 

@@ -107,6 +107,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
     var showBackground by remember { mutableStateOf(true) }
     var widgetShape by remember { mutableStateOf("rect") }
+    var requireAuth by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         cars = SnapshotStore(context).current().vehicles
@@ -123,6 +124,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         }
         showBackground = SettingsStore(context).widgetShowBackground(widgetId)
         widgetShape = SettingsStore(context).widgetShape(widgetId)
+        requireAuth = SettingsStore(context).widgetRequireAuth(widgetId)
         loaded = true
     }
 
@@ -231,6 +233,20 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     }
                     Switch(checked = showBackground, onCheckedChange = { showBackground = it })
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Require authentication", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Authenticate before running widget commands",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = requireAuth, onCheckedChange = { requireAuth = it })
+                }
                 Column {
                     Text("Shape", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
@@ -255,6 +271,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     SettingsStore(context).setWidgetConfig(widgetId, vin, actions.toList())
                     SettingsStore(context).setWidgetShowBackground(widgetId, showBackground)
                     SettingsStore(context).setWidgetShape(widgetId, widgetShape)
+                    SettingsStore(context).setWidgetRequireAuth(widgetId, requireAuth)
                     onDone()
                 }
             },

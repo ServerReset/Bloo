@@ -59,8 +59,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.keyframes
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -178,11 +182,12 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val car = ui.cars[page]
-                val active = page == activeCarIndex && !carPager.isScrollInProgress
+                val showColumn = page == carPager.settledPage
+                val active = showColumn && !carPager.isScrollInProgress
                 val carRoles = ui.settings?.carColors?.get(car.vin)
-                if (active) {
+                if (showColumn) {
                     val body: @Composable () -> Unit = {
-                        CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, true)
+                        CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
                     }
                     if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
                     else body()
@@ -256,9 +261,13 @@ private fun CarColumn(
 
     val tiles = remember(ui.pebbleOverride, ui.settings, ui.presets, ui.extras, car) { visibleTiles(ui, car) }
     val tileCount = tiles.size
+    val infinite = tileCount > 1
+    val cycles = if (infinite) 200 else 1
+    val total = tileCount * cycles
     val summaryIdx = tiles.indexOf(WearTiles.SUMMARY).coerceAtLeast(0)
+    val initialIndex = if (infinite) (cycles / 2) * tileCount + summaryIdx else summaryIdx
 
-    val state = listStates.getOrPut(car.vin) { ScalingLazyListState(summaryIdx) }
+    val state = listStates.getOrPut(car.vin) { ScalingLazyListState(initialIndex) }
 
     // Claim rotary focus when this page becomes active. Adjacent pre-composed
     // pages skip this so only the settled page owns the crown/bezel.
@@ -283,7 +292,23 @@ private fun CarColumn(
             }?.index ?: 0
         }
     }
-    val centerTile = if (tileCount > 0) tiles[centerItemIndex.coerceIn(0, tileCount - 1)] else ""
+    val centerTile = if (tileCount > 0) tiles[centerItemIndex % tileCount] else ""
+
+    // Wrap-around guardian: once the user drifts near the ends of the virtual
+    // list, silently teleport to the equivalent position in the centre segment
+    // so infinite scrolling never hits a hard stop.
+    LaunchedEffect(Unit) {
+        if (!infinite) return@LaunchedEffect
+        snapshotFlow { centerItemIndex to state.isScrollInProgress }
+            .collect { (idx, scrolling) ->
+                if (!scrolling && rotaryJob?.isActive != true) {
+                    if (idx < tileCount * 2 || idx > total - tileCount * 2) {
+                        val phase = idx % tileCount
+                        state.scrollToItem((cycles / 2) * tileCount + phase)
+                    }
+                }
+            }
+    }
 
     Box(Modifier.fillMaxSize()) {
         ScalingLazyColumn(
@@ -298,7 +323,7 @@ private fun CarColumn(
                     }?.index ?: return@onRotaryScrollEvent true
                     val dir = if (e.verticalScrollPixels > 0) 1 else -1
                     val maxIdx = (info.totalItemsCount - 1).coerceAtLeast(0)
-                    val target = (center + dir).coerceIn(0, maxIdx)
+                    val target = if (infinite) center + dir else (center + dir).coerceIn(0, maxIdx)
                     rotaryJob?.cancel()
                     rotaryJob = scope.launch { state.animateScrollToItem(target) }
                     true
@@ -310,8 +335,8 @@ private fun CarColumn(
             contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(items = tiles, key = { it }) { tileKey ->
-                TileContent(tileKey, vm, ui, car, onSettings, onTrips, onReorder)
+            items(count = total, key = { it }) { i ->
+                TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
 
@@ -319,7 +344,7 @@ private fun CarColumn(
         // never clips them.
         CurvedDotIndicator(
             total = tileCount,
-            activeIndex = centerItemIndex.coerceIn(0, (tileCount - 1).coerceAtLeast(0)),
+            activeIndex = if (tileCount > 0) centerItemIndex % tileCount else 0,
         )
 
         // Name the car once you leave its summary tile.
@@ -431,6 +456,7 @@ private fun CurvedDotIndicator(total: Int, activeIndex: Int) {
 @Composable
 private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
+    val hapticFeedback = LocalHapticFeedback.current
     // 0f = pill only, 1f = full screen filled
     val expandProgress = remember { Animatable(0f) }
 
@@ -467,16 +493,28 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: (
                         down.consume()
                         var holdJob: Job? = null
                         var completed = false
+                        var hapticJob: Job? = null
+                        hapticJob = scope.launch {
+                            var delayMs = 300L
+                            while (isActive) {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                delay(delayMs)
+                                delayMs = (delayMs * 0.7f).toLong().coerceAtLeast(40L)
+                            }
+                        }
                         holdJob = scope.launch {
-                            // Animate to full screen over 2 seconds
                             expandProgress.animateTo(
                                 1f,
-                                tween(2000, easing = LinearEasing)
+                                keyframes {
+                                    durationMillis = 1000
+                                    0f at 0
+                                    1.06f at 800 using FastOutSlowInEasing
+                                    1f at 1000
+                                }
                             )
+                            hapticJob?.cancel()
                             completed = true
-                            // Trigger the refresh
                             onRefresh()
-                            // Brief hold at full, then collapse
                             delay(600)
                             expandProgress.animateTo(0f, tween(400))
                         }
@@ -484,6 +522,7 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: (
                         try {
                             waitForUpOrCancellation()
                         } finally {
+                            hapticJob?.cancel()
                             if (!completed) {
                                 holdJob?.cancel()
                                 scope.launch {

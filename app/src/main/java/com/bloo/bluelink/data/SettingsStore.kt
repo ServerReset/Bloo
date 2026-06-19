@@ -509,6 +509,13 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    suspend fun widgetRequireAuth(widgetId: Int): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_auth")] ?: true
+
+    suspend fun setWidgetRequireAuth(widgetId: Int, value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_auth")] = value }
+    }
+
     suspend fun widgetLocationAddress(widgetId: Int): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_addr")]?.takeIf { it.isNotBlank() }
 
