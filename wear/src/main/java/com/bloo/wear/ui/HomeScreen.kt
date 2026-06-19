@@ -53,6 +53,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -269,6 +270,17 @@ private fun CarColumn(
 
     val state = listStates.getOrPut(car.vin) { ScalingLazyListState(initialIndex) }
 
+    // When the tile list changes (reorder or alerts appearing/disappearing), scroll
+    // back to summary so the new order is immediately visible. The version counter
+    // skips the first composition (state was just initialised to initialIndex).
+    var tileListVersion by remember(car.vin) { mutableIntStateOf(0) }
+    LaunchedEffect(tiles) {
+        if (tileListVersion > 0) {
+            state.scrollToItem((cycles / 2) * tileCount + summaryIdx)
+        }
+        tileListVersion++
+    }
+
     // Claim rotary focus when this page becomes active. Adjacent pre-composed
     // pages skip this so only the settled page owns the crown/bezel.
     LaunchedEffect(car.vin, active) {
@@ -282,6 +294,7 @@ private fun CarColumn(
 
     var rotaryJob: Job? by remember { mutableStateOf(null) }
     val snapFling = ScalingLazyColumnDefaults.snapFlingBehavior(state)
+    val virtualList = remember(total) { List(total) { it } }
 
     val centerItemIndex by remember {
         derivedStateOf {
@@ -335,8 +348,8 @@ private fun CarColumn(
             contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(count = total, key = { it }) { i ->
-                TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
+            items(items = virtualList, key = { it }) { idx ->
+                TileContent(tiles[idx % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
 
