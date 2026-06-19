@@ -53,11 +53,11 @@ import com.bloo.bluelink.data.VehicleSnapshot
  *
  * Five layout tiers, chosen by aspect ratio and dimensions:
  *
- *  • Compact (h < 60 dp): Single row — car name (when wide enough) + percent +
- *    state + circular action buttons.
- *  • NarrowTall (w < 90 dp, portrait): Single-column stack — car name, percent,
- *    state, range/battery, then action buttons stacked vertically. Ideal for 1-cell-
- *    wide placements (≈ 74 dp on most launchers).
+ *  • Compact (h < 60 dp): Single row — car name (always) above percent + state,
+ *    with circular action buttons on the right when width allows.
+ *  • NarrowTall (portrait & (w < 110 dp or h > w × 2.5)): Single-column stack —
+ *    car name, percent, state, range/battery, then action buttons stacked
+ *    vertically. Covers 1-cell-wide, many-tall placements.
  *  • WideRow (!portrait, w > h × 2.2): Compact status + 4 action pills in a row.
  *  • Portrait (h ≥ 60 dp, h > w × 1.2): Status info stacked above a 2-row button
  *    grid; photo backdrop when h ≥ 200 dp.
@@ -108,7 +108,8 @@ class BlooWidget : GlanceAppWidget() {
                 when {
                     h < 60.dp -> if (snap == null) UnconfiguredCompact(widgetId)
                                  else CompactBody(widgetId, snap, actions, w)
-                    w < 90.dp && isPortrait -> if (snap == null) UnconfiguredFull(widgetId)
+                    isPortrait && (w < 110.dp || h > w * 2.5f) ->
+                                 if (snap == null) UnconfiguredFull(widgetId)
                                  else NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape)
                     !isPortrait && w > h * 2.2f -> if (snap == null) UnconfiguredCompact(widgetId)
                                                else WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape)
@@ -163,8 +164,10 @@ class BlooWidget : GlanceAppWidget() {
     // ── Compact single-row layout ─────────────────────────────────────────────
 
     /**
-     * Minimal one-row layout for short widgets (h < 60 dp):
-     * percent + state label on the left, up to four circular action buttons on the right.
+     * Minimal one-row layout for short widgets (h < 60 dp): the car name always
+     * sits on top (the one piece of context that must never be dropped), with
+     * percent + state beneath it, and up to four circular action buttons on the
+     * right when width allows.
      */
     @Composable
     private fun CompactBody(
@@ -176,8 +179,7 @@ class BlooWidget : GlanceAppWidget() {
         val context = LocalContext.current
         // Reserve ~100dp for the status cluster + 5dp gap per button at 34dp each.
         val maxButtons = ((w - 110.dp) / 39.dp).toInt().coerceIn(0, 4)
-        val showName = w >= 200.dp
-        val showState = w >= 145.dp
+        val showState = w >= 150.dp
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -190,17 +192,17 @@ class BlooWidget : GlanceAppWidget() {
             Column(
                 modifier = GlanceModifier.defaultWeight(),
             ) {
-                if (showName) {
-                    Text(
-                        snap.name,
-                        maxLines = 1,
-                        style = TextStyle(
-                            color = GlanceTheme.colors.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 10.sp,
-                        ),
-                    )
-                }
+                // Car name is always present — the essential context even at the
+                // smallest size.
+                Text(
+                    snap.name,
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 10.sp,
+                    ),
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         snap.percent?.let { "$it%" } ?: "—",
@@ -208,7 +210,7 @@ class BlooWidget : GlanceAppWidget() {
                         style = TextStyle(
                             color = GlanceTheme.colors.onSurface,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
+                            fontSize = 16.sp,
                         ),
                     )
                     if (showState) {
@@ -242,13 +244,13 @@ class BlooWidget : GlanceAppWidget() {
     // ── Narrow-tall layout ────────────────────────────────────────────────────
 
     /**
-     * Single-column layout for very narrow portrait placements (w < 90 dp) —
-     * a 1-cell-wide widget stacked several cells tall. From top to bottom:
-     *   • car name
+     * Single-column layout for narrow, tall placements (1 cell wide, many tall —
+     * w < 110 dp or h > w × 2.5). From top to bottom:
+     *   • car name (always shown)
      *   • large percentage
      *   • state label
      *   • battery/fuel kind + range (when h allows)
-     *   • up to four action buttons stacked vertically
+     *   • as many action buttons as fit, stacked vertically
      */
     @Composable
     private fun NarrowTallBody(
@@ -265,14 +267,19 @@ class BlooWidget : GlanceAppWidget() {
         val corner = if (isPill) w / 2 else (w / 4).coerceIn(14.dp, 28.dp)
         val pad = if (isPill) (w / 5).coerceIn(6.dp, 14.dp) else 8.dp
         val gap = 5.dp
+        val btnH = 34.dp
 
-        // Vertical space reserved for action buttons (each ~34dp + gap).
-        val maxButtons = actions.size.coerceAtMost(4)
-        val buttonAreaH = if (maxButtons > 0) (34.dp * maxButtons + gap * (maxButtons - 1)) else 0.dp
-        val statusH = h - pad * 2 - buttonAreaH - (if (maxButtons > 0) gap else 0.dp)
-        val showKind = statusH >= 80.dp
-        val showRange = statusH >= 70.dp
-        val showState = statusH >= 48.dp
+        // Always reserve room for the status block (name + percent), then fit as
+        // many stacked buttons as the remaining height allows (up to four).
+        val minStatusH = 58.dp
+        val avail = h - pad * 2
+        val fitButtons = (((avail - minStatusH - gap) / (btnH + gap)).toInt()).coerceIn(0, 4)
+        val maxButtons = actions.size.coerceAtMost(fitButtons)
+        val buttonAreaH = if (maxButtons > 0) (btnH * maxButtons + gap * maxButtons) else 0.dp
+        val statusH = (avail - buttonAreaH).coerceAtLeast(minStatusH)
+        val showKind = statusH >= 100.dp
+        val showRange = statusH >= 86.dp
+        val showState = statusH >= 70.dp
         val percentSize = when {
             statusH >= 130.dp -> 34.sp
             statusH >= 100.dp -> 28.sp
@@ -537,8 +544,8 @@ class BlooWidget : GlanceAppWidget() {
 
         val (stateLabel, stateColor) = stateOf(snap, hasPhoto)
 
-        // Derive what to show based on available height.
-        val showName = availH >= 90.dp
+        // Car name is always shown; the rest reveals progressively with height.
+        val showName = true
         val showKind = availH >= 65.dp
         val showRange = availH >= 52.dp
         val showState = availH >= 36.dp
@@ -702,11 +709,10 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     /**
-     * Left-side status column in the landscape layout. Reveals info progressively:
-     *  h ≥ 60 dp  → state + percent
+     * Left-side status column in the landscape layout. Car name + percent are
+     * always shown; the rest reveals progressively:
      *  h ≥ 76 dp  → + range
      *  h ≥ 86 dp  → + battery/fuel label
-     *  h ≥ 96 dp  → + car name
      *  h ≥ 160 dp → photo backdrop; text turns white
      */
     @Composable
@@ -721,7 +727,7 @@ class BlooWidget : GlanceAppWidget() {
         val onVariant = if (hasPhoto) ColorProvider(Color(1f, 1f, 1f, 0.70f)) else GlanceTheme.colors.onSurfaceVariant
         val (stateLabel, stateColor) = stateOf(snap, hasPhoto)
 
-        val showName = h >= 96.dp
+        val showName = true
         val showKind = h >= 86.dp
         val showRange = h >= 76.dp
         val percentSize = when {
