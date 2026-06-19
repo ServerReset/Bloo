@@ -414,15 +414,20 @@ class BlooWidget : GlanceAppWidget() {
                     .padding(horizontal = hPad, vertical = pad),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Compact status: percent + state
+                // Compact status: name + percent + state
                 Column(
                     modifier = GlanceModifier.height(pillH).clickable(openAction),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
+                        snap.name,
+                        maxLines = 1,
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = 10.sp),
+                    )
+                    Text(
                         snap.percent?.let { "$it%" } ?: "—",
                         maxLines = 1,
-                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp),
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp),
                     )
                     Text(stateLabel, maxLines = 1, style = TextStyle(color = stateColor, fontSize = 10.sp))
                 }
