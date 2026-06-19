@@ -1340,166 +1340,217 @@ private fun LoginScreen(
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
     val cfg = LocalConfiguration.current
-    // Shrink the hero on short cover screens; cap form width on tablets.
     val shortScreen = cfg.screenHeightDp < 520
-    val heroHeight = if (shortScreen) 96.dp else 150.dp
+    val heroHeight = if (shortScreen) 96.dp else 160.dp
+    val context = LocalContext.current
+
+    // Brand-specific copy
+    val brandSubtitle = when (brand) {
+        Brand.HYUNDAI -> "A better Bluelink · US"
+        Brand.GENESIS -> "A better Genesis · US"
+        Brand.KIA     -> "A better Kia Connect · US"
+    }
+    val emailLabel = when (brand) {
+        Brand.HYUNDAI -> "Bluelink email"
+        Brand.GENESIS -> "Genesis account email"
+        Brand.KIA     -> "Kia Connect email"
+    }
+
+    // Animate the form in from below on first composition.
+    var formVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { formVisible = true }
 
     if (onCancel != null) BackHandler { onCancel() }
 
     Box(Modifier.fillMaxSize()) {
-    AuroraBackground(Modifier.matchParentSize())
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Wordmark hero over the animated aurora (transparent hero background).
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(heroHeight),
-            contentAlignment = Alignment.BottomStart,
-        ) {
-            Column(Modifier.padding(24.dp)) {
-                Text(
-                    "Bloo",
-                    style = if (shortScreen) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                )
-                Text(
-                    "A better Blue Link · US",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
-            }
-        }
-
-        // No sheet/frame: the form floats directly over the aurora. Inputs and
-        // buttons carry their own fills so they stay legible and high-contrast.
+        AuroraBackground(Modifier.matchParentSize())
         Column(
             Modifier
-                .fillMaxWidth()
-                .widthIn(max = 480.dp)
-                .padding(horizontal = 24.dp)
-                .padding(top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Opaque, filled fields so each input reads as a floating rounded
-            // card over the aurora rather than a faint outline.
-            val fieldColors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = scheme.surface,
-                unfocusedContainerColor = scheme.surface,
-                disabledContainerColor = scheme.surface,
-                focusedBorderColor = Color.Transparent,
-                unfocusedBorderColor = Color.Transparent,
-            )
-
-            Text(
-                "Brand",
-                style = MaterialTheme.typography.labelLarge,
-                color = scheme.onSurface,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Brand.entries.forEach { b ->
-                    MorphChip(selected = brand == b, onClick = { brand = b }, label = b.label)
-                }
-            }
-
-            Text(
-                if (brand == Brand.KIA) "Kia Connect email" else "Blue Link email",
-                style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                placeholder = { Text(if (brand == Brand.KIA) "Kia Connect email" else "Blue Link email") },
-                singleLine = true,
-                shape = FieldShape,
-                colors = fieldColors,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                "Password",
-                style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                placeholder = { Text("Password") },
-                singleLine = true,
-                shape = FieldShape,
-                colors = fieldColors,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            // Kia US doesn't use a service PIN; commands are session-keyed.
-            if (!brand.usesOtpLogin) {
-                Text(
-                    "Service PIN",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = { pin = it },
-                    placeholder = { Text("Service PIN") },
-                    singleLine = true,
-                    shape = FieldShape,
-                    colors = fieldColors,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            // High-contrast primary call-to-action, floating over the aurora.
-            MorphButton(
-                onClick = { onLogin(email, password, pin, brand) },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                enabled = !loading,
-                containerColor = scheme.primary,
-                contentColor = scheme.onPrimary,
+            // Wordmark hero — subtitle crossfades when the brand changes.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(heroHeight),
+                contentAlignment = Alignment.BottomStart,
             ) {
-                if (loading) LoadingIndicator() else Text("Sign in", fontWeight = FontWeight.SemiBold)
-            }
-            if (onCancel != null) {
-                MorphButton(
-                    onClick = onCancel,
-                    modifier = Modifier.fillMaxWidth(),
-                    containerColor = scheme.secondaryContainer,
-                    contentColor = scheme.onSecondaryContainer,
-                ) { Text("Cancel", fontWeight = FontWeight.SemiBold) }
-            }
-            val context = LocalContext.current
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                TextButton(onClick = {
-                    val forgotUrl = when (brand) {
-                        Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgotPassword.html"
-                        Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
-                        Brand.KIA     -> "https://owners.kia.com/us/en/forgot-credentials/credentials-user-id.html"
-                    }
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(forgotUrl)))
-                }) {
+                Column(Modifier.padding(24.dp)) {
                     Text(
-                        "Forgot password?",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onSurfaceVariant,
+                        "Bloo",
+                        style = if (shortScreen) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
                     )
+                    AnimatedContent(
+                        targetState = brandSubtitle,
+                        transitionSpec = {
+                            (fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 3 }) togetherWith
+                                (fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 3 })
+                        },
+                        label = "loginSubtitle",
+                    ) { subtitle ->
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
                 }
             }
-            Text(
-                "Credentials are sent directly to ${brand.label}'s telematics servers and " +
-                    "stored encrypted on this device.",
-                style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant,
-            )
+
+            // Form slides up from below on first composition.
+            AnimatedVisibility(
+                visible = formVisible,
+                enter = slideInVertically(tween(420, easing = LinearOutSlowInEasing)) { it / 3 } +
+                    fadeIn(tween(380)),
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 480.dp)
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    val fieldColors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = scheme.surface,
+                        unfocusedContainerColor = scheme.surface,
+                        disabledContainerColor = scheme.surface,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                    )
+
+                    Text(
+                        "Sign in with",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = scheme.onSurface,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Brand.entries.forEach { b ->
+                            MorphChip(selected = brand == b, onClick = { brand = b }, label = b.label)
+                        }
+                    }
+
+                    // Email field — label and placeholder animate with brand.
+                    AnimatedContent(
+                        targetState = emailLabel,
+                        transitionSpec = {
+                            fadeIn(tween(220)) togetherWith fadeOut(tween(160))
+                        },
+                        label = "emailLabel",
+                    ) { label ->
+                        Text(label, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    }
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = { Text(emailLabel) },
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = fieldColors,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    Text("Password", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = { Text("Password") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = fieldColors,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    // PIN — only for Hyundai/Genesis (Kia uses OTP).
+                    AnimatedVisibility(
+                        visible = !brand.usesOtpLogin,
+                        enter = expandVertically(tween(280)) + fadeIn(tween(280)),
+                        exit = shrinkVertically(tween(220)) + fadeOut(tween(180)),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Text("Service PIN", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                            OutlinedTextField(
+                                value = pin,
+                                onValueChange = { pin = it },
+                                placeholder = { Text("Service PIN") },
+                                singleLine = true,
+                                shape = FieldShape,
+                                colors = fieldColors,
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+
+                    // Sign in CTA — label reflects the chosen brand.
+                    MorphButton(
+                        onClick = { onLogin(email, password, pin, brand) },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        enabled = !loading,
+                        containerColor = scheme.primary,
+                        contentColor = scheme.onPrimary,
+                    ) {
+                        if (loading) {
+                            LoadingIndicator()
+                        } else {
+                            AnimatedContent(
+                                targetState = brand.label,
+                                transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
+                                label = "signInLabel",
+                            ) { label ->
+                                Text("Sign in to $label", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+
+                    if (onCancel != null) {
+                        MorphButton(
+                            onClick = onCancel,
+                            modifier = Modifier.fillMaxWidth(),
+                            containerColor = scheme.secondaryContainer,
+                            contentColor = scheme.onSecondaryContainer,
+                        ) { Text("Cancel", fontWeight = FontWeight.SemiBold) }
+                    }
+
+                    // Forgot password — MorphTextButton that routes to the right brand portal.
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        MorphTextButton(
+                            text = "Forgot password?",
+                            onClick = {
+                                val forgotUrl = when (brand) {
+                                    Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
+                                    Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
+                                    Brand.KIA     -> "https://owners.kia.com/us/en/kia-owner-portal.html"
+                                }
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(forgotUrl)))
+                            },
+                            contentColor = scheme.onSurfaceVariant,
+                        )
+                    }
+
+                    AnimatedContent(
+                        targetState = brand.label,
+                        transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(180)) },
+                        label = "privacyNote",
+                    ) { label ->
+                        Text(
+                            "Credentials are sent directly to $label's telematics servers and " +
+                                "stored encrypted on this device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
-    }
     }
 }
 
@@ -1933,7 +1984,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             visible = carNameVisible,
                             enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
                             exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 2 },
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 6.dp),
+                            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
                         ) {
                             Surface(
                                 onClick = { pillScope.launch { scrollToTopFn?.invoke() } },
