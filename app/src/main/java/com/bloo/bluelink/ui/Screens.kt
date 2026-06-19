@@ -3656,14 +3656,12 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
         v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, dragHandle,
         summary = "On-device Gemini Nano",
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        headerAction = {
-            PebbleActionButton(
-                label = "Summarize",
-                icon = Icons.Filled.AutoAwesome,
-                onClick = { vm.summarizeCar(v) },
-                pending = busy,
-            )
-        },
+        headerAction = PebbleHeaderAction(
+            label = "Summarize",
+            icon = Icons.Filled.AutoAwesome,
+            onClick = { vm.summarizeCar(v) },
+            pending = busy,
+        ),
     ) {
         if (summary != null) {
             Text(summary, style = MaterialTheme.typography.bodyMedium)
@@ -4387,7 +4385,7 @@ private fun Pebble(
     dragHandle: Modifier = Modifier,
     summary: String? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    headerAction: (@Composable () -> Unit)? = null,
+    headerAction: PebbleHeaderAction? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val forceExpanded = LocalForceExpanded.current
@@ -4573,15 +4571,28 @@ private fun PebbleActionButton(
     }
 }
 
+private class PebbleHeaderAction(
+    val label: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+    val enabled: Boolean = true,
+    val pending: Boolean = false,
+    val active: Boolean = false,
+    val spinning: Boolean = false,
+    val bounceIcon: Boolean = false,
+    val activeContainer: Color? = null,
+    val activeContent: Color? = null,
+    val isWarning: Boolean = false,
+)
+
 /**
  * Right-side expand control for pebbles that also have an action button.
- * The action (PebbleActionButton) sits on the left with a 3dp gap, then a
- * chevron-only pill button on the right that morphs to a rounded-square when
- * the section is expanded.
+ * Left half: the action (label + icon); right half: chevron nub. Together
+ * they form a connected split pill, identical in style to [PresetPill].
  */
 @Composable
 private fun SplitExpandButton(
-    action: @Composable () -> Unit,
+    action: PebbleHeaderAction,
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
@@ -4591,23 +4602,126 @@ private fun SplitExpandButton(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitChevron",
     )
+    val leftInteraction = remember { MutableInteractionSource() }
+    val leftPressed by leftInteraction.collectIsPressedAsState()
+    val morphed = action.active || leftPressed
+
+    val outer by animateDpAsState(
+        if (morphed) 16.dp else 50.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "splitOuter",
+    )
+    val inner by animateDpAsState(
+        if (morphed) 16.dp else 10.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "splitInner",
+    )
+
+    val defaultContainer = buttonContainer()
+    val leftBg by androidx.compose.animation.animateColorAsState(
+        when {
+            action.isWarning -> MaterialTheme.colorScheme.errorContainer
+            action.active -> (action.activeContainer ?: MaterialTheme.colorScheme.primary)
+            else -> defaultContainer
+        },
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "splitLeftBg",
+    )
+    val leftFg = when {
+        action.isWarning -> MaterialTheme.colorScheme.onErrorContainer
+        action.active -> (action.activeContent ?: MaterialTheme.colorScheme.onPrimary)
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
+    // Bounce animation for the location button's icon.
+    val bounceY = remember { Animatable(0f) }
+    val bounceScope = rememberCoroutineScope()
+    var bouncing by remember { mutableStateOf(false) }
+
+    // Spinning animation for the climate button's icon.
+    val spinAngle = remember { Animatable(0f) }
+    LaunchedEffect(action.spinning) {
+        if (action.spinning) {
+            spinAngle.animateTo(
+                targetValue = spinAngle.value + 360f,
+                animationSpec = tween(durationMillis = 850, easing = FastOutLinearInEasing),
+            )
+            while (true) {
+                spinAngle.animateTo(
+                    targetValue = spinAngle.value + 360f,
+                    animationSpec = tween(durationMillis = 600, easing = LinearEasing),
+                )
+            }
+        } else if (spinAngle.value != 0f) {
+            val target = kotlin.math.ceil(spinAngle.value / 360f) * 360f
+            spinAngle.animateTo(target, tween(durationMillis = 700, easing = LinearOutSlowInEasing))
+            spinAngle.snapTo(0f)
+        }
+    }
+
     Row(
+        modifier = Modifier.height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        action()
-        MorphButton(
-            onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
-            active = expanded,
-            activeContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            activeContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        // Left half — action button.
+        Surface(
+            onClick = {
+                if (action.bounceIcon) bounceScope.launch {
+                    bouncing = true
+                    bounceY.animateTo(-9f, spring(stiffness = Spring.StiffnessHigh))
+                    bounceY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                    bouncing = false
+                }
+                haptics?.click()
+                action.onClick()
+            },
+            enabled = action.enabled && !action.pending,
+            interactionSource = leftInteraction,
+            color = leftBg,
+            contentColor = leftFg,
+            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+            modifier = Modifier.fillMaxHeight(),
         ) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                modifier = Modifier.size(20.dp).rotate(rotation),
-            )
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .graphicsLayer { translationY = bounceY.value },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (action.pending && !bouncing) {
+                    LoadingIndicator(Modifier.size(16.dp))
+                } else {
+                    Icon(
+                        action.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp).rotate(spinAngle.value),
+                    )
+                }
+                if (action.label.isNotEmpty()) {
+                    Text(action.label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+            }
+        }
+        // Right half — chevron nub.
+        Surface(
+            onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+            modifier = Modifier.fillMaxHeight(),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.size(20.dp).rotate(rotation),
+                )
+            }
         }
     }
 }
@@ -4966,18 +5080,12 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
         summary = diagSummary,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        headerAction = if (hasWarning) ({
-            // Red warning chip; tapping it just expands the pebble like the arrow.
-            MorphButton(
-                onClick = { vm.togglePebble(v, "diagnostics") },
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                modifier = Modifier.heightIn(min = 42.dp),
-            ) {
-                Icon(Icons.Filled.Warning, contentDescription = "Has warnings", modifier = Modifier.size(18.dp))
-            }
-        }) else null,
+        headerAction = if (hasWarning) PebbleHeaderAction(
+            label = "",
+            icon = Icons.Filled.Warning,
+            onClick = { vm.togglePebble(v, "diagnostics") },
+            isWarning = true,
+        ) else null,
     ) {
         if (rows.isEmpty()) {
             Text(
@@ -5127,24 +5235,21 @@ private fun ClimatePebble(
             climateOn -> "On"
             else -> "Off"
         },
-        headerAction = {
-            PebbleActionButton(
-                label = when {
-                    climateOn && driving -> "On"
-                    climateOn -> "Stop"
-                    else -> "Start"
-                },
-                icon = Icons.Filled.AcUnit,
-                onClick = {
-                    if (climateOn) { vm.stopClimate(v); activePresetId = null } else startClimate()
-                },
-                // No remote climate commands while driving.
-                enabled = !driving,
-                pending = pending,
-                active = climateOn,
-                spinning = climateOn,
-            )
-        },
+        headerAction = PebbleHeaderAction(
+            label = when {
+                climateOn && driving -> "On"
+                climateOn -> "Stop"
+                else -> "Start"
+            },
+            icon = Icons.Filled.AcUnit,
+            onClick = {
+                if (climateOn) { vm.stopClimate(v); activePresetId = null } else startClimate()
+            },
+            enabled = !driving,
+            pending = pending,
+            active = climateOn,
+            spinning = climateOn,
+        ),
     ) {
         if (driving) {
             if (climateOn) {
@@ -5689,18 +5794,16 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     Pebble(
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
         summary = summary,
-        headerAction = {
-            PebbleActionButton(
-                label = if (charging) "Stop" else "Start",
-                icon = Icons.Filled.Bolt,
-                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
-                enabled = plugged,
-                pending = pending,
-                active = charging,
-                activeContainer = ChargeGreen,
-                activeContent = Color.White,
-            )
-        },
+        headerAction = PebbleHeaderAction(
+            label = if (charging) "Stop" else "Start",
+            icon = Icons.Filled.Bolt,
+            onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
+            enabled = plugged,
+            pending = pending,
+            active = charging,
+            activeContainer = ChargeGreen,
+            activeContent = Color.White,
+        ),
     ) {
         if (plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
@@ -5797,16 +5900,14 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     val summary = place ?: if (location != null) "Located" else "Not located yet"
     Pebble(
         v, "location", "Location", Icons.Filled.LocationOn, state, vm, dragHandle, summary = summary,
-        headerAction = {
-            PebbleActionButton(
-                label = "Locate",
-                icon = Icons.Filled.LocationOn,
-                onClick = { vm.locate(v) },
-                enabled = !locating,
-                pending = locating,
-                bounceIcon = true,
-            )
-        },
+        headerAction = PebbleHeaderAction(
+            label = "Locate",
+            icon = Icons.Filled.LocationOn,
+            onClick = { vm.locate(v) },
+            enabled = !locating,
+            pending = locating,
+            bounceIcon = true,
+        ),
     ) {
         if (location == null) {
             Text("Tap Locate to query the car's current position.")
@@ -5931,19 +6032,17 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
     }
     Pebble(
         v, "weather", "Weather", Icons.Filled.WbSunny, state, vm, dragHandle, summary = summary,
-        headerAction = {
-            PebbleActionButton(
-                label = "Refresh",
-                icon = Icons.Filled.Refresh,
-                onClick = {
-                    weatherSpinning = true
-                    spinStartedAt = System.currentTimeMillis()
-                    vm.loadHomeWeather(force = true)
-                },
-                enabled = hasLocation,
-                spinning = weatherSpinning,
-            )
-        },
+        headerAction = PebbleHeaderAction(
+            label = "Refresh",
+            icon = Icons.Filled.Refresh,
+            onClick = {
+                weatherSpinning = true
+                spinStartedAt = System.currentTimeMillis()
+                vm.loadHomeWeather(force = true)
+            },
+            enabled = hasLocation,
+            spinning = weatherSpinning,
+        ),
     ) {
         when {
             !hasLocation -> Text(

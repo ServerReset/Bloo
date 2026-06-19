@@ -48,6 +48,7 @@ import com.bloo.bluelink.R
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import kotlinx.coroutines.flow.first
 
 /**
  * The Bloo home-screen widget (Jetpack Glance).
@@ -101,6 +102,30 @@ class BlooWidget : GlanceAppWidget() {
         val pendingAction = cfg?.let { SettingsStore(context).widgetPendingAction(widgetId) }
         val locationAddress = cfg?.let { SettingsStore(context).widgetLocationAddress(widgetId) }
 
+        // Derive the accent colour from the app's selected palette (or per-car override).
+        // Used for default widget button backgrounds so they match the user's chosen theme.
+        val accentBg: ColorProvider
+        val accentFg = ColorProvider(Color.White)
+        run {
+            val appearance = SettingsStore(context).appearance.first()
+            val vin = snap?.vin
+            val customPalettes = appearance.customPalettes
+            val swatchArgb: Int = (
+                vin?.let { appearance.carCustomPaletteIds[it] }
+                    ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb }
+                    ?: appearance.activeCustomPaletteId
+                        ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb }
+                    ?: appearance.colorPalette.swatch.toArgb()
+            )
+            // Shift to a medium-value tone that reads on both light and dark backgrounds
+            // (roughly equivalent to Material TonalPalette P-50).
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(swatchArgb, hsv)
+            if (hsv[2] < 0.35f) hsv[2] = 0.55f  // boost very dark seeds
+            val accentColor = Color(android.graphics.Color.HSVToColor(hsv).toLong() and 0xFFFFFFFFL)
+            accentBg = ColorProvider(accentColor)
+        }
+
         provideContent {
             GlanceTheme {
                 val w = LocalSize.current.width
@@ -111,27 +136,27 @@ class BlooWidget : GlanceAppWidget() {
                 // unavailable (e.g. app not signed in), so show a softer placeholder.
                 when {
                     h < 60.dp -> when {
-                        snap != null -> CompactBody(widgetId, snap, actions, w, showBackground, widgetShape, pendingAction)
+                        snap != null -> CompactBody(widgetId, snap, actions, w, showBackground, widgetShape, pendingAction, accentBg, accentFg)
                         cfg == null  -> UnconfiguredCompact(widgetId)
                         else         -> UnavailableCompact(showBackground, widgetShape)
                     }
                     isPortrait && (w < 110.dp || h > w * 2.5f) -> when {
-                        snap != null -> NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
+                        snap != null -> NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, accentBg, accentFg)
                         cfg == null  -> UnconfiguredFull(widgetId)
                         else         -> UnavailableFull(showBackground, widgetShape)
                     }
                     !isPortrait && w > h * 2.2f -> when {
-                        snap != null -> WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
+                        snap != null -> WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, accentBg, accentFg)
                         cfg == null  -> UnconfiguredCompact(widgetId)
                         else         -> UnavailableCompact(showBackground, widgetShape)
                     }
                     isPortrait -> when {
-                        snap != null -> PortraitBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
+                        snap != null -> PortraitBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction, accentBg, accentFg)
                         cfg == null  -> UnconfiguredFull(widgetId)
                         else         -> UnavailableFull(showBackground, widgetShape)
                     }
                     else -> when {
-                        snap != null -> LandscapeBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
+                        snap != null -> LandscapeBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction, accentBg, accentFg)
                         cfg == null  -> UnconfiguredFull(widgetId)
                         else         -> UnavailableFull(showBackground, widgetShape)
                     }
@@ -218,6 +243,8 @@ class BlooWidget : GlanceAppWidget() {
         showBackground: Boolean,
         widgetShape: String,
         pendingAction: String?,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         val context = LocalContext.current
         val isPill = widgetShape == "pill"
@@ -264,8 +291,26 @@ class BlooWidget : GlanceAppWidget() {
                     val isPending = pendingAction == action.key
                     val isClimateActive = snap.climateOn == true &&
                         action.key in listOf("climate", "climate_on", "climate_off")
-                    val bgColor = if (isClimateActive) GlanceTheme.colors.tertiary else GlanceTheme.colors.secondaryContainer
-                    val iconColor = if (isClimateActive) GlanceTheme.colors.onTertiary else GlanceTheme.colors.onSecondaryContainer
+                    val isLockAction = action.key in listOf("doors", "lock", "unlock")
+                    val isLocked = snap.locked
+                    val isLockedState = isLockAction && isLocked == true
+                    val isUnlockedState = isLockAction && isLocked == false
+                    val isChargeActive = snap.charging == true &&
+                        action.key in listOf("charge", "start_charge", "stop_charge")
+                    val bgColor = when {
+                        isPending -> GlanceTheme.colors.secondaryContainer
+                        isClimateActive -> GlanceTheme.colors.tertiary
+                        isChargeActive -> ColorProvider(Color(0xFF2EBD59))
+                        isLockedState -> GlanceTheme.colors.primary
+                        isUnlockedState -> GlanceTheme.colors.error
+                        else -> accentBg
+                    }
+                    val iconColor = when {
+                        isPending -> GlanceTheme.colors.onSecondaryContainer
+                        isClimateActive -> GlanceTheme.colors.onTertiary
+                        isChargeActive || isLockedState || isUnlockedState -> accentFg
+                        else -> accentFg
+                    }
                     val iconRes = when {
                         isPending -> R.drawable.ic_widget_refresh
                         isClimateActive -> R.drawable.ic_widget_climate_active
@@ -313,6 +358,8 @@ class BlooWidget : GlanceAppWidget() {
         showBackground: Boolean,
         widgetShape: String,
         pendingAction: String?,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         val context = LocalContext.current
         val isPill = widgetShape == "pill"
@@ -406,17 +453,33 @@ class BlooWidget : GlanceAppWidget() {
                         val isPending = pendingAction == action.key
                         val isClimateActive = snap.climateOn == true &&
                             action.key in listOf("climate", "climate_on", "climate_off")
+                        val isLockAction = action.key in listOf("doors", "lock", "unlock")
                         val isLocked = snap.locked
+                        val isLockedState = isLockAction && isLocked == true
+                        val isUnlockedState = isLockAction && isLocked == false
+                        val isChargeActive = snap.charging == true &&
+                            action.key in listOf("charge", "start_charge", "stop_charge")
                         val lockCorner = when {
-                            action.key in listOf("doors", "lock", "unlock") -> when (isLocked) {
+                            isLockAction -> when (isLocked) {
                                 true -> 17.dp
                                 false -> 7.dp
                                 null -> 17.dp
                             }
                             else -> 17.dp
                         }
-                        val bgColor = if (isClimateActive) GlanceTheme.colors.tertiary else GlanceTheme.colors.secondaryContainer
-                        val iconColor = if (isClimateActive) GlanceTheme.colors.onTertiary else GlanceTheme.colors.onSecondaryContainer
+                        val bgColor = when {
+                            isPending -> GlanceTheme.colors.secondaryContainer
+                            isClimateActive -> GlanceTheme.colors.tertiary
+                            isChargeActive -> ColorProvider(Color(0xFF2EBD59))
+                            isLockedState -> GlanceTheme.colors.primary
+                            isUnlockedState -> GlanceTheme.colors.error
+                            else -> accentBg
+                        }
+                        val iconColor = when {
+                            isPending -> GlanceTheme.colors.onSecondaryContainer
+                            isClimateActive -> GlanceTheme.colors.onTertiary
+                            else -> accentFg
+                        }
                         val iconRes = when {
                             isPending -> R.drawable.ic_widget_refresh
                             isClimateActive -> R.drawable.ic_widget_climate_active
@@ -460,6 +523,8 @@ class BlooWidget : GlanceAppWidget() {
         showBackground: Boolean,
         widgetShape: String,
         pendingAction: String?,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         val context = LocalContext.current
         val isPill = widgetShape == "pill"
@@ -511,11 +576,11 @@ class BlooWidget : GlanceAppWidget() {
                 ) {
                     actions.take(4).forEachIndexed { i, action ->
                         if (i > 0) Spacer(GlanceModifier.width(gap))
-                        ActionPill(widgetId, snap.vin, action, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
+                        ActionPill(widgetId, snap.vin, action, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, accentBg, accentFg)
                     }
                     repeat((4 - actions.size).coerceAtLeast(0)) { i ->
                         if (actions.isNotEmpty() || i > 0) Spacer(GlanceModifier.width(gap))
-                        ActionPill(widgetId, snap.vin, null, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
+                        ActionPill(widgetId, snap.vin, null, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, accentBg, accentFg)
                     }
                 }
             }
@@ -541,6 +606,8 @@ class BlooWidget : GlanceAppWidget() {
         widgetShape: String,
         locationAddress: String?,
         pendingAction: String?,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         val context = LocalContext.current
         val showPhoto = photoBitmap != null && h >= 200.dp
@@ -606,6 +673,8 @@ class BlooWidget : GlanceAppWidget() {
                     gap = gap,
                     pendingAction = pendingAction,
                     snap = snap,
+                    accentBg = accentBg,
+                    accentFg = accentFg,
                 )
             }
         }
@@ -689,6 +758,8 @@ class BlooWidget : GlanceAppWidget() {
         gap: Dp,
         pendingAction: String?,
         snap: VehicleSnapshot,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         Column(
             modifier = GlanceModifier.fillMaxWidth(),
@@ -696,7 +767,7 @@ class BlooWidget : GlanceAppWidget() {
         ) {
             repeat(4) { i ->
                 if (i > 0) Spacer(GlanceModifier.height(gap))
-                ActionPill(widgetId, vin, actions.getOrNull(i), pillH, GlanceModifier.fillMaxWidth(), pendingAction, snap)
+                ActionPill(widgetId, vin, actions.getOrNull(i), pillH, GlanceModifier.fillMaxWidth(), pendingAction, snap, accentBg, accentFg)
             }
         }
     }
@@ -720,6 +791,8 @@ class BlooWidget : GlanceAppWidget() {
         widgetShape: String,
         locationAddress: String?,
         pendingAction: String?,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         val context = LocalContext.current
         val showPhoto = photoBitmap != null && h >= 160.dp
@@ -788,6 +861,8 @@ class BlooWidget : GlanceAppWidget() {
                                else GlanceModifier.fillMaxWidth().fillMaxHeight(),
                     pendingAction = pendingAction,
                     snap = snap,
+                    accentBg = accentBg,
+                    accentFg = accentFg,
                 )
             }
         }
@@ -870,12 +945,14 @@ class BlooWidget : GlanceAppWidget() {
         modifier: GlanceModifier,
         pendingAction: String?,
         snap: VehicleSnapshot,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         val pillH = ((contentH - gap) / 2).coerceIn(26.dp, 56.dp)
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-            GridRow(widgetId, vin, actions.getOrNull(0), actions.getOrNull(1), cols, pillH, gap, pendingAction, snap)
+            GridRow(widgetId, vin, actions.getOrNull(0), actions.getOrNull(1), cols, pillH, gap, pendingAction, snap, accentBg, accentFg)
             Spacer(GlanceModifier.height(gap))
-            GridRow(widgetId, vin, actions.getOrNull(2), actions.getOrNull(3), cols, pillH, gap, pendingAction, snap)
+            GridRow(widgetId, vin, actions.getOrNull(2), actions.getOrNull(3), cols, pillH, gap, pendingAction, snap, accentBg, accentFg)
         }
     }
 
@@ -890,12 +967,14 @@ class BlooWidget : GlanceAppWidget() {
         gap: Dp,
         pendingAction: String?,
         snap: VehicleSnapshot,
+        accentBg: ColorProvider,
+        accentFg: ColorProvider,
     ) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            ActionPill(widgetId, vin, first, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
+            ActionPill(widgetId, vin, first, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, accentBg, accentFg)
             if (cols >= 2) {
                 Spacer(GlanceModifier.width(gap))
-                ActionPill(widgetId, vin, second, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
+                ActionPill(widgetId, vin, second, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, accentBg, accentFg)
             }
         }
     }
@@ -909,6 +988,8 @@ class BlooWidget : GlanceAppWidget() {
         modifier: GlanceModifier,
         pendingAction: String? = null,
         snap: VehicleSnapshot? = null,
+        accentBg: ColorProvider = GlanceTheme.colors.secondaryContainer,
+        accentFg: ColorProvider = GlanceTheme.colors.onSecondaryContainer,
     ) {
         val context = LocalContext.current
         if (action == null) {
@@ -920,9 +1001,24 @@ class BlooWidget : GlanceAppWidget() {
             action.key in listOf("climate", "climate_on", "climate_off")
         val isLockAction = action.key in listOf("doors", "lock", "unlock")
         val isLocked = snap?.locked
+        val isLockedState = isLockAction && isLocked == true
+        val isUnlockedState = isLockAction && isLocked == false
+        val isChargeActive = snap?.charging == true &&
+            action.key in listOf("charge", "start_charge", "stop_charge")
 
-        val bgColor = if (isClimateActive) GlanceTheme.colors.tertiary else GlanceTheme.colors.secondaryContainer
-        val iconColor = if (isClimateActive) GlanceTheme.colors.onTertiary else GlanceTheme.colors.onSecondaryContainer
+        val bgColor = when {
+            isPending -> GlanceTheme.colors.secondaryContainer
+            isClimateActive -> GlanceTheme.colors.tertiary
+            isChargeActive -> ColorProvider(Color(0xFF2EBD59))
+            isLockedState -> GlanceTheme.colors.primary
+            isUnlockedState -> GlanceTheme.colors.error
+            else -> accentBg
+        }
+        val iconColor = when {
+            isPending -> GlanceTheme.colors.onSecondaryContainer
+            isClimateActive -> GlanceTheme.colors.onTertiary
+            else -> accentFg
+        }
         val iconRes = when {
             isPending -> R.drawable.ic_widget_refresh
             isClimateActive -> R.drawable.ic_widget_climate_active

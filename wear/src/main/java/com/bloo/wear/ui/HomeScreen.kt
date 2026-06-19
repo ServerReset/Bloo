@@ -269,6 +269,9 @@ private fun CarColumn(
     val initialIndex = if (infinite) (cycles / 2) * tileCount + summaryIdx else summaryIdx
 
     val state = listStates.getOrPut(car.vin) { ScalingLazyListState(initialIndex) }
+    // ScalingLazyListScope only has items(List<T>), not items(count). Build the
+    // virtual index list once so the key lambda receives unique ints.
+    val virtualList = remember(total) { List(total) { it } }
 
     // When tiles reorder or alerts appear/disappear, scroll back to summary so the
     // new order is immediately visible. `initialised` skips the first composition
@@ -347,7 +350,7 @@ private fun CarColumn(
             contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(count = total, key = { it }) { i ->
+            items(items = virtualList, key = { it }) { i ->
                 TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
