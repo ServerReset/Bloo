@@ -1349,13 +1349,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val startedAt = System.currentTimeMillis()
             _state.update { it.copy(pending = it.pending + key, message = null) }
+            // Apply the optimistic state and persist it immediately so the widget
+            // reflects the expected outcome before the network round-trip completes.
+            if (optimistic != null) {
+                _state.update { st ->
+                    if (st.statuses[vin] != null) {
+                        st.copy(statuses = st.statuses + (vin to optimistic(st.statuses.getValue(vin))))
+                    } else st
+                }
+                persistSnapshots()
+            }
             try {
                 // Serialize with status fetches: Hyundai rejects overlapping
                 // requests with "a previous request is pending".
                 statusMutex.withLock { block() }
                 AppLog.log(success)
-                // Success is shown through the control's state (no toast); only
-                // optimistically flip the cached status so the toggle updates.
+                // Confirm the optimistic state (or reapply if it wasn't set above).
                 _state.update { st ->
                     val statuses = if (optimistic != null && st.statuses[vin] != null) {
                         st.statuses + (vin to optimistic(st.statuses.getValue(vin)))
@@ -1371,6 +1380,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val msg = e.message ?: "Command failed"
                 AppLog.log("⚠ $msg")
                 _state.update { it.copy(message = msg) }
+                // Revert the optimistic state on failure by scheduling a fresh refresh.
+                viewModelScope.launch {
+                    _state.value.vehicles.firstOrNull { it.vin == vin }?.let { refreshStatus(it) }
+                }
             } finally {
                 // Keep the control locked for at least MIN_COMMAND_LOCK_MS after a
                 // command so a quick double-tap can't fire an overlapping request

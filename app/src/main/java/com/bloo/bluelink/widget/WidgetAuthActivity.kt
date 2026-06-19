@@ -1,7 +1,6 @@
 package com.bloo.bluelink.widget
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -11,13 +10,8 @@ import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.SnapshotStore
-import com.bloo.bluelink.data.WearCommand
-import com.bloo.bluelink.data.WearCommandRunner
 import androidx.glance.appwidget.updateAll
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * A transparent activity that gates a widget button behind a biometric / device-
@@ -71,58 +65,19 @@ class WidgetAuthActivity : FragmentActivity() {
     }
 
     private fun run(action: WidgetAction, vin: String) {
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) { execute(action, vin) }
+        if (action.kind == WidgetAction.Kind.OPEN) {
+            openApp(vin)
             finish()
+            return
         }
-    }
-
-    private suspend fun execute(action: WidgetAction, vin: String) {
-        val ctx = applicationContext
-        when (action.kind) {
-            WidgetAction.Kind.COMMAND ->
-                action.wearAction?.let { WearCommandRunner.execute(ctx, WearCommand(vin, it)) }
-
-            WidgetAction.Kind.REFRESH -> WearCommandRunner.refresh(ctx, vin)
-
-            WidgetAction.Kind.LOCATION -> {
-                WearCommandRunner.refresh(ctx, vin)
-                val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
-                val lat = snap?.lat
-                val lon = snap?.lon
-                if (lat != null && lon != null) {
-                    // Geocode and save the address so the widget can display it.
-                    runCatching {
-                        val results = android.location.Geocoder(ctx, java.util.Locale.getDefault())
-                            .getFromLocation(lat, lon, 1)
-                        val addr = results?.firstOrNull()?.let { a ->
-                            buildString {
-                                if (!a.thoroughfare.isNullOrBlank()) append(a.thoroughfare)
-                                if (!a.subThoroughfare.isNullOrBlank()) { if (isNotEmpty()) insert(0, "${a.subThoroughfare} ") }
-                                if (!a.locality.isNullOrBlank()) { if (isNotEmpty()) append(", "); append(a.locality) }
-                            }.takeIf { it.isNotBlank() } ?: a.getAddressLine(0)
-                        }
-                        if (!addr.isNullOrBlank()) {
-                            SettingsStore(ctx).setWidgetLocationAddress(widgetId, addr)
-                        }
-                    }
-                }
-            }
-
-            WidgetAction.Kind.OPEN -> openApp(vin)
-        }
-        runCatching { BlooWidget().updateAll(ctx) }
-    }
-
-    private fun openMaps(lat: Double, lon: Double) {
-        val uri = Uri.parse("geo:$lat,$lon?q=$lat,$lon(Car)")
-        val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { startActivity(intent) }.onFailure {
-            val web = Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lon"),
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { startActivity(web) }
+        lifecycleScope.launch {
+            val ctx = applicationContext
+            // Save pending action so the widget shows a loading state immediately.
+            SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key)
+            runCatching { BlooWidget().updateAll(ctx) }
+            // Queue the actual work; finish right away so the home screen is unblocked.
+            WidgetCommandWorker.enqueue(ctx, widgetId, vin, action)
+            finish()
         }
     }
 

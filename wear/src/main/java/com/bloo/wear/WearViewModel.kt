@@ -604,6 +604,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 publish()
                 sessionFetched.remove(vin)
                 refreshStatus(vin, surface = false)
+                runCatching {
+                    androidx.wear.tiles.TileService.getUpdater(ctx)
+                        .requestUpdate(com.bloo.wear.tile.BlooTileService::class.java)
+                }
             }.onFailure { e ->
                 val relayed = runCatching { WearComms.send(ctx, toWearCommand(vin, action)) }.isSuccess
                 if (!relayed) _ui.update { it.copy(message = e.message ?: "Command failed") }

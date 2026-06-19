@@ -44,6 +44,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.bloo.bluelink.R
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleSnapshot
@@ -97,6 +98,7 @@ class BlooWidget : GlanceAppWidget() {
 
         val showBackground = cfg?.let { SettingsStore(context).widgetShowBackground(widgetId) } ?: true
         val widgetShape = cfg?.let { SettingsStore(context).widgetShape(widgetId) } ?: "rect"
+        val pendingAction = cfg?.let { SettingsStore(context).widgetPendingAction(widgetId) }
         val locationAddress = cfg?.let { SettingsStore(context).widgetLocationAddress(widgetId) }
 
         provideContent {
@@ -107,16 +109,16 @@ class BlooWidget : GlanceAppWidget() {
                 // Layout tier selection — order matters: NarrowTall must precede WideRow/Portrait.
                 when {
                     h < 60.dp -> if (snap == null) UnconfiguredCompact(widgetId)
-                                 else CompactBody(widgetId, snap, actions, w)
+                                 else CompactBody(widgetId, snap, actions, w, showBackground, widgetShape, pendingAction)
                     isPortrait && (w < 110.dp || h > w * 2.5f) ->
                                  if (snap == null) UnconfiguredFull(widgetId)
-                                 else NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape)
+                                 else NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
                     !isPortrait && w > h * 2.2f -> if (snap == null) UnconfiguredCompact(widgetId)
-                                               else WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape)
+                                               else WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction)
                     isPortrait -> if (snap == null) UnconfiguredFull(widgetId)
-                                  else PortraitBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress)
+                                  else PortraitBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
                     else       -> if (snap == null) UnconfiguredFull(widgetId)
-                                  else LandscapeBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress)
+                                  else LandscapeBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress, pendingAction)
                 }
             }
         }
@@ -175,67 +177,78 @@ class BlooWidget : GlanceAppWidget() {
         snap: VehicleSnapshot,
         actions: List<WidgetAction>,
         w: Dp,
+        showBackground: Boolean,
+        widgetShape: String,
+        pendingAction: String?,
     ) {
         val context = LocalContext.current
-        // Reserve ~100dp for the status cluster + 5dp gap per button at 34dp each.
+        val isPill = widgetShape == "pill"
+        val corner = if (isPill) 28.dp else 20.dp
+        val hPad = if (isPill) 14.dp else 10.dp
+        // Reserve space for the status cluster + 5dp gap per 34dp button.
         val maxButtons = ((w - 110.dp) / 39.dp).toInt().coerceIn(0, 4)
         val showState = w >= 150.dp
-        Row(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .background(GlanceTheme.colors.widgetBackground)
-                .cornerRadius(20.dp)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-                .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = GlanceModifier.defaultWeight(),
+
+        val boxMod = if (showBackground) {
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        } else {
+            GlanceModifier.fillMaxSize().cornerRadius(corner)
+        }
+
+        Box(modifier = boxMod) {
+            Row(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(horizontal = hPad, vertical = 4.dp)
+                    .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Car name is always present — the essential context even at the
-                // smallest size.
-                Text(
-                    snap.name,
-                    maxLines = 1,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 10.sp,
-                    ),
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = GlanceModifier.defaultWeight()) {
                     Text(
-                        snap.percent?.let { "$it%" } ?: "—",
+                        snap.name,
                         maxLines = 1,
-                        style = TextStyle(
-                            color = GlanceTheme.colors.onSurface,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                        ),
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = 10.sp),
                     )
-                    if (showState) {
-                        Spacer(GlanceModifier.width(7.dp))
-                        val (label, color) = stateOf(snap)
-                        Text(label, maxLines = 1, style = TextStyle(color = color, fontWeight = FontWeight.Medium, fontSize = 12.sp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            snap.percent?.let { "$it%" } ?: "—",
+                            maxLines = 1,
+                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp),
+                        )
+                        if (showState) {
+                            Spacer(GlanceModifier.width(7.dp))
+                            val (label, color) = stateOf(snap)
+                            Text(label, maxLines = 1, style = TextStyle(color = color, fontWeight = FontWeight.Medium, fontSize = 12.sp))
+                        }
                     }
                 }
-            }
-            actions.take(maxButtons).forEach { action ->
-                Spacer(GlanceModifier.width(5.dp))
-                Box(
-                    modifier = GlanceModifier
-                        .size(34.dp)
-                        .background(GlanceTheme.colors.secondaryContainer)
-                        .cornerRadius(17.dp)
-                        .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(
-                        provider = ImageProvider(action.icon),
-                        contentDescription = action.label,
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
-                        modifier = GlanceModifier.size(17.dp),
-                    )
+                actions.take(maxButtons).forEach { action ->
+                    val isPending = pendingAction == action.key
+                    val isClimateActive = snap.climateOn == true &&
+                        action.key in listOf("climate", "climate_on", "climate_off")
+                    val bgColor = if (isClimateActive) GlanceTheme.colors.tertiary else GlanceTheme.colors.secondaryContainer
+                    val iconColor = if (isClimateActive) GlanceTheme.colors.onTertiary else GlanceTheme.colors.onSecondaryContainer
+                    val iconRes = when {
+                        isPending -> R.drawable.ic_widget_refresh
+                        isClimateActive -> R.drawable.ic_widget_climate_active
+                        else -> action.icon
+                    }
+                    Spacer(GlanceModifier.width(5.dp))
+                    Box(
+                        modifier = GlanceModifier
+                            .size(34.dp)
+                            .background(bgColor)
+                            .cornerRadius(17.dp)
+                            .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            provider = ImageProvider(iconRes),
+                            contentDescription = action.label,
+                            colorFilter = ColorFilter.tint(iconColor),
+                            modifier = GlanceModifier.size(17.dp),
+                        )
+                    }
                 }
             }
         }
@@ -261,6 +274,7 @@ class BlooWidget : GlanceAppWidget() {
         h: Dp,
         showBackground: Boolean,
         widgetShape: String,
+        pendingAction: String?,
     ) {
         val context = LocalContext.current
         val isPill = widgetShape == "pill"
@@ -351,19 +365,38 @@ class BlooWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.height(gap))
                     actions.take(maxButtons).forEachIndexed { i, action ->
                         if (i > 0) Spacer(GlanceModifier.height(gap))
+                        val isPending = pendingAction == action.key
+                        val isClimateActive = snap.climateOn == true &&
+                            action.key in listOf("climate", "climate_on", "climate_off")
+                        val isLocked = snap.locked
+                        val lockCorner = when {
+                            action.key in listOf("doors", "lock", "unlock") -> when (isLocked) {
+                                true -> 17.dp
+                                false -> 7.dp
+                                null -> 17.dp
+                            }
+                            else -> 17.dp
+                        }
+                        val bgColor = if (isClimateActive) GlanceTheme.colors.tertiary else GlanceTheme.colors.secondaryContainer
+                        val iconColor = if (isClimateActive) GlanceTheme.colors.onTertiary else GlanceTheme.colors.onSecondaryContainer
+                        val iconRes = when {
+                            isPending -> R.drawable.ic_widget_refresh
+                            isClimateActive -> R.drawable.ic_widget_climate_active
+                            else -> action.icon
+                        }
                         Box(
                             modifier = GlanceModifier
                                 .fillMaxWidth()
                                 .height(34.dp)
-                                .background(GlanceTheme.colors.secondaryContainer)
-                                .cornerRadius(17.dp)
+                                .background(bgColor)
+                                .cornerRadius(lockCorner)
                                 .clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, action))),
                             contentAlignment = Alignment.Center,
                         ) {
                             Image(
-                                provider = ImageProvider(action.icon),
+                                provider = ImageProvider(iconRes),
                                 contentDescription = action.label,
-                                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
+                                colorFilter = ColorFilter.tint(iconColor),
                                 modifier = GlanceModifier.size(17.dp),
                             )
                         }
@@ -388,6 +421,7 @@ class BlooWidget : GlanceAppWidget() {
         h: Dp,
         showBackground: Boolean,
         widgetShape: String,
+        pendingAction: String?,
     ) {
         val context = LocalContext.current
         val isPill = widgetShape == "pill"
@@ -439,11 +473,11 @@ class BlooWidget : GlanceAppWidget() {
                 ) {
                     actions.take(4).forEachIndexed { i, action ->
                         if (i > 0) Spacer(GlanceModifier.width(gap))
-                        ActionPill(widgetId, snap.vin, action, pillH, GlanceModifier.defaultWeight())
+                        ActionPill(widgetId, snap.vin, action, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
                     }
                     repeat((4 - actions.size).coerceAtLeast(0)) { i ->
                         if (actions.isNotEmpty() || i > 0) Spacer(GlanceModifier.width(gap))
-                        ActionPill(widgetId, snap.vin, null, pillH, GlanceModifier.defaultWeight())
+                        ActionPill(widgetId, snap.vin, null, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
                     }
                 }
             }
@@ -468,6 +502,7 @@ class BlooWidget : GlanceAppWidget() {
         showBackground: Boolean,
         widgetShape: String,
         locationAddress: String?,
+        pendingAction: String?,
     ) {
         val context = LocalContext.current
         val showPhoto = photoBitmap != null && h >= 200.dp
@@ -531,6 +566,8 @@ class BlooWidget : GlanceAppWidget() {
                     actions = actions,
                     pillH = pillH,
                     gap = gap,
+                    pendingAction = pendingAction,
+                    snap = snap,
                 )
             }
         }
@@ -612,6 +649,8 @@ class BlooWidget : GlanceAppWidget() {
         actions: List<WidgetAction>,
         pillH: Dp,
         gap: Dp,
+        pendingAction: String?,
+        snap: VehicleSnapshot,
     ) {
         Column(
             modifier = GlanceModifier.fillMaxWidth(),
@@ -619,7 +658,7 @@ class BlooWidget : GlanceAppWidget() {
         ) {
             repeat(4) { i ->
                 if (i > 0) Spacer(GlanceModifier.height(gap))
-                ActionPill(widgetId, vin, actions.getOrNull(i), pillH, GlanceModifier.fillMaxWidth())
+                ActionPill(widgetId, vin, actions.getOrNull(i), pillH, GlanceModifier.fillMaxWidth(), pendingAction, snap)
             }
         }
     }
@@ -642,6 +681,7 @@ class BlooWidget : GlanceAppWidget() {
         showBackground: Boolean,
         widgetShape: String,
         locationAddress: String?,
+        pendingAction: String?,
     ) {
         val context = LocalContext.current
         val showPhoto = photoBitmap != null && h >= 160.dp
@@ -708,6 +748,8 @@ class BlooWidget : GlanceAppWidget() {
                     gap = gap,
                     modifier = if (showStatus) GlanceModifier.defaultWeight().fillMaxHeight()
                                else GlanceModifier.fillMaxWidth().fillMaxHeight(),
+                    pendingAction = pendingAction,
+                    snap = snap,
                 )
             }
         }
@@ -788,12 +830,14 @@ class BlooWidget : GlanceAppWidget() {
         contentH: Dp,
         gap: Dp,
         modifier: GlanceModifier,
+        pendingAction: String?,
+        snap: VehicleSnapshot,
     ) {
         val pillH = ((contentH - gap) / 2).coerceIn(26.dp, 56.dp)
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-            GridRow(widgetId, vin, actions.getOrNull(0), actions.getOrNull(1), cols, pillH, gap)
+            GridRow(widgetId, vin, actions.getOrNull(0), actions.getOrNull(1), cols, pillH, gap, pendingAction, snap)
             Spacer(GlanceModifier.height(gap))
-            GridRow(widgetId, vin, actions.getOrNull(2), actions.getOrNull(3), cols, pillH, gap)
+            GridRow(widgetId, vin, actions.getOrNull(2), actions.getOrNull(3), cols, pillH, gap, pendingAction, snap)
         }
     }
 
@@ -806,12 +850,14 @@ class BlooWidget : GlanceAppWidget() {
         cols: Int,
         pillH: Dp,
         gap: Dp,
+        pendingAction: String?,
+        snap: VehicleSnapshot,
     ) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            ActionPill(widgetId, vin, first, pillH, GlanceModifier.defaultWeight())
+            ActionPill(widgetId, vin, first, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
             if (cols >= 2) {
                 Spacer(GlanceModifier.width(gap))
-                ActionPill(widgetId, vin, second, pillH, GlanceModifier.defaultWeight())
+                ActionPill(widgetId, vin, second, pillH, GlanceModifier.defaultWeight(), pendingAction, snap)
             }
         }
     }
@@ -823,25 +869,50 @@ class BlooWidget : GlanceAppWidget() {
         action: WidgetAction?,
         pillH: Dp,
         modifier: GlanceModifier,
+        pendingAction: String? = null,
+        snap: VehicleSnapshot? = null,
     ) {
         val context = LocalContext.current
         if (action == null) {
             Box(modifier.height(pillH)) {}
             return
         }
+        val isPending = pendingAction == action.key
+        val isClimateActive = snap?.climateOn == true &&
+            action.key in listOf("climate", "climate_on", "climate_off")
+        val isLockAction = action.key in listOf("doors", "lock", "unlock")
+        val isLocked = snap?.locked
+
+        val bgColor = if (isClimateActive) GlanceTheme.colors.tertiary else GlanceTheme.colors.secondaryContainer
+        val iconColor = if (isClimateActive) GlanceTheme.colors.onTertiary else GlanceTheme.colors.onSecondaryContainer
+        val iconRes = when {
+            isPending -> R.drawable.ic_widget_refresh
+            isClimateActive -> R.drawable.ic_widget_climate_active
+            else -> action.icon
+        }
+        // Lock/unlock morph: pill shape when locked, rounded-square when unlocked
+        val corner = when {
+            isLockAction -> when (isLocked) {
+                true -> pillH / 2
+                false -> pillH * 0.2f
+                null -> pillH / 2
+            }
+            else -> pillH / 2
+        }
+
         val iconSize = (pillH * 0.46f).coerceIn(14.dp, 24.dp)
         Box(
             modifier = modifier
                 .height(pillH)
-                .background(GlanceTheme.colors.secondaryContainer)
-                .cornerRadius(pillH / 2)
+                .background(bgColor)
+                .cornerRadius(corner)
                 .clickable(actionStartActivity(authIntent(context, widgetId, vin, action))),
             contentAlignment = Alignment.Center,
         ) {
             Image(
-                provider = ImageProvider(action.icon),
+                provider = ImageProvider(iconRes),
                 contentDescription = action.label,
-                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
+                colorFilter = ColorFilter.tint(iconColor),
                 modifier = GlanceModifier.size(iconSize),
             )
         }

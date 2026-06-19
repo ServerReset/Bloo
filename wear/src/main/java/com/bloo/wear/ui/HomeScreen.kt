@@ -57,7 +57,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -120,8 +119,6 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private fun wrap(index: Int, count: Int) = ((index % count) + count) % count
-
 /** Synthetic tile key for the alerts card (not part of the user-orderable set). */
 private const val TILE_ALERTS = "alerts"
 
@@ -157,26 +154,14 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
         return
     }
     val count = ui.cars.size
-    val loop = count > 1
-    val virtual = if (loop) count * 50 else count
 
-    // key() resets the pager when the VIN list changes (e.g. cars added/removed).
     key(ui.cars.map { it.vin }) {
-        val carPager = rememberPagerState(initialPage = if (loop) virtual / 2 else 0) { virtual }
+        val carPager = rememberPagerState(initialPage = 0) { count }
 
-        // Per-car scroll state, hoisted above the pager so it survives a page
-        // being disposed (swiped away) or toggled to its cheap preview. Without
-        // this the list reset to the summary tile on every recomposition.
         val listStates = remember { mutableStateMapOf<String, ScalingLazyListState>() }
 
-        // The one car the user is actually on. Driven by settledPage so it only
-        // changes once a swipe comes to rest — never mid-gesture.
-        val activeCarIndex by remember {
-            derivedStateOf { wrap(carPager.settledPage, count) }
-        }
+        val activeCarIndex by remember { derivedStateOf { carPager.settledPage } }
 
-        // Only fetch a car's status once it actually settles on a *new* VIN, so a
-        // swipe doesn't churn through cars or re-trigger fetches mid-gesture.
         var lastShownVin by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(activeCarIndex) {
             val vin = ui.cars.getOrNull(activeCarIndex)?.vin
@@ -189,27 +174,25 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
         Box(Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = carPager,
-                // Pre-compose adjacent pages so the swipe starts against an
-                // already-measured layout — no first-frame stutter.
-                beyondViewportPageCount = 1,
+                beyondViewportPageCount = 0,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
-                val car = ui.cars[wrap(page, count)]
-                // active = settled on this car AND finger is off the pager.
-                // Adjacent pages stay in composition (for instant swipe) but
-                // their CarColumn is non-focusable → no bezel conflict.
-                val active = wrap(page, count) == activeCarIndex && !carPager.isScrollInProgress
+                val car = ui.cars[page]
+                val active = page == activeCarIndex && !carPager.isScrollInProgress
                 val carRoles = ui.settings?.carColors?.get(car.vin)
-                val body: @Composable () -> Unit = {
-                    CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
-                }
-                if (carRoles != null) {
-                    MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
+                if (active) {
+                    val body: @Composable () -> Unit = {
+                        CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, true)
+                    }
+                    if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
+                    else body()
                 } else {
-                    body()
+                    val body: @Composable () -> Unit = { CarPreview(car, ui) }
+                    if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
+                    else body()
                 }
             }
-            CurvedIndicator(count, wrap(carPager.currentPage, count), anchor = 90f)
+            CurvedIndicator(count, carPager.currentPage, anchor = 90f)
         }
     }
 }
@@ -273,16 +256,9 @@ private fun CarColumn(
 
     val tiles = remember(ui.pebbleOverride, ui.settings, ui.presets, ui.extras, car) { visibleTiles(ui, car) }
     val tileCount = tiles.size
-    // Wrap-around (endless) scrolling once there's more than one tile.
-    val infinite = tileCount > 1
-    val cycles = if (infinite) 200 else 1
-    val total = tileCount * cycles
     val summaryIdx = tiles.indexOf(WearTiles.SUMMARY).coerceAtLeast(0)
-    val initialIndex = if (infinite) (cycles / 2) * tileCount + summaryIdx else summaryIdx
 
-    // One scroll state per car, kept alive in the hoisted map so the user's tile
-    // position is preserved across recompositions and page preview swaps.
-    val state = listStates.getOrPut(car.vin) { ScalingLazyListState(initialIndex) }
+    val state = listStates.getOrPut(car.vin) { ScalingLazyListState(summaryIdx) }
 
     // Claim rotary focus when this page becomes active. Adjacent pre-composed
     // pages skip this so only the settled page owns the crown/bezel.
@@ -307,21 +283,7 @@ private fun CarColumn(
             }?.index ?: 0
         }
     }
-    val centerTile = if (tileCount > 0) tiles[wrap(centerItemIndex, tileCount)] else ""
-
-    // Wrap-around guardian: when near either end of the virtual list, instantly
-    // jump to the middle band so we never hit the hard boundary.
-    LaunchedEffect(Unit) {
-        snapshotFlow { centerItemIndex to state.isScrollInProgress }
-            .collect { (idx, scrolling) ->
-                if (infinite && !scrolling && rotaryJob?.isActive != true) {
-                    if (idx < tileCount * 2 || idx > total - tileCount * 2) {
-                        val phase = wrap(idx, tileCount)
-                        state.scrollToItem((cycles / 2) * tileCount + phase)
-                    }
-                }
-            }
-    }
+    val centerTile = if (tileCount > 0) tiles[centerItemIndex.coerceIn(0, tileCount - 1)] else ""
 
     Box(Modifier.fillMaxSize()) {
         ScalingLazyColumn(
@@ -336,8 +298,7 @@ private fun CarColumn(
                     }?.index ?: return@onRotaryScrollEvent true
                     val dir = if (e.verticalScrollPixels > 0) 1 else -1
                     val maxIdx = (info.totalItemsCount - 1).coerceAtLeast(0)
-                    val target = if (infinite) center + dir else (center + dir).coerceIn(0, maxIdx)
-                    if (target < 0 || target > maxIdx) return@onRotaryScrollEvent true
+                    val target = (center + dir).coerceIn(0, maxIdx)
                     rotaryJob?.cancel()
                     rotaryJob = scope.launch { state.animateScrollToItem(target) }
                     true
@@ -349,8 +310,8 @@ private fun CarColumn(
             contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(count = total, key = { it }) { i ->
-                TileContent(tiles[wrap(i, tileCount)], vm, ui, car, onSettings, onTrips, onReorder)
+            items(items = tiles, key = { it }) { tileKey ->
+                TileContent(tileKey, vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
 
@@ -358,7 +319,7 @@ private fun CarColumn(
         // never clips them.
         CurvedDotIndicator(
             total = tileCount,
-            activeIndex = wrap(centerItemIndex, tileCount.coerceAtLeast(1)),
+            activeIndex = centerItemIndex.coerceIn(0, (tileCount - 1).coerceAtLeast(0)),
         )
 
         // Name the car once you leave its summary tile.

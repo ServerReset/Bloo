@@ -499,6 +499,16 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_shape")] = shape }
     }
 
+    suspend fun widgetPendingAction(widgetId: Int): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_pending")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setWidgetPendingAction(widgetId: Int, action: String?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("widget_${widgetId}_pending")
+            if (action.isNullOrBlank()) it.remove(key) else it[key] = action
+        }
+    }
+
     suspend fun widgetLocationAddress(widgetId: Int): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_addr")]?.takeIf { it.isNotBlank() }
 

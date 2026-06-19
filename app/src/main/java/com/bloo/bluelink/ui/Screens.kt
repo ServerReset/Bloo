@@ -3471,10 +3471,10 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
     }
 }
 
-/** How far content (and the floating overlays) slide down during a refresh. */
+/** How far the floating overlays (dots, buttons) slide down during a refresh. */
 private val RefreshPullShift = 96.dp
 
-/** Wraps content with the pull-to-refresh gesture, offset and squiggly indicator. */
+/** Wraps content with the pull-to-refresh gesture with an overlay indicator. */
 @Composable
 private fun Refreshable(
     v: Vehicle,
@@ -3485,7 +3485,6 @@ private fun Refreshable(
     val ptrState = rememberPullToRefreshState()
     val density = LocalDensity.current
     val haptics = LocalHaptics.current
-    // Drop the indicator below the status bar so it sits clear of the notch.
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // Publish the pull distance so GarageScreen's overlays track the pull live.
@@ -3503,13 +3502,9 @@ private fun Refreshable(
                 onRefresh = { haptics?.diceRoll(); vm.refreshStatus(v) },
             ),
     ) {
-        val maxShift = RefreshPullShift
-        val shift = if (state.refreshing) maxShift else (maxShift * ptrState.distanceFraction).coerceIn(0.dp, maxShift)
-        Box(Modifier.fillMaxSize().offset { IntOffset(0, with(density) { shift.roundToPx() }) }) {
-            content()
-        }
-        // The indicator starts fully above the status bar and slides down to settle
-        // just below it as you pull; on completion it rides back up off-screen.
+        // Content stays full-size and edge-to-edge; never shifted down.
+        content()
+        // Indicator floats above content as a z-elevated overlay.
         val indicatorProgress = if (state.refreshing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
         val offScreenPx = with(density) { -(topInset + 56.dp).roundToPx() }
         val onScreenPx = with(density) { (topInset + 28.dp).roundToPx() }
