@@ -257,6 +257,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** VINs with a status request currently queued or running (de-dupes). */
     private val statusInFlight = mutableSetOf<String>()
 
+    /** Subset of [statusInFlight] whose call used surfaceErrors=true (drives the spinner + settle haptic). */
+    private val surfaceInFlight = mutableSetOf<String>()
+
     /** VINs fetched from the network this session (cache restore doesn't count). */
     private val sessionFetched = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
@@ -715,6 +718,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     ) {
         synchronized(statusInFlight) {
             if (!statusInFlight.add(v.vin)) return
+            if (surfaceErrors) surfaceInFlight.add(v.vin)
         }
         // Only show the spinner/settle-haptic for user-triggered refreshes; silent
         // background fetches (ensureStatus) run without touching refreshing so the
@@ -762,11 +766,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 AppLog.log("⚠ ${v.name}: $msg")
                 if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg") }
             } finally {
-                val stillBusy = synchronized(statusInFlight) {
+                // Clear refreshing only when no more user-visible (surfaceErrors) fetches remain.
+                // Background fetches finishing after a user refresh must not prematurely clear
+                // the spinner or trigger the settle haptic.
+                val noMoreSurface = synchronized(statusInFlight) {
                     statusInFlight.remove(v.vin)
-                    statusInFlight.isNotEmpty()
+                    surfaceInFlight.remove(v.vin)
+                    surfaceInFlight.isEmpty()
                 }
-                if (!stillBusy) _state.update { it.copy(refreshing = false) }
+                if (noMoreSurface) _state.update { it.copy(refreshing = false) }
             }
         }
     }

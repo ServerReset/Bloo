@@ -100,10 +100,13 @@ class BlooWidget : GlanceAppWidget() {
                 val w = LocalSize.current.width
                 val h = LocalSize.current.height
                 val isPortrait = h > w * 1.2f
+                // "Wide row" triggers whenever the widget is strongly landscape (w > 2.2×h),
+                // giving a compact status + 4 pills in a single row. This covers both the
+                // classic h<80dp banner and taller-but-very-wide placements (e.g. 4×2 cells).
                 when {
                     h < 60.dp -> if (snap == null) UnconfiguredCompact(widgetId)
                                  else CompactBody(widgetId, snap, actions, w)
-                    h < 80.dp && w > h * 3f -> if (snap == null) UnconfiguredCompact(widgetId)
+                    !isPortrait && w > h * 2.2f -> if (snap == null) UnconfiguredCompact(widgetId)
                                                else WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape)
                     isPortrait -> if (snap == null) UnconfiguredFull(widgetId)
                                   else PortraitBody(widgetId, snap, actions, w, h, photoBitmap, showBackground, widgetShape, locationAddress)
@@ -235,8 +238,11 @@ class BlooWidget : GlanceAppWidget() {
         widgetShape: String,
     ) {
         val context = LocalContext.current
-        val corner = if (widgetShape == "pill") h / 2 else 20.dp
+        val isPill = widgetShape == "pill"
+        val corner = if (isPill) h / 2 else 20.dp
         val pad = 8.dp
+        // Pill shape: add horizontal inset so content clears the rounded ends.
+        val hPad = if (isPill) (h / 3).coerceIn(pad, 28.dp) else pad
         val gap = 5.dp
         val pillH = (h - pad * 2).coerceIn(24.dp, 54.dp)
 
@@ -253,7 +259,7 @@ class BlooWidget : GlanceAppWidget() {
             Row(
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .padding(horizontal = pad, vertical = pad),
+                    .padding(horizontal = hPad, vertical = pad),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Compact status: percent + state
@@ -308,15 +314,18 @@ class BlooWidget : GlanceAppWidget() {
     ) {
         val context = LocalContext.current
         val showPhoto = photoBitmap != null && h >= 200.dp
-        val pad = when {
+        val isPill = widgetShape == "pill"
+        val basePad = when {
             h >= 220.dp -> 18.dp
             h >= 150.dp -> 14.dp
             else -> 11.dp
         }
-        val corner = if (widgetShape == "pill") w / 2 else (w / 4).coerceIn(18.dp, 32.dp)
+        // Pill widgets need extra vertical inset so content clears the curved caps.
+        val pad = if (isPill) (basePad + (w / 5).coerceAtMost(22.dp)) else basePad
+        val corner = if (isPill) w / 2 else (w / 4).coerceIn(18.dp, 32.dp)
         val gap = 7.dp
         // 4 full-width stacked pills; height derived from available space with generous floor
-        val pillH = ((h - pad * 2 - gap * 3) / 5.2f).coerceIn(36.dp, 60.dp)
+        val pillH = ((h - pad * 2 - gap * 3) / 5.2f).coerceIn(32.dp, 60.dp)
         val gridH = pillH * 4 + gap * 3
         val statusH = h - pad * 2 - gridH - gap
         val showStatus = statusH >= 28.dp
@@ -426,7 +435,7 @@ class BlooWidget : GlanceAppWidget() {
             }
             if (showKind) {
                 Text(
-                    if (snap.isEv) "battery" else "fuel",
+                    if (snap.isEv) "Battery" else "Fuel",
                     maxLines = 1,
                     style = TextStyle(color = onVariant, fontSize = 11.sp),
                 )
@@ -479,17 +488,21 @@ class BlooWidget : GlanceAppWidget() {
     ) {
         val context = LocalContext.current
         val showPhoto = photoBitmap != null && h >= 160.dp
-        val pad = when {
+        val isPill = widgetShape == "pill"
+        val basePad = when {
             h >= 180.dp -> 20.dp
             h >= 130.dp -> 16.dp
             h >= 90.dp  -> 13.dp
             else        -> 11.dp
         }
-        val corner = if (widgetShape == "pill") h / 2 else (h / 4).coerceIn(18.dp, 32.dp)
+        // Pill widgets need extra horizontal inset so content clears the rounded ends.
+        val hPad = if (isPill) (basePad + (h / 4).coerceAtMost(20.dp)) else basePad
+        val vPad = basePad
+        val corner = if (isPill) h / 2 else (h / 4).coerceIn(18.dp, 32.dp)
         val gap = 6.dp
         val gridCols = if (w >= 160.dp) 2 else 1
         val gridMinW = (gridCols * 54).dp + gap * (gridCols - 1)
-        val showStatus = (w - pad * 2) > gridMinW + 48.dp
+        val showStatus = (w - hPad * 2) > gridMinW + 48.dp
 
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
 
@@ -513,7 +526,7 @@ class BlooWidget : GlanceAppWidget() {
             Row(
                 modifier = GlanceModifier
                     .fillMaxSize()
-                    .padding(pad),
+                    .padding(horizontal = hPad, vertical = vPad),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (showStatus) {
@@ -534,7 +547,7 @@ class BlooWidget : GlanceAppWidget() {
                     vin = snap.vin,
                     actions = actions,
                     cols = gridCols,
-                    contentH = h - pad * 2,
+                    contentH = h - vPad * 2,
                     gap = gap,
                     modifier = if (showStatus) GlanceModifier.defaultWeight().fillMaxHeight()
                                else GlanceModifier.fillMaxWidth().fillMaxHeight(),
@@ -595,7 +608,7 @@ class BlooWidget : GlanceAppWidget() {
             }
             if (showKind) {
                 Text(
-                    if (snap.isEv) "battery" else "fuel",
+                    if (snap.isEv) "Battery" else "Fuel",
                     maxLines = 1,
                     style = TextStyle(color = onVariant, fontSize = 11.sp),
                 )

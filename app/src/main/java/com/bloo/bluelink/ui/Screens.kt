@@ -503,10 +503,15 @@ private fun OnboardingScreen(vm: AppViewModel) {
     val state by vm.state.collectAsState()
     val canBio = remember { vm.canUseBiometrics() }
     val scheme = MaterialTheme.colorScheme
+    var countdown by remember { mutableIntStateOf(15) }
 
     LaunchedEffect(Unit) {
         Fireworks.playSound(context)
         haptics?.fireworks()
+        while (countdown > 0) {
+            delay(1_000)
+            countdown--
+        }
     }
     BackHandler {}
 
@@ -609,43 +614,31 @@ private fun OnboardingScreen(vm: AppViewModel) {
                                     }
                                 }
                             }
-                            // Seats
+                            // Seats — individual row per position with heat / cool toggles
                             Text(
                                 "Seats",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = scheme.primary,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                // label, isOn, onClick
-                                val seatChips: List<Triple<String, Boolean, () -> Unit>> = listOf(
-                                    Triple("Driver heat", sc.driverHeat) { vm.setSeatFlag(vehicle, "dh", !sc.driverHeat) },
-                                    Triple("Driver cool", sc.driverCool) { vm.setSeatFlag(vehicle, "dc", !sc.driverCool) },
-                                    Triple("Pass heat", sc.passHeat) { vm.setSeatFlag(vehicle, "ph", !sc.passHeat) },
-                                    Triple("Pass cool", sc.passCool) { vm.setSeatFlag(vehicle, "pc", !sc.passCool) },
-                                    Triple("Rear heat", sc.rearLeftHeat) { vm.setSeatFlag(vehicle, "rlh", !sc.rearLeftHeat); vm.setSeatFlag(vehicle, "rrh", !sc.rearLeftHeat) },
-                                    Triple("Rear cool", sc.rearLeftCool) { vm.setSeatFlag(vehicle, "rlc", !sc.rearLeftCool); vm.setSeatFlag(vehicle, "rrc", !sc.rearLeftCool) },
-                                )
-                                seatChips.forEach { (chipLabel, chipOn, chipToggle) ->
-                                    Surface(
-                                        onClick = chipToggle,
-                                        shape = RoundedCornerShape(50),
-                                        color = if (chipOn) scheme.secondaryContainer else scheme.surfaceContainerHighest,
-                                        contentColor = if (chipOn) scheme.onSecondaryContainer else scheme.onSurface,
-                                        border = if (chipOn) null else BorderStroke(1.dp, scheme.outlineVariant),
-                                    ) {
-                                        Row(
-                                            Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                        ) {
-                                            if (chipOn) {
-                                                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            }
-                                            Text(chipLabel, style = MaterialTheme.typography.labelMedium)
-                                        }
-                                    }
-                                }
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(scheme.surfaceContainerHighest)
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                            ) {
+                                WizardSeatRow("Driver", sc.driverHeat, sc.driverCool,
+                                    { vm.setSeatFlag(vehicle, "dh", it) }, { vm.setSeatFlag(vehicle, "dc", it) })
+                                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+                                WizardSeatRow("Front passenger", sc.passHeat, sc.passCool,
+                                    { vm.setSeatFlag(vehicle, "ph", it) }, { vm.setSeatFlag(vehicle, "pc", it) })
+                                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+                                WizardSeatRow("Rear left", sc.rearLeftHeat, sc.rearLeftCool,
+                                    { vm.setSeatFlag(vehicle, "rlh", it) }, { vm.setSeatFlag(vehicle, "rlc", it) })
+                                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+                                WizardSeatRow("Rear right", sc.rearRightHeat, sc.rearRightCool,
+                                    { vm.setSeatFlag(vehicle, "rrh", it) }, { vm.setSeatFlag(vehicle, "rrc", it) })
                             }
                             // Steering wheel heat
                             Text(
@@ -752,16 +745,33 @@ private fun OnboardingScreen(vm: AppViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // --- Enter Bloo CTA ---
+            // --- Enter Bloo CTA (gated by 15 s so users actually read the onboarding) ---
             MorphButton(
                 onClick = { vm.finishOnboarding() },
-                active = true,
+                enabled = countdown == 0,
+                active = countdown == 0,
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 16.dp),
             ) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Enter Bloo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                AnimatedContent(
+                    targetState = countdown,
+                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
+                    label = "onboardCta",
+                ) { cd ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (cd > 0) {
+                            Text(
+                                "Almost there… $cd",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        } else {
+                            Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Enter Bloo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
 
             Spacer(Modifier.height(32.dp))
@@ -1468,7 +1478,12 @@ private fun LoginScreen(
             val context = LocalContext.current
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 TextButton(onClick = {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://owners.hyundaiusa.com/us/en/forgotPassword.html")))
+                    val forgotUrl = when (brand) {
+                        Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgotPassword.html"
+                        Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
+                        Brand.KIA     -> "https://owners.kia.com/us/en/forgot-credentials/credentials-user-id.html"
+                    }
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(forgotUrl)))
                 }) {
                     Text(
                         "Forgot password?",
@@ -1912,43 +1927,57 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     if (pageCount > 1) {
                         PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
                     }
-                    // Hoisted car-name pill with wipe + bouncy resize (single car per page only).
+                    // Hoisted car-name pill — centered at top, slides in/out vertically.
                     if (perPage == 1) {
                         AnimatedVisibility(
                             visible = carNameVisible,
-                            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it },
-                            exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it },
-                            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
+                            enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
+                            exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 2 },
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 6.dp),
                         ) {
                             Surface(
                                 onClick = { pillScope.launch { scrollToTopFn?.invoke() } },
                                 shape = RoundedCornerShape(50),
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
                                 contentColor = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.animateContentSize(
-                                    spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)
-                                ),
+                                shadowElevation = 2.dp,
                             ) {
-                                AnimatedContent(
-                                    targetState = state.currentIndex,
-                                    transitionSpec = {
-                                        val dir = if (targetState > initialState) 1 else -1
-                                        (slideInHorizontally(tween(110)) { it * dir / 2 } +
-                                            scaleIn(tween(110), initialScale = 0.88f) +
-                                            fadeIn(tween(110))) togetherWith
-                                        (slideOutHorizontally(tween(80)) { -it * dir / 2 } +
-                                            scaleOut(tween(80), targetScale = 0.88f) +
-                                            fadeOut(tween(80)))
-                                    },
-                                    label = "carNamePill",
-                                ) { idx ->
-                                    Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                                Row(
+                                    Modifier
+                                        .animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
+                                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    AnimatedContent(
+                                        targetState = state.currentIndex,
+                                        transitionSpec = {
+                                            val dir = if (targetState > initialState) 1 else -1
+                                            (slideInHorizontally(tween(200)) { it * dir / 3 } +
+                                                fadeIn(tween(200))) togetherWith
+                                                fadeOut(tween(120))
+                                        },
+                                        label = "carNamePill",
+                                    ) { idx ->
                                         Text(
                                             vehicles.getOrNull(idx)?.name ?: "",
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                         )
+                                    }
+                                    if (vehicles.size > 1) {
+                                        AnimatedContent(
+                                            targetState = state.currentIndex,
+                                            transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
+                                            label = "carNamePillCount",
+                                        ) { idx ->
+                                            Text(
+                                                "${idx + 1} / ${vehicles.size}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }
