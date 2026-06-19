@@ -4604,7 +4604,8 @@ private fun SplitExpandButton(
     )
     val leftInteraction = remember { MutableInteractionSource() }
     val leftPressed by leftInteraction.collectIsPressedAsState()
-    val morphed = action.active || leftPressed
+    // Morph to rounded-rect when action is active, pressed, OR pebble is expanded.
+    val morphed = action.active || leftPressed || expanded
 
     val outer by animateDpAsState(
         if (morphed) 16.dp else 50.dp,
@@ -4707,8 +4708,8 @@ private fun SplitExpandButton(
         // Right half — chevron nub.
         Surface(
             onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = buttonContainer(),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
             modifier = Modifier.fillMaxHeight(),
         ) {
@@ -4742,18 +4743,25 @@ private fun MorphExpandButton(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphChevron",
     )
-    MorphButton(
+    val corner by animateDpAsState(
+        targetValue = if (expanded) 14.dp else 50.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "morphExpandCorner",
+    )
+    Surface(
         onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
-        active = expanded,
-        activeContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-        activeContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(corner),
+        color = buttonContainer(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.size(50.dp),
     ) {
-        Icon(
-            Icons.Filled.KeyboardArrowDown,
-            contentDescription = if (expanded) "Collapse" else "Expand",
-            modifier = Modifier.size(20.dp).rotate(rotation),
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                modifier = Modifier.size(20.dp).rotate(rotation),
+            )
+        }
     }
 }
 
