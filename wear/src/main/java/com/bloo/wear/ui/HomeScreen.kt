@@ -293,7 +293,6 @@ private fun CarColumn(
 
     var rotaryJob: Job? by remember { mutableStateOf(null) }
     val snapFling = ScalingLazyColumnDefaults.snapFlingBehavior(state)
-    val virtualList = remember(total) { List(total) { it } }
 
     val centerItemIndex by remember {
         derivedStateOf {
@@ -347,8 +346,8 @@ private fun CarColumn(
             contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(items = virtualList, key = { it }) { idx ->
-                TileContent(tiles[idx % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
+            items(count = total, key = { it }) { i ->
+                TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
 
