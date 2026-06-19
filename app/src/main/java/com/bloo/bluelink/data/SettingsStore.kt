@@ -526,6 +526,22 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    suspend fun widgetLocationLatLon(widgetId: Int): Pair<Double, Double>? {
+        val data = context.settingsDataStore.data.first()
+        val lat = data[stringPreferencesKey("widget_${widgetId}_lat")]?.toDoubleOrNull() ?: return null
+        val lon = data[stringPreferencesKey("widget_${widgetId}_lon")]?.toDoubleOrNull() ?: return null
+        return lat to lon
+    }
+
+    suspend fun setWidgetLocationLatLon(widgetId: Int, lat: Double?, lon: Double?) {
+        context.settingsDataStore.edit {
+            val latKey = stringPreferencesKey("widget_${widgetId}_lat")
+            val lonKey = stringPreferencesKey("widget_${widgetId}_lon")
+            if (lat != null) it[latKey] = lat.toString() else it.remove(latKey)
+            if (lon != null) it[lonKey] = lon.toString() else it.remove(lonKey)
+        }
+    }
+
     // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
 
     suspend fun hotspot(vin: String): String? =

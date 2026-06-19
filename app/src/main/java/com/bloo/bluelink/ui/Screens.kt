@@ -4612,11 +4612,7 @@ private fun SplitExpandButton(
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuter",
     )
-    val inner by animateDpAsState(
-        if (morphed) 16.dp else 10.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitInner",
-    )
+    val inner = 6.dp
 
     val defaultContainer = buttonContainer()
     val leftBg by androidx.compose.animation.animateColorAsState(
@@ -4809,19 +4805,19 @@ private fun TripRow(trip: EvTrip) {
                 Text("%.1f mi".format(it), style = MaterialTheme.typography.bodyMedium)
             }
         }
-        val pace = buildList {
+        val pace = remember(trip) { buildList {
             trip.driveMinutes?.let { add("$it min") }
             trip.idleMinutes?.takeIf { it > 0 }?.let { add("$it min idle") }
             trip.avgspeed?.value?.let { add("avg ${it.toInt()} mph") }
             trip.maxspeed?.value?.let { add("max ${it.toInt()} mph") }
-        }
+        } }
         if (pace.isNotEmpty()) {
             Text(pace.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        val energy = buildList {
+        val energy = remember(trip) { buildList {
             trip.usedKwh?.let { add("$it kWh used") }
             trip.regenKwh?.takeIf { it > 0 }?.let { add("$it kWh regen") }
-        }
+        } }
         if (energy.isNotEmpty()) {
             Text(energy.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -5037,7 +5033,7 @@ private data class DiagRow(val label: String, val value: String, val indent: Boo
 @Composable
 private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
-    val rows = buildList {
+    val rows = remember(status, fahrenheit) { buildList {
         status?.tirePressureLamp?.let { tp ->
             val psiSuffix = status.tirePressure?.all?.takeIf { it > 0 }?.let { " · $it psi" } ?: ""
             add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning$psiSuffix" else "OK$psiSuffix"))
@@ -5078,12 +5074,14 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         if (status?.trunkOpen == true) add(DiagRow("Trunk", "Open"))
         if (status?.hoodOpen == true) add(DiagRow("Hood", "Open"))
         if (status?.doorLock == false && status.engine != true) add(DiagRow("Lock", "Car is unlocked while parked"))
-    }
+    } }
     // Surface a warning affordance if any diagnostic reports a problem.
-    val hasWarning = (status?.tirePressureLamp?.hasWarning == true) ||
+    val hasWarning = remember(status) {
+        (status?.tirePressureLamp?.hasWarning == true) ||
         status?.lowFuelLight == true || status?.washerFluidStatus == true ||
         status?.breakOilStatus == true || status?.smartKeyBatteryWarning == true
-    val diagSummary = if (rows.isEmpty()) "No data" else "${rows.count { !it.indent }} checks"
+    }
+    val diagSummary = remember(rows) { if (rows.isEmpty()) "No data" else "${rows.count { !it.indent }} checks" }
     Pebble(
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
         summary = diagSummary,
