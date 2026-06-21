@@ -53,6 +53,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -101,9 +102,11 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Card
+import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.SeatLevel
@@ -296,6 +299,7 @@ private fun CarColumn(
     }
 
     var rotaryJob: Job? by remember { mutableStateOf(null) }
+    var rotaryTargetIdx by remember { mutableIntStateOf(-1) }
     val snapFling = ScalingLazyColumnDefaults.snapFlingBehavior(state)
 
     val centerItemIndex by remember {
@@ -331,16 +335,16 @@ private fun CarColumn(
                 .fillMaxSize()
                 .onRotaryScrollEvent { e ->
                     if (!active) return@onRotaryScrollEvent false
-                    val info = state.layoutInfo
-                    val viewportCenter = info.viewportSize.height / 2
-                    val center = info.visibleItemsInfo.minByOrNull {
-                        abs(it.offset + it.size / 2 - viewportCenter)
-                    }?.index ?: return@onRotaryScrollEvent true
+                    val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
                     val dir = if (e.verticalScrollPixels > 0) 1 else -1
-                    val maxIdx = (info.totalItemsCount - 1).coerceAtLeast(0)
-                    val target = if (infinite) center + dir else (center + dir).coerceIn(0, maxIdx)
+                    val base = if (rotaryTargetIdx >= 0) rotaryTargetIdx else centerItemIndex
+                    val newTarget = if (infinite) base + dir else (base + dir).coerceIn(0, maxIdx)
+                    rotaryTargetIdx = newTarget
                     rotaryJob?.cancel()
-                    rotaryJob = scope.launch { state.animateScrollToItem(target) }
+                    rotaryJob = scope.launch {
+                        state.animateScrollToItem(newTarget)
+                        rotaryTargetIdx = -1
+                    }
                     true
                 }
                 .focusRequester(focusRequester)
@@ -475,20 +479,20 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: (
     // 0f = pill only, 1f = full screen filled
     val expandProgress = remember { Animatable(0f) }
 
-    // Expanding circle: starts as a tiny point at the pill, grows to fill the screen.
+    // Circular progress ring that fills clockwise as the user holds.
     // Only composed while the hold is active (saves a layer at rest).
     if (expandProgress.value > 0.001f) {
-        Box(
-            Modifier
+        val progressColor = MaterialTheme.colorScheme.primary
+        CircularProgressIndicator(
+            progress = { expandProgress.value.coerceIn(0f, 1f) },
+            modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    val s = expandProgress.value
-                    scaleX = s
-                    scaleY = s
-                    transformOrigin = TransformOrigin(0.5f, 0.08f)
-                    alpha = (s * 4f).coerceIn(0f, 1f)
-                }
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .graphicsLayer { alpha = (expandProgress.value * 3f).coerceIn(0f, 1f) },
+            strokeWidth = 4.dp,
+            colors = ProgressIndicatorDefaults.colors(
+                indicatorColor = progressColor,
+                trackColor = progressColor.copy(alpha = 0.15f),
+            ),
         )
     }
 
@@ -501,7 +505,6 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: (
         Box(
             Modifier
                 .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f))
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -510,11 +513,24 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: (
                         var completed = false
                         var hapticJob: Job? = null
                         hapticJob = scope.launch {
-                            var delayMs = 300L
+                            var delayMs = 250L
+                            var count = 0
                             while (isActive) {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                // Escalate: start gentle, go strong
+                                val type = when {
+                                    count < 3  -> HapticFeedbackType.TextHandleMove
+                                    count < 7  -> HapticFeedbackType.LongPress
+                                    else       -> HapticFeedbackType.LongPress
+                                }
+                                hapticFeedback.performHapticFeedback(type)
+                                if (count >= 3) {
+                                    // Double-pulse for stronger feel
+                                    delay(40L)
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                                count++
                                 delay(delayMs)
-                                delayMs = (delayMs * 0.7f).toLong().coerceAtLeast(40L)
+                                delayMs = (delayMs * 0.65f).toLong().coerceAtLeast(25L)
                             }
                         }
                         holdJob = scope.launch {
@@ -557,7 +573,7 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, onRefresh: (
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onBackground,
             )
         }
     }
