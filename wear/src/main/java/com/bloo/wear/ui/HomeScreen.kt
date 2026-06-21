@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
@@ -724,15 +725,36 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     }
     list.forEach { preset ->
         val isActive = ui.draftFor(car.vin).activePresetId == preset.id && car.climateOn == true
-        MorphButton(
-            label = preset.name,
-            icon = Icons.Filled.Thermostat,
-            active = isActive,
-            activeColor = MaterialTheme.colorScheme.tertiary,
-            pending = "${car.vin}:climate" in ui.pending,
-            // Tapping the running preset turns climate off, like the phone.
-            onClick = { if (isActive) vm.toggleClimate(car.vin) else vm.applyPreset(car.vin, preset) },
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MorphButton(
+                label = preset.name,
+                modifier = Modifier.weight(1f),
+                icon = Icons.Filled.Thermostat,
+                active = isActive,
+                activeColor = MaterialTheme.colorScheme.tertiary,
+                pending = "${car.vin}:climate" in ui.pending,
+                onClick = { if (isActive) vm.toggleClimate(car.vin) else vm.applyPreset(car.vin, preset) },
+            )
+            Spacer(Modifier.width(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f))
+                    .clickable { vm.deletePreset(car.vin, preset.id) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Delete preset",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        }
         Spacer(Modifier.height(6.dp))
     }
     val saveInput = rememberWearTextInput("Preset name") { name -> vm.saveCurrentAsPreset(car.vin, name) }

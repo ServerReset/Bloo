@@ -242,30 +242,30 @@ class BlooWidget : GlanceAppWidget() {
 
     // ── Small shared pieces ───────────────────────────────────────────────────
 
-    /** A small filled pill showing the vehicle state (Charging / Locked / …). */
+    /** A filled pill showing the vehicle state (Charging / Locked / …). */
     @Composable
     private fun StateChip(label: String, color: ColorProvider) {
         Box(
-            modifier = GlanceModifier.background(color).cornerRadius(9.dp).padding(horizontal = 8.dp, vertical = 2.dp),
+            modifier = GlanceModifier.background(color).cornerRadius(10.dp).padding(horizontal = 10.dp, vertical = 3.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 label,
                 maxLines = 1,
-                style = TextStyle(color = ColorProvider(Color.White), fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp, fontWeight = FontWeight.Bold),
             )
         }
     }
 
-    /** A thin battery/fuel progress bar. [trackW] is the full track width in dp. */
+    /** A battery/fuel progress bar. [trackW] is the full track width in dp. */
     @Composable
     private fun BatteryBar(percent: Int?, trackW: Dp, theme: WidgetTheme, onPhoto: Boolean) {
         val pct = (percent ?: 0).coerceIn(0, 100)
         val fillW = trackW * (pct / 100f)
-        val trackColor = if (onPhoto) ColorProvider(Color(1f, 1f, 1f, 0.25f)) else ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.35f))
-        Box(modifier = GlanceModifier.width(trackW).height(5.dp).background(trackColor).cornerRadius(3.dp)) {
+        val trackColor = if (onPhoto) ColorProvider(Color(1f, 1f, 1f, 0.22f)) else ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.28f))
+        Box(modifier = GlanceModifier.width(trackW).height(7.dp).background(trackColor).cornerRadius(4.dp)) {
             if (fillW > 0.dp) {
-                Box(GlanceModifier.width(fillW).height(5.dp).background(theme.accent).cornerRadius(3.dp)) {}
+                Box(GlanceModifier.width(fillW).height(7.dp).background(theme.accent).cornerRadius(4.dp)) {}
             }
         }
     }
@@ -316,6 +316,14 @@ class BlooWidget : GlanceAppWidget() {
                             maxLines = 1,
                             style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp),
                         )
+                        if (w >= 200.dp && snap.rangeMi != null) {
+                            Spacer(GlanceModifier.width(5.dp))
+                            Text(
+                                "· ${snap.rangeMi} mi",
+                                maxLines = 1,
+                                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
+                            )
+                        }
                         if (showState) {
                             Spacer(GlanceModifier.width(7.dp))
                             val (label, color) = stateOf(snap, theme)
@@ -571,9 +579,11 @@ class BlooWidget : GlanceAppWidget() {
         val corner = if (isPill) w / 2 else (w / 4).coerceIn(20.dp, 32.dp)
         val gap = 7.dp
         val mapCardH = if (showMap) 112.dp else 0.dp
-        // Slightly smaller, refined buttons; more divisor weight → status keeps room.
-        val pillH = ((h - pad * 2 - gap * 3 - mapCardH) / 5.8f).coerceIn(30.dp, 52.dp)
-        val gridH = pillH * 4 + gap * 3
+        // Use 2-column grid when the widget is wide enough; otherwise single column with labels.
+        val gridCols = if (w >= 130.dp) 2 else 1
+        val gridRows = if (gridCols == 2) 2 else 4
+        val pillH = ((h - pad * 2 - gap * (gridRows - 1) - mapCardH) / (gridRows + 1.8f)).coerceIn(30.dp, 54.dp)
+        val gridH = pillH * gridRows + gap * (gridRows - 1)
         val statusH = h - pad * 2 - gridH - gap - (if (showMap) mapCardH + gap else 0.dp)
         val showStatus = statusH >= 28.dp
         val barW = (w - pad * 2).coerceAtLeast(0.dp)
@@ -616,7 +626,7 @@ class BlooWidget : GlanceAppWidget() {
                     LocationCard(mapBitmap!!, locationAddress, mapCardH, openAction)
                     Spacer(GlanceModifier.height(gap))
                 }
-                PortraitButtonGrid(widgetId, snap.vin, actions, pillH, gap, pendingAction, snap, theme)
+                PortraitButtonGrid(widgetId, snap.vin, actions, pillH, gap, pendingAction, snap, theme, gridCols)
             }
         }
     }
@@ -680,6 +690,7 @@ class BlooWidget : GlanceAppWidget() {
         val showRange = availH >= 70.dp
         val showBar = availH >= 50.dp
         val showState = availH >= 32.dp
+        val showRangeInline = availH in 50.dp..69.dp && snap.rangeMi != null
         val percentSize = when {
             availH >= 140.dp -> 42.sp
             availH >= 110.dp -> 36.sp
@@ -700,11 +711,27 @@ class BlooWidget : GlanceAppWidget() {
                 style = TextStyle(color = onSurface, fontWeight = FontWeight.Bold, fontSize = nameFontSize),
             )
             Spacer(GlanceModifier.height(2.dp))
-            Text(
-                snap.percent?.let { "$it%" } ?: "—",
-                maxLines = 1,
-                style = TextStyle(color = onSurface, fontWeight = FontWeight.Bold, fontSize = percentSize),
-            )
+            if (showRangeInline) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        snap.percent?.let { "$it%" } ?: "—",
+                        maxLines = 1,
+                        style = TextStyle(color = onSurface, fontWeight = FontWeight.Bold, fontSize = percentSize),
+                    )
+                    Spacer(GlanceModifier.width(6.dp))
+                    Text(
+                        "${snap.rangeMi} mi",
+                        maxLines = 1,
+                        style = TextStyle(color = onVariant, fontSize = 12.sp),
+                    )
+                }
+            } else {
+                Text(
+                    snap.percent?.let { "$it%" } ?: "—",
+                    maxLines = 1,
+                    style = TextStyle(color = onSurface, fontWeight = FontWeight.Bold, fontSize = percentSize),
+                )
+            }
             if (showBar) {
                 Spacer(GlanceModifier.height(5.dp))
                 BatteryBar(snap.percent, barW, theme, onPhoto = hasPhoto)
@@ -739,14 +766,28 @@ class BlooWidget : GlanceAppWidget() {
         pendingAction: String?,
         snap: VehicleSnapshot,
         theme: WidgetTheme,
+        cols: Int = 1,
     ) {
-        Column(
-            modifier = GlanceModifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            repeat(4) { i ->
-                if (i > 0) Spacer(GlanceModifier.height(gap))
-                ActionPill(widgetId, vin, actions.getOrNull(i), pillH, GlanceModifier.fillMaxWidth(), pendingAction, snap, theme, allowLabel = true)
+        if (cols == 1) {
+            Column(
+                modifier = GlanceModifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                repeat(4) { i ->
+                    if (i > 0) Spacer(GlanceModifier.height(gap))
+                    ActionPill(widgetId, vin, actions.getOrNull(i), pillH, GlanceModifier.fillMaxWidth(), pendingAction, snap, theme, allowLabel = true)
+                }
+            }
+        } else {
+            Column(modifier = GlanceModifier.fillMaxWidth()) {
+                repeat(2) { row ->
+                    if (row > 0) Spacer(GlanceModifier.height(gap))
+                    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        ActionPill(widgetId, vin, actions.getOrNull(row * 2), pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = pillH >= 44.dp)
+                        Spacer(GlanceModifier.width(gap))
+                        ActionPill(widgetId, vin, actions.getOrNull(row * 2 + 1), pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = pillH >= 44.dp)
+                    }
+                }
             }
         }
     }
@@ -1063,11 +1104,12 @@ class BlooWidget : GlanceAppWidget() {
 
     @Composable
     private fun stateOf(snap: VehicleSnapshot, theme: WidgetTheme, hasPhoto: Boolean = false): Pair<String, ColorProvider> = when {
-        snap.engineOn == true -> "Driving" to theme.accent
-        snap.charging == true -> "Charging" to theme.charge
-        snap.locked == true  -> "Locked" to theme.accent
-        snap.locked == false -> "Unlocked" to theme.unlocked
-        else                 -> "—" to ColorProvider(Color(0.42f, 0.42f, 0.46f, 1f))
+        snap.engineOn == true  -> "Driving" to theme.accent
+        snap.charging == true  -> "Charging" to theme.charge
+        snap.climateOn == true -> "Climate on" to ColorProvider(Color(0xFF5DA3A3))
+        snap.locked == true    -> "Locked" to theme.accent
+        snap.locked == false   -> "Unlocked" to theme.unlocked
+        else                   -> "—" to ColorProvider(Color(0.42f, 0.42f, 0.46f, 1f))
     }
 
     private fun authIntent(context: Context, widgetId: Int, vin: String, action: WidgetAction): Intent =

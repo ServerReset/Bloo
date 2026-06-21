@@ -394,6 +394,7 @@ fun MorphButton(
     activeColor: Color,
     pending: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -409,7 +410,7 @@ fun MorphButton(
         onClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onClick() },
         enabled = !pending,
         interactionSource = interaction,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(percent = pct.roundToInt()),
         colors = if (active) {
             ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
