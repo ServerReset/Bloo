@@ -1077,7 +1077,7 @@ class BlooWidget : GlanceAppWidget() {
             putExtra(WidgetAuthActivity.EXTRA_WIDGET_ID, widgetId)
             putExtra(WidgetAuthActivity.EXTRA_VIN, vin)
             putExtra(WidgetAuthActivity.EXTRA_ACTION, action.key)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
         }
 
     private fun configIntent(context: Context, widgetId: Int): Intent =

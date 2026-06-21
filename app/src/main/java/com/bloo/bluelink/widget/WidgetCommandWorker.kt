@@ -38,8 +38,12 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
 
     private suspend fun execute(ctx: Context, widgetId: Int, vin: String, action: WidgetAction) {
         when (action.kind) {
-            WidgetAction.Kind.COMMAND ->
+            WidgetAction.Kind.COMMAND -> {
                 action.wearAction?.let { WearCommandRunner.execute(ctx, WearCommand(vin, it)) }
+                // Brief pause for the car to process the command, then fetch actual state.
+                kotlinx.coroutines.delay(4000)
+                WearCommandRunner.refresh(ctx, vin)
+            }
 
             WidgetAction.Kind.REFRESH -> WearCommandRunner.refresh(ctx, vin)
 

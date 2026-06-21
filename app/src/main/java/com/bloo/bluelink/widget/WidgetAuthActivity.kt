@@ -97,7 +97,7 @@ class WidgetAuthActivity : FragmentActivity() {
 
     /** Finish without any window animation (prevents the opaque task-switch flash). */
     private fun finishNoAnim() {
-        finish()
+        finishAndRemoveTask()
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
     }
