@@ -19,6 +19,7 @@ import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
 import com.bloo.bluelink.work.AlertWorker
+import com.bloo.bluelink.work.DepartureWorker
 
 class MainActivity : FragmentActivity() {
 
@@ -48,6 +49,7 @@ class MainActivity : FragmentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         AlertWorker.schedule(applicationContext)
+        DepartureWorker.schedule(applicationContext)
         ContextCompat.registerReceiver(
             this,
             screenReceiver,

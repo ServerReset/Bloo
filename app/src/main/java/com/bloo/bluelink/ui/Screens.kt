@@ -292,6 +292,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.tan
+import java.util.Calendar
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
 
@@ -3566,8 +3567,8 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     Surface(
         modifier = Modifier.fillMaxWidth().then(dragHandle).height(ControlHeight),
         shape = RoundedCornerShape(PebbleCornerCollapsed),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = tintedSurface(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
             PrimaryActions(v, state, vm)
@@ -3683,28 +3684,18 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 @Composable
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    // Doors sit inside a collapsed-pebble shaped card so the controls have a
-    // "holding" container like every other section.
-    Card(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(PebbleCornerCollapsed),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        // Extra start inset lines the "Locked/Unlocked" text up with the other
-        // pebble titles; a small end inset nudges the button toward the edge.
-        Box(Modifier.padding(start = 26.dp, end = 8.dp)) {
-            StateControl(
-                name = "",
-                isOn = status?.doorLock,
-                stateOn = "Locked", stateOff = "Unlocked",
-                turnOn = "Lock", turnOff = "Unlock",
-                icon = Icons.Filled.Lock, deactivateIcon = Icons.Filled.LockOpen,
-                pending = state.isPending(v.vin, "doors"),
-                onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
-                highlightWhenOff = true,
-                offTextColor = MaterialTheme.colorScheme.error,
-            )
-        }
+    Box(Modifier.fillMaxWidth().padding(start = 26.dp, end = 8.dp)) {
+        StateControl(
+            name = "",
+            isOn = status?.doorLock,
+            stateOn = "Locked", stateOff = "Unlocked",
+            turnOn = "Lock", turnOff = "Unlock",
+            icon = Icons.Filled.Lock, deactivateIcon = Icons.Filled.LockOpen,
+            pending = state.isPending(v.vin, "doors"),
+            onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
+            highlightWhenOff = true,
+            offTextColor = MaterialTheme.colorScheme.error,
+        )
     }
 }
 
@@ -5403,6 +5394,8 @@ private fun ClimatePebble(
             }
         }
 
+        DepartureScheduleSection(v, state, vm)
+
         SectionLabel("Save")
         MorphTextButton(
             text = "Save as preset",
@@ -5440,6 +5433,61 @@ private fun ClimatePebble(
                     MorphTextButton("Cancel", onClick = { showAddPreset = false })
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun DepartureScheduleSection(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val schedule = state.departureSchedules[v.vin] ?: SettingsStore.DepartureSchedule()
+    val dow = listOf(
+        Calendar.MONDAY to "Mo",
+        Calendar.TUESDAY to "Tu",
+        Calendar.WEDNESDAY to "We",
+        Calendar.THURSDAY to "Th",
+        Calendar.FRIDAY to "Fr",
+        Calendar.SATURDAY to "Sa",
+        Calendar.SUNDAY to "Su",
+    )
+
+    SectionLabel("Departure")
+    ToggleRow("Precondition before departure", schedule.enabled) { enabled ->
+        vm.setDepartureSchedule(v, schedule.copy(enabled = enabled))
+    }
+
+    if (schedule.enabled) {
+        // Time picker: hour + minute driven by two sliders.
+        val hour = schedule.minutes / 60
+        val minute = schedule.minutes % 60
+        val amPm = if (hour < 12) "AM" else "PM"
+        val display12 = ((if (hour % 12 == 0) 12 else hour % 12)).toString().padStart(2, '0') +
+            ":" + minute.toString().padStart(2, '0') + " " + amPm
+        StepRow("Departure time", display12)
+        AnimatedSlider(
+            value = schedule.minutes.toFloat(),
+            onValueChange = { vm.setDepartureSchedule(v, schedule.copy(minutes = it.roundToInt())) },
+            valueRange = 0f..1439f,
+            steps = 287,
+        )
+
+        Text(
+            "Climate will start ~15 min before this time.",
+            style = MaterialTheme.typography.bodySmall,
+            color = LocalContentColor.current.copy(alpha = 0.7f),
+        )
+
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            dow.forEach { (day, label) ->
+                MorphChip(
+                    selected = day in schedule.days,
+                    onClick = {
+                        val days = if (day in schedule.days) schedule.days - day else schedule.days + day
+                        vm.setDepartureSchedule(v, schedule.copy(days = days))
+                    },
+                    label = label,
+                )
+            }
         }
     }
 }

@@ -87,6 +87,8 @@ data class UiState(
     val trips: Map<String, List<EvTrip>> = emptyMap(),
     /** User-named climate presets by VIN. */
     val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
+    /** Departure preconditioning schedules by VIN. */
+    val departureSchedules: Map<String, SettingsStore.DepartureSchedule> = emptyMap(),
     /** Live climate draft mirrored from the watch, by VIN (two-way climate sync). */
     val climateSync: Map<String, com.bloo.bluelink.data.ClimateSync> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
@@ -576,6 +578,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
         val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
+        val departureSchedules = vehicles.associate { it.vin to settingsStore.departureSchedule(it.vin) }
         val firstRun = !settingsStore.onboardingSeen()
         val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin) }.map { it.vin }
         // On first open all pebbles start expanded regardless of any stored state.
@@ -604,6 +607,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 lastServiceMiles = lastSvc,
                 serviceIntervalMiles = svcInterval,
                 climatePresets = climatePresets,
+                departureSchedules = departureSchedules,
                 collapsedPebbles = collapsed,
                 hiddenPebbles = hidden,
                 hotspotSections = hotspots,
@@ -1178,6 +1182,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(trips = it.trips + (v.vin to result), pending = it.pending - "${v.vin}:trips")
             }
         }
+    }
+
+    /** Current departure preconditioning schedule for a car. */
+    suspend fun departureSchedule(v: Vehicle): SettingsStore.DepartureSchedule =
+        settingsStore.departureSchedule(v.vin)
+
+    /** Persist a new departure schedule and keep the live UI state in sync. */
+    fun setDepartureSchedule(v: Vehicle, schedule: SettingsStore.DepartureSchedule) {
+        _state.update { it.copy(departureSchedules = it.departureSchedules + (v.vin to schedule)) }
+        viewModelScope.launch { settingsStore.setDepartureSchedule(v.vin, schedule) }
     }
 
     /** Restore the last-used climate settings for a car (null if never saved). */

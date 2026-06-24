@@ -626,6 +626,42 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    // --- Departure preconditioning ----------------------------------------
+
+    data class DepartureSchedule(
+        val enabled: Boolean = false,
+        /** Minutes since midnight for the scheduled departure time. */
+        val minutes: Int = 8 * 60,
+        /** Calendar.DAY_OF_WEEK values (1 = Sunday … 7 = Saturday). */
+        val days: Set<Int> = emptySet(),
+    )
+
+    suspend fun departureSchedule(vin: String): DepartureSchedule {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("dep_sched_$vin")]
+            ?: return DepartureSchedule()
+        val parts = raw.split("|")
+        return runCatching {
+            DepartureSchedule(
+                enabled = parts[0] == "1",
+                minutes = parts[1].toInt(),
+                days = parts[2].split(",").filter { it.isNotEmpty() }.map { it.toInt() }.toSet(),
+            )
+        }.getOrDefault(DepartureSchedule())
+    }
+
+    suspend fun setDepartureSchedule(vin: String, schedule: DepartureSchedule) {
+        val raw = "${if (schedule.enabled) "1" else "0"}|${schedule.minutes}|${schedule.days.joinToString(",")}"
+        context.settingsDataStore.edit { it[stringPreferencesKey("dep_sched_$vin")] = raw }
+    }
+
+    /** The date string ("yyyy-MM-dd") when departure preconditioning last fired for a car. */
+    suspend fun departureLastFired(vin: String): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("dep_fired_$vin")]
+
+    suspend fun setDepartureLastFired(vin: String, date: String) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("dep_fired_$vin")] = date }
+    }
+
     // --- Custom colour palettes ------------------------------------------
 
     private val paletteJson = Json { ignoreUnknownKeys = true }
