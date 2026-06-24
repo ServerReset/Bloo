@@ -166,6 +166,9 @@ object WearAction {
 
     /** Re-fetch a single car's status (or all, when [WearCommand.vin] is blank). */
     const val REFRESH = "refresh"
+
+    /** Request the phone to generate and push an AI summary for a car. */
+    const val AI_SUMMARY = "ai_summary"
 }
 
 /** A command the watch wants run for one car. */

@@ -54,7 +54,7 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.ui.draw.clip
@@ -401,9 +401,9 @@ fun MorphButton(
     val haptics = LocalHapticFeedback.current
     // Match the phone's MorphButton: pill (50%) ↔ rounded square (28%) with a
     // soft expressive spring.
-    val pct by animateFloatAsState(
-        targetValue = if (active || pressed) 28f else 50f,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow),
+    val corner by animateDpAsState(
+        targetValue = if (active || pending) 12.dp else 50.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "morphCorner",
     )
     Button(
@@ -411,7 +411,7 @@ fun MorphButton(
         enabled = !pending,
         interactionSource = interaction,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(percent = pct.roundToInt()),
+        shape = RoundedCornerShape(corner),
         colors = if (active) {
             ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
         } else {

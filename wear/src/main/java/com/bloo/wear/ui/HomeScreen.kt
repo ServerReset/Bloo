@@ -437,7 +437,7 @@ private fun TileContent(
         WearTiles.WEATHER -> WeatherCard(ui, car)
         WearTiles.INFO -> InfoCard(car)
         WearTiles.DIAGNOSTICS -> DiagnosticsCard(car)
-        WearTiles.AI -> AiCard(ui, car)
+        WearTiles.AI -> AiCard(vm, ui, car)
         WearTiles.ASSIST -> AssistCard(car)
         WearTiles.MORE -> MoreCard(vm, ui, car, onSettings, onTrips, onReorder)
     }
@@ -916,13 +916,22 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics") {
 }
 
 @Composable
-private fun AiCard(ui: WearUi, car: CarView) = SectionCard("AI summary") {
+private fun AiCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("AI summary") {
     val text = ui.extras.ai[car.vin]
     if (text.isNullOrBlank()) {
-        Text("No summary yet — generate on your phone", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("No summary yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     } else {
         Text(text, style = MaterialTheme.typography.bodySmall)
     }
+    Spacer(Modifier.height(6.dp))
+    MorphButton(
+        label = "Request summary",
+        icon = Icons.Filled.Refresh,
+        active = false,
+        activeColor = MaterialTheme.colorScheme.primary,
+        pending = "${car.vin}:ai_summary" in ui.pending,
+        onClick = { vm.requestAiSummary(car.vin) },
+    )
 }
 
 @Composable

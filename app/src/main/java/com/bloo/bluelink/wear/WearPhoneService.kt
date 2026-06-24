@@ -1,8 +1,12 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.Ai
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.ClimateSyncStore
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
+import com.bloo.bluelink.data.WearExtras
 import com.bloo.bluelink.data.WearSync
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataEvent
@@ -31,6 +35,26 @@ class WearPhoneService : WearableListenerService() {
         when (event.path) {
             WearSync.PATH_COMMAND -> {
                 val command = WearSync.decodeCommand(String(event.data)) ?: return
+                if (command.action == WearAction.AI_SUMMARY) {
+                    scope.launch {
+                        val ctx = applicationContext
+                        val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == command.vin }
+                        if (snap != null) {
+                            val summary = runCatching { Ai(ctx).summarize("${snap.name} vehicle status: The doors are ${if (snap.locked == true) "locked" else "unlocked"}. Climate is ${if (snap.climateOn == true) "on" else "off"}.${snap.percent?.let { " Battery is at $it%." } ?: ""}${snap.rangeMi?.let { " Range is $it miles." } ?: ""}") }.getOrNull()
+                            if (summary != null) {
+                                // Read the current extras item from the Data Layer, patch the ai map, republish.
+                                val dataClient = Wearable.getDataClient(ctx)
+                                val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
+                                val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
+                                items?.release()
+                                val updated = existing.copy(ai = existing.ai + (command.vin to summary))
+                                WearBridge.publishExtras(ctx, updated)
+                                AppLog.log("AI summary generated for ${snap.name}")
+                            }
+                        }
+                    }
+                    return
+                }
                 scope.launch {
                     val result = WearBridge.execute(applicationContext, command)
                     // Tell the watch how it went, then push the updated snapshots.

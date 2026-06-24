@@ -17,10 +17,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BlooWear">
 
-        <!-- This watch app works without the phone app installed. -->
+        <!-- This watch app requires the phone companion app. -->
         <meta-data
             android:name="com.google.android.wearable.standalone"
-            android:value="true" />
+            android:value="false" />
 
         <uses-library
             android:name="com.google.android.wearable"

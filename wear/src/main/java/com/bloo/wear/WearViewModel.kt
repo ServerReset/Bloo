@@ -280,15 +280,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Loading ----------------------------------------------------------
 
     private suspend fun loadGarage() {
-        val brands = sessionStore.loggedInBrands()
-        val fetched = brands.flatMap { b ->
-            runCatching { BlueLinkGate.statusMutex.withLock { repoFor(b).vehicles() } }.getOrElse { emptyList() }
-        }
-        vehicles = when {
-            fetched.isNotEmpty() -> fetched
-            // No network but the phone already synced cars — show those.
-            snapshots.isNotEmpty() -> snapshots.values.map { it.toVehicle() }
-            else -> emptyList()
+        // Companion mode: rely on phone-synced snapshots. Request a push if we have nothing.
+        vehicles = if (snapshots.isNotEmpty()) {
+            snapshots.values.map { it.toVehicle() }
+        } else {
+            runCatching { WearComms.requestSync(ctx, "", refresh = false) }
+            emptyList()
         }
         publish(WearScreen.Ready)
         // Status is fetched lazily, per car, as pages are shown (see onCarShown).
@@ -319,30 +316,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshStatus(vin: String, surface: Boolean = true) {
-        val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:refresh") {
-            runCatching {
-                BlueLinkGate.statusMutex.withLock { repoFor(v.brand).status(v, refresh = true) }
-            }.onSuccess { s ->
-                if (s != null) {
-                    statuses = statuses + (vin to s)
-                    fetchedAt = fetchedAt + (vin to System.currentTimeMillis())
-                    // Seed the charge-limit sliders from the car's current targets.
-                    val ac = s.evStatus?.reservChargeInfos?.level(1)
-                    val dc = s.evStatus?.reservChargeInfos?.level(0)
-                    _ui.update { u -> u.copy(acLimitDraft = u.acLimitDraft ?: ac, dcLimitDraft = u.dcLimitDraft ?: dc) }
-                    s.vehicleLocation?.coord?.let { c ->
-                        val la = c.lat; val lo = c.lon
-                        if (la != null && lo != null) geocode(vin, la, lo)
-                    }
-                    persistCache()
-                    publish()
-                }
-            }.onFailure { e ->
-                sessionFetched.remove(vin) // allow a retry
-                if (surface) _ui.update { it.copy(message = "Couldn't refresh") }
-                AppLog.log("Watch refresh failed: ${e.message}")
-            }
+            // Companion-first: ask the phone to refresh and push updated data.
+            val relayed = runCatching { WearComms.requestSync(ctx, vin, refresh = true) }.isSuccess
+            if (!relayed && surface) _ui.update { it.copy(message = "Couldn't refresh") }
         }
     }
 
@@ -595,23 +572,52 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Send an AI summary request to the paired phone via the command channel. */
+    fun requestAiSummary(vin: String) {
+        val key = "$vin:ai_summary"
+        mark(key) {
+            runCatching {
+                WearComms.send(
+                    ctx,
+                    com.bloo.bluelink.data.WearCommand(vin = vin, action = com.bloo.bluelink.data.WearAction.AI_SUMMARY),
+                )
+            }.onFailure { e ->
+                _ui.update { it.copy(message = e.message ?: "Could not request summary") }
+                AppLog.log("AI summary request failed: ${e.message}")
+            }
+        }
+    }
+
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {
-            runCatching {
-                BlueLinkGate.statusMutex.withLock { block(v, repoFor(v.brand), statuses[vin]) }
-            }.onSuccess {
+            // Companion-first: relay to phone. Only execute locally if no phone is reachable.
+            val relayed = runCatching { WearComms.send(ctx, toWearCommand(vin, action)) }.isSuccess
+            if (relayed) {
                 publish()
                 sessionFetched.remove(vin)
-                refreshStatus(vin, surface = false)
                 runCatching {
                     androidx.wear.tiles.TileService.getUpdater(ctx)
                         .requestUpdate(com.bloo.wear.tile.BlooTileService::class.java)
                 }
-            }.onFailure { e ->
-                val relayed = runCatching { WearComms.send(ctx, toWearCommand(vin, action)) }.isSuccess
-                if (!relayed) _ui.update { it.copy(message = e.message ?: "Command failed") }
-                AppLog.log("Watch command $action failed: ${e.message}")
+                com.bloo.wear.complication.ComplicationLink.requestUpdate(ctx)
+            } else {
+                // Phone unreachable — fall back to standalone
+                runCatching {
+                    BlueLinkGate.statusMutex.withLock { block(v, repoFor(v.brand), statuses[vin]) }
+                }.onSuccess {
+                    publish()
+                    sessionFetched.remove(vin)
+                    refreshStatus(vin, surface = false)
+                    runCatching {
+                        androidx.wear.tiles.TileService.getUpdater(ctx)
+                            .requestUpdate(com.bloo.wear.tile.BlooTileService::class.java)
+                    }
+                    com.bloo.wear.complication.ComplicationLink.requestUpdate(ctx)
+                }.onFailure { e ->
+                    _ui.update { it.copy(message = e.message ?: "Command failed") }
+                    AppLog.log("Watch command $action failed: ${e.message}")
+                }
             }
         }
     }
