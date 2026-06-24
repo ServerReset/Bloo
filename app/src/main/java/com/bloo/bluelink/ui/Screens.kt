@@ -3567,7 +3567,7 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     Surface(
         modifier = Modifier.fillMaxWidth().then(dragHandle).height(ControlHeight),
         shape = RoundedCornerShape(PebbleCornerCollapsed),
-        color = tintedSurface(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
