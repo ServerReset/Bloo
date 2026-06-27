@@ -124,7 +124,7 @@ internal fun ColorScheme.applyCustomPalette(p: CustomPaletteData): ColorScheme {
 }
 
 /** Recolour the accent roles of a scheme to match [palette] by rotating their hue. */
-private fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
+internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
     val delta = palette.hue - BasePaletteHue
     if (delta == 0f) return this
     fun Color.r() = rotateHue(delta)
@@ -136,6 +136,43 @@ private fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
         tertiary = tertiary.r(), onTertiary = onTertiary.r(),
         tertiaryContainer = tertiaryContainer.r(), onTertiaryContainer = onTertiaryContainer.r(),
     )
+}
+
+/**
+ * Resolve the app's active accent [Color] outside of a Compose context (e.g. widgets,
+ * tiles, notifications). Mirrors the exact logic used by [BlooTheme] so the color is
+ * always consistent with what the app shows.
+ *
+ * Reads system dark-mode state from the [context] configuration; also handles dynamic
+ * color, per-car palette overrides, and the global custom palette.
+ */
+internal fun resolveWidgetAccent(
+    context: Context,
+    appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
+    vin: String? = null,
+): Color {
+    val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+        android.content.res.Configuration.UI_MODE_NIGHT_YES
+    val base = if (isDark) DarkExpressive else LightExpressive
+
+    // Per-car custom palette takes highest priority.
+    val carCustomId = vin?.let { appearance.carCustomPaletteIds[it] }
+    carCustomId?.let { id -> appearance.customPalettes.firstOrNull { it.id == id } }
+        ?.let { return base.applyCustomPalette(it).primary }
+
+    // Global custom palette.
+    appearance.activeCustomPaletteId
+        ?.let { id -> appearance.customPalettes.firstOrNull { it.id == id } }
+        ?.let { return base.applyCustomPalette(it).primary }
+
+    // Dynamic color (Material You) — API 31+.
+    if (appearance.dynamicColor && Build.VERSION.SDK_INT >= 31) {
+        return if (isDark) dynamicDarkColorScheme(context).primary
+               else dynamicLightColorScheme(context).primary
+    }
+
+    // Built-in enum palette.
+    return base.applyPalette(appearance.colorPalette).primary
 }
 
 // --- Expressive color palettes -------------------------------------------

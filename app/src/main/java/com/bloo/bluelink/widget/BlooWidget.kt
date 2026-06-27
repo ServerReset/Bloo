@@ -50,6 +50,7 @@ import com.bloo.bluelink.R
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.ui.resolveWidgetAccent
 import kotlinx.coroutines.flow.first
 
 /**
@@ -118,20 +119,12 @@ class BlooWidget : GlanceAppWidget() {
             if (mapFile.exists()) runCatching { BitmapFactory.decodeFile(mapFile.absolutePath) }.getOrNull() else null
         } else null
 
-        // ── Pull the widget accent directly from the app's active colour palette ──
-        // Use swatch / custom-palette primary as-is — the same colour the app uses
-        // for its own containers.  Only pending needs a derived tint (muted variant).
+        // ── Pull the widget accent from the app's active colour palette ──
+        // resolveWidgetAccent mirrors BlooTheme's palette logic exactly, including
+        // dark-mode adaptation and dynamic color, so the widget always matches the app.
         val theme: WidgetTheme = run {
             val appearance = SettingsStore(context).appearance.first()
-            val vin = snap?.vin
-            val customPalettes = appearance.customPalettes
-            val accentColor: Color = (
-                vin?.let { appearance.carCustomPaletteIds[it] }
-                    ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb?.let { Color(it) } }
-                    ?: appearance.activeCustomPaletteId
-                        ?.let { id -> customPalettes.firstOrNull { it.id == id }?.primaryArgb?.let { Color(it) } }
-                    ?: appearance.colorPalette.swatch
-            )
+            val accentColor: Color = resolveWidgetAccent(context, appearance, snap?.vin)
             val hsv = FloatArray(3)
             android.graphics.Color.colorToHSV(accentColor.toArgb(), hsv)
             // Pending: desaturated + dimmed so in-flight buttons read as muted.
