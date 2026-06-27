@@ -366,7 +366,6 @@ fun BlooTheme(
     val density = LocalDensity.current
     val scaledDensity = Density(density.density, density.fontScale * uiScale)
 
-    val context = LocalContext.current
     val reduceMotion = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
