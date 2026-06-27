@@ -1,5 +1,6 @@
 package com.bloo.wear.tile
 
+import androidx.compose.ui.graphics.toArgb
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DeviceParametersBuilders.DeviceParameters
@@ -11,6 +12,7 @@ import androidx.wear.protolayout.TimelineBuilders
 import androidx.wear.protolayout.material.Chip
 import androidx.wear.protolayout.material.ChipColors
 import androidx.wear.protolayout.material.CircularProgressIndicator
+import androidx.wear.protolayout.material.Colors
 import androidx.wear.protolayout.material.CompactChip
 import androidx.wear.protolayout.material.ProgressIndicatorColors
 import androidx.wear.protolayout.material.Text
@@ -20,6 +22,7 @@ import androidx.wear.protolayout.material.layouts.PrimaryLayout
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WearAction
@@ -27,14 +30,15 @@ import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearCommandRunner
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 
 /**
  * Bloo Wear OS Tile — shows charge level as an edge arc, car name, range, and
- * lock + climate chips. Lock/Unlock and Climate On/Off are executed via the
- * shared [WearCommandRunner] on next tile request (LoadAction).
+ * lock + climate chips. Colors come from the app's active palette so the tile
+ * always matches the phone app theme.
  */
 class BlooTileService : TileService() {
 
@@ -62,14 +66,27 @@ class BlooTileService : TileService() {
             }
         }
         val snapshot = runBlocking { SnapshotStore(ctx).current().selected }
+        val accentArgb = runBlocking { resolveAccent(ctx, snapshot?.vin) }
         val device = params.deviceConfiguration
-        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot)
+        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, accentArgb)
         return TileBuilders.Tile.Builder()
             .setResourcesVersion(RES_VERSION)
             .setFreshnessIntervalMillis(FRESHNESS_MS)
             .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layout))
             .build()
     }
+
+    /** Read the app's active palette accent as an ARGB int. Falls back to brand indigo. */
+    private suspend fun resolveAccent(ctx: android.content.Context, vin: String?): Int =
+        runCatching {
+            val appearance = SettingsStore(ctx).appearance.first()
+            val customs = appearance.customPalettes
+            vin?.let { appearance.carCustomPaletteIds[it] }
+                ?.let { id -> customs.firstOrNull { it.id == id }?.primaryArgb }
+                ?: appearance.activeCustomPaletteId
+                    ?.let { id -> customs.firstOrNull { it.id == id }?.primaryArgb }
+                ?: appearance.colorPalette.swatch.toArgb()
+        }.getOrElse { CLR_ACCENT_DEFAULT }
 
     private fun emptyLayout(
         ctx: android.content.Context,
@@ -90,40 +107,51 @@ class BlooTileService : TileService() {
         ctx: android.content.Context,
         device: DeviceParameters,
         snap: VehicleSnapshot,
+        accentArgb: Int,
     ): LayoutElementBuilders.LayoutElement {
-        val locked = snap.locked == true
-        val charging = snap.charging == true
-        val climate = snap.climateOn == true
-        val pct = snap.percent ?: 0
-        val pctText = "${snap.percent ?: "—"}%"
-        val rngText = snap.rangeMi?.let { "$it mi" } ?: ""
+        val screenDp = device.screenWidthDp
+        // Tight spacing on small watches so chips don't overflow the edge layout's
+        // inner circle. screenWidthDp == screenHeightDp for round watches.
+        val isSmall = screenDp < 193
+        val isTiny  = screenDp < 182
 
-        // Charge arc around the edge.
-        val arcColor = when {
+        val locked   = snap.locked   == true
+        val charging = snap.charging == true
+        val climate  = snap.climateOn == true
+        val pct      = snap.percent ?: 0
+        val pctText  = "${snap.percent ?: "—"}%"
+        val rngText  = snap.rangeMi?.let { "$it mi" } ?: ""
+
+        // Arc: accent for normal charge; semantic red/amber for warnings.
+        val arcArgb = when {
             charging -> CLR_CHARGE
             pct < 15 -> CLR_ERR
             pct < 30 -> CLR_WARN
-            else -> CLR_BLUE
+            else     -> accentArgb
         }
+
+        // Chip palette keyed off the app's accent. Active state = accent fill,
+        // inactive state = dark surface so the difference is immediately clear.
+        val palette = Colors(accentArgb, CLR_WHITE, CLR_SURFACE, CLR_DIM)
+
         val arc = CircularProgressIndicator.Builder()
             .setProgress(pct.coerceIn(0, 100) / 100f)
             .setCircularProgressIndicatorColors(
                 ProgressIndicatorColors.progressIndicatorColors(
-                    // Colors(primary, onPrimary, surface, onSurface):
-                    // primary → arc fill, surface → track background.
-                    androidx.wear.protolayout.material.Colors(
-                        arcColor, CLR_WHITE, CLR_TRACK, CLR_WHITE
-                    )
+                    Colors(arcArgb, CLR_WHITE, CLR_TRACK, CLR_WHITE)
                 )
             )
             .build()
 
-        // Centre column: name · pct · range · status line.
         val statusLine = when {
-            charging -> "Charging" + if (snap.rangeMi != null) " · $rngText" else ""
-            climate -> "Climate on"
-            else -> if (locked) "Locked" else "Unlocked"
+            charging -> "Charging" + if (rngText.isNotEmpty()) " · $rngText" else ""
+            climate  -> "Climate on"
+            else     -> if (locked) "Locked" else "Unlocked"
         }
+        val statusColor = if (charging) CLR_CHARGE else CLR_DIM
+
+        // Shrink the big % number on tiny watches so the column still fits.
+        val pctTypography = if (isTiny) Typography.TYPOGRAPHY_DISPLAY2 else Typography.TYPOGRAPHY_DISPLAY1
 
         val centerCol = LayoutElementBuilders.Column.Builder()
             .addContent(
@@ -135,7 +163,7 @@ class BlooTileService : TileService() {
             )
             .addContent(
                 Text.Builder(ctx, pctText)
-                    .setTypography(Typography.TYPOGRAPHY_DISPLAY1)
+                    .setTypography(pctTypography)
                     .setColor(argb(CLR_WHITE))
                     .setMaxLines(1)
                     .build()
@@ -143,77 +171,46 @@ class BlooTileService : TileService() {
             .addContent(
                 Text.Builder(ctx, statusLine)
                     .setTypography(Typography.TYPOGRAPHY_CAPTION1)
-                    .setColor(argb(if (charging) CLR_CHARGE else CLR_DIM))
+                    .setColor(argb(statusColor))
                     .setMaxLines(1)
                     .build()
             )
             .build()
 
-        // Lock / Unlock chip.
+        // Lock: accent chip = active (locked → "Unlock"), secondary = idle (unlocked → "Lock").
         val lockAction = if (locked) WearAction.UNLOCK else WearAction.LOCK
-        val lockLabel = if (locked) "Unlock" else "Lock"
-        val lockChip = Chip.Builder(
-            ctx,
-            Clickable.Builder()
-                .setId(CMD_PREFIX + lockAction)
-                .setOnClick(ActionBuilders.LoadAction.Builder().build())
-                .build(),
-            device,
-        )
+        val lockLabel  = if (locked) "Unlock" else "Lock"
+        val lockChip = Chip.Builder(ctx, cmd(lockAction), device)
             .setPrimaryLabelContent(lockLabel)
             .setChipColors(
-                if (locked) {
-                    ChipColors.primaryChipColors(
-                        androidx.wear.protolayout.material.Colors.DEFAULT
-                    )
-                } else {
-                    ChipColors.secondaryChipColors(
-                        androidx.wear.protolayout.material.Colors.DEFAULT
-                    )
-                }
+                if (locked) ChipColors.primaryChipColors(palette)
+                else        ChipColors.secondaryChipColors(palette)
             )
             .setWidth(DimensionBuilders.expand())
             .build()
 
-        // Climate On / Off chip.
+        // Climate: accent chip = active (running → "Stop"), secondary = idle (off → "Climate").
+        // Keep labels ≤ 10 chars so they never truncate on any watch size.
         val climateAction = if (climate) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
-        val climateLabel = if (climate) "Stop climate" else "Start climate"
-        val climateChip = Chip.Builder(
-            ctx,
-            Clickable.Builder()
-                .setId(CMD_PREFIX + climateAction)
-                .setOnClick(ActionBuilders.LoadAction.Builder().build())
-                .build(),
-            device,
-        )
+        val climateLabel  = if (climate) "Stop" else "Climate"
+        val climateChip = Chip.Builder(ctx, cmd(climateAction), device)
             .setPrimaryLabelContent(climateLabel)
             .setChipColors(
-                if (climate) {
-                    ChipColors.primaryChipColors(
-                        androidx.wear.protolayout.material.Colors.DEFAULT
-                    )
-                } else {
-                    ChipColors.secondaryChipColors(
-                        androidx.wear.protolayout.material.Colors.DEFAULT
-                    )
-                }
+                if (climate) ChipColors.primaryChipColors(palette)
+                else         ChipColors.secondaryChipColors(palette)
             )
             .setWidth(DimensionBuilders.expand())
             .build()
+
+        // Tighten the gap between chips on smaller screens so the column fits
+        // inside the EdgeContentLayout's inner circle without overflow.
+        val gap = if (isTiny) 1f else if (isSmall) 2f else 4f
 
         val content = LayoutElementBuilders.Column.Builder()
             .addContent(centerCol)
-            .addContent(
-                LayoutElementBuilders.Spacer.Builder()
-                    .setHeight(DimensionBuilders.dp(4f))
-                    .build()
-            )
+            .addContent(spacer(gap))
             .addContent(lockChip)
-            .addContent(
-                LayoutElementBuilders.Spacer.Builder()
-                    .setHeight(DimensionBuilders.dp(4f))
-                    .build()
-            )
+            .addContent(spacer(gap))
             .addContent(climateChip)
             .build()
 
@@ -237,13 +234,9 @@ class BlooTileService : TileService() {
             .build()
     }
 
-    private fun openChip(
-        ctx: android.content.Context,
-        device: DeviceParameters,
-    ): LayoutElementBuilders.LayoutElement =
+    private fun openChip(ctx: android.content.Context, device: DeviceParameters) =
         CompactChip.Builder(
-            ctx,
-            "Open Bloo",
+            ctx, "Open Bloo",
             Clickable.Builder()
                 .setId("open")
                 .setOnClick(
@@ -260,18 +253,28 @@ class BlooTileService : TileService() {
             device,
         ).build()
 
-    private companion object {
-        const val RES_VERSION = "2"
-        const val CMD_PREFIX = "cmd:"
-        const val FRESHNESS_MS = 10L * 60L * 1000L  // 10 min
+    private fun cmd(action: String): Clickable = Clickable.Builder()
+        .setId(CMD_PREFIX + action)
+        .setOnClick(ActionBuilders.LoadAction.Builder().build())
+        .build()
 
-        // Tile palette (ARGB).
-        const val CLR_WHITE = 0xFFFFFFFF.toInt()
-        const val CLR_DIM = 0xFFAAAAAA.toInt()
-        const val CLR_BLUE = 0xFFADC6FF.toInt()
-        const val CLR_CHARGE = 0xFF2EBD59.toInt()
-        const val CLR_WARN = 0xFFF5A623.toInt()
-        const val CLR_ERR = 0xFFE5484D.toInt()
-        const val CLR_TRACK = 0xFF3C3C3C.toInt()
+    private fun spacer(dp: Float): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Spacer.Builder()
+            .setHeight(DimensionBuilders.dp(dp))
+            .build()
+
+    private companion object {
+        const val RES_VERSION    = "3"
+        const val CMD_PREFIX     = "cmd:"
+        const val FRESHNESS_MS   = 10L * 60L * 1000L
+
+        const val CLR_WHITE          = 0xFFFFFFFF.toInt()
+        const val CLR_DIM            = 0xFFAAAAAA.toInt()
+        const val CLR_CHARGE         = 0xFF2EBD59.toInt()
+        const val CLR_WARN           = 0xFFF5A623.toInt()
+        const val CLR_ERR            = 0xFFE5484D.toInt()
+        const val CLR_TRACK          = 0xFF3C3C3C.toInt()
+        const val CLR_SURFACE        = 0xFF1A1B20.toInt()
+        const val CLR_ACCENT_DEFAULT = 0xFF7B83EB.toInt()  // Bloo brand indigo fallback
     }
 }
