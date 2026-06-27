@@ -22,7 +22,6 @@ object WearTiles {
     const val WEATHER = "weather"
     const val INFO = "info"
     const val DIAGNOSTICS = "diagnostics"
-    const val AI = "ai"
     const val ASSIST = "assist"
     const val MORE = "more"
 
@@ -30,7 +29,7 @@ object WearTiles {
 
     val DEFAULT_ORDER = listOf(
         SUMMARY, LOCK, CLIMATE, SMART_CLIMATE, COMFORT, PRESETS, CHARGE, LIMITS,
-        LOCATION, WEATHER, INFO, DIAGNOSTICS, AI, ASSIST, MORE,
+        LOCATION, WEATHER, INFO, DIAGNOSTICS, ASSIST, MORE,
     )
 
     val LABELS = mapOf(
@@ -46,7 +45,6 @@ object WearTiles {
         WEATHER to "Weather",
         INFO to "Info",
         DIAGNOSTICS to "Diagnostics",
-        AI to "AI Summary",
         ASSIST to "Assist",
         MORE to "More",
     )
@@ -71,7 +69,7 @@ object WearPebbles {
         "summary" to listOf(WearTiles.SUMMARY),
         "controls" to listOf(WearTiles.LOCK),
         "charge" to listOf(WearTiles.CHARGE, WearTiles.LIMITS),
-        "ai" to listOf(WearTiles.AI),
+        "ai" to emptyList(),
         "climate" to listOf(WearTiles.CLIMATE, WearTiles.SMART_CLIMATE, WearTiles.COMFORT, WearTiles.PRESETS),
         "info" to listOf(WearTiles.INFO),
         "location" to listOf(WearTiles.LOCATION),

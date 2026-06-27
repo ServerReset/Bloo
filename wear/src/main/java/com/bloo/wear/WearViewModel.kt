@@ -572,28 +572,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Send an AI summary request to the paired phone via the command channel. */
-    fun requestAiSummary(vin: String) {
-        val key = "$vin:ai_summary"
-        mark(key) {
-            runCatching {
-                WearComms.send(
-                    ctx,
-                    com.bloo.bluelink.data.WearCommand(vin = vin, action = com.bloo.bluelink.data.WearAction.AI_SUMMARY),
-                )
-            }.onFailure { e ->
-                _ui.update { it.copy(message = e.message ?: "Could not request summary") }
-                AppLog.log("AI summary request failed: ${e.message}")
-            }
-        }
-    }
-
     private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {
             // Companion-first: relay to phone. Only execute locally if no phone is reachable.
-            val relayed = runCatching { WearComms.send(ctx, toWearCommand(vin, action)) }.isSuccess
+            val wearCommand = toWearCommand(vin, action)
+            val relayed = runCatching { WearComms.send(ctx, wearCommand) }.isSuccess
             if (relayed) {
+                val currentSnap = snapshots[vin]
+                if (currentSnap != null) {
+                    snapshots = snapshots + (vin to com.bloo.bluelink.data.WearCommandRunner.optimistic(currentSnap, wearCommand.action))
+                }
                 publish()
                 sessionFetched.remove(vin)
                 runCatching {

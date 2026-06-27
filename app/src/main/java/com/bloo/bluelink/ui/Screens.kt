@@ -286,7 +286,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.tan
-import java.util.Calendar
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
 
@@ -5213,8 +5212,6 @@ private fun ClimatePebble(
             }
         }
 
-        DepartureScheduleSection(v, state, vm)
-
         SectionLabel("Save")
         MorphTextButton(
             text = "Save as preset",
@@ -5252,61 +5249,6 @@ private fun ClimatePebble(
                     MorphTextButton("Cancel", onClick = { showAddPreset = false })
                 },
             )
-        }
-    }
-}
-
-@Composable
-private fun DepartureScheduleSection(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val schedule = state.departureSchedules[v.vin] ?: SettingsStore.DepartureSchedule()
-    val dow = listOf(
-        Calendar.MONDAY to "Mo",
-        Calendar.TUESDAY to "Tu",
-        Calendar.WEDNESDAY to "We",
-        Calendar.THURSDAY to "Th",
-        Calendar.FRIDAY to "Fr",
-        Calendar.SATURDAY to "Sa",
-        Calendar.SUNDAY to "Su",
-    )
-
-    SectionLabel("Departure")
-    ToggleRow("Precondition before departure", schedule.enabled) { enabled ->
-        vm.setDepartureSchedule(v, schedule.copy(enabled = enabled))
-    }
-
-    if (schedule.enabled) {
-        // Time picker: hour + minute driven by two sliders.
-        val hour = schedule.minutes / 60
-        val minute = schedule.minutes % 60
-        val amPm = if (hour < 12) "AM" else "PM"
-        val display12 = ((if (hour % 12 == 0) 12 else hour % 12)).toString().padStart(2, '0') +
-            ":" + minute.toString().padStart(2, '0') + " " + amPm
-        StepRow("Departure time", display12)
-        AnimatedSlider(
-            value = schedule.minutes.toFloat(),
-            onValueChange = { vm.setDepartureSchedule(v, schedule.copy(minutes = it.roundToInt())) },
-            valueRange = 0f..1439f,
-            steps = 287,
-        )
-
-        Text(
-            "Climate will start ~15 min before this time.",
-            style = MaterialTheme.typography.bodySmall,
-            color = LocalContentColor.current.copy(alpha = 0.7f),
-        )
-
-        Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            dow.forEach { (day, label) ->
-                MorphChip(
-                    selected = day in schedule.days,
-                    onClick = {
-                        val days = if (day in schedule.days) schedule.days - day else schedule.days + day
-                        vm.setDepartureSchedule(v, schedule.copy(days = days))
-                    },
-                    label = label,
-                )
-            }
         }
     }
 }

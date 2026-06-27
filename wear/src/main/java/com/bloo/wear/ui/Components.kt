@@ -257,7 +257,7 @@ fun MorphButton(
     // Match the phone's MorphButton: pill (50%) ↔ rounded square (28%) with a
     // soft expressive spring.
     val corner by animateDpAsState(
-        targetValue = if (active || pending) 12.dp else 50.dp,
+        targetValue = if (active || pending || pressed) 12.dp else 50.dp,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "morphCorner",
     )
