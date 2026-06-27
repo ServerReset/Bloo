@@ -4,7 +4,9 @@ import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,8 +15,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,53 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.foundation.progressSemantics
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
-import androidx.wear.compose.material3.CircularProgressIndicator
-import androidx.wear.compose.material3.FilledTonalButton
-import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.Text
-import androidx.wear.input.RemoteInputIntentHelper
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.Dp
-import coil.compose.AsyncImage
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.ln
-import kotlin.math.tan
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Cloud
@@ -79,10 +35,36 @@ import androidx.compose.material.icons.filled.Thunderstorm
 import androidx.compose.material.icons.filled.Umbrella
 import androidx.compose.material.icons.filled.WbCloudy
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.Text
+import androidx.wear.input.RemoteInputIntentHelper
+import coil.compose.AsyncImage
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.ln
 import kotlin.math.roundToInt
+import kotlin.math.tan
 
 /**
  * The Wear text-entry pattern: tapping launches the system input overlay
@@ -166,7 +148,7 @@ fun relativeLabel(ms: Long?): String {
 }
 
 /** "1h 20m" / "45 min". */
-fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
+fun fmtMinutes(min: Int): String = com.bloo.bluelink.data.fmtMinutes(min)
 
 /** A label → value row used in the details card. */
 @Composable
@@ -228,10 +210,9 @@ fun tempColor(tempF: Int): Color {
 }
 
 /**
- * The phone app's fully custom slider (ported verbatim from Screens.kt's
- * AnimatedSlider): hand-drawn track + tall thumb + tick dots, live finger
- * tracking with a small overshoot, and a soft spring settle onto the nearest
- * step. Claims only horizontal drags, so vertical scrolling/paging still works.
+ * The app's fully custom slider — now a thin wrapper over the single shared
+ * implementation in :uicommon so the hand-drawn track/thumb/tick logic lives in
+ * exactly one place.
  */
 @Composable
 fun AnimatedSlider(
@@ -243,146 +224,37 @@ fun AnimatedSlider(
 ) {
     val haptics = LocalHapticFeedback.current
     val scheme = MaterialTheme.colorScheme
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    var widthPx by remember { mutableFloatStateOf(0f) }
-
-    val anim = remember { Animatable(value) }
-    var dragging by remember { mutableStateOf(false) }
-    var prevStep by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
-
-    LaunchedEffect(value) {
-        if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
-    }
-
-    val trackThickness = 14.dp
-    val thumbW = 6.dp
-    val thumbH = 44.dp
-    val gap = 6.dp
-    val dotR = 2.5.dp
-    val edgePad = 14.dp
-    val edgePadPx = with(density) { edgePad.toPx() }
-
-    val inactiveColor = scheme.surfaceContainerHigh
-    val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
-    val dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f)
-
-    fun rawForX(x: Float): Float {
-        val travel = (widthPx - 2 * edgePadPx).coerceAtLeast(1f)
-        val frac = (x - edgePadPx) / travel
-        return valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
-    }
-    fun trackTo(x: Float) {
-        val raw = rawForX(x)
-        val span = (valueRange.endInclusive - valueRange.start)
-        val overshoot = span * 0.045f
-        val visual = raw.coerceIn(valueRange.start - overshoot, valueRange.endInclusive + overshoot)
-        scope.launch { anim.snapTo(visual) }
-        val clamped = raw.coerceIn(valueRange.start, valueRange.endInclusive)
-        val s = snapToStep(clamped, valueRange, steps)
-        if (steps > 0 && s != prevStep) {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            prevStep = s
-        }
-        onValueChange(s)
-    }
-    fun settleTo(target: Float) {
-        prevStep = target
-        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        onValueChange(target)
-        scope.launch {
-            anim.animateTo(target, animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow))
-        }
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(thumbH)
-            .onSizeChanged { widthPx = it.width.toFloat() }
-            .pointerInput(valueRange, steps) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val slop = viewConfiguration.touchSlop
-                    var claimed = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) {
-                            if (!claimed) {
-                                change.consume()
-                                settleTo(snapToStep(rawForX(down.position.x), valueRange, steps))
-                            }
-                            break
-                        }
-                        if (!claimed) {
-                            val dx = kotlin.math.abs(change.position.x - down.position.x)
-                            val dy = kotlin.math.abs(change.position.y - down.position.y)
-                            when {
-                                dx > slop && dx >= dy -> {
-                                    claimed = true
-                                    dragging = true
-                                    change.consume()
-                                    trackTo(change.position.x)
-                                }
-                                dy > slop -> break
-                            }
-                        } else if (change.positionChanged()) {
-                            trackTo(change.position.x)
-                            change.consume()
-                        }
-                    }
-                    if (claimed) {
-                        dragging = false
-                        settleTo(snapToStep(anim.value, valueRange, steps))
-                    }
-                }
-            }
-            .progressSemantics(anim.value, valueRange, steps),
-    ) {
-        Canvas(Modifier.fillMaxWidth().height(thumbH)) {
-            val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
-            val frac2 = (anim.value - valueRange.start) / span2
-            val halfThumb = thumbW.toPx() / 2f
-            val gapPx = gap.toPx()
-            val padPx = edgePad.toPx()
-            val travel = (size.width - 2 * padPx).coerceAtLeast(0f)
-            val thumbX = padPx + travel * frac2
-            val cy = size.height / 2f
-            val th = trackThickness.toPx()
-            val top = cy - th / 2f
-            val radius = CornerRadius(th / 2f)
-            val cut = halfThumb + gapPx
-
-            val inStart = (thumbX + cut).coerceAtMost(size.width)
-            if (inStart < size.width) {
-                drawRoundRect(inactiveColor, topLeft = Offset(inStart, top), size = Size(size.width - inStart, th), cornerRadius = radius)
-            }
-            val acEnd = (thumbX - cut).coerceAtLeast(0f)
-            if (acEnd > 0f) {
-                drawRoundRect(accent, topLeft = Offset(0f, top), size = Size(acEnd, th), cornerRadius = radius)
-            }
-            if (steps > 0) {
-                val n = steps + 2
-                val rPx = dotR.toPx()
-                for (i in 0 until n) {
-                    val tf = i.toFloat() / (n - 1)
-                    val x = padPx + travel * tf
-                    if (kotlin.math.abs(x - thumbX) < cut) continue
-                    drawCircle(if (x <= thumbX) dotOnActive else dotOnInactive, rPx, Offset(x, cy))
-                }
-            }
-            val twPx = thumbW.toPx()
-            drawRoundRect(accent, topLeft = Offset(thumbX - twPx / 2f, 0f), size = Size(twPx, size.height), cornerRadius = CornerRadius(twPx / 2f))
-        }
-    }
+    com.bloo.uicommon.AnimatedSlider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        steps = steps,
+        accent = accent,
+        inactiveColor = scheme.surfaceContainerHigh,
+        dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
+        dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
+        reduceMotion = LocalReduceMotion.current,
+        onStepTick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+        onSettle = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+    )
 }
 
-private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
-    if (steps <= 0) return v.coerceIn(range.start, range.endInclusive)
-    val inc = (range.endInclusive - range.start) / (steps + 1)
-    val snapped = range.start + Math.round((v - range.start) / inc) * inc
-    return snapped.coerceIn(range.start, range.endInclusive)
+@Composable
+fun WiggleText(
+    text: String,
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+    color: Color = Color.Unspecified,
+    fontWeight: FontWeight? = null,
+    maxLines: Int = 1,
+) {
+    val resolvedColor = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color
+    val mergedStyle = if (fontWeight != null) style.copy(fontWeight = fontWeight) else style
+    com.bloo.uicommon.WiggleText(
+        text = text,
+        style = mergedStyle.copy(color = resolvedColor),
+        maxLines = maxLines,
+        reduceMotion = LocalReduceMotion.current,
+    )
 }
 
 /** The app's pill→rounded-square morphing button, for Wear. */
@@ -425,18 +297,7 @@ fun MorphButton(
 
 // ---- Weather helpers (mirror the phone's WeatherCode mapping) -------------
 
-fun weatherLabel(code: Int): String = when (code) {
-    0 -> "Clear"
-    1, 2 -> "Partly cloudy"
-    3 -> "Cloudy"
-    45, 48 -> "Fog"
-    51, 53, 55, 56, 57 -> "Drizzle"
-    61, 63, 65, 66, 67 -> "Rain"
-    71, 73, 75, 77, 85, 86 -> "Snow"
-    80, 81, 82 -> "Showers"
-    95, 96, 99 -> "Thunderstorm"
-    else -> "—"
-}
+fun weatherLabel(code: Int): String = com.bloo.bluelink.data.weatherLabel(code)
 
 fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
     0 -> if (isDay) Icons.Filled.WbSunny else Icons.Filled.Nightlight
@@ -449,7 +310,7 @@ fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
 }
 
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
-    if (fahrenheit) "${(tempC * 9 / 5 + 32).toInt()}°F" else "${tempC.toInt()}°C"
+    com.bloo.bluelink.data.weatherTemp(tempC, fahrenheit)
 
 @Composable
 fun AnimatedValue(
@@ -459,12 +320,15 @@ fun AnimatedValue(
     fontWeight: FontWeight? = null,
     maxLines: Int = 1,
 ) {
-    AnimatedContent(
-        targetState = value,
-        transitionSpec = {
-            (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 3 }) togetherWith
-            (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 })
-        },
-        label = "animVal",
-    ) { v -> Text(v, style = style, color = color, fontWeight = fontWeight, maxLines = maxLines) }
+    val resolvedColor = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color
+    val mergedStyle = style.copy(
+        color = resolvedColor,
+        fontWeight = fontWeight ?: style.fontWeight,
+    )
+    com.bloo.uicommon.AnimatedValue(
+        value = value,
+        style = mergedStyle,
+        maxLines = maxLines,
+        reduceMotion = LocalReduceMotion.current,
+    )
 }

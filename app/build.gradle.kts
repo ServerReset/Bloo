@@ -78,6 +78,8 @@ dependencies {
 
     // Shared networking / auth / model layer (also consumed by the :wear app).
     implementation(project(":shared"))
+    // Shared foundation-only Compose components (custom slider, WiggleText, etc.).
+    implementation(project(":uicommon"))
     // Wear OS Data Layer — pushes car snapshots to the watch and receives the
     // watch's remote commands.
     implementation("com.google.android.gms:play-services-wearable:18.2.0")

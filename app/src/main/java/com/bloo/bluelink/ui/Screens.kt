@@ -243,6 +243,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -2784,7 +2785,7 @@ private fun RollingNumber(
                 (fadeOut(tween(120)) + slideOutVertically { -dir * it / 2 })
         },
         label = "num",
-    ) { t -> Text(t, style = style, fontWeight = fontWeight, color = color) }
+    ) { t -> WiggleText(t, style = style, fontWeight = fontWeight, color = color) }
 }
 
 /** A coarse, self-ticking "x min ago" string for [millis] (null → null). */
@@ -2960,212 +2961,38 @@ private fun AnimatedSlider(
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    var widthPx by remember { mutableFloatStateOf(0f) }
-
-    // The thumb position is driven continuously so it tracks the finger exactly
-    // while interacting. On release we spring it to the nearest step, giving a
-    // small bounce as it settles.
-    val anim = remember { Animatable(value) }
-    var dragging by remember { mutableStateOf(false) }
-    var prevStep by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
-
-    // Follow external value changes when the user isn't interacting.
-    LaunchedEffect(value) {
-        if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
-    }
-
-    // Geometry of the fully custom track + thumb. Drawing it ourselves (no Material
-    // Slider) keeps the rounded ends clean, lets the thumb sit exactly on its tick,
-    // and insets the end ticks from the track caps so they're not crammed at the edge.
-    val trackThickness = 14.dp
-    val thumbW = 6.dp
-    val thumbH = 44.dp
-    val gap = 6.dp
-    val dotR = 2.5.dp
-    // How far the thumb travel and the tick row are inset from the track caps.
-    val edgePad = 14.dp
-    val edgePadPx = with(density) { edgePad.toPx() }
-
-    val inactiveColor = scheme.surfaceContainerHighest
-    val dotOnActive = scheme.onPrimary.copy(alpha = 0.7f)
-    val dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f)
-
-    // Map an x pixel position onto a raw value, using the same inset travel band
-    // the track is drawn with so the thumb lands exactly under the finger.
-    // The fraction is NOT clamped here so the thumb can visually overshoot the edges
-    // during a drag — it snaps back via spring when released.
-    fun rawForX(x: Float): Float {
-        val travel = (widthPx - 2 * edgePadPx).coerceAtLeast(1f)
-        val frac = (x - edgePadPx) / travel
-        return valueRange.start + frac * (valueRange.endInclusive - valueRange.start)
-    }
-    // While dragging: track the finger live and let the thumb overshoot visually.
-    // Only the clamped value is reported and snapped to a step.
-    fun trackTo(x: Float) {
-        val raw = rawForX(x)
-        // Allow only a small overshoot past the ends so the thumb gives a gentle
-        // nudge off the edge rather than flying far past it.
-        val span = (valueRange.endInclusive - valueRange.start)
-        val overshoot = span * 0.045f
-        val visual = raw.coerceIn(valueRange.start - overshoot, valueRange.endInclusive + overshoot)
-        scope.launch { anim.snapTo(visual) }
-        val clamped = raw.coerceIn(valueRange.start, valueRange.endInclusive)
-        val s = snapToStep(clamped, valueRange, steps)
-        if (steps > 0 && s != prevStep) {
-            haptics?.tick()
-            prevStep = s
-        }
-        onValueChange(s)
-    }
-    // On release (or tap): spring the thumb onto a step and report it. One launch,
-    // so there's no race with live tracking.
-    fun settleTo(target: Float) {
-        prevStep = target
-        haptics?.click()
-        onValueChange(target)
-        scope.launch {
-            anim.animateTo(
-                target,
-                // A slow, gentle settle onto the step — a touch of bounce, but it
-                // glides rather than snapping.
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
-            )
-        }
-    }
-
-    // One gesture handler disambiguates three intents from a single press:
-    //  - release within touch-slop  -> tap: spring the thumb to the tapped step.
-    //  - horizontal movement first  -> drag: claim it, follow the finger live.
-    //  - vertical movement first    -> scroll: bail without consuming so the
-    //                                  enclosing list scrolls as usual.
-    // Nothing is consumed until a horizontal drag (or the tap's release) is
-    // confirmed, so vertical scrolling over a slider keeps working.
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(thumbH)
-            .onSizeChanged { widthPx = it.width.toFloat() }
-            .pointerInput(valueRange, steps) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val slop = viewConfiguration.touchSlop
-                    var claimed = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) {
-                            // Released. If never claimed as a drag, it's a tap.
-                            if (!claimed) {
-                                change.consume()
-                                settleTo(snapToStep(rawForX(down.position.x), valueRange, steps))
-                            }
-                            break
-                        }
-                        if (!claimed) {
-                            val dx = kotlin.math.abs(change.position.x - down.position.x)
-                            val dy = kotlin.math.abs(change.position.y - down.position.y)
-                            when {
-                                dx > slop && dx >= dy -> {
-                                    // Horizontal: claim the gesture as a slider drag.
-                                    claimed = true
-                                    dragging = true
-                                    change.consume()
-                                    trackTo(change.position.x)
-                                }
-                                dy > slop -> break // Vertical: let the parent scroll.
-                            }
-                        } else if (change.positionChanged()) {
-                            trackTo(change.position.x)
-                            change.consume()
-                        }
-                    }
-                    if (claimed) {
-                        dragging = false
-                        settleTo(snapToStep(anim.value, valueRange, steps))
-                    }
-                }
-            }
-            .progressSemantics(anim.value, valueRange, steps),
-    ) {
-        Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(thumbH),
-        ) {
-            val span2 = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
-            // Raw (unclamped) fraction drives the thumb position so it can overshoot the
-            // edges during a drag; the track fill is clamped separately.
-            val frac2 = (anim.value - valueRange.start) / span2
-            val fillFrac = frac2.coerceIn(0f, 1f)
-            val halfThumb = thumbW.toPx() / 2f
-            val gapPx = gap.toPx()
-            val padPx = edgePad.toPx()
-            // Thumb + ticks travel within the inset band; the track bar itself
-            // still spans the full width with rounded caps at the very edges.
-            val travel = (size.width - 2 * padPx).coerceAtLeast(0f)
-            val thumbX = padPx + travel * frac2
-            val cy = size.height / 2f
-            val th = trackThickness.toPx()
-            val top = cy - th / 2f
-            val radius = androidx.compose.ui.geometry.CornerRadius(th / 2f)
-            val cut = halfThumb + gapPx
-
-            // Inactive segment (right of the thumb, up to the right cap).
-            val inStart = (thumbX + cut).coerceAtMost(size.width)
-            if (inStart < size.width) {
-                drawRoundRect(
-                    inactiveColor,
-                    topLeft = Offset(inStart, top),
-                    size = androidx.compose.ui.geometry.Size(size.width - inStart, th),
-                    cornerRadius = radius,
-                )
-            }
-            // Active segment (left cap up to the thumb).
-            val acEnd = (thumbX - cut).coerceAtLeast(0f)
-            if (acEnd > 0f) {
-                drawRoundRect(
-                    accent,
-                    topLeft = Offset(0f, top),
-                    size = androidx.compose.ui.geometry.Size(acEnd, th),
-                    cornerRadius = radius,
-                )
-            }
-            // Tick dots - evenly spaced across the inset band, skipping any
-            // that fall under the thumb.
-            if (steps > 0) {
-                val n = steps + 2
-                val rPx = dotR.toPx()
-                for (i in 0 until n) {
-                    val tf = i.toFloat() / (n - 1)
-                    val x = padPx + travel * tf
-                    if (kotlin.math.abs(x - thumbX) < cut) continue
-                    drawCircle(
-                        if (x <= thumbX) dotOnActive else dotOnInactive,
-                        rPx,
-                        Offset(x, cy),
-                    )
-                }
-            }
-            // The thumb - a tall rounded bar centered on its value.
-            val twPx = thumbW.toPx()
-            drawRoundRect(
-                accent,
-                topLeft = Offset(thumbX - twPx / 2f, 0f),
-                size = androidx.compose.ui.geometry.Size(twPx, size.height),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(twPx / 2f),
-            )
-        }
-    }
+    com.bloo.uicommon.AnimatedSlider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        steps = steps,
+        accent = accent,
+        inactiveColor = scheme.surfaceContainerHighest,
+        dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
+        dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
+        reduceMotion = LocalReduceMotion.current,
+        onStepTick = { haptics?.tick() },
+        onSettle = { haptics?.click() },
+    )
 }
 
-private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
-    if (steps <= 0) return v.coerceIn(range.start, range.endInclusive)
-    val inc = (range.endInclusive - range.start) / (steps + 1)
-    val snapped = range.start + Math.round((v - range.start) / inc) * inc
-    return snapped.coerceIn(range.start, range.endInclusive)
+@Composable
+private fun WiggleText(
+    text: String,
+    style: TextStyle,
+    fontWeight: FontWeight,
+    color: Color = Color.Unspecified,
+) {
+    val resolvedColor = if (color == Color.Unspecified) LocalContentColor.current else color
+    com.bloo.uicommon.WiggleText(
+        text = text,
+        style = style.copy(fontWeight = fontWeight, color = resolvedColor),
+        reduceMotion = LocalReduceMotion.current,
+    )
 }
+
+private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float =
+    com.bloo.uicommon.snapToStep(v, range, steps)
 
 /**
  * Softly fades the top/bottom [length] of a vertically scrolling area instead of
@@ -5920,7 +5747,7 @@ private fun chargerLabel(plugin: Int?): String? = when (plugin) {
     else -> null
 }
 
-private fun fmtMinutes(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
+private fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
 
 /**
  * A climate setpoint (the API reports it as a °F string) rendered in the user's
@@ -7586,7 +7413,7 @@ private fun StatusRow(label: String, value: String) {
                 (fadeOut(tween(100)) + slideOutVertically { -it / 2 })
             },
             label = "statusVal",
-        ) { v -> Text(v, fontWeight = FontWeight.Medium) }
+        ) { v -> WiggleText(v, style = LocalTextStyle.current, fontWeight = FontWeight.Medium) }
     }
 }
 

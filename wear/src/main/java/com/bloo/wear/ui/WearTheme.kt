@@ -1,17 +1,26 @@
 package com.bloo.wear.ui
 
+import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
+import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearSettingsPayload
 
-/** Brand accents reused across the watch UI (mirrors the phone's Screens.kt). */
+/** True when the user has disabled animations in Accessibility settings. */
+val LocalReduceMotion = staticCompositionLocalOf { false }
+
+/** Brand accents reused across the watch UI, sourced from the shared BlooColors. */
 object WearColors {
-    val chargeGreen = Color(0xFF2EBD59)
-    val heat = Color(0xFFE5484D)
-    val cool = Color(0xFF2E78FF)
+    val chargeGreen = Color(BlooColors.chargeGreen)
+    val heat        = Color(BlooColors.heat)
+    val cool        = Color(BlooColors.cool)
 }
 
 /** Build a Wear M3 [ColorScheme] from the phone's resolved role colours. */
@@ -51,9 +60,15 @@ fun schemeFrom(c: WearColorRoles): ColorScheme = ColorScheme(
 @Composable
 fun BlooWearTheme(settings: WearSettingsPayload?, content: @Composable () -> Unit) {
     val colors = settings?.colors
-    if (colors != null) {
-        MaterialTheme(colorScheme = schemeFrom(colors), content = content)
-    } else {
-        MaterialTheme(content = content)
+    val context = LocalContext.current
+    val reduceMotion = remember {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+    CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
+        if (colors != null) {
+            MaterialTheme(colorScheme = schemeFrom(colors), content = content)
+        } else {
+            MaterialTheme(content = content)
+        }
     }
 }

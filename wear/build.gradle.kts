@@ -76,6 +76,8 @@ kotlin {
 
 dependencies {
     implementation(project(":shared"))
+    // Shared foundation-only Compose components (custom slider, WiggleText, etc.).
+    implementation(project(":uicommon"))
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
     implementation("androidx.core:core-ktx:1.15.0")

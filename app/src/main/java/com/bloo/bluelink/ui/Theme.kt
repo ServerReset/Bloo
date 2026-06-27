@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +19,8 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -363,15 +366,26 @@ fun BlooTheme(
     val density = LocalDensity.current
     val scaledDensity = Density(density.density, density.fontScale * uiScale)
 
+    val context = LocalContext.current
+    val reduceMotion = remember {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
     MaterialExpressiveTheme(
         colorScheme = scheme,
         motionScheme = MotionScheme.expressive(),
         typography = expressiveTypography(fontChoice),
         shapes = ExpressiveShapes,
     ) {
-        CompositionLocalProvider(LocalDensity provides scaledDensity, content = content)
+        CompositionLocalProvider(
+            LocalDensity provides scaledDensity,
+            LocalReduceMotion provides reduceMotion,
+            content = content,
+        )
     }
 }
+
+/** True when the user has disabled animations in Accessibility settings. */
+val LocalReduceMotion = staticCompositionLocalOf { false }
 
 /**
  * Overrides only the colour scheme for a per-car custom palette, inheriting
