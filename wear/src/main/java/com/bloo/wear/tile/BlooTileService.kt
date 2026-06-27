@@ -1,6 +1,5 @@
 package com.bloo.wear.tile
 
-import androidx.compose.ui.graphics.toArgb
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DeviceParametersBuilders.DeviceParameters
@@ -22,12 +21,12 @@ import androidx.wear.protolayout.material.layouts.PrimaryLayout
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearCommandRunner
+import com.bloo.wear.WearSettingsStore
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.first
@@ -79,13 +78,10 @@ class BlooTileService : TileService() {
     /** Read the app's active palette accent as an ARGB int. Falls back to brand indigo. */
     private suspend fun resolveAccent(ctx: android.content.Context, vin: String?): Int =
         runCatching {
-            val appearance = SettingsStore(ctx).appearance.first()
-            val customs = appearance.customPalettes
-            vin?.let { appearance.carCustomPaletteIds[it] }
-                ?.let { id -> customs.firstOrNull { it.id == id }?.primaryArgb }
-                ?: appearance.activeCustomPaletteId
-                    ?.let { id -> customs.firstOrNull { it.id == id }?.primaryArgb }
-                ?: appearance.colorPalette.swatch.toArgb()
+            val payload = WearSettingsStore(ctx).flow.first()
+            vin?.let { payload?.carColors?.get(it)?.primary }
+                ?: payload?.colors?.primary
+                ?: CLR_ACCENT_DEFAULT
         }.getOrElse { CLR_ACCENT_DEFAULT }
 
     private fun emptyLayout(
