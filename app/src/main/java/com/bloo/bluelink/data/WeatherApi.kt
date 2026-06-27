@@ -63,6 +63,12 @@ enum class WeatherCode(val label: String) {
     THUNDERSTORM("Thunderstorm"),
     UNKNOWN("—");
 
+    /** A representative WMO integer for this condition — round-trips through [from]. */
+    fun toCode(): Int = when (this) {
+        CLEAR -> 0; PARTLY_CLOUDY -> 1; CLOUDY -> 3; FOG -> 45; DRIZZLE -> 51
+        RAIN -> 61; SHOWERS -> 80; SNOW -> 71; THUNDERSTORM -> 95; UNKNOWN -> -1
+    }
+
     companion object {
         fun from(code: Int): WeatherCode = when (code) {
             0 -> CLEAR

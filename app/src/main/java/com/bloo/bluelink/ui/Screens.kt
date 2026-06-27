@@ -145,13 +145,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.filled.WbCloudy
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Nightlight
-import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.Grain
-import androidx.compose.material.icons.filled.Umbrella
-import androidx.compose.material.icons.filled.Thunderstorm
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -2711,8 +2704,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
 private val ChargeGreen = Color(0xFF2EBD59)
 private val ChargeGreenDark = Color(0xFF1B8A41)
 
-/** Gentle spring damping - present, but not an aggressive overshoot (0.82). */
-private const val SoftDamping = 0.82f
+private val SoftDamping get() = com.bloo.uicommon.SoftDamping
 
 /**
  * When true (cover-screen tiles), pebbles render permanently open with no
@@ -5753,10 +5745,8 @@ private fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
  * A climate setpoint (the API reports it as a °F string) rendered in the user's
  * chosen unit. Non-numeric values pass through with a bare degree sign.
  */
-private fun degLabel(valueF: String, fahrenheit: Boolean): String {
-    val f = valueF.toDoubleOrNull() ?: return "$valueF°"
-    return if (fahrenheit) "${f.roundToInt()}°F" else "${((f - 32) * 5 / 9.0).roundToInt()}°C"
-}
+private fun degLabel(valueF: String, fahrenheit: Boolean): String =
+    com.bloo.bluelink.data.degLabel(valueF, fahrenheit)
 
 /** A descriptive name for a vibrancy multiplier (0 = greyscale, 1 = default, 2 = ultra). */
 private fun vibrancyLabel(v: Float): String = when {
@@ -5825,29 +5815,12 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 // --- Weather --------------------------------------------------------------
 
 /** The icon for a condition, picking a sun/moon variant by day vs night. */
-private fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector = when (code) {
-    WeatherCode.CLEAR -> if (isDay) Icons.Filled.WbSunny else Icons.Filled.Nightlight
-    WeatherCode.PARTLY_CLOUDY -> Icons.Filled.WbCloudy
-    WeatherCode.CLOUDY -> Icons.Filled.Cloud
-    WeatherCode.FOG -> Icons.Filled.BlurOn
-    WeatherCode.DRIZZLE -> Icons.Filled.Grain
-    WeatherCode.RAIN, WeatherCode.SHOWERS -> Icons.Filled.Umbrella
-    WeatherCode.SNOW -> Icons.Filled.AcUnit
-    WeatherCode.THUNDERSTORM -> Icons.Filled.Thunderstorm
-    WeatherCode.UNKNOWN -> Icons.Filled.Cloud
-}
+private fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector =
+    com.bloo.uicommon.weatherIcon(code.toCode(), isDay)
 
-/** A condition-appropriate accent colour for the weather icon. */
 @Composable
-private fun weatherTint(code: WeatherCode, isDay: Boolean): Color = when (code) {
-    WeatherCode.CLEAR -> if (isDay) Color(0xFFFFB300) else Color(0xFFB0BEC5)
-    WeatherCode.PARTLY_CLOUDY -> Color(0xFF90A4AE)
-    WeatherCode.CLOUDY, WeatherCode.FOG -> MaterialTheme.colorScheme.onSurfaceVariant
-    WeatherCode.DRIZZLE, WeatherCode.RAIN, WeatherCode.SHOWERS -> Color(0xFF4FC3F7)
-    WeatherCode.SNOW -> Color(0xFF81D4FA)
-    WeatherCode.THUNDERSTORM -> Color(0xFF9575CD)
-    WeatherCode.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
-}
+private fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
+    com.bloo.uicommon.weatherTint(code.toCode(), isDay, MaterialTheme.colorScheme.onSurfaceVariant)
 
 /**
  * A compact one-line weather readout: icon, temperature and condition, with a

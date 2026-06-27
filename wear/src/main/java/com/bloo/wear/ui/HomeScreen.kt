@@ -841,7 +841,9 @@ private fun WeatherCard(ui: WearUi, car: CarView) = SectionCard("Weather") {
     val w = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather ?: return@SectionCard
     val f = ui.settings?.useFahrenheit != false
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(weatherIcon(w.code, w.isDay), contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(28.dp))
+        Icon(weatherIcon(w.code, w.isDay), contentDescription = null,
+            tint = com.bloo.uicommon.weatherTint(w.code, w.isDay, MaterialTheme.colorScheme.onSurfaceVariant),
+            modifier = Modifier.size(28.dp))
         Column {
             Text(weatherTemp(w.tempC, f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(weatherLabel(w.code), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

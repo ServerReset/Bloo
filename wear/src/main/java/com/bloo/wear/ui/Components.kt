@@ -27,14 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AcUnit
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Nightlight
-import androidx.compose.material.icons.filled.Thunderstorm
-import androidx.compose.material.icons.filled.Umbrella
-import androidx.compose.material.icons.filled.WbCloudy
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -136,16 +128,7 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
 }
 
 /** Relative "x min ago" for a wall-clock timestamp. */
-fun relativeLabel(ms: Long?): String {
-    if (ms == null || ms <= 0) return ""
-    val d = System.currentTimeMillis() - ms
-    return when {
-        d < 60_000 -> "just now"
-        d < 3_600_000 -> "${d / 60_000} min ago"
-        d < 86_400_000 -> "${d / 3_600_000} hr ago"
-        else -> "${d / 86_400_000} d ago"
-    }
-}
+fun relativeLabel(ms: Long?): String = com.bloo.bluelink.data.relativeLabel(ms)
 
 /** "1h 20m" / "45 min". */
 fun fmtMinutes(min: Int): String = com.bloo.bluelink.data.fmtMinutes(min)
@@ -299,15 +282,8 @@ fun MorphButton(
 
 fun weatherLabel(code: Int): String = com.bloo.bluelink.data.weatherLabel(code)
 
-fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
-    0 -> if (isDay) Icons.Filled.WbSunny else Icons.Filled.Nightlight
-    1, 2 -> Icons.Filled.WbCloudy
-    3, 45, 48 -> Icons.Filled.Cloud
-    51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> Icons.Filled.Umbrella
-    71, 73, 75, 77, 85, 86 -> Icons.Filled.AcUnit
-    95, 96, 99 -> Icons.Filled.Thunderstorm
-    else -> Icons.Filled.Cloud
-}
+fun weatherIcon(code: Int, isDay: Boolean): ImageVector =
+    com.bloo.uicommon.weatherIcon(code, isDay)
 
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     com.bloo.bluelink.data.weatherTemp(tempC, fahrenheit)

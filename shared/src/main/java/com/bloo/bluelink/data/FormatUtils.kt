@@ -3,6 +3,27 @@ package com.bloo.bluelink.data
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
+/** "just now" / "x min ago" / "x hr ago" for a wall-clock timestamp in ms. */
+fun relativeLabel(ms: Long?): String {
+    if (ms == null || ms <= 0) return ""
+    val d = System.currentTimeMillis() - ms
+    return when {
+        d < 60_000 -> "just now"
+        d < 3_600_000 -> "${d / 60_000} min ago"
+        d < 86_400_000 -> "${d / 3_600_000} hr ago"
+        else -> "${d / 86_400_000} d ago"
+    }
+}
+
+/**
+ * A climate setpoint (the API reports it as a °F string) rendered in the user's
+ * chosen unit. Non-numeric values pass through with a bare degree sign.
+ */
+fun degLabel(valueF: String, fahrenheit: Boolean): String {
+    val f = valueF.toDoubleOrNull() ?: return "$valueF°"
+    return if (fahrenheit) "${f.toLong()}°F" else "${((f - 32) * 5 / 9.0).toLong()}°C"
+}
+
 /** Human-readable label for a WMO weather code integer. */
 fun weatherLabel(code: Int): String = when (code) {
     0 -> "Clear"
