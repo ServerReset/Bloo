@@ -187,12 +187,27 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                 beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
+                // Smooth fade + subtle squeeze as pages leave/enter.
+                val pageOff by remember(page) {
+                    derivedStateOf {
+                        ((page - carPager.currentPage).toFloat() +
+                            carPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+                    }
+                }
                 val car = ui.cars[page]
                 // active = only the settled page claims rotary focus / input.
                 val active = page == carPager.settledPage && !carPager.isScrollInProgress
                 val carRoles = ui.settings?.carColors?.get(car.vin)
                 val body: @Composable () -> Unit = {
-                    CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
+                    Box(
+                        Modifier.fillMaxSize().graphicsLayer {
+                            alpha  = 1f - pageOff * 0.28f
+                            scaleX = 1f - pageOff * 0.03f
+                            scaleY = 1f - pageOff * 0.03f
+                        }
+                    ) {
+                        CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
+                    }
                 }
                 if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
                 else body()
@@ -336,11 +351,30 @@ private fun CarColumn(
                 .focusable(active),
             state = state,
             flingBehavior = snapFling,
-            contentPadding = PaddingValues(horizontal = if (round) 16.dp else 8.dp, vertical = 40.dp),
+            contentPadding = PaddingValues(vertical = 40.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
-                TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
+                // Cards expand toward full-watch-width when centered and shrink as
+                // they scroll toward the edges — mirrors Wear OS health apps' feel.
+                val centrality by remember {
+                    derivedStateOf {
+                        val info = state.layoutInfo
+                        val vh = info.viewportSize.height.toFloat()
+                        if (vh == 0f) return@derivedStateOf 0f
+                        val vc = vh / 2f
+                        val item = info.visibleItemsInfo.firstOrNull { it.index == i }
+                            ?: return@derivedStateOf 0f
+                        val ic = item.offset.toFloat() + item.size.toFloat() / 2f
+                        (1f - (abs(ic - vc) / vc)).coerceIn(0f, 1f)
+                    }
+                }
+                val maxH = if (round) 18f else 10f
+                val minH = if (round) 3f else 1f
+                val hPad = minH + (maxH - minH) * (1f - centrality)
+                Box(Modifier.fillMaxWidth().padding(horizontal = hPad.dp)) {
+                    TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
+                }
             }
         }
 
