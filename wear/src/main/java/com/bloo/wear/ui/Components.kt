@@ -265,7 +265,8 @@ fun MorphButton(
         label = "morphCorner",
     )
     // Inactive background mirrors buttonContainer() from Theme.kt.
-    val containerColor = lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.18f)
+    // Wear ColorScheme has surfaceContainerHigh but not surfaceContainerHighest.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
     val bg by animateColorAsState(
         targetValue = if (active) activeColor else containerColor,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),

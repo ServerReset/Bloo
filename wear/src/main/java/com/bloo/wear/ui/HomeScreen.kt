@@ -164,10 +164,11 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     }
     val count = ui.cars.size
 
+    // Kept outside key() so scroll positions survive when the VIN list refreshes.
+    val listStates = remember { mutableStateMapOf<String, ScalingLazyListState>() }
+
     key(ui.cars.map { it.vin }) {
         val carPager = rememberPagerState(initialPage = 0) { count }
-
-        val listStates = remember { mutableStateMapOf<String, ScalingLazyListState>() }
 
         val activeCarIndex by remember { derivedStateOf { carPager.settledPage } }
 
@@ -183,37 +184,20 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
         Box(Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = carPager,
-                beyondViewportPageCount = 0,
+                beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val car = ui.cars[page]
-                val showColumn = page == carPager.settledPage
-                val active = showColumn && !carPager.isScrollInProgress
+                // active = only the settled page claims rotary focus / input.
+                val active = page == carPager.settledPage && !carPager.isScrollInProgress
                 val carRoles = ui.settings?.carColors?.get(car.vin)
-                if (showColumn) {
-                    val body: @Composable () -> Unit = {
-                        CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
-                    }
-                    if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
-                    else body()
-                } else {
-                    val body: @Composable () -> Unit = { CarPreview(car, ui) }
-                    if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
-                    else body()
+                val body: @Composable () -> Unit = {
+                    CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
                 }
+                if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
+                else body()
             }
             CurvedIndicator(count, carPager.currentPage, anchor = 90f)
-        }
-    }
-}
-
-/** A cheap, non-focusable snapshot of a car shown while the pager is mid-swipe.
- *  Keeps swiping smooth by not composing the full endless-scroll tile list. */
-@Composable
-private fun CarPreview(car: CarView, ui: WearUi) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Box(Modifier.padding(horizontal = 16.dp)) {
-            SummaryCard(car, ui)
         }
     }
 }
