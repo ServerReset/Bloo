@@ -581,7 +581,27 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             if (relayed) {
                 val currentSnap = snapshots[vin]
                 if (currentSnap != null) {
-                    snapshots = snapshots + (vin to com.bloo.bluelink.data.WearCommandRunner.optimistic(currentSnap, wearCommand.action))
+                    val newSnap = com.bloo.bluelink.data.WearCommandRunner.optimistic(currentSnap, wearCommand.action)
+                    snapshots = snapshots + (vin to newSnap)
+                    // statuses takes priority over snapshots in buildCarView(); flip the relevant
+                    // field so the button label/color reflects the command outcome instantly.
+                    statuses[vin]?.let { s ->
+                        statuses = statuses + (vin to when (wearCommand.action) {
+                            com.bloo.bluelink.data.WearAction.TOGGLE_LOCK,
+                            com.bloo.bluelink.data.WearAction.LOCK,
+                            com.bloo.bluelink.data.WearAction.UNLOCK ->
+                                s.copy(doorLock = newSnap.locked)
+                            com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE,
+                            com.bloo.bluelink.data.WearAction.CLIMATE_ON,
+                            com.bloo.bluelink.data.WearAction.CLIMATE_OFF ->
+                                s.copy(airCtrlOn = newSnap.climateOn)
+                            com.bloo.bluelink.data.WearAction.TOGGLE_CHARGE,
+                            com.bloo.bluelink.data.WearAction.CHARGE_ON,
+                            com.bloo.bluelink.data.WearAction.CHARGE_OFF ->
+                                s.copy(evStatus = (s.evStatus ?: com.bloo.bluelink.data.EvStatus()).copy(batteryCharge = newSnap.charging ?: false))
+                            else -> s
+                        })
+                    }
                 }
                 publish()
                 sessionFetched.remove(vin)
