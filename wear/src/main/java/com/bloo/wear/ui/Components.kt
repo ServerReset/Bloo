@@ -4,7 +4,9 @@ import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
@@ -240,7 +242,7 @@ fun WiggleText(
     )
 }
 
-/** The app's pill→rounded-square morphing button, for Wear. */
+/** The app's pill→rounded-square morphing button, for Wear. Matches the phone's MorphButton. */
 @Composable
 fun MorphButton(
     label: String,
@@ -254,27 +256,46 @@ fun MorphButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
-    // Match the phone's MorphButton: pill (50%) ↔ rounded square (28%) with a
-    // soft expressive spring.
-    val corner by animateDpAsState(
-        targetValue = if (active || pending || pressed) 12.dp else 50.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+    val scheme = MaterialTheme.colorScheme
+
+    // 50% = true pill; 28% = rounded rectangle — phone's exact values with the same spring.
+    val pct by animateFloatAsState(
+        targetValue = if (active || pressed) 28f else 50f,
+        animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphCorner",
     )
+    // Inactive background mirrors buttonContainer() from Theme.kt.
+    val containerColor = lerp(scheme.surfaceContainerHighest, scheme.onSurface, 0.18f)
+    val bg by animateColorAsState(
+        targetValue = if (active) activeColor else containerColor,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "morphBg",
+    )
+    val resolvedContent = if (active) scheme.onPrimary else scheme.onSurface
+
     Button(
-        onClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onClick() },
+        onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick() },
         enabled = !pending,
         interactionSource = interaction,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(corner),
-        colors = if (active) {
-            ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
-        } else {
-            ButtonDefaults.filledTonalButtonColors()
+        modifier = modifier.fillMaxWidth().animateContentSize(
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        ),
+        shape = RoundedCornerShape(percent = pct.roundToInt()),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = bg,
+            contentColor = resolvedContent,
+            disabledContainerColor = bg,
+            disabledContentColor = resolvedContent.copy(alpha = 0.38f),
+        ),
+        border = if (active || pending) null else BorderStroke(1.dp, scheme.outline.copy(alpha = 0.4f)),
+        label = { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) },
+        icon = {
+            if (pending) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp))
+            } else {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
         },
-        border = if (!active && !pending) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)) else null,
-        label = { Text(if (pending) "Sending…" else label, maxLines = 1) },
-        icon = { Icon(icon, contentDescription = null) },
     )
 }
 
