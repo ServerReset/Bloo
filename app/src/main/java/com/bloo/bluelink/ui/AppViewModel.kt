@@ -110,11 +110,11 @@ data class UiState(
     /** Per-VIN pebble pinned to the dual-column "hot spot" (under car info). */
     val hotspotSections: Map<String, String> = emptyMap(),
     /** Quick-tile assignments: index -> (vin, command), or null if unassigned. */
-    val tileConfigs: List<Pair<String, String>?> = List(8) { null },
+    val tileConfigs: List<Pair<String, String>?> = List(12) { null },
     /** Optional per-tile custom names (index -> label or null). */
-    val tileLabels: List<String?> = List(8) { null },
+    val tileLabels: List<String?> = List(12) { null },
     /** Per-tile climate target: "default", "smart", or a preset id. */
-    val tileClimateTargets: List<String> = List(8) { "default" },
+    val tileClimateTargets: List<String> = List(12) { "default" },
     /** Quick tiles run the command in the background (vs opening the app). */
     val tileBackground: Boolean = false,
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */

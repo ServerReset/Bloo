@@ -145,6 +145,46 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+        <service
+            android:name=".tiles.BlooTile9"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_lock"
+            android:label="Bloo tile 9"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".tiles.BlooTile10"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_climate"
+            android:label="Bloo tile 10"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".tiles.BlooTile11"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_lock"
+            android:label="Bloo tile 11"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".tiles.BlooTile12"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_climate"
+            android:label="Bloo tile 12"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <!-- Home-screen widget: pinned car status + four assignable pill buttons. -->
         <receiver

@@ -172,6 +172,8 @@ abstract class BlooTileService : TileService() {
                 BlooTile3::class.java, BlooTile4::class.java,
                 BlooTile5::class.java, BlooTile6::class.java,
                 BlooTile7::class.java, BlooTile8::class.java,
+                BlooTile9::class.java, BlooTile10::class.java,
+                BlooTile11::class.java, BlooTile12::class.java,
             )
             classes.forEach { cls ->
                 runCatching { requestListeningState(context, ComponentName(context, cls)) }
@@ -188,3 +190,7 @@ class BlooTile5 : BlooTileService() { override val index = 4 }
 class BlooTile6 : BlooTileService() { override val index = 5 }
 class BlooTile7 : BlooTileService() { override val index = 6 }
 class BlooTile8 : BlooTileService() { override val index = 7 }
+class BlooTile9 : BlooTileService() { override val index = 8 }
+class BlooTile10 : BlooTileService() { override val index = 9 }
+class BlooTile11 : BlooTileService() { override val index = 10 }
+class BlooTile12 : BlooTileService() { override val index = 11 }
