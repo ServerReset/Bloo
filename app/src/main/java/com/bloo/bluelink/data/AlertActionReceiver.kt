@@ -34,10 +34,10 @@ class AlertActionReceiver : BroadcastReceiver() {
                     .getOrNull()
                 val ok = result?.ok == true
                 val title = if (ok) "$label sent" else "$label failed"
-                val text = when {
-                    ok -> "Bloo sent the command to your car."
-                    result?.message != null -> result.message
-                    else -> "Couldn't reach the car. Try again from the app."
+                val text = if (ok) {
+                    "Bloo sent the command to your car."
+                } else {
+                    result?.message ?: "Couldn't reach the car. Try again from the app."
                 }
                 // Reuse the same id so the follow-up replaces the (now-cancelled) alert.
                 if (notifId != -1) Notifications.post(ctx, notifId, title, text)
