@@ -33,9 +33,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
+import kotlin.coroutines.resume
 
 enum class WearScreen { Loading, SignedOut, Ready }
 
@@ -177,6 +180,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // forth doesn't re-hit the (rate-limited, battery-hungry) network each time.
     private val sessionFetched = mutableSetOf<String>()
     private val tripsFetched = mutableSetOf<String>()
+    // Coords we've already attempted to reverse-geocode (per session), keyed by vin.
+    private val geocoded = mutableSetOf<String>()
 
     private val _ui = MutableStateFlow(WearUi())
     val ui = _ui.asStateFlow()
@@ -389,22 +394,52 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Reverse-geocode the car's coordinates to a human place name. */
-    private fun geocode(vin: String, lat: Double, lon: Double) {
+    /**
+     * Reverse-geocode a car's coordinates to a human place name, once per car per
+     * session. Called by the Location card when it has coordinates. Uses the
+     * non-blocking Geocoder API on API 33+ (the legacy overload can hang) with a
+     * hard timeout, and is a no-op where no geocoder backend is available.
+     */
+    fun ensurePlaceName(vin: String, lat: Double, lon: Double) {
+        if (vin in geocoded || placeNames.containsKey(vin)) return
+        if (!Geocoder.isPresent()) return
+        geocoded.add(vin)
         viewModelScope.launch {
-            val name = withContext(Dispatchers.IO) {
-                runCatching {
-                    @Suppress("DEPRECATION")
-                    val a = Geocoder(ctx, Locale.getDefault()).getFromLocation(lat, lon, 1)?.firstOrNull()
-                    a?.let {
-                        listOfNotNull(it.locality ?: it.subAdminArea, it.adminArea)
-                            .joinToString(", ").ifBlank { it.getAddressLine(0) }
-                    }
-                }.getOrNull()
-            }
+            val name = reverseGeocode(lat, lon)
             if (!name.isNullOrBlank()) {
                 placeNames = placeNames + (vin to name)
                 publish()
+            } else {
+                // Allow a later retry (e.g. coords updated) if this attempt found nothing.
+                geocoded.remove(vin)
+            }
+        }
+    }
+
+    private suspend fun reverseGeocode(lat: Double, lon: Double): String? {
+        val geocoder = Geocoder(ctx, Locale.getDefault())
+        fun format(a: android.location.Address): String? =
+            listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea)
+                .joinToString(", ").ifBlank { a.getAddressLine(0) }
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            withTimeoutOrNull(6000) {
+                suspendCancellableCoroutine { cont ->
+                    geocoder.getFromLocation(lat, lon, 1, object : Geocoder.GeocodeListener {
+                        override fun onGeocode(addresses: MutableList<android.location.Address>) {
+                            if (cont.isActive) cont.resume(addresses.firstOrNull()?.let(::format))
+                        }
+                        override fun onError(message: String?) {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                    })
+                }
+            }
+        } else {
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(6000) {
+                    @Suppress("DEPRECATION")
+                    runCatching { geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()?.let(::format) }.getOrNull()
+                }
             }
         }
     }
@@ -605,11 +640,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 publish()
                 sessionFetched.remove(vin)
-                runCatching {
-                    androidx.wear.tiles.TileService.getUpdater(ctx)
-                        .requestUpdate(com.bloo.wear.tile.BlooTileService::class.java)
-                }
-                com.bloo.wear.complication.ComplicationLink.requestUpdate(ctx)
+                requestWidgetUpdates()
             } else {
                 // Phone unreachable — fall back to standalone
                 runCatching {
@@ -618,11 +649,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     publish()
                     sessionFetched.remove(vin)
                     refreshStatus(vin, surface = false)
-                    runCatching {
-                        androidx.wear.tiles.TileService.getUpdater(ctx)
-                            .requestUpdate(com.bloo.wear.tile.BlooTileService::class.java)
-                    }
-                    com.bloo.wear.complication.ComplicationLink.requestUpdate(ctx)
+                    requestWidgetUpdates()
                 }.onFailure { e ->
                     _ui.update { it.copy(message = e.message ?: "Command failed") }
                     AppLog.log("Watch command $action failed: ${e.message}")
@@ -648,6 +675,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         statuses = statuses + (vin to change(cur))
     }
 
+    /** Nudge the tile and watch-face complication to re-read the updated snapshot. */
+    private fun requestWidgetUpdates() {
+        runCatching {
+            androidx.wear.tiles.TileService.getUpdater(ctx)
+                .requestUpdate(com.bloo.wear.tile.BlooTileService::class.java)
+        }
+        com.bloo.wear.complication.ComplicationLink.requestUpdate(ctx)
+    }
+
     // ---- Plumbing ---------------------------------------------------------
 
     private fun mark(key: String, block: suspend () -> Unit) {
@@ -659,10 +695,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 publish()
             }
         }
-    }
-
-    private suspend fun persistCache() {
-        runCatching { statusCache.save(statuses, emptyMap(), emptyMap(), fetchedAt) }
     }
 
     private fun publish(screen: WearScreen? = null) {

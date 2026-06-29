@@ -131,6 +131,13 @@ import kotlin.math.roundToInt
 /** Synthetic tile key for the alerts card (not part of the user-orderable set). */
 private const val TILE_ALERTS = "alerts"
 
+/** Number of active warnings (open doors/windows/trunk/hood + tire/fluid/key alerts). */
+private val CarView.alertCount: Int
+    get() = doorsOpen.size + windowsOpen.size +
+        (if (trunkOpen) 1 else 0) + (if (hoodOpen) 1 else 0) +
+        (if (tireWarning) 1 else 0) + (if (lowFuel) 1 else 0) +
+        (if (washerLow) 1 else 0) + (if (brakeLow) 1 else 0) + (if (keyFobLow) 1 else 0)
+
 @Composable
 fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit = {}) {
     if (ui.cars.isEmpty()) {
@@ -213,15 +220,15 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                 else body()
             }
             CurvedIndicator(count, carPager.currentPage, anchor = 90f)
+            // Shown once for the whole screen, above all pages.
+            MessageSnackbar(ui.message, onDismiss = { vm.dismissMessage() })
         }
     }
 }
 
 /** The ordered tiles actually shown for this car (conditions resolved once). */
 private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
-    val hasAlerts = car.doorsOpen.isNotEmpty() || car.windowsOpen.isNotEmpty() ||
-        car.trunkOpen || car.hoodOpen || car.tireWarning ||
-        car.lowFuel || car.brakeLow || car.washerLow || car.keyFobLow
+    val hasAlerts = car.alertCount > 0
     val out = ArrayList<String>()
     if (hasAlerts) out.add(TILE_ALERTS)
     // Tile order is derived from this car's pebble order, kept in sync with the
@@ -392,39 +399,46 @@ private fun CarColumn(
             phoneConnected = ui.phoneConnected,
             onRefresh = { vm.refreshStatus(car.vin) },
         )
+    }
+}
 
-        // Auto-dismissing message snackbar at the bottom.
-        if (ui.message != null) {
-            LaunchedEffect(ui.message) {
-                delay(3500)
-                vm.dismissMessage()
-            }
+/**
+ * Auto-dismissing status snackbar, error-tinted for failures. Lives at the
+ * HomeScreen level (not inside CarColumn) so the pager's adjacent pre-composed
+ * pages don't each spin up their own copy + dismiss timer.
+ */
+@Composable
+private fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
+    if (message != null) {
+        LaunchedEffect(message) {
+            delay(3500)
+            onDismiss()
         }
-        val isErrorMsg = ui.message?.let {
-            it.contains("fail", ignoreCase = true) || it.contains("error", ignoreCase = true) ||
-            it.contains("couldn't", ignoreCase = true) || it.contains("can't", ignoreCase = true) ||
-            it.contains("denied", ignoreCase = true)
-        } == true
-        AnimatedVisibility(
-            visible = ui.message != null,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
+    }
+    val isError = message?.let {
+        it.contains("fail", ignoreCase = true) || it.contains("error", ignoreCase = true) ||
+        it.contains("couldn't", ignoreCase = true) || it.contains("can't", ignoreCase = true) ||
+        it.contains("denied", ignoreCase = true)
+    } == true
+    AnimatedVisibility(
+        visible = message != null,
+        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer)
+                .clickable { onDismiss() }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(if (isErrorMsg) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable { vm.dismissMessage() }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text(
-                    ui.message ?: "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isErrorMsg) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                )
-            }
+            Text(
+                message ?: "",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+            )
         }
     }
 }
@@ -652,12 +666,7 @@ private fun AlertsCard(car: CarView) {
 
 @Composable
 private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
-    val alertCount = with(car) {
-        doorsOpen.size + windowsOpen.size +
-            (if (trunkOpen) 1 else 0) + (if (hoodOpen) 1 else 0) +
-            (if (tireWarning) 1 else 0) + (if (lowFuel) 1 else 0) +
-            (if (washerLow) 1 else 0) + (if (brakeLow) 1 else 0) + (if (keyFobLow) 1 else 0)
-    }
+    val alertCount = car.alertCount
     val isStale = car.fetchedAt != null && System.currentTimeMillis() - car.fetchedAt > 30 * 60 * 1000L
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(contentAlignment = Alignment.TopEnd) {
@@ -917,6 +926,10 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
     val lat = car.lat ?: 0.0
     val lon = car.lon ?: 0.0
     val context = LocalContext.current
+    // Resolve a human-readable place name the first time we have coordinates.
+    LaunchedEffect(car.vin, car.lat, car.lon) {
+        if (car.lat != null && car.lon != null) vm.ensurePlaceName(car.vin, car.lat, car.lon)
+    }
     MapThumbnail(lat, lon)
     Spacer(Modifier.height(4.dp))
     Text(
@@ -1097,12 +1110,7 @@ private fun AssistCard(car: CarView) = SectionCard("Assist") {
 @Composable
 private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit) = SectionCard("More") {
     val accent = MaterialTheme.colorScheme.primary
-    val alertCount = with(car) {
-        doorsOpen.size + windowsOpen.size +
-            (if (trunkOpen) 1 else 0) + (if (hoodOpen) 1 else 0) +
-            (if (tireWarning) 1 else 0) + (if (lowFuel) 1 else 0) +
-            (if (washerLow) 1 else 0) + (if (brakeLow) 1 else 0) + (if (keyFobLow) 1 else 0)
-    }
+    val alertCount = car.alertCount
     if (alertCount > 0) {
         StatusRow(
             "Alerts",
