@@ -6648,22 +6648,20 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Quick Settings tiles
             SettingsCard("Quick tiles") {
                 Text(
-                    "Assign each Quick Settings tile to a car and action, then add the tiles " +
-                        "from your notification shade's edit screen.",
+                    "Set up to two quick tiles per car (e.g. Lock and Climate), then add the " +
+                        "tiles from your notification shade's edit screen.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 ToggleRow("Run command in background", state.tileBackground) { vm.setTileBackground(it) }
                 Text(
-                    if (state.tileBackground) "Tiles fire the command directly (no app open)."
-                    else "Tiles open Bloo and run the command there.",
+                    if (state.tileBackground) "Tiles fire the command directly, then toast what was sent."
+                    else "Tiles briefly open Bloo to send, then close.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(4.dp))
-                for (i in 0 until com.bloo.bluelink.data.TILE_COUNT) {
-                    TileAssignRow(i, state, vm)
-                }
+                QuickTilesPerCar(state, vm)
             }
 
             // Security
@@ -7220,11 +7218,47 @@ private val TileActions = listOf(
 
 /** One Quick Settings tile's car + action assignment, via two dropdowns. */
 @Composable
-private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
-    val cfg = state.tileConfigs.getOrNull(index)
-    val car = cfg?.let { c -> state.vehicles.firstOrNull { it.vin == c.first } }
-    val action = cfg?.second
-    var carMenu by remember { mutableStateOf(false) }
+private fun QuickTilesPerCar(state: UiState, vm: AppViewModel) {
+    if (state.vehicles.isEmpty()) {
+        Text(
+            "Add a car to set up quick tiles.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    val count = com.bloo.bluelink.data.TILE_COUNT
+    state.vehicles.forEach { car ->
+        Spacer(Modifier.height(6.dp))
+        Text(
+            car.name,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        val assigned = (0 until count).filter { state.tileConfigs.getOrNull(it)?.first == car.vin }
+        val slots = assigned.take(2)
+        slots.forEach { idx -> TileSlotRow(idx, car.vin, state, vm) }
+        if (slots.size < 2) {
+            val free = (0 until count).firstOrNull { state.tileConfigs.getOrNull(it) == null }
+            if (free != null) {
+                MorphTextButton(
+                    "+ Add quick tile",
+                    onClick = { vm.setTileAssignment(free, car.vin, if (slots.isEmpty()) "doors" else "climate") },
+                )
+            } else {
+                Text(
+                    "All $count tiles are in use — remove one to add another.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TileSlotRow(index: Int, vin: String, state: UiState, vm: AppViewModel) {
+    val action = state.tileConfigs.getOrNull(index)?.second
     var actMenu by remember { mutableStateOf(false) }
     var climMenu by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -7233,38 +7267,26 @@ private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Tile ${index + 1}", style = MaterialTheme.typography.bodyMedium)
+            Text("Tile ${index + 1}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
-            Box {
-                MorphTextButton(car?.name?.take(10) ?: "Car", onClick = { carMenu = true })
-                DropdownMenu(expanded = carMenu, onDismissRequest = { carMenu = false }) {
-                    DropdownMenuItem(text = { Text("None") }, onClick = {
-                        vm.setTileAssignment(index, null, null); carMenu = false
-                    })
-                    state.vehicles.forEach { v ->
-                        DropdownMenuItem(text = { Text(v.name) }, onClick = {
-                            vm.setTileAssignment(index, v.vin, action ?: "doors"); carMenu = false
-                        })
-                    }
-                }
-            }
             Box {
                 MorphTextButton(
                     TileActions.firstOrNull { it.first == action }?.second ?: "Action",
                     onClick = { actMenu = true },
-                    enabled = car != null,
                 )
                 DropdownMenu(expanded = actMenu, onDismissRequest = { actMenu = false }) {
                     TileActions.forEach { (cmd, label) ->
                         DropdownMenuItem(text = { Text(label) }, onClick = {
-                            car?.let { vm.setTileAssignment(index, it.vin, cmd) }; actMenu = false
+                            vm.setTileAssignment(index, vin, cmd); actMenu = false
                         })
                     }
+                    DropdownMenuItem(text = { Text("Remove") }, onClick = {
+                        vm.setTileAssignment(index, null, null); actMenu = false
+                    })
                 }
             }
         }
-        // Custom name + climate target only matter once a car is assigned.
-        if (car != null && action != null && action != "open") {
+        if (action != null && action != "open") {
             var name by remember(state.tileLabels.getOrNull(index)) {
                 mutableStateOf(state.tileLabels.getOrNull(index).orEmpty())
             }
@@ -7277,7 +7299,7 @@ private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
             if (action == "climate") {
-                val presets = state.climatePresets[car.vin].orEmpty()
+                val presets = state.climatePresets[vin].orEmpty()
                 val target = state.tileClimateTargets.getOrNull(index) ?: "default"
                 val targetLabel = when (target) {
                     "default" -> "Basic (72°F)"

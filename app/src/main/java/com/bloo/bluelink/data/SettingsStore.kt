@@ -69,8 +69,8 @@ val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", 
 /** Pebbles the user may hide (the others are essential). */
 val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trips", "info", "diagnostics", "ai")
 
-/** Number of configurable Quick Settings tiles. */
-const val TILE_COUNT = 4
+/** Number of configurable Quick Settings tiles (room for ~two per car). */
+const val TILE_COUNT = 8
 
 /** App appearance preferences, kept separate from the session so sign-out keeps them. */
 class SettingsStore(private val context: Context) {
