@@ -136,6 +136,12 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.Bloo.Transparent" />
 
+        <!-- Runs an alert notification's action button (e.g. Lock / Turn off),
+             including taps bridged from the watch. -->
+        <receiver
+            android:name=".data.AlertActionReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

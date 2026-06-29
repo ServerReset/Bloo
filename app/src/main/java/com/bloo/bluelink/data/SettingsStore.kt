@@ -188,6 +188,8 @@ class SettingsStore(private val context: Context) {
         val service: Boolean = true,
         val doorOpen: Boolean = true,
         val doorOpenMinutes: Int = 5,
+        val running: Boolean = true,
+        val runningMinutes: Int = 10,
     )
 
     suspend fun notificationPrefs(): NotificationPrefs {
@@ -196,6 +198,8 @@ class SettingsStore(private val context: Context) {
             service = p[booleanPreferencesKey("notify_service")] ?: true,
             doorOpen = p[booleanPreferencesKey("notify_door")] ?: true,
             doorOpenMinutes = p[stringPreferencesKey("notify_door_min")]?.toIntOrNull() ?: 5,
+            running = p[booleanPreferencesKey("notify_running")] ?: true,
+            runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
         )
     }
 
@@ -204,6 +208,8 @@ class SettingsStore(private val context: Context) {
             service = p[booleanPreferencesKey("notify_service")] ?: true,
             doorOpen = p[booleanPreferencesKey("notify_door")] ?: true,
             doorOpenMinutes = p[stringPreferencesKey("notify_door_min")]?.toIntOrNull() ?: 5,
+            running = p[booleanPreferencesKey("notify_running")] ?: true,
+            runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
         )
     }
 
@@ -216,6 +222,12 @@ class SettingsStore(private val context: Context) {
     suspend fun setDoorOpenMinutes(v: Int) =
         context.settingsDataStore.edit { it[stringPreferencesKey("notify_door_min")] = v.toString() }.let {}
 
+    suspend fun setNotifyRunning(v: Boolean) =
+        context.settingsDataStore.edit { it[booleanPreferencesKey("notify_running")] = v }.let {}
+
+    suspend fun setRunningMinutes(v: Int) =
+        context.settingsDataStore.edit { it[stringPreferencesKey("notify_running_min")] = v.toString() }.let {}
+
     // Transient alert bookkeeping (per car), used to fire each alert only once.
     suspend fun doorOpenSince(vin: String): Long? =
         context.settingsDataStore.data.first()[stringPreferencesKey("door_since_$vin")]?.toLongOrNull()
@@ -223,6 +235,16 @@ class SettingsStore(private val context: Context) {
     suspend fun setDoorOpenSince(vin: String, value: Long?) {
         context.settingsDataStore.edit {
             val k = stringPreferencesKey("door_since_$vin")
+            if (value == null) it.remove(k) else it[k] = value.toString()
+        }
+    }
+
+    suspend fun engineOnSince(vin: String): Long? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("engine_since_$vin")]?.toLongOrNull()
+
+    suspend fun setEngineOnSince(vin: String, value: Long?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("engine_since_$vin")
             if (value == null) it.remove(k) else it[k] = value.toString()
         }
     }

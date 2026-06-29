@@ -282,13 +282,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
-        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text) }
+        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions) }
         alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text) } }
     }
 
     fun setNotifyService(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyService(v) }
     fun setNotifyDoor(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyDoor(v) }
     fun setDoorOpenMinutes(m: Int) = viewModelScope.launch { settingsStore.setDoorOpenMinutes(m) }
+    fun setNotifyRunning(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyRunning(v) }
+    fun setRunningMinutes(m: Int) = viewModelScope.launch { settingsStore.setRunningMinutes(m) }
 
     /** Write the current live status/location maps to disk (survives restart). */
     private fun persistCache() {

@@ -6620,9 +6620,26 @@ private fun SettingsScreen(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
                 }
+                ToggleRow("Car-running alerts", notif.running) { vm.setNotifyRunning(it) }
+                if (notif.running) {
+                    var runMin by remember(notif.runningMinutes) { mutableStateOf(notif.runningMinutes.toString()) }
+                    OutlinedTextField(
+                        value = runMin,
+                        onValueChange = {
+                            runMin = it.filter(Char::isDigit)
+                            runMin.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setRunningMinutes)
+                        },
+                        label = { Text("Running minutes") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
                 Text(
-                    "Background checks run roughly every 30 minutes, so door alerts may " +
-                        "arrive a little after your set time.",
+                    "Background checks run roughly every 30 minutes, so alerts may " +
+                        "arrive a little after your set time. Door and running alerts " +
+                        "include a one-tap action to lock or turn the car off.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -7075,6 +7092,9 @@ private fun SettingsSearchResults(
     }
     add("Door-left-open alerts", "notification door open") {
         ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
+    }
+    add("Car-running alerts", "notification engine climate running left on") {
+        ToggleRow("Car-running alerts", notif.running) { vm.setNotifyRunning(it) }
     }
 
     // --- Per-car ---
