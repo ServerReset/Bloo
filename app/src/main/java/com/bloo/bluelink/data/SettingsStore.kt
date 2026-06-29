@@ -473,6 +473,29 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** Optional user-chosen label shown on the tile (null → derive from state). */
+    suspend fun tileLabel(index: Int): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("tile_${index}_label")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setTileLabel(index: Int, label: String?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("tile_${index}_label")
+            if (label.isNullOrBlank()) it.remove(k) else it[k] = label.trim()
+        }
+    }
+
+    /** What the climate tile runs: "default", "smart", or a preset id. */
+    suspend fun tileClimateTarget(index: Int): String =
+        context.settingsDataStore.data.first()[stringPreferencesKey("tile_${index}_climate")]
+            ?.takeIf { it.isNotBlank() } ?: "default"
+
+    suspend fun setTileClimateTarget(index: Int, target: String?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("tile_${index}_climate")
+            if (target.isNullOrBlank()) it.remove(k) else it[k] = target
+        }
+    }
+
     /** When true, tiles run the command in the background; else they open the app. */
     suspend fun tileBackground(): Boolean =
         context.settingsDataStore.data.first()[booleanPreferencesKey("tile_background")] ?: false

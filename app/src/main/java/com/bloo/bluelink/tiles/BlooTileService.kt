@@ -4,27 +4,30 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.widget.Toast
 import com.bloo.bluelink.MainActivity
+import com.bloo.bluelink.R
 import com.bloo.bluelink.Shortcuts
-import com.bloo.bluelink.data.Brand
-import com.bloo.bluelink.data.ClimateRequest
-import com.bloo.bluelink.data.CredentialStore
-import com.bloo.bluelink.data.SessionStore
-import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.TileCommandRunner
+import com.bloo.bluelink.data.VehicleSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * A configurable Quick Settings tile. Each tile is assigned a car + action in
- * Settings. Tapping it either runs the command in the background (using the
- * stored session) or opens the app and runs it, per the user's preference.
+ * Settings, with an optional custom name. The tile reflects the car's live state
+ * (locked/unlocked, climate on/off, charging) with matching icons, and tapping it
+ * toggles that state — either silently in the background or via a quick
+ * open-send-close surface, per the user's preference.
  */
 abstract class BlooTileService : TileService() {
 
@@ -38,21 +41,55 @@ abstract class BlooTileService : TileService() {
 
     private suspend fun render() {
         val tile = qsTile ?: return
-        val cfg = SettingsStore(applicationContext).tileConfig(index)
+        val ctx = applicationContext
+        val cfg = SettingsStore(ctx).tileConfig(index)
         if (cfg == null) {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = "Bloo tile ${index + 1}"
+            tile.label = SettingsStore(ctx).tileLabel(index) ?: "Bloo tile ${index + 1}"
+            tile.icon = Icon.createWithResource(ctx, R.drawable.ic_shortcut_car)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = "Unassigned"
-        } else {
-            val (vin, cmd) = cfg
-            val name = runCatching {
-                SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin }?.name
-            }.getOrNull() ?: "Car"
-            tile.state = Tile.STATE_ACTIVE
-            tile.label = cmd.replaceFirstChar { it.uppercase() }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = name
+            tile.updateTile()
+            return
         }
+        val (vin, cmd) = cfg
+        val snap = runCatching {
+            SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
+        }.getOrNull()
+        val custom = SettingsStore(ctx).tileLabel(index)
+
+        tile.state = if (isActiveState(cmd, snap)) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        tile.icon = Icon.createWithResource(ctx, iconFor(cmd, snap))
+        tile.label = custom ?: defaultLabel(cmd, snap)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = snap?.name ?: "Car"
         tile.updateTile()
+    }
+
+    /** Whether the tile should read as "on" given the car's current state. */
+    private fun isActiveState(cmd: String, snap: VehicleSnapshot?): Boolean = when (cmd) {
+        "doors", "lock" -> snap?.locked == true
+        "unlock" -> snap?.locked == false
+        "climate" -> snap?.climateOn == true
+        "charge" -> snap?.charging == true
+        else -> false
+    }
+
+    private fun iconFor(cmd: String, snap: VehicleSnapshot?): Int = when (cmd) {
+        "doors" -> if (snap?.locked == false) R.drawable.ic_shortcut_unlock else R.drawable.ic_shortcut_lock
+        "lock" -> R.drawable.ic_shortcut_lock
+        "unlock" -> R.drawable.ic_shortcut_unlock
+        "climate" -> R.drawable.ic_shortcut_climate
+        "charge" -> R.drawable.ic_widget_bolt
+        else -> R.drawable.ic_shortcut_car
+    }
+
+    private fun defaultLabel(cmd: String, snap: VehicleSnapshot?): String = when (cmd) {
+        "doors" -> if (snap?.locked == false) "Unlocked" else "Locked"
+        "lock" -> "Lock"
+        "unlock" -> "Unlock"
+        "climate" -> if (snap?.climateOn == true) "Climate on" else "Climate"
+        "charge" -> if (snap?.charging == true) "Charging" else "Charge"
+        "open" -> "Open"
+        else -> cmd.replaceFirstChar { it.uppercase() }
     }
 
     override fun onClick() {
@@ -60,18 +97,23 @@ abstract class BlooTileService : TileService() {
         val ctx = applicationContext
         scope.launch {
             val cfg = SettingsStore(ctx).tileConfig(index)
-            if (cfg == null) {
-                openApp(null, null)
-                return@launch
-            }
+            if (cfg == null) { openApp(null, null); return@launch }
             val (vin, cmd) = cfg
-            // "open" always opens the app; otherwise honour the background setting.
-            if (cmd != "open" && SettingsStore(ctx).tileBackground()) {
-                runInBackground(ctx, vin, cmd)
-            } else {
-                openApp(vin, cmd)
+            when {
+                cmd == "open" -> openApp(vin, cmd)
+                SettingsStore(ctx).tileBackground() -> runBackground(ctx, vin, cmd)
+                else -> launchActionActivity(vin, cmd)
             }
         }
+    }
+
+    /** Background mode: run with the stored session, toast the result, reflect it. */
+    private suspend fun runBackground(ctx: Context, vin: String, cmd: String) {
+        val target = SettingsStore(ctx).tileClimateTarget(index)
+        val result = withContext(Dispatchers.IO) { TileCommandRunner.run(ctx, vin, cmd, target) }
+        Toast.makeText(ctx, result.message, Toast.LENGTH_SHORT).show()
+        render()
+        requestUpdates(ctx)
     }
 
     /** Open Bloo and let it run the command (reuses the shortcut routing). */
@@ -84,6 +126,21 @@ abstract class BlooTileService : TileService() {
                 putExtra(Shortcuts.EXTRA_CMD, cmd)
             }
         }
+        collapseAndStart(intent)
+    }
+
+    /** Open-and-close mode: a transparent activity runs the command then finishes. */
+    private fun launchActionActivity(vin: String, cmd: String) {
+        val intent = Intent(this, TileActionActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(TileActionActivity.EXTRA_VIN, vin)
+            putExtra(TileActionActivity.EXTRA_CMD, cmd)
+            putExtra(TileActionActivity.EXTRA_INDEX, index)
+        }
+        collapseAndStart(intent)
+    }
+
+    private fun collapseAndStart(intent: Intent) {
         val run = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 val pi = PendingIntent.getActivity(
@@ -97,28 +154,6 @@ abstract class BlooTileService : TileService() {
             }
         }
         if (isLocked) unlockAndRun(run) else run()
-    }
-
-    /** Fire the command directly from the tile using the stored session. */
-    private fun runInBackground(ctx: Context, vin: String, cmd: String) {
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin } ?: return@runCatching
-                val v = snap.toVehicle()
-                val brand = Brand.fromIndicator(v.brandIndicator)
-                val repo = repositoryFor(brand, SessionStore(ctx), CredentialStore(ctx))
-                when (cmd) {
-                    // Toggles based on the last-known snapshot state.
-                    "doors" -> if (snap.locked == true) repo.unlock(v) else repo.lock(v)
-                    "climate" -> if (snap.climateOn == true) repo.stopClimate(v) else {
-                        repo.startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
-                    }
-                    "lock" -> repo.lock(v)
-                    "unlock" -> repo.unlock(v)
-                    "charge" -> repo.startCharge(v)
-                }
-            }
-        }
     }
 
     companion object {

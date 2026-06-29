@@ -111,6 +111,10 @@ data class UiState(
     val hotspotSections: Map<String, String> = emptyMap(),
     /** Quick-tile assignments: index -> (vin, command), or null if unassigned. */
     val tileConfigs: List<Pair<String, String>?> = List(4) { null },
+    /** Optional per-tile custom names (index -> label or null). */
+    val tileLabels: List<String?> = List(4) { null },
+    /** Per-tile climate target: "default", "smart", or a preset id. */
+    val tileClimateTargets: List<String> = List(4) { "default" },
     /** Quick tiles run the command in the background (vs opening the app). */
     val tileBackground: Boolean = false,
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
@@ -586,6 +590,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
         val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
         val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
+        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it) }
+        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it) }
         val tileBackground = settingsStore.tileBackground()
         val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
@@ -610,6 +616,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 hiddenPebbles = hidden,
                 hotspotSections = hotspots,
                 tileConfigs = tileConfigs,
+                tileLabels = tileLabels,
+                tileClimateTargets = tileClimateTargets,
                 tileBackground = tileBackground,
                 shortcutSet = shortcutSet,
                 currentIndex = index,
@@ -1143,6 +1151,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Set (or clear with null/blank) a tile's custom display name. */
+    fun setTileLabel(index: Int, label: String?) {
+        _state.update {
+            val list = it.tileLabels.toMutableList()
+            if (index in list.indices) list[index] = label?.trim()?.takeIf { s -> s.isNotEmpty() }
+            it.copy(tileLabels = list)
+        }
+        viewModelScope.launch {
+            settingsStore.setTileLabel(index, label)
+            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
+        }
+    }
+
+    /** Set what the climate tile runs: "default", "smart", or a preset id. */
+    fun setTileClimateTarget(index: Int, target: String) {
+        _state.update {
+            val list = it.tileClimateTargets.toMutableList()
+            if (index in list.indices) list[index] = target
+            it.copy(tileClimateTargets = list)
+        }
+        viewModelScope.launch { settingsStore.setTileClimateTarget(index, target) }
+    }
+
     fun setTileBackground(value: Boolean) {
         _state.update { it.copy(tileBackground = value) }
         viewModelScope.launch {
@@ -1376,6 +1407,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     st.copy(statuses = statuses)
                 }
                 persistSnapshots()
+                // Keep the Quick Settings tiles' state/icon in sync with the car.
+                runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication()) }
                 // Auto-AI: a command changed the car's state, refresh the summary.
                 _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
             } catch (e: Exception) {

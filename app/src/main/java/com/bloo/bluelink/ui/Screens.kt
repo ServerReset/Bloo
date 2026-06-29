@@ -7211,7 +7211,12 @@ private fun SettingsSearchResults(
     }
 }
 
-private val TileActions = listOf("doors" to "Lock / unlock", "climate" to "Climate", "open" to "Open")
+private val TileActions = listOf(
+    "doors" to "Lock / unlock",
+    "climate" to "Climate",
+    "charge" to "Charge",
+    "open" to "Open",
+)
 
 /** One Quick Settings tile's car + action assignment, via two dropdowns. */
 @Composable
@@ -7221,37 +7226,87 @@ private fun TileAssignRow(index: Int, state: UiState, vm: AppViewModel) {
     val action = cfg?.second
     var carMenu by remember { mutableStateOf(false) }
     var actMenu by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("Tile ${index + 1}", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.weight(1f))
-        Box {
-            MorphTextButton(car?.name?.take(10) ?: "Car", onClick = { carMenu = true })
-            DropdownMenu(expanded = carMenu, onDismissRequest = { carMenu = false }) {
-                DropdownMenuItem(text = { Text("None") }, onClick = {
-                    vm.setTileAssignment(index, null, null); carMenu = false
-                })
-                state.vehicles.forEach { v ->
-                    DropdownMenuItem(text = { Text(v.name) }, onClick = {
-                        vm.setTileAssignment(index, v.vin, action ?: "doors"); carMenu = false
+    var climMenu by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("Tile ${index + 1}", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.weight(1f))
+            Box {
+                MorphTextButton(car?.name?.take(10) ?: "Car", onClick = { carMenu = true })
+                DropdownMenu(expanded = carMenu, onDismissRequest = { carMenu = false }) {
+                    DropdownMenuItem(text = { Text("None") }, onClick = {
+                        vm.setTileAssignment(index, null, null); carMenu = false
                     })
+                    state.vehicles.forEach { v ->
+                        DropdownMenuItem(text = { Text(v.name) }, onClick = {
+                            vm.setTileAssignment(index, v.vin, action ?: "doors"); carMenu = false
+                        })
+                    }
+                }
+            }
+            Box {
+                MorphTextButton(
+                    TileActions.firstOrNull { it.first == action }?.second ?: "Action",
+                    onClick = { actMenu = true },
+                    enabled = car != null,
+                )
+                DropdownMenu(expanded = actMenu, onDismissRequest = { actMenu = false }) {
+                    TileActions.forEach { (cmd, label) ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = {
+                            car?.let { vm.setTileAssignment(index, it.vin, cmd) }; actMenu = false
+                        })
+                    }
                 }
             }
         }
-        Box {
-            MorphTextButton(
-                TileActions.firstOrNull { it.first == action }?.second ?: "Action",
-                onClick = { actMenu = true },
-                enabled = car != null,
+        // Custom name + climate target only matter once a car is assigned.
+        if (car != null && action != null && action != "open") {
+            var name by remember(state.tileLabels.getOrNull(index)) {
+                mutableStateOf(state.tileLabels.getOrNull(index).orEmpty())
+            }
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it; vm.setTileLabel(index, it) },
+                label = { Text("Custom name (optional)") },
+                singleLine = true,
+                shape = FieldShape,
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
-            DropdownMenu(expanded = actMenu, onDismissRequest = { actMenu = false }) {
-                TileActions.forEach { (cmd, label) ->
-                    DropdownMenuItem(text = { Text(label) }, onClick = {
-                        car?.let { vm.setTileAssignment(index, it.vin, cmd) }; actMenu = false
-                    })
+            if (action == "climate") {
+                val presets = state.climatePresets[car.vin].orEmpty()
+                val target = state.tileClimateTargets.getOrNull(index) ?: "default"
+                val targetLabel = when (target) {
+                    "default" -> "Basic (72°F)"
+                    "smart" -> "Smart climate"
+                    else -> presets.firstOrNull { it.id == target }?.name ?: "Basic (72°F)"
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("Runs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.weight(1f))
+                    Box {
+                        MorphTextButton(targetLabel, onClick = { climMenu = true })
+                        DropdownMenu(expanded = climMenu, onDismissRequest = { climMenu = false }) {
+                            DropdownMenuItem(text = { Text("Basic (72°F)") }, onClick = {
+                                vm.setTileClimateTarget(index, "default"); climMenu = false
+                            })
+                            DropdownMenuItem(text = { Text("Smart climate") }, onClick = {
+                                vm.setTileClimateTarget(index, "smart"); climMenu = false
+                            })
+                            presets.forEach { p ->
+                                DropdownMenuItem(text = { Text(p.name) }, onClick = {
+                                    vm.setTileClimateTarget(index, p.id); climMenu = false
+                                })
+                            }
+                        }
+                    }
                 }
             }
         }
