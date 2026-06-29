@@ -20,7 +20,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * A configurable Quick Settings tile. Each tile is assigned a car + action in
@@ -64,10 +63,14 @@ abstract class BlooTileService : TileService() {
         tile.updateTile()
     }
 
-    /** Whether the tile should read as "on" given the car's current state. */
+    /**
+     * Whether the tile reads as "on" (filled/white background) given the car's
+     * state. For lock/unlock the *unlocked* car is the noteworthy state, so the
+     * tile lights up white when unlocked and is plain ("none") when locked.
+     */
     private fun isActiveState(cmd: String, snap: VehicleSnapshot?): Boolean = when (cmd) {
-        "doors", "lock" -> snap?.locked == true
-        "unlock" -> snap?.locked == false
+        "doors", "lock" -> snap?.locked == false
+        "unlock" -> snap?.locked == true
         "climate" -> snap?.climateOn == true
         "charge" -> snap?.charging == true
         else -> false
@@ -107,13 +110,18 @@ abstract class BlooTileService : TileService() {
         }
     }
 
-    /** Background mode: run with the stored session, toast the result, reflect it. */
+    /**
+     * Background mode: ack instantly with a toast, then run the command via
+     * WorkManager so it survives this service being destroyed (the cause of taps
+     * "doing nothing"). The worker refreshes the tiles when it's done.
+     */
     private suspend fun runBackground(ctx: Context, vin: String, cmd: String) {
+        val snap = runCatching {
+            SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
+        }.getOrNull()
+        Toast.makeText(ctx, TileCommandRunner.ackText(cmd, snap), Toast.LENGTH_SHORT).show()
         val target = SettingsStore(ctx).tileClimateTarget(index)
-        val result = withContext(Dispatchers.IO) { TileCommandRunner.run(ctx, vin, cmd, target) }
-        Toast.makeText(ctx, result.message, Toast.LENGTH_SHORT).show()
-        render()
-        requestUpdates(ctx)
+        TileCommandWorker.enqueue(ctx, vin, cmd, target)
     }
 
     /** Open Bloo and let it run the command (reuses the shortcut routing). */

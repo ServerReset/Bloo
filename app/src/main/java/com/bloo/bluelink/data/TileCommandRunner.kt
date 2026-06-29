@@ -72,6 +72,16 @@ object TileCommandRunner {
         return "Starting climate"
     }
 
+    /** Short "doing it" toast text for a tap, based on the last-known state. */
+    fun ackText(cmd: String, snap: VehicleSnapshot?): String = when (cmd) {
+        "doors" -> if (snap?.locked == true) "Unlocking…" else "Locking…"
+        "lock" -> "Locking…"
+        "unlock" -> "Unlocking…"
+        "climate" -> if (snap?.climateOn == true) "Stopping climate…" else "Starting climate…"
+        "charge" -> if (snap?.charging == true) "Stopping charge…" else "Starting charge…"
+        else -> "Sending…"
+    }
+
     /** The snapshot a tile command is expected to produce, for instant feedback. */
     fun optimistic(snap: VehicleSnapshot, cmd: String): VehicleSnapshot = when (cmd) {
         "doors" -> snap.copy(locked = !(snap.locked ?: false))

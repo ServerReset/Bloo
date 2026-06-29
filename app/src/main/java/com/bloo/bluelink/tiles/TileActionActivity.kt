@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.TileCommandRunner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -12,10 +13,10 @@ import kotlinx.coroutines.withContext
 
 /**
  * The "open & send, then close" path for a Quick Settings tile. A transparent,
- * no-history activity that runs the tile's command with the stored session, shows
- * a short toast, refreshes the tiles, and finishes — so the shade collapses and
- * the user is returned to wherever they were instead of being dropped into the
- * app. (Background mode runs straight from the tile and never comes here.)
+ * no-history activity that acks with a toast, enqueues the command on WorkManager
+ * (so it survives this activity finishing), and closes — returning the user to
+ * wherever they were instead of dropping them into the app. (Background mode runs
+ * straight from the tile via the same worker and never comes here.)
  */
 class TileActionActivity : FragmentActivity() {
 
@@ -25,14 +26,15 @@ class TileActionActivity : FragmentActivity() {
         val cmd = intent.getStringExtra(EXTRA_CMD)
         if (vin == null || cmd == null) { finishNoAnim(); return }
         val appCtx = applicationContext
+        val index = intent.getIntExtra(EXTRA_INDEX, 0)
 
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                val target = SettingsStore(appCtx).tileClimateTarget(intent.getIntExtra(EXTRA_INDEX, 0))
-                TileCommandRunner.run(appCtx, vin, cmd, target)
+            val snap = withContext(Dispatchers.IO) {
+                SnapshotStore(appCtx).current().vehicles.firstOrNull { it.vin == vin }
             }
-            Toast.makeText(appCtx, result.message, Toast.LENGTH_SHORT).show()
-            runCatching { BlooTileService.requestUpdates(appCtx) }
+            val target = withContext(Dispatchers.IO) { SettingsStore(appCtx).tileClimateTarget(index) }
+            Toast.makeText(appCtx, TileCommandRunner.ackText(cmd, snap), Toast.LENGTH_SHORT).show()
+            TileCommandWorker.enqueue(appCtx, vin, cmd, target)
             finishNoAnim()
         }
     }
