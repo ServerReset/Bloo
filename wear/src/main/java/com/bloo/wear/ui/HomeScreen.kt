@@ -216,8 +216,10 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                         CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
                     }
                 }
-                if (carRoles != null) MaterialTheme(colorScheme = schemeFrom(carRoles)) { body() }
-                else body()
+                if (carRoles != null) {
+                    val carScheme = remember(carRoles) { schemeFrom(carRoles) }
+                    MaterialTheme(colorScheme = carScheme) { body() }
+                } else body()
             }
             CurvedIndicator(count, carPager.currentPage, anchor = 90f)
             // Shown once for the whole screen, above all pages.
@@ -362,9 +364,11 @@ private fun CarColumn(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
-                // Cards expand toward full-watch-width when centered and shrink as
-                // they scroll toward the edges — mirrors Wear OS health apps' feel.
-                val centrality by remember {
+                // Cards swell toward full width at the centre and shrink toward the
+                // edges. Centrality is held as a State and read INSIDE graphicsLayer so
+                // the per-frame effect runs in the draw phase only — no recomposition or
+                // remeasure of every visible tile on each scroll frame.
+                val centrality = remember {
                     derivedStateOf {
                         val info = state.layoutInfo
                         val vh = info.viewportSize.height.toFloat()
@@ -376,10 +380,17 @@ private fun CarColumn(
                         (1f - (abs(ic - vc) / vc)).coerceIn(0f, 1f)
                     }
                 }
-                val maxH = if (round) 18f else 10f
-                val minH = if (round) 3f else 1f
-                val hPad = minH + (maxH - minH) * (1f - centrality)
-                Box(Modifier.fillMaxWidth().padding(horizontal = hPad.dp)) {
+                val edgeScale = if (round) 0.86f else 0.93f
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = if (round) 3.dp else 1.dp)
+                        .graphicsLayer {
+                            val s = edgeScale + (1f - edgeScale) * centrality.value
+                            scaleX = s
+                            scaleY = s
+                        },
+                ) {
                     TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
                 }
             }

@@ -111,16 +111,20 @@ fun ChargeRing(percent: Int?, modifier: Modifier = Modifier, size: Dp = 88.dp) {
 /** A small OSM map thumbnail centred on the car, with a marker. */
 @Composable
 fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
-    val z = 15
-    val n = (1 shl z).toDouble()
-    val latRad = Math.toRadians(lat)
-    val xf = (lon + 180.0) / 360.0 * n
-    val yf = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * n
-    val xt = xf.toInt()
-    val yt = yf.toInt()
-    val url = "https://tile.openstreetmap.org/$z/$xt/$yt.png"
-    val mx = (xf - xt).toFloat()
-    val my = (yf - yt).toFloat()
+    // Tile coords + marker offset only depend on lat/lon — compute once per location.
+    val tile = remember(lat, lon) {
+        val z = 15
+        val n = (1 shl z).toDouble()
+        val latRad = Math.toRadians(lat)
+        val xf = (lon + 180.0) / 360.0 * n
+        val yf = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * n
+        val xt = xf.toInt()
+        val yt = yf.toInt()
+        Triple("https://tile.openstreetmap.org/$z/$xt/$yt.png", (xf - xt).toFloat(), (yf - yt).toFloat())
+    }
+    val url = tile.first
+    val mx = tile.second
+    val my = tile.third
     val marker = MaterialTheme.colorScheme.error
     val context = androidx.compose.ui.platform.LocalContext.current
     Box(modifier.size(116.dp).clip(RoundedCornerShape(18.dp))) {

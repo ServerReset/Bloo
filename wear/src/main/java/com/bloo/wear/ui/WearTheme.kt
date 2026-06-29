@@ -64,9 +64,11 @@ fun BlooWearTheme(settings: WearSettingsPayload?, content: @Composable () -> Uni
     val reduceMotion = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
+    // Rebuild the 25-colour scheme only when the synced roles actually change.
+    val scheme = colors?.let { c -> remember(c) { schemeFrom(c) } }
     CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
-        if (colors != null) {
-            MaterialTheme(colorScheme = schemeFrom(colors), content = content)
+        if (scheme != null) {
+            MaterialTheme(colorScheme = scheme, content = content)
         } else {
             MaterialTheme(content = content)
         }
