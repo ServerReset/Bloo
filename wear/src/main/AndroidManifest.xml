@@ -83,6 +83,47 @@
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="300" />
         </service>
+
+        <!-- Watch-face complication: lock state, tap to lock/unlock. -->
+        <service
+            android:name=".complication.LockComplication"
+            android:exported="true"
+            android:label="Bloo lock"
+            android:icon="@drawable/ic_shortcut_lock"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.watchface.complications.datasource.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
+
+        <!-- Watch-face complication: climate state, tap to start/stop. -->
+        <service
+            android:name=".complication.ClimateComplication"
+            android:exported="true"
+            android:label="Bloo climate"
+            android:icon="@drawable/ic_shortcut_climate"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.watchface.complications.datasource.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
+
+        <!-- Runs a complication tap (lock / climate toggle). -->
+        <receiver
+            android:name=".complication.ComplicationTapReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

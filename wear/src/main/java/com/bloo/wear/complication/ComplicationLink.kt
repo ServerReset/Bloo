@@ -11,10 +11,16 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
  */
 object ComplicationLink {
     fun requestUpdate(context: Context) {
-        runCatching {
-            ComplicationDataSourceUpdateRequester
-                .create(context, ComponentName(context, ChargeComplication::class.java))
-                .requestUpdateAll()
+        listOf(
+            ChargeComplication::class.java,
+            LockComplication::class.java,
+            ClimateComplication::class.java,
+        ).forEach { cls ->
+            runCatching {
+                ComplicationDataSourceUpdateRequester
+                    .create(context, ComponentName(context, cls))
+                    .requestUpdateAll()
+            }
         }
     }
 }
