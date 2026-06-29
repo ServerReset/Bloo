@@ -228,11 +228,12 @@ class BlooTileService : TileService() {
             )
             .build()
 
-        // Lock chip: accent when locked (tap to unlock), inactive surface when unlocked (tap to lock).
+        // Lock chip: the unlocked car is the noteworthy state, so it's highlighted
+        // (accent fill) — matching the phone tile — while a locked car sits calm.
         val lockImg    = if (locked) Img.LOCK else Img.UNLOCK
         val lockLabel  = if (locked) "Unlock" else "Lock"
-        val lockColors = if (locked) ChipColors.primaryChipColors(activePalette)
-                         else        ChipColors.secondaryChipColors(inactivePalette)
+        val lockColors = if (locked) ChipColors.secondaryChipColors(inactivePalette)
+                         else        ChipColors.primaryChipColors(activePalette)
         val lockAction = if (locked) WearAction.UNLOCK else WearAction.LOCK
 
         // Climate chip: active when climate is on (charge palette when charging, tertiary for climate).

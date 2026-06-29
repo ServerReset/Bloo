@@ -469,9 +469,11 @@ private fun TileContent(
         TILE_ALERTS -> AlertsCard(car)
         WearTiles.SUMMARY -> SummaryCard(car, ui)
         WearTiles.LOCK -> MorphButton(
+            // The unlocked car is the noteworthy state, so it's the highlighted one
+            // (consistent with the phone tile and the watch Tile).
             label = if (car.locked == true) "Locked" else "Unlocked",
             icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
-            active = car.locked == true,
+            active = car.locked == false,
             activeColor = MaterialTheme.colorScheme.primary,
             pending = "${car.vin}:doors" in ui.pending,
             onClick = { vm.toggleLock(car.vin) },
