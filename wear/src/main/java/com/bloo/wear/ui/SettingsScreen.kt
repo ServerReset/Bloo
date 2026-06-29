@@ -32,7 +32,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -55,6 +58,13 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     var confirmSignOut by remember { mutableStateOf(false) }
+    // Auto-reset the destructive confirm so a stale "tap again" can't sign you out later.
+    LaunchedEffect(confirmSignOut) {
+        if (confirmSignOut) {
+            delay(4000)
+            confirmSignOut = false
+        }
+    }
 
     ScalingLazyColumn(
         modifier = Modifier
@@ -77,7 +87,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 if (ui.accounts.isEmpty()) {
                     Text("Synced from phone", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    ui.accounts.forEach { email -> Text(email, style = MaterialTheme.typography.bodySmall, maxLines = 1) }
+                    ui.accounts.forEach { email -> Text(email, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
             }
         }
@@ -120,7 +130,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 SliderRow(
                     label = "Scale",
                     valueLabel = "${"%.1f".format(ui.localSettings.fontScale)}×",
-                    value = ((ui.localSettings.fontScale - 0.8f) / 0.05f).toInt(),
+                    value = ((ui.localSettings.fontScale - 0.8f) / 0.05f).roundToInt(),
                     min = 0,
                     max = 12,
                     step = 1,

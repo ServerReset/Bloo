@@ -90,40 +90,38 @@ class BlooWidget : GlanceAppWidget() {
     private val unlockedRed = Color(0xFFE5484D)
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        // Construct each store once — these were previously rebuilt ~7× per render.
+        val settings = SettingsStore(context)
         val widgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val cfg = SettingsStore(context).widgetConfig(widgetId)
+        val cfg = settings.widgetConfig(widgetId)
         val snapshots = SnapshotStore(context).current().vehicles
         val snap = cfg?.let { c -> snapshots.firstOrNull { it.vin == c.first } }
         val actions = cfg?.second.orEmpty().mapNotNull { WidgetAction.fromKey(it) }
 
-        // Load the car photo so it can serve as the backdrop ImageProvider.
+        // Load the car photo so it can serve as the backdrop ImageProvider. Decode is
+        // cached by path+mtime so repeated renders (resize/refresh) don't re-decode.
         val photoBitmap: Bitmap? = snap?.let { s ->
-            val path = SettingsStore(context).imageUrl(s.vin)
-            if (path != null && path.startsWith("/")) {
-                runCatching {
-                    val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                    BitmapFactory.decodeFile(path, opts)
-                }.getOrNull()
-            } else null
+            val path = settings.imageUrl(s.vin)
+            if (path != null && path.startsWith("/")) decodeCached(path, sample = 2) else null
         }
 
-        val showBackground = cfg?.let { SettingsStore(context).widgetShowBackground(widgetId) } ?: true
-        val widgetShape = cfg?.let { SettingsStore(context).widgetShape(widgetId) } ?: "rect"
-        val pendingAction = cfg?.let { SettingsStore(context).widgetPendingAction(widgetId) }
-        val locationAddress = cfg?.let { SettingsStore(context).widgetLocationAddress(widgetId) }
+        val showBackground = cfg?.let { settings.widgetShowBackground(widgetId) } ?: true
+        val widgetShape = cfg?.let { settings.widgetShape(widgetId) } ?: "rect"
+        val pendingAction = cfg?.let { settings.widgetPendingAction(widgetId) }
+        val locationAddress = cfg?.let { settings.widgetLocationAddress(widgetId) }
 
         // Cached location-map tile, present only after a Location action has run.
         val hasLocationAction = actions.any { it == WidgetAction.LOCATION }
         val mapBitmap: Bitmap? = if (hasLocationAction) {
             val mapFile = java.io.File(context.cacheDir, "widget_map_$widgetId.png")
-            if (mapFile.exists()) runCatching { BitmapFactory.decodeFile(mapFile.absolutePath) }.getOrNull() else null
+            if (mapFile.exists()) decodeCached(mapFile.absolutePath, sample = 1, rgb565 = true) else null
         } else null
 
         // ── Pull the widget accent from the app's active colour palette ──
         // resolveWidgetAccent mirrors BlooTheme's palette logic exactly, including
         // dark-mode adaptation and dynamic color, so the widget always matches the app.
         val theme: WidgetTheme = run {
-            val appearance = SettingsStore(context).appearance.first()
+            val appearance = settings.appearance.first()
             val accentColor: Color = resolveWidgetAccent(context, appearance, snap?.vin)
             val hsv = FloatArray(3)
             android.graphics.Color.colorToHSV(accentColor.toArgb(), hsv)
@@ -559,8 +557,11 @@ class BlooWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.fillMaxSize().padding(horizontal = hPad, vertical = pad),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Cap the info column so a long car name truncates instead of squeezing
+                // the action buttons off the row.
+                val infoW = (w * 0.4f).coerceIn(70.dp, 150.dp)
                 Column(
-                    modifier = GlanceModifier.height(pillH).clickable(openAction),
+                    modifier = GlanceModifier.height(pillH).width(infoW).clickable(openAction),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -1129,12 +1130,10 @@ class BlooWidget : GlanceAppWidget() {
         theme: WidgetTheme,
     ): ActionVisual {
         val isPending = pendingAction == action.key
-        val isClimateActive = snap?.climateOn == true &&
-            action.key in listOf("climate", "climate_on", "climate_off")
-        val isLockAction = action.key in listOf("doors", "lock", "unlock")
+        val isClimateActive = snap?.climateOn == true && action.key in CLIMATE_KEYS
+        val isLockAction = action.key in LOCK_KEYS
         val isUnlockedState = isLockAction && snap?.locked == false
-        val isChargeActive = snap?.charging == true &&
-            action.key in listOf("charge", "start_charge", "stop_charge")
+        val isChargeActive = snap?.charging == true && action.key in CHARGE_KEYS
 
         val iconRes = when {
             isPending -> R.drawable.ic_widget_refresh
@@ -1181,4 +1180,35 @@ class BlooWidget : GlanceAppWidget() {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+
+    /**
+     * Decode a file-backed bitmap, memoised by path + last-modified so the same
+     * image isn't re-decoded on every resize/refresh render. [rgb565] halves the
+     * memory for opaque images (map tiles) where alpha isn't needed.
+     */
+    private fun decodeCached(path: String, sample: Int, rgb565: Boolean = false): Bitmap? {
+        val file = java.io.File(path)
+        if (!file.exists()) return null
+        val key = "$path:${file.lastModified()}:$sample:$rgb565"
+        bitmapCache.get(key)?.let { return it }
+        return runCatching {
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = sample
+                if (rgb565) inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            BitmapFactory.decodeFile(path, opts)
+        }.getOrNull()?.also { bitmapCache.put(key, it) }
+    }
+
+    companion object {
+        // Small LRU so the widget never holds more than a few decoded images at once.
+        private val bitmapCache = object : android.util.LruCache<String, Bitmap>(6) {
+            override fun sizeOf(key: String, value: Bitmap) = 1
+        }
+
+        // Hoisted membership sets — avoids allocating list literals per button per render.
+        private val CLIMATE_KEYS = setOf("climate", "climate_on", "climate_off")
+        private val LOCK_KEYS = setOf("doors", "lock", "unlock")
+        private val CHARGE_KEYS = setOf("charge", "start_charge", "stop_charge")
+    }
 }

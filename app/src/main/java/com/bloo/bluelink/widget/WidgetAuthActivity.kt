@@ -13,7 +13,9 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearCommandRunner
 import androidx.glance.appwidget.updateAll
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * A transparent activity that gates a widget button behind a biometric / device-
@@ -77,17 +79,21 @@ class WidgetAuthActivity : FragmentActivity() {
         }
         lifecycleScope.launch {
             val ctx = applicationContext
-            // Optimistic snapshot update so the widget immediately shows the expected
-            // new state (behind the loading icon) once the home screen comes forward.
-            if (action.wearAction != null) {
-                runCatching {
-                    val store = SnapshotStore(ctx)
-                    val snap = store.current().vehicles.firstOrNull { it.vin == vin }
-                    if (snap != null) store.updateVehicle(WearCommandRunner.optimistic(snap, action.wearAction))
+            // DataStore writes off the main thread so the transparent activity dismisses
+            // without waiting on disk.
+            withContext(Dispatchers.IO) {
+                // Optimistic snapshot update so the widget immediately shows the expected
+                // new state (behind the loading icon) once the home screen comes forward.
+                if (action.wearAction != null) {
+                    runCatching {
+                        val store = SnapshotStore(ctx)
+                        val snap = store.current().vehicles.firstOrNull { it.vin == vin }
+                        if (snap != null) store.updateVehicle(WearCommandRunner.optimistic(snap, action.wearAction))
+                    }
                 }
+                // Mark pending so the widget overlays the refresh spinner.
+                SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key)
             }
-            // Mark pending so the widget overlays the refresh spinner.
-            SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key)
             runCatching { BlooWidget().updateAll(ctx) }
             // Queue the actual work; finish right away so the home screen is unblocked.
             WidgetCommandWorker.enqueue(ctx, widgetId, vin, action)

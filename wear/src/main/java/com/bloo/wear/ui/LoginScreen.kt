@@ -22,6 +22,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -111,6 +112,8 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -131,7 +134,7 @@ private fun BrandChip(label: String, selected: Boolean, modifier: Modifier, onCl
         onClick = onClick,
         modifier = modifier,
         colors = if (selected) ButtonDefaults.buttonColors() else ButtonDefaults.filledTonalButtonColors(),
-        label = { Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis) },
     )
 }
 
@@ -140,7 +143,7 @@ private fun FieldButton(label: String, value: String, onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        label = { Text(value.ifBlank { label }, maxLines = 1) },
-        secondaryLabel = if (value.isNotBlank()) ({ Text(label, maxLines = 1) }) else null,
+        label = { Text(value.ifBlank { label }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        secondaryLabel = if (value.isNotBlank()) ({ Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }) else null,
     )
 }

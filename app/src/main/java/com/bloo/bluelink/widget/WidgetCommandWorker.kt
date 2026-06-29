@@ -12,6 +12,11 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearCommandRunner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 
 /**
  * Runs a widget button command in the background so [WidgetAuthActivity] can
@@ -54,9 +59,8 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 val lon = snap?.lon
                 if (lat != null && lon != null) {
                     runCatching {
-                        val results = android.location.Geocoder(ctx, java.util.Locale.getDefault())
-                            .getFromLocation(lat, lon, 1)
-                        val addr = results?.firstOrNull()?.let { a ->
+                        val a = geocode(ctx, lat, lon)
+                        val addr = a?.let {
                             buildString {
                                 if (!a.thoroughfare.isNullOrBlank()) append(a.thoroughfare)
                                 if (!a.subThoroughfare.isNullOrBlank()) { if (isNotEmpty()) insert(0, "${a.subThoroughfare} ") }
@@ -73,6 +77,36 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             }
 
             WidgetAction.Kind.OPEN -> { /* handled directly in WidgetAuthActivity */ }
+        }
+    }
+
+    /**
+     * Reverse-geocode with a hard timeout. Uses the non-blocking listener API on
+     * API 33+ (the legacy blocking overload can hang with no timeout and would stall
+     * the worker — and the pending-spinner clear — indefinitely).
+     */
+    private suspend fun geocode(ctx: Context, lat: Double, lon: Double): android.location.Address? {
+        val geocoder = android.location.Geocoder(ctx, java.util.Locale.getDefault())
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            withTimeoutOrNull(6000) {
+                suspendCancellableCoroutine { cont ->
+                    geocoder.getFromLocation(lat, lon, 1, object : android.location.Geocoder.GeocodeListener {
+                        override fun onGeocode(addresses: MutableList<android.location.Address>) {
+                            if (cont.isActive) cont.resume(addresses.firstOrNull())
+                        }
+                        override fun onError(message: String?) {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                    })
+                }
+            }
+        } else {
+            withContext(Dispatchers.IO) {
+                withTimeoutOrNull(6000) {
+                    @Suppress("DEPRECATION")
+                    runCatching { geocoder.getFromLocation(lat, lon, 1)?.firstOrNull() }.getOrNull()
+                }
+            }
         }
     }
 

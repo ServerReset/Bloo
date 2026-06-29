@@ -42,8 +42,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Button
@@ -87,7 +91,11 @@ private const val KEY = "bloo_input"
 /** Charge/fuel percentage as a ring with the value centred. */
 @Composable
 fun ChargeRing(percent: Int?, modifier: Modifier = Modifier, size: Dp = 88.dp) {
-    Box(contentAlignment = Alignment.Center, modifier = modifier.size(size)) {
+    val ringDesc = percent?.let { "Charge $it percent" } ?: "Charge level unknown"
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.size(size).semantics { contentDescription = ringDesc },
+    ) {
         CircularProgressIndicator(
             progress = { (percent ?: 0).coerceIn(0, 100) / 100f },
             modifier = Modifier.size(size),
@@ -135,21 +143,32 @@ fun relativeLabel(ms: Long?): String = com.bloo.bluelink.data.relativeLabel(ms)
 /** "1h 20m" / "45 min". */
 fun fmtMinutes(min: Int): String = com.bloo.bluelink.data.fmtMinutes(min)
 
-/** A label → value row used in the details card. */
+/** A label → value row used in the details card. Both sides truncate so a long
+ *  value (efficiency, address, kWh) can never collide with the label on a round face. */
 @Composable
 fun StatusRow(label: String, value: String, valueColor: Color? = null) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             label,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             value,
+            modifier = Modifier.weight(1f, fill = false),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium,
             color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
         )
     }
 }

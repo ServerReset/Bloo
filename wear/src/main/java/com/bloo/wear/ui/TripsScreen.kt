@@ -19,6 +19,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -77,8 +78,8 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                 val t = trips[index]
                 item(key = index) {
                     Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                        t.startdate?.take(16)?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                        t.startdate?.take(16)?.replace('T', ' ')?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         t.distance?.let { StatusRow("Distance", "%.1f mi".format(it)) }
                         t.driveMinutes?.let { StatusRow("Drive", fmtMinutes(it)) }

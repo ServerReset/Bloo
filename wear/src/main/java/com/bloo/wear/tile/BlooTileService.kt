@@ -51,7 +51,6 @@ class BlooTileService : TileService() {
         const val UNLOCK  = "img_unlock"
         const val CLIMATE = "img_climate"
         const val BOLT    = "img_bolt"
-        const val REFRESH = "img_refresh"
     }
 
     override fun onTileRequest(
@@ -69,7 +68,6 @@ class BlooTileService : TileService() {
                 .addIdToImageMapping(Img.UNLOCK,  imgRes(R.drawable.ic_shortcut_unlock))
                 .addIdToImageMapping(Img.CLIMATE, imgRes(R.drawable.ic_shortcut_climate))
                 .addIdToImageMapping(Img.BOLT,    imgRes(R.drawable.ic_widget_bolt))
-                .addIdToImageMapping(Img.REFRESH, imgRes(R.drawable.ic_widget_refresh))
                 .build()
         )
 
@@ -86,24 +84,32 @@ class BlooTileService : TileService() {
         val ctx = applicationContext
         val clickId = params.currentState.lastClickableId
 
-        // Handle a chip tap: apply optimistic update via WearComms (which also relays to phone).
-        if (clickId.startsWith(CMD_PREFIX)) {
-            val action = clickId.removePrefix(CMD_PREFIX)
-            runBlocking {
-                SnapshotStore(ctx).current().selected?.let { sel ->
+        // One pass off the disk: read the snapshot once, apply the optional command's
+        // optimistic update (WearComms.send writes back to the store), re-read so the
+        // rendered car reflects it, then resolve theme roles for that same car.
+        val (snapshot, roles) = runBlocking {
+            val store = SnapshotStore(ctx)
+            var data = store.current()
+            if (clickId.startsWith(CMD_PREFIX)) {
+                val action = clickId.removePrefix(CMD_PREFIX)
+                data.selected?.let { sel ->
                     runCatching { WearComms.send(ctx, WearCommand(sel.vin, action)) }
                 }
+                data = store.current()
             }
+            val sel = data.selected
+            sel to resolveRoles(ctx, sel?.vin)
         }
 
-        val snapshot = runBlocking { SnapshotStore(ctx).current().selected }
-        val roles    = runBlocking { resolveRoles(ctx, snapshot?.vin) }
-        val device   = params.deviceConfiguration
-        val layout   = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles)
+        val device = params.deviceConfiguration
+        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles)
+
+        // Refresh faster while charging (percent moves quickly) than when idle.
+        val freshness = if (snapshot?.charging == true) FRESHNESS_CHARGING_MS else FRESHNESS_MS
 
         return TileBuilders.Tile.Builder()
             .setResourcesVersion(RES_VERSION)
-            .setFreshnessIntervalMillis(FRESHNESS_MS)
+            .setFreshnessIntervalMillis(freshness)
             .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layout))
             .build()
     }
@@ -152,9 +158,14 @@ class BlooTileService : TileService() {
         val pct      = snap.percent ?: 0
         val pctText  = "${snap.percent ?: "—"}%"
         val rngText  = snap.rangeMi?.let { "$it mi" } ?: ""
+        // Clarify what the big % means for this car (and double as the brand footer).
+        val secondaryLabel = if (snap.isEv) "Battery" else "Fuel"
 
-        // Arc color: semantic for warnings, accent otherwise.
+        val hasPct = snap.percent != null
+
+        // Arc color: neutral track when unknown, semantic for warnings, accent otherwise.
         val arcArgb = when {
+            !hasPct  -> CLR_TRACK
             charging -> CLR_CHARGE
             pct < 15 -> roles.error
             pct < 30 -> CLR_WARN
@@ -196,6 +207,7 @@ class BlooTileService : TileService() {
                     .setTypography(Typography.TYPOGRAPHY_CAPTION2)
                     .setColor(argb(CLR_DIM))
                     .setMaxLines(1)
+                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                     .build()
             )
             .addContent(
@@ -203,6 +215,7 @@ class BlooTileService : TileService() {
                     .setTypography(pctTypo)
                     .setColor(argb(CLR_WHITE))
                     .setMaxLines(1)
+                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                     .build()
             )
             .addContent(
@@ -210,6 +223,7 @@ class BlooTileService : TileService() {
                     .setTypography(Typography.TYPOGRAPHY_CAPTION1)
                     .setColor(argb(statusArgb))
                     .setMaxLines(1)
+                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                     .build()
             )
             .build()
@@ -272,14 +286,16 @@ class BlooTileService : TileService() {
                     .setTypography(Typography.TYPOGRAPHY_CAPTION1)
                     .setColor(argb(CLR_DIM))
                     .setMaxLines(1)
+                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                     .build()
             )
             .setContent(content)
             .setSecondaryLabelTextContent(
-                Text.Builder(ctx, "Bloo")
+                Text.Builder(ctx, secondaryLabel)
                     .setTypography(Typography.TYPOGRAPHY_CAPTION2)
                     .setColor(argb(CLR_DIM))
                     .setMaxLines(1)
+                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                     .build()
             )
             .build()
@@ -321,6 +337,7 @@ class BlooTileService : TileService() {
         const val RES_VERSION  = "4"
         const val CMD_PREFIX   = "cmd:"
         const val FRESHNESS_MS = 10L * 60L * 1000L
+        const val FRESHNESS_CHARGING_MS = 90L * 1000L
 
         const val CLR_WHITE = 0xFFFFFFFF.toInt()
         const val CLR_DIM   = 0xFFAAAAAA.toInt()
