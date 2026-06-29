@@ -54,11 +54,25 @@ object WearComms {
                     )
                 }.onFailure {
                     // Phone dropped mid-send — fall back to standalone.
-                    WearCommandRunner.execute(context, command)
+                    runStandalone(context, command)
                 }
             } else {
-                WearCommandRunner.execute(context, command)
+                runStandalone(context, command)
             }
+        }
+    }
+
+    /** Execute a command on the watch's own connection and, on failure, post a
+     *  native watch notification — the phone isn't there to report the outcome. */
+    private suspend fun runStandalone(context: Context, command: WearCommand) {
+        val result = WearCommandRunner.execute(context, command)
+        if (!result.ok) {
+            WearNotifications.post(
+                context,
+                ("cmd" + command.vin).hashCode(),
+                "Command failed",
+                result.message ?: "Couldn't reach your car. Try again when your phone is nearby.",
+            )
         }
     }
 

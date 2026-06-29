@@ -1,10 +1,15 @@
 package com.bloo.wear
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.core.content.ContextCompat
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalDensity
@@ -16,8 +21,19 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: WearViewModel by viewModels()
 
+    private val notifPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* best-effort */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Ask once for notification permission so the watch can surface command
+        // results / alerts (Wear OS 4+ gates POST_NOTIFICATIONS at runtime).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            runCatching { notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        }
         setContent {
             val ui by viewModel.ui.collectAsState()
             BlooWearTheme(ui.settings) {
