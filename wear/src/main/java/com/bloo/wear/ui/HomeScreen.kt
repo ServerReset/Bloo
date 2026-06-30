@@ -362,19 +362,23 @@ private fun CarColumn(
                 .focusable(active),
             state = state,
             flingBehavior = snapFling,
+            // Flatten the built-in SLC scaling so our own focus-zoom is the single,
+            // predictable source of the shrink/fade (no double-scaling).
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
             // Horizontal inset keeps card content (headers, right-aligned values)
             // inside the round screen's safe area so nothing clips in the corners.
             contentPadding = PaddingValues(
-                horizontal = if (round) 20.dp else 10.dp,
-                vertical = 40.dp,
+                horizontal = if (round) 22.dp else 12.dp,
+                vertical = 60.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
-                // Cards swell toward full width at the centre and shrink toward the
-                // edges. Centrality is held as a State and read INSIDE graphicsLayer so
-                // the per-frame effect runs in the draw phase only — no recomposition or
-                // remeasure of every visible tile on each scroll frame.
+                // Focus-zoom: each tile's whole content is largest when centred and
+                // smoothly shrinks + fades toward BOTH the top and bottom edges, driven
+                // purely by screen position (not card size). `centrality` is a State read
+                // INSIDE graphicsLayer so the per-frame effect runs in the draw phase only
+                // — no recomposition or remeasure of any tile while scrolling.
                 val centrality = remember {
                     derivedStateOf {
                         val info = state.layoutInfo
@@ -387,14 +391,19 @@ private fun CarColumn(
                         (1f - (abs(ic - vc) / vc)).coerceIn(0f, 1f)
                     }
                 }
-                val edgeScale = if (round) 0.90f else 0.94f
+                val edgeScale = if (round) 0.74f else 0.84f
+                val edgeAlpha = 0.45f
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .graphicsLayer {
-                            val s = edgeScale + (1f - edgeScale) * centrality.value
+                            // Smoothstep the position curve for a softer focus falloff.
+                            val c = centrality.value
+                            val eased = c * c * (3f - 2f * c)
+                            val s = edgeScale + (1f - edgeScale) * eased
                             scaleX = s
                             scaleY = s
+                            alpha = edgeAlpha + (1f - edgeAlpha) * eased
                         },
                 ) {
                     TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
