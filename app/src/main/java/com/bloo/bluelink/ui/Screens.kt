@@ -4005,7 +4005,13 @@ private fun MorphButtonLabel(
  * feels the same everywhere.
  */
 @Composable
-private fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, modifier: Modifier = Modifier) {
+private fun MorphChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+) {
     val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -4028,12 +4034,18 @@ private fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, mod
         interactionSource = interaction,
         modifier = modifier,
     ) {
-        Text(
-            label,
+        Row(
             Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            )
+        }
     }
 }
 
@@ -7218,11 +7230,15 @@ private fun SettingsSearchResults(
 }
 
 private val TileActions = listOf(
-    "doors" to "Lock / unlock",
-    "climate" to "Climate",
-    "charge" to "Charge",
-    "open" to "Open",
+    Triple("doors", "Lock / unlock", Icons.Filled.Lock),
+    Triple("climate", "Climate", Icons.Filled.Thermostat),
+    Triple("charge", "Charge", Icons.Filled.Bolt),
+    Triple("open", "Open", Icons.Filled.DirectionsCar),
 )
+
+/** Label for a tile action key (falls back to the key). */
+private fun tileActionLabel(cmd: String): String =
+    TileActions.firstOrNull { it.first == cmd }?.second ?: cmd
 
 /** One Quick Settings tile's car + action assignment, via two dropdowns. */
 @Composable
@@ -7259,14 +7275,6 @@ private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
     }
 }
 
-private fun tileIconVector(cmd: String, climateTarget: String) = when (cmd) {
-    "doors" -> Icons.Filled.Lock
-    "climate" -> Icons.Filled.Thermostat
-    "charge" -> Icons.Filled.Bolt
-    "open" -> Icons.Filled.DirectionsCar
-    else -> Icons.Filled.Lock
-}
-
 private fun tileSummary(cmd: String, climateTarget: String, presetName: String?): String = when (cmd) {
     "doors" -> "Lock / unlock"
     "climate" -> when (climateTarget) {
@@ -7293,6 +7301,27 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
     val presetName = presets.firstOrNull { it.id == target }?.name
     var expanded by remember { mutableStateOf(false) }
 
+    // Live car state so the preview matches what the tile will actually show.
+    val status = state.vehicles.firstOrNull { it.vin == vin }?.let { state.statusFor(it) }
+    val active = when (cmd) {
+        "doors" -> status?.doorLock == false
+        "climate" -> status?.airCtrlOn == true
+        "charge" -> status?.evStatus?.batteryCharge == true
+        else -> false
+    }
+    val liveLabel = when (cmd) {
+        "doors" -> status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
+        "climate" -> if (status?.airCtrlOn == true) "On" else null
+        "charge" -> if (status?.evStatus?.batteryCharge == true) "Charging" else null
+        else -> null
+    }
+    val headerIcon = when (cmd) {
+        "doors" -> if (status?.doorLock == false) Icons.Filled.LockOpen else Icons.Filled.Lock
+        "climate" -> Icons.Filled.Thermostat
+        "charge" -> Icons.Filled.Bolt
+        else -> Icons.Filled.DirectionsCar
+    }
+
     Card(
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
@@ -7306,23 +7335,40 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    tileIconVector(cmd, target),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                // Icon bubble that mirrors the live tile: filled accent when "on".
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(
+                            if (active) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        headerIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = if (active) MaterialTheme.colorScheme.onPrimary
+                               else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        customName ?: TileActions.firstOrNull { it.first == cmd }?.second ?: "Tile",
+                        if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd)),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        tileSummary(cmd, target, presetName),
+                        tileSummary(cmd, target, presetName) + (liveLabel?.let { " · $it" } ?: ""),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (active) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 MorphTextButton(if (expanded) "Done" else "Edit", onClick = { expanded = !expanded })
@@ -7333,8 +7379,13 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                 Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TileActions.forEach { (key, label) ->
-                        MorphChip(selected = cmd == key, onClick = { vm.setTileAssignment(index, vin, key) }, label = label)
+                    TileActions.forEach { (key, label, icon) ->
+                        MorphChip(
+                            selected = cmd == key,
+                            onClick = { vm.setTileAssignment(index, vin, key) },
+                            label = label,
+                            icon = icon,
+                        )
                     }
                 }
 
