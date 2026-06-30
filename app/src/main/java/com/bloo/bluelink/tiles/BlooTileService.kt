@@ -1,6 +1,7 @@
 package com.bloo.bluelink.tiles
 
 import android.app.PendingIntent
+import android.app.StatusBarManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -89,16 +90,8 @@ abstract class BlooTileService : TileService() {
         else -> false
     }
 
-    private fun iconFor(cmd: String, snap: VehicleSnapshot?): Int = when (cmd) {
-        // Only claim "open padlock" when we actually know it's unlocked; a closed
-        // padlock otherwise (locked, or state not yet synced).
-        "doors" -> if (snap?.locked == false) R.drawable.ic_shortcut_unlock else R.drawable.ic_shortcut_lock
-        "lock" -> R.drawable.ic_shortcut_lock
-        "unlock" -> R.drawable.ic_shortcut_unlock
-        "climate" -> R.drawable.ic_shortcut_climate
-        "charge" -> R.drawable.ic_widget_bolt
-        else -> R.drawable.ic_shortcut_car
-    }
+    private fun iconFor(cmd: String, snap: VehicleSnapshot?): Int =
+        iconResFor(cmd, unlocked = snap?.locked == false)
 
     private fun defaultLabel(cmd: String, snap: VehicleSnapshot?): String = when (cmd) {
         // Known state → state label; unknown → neutral "Lock / unlock".
@@ -188,17 +181,68 @@ abstract class BlooTileService : TileService() {
         /** Don't kick a live refresh for the same car more than once per minute. */
         private const val LIVE_REFRESH_THROTTLE_MS = 60_000L
 
+        /** The pool of concrete tile services, indexed 0..TILE_COUNT-1. */
+        private val TILE_CLASSES: List<Class<out BlooTileService>> = listOf(
+            BlooTile1::class.java, BlooTile2::class.java,
+            BlooTile3::class.java, BlooTile4::class.java,
+            BlooTile5::class.java, BlooTile6::class.java,
+            BlooTile7::class.java, BlooTile8::class.java,
+            BlooTile9::class.java, BlooTile10::class.java,
+            BlooTile11::class.java, BlooTile12::class.java,
+        )
+
+        /** The concrete tile service class backing pool slot [index] (0-based). */
+        fun classFor(index: Int): Class<out BlooTileService>? = TILE_CLASSES.getOrNull(index)
+
+        /**
+         * The drawable shown in the QS shade for an action + lock state. Shared by
+         * the live tile render and the in-app preview/add flow so they always match.
+         */
+        fun iconResFor(cmd: String, unlocked: Boolean): Int = when (cmd) {
+            // Only claim "open padlock" when we actually know it's unlocked; a closed
+            // padlock otherwise (locked, or state not yet synced).
+            "doors" -> if (unlocked) R.drawable.ic_shortcut_unlock else R.drawable.ic_shortcut_lock
+            "lock" -> R.drawable.ic_shortcut_lock
+            "unlock" -> R.drawable.ic_shortcut_unlock
+            "climate" -> R.drawable.ic_shortcut_climate
+            "charge" -> R.drawable.ic_widget_bolt
+            else -> R.drawable.ic_shortcut_car
+        }
+
+        /** Whether the system can prompt to add a tile straight to the shade (API 33+). */
+        fun canRequestAdd(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+        /**
+         * Ask the system to add the tile backing [index] directly to the user's
+         * Quick Settings shade, previewing the given [label] and [iconRes] in the OS
+         * dialog (so the tile's name/properties are shown before it's added). Returns
+         * false when unavailable (older OS / no service) so the caller can fall back
+         * to guidance. [onResult] receives a StatusBarManager.TILE_ADD_REQUEST_* code.
+         */
+        fun requestAddToQuickSettings(
+            context: Context,
+            index: Int,
+            label: String,
+            iconRes: Int,
+            onResult: (Int) -> Unit = {},
+        ): Boolean {
+            if (!canRequestAdd()) return false
+            val cls = classFor(index) ?: return false
+            val sbm = context.getSystemService(StatusBarManager::class.java) ?: return false
+            return runCatching {
+                sbm.requestAddTileService(
+                    ComponentName(context, cls),
+                    label,
+                    Icon.createWithResource(context, iconRes),
+                    context.mainExecutor,
+                ) { result -> onResult(result) }
+                true
+            }.getOrDefault(false)
+        }
+
         /** Ask the system to refresh all of Bloo's active tiles. */
         fun requestUpdates(context: Context) {
-            val classes = listOf(
-                BlooTile1::class.java, BlooTile2::class.java,
-                BlooTile3::class.java, BlooTile4::class.java,
-                BlooTile5::class.java, BlooTile6::class.java,
-                BlooTile7::class.java, BlooTile8::class.java,
-                BlooTile9::class.java, BlooTile10::class.java,
-                BlooTile11::class.java, BlooTile12::class.java,
-            )
-            classes.forEach { cls ->
+            TILE_CLASSES.forEach { cls ->
                 runCatching { requestListeningState(context, ComponentName(context, cls)) }
             }
         }

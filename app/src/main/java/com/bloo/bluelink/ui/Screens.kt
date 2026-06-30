@@ -7,12 +7,14 @@
 
 package com.bloo.bluelink.ui
 
+import android.app.StatusBarManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -6538,9 +6540,17 @@ private fun SettingsScreen(vm: AppViewModel) {
                     valueRange = 0.85f..1.3f,
                     steps = 8,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 // Global temperature unit, applied everywhere temperatures show.
-                ToggleRow("Use Fahrenheit", appearance.useFahrenheit) { vm.setUseFahrenheit(it) }
+                SettingsSegmentedRow(
+                    label = "Temperature unit",
+                    options = listOf(
+                        SegmentOption("c", "Celsius", null),
+                        SegmentOption("f", "Fahrenheit", null),
+                    ),
+                    selectedKey = if (appearance.useFahrenheit) "f" else "c",
+                    onSelect = { vm.setUseFahrenheit(it == "f") },
+                )
             }
 
             // Font
@@ -6559,7 +6569,15 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Links
             SettingsCard("Links") {
-                ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
+                SettingsSegmentedRow(
+                    label = "Open links",
+                    options = listOf(
+                        SegmentOption("app", "In app", null),
+                        SegmentOption("browser", "Browser", null),
+                    ),
+                    selectedKey = if (appearance.linksInApp) "app" else "browser",
+                    onSelect = { vm.setLinksInApp(it == "app") },
+                )
             }
 
             // Logs
@@ -6761,17 +6779,18 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Theme
             SettingsCard("Theme") {
-                val labels = mapOf(
-                    ThemeMode.SYSTEM to "Follow system",
-                    ThemeMode.LIGHT to "Light",
-                    ThemeMode.DARK to "Dark",
-                    ThemeMode.AMOLED to "AMOLED (pure black)",
+                // Short segment labels; AMOLED is "pure black" for OLED screens.
+                SettingsSegmentedRow(
+                    label = "Appearance",
+                    options = listOf(
+                        SegmentOption(ThemeMode.SYSTEM.name, "System", null),
+                        SegmentOption(ThemeMode.LIGHT.name, "Light", null),
+                        SegmentOption(ThemeMode.DARK.name, "Dark", null),
+                        SegmentOption(ThemeMode.AMOLED.name, "AMOLED", null),
+                    ),
+                    selectedKey = appearance.themeMode.name,
+                    onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ThemeMode.entries.forEach { mode ->
-                        ChoiceRow(labels.getValue(mode), appearance.themeMode == mode) { vm.setThemeMode(mode) }
-                    }
-                }
             }
 
             // Weather
@@ -7330,6 +7349,29 @@ private fun MorphSegmented(
     }
 }
 
+/**
+ * A labelled [MorphSegmented]: a small caption above a full-width segmented
+ * control. The expressive replacement for a switch when the setting is really a
+ * choice between two equal alternatives (°C/°F, in-app/browser) rather than on/off.
+ */
+@Composable
+private fun SettingsSegmentedRow(
+    label: String,
+    options: List<SegmentOption>,
+    selectedKey: String,
+    onSelect: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        MorphSegmented(options = options, selectedKey = selectedKey, onSelect = onSelect)
+    }
+}
+
 /** Expressive per-car header: a tonal thumbnail/gradient bubble, name, and tile count. */
 @Composable
 private fun CarTilesHeader(name: String, img: String?, assignedCount: Int, totalTiles: Int) {
@@ -7365,7 +7407,11 @@ private fun CarTilesHeader(name: String, img: String?, assignedCount: Int, total
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                if (assignedCount == 0) "No tiles yet" else "$assignedCount of $totalTiles tiles",
+                when (assignedCount) {
+                    0 -> "No tiles yet"
+                    1 -> "1 quick tile"
+                    else -> "$assignedCount quick tiles"
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = scheme.onSurfaceVariant,
             )
@@ -7465,6 +7511,33 @@ private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
     }
 }
 
+/**
+ * Prompt the OS to add this configured tile straight to the Quick Settings shade.
+ * The system dialog previews [label] + the action's icon before adding, so the
+ * tile's name/properties are shown up front. On API < 33 (no add-tile API) we
+ * guide the user to add it manually instead.
+ */
+private fun addTileToQuickSettings(context: Context, index: Int, cmd: String, label: String, unlocked: Boolean) {
+    val iconRes = com.bloo.bluelink.tiles.BlooTileService.iconResFor(cmd, unlocked)
+    val requested = com.bloo.bluelink.tiles.BlooTileService.requestAddToQuickSettings(
+        context, index, label, iconRes,
+    ) { result ->
+        val msg = when (result) {
+            StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> "“$label” added to Quick Settings"
+            StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> "“$label” is already in Quick Settings"
+            else -> null
+        }
+        msg?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    }
+    if (!requested) {
+        Toast.makeText(
+            context,
+            "Open Quick Settings, tap edit, and add “$label” from the tile list.",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+}
+
 private fun tileSummary(cmd: String, climateTarget: String, presetName: String?): String = when (cmd) {
     "doors" -> "Lock / unlock"
     "climate" -> when (climateTarget) {
@@ -7484,6 +7557,7 @@ private fun tileSummary(cmd: String, climateTarget: String, presetName: String?)
  */
 @Composable
 private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewModel) {
+    val context = LocalContext.current
     val cmd = state.tileConfigs.getOrNull(index)?.second ?: "doors"
     val customName = state.tileLabels.getOrNull(index)?.takeIf { it.isNotBlank() }
     val presets = state.climatePresets[vin].orEmpty()
@@ -7593,6 +7667,24 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                 }
 
                 Spacer(Modifier.height(12.dp))
+                val addLabel = if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd))
+                MorphButton(
+                    onClick = {
+                        addTileToQuickSettings(
+                            context, index, cmd, addLabel,
+                            unlocked = status?.doorLock == false,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add to Quick Settings", fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(8.dp))
                 MorphButton(
                     onClick = { vm.setTileAssignment(index, null, null) },
                     containerColor = MaterialTheme.colorScheme.errorContainer,
