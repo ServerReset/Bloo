@@ -6662,26 +6662,50 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Quick Settings tiles
             SettingsCard("Quick tiles") {
                 Text(
-                    "Set up to two quick tiles per car (e.g. Lock and Climate), then add the " +
+                    "Set up quick tiles per car (e.g. Lock and Climate), then add the " +
                         "tiles from your notification shade's edit screen.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                ToggleRow("Run command in background", state.tileBackground) { vm.setTileBackground(it) }
+                Spacer(Modifier.height(12.dp))
+
+                Text("When a tile is tapped", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("background", "Run in background", Icons.Filled.Bolt),
+                        SegmentOption("open", "Open the app", Icons.Filled.OpenInNew),
+                    ),
+                    selectedKey = if (state.tileBackground) "background" else "open",
+                    onSelect = { vm.setTileBackground(it == "background") },
+                )
+                Spacer(Modifier.height(4.dp))
                 Text(
                     if (state.tileBackground) "Tiles fire the command directly, then toast what was sent."
                     else "Tiles briefly open Bloo to send, then close.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                ToggleRow("Live refresh when shown", state.tileLiveRefresh) { vm.setTileLiveRefresh(it) }
+
+                Spacer(Modifier.height(14.dp))
+                Text("Live refresh when shown", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("off", "Off", null),
+                        SegmentOption("on", "On", Icons.Filled.Refresh),
+                    ),
+                    selectedKey = if (state.tileLiveRefresh) "on" else "off",
+                    onSelect = { vm.setTileLiveRefresh(it == "on") },
+                )
+                Spacer(Modifier.height(4.dp))
                 Text(
                     "Pulls the car's latest lock/climate state when a tile appears, so it's " +
                         "always current. Uses a little more battery/data (throttled to once a minute per car).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 QuickTilesManager(state, vm)
             }
 
@@ -7241,7 +7265,171 @@ private val TileActions = listOf(
 private fun tileActionLabel(cmd: String): String =
     TileActions.firstOrNull { it.first == cmd }?.second ?: cmd
 
-/** One Quick Settings tile's car + action assignment, via two dropdowns. */
+/** One option in a [MorphSegmented] control. */
+private data class SegmentOption(val key: String, val label: String, val icon: ImageVector?)
+
+/**
+ * A full-width segmented selector built from the app's MorphChip vocabulary: a
+ * tonal track whose active segment fills with the primary accent and morphs to a
+ * rounded-square, the rest staying pill-calm. Replaces pairs of raw switches
+ * where the choice is really one-of-two behaviors.
+ */
+@Composable
+private fun MorphSegmented(
+    options: List<SegmentOption>,
+    selectedKey: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = buttonContainer(),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            options.forEach { opt ->
+                val selected = opt.key == selectedKey
+                val corner by animateDpAsState(
+                    if (selected) 12.dp else 18.dp,
+                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
+                    label = "segCorner",
+                )
+                val bg by androidx.compose.animation.animateColorAsState(
+                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "segBg",
+                )
+                val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                Surface(
+                    onClick = { onSelect(opt.key) },
+                    shape = RoundedCornerShape(corner),
+                    color = bg,
+                    contentColor = fg,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Row(
+                        Modifier.padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (opt.icon != null) {
+                            Icon(opt.icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text(
+                            opt.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Expressive per-car header: a tonal thumbnail/gradient bubble, name, and tile count. */
+@Composable
+private fun CarTilesHeader(name: String, img: String?, assignedCount: Int, totalTiles: Int) {
+    val scheme = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(15.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!img.isNullOrBlank()) {
+                AsyncImage(
+                    model = if (img.startsWith("/")) java.io.File(img) else img,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                if (assignedCount == 0) "No tiles yet" else "$assignedCount of $totalTiles tiles",
+                style = MaterialTheme.typography.labelMedium,
+                color = scheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Shared muted hint line for the tile manager's empty/full states. */
+@Composable
+private fun TileEmptyHint(text: String) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        )
+    }
+}
+
+/**
+ * A miniature of the real Quick Settings shade tile: a rounded pill with a leading
+ * icon bubble, the tile label, and a state line. Filled with the accent when
+ * [active] (mirrors BlooTileService's STATE_ACTIVE rendering) so the preview is honest.
+ */
+@Composable
+private fun TileShadePreview(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val container by androidx.compose.animation.animateColorAsState(
+        if (active) scheme.primary else scheme.surfaceVariant,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "previewBg",
+    )
+    val onContainer = if (active) scheme.onPrimary else scheme.onSurface
+    val bubble = if (active) scheme.onPrimary.copy(alpha = 0.20f) else scheme.surface
+    val bubbleIcon = if (active) scheme.onPrimary else scheme.onSurfaceVariant
+    Surface(shape = RoundedCornerShape(28.dp), color = container, contentColor = onContainer, modifier = modifier) {
+        Row(
+            Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(Modifier.size(38.dp).clip(CircleShape).background(bubble), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = bubbleIcon, modifier = Modifier.size(20.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = onContainer.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** Per-car Quick Settings tile manager with live previews. */
 @Composable
 private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
     if (state.vehicles.isEmpty()) {
@@ -7253,25 +7441,26 @@ private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
         return
     }
     val count = com.bloo.bluelink.data.TILE_COUNT
-    state.vehicles.forEach { car ->
-        Spacer(Modifier.height(10.dp))
-        SectionLabel(car.name)
+    state.vehicles.forEachIndexed { carIdx, car ->
+        Spacer(Modifier.height(if (carIdx == 0) 6.dp else 18.dp))
         val assigned = (0 until count).filter { state.tileConfigs.getOrNull(it)?.first == car.vin }
+        CarTilesHeader(
+            name = car.name,
+            img = state.imageUrls[car.vin],
+            assignedCount = assigned.size,
+            totalTiles = count,
+        )
+        Spacer(Modifier.height(8.dp))
         assigned.forEach { idx ->
             key(idx) { QuickTileCard(idx, car.vin, state, vm) }
         }
         val free = (0 until count).firstOrNull { state.tileConfigs.getOrNull(it) == null }
-        if (free != null) {
-            AddTilePill(
+        when {
+            free != null -> AddTilePill(
                 label = if (assigned.isEmpty()) "Add a quick tile" else "Add another",
                 onClick = { vm.setTileAssignment(free, car.vin, if (assigned.isEmpty()) "doors" else "climate") },
             )
-        } else if (assigned.isEmpty()) {
-            Text(
-                "All $count tiles are in use — remove one to add another.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            assigned.isEmpty() -> TileEmptyHint("All $count tiles are in use — remove one to add another.")
         }
     }
 }
@@ -7323,59 +7512,44 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
         else -> Icons.Filled.DirectionsCar
     }
 
+    val chevron by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "tileChevron",
+    )
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 5.dp)
             .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
             Row(
                 Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // Icon bubble that mirrors the live tile: filled accent when "on".
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(
-                            if (active) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        headerIcon,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = if (active) MaterialTheme.colorScheme.onPrimary
-                               else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd)),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        tileSummary(cmd, target, presetName) + (liveLabel?.let { " · $it" } ?: ""),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (active) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                MorphTextButton(if (expanded) "Done" else "Edit", onClick = { expanded = !expanded })
+                // A faithful preview of the shade tile itself, so users see exactly
+                // what the QS tile will read (mirrors BlooTileService state rendering).
+                TileShadePreview(
+                    icon = headerIcon,
+                    title = if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd)),
+                    subtitle = liveLabel ?: tileSummary(cmd, target, presetName),
+                    active = active,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Edit tile",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(chevron),
+                )
             }
 
             if (expanded) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(10.dp))
                 Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
