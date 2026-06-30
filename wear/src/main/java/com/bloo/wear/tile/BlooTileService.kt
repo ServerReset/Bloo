@@ -5,6 +5,7 @@ import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DeviceParametersBuilders.DeviceParameters
 import androidx.wear.protolayout.DimensionBuilders
 import androidx.wear.protolayout.LayoutElementBuilders
+import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ModifiersBuilders.Clickable
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
@@ -274,8 +275,18 @@ class BlooTileService : TileService() {
 
         val gap = if (isTiny) 2f else if (isSmall) 3f else 5f
 
-        val content = LayoutElementBuilders.Column.Builder()
+        // The centre (name/%/status) opens the app on tap; the chips own their own taps.
+        val centerTappable = LayoutElementBuilders.Box.Builder()
             .addContent(centerCol)
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setClickable(openClickable(ctx))
+                    .build()
+            )
+            .build()
+
+        val content = LayoutElementBuilders.Column.Builder()
+            .addContent(centerTappable)
             .addContent(spacer(gap))
             .addContent(chipRow)
             .build()
@@ -305,23 +316,23 @@ class BlooTileService : TileService() {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun openChip(ctx: android.content.Context, device: DeviceParameters) =
-        CompactChip.Builder(
-            ctx, "Open Bloo",
-            Clickable.Builder()
-                .setId("open")
-                .setOnClick(
-                    ActionBuilders.LaunchAction.Builder()
-                        .setAndroidActivity(
-                            ActionBuilders.AndroidActivity.Builder()
-                                .setPackageName(ctx.packageName)
-                                .setClassName("com.bloo.wear.MainActivity")
-                                .build()
-                        )
-                        .build()
-                )
-                .build(),
-            device,
-        ).build()
+        CompactChip.Builder(ctx, "Open Bloo", openClickable(ctx), device).build()
+
+    /** A click action that launches the watch app. */
+    private fun openClickable(ctx: android.content.Context): Clickable =
+        Clickable.Builder()
+            .setId("open")
+            .setOnClick(
+                ActionBuilders.LaunchAction.Builder()
+                    .setAndroidActivity(
+                        ActionBuilders.AndroidActivity.Builder()
+                            .setPackageName(ctx.packageName)
+                            .setClassName("com.bloo.wear.MainActivity")
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
 
     private fun cmd(action: String): Clickable = Clickable.Builder()
         .setId(CMD_PREFIX + action)

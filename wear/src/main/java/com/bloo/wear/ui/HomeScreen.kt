@@ -683,7 +683,7 @@ private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
     val isStale = car.fetchedAt != null && System.currentTimeMillis() - car.fetchedAt > 30 * 60 * 1000L
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(contentAlignment = Alignment.TopEnd) {
-            ChargeRing(car.percent, size = 60.dp)
+            ChargeRing(car.percent, size = 60.dp, charging = car.charging == true)
             if (alertCount > 0) {
                 Box(
                     modifier = Modifier

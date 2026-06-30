@@ -55,6 +55,7 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
 import coil.compose.AsyncImage
@@ -88,10 +89,21 @@ fun rememberWearTextInput(label: String, onResult: (String) -> Unit): () -> Unit
 
 private const val KEY = "bloo_input"
 
-/** Charge/fuel percentage as a ring with the value centred. */
+/** Charge/fuel percentage as a ring with the value centred. The ring colour
+ *  reflects state: green while charging, red when critically low, else accent. */
 @Composable
-fun ChargeRing(percent: Int?, modifier: Modifier = Modifier, size: Dp = 88.dp) {
+fun ChargeRing(
+    percent: Int?,
+    modifier: Modifier = Modifier,
+    size: Dp = 88.dp,
+    charging: Boolean = false,
+) {
     val ringDesc = percent?.let { "Charge $it percent" } ?: "Charge level unknown"
+    val ringColor = when {
+        charging -> WearColors.chargeGreen
+        (percent ?: 100) < 15 -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.size(size).semantics { contentDescription = ringDesc },
@@ -99,6 +111,7 @@ fun ChargeRing(percent: Int?, modifier: Modifier = Modifier, size: Dp = 88.dp) {
         CircularProgressIndicator(
             progress = { (percent ?: 0).coerceIn(0, 100) / 100f },
             modifier = Modifier.size(size),
+            colors = ProgressIndicatorDefaults.colors(indicatorColor = ringColor),
         )
         AnimatedContent(
             targetState = percent?.let { "$it%" } ?: "—",
