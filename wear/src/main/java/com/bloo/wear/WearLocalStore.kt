@@ -122,6 +122,8 @@ data class WearLocalSettings(
     val tileOrder: List<String> = WearTiles.DEFAULT_ORDER,
     /** Which action chips the glanceable Tile shows (subset of [TILE_CHIP_ACTIONS]). */
     val tileActions: List<String> = listOf("lock", "climate"),
+    /** VIN the Tile should show; null = follow the app/widget's selected car. */
+    val tileCarVin: String? = null,
 )
 
 /** The actions a Tile chip can perform, in canonical order. */
@@ -132,6 +134,7 @@ class WearLocalStore(private val context: Context) {
     private val keyFontScale = floatPreferencesKey("font_scale")
     private val keyTileOrder = stringPreferencesKey("tile_order")
     private val keyTileActions = stringPreferencesKey("tile_actions")
+    private val keyTileCarVin = stringPreferencesKey("tile_car_vin")
 
     val flow: Flow<WearLocalSettings> = context.wearLocalStore.data.map { prefs ->
         val fontScale = (prefs[keyFontScale] ?: 1f).coerceIn(0.8f, 1.4f)
@@ -147,7 +150,13 @@ class WearLocalStore(private val context: Context) {
             ?.filter { it in TILE_CHIP_ACTIONS }
             ?.takeIf { it.isNotEmpty() }
             ?: listOf("lock", "climate")
-        WearLocalSettings(fontScale = fontScale, tileOrder = merged, tileActions = actions)
+        val tileCarVin = prefs[keyTileCarVin]?.takeIf { it.isNotBlank() }
+        WearLocalSettings(
+            fontScale = fontScale,
+            tileOrder = merged,
+            tileActions = actions,
+            tileCarVin = tileCarVin,
+        )
     }
 
     suspend fun setFontScale(f: Float) {
@@ -161,5 +170,12 @@ class WearLocalStore(private val context: Context) {
     suspend fun setTileActions(actions: List<String>) {
         val clean = actions.filter { it in TILE_CHIP_ACTIONS }.distinct().take(2).ifEmpty { listOf("lock") }
         context.wearLocalStore.edit { it[keyTileActions] = clean.joinToString(",") }
+    }
+
+    /** Pick the car the Tile shows. Pass null to follow the selected car. */
+    suspend fun setTileCarVin(vin: String?) {
+        context.wearLocalStore.edit { prefs ->
+            if (vin.isNullOrBlank()) prefs.remove(keyTileCarVin) else prefs[keyTileCarVin] = vin
+        }
     }
 }

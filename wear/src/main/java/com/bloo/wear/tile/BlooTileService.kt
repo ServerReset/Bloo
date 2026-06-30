@@ -9,8 +9,9 @@ import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ModifiersBuilders.Clickable
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
-import androidx.wear.protolayout.material.Chip
-import androidx.wear.protolayout.material.ChipColors
+import androidx.wear.protolayout.material.Button
+import androidx.wear.protolayout.material.ButtonColors
+import androidx.wear.protolayout.material.ButtonDefaults
 import androidx.wear.protolayout.material.CircularProgressIndicator
 import androidx.wear.protolayout.material.Colors
 import androidx.wear.protolayout.material.CompactChip
@@ -92,19 +93,24 @@ class BlooTileService : TileService() {
         // rendered car reflects it, then resolve theme roles for that same car.
         val result = runBlocking {
             val store = SnapshotStore(ctx)
+            val local = runCatching { WearLocalStore(ctx).flow.first() }.getOrNull()
+            val actions = local?.tileActions ?: listOf("lock", "climate")
+            val tileVin = local?.tileCarVin
+
+            // The Tile shows the user's pinned car if it still exists, else the
+            // app/widget's selected car.
+            fun pick(d: SnapshotStore.SnapshotData): VehicleSnapshot? =
+                tileVin?.let { v -> d.vehicles.firstOrNull { it.vin == v } } ?: d.selected
+
             var data = store.current()
+            var car = pick(data)
             if (clickId.startsWith(CMD_PREFIX)) {
                 val action = clickId.removePrefix(CMD_PREFIX)
-                data.selected?.let { sel ->
-                    runCatching { WearComms.send(ctx, WearCommand(sel.vin, action)) }
-                }
+                car?.let { c -> runCatching { WearComms.send(ctx, WearCommand(c.vin, action)) } }
                 data = store.current()
+                car = pick(data)
             }
-            val sel = data.selected
-            val roles = resolveRoles(ctx, sel?.vin)
-            val actions = runCatching { WearLocalStore(ctx).flow.first().tileActions }
-                .getOrElse { listOf("lock", "climate") }
-            Triple(sel, roles, actions)
+            Triple(car, resolveRoles(ctx, car?.vin), actions)
         }
         val snapshot = result.first
         val roles = result.second
@@ -183,11 +189,6 @@ class BlooTileService : TileService() {
             else     -> roles.primary
         }
 
-        // Active chip: primary fill. Inactive: surfaceContainerHigh with dimmed text.
-        val activePalette   = Colors(roles.primary, roles.onPrimary, roles.surfaceContainer, roles.onSurface)
-        val inactivePalette = Colors(roles.surfaceContainerHigh, roles.onSurfaceVariant, roles.surfaceContainer, roles.onSurface)
-        val chargePalette   = Colors(CLR_CHARGE, CLR_WHITE, roles.surfaceContainer, roles.onSurface)
-
         val arc = CircularProgressIndicator.Builder()
             .setProgress(pct.coerceIn(0, 100) / 100f)
             .setCircularProgressIndicatorColors(
@@ -239,20 +240,21 @@ class BlooTileService : TileService() {
             )
             .build()
 
-        // The user's chosen chips (1–2 of lock/climate/charge), split evenly across
-        // the inner-circle width. A single chip is allowed to grow wider.
+        // The user's chosen actions (1–2 of lock/climate/charge) as circular icon
+        // buttons. Icon-only, so they can never truncate like text chips did.
         val chosen = actions.filter { it in TILE_CHIP_ACTIONS }.distinct().take(2)
             .ifEmpty { listOf("lock", "climate") }
-        val chipGap = if (isTiny) 2f else 4f
-        val innerW  = screenDp * 0.76f - chipGap
-        val chipW   = (innerW / chosen.size).coerceIn(52f, if (chosen.size == 1) 150f else 84f)
+        val btnSize = when {
+            chosen.size == 1 -> ButtonDefaults.LARGE_SIZE
+            isTiny           -> DimensionBuilders.dp(44f)
+            else             -> ButtonDefaults.DEFAULT_SIZE
+        }
+        val chipGap = if (isTiny) 6f else 12f
 
         val chipRowBuilder = LayoutElementBuilders.Row.Builder().setHeight(DimensionBuilders.wrap())
         chosen.forEachIndexed { i, action ->
             if (i > 0) chipRowBuilder.addContent(spacer(chipGap))
-            chipRowBuilder.addContent(
-                actionChip(ctx, device, action, snap, roles, activePalette, inactivePalette, chargePalette, chipW),
-            )
+            chipRowBuilder.addContent(actionButton(ctx, action, snap, roles, btnSize))
         }
         val chipRow = chipRowBuilder.build()
 
@@ -322,58 +324,54 @@ class BlooTileService : TileService() {
         .setOnClick(ActionBuilders.LoadAction.Builder().build())
         .build()
 
-    /** Build one state-reflecting action chip (lock / climate / charge). */
-    private fun actionChip(
+    /** Build one state-reflecting circular action button (lock / climate / charge).
+     *  Icon-only, so it can never truncate like the old text chips. Colour encodes
+     *  state: filled-accent when "on", muted surface when off. */
+    private fun actionButton(
         ctx: android.content.Context,
-        device: DeviceParameters,
         action: String,
         snap: VehicleSnapshot,
         roles: WearColorRoles,
-        activePalette: Colors,
-        inactivePalette: Colors,
-        chargePalette: Colors,
-        chipW: Float,
+        size: DimensionBuilders.DpProp,
     ): LayoutElementBuilders.LayoutElement {
         val locked = snap.locked == true
         val charging = snap.charging == true
         val climate = snap.climateOn == true
-        val tertiaryPalette = Colors(roles.tertiary, roles.onTertiary, roles.surfaceContainer, roles.onSurface)
+        val offColors = ButtonColors(roles.surfaceContainerHigh, roles.onSurfaceVariant)
 
         val img: String
-        val label: String
-        val colors: ChipColors
+        val colors: ButtonColors
         val act: String
+        val desc: String
         when (action) {
             "charge" -> {
                 img = Img.BOLT
-                label = if (charging) "Stop" else "Charge"
-                colors = if (charging) ChipColors.primaryChipColors(chargePalette)
-                         else ChipColors.secondaryChipColors(inactivePalette)
+                colors = if (charging) ButtonColors(CLR_CHARGE, CLR_WHITE) else offColors
                 act = if (charging) WearAction.CHARGE_OFF else WearAction.CHARGE_ON
+                desc = if (charging) "Stop charging" else "Start charging"
             }
             "climate" -> {
                 img = Img.CLIMATE
-                label = if (climate) "Stop" else "Climate"
                 colors = when {
-                    charging -> ChipColors.primaryChipColors(chargePalette)
-                    climate -> ChipColors.primaryChipColors(tertiaryPalette)
-                    else -> ChipColors.secondaryChipColors(inactivePalette)
+                    charging -> ButtonColors(CLR_CHARGE, CLR_WHITE)
+                    climate  -> ButtonColors(roles.tertiary, roles.onTertiary)
+                    else     -> offColors
                 }
                 act = if (climate) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
+                desc = if (climate) "Turn climate off" else "Turn climate on"
             }
-            else -> { // lock — unlocked is the highlighted state
+            else -> { // lock — unlocked is the highlighted (filled-primary) state
                 img = if (locked) Img.LOCK else Img.UNLOCK
-                label = if (locked) "Unlock" else "Lock"
-                colors = if (locked) ChipColors.secondaryChipColors(inactivePalette)
-                         else ChipColors.primaryChipColors(activePalette)
+                colors = if (locked) offColors else ButtonColors(roles.primary, roles.onPrimary)
                 act = if (locked) WearAction.UNLOCK else WearAction.LOCK
+                desc = if (locked) "Unlock" else "Lock"
             }
         }
-        return Chip.Builder(ctx, cmd(act), device)
+        return Button.Builder(ctx, cmd(act))
+            .setButtonColors(colors)
             .setIconContent(img)
-            .setPrimaryLabelContent(label)
-            .setChipColors(colors)
-            .setWidth(DimensionBuilders.dp(chipW))
+            .setContentDescription(desc)
+            .setSize(size)
             .build()
     }
 

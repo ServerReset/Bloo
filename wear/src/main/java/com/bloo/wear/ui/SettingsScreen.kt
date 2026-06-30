@@ -165,6 +165,41 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
+        if (ui.cars.size > 1) {
+            item {
+                Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                    Text("Tile car", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Which car the glanceable Tile shows.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    val selectedVin = ui.localSettings.tileCarVin
+                    @Composable
+                    fun carOption(label: String, vin: String?) {
+                        val active = vin == selectedVin
+                        if (active) {
+                            FilledTonalButton(
+                                onClick = { vm.setTileCarVin(vin) },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            )
+                        } else {
+                            OutlinedButton(
+                                onClick = { vm.setTileCarVin(vin) },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    carOption("Follow selected", null)
+                    ui.cars.forEach { car -> carOption(car.name, car.vin) }
+                }
+            }
+        }
+
         item {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
                 Text("Tile order", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
