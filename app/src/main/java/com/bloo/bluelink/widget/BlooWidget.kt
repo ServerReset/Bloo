@@ -107,6 +107,7 @@ class BlooWidget : GlanceAppWidget() {
 
         val showBackground = cfg?.let { settings.widgetShowBackground(widgetId) } ?: true
         val widgetShape = cfg?.let { settings.widgetShape(widgetId) } ?: "rect"
+        val widgetStyle = cfg?.let { settings.widgetStyle(widgetId) } ?: "auto"
         val pendingAction = cfg?.let { settings.widgetPendingAction(widgetId) }
         val locationAddress = cfg?.let { settings.widgetLocationAddress(widgetId) }
 
@@ -160,6 +161,11 @@ class BlooWidget : GlanceAppWidget() {
                 // never fall through to landscape.
                 val isSkinny = isPortrait && (w < 155.dp || h > w * 2.0f)
                 when {
+                    // User-chosen alternate styles render the same at any size.
+                    snap != null && widgetStyle == "minimal" ->
+                        MinimalBody(widgetId, snap, w, h, showBackground, widgetShape, theme)
+                    snap != null && widgetStyle == "stats" ->
+                        StatsBody(widgetId, snap, w, h, showBackground, widgetShape, theme)
                     h < 65.dp -> when {
                         snap != null -> CompactBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
@@ -276,6 +282,125 @@ class BlooWidget : GlanceAppWidget() {
             if (fillW > 0.dp) {
                 Box(GlanceModifier.width(fillW).height(7.dp).background(theme.accent).cornerRadius(4.dp)) {}
             }
+        }
+    }
+
+    // ── Alternate user-selectable styles ──────────────────────────────────────
+
+    /** "Minimal": car name + one big number (charge or range) + a state chip,
+     *  centered. No photo/map/buttons — a clean glance. Tap opens the app. */
+    @Composable
+    private fun MinimalBody(
+        widgetId: Int,
+        snap: VehicleSnapshot,
+        w: Dp,
+        h: Dp,
+        showBackground: Boolean,
+        widgetShape: String,
+        theme: WidgetTheme,
+    ) {
+        val context = LocalContext.current
+        val corner = if (widgetShape == "pill") 28.dp else 24.dp
+        val base = if (showBackground) {
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        } else {
+            GlanceModifier.fillMaxSize().cornerRadius(corner)
+        }
+        val (stateLabel, stateColor) = stateOf(snap, theme)
+        val big = snap.percent?.let { "$it%" } ?: snap.rangeMi?.let { "$it mi" } ?: "—"
+        val bigSize = if (h < 95.dp) 28.sp else 46.sp
+        Box(
+            modifier = base.clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN)))
+                .padding(14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    snap.name,
+                    maxLines = 1,
+                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                )
+                Spacer(GlanceModifier.height(2.dp))
+                Text(
+                    big,
+                    maxLines = 1,
+                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = bigSize, fontWeight = FontWeight.Bold),
+                )
+                if (h >= 80.dp) {
+                    Spacer(GlanceModifier.height(8.dp))
+                    StateChip(stateLabel, stateColor)
+                }
+            }
+        }
+    }
+
+    /** "Stats": car name + a 2×2 grid of metrics (Battery, Range, Lock, Climate).
+     *  Info-dense at a glance; tap opens the app. */
+    @Composable
+    private fun StatsBody(
+        widgetId: Int,
+        snap: VehicleSnapshot,
+        w: Dp,
+        h: Dp,
+        showBackground: Boolean,
+        widgetShape: String,
+        theme: WidgetTheme,
+    ) {
+        val context = LocalContext.current
+        val corner = if (widgetShape == "pill") 28.dp else 24.dp
+        val base = if (showBackground) {
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        } else {
+            GlanceModifier.fillMaxSize().cornerRadius(corner)
+        }
+        val lock = when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }
+        val climate = if (snap.climateOn == true) "On" else "Off"
+        Column(
+            modifier = base.clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN)))
+                .padding(14.dp),
+        ) {
+            Text(
+                snap.name,
+                maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+            )
+            Spacer(GlanceModifier.height(8.dp))
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                StatCell("Battery", snap.percent?.let { "$it%" } ?: "—", theme.accent, GlanceModifier.defaultWeight())
+                Spacer(GlanceModifier.width(8.dp))
+                StatCell("Range", snap.rangeMi?.let { "$it mi" } ?: "—", theme.accent, GlanceModifier.defaultWeight())
+            }
+            if (h >= 110.dp) {
+                Spacer(GlanceModifier.height(8.dp))
+                Row(modifier = GlanceModifier.fillMaxWidth()) {
+                    StatCell("Lock", lock, if (snap.locked == false) theme.unlocked else theme.accentMuted, GlanceModifier.defaultWeight())
+                    Spacer(GlanceModifier.width(8.dp))
+                    StatCell("Climate", climate, if (snap.climateOn == true) theme.climate else theme.accentMuted, GlanceModifier.defaultWeight())
+                }
+            }
+        }
+    }
+
+    /** One labelled metric cell for [StatsBody]. */
+    @Composable
+    private fun StatCell(label: String, value: String, accent: ColorProvider, modifier: GlanceModifier = GlanceModifier) {
+        Column(
+            modifier = modifier
+                .background(ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.16f)))
+                .cornerRadius(14.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(
+                label.uppercase(),
+                maxLines = 1,
+                style = TextStyle(color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold),
+            )
+            Spacer(GlanceModifier.height(2.dp))
+            Text(
+                value,
+                maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+            )
         }
     }
 

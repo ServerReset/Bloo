@@ -107,6 +107,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
     var showBackground by remember { mutableStateOf(true) }
     var widgetShape by remember { mutableStateOf("rect") }
+    var widgetStyle by remember { mutableStateOf("auto") }
     var requireAuth by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -124,6 +125,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         }
         showBackground = SettingsStore(context).widgetShowBackground(widgetId)
         widgetShape = SettingsStore(context).widgetShape(widgetId)
+        widgetStyle = SettingsStore(context).widgetStyle(widgetId)
         requireAuth = SettingsStore(context).widgetRequireAuth(widgetId)
         loaded = true
     }
@@ -260,6 +262,25 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                         }
                     }
                 }
+                Column {
+                    Text("Layout", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Auto adapts to the widget's size. Minimal shows one big number; " +
+                            "Stats shows a metric grid.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("auto" to "Auto", "minimal" to "Minimal", "stats" to "Stats").forEach { (key, label) ->
+                            FilterChip(
+                                selected = widgetStyle == key,
+                                onClick = { widgetStyle = key },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -271,6 +292,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     SettingsStore(context).setWidgetConfig(widgetId, vin, actions.toList())
                     SettingsStore(context).setWidgetShowBackground(widgetId, showBackground)
                     SettingsStore(context).setWidgetShape(widgetId, widgetShape)
+                    SettingsStore(context).setWidgetStyle(widgetId, widgetStyle)
                     SettingsStore(context).setWidgetRequireAuth(widgetId, requireAuth)
                     onDone()
                 }

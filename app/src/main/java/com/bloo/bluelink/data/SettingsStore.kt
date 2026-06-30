@@ -561,6 +561,14 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_shape")] = shape }
     }
 
+    // "auto" = adaptive size-tier layout, "minimal" = big stat, "stats" = metric grid
+    suspend fun widgetStyle(widgetId: Int): String =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_style")] ?: "auto"
+
+    suspend fun setWidgetStyle(widgetId: Int, style: String) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_style")] = style }
+    }
+
     suspend fun widgetPendingAction(widgetId: Int): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_pending")]?.takeIf { it.isNotBlank() }
 
