@@ -698,9 +698,10 @@ private fun SectionCard(
 /** Alert card — shown only when there are open doors/windows/warnings. */
 @Composable
 private fun AlertsCard(car: CarView) {
+    fun openSummary(items: List<String>) = if (items.size == 1) items.first() else "${items.size} open"
     val warnings = buildList {
-        if (car.doorsOpen.isNotEmpty()) add("Doors" to car.doorsOpen.joinToString(", "))
-        if (car.windowsOpen.isNotEmpty()) add("Windows" to car.windowsOpen.joinToString(", "))
+        if (car.doorsOpen.isNotEmpty()) add("Doors" to openSummary(car.doorsOpen))
+        if (car.windowsOpen.isNotEmpty()) add("Windows" to openSummary(car.windowsOpen))
         if (car.trunkOpen) add("Trunk" to "Open")
         if (car.hoodOpen) add("Hood" to "Open")
         if (car.tireWarning) add("Tires" to "Check")

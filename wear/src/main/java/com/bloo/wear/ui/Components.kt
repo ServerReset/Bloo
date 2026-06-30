@@ -17,6 +17,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -139,11 +142,25 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val mx = tile.second
     val my = tile.third
     val marker = MaterialTheme.colorScheme.error
+    val placeholder = MaterialTheme.colorScheme.surfaceContainerHigh
     val context = androidx.compose.ui.platform.LocalContext.current
-    Box(modifier.size(116.dp).clip(RoundedCornerShape(18.dp))) {
+    Box(
+        modifier
+            .size(116.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(placeholder),
+        contentAlignment = Alignment.Center,
+    ) {
+        // A pin shows even before the tile loads / when offline, so it's never blank.
+        Icon(
+            Icons.Filled.LocationOn,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(28.dp),
+        )
         AsyncImage(
             model = url,
-            contentDescription = "Map",
+            contentDescription = "Map of car location",
             contentScale = ContentScale.Crop,
             imageLoader = com.bloo.wear.WearImage.loader(context),
             modifier = Modifier.matchParentSize(),
@@ -325,7 +342,7 @@ fun MorphButton(
             disabledContentColor = resolvedContent.copy(alpha = 0.38f),
         ),
         border = if (active || pending) null else BorderStroke(1.dp, scheme.outline.copy(alpha = 0.4f)),
-        label = { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) },
+        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold) },
         icon = {
             if (pending) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp))
