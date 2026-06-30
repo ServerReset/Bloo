@@ -509,15 +509,6 @@ class BlooWidget : GlanceAppWidget() {
             "climate" -> if (snap.climateOn == true) "On" else "Off"
             else -> "—"
         }
-        val cells: @Composable () -> Unit = {
-            pick.forEach { m ->
-                Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(m.uppercase(), maxLines = 1, style = TextStyle(color = theme.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold))
-                    Spacer(GlanceModifier.height(2.dp))
-                    Text(valueOf(m), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 32.sp, fontWeight = FontWeight.Bold))
-                }
-            }
-        }
         Box(base.clickable(open).padding(14.dp)) {
             Column(GlanceModifier.fillMaxSize()) {
                 if (showName) {
@@ -525,9 +516,25 @@ class BlooWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.height(6.dp))
                 }
                 if (w > h) {
-                    Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) { cells() }
+                    Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
+                        pick.forEach { m ->
+                            Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(m.uppercase(), maxLines = 1, style = TextStyle(color = theme.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold))
+                                Spacer(GlanceModifier.height(2.dp))
+                                Text(valueOf(m), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 32.sp, fontWeight = FontWeight.Bold))
+                            }
+                        }
+                    }
                 } else {
-                    Column(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) { cells() }
+                    Column(GlanceModifier.fillMaxWidth().defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        pick.forEach { m ->
+                            Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(m.uppercase(), maxLines = 1, style = TextStyle(color = theme.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold))
+                                Spacer(GlanceModifier.height(2.dp))
+                                Text(valueOf(m), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 32.sp, fontWeight = FontWeight.Bold))
+                            }
+                        }
+                    }
                 }
             }
         }
