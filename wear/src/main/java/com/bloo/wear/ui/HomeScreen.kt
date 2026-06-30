@@ -81,6 +81,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onSizeChanged
@@ -646,11 +647,33 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
 // ---- Section cards -------------------------------------------------------
 
 @Composable
-private fun SectionCard(title: String?, content: @Composable ColumnScope.() -> Unit) {
+private fun SectionCard(
+    title: String?,
+    icon: ImageVector? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
         if (title != null) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(2.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (icon != null) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    title.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(Modifier.height(5.dp))
         }
         content()
     }
@@ -673,6 +696,14 @@ private fun AlertsCard(car: CarView) {
     if (warnings.isEmpty()) return
     val errColor = MaterialTheme.colorScheme.error
     SectionCard(null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(15.dp), tint = errColor)
+            Text("ALERTS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = errColor)
+        }
+        Spacer(Modifier.height(5.dp))
         warnings.forEach { (label, value) -> StatusRow(label, value, valueColor = errColor) }
     }
 }
@@ -747,7 +778,7 @@ private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
 }
 
 @Composable
-private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Climate") {
+private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Climate", Icons.Filled.Thermostat) {
     val d = ui.draftFor(car.vin)
     MorphButton(
         label = if (car.climateOn == true) "Climate on" else "Start climate",
@@ -765,7 +796,7 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 }
 
 @Composable
-private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate") {
+private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate", Icons.Filled.Thermostat) {
     val weather: WearWeather? = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
     val ambientF = weather?.let { ((it.tempC * 9.0 / 5.0) + 32).toInt() }
     val label = if (ambientF != null) {
@@ -795,7 +826,7 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
 }
 
 @Composable
-private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort") {
+private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort", Icons.Filled.AirlineSeatReclineNormal) {
     val d = ui.draftFor(car.vin)
     SwitchButton(checked = d.steering, onCheckedChange = { vm.toggleSteering(car.vin) }, modifier = Modifier.fillMaxWidth(), label = { Text("Steering heat") })
     Spacer(Modifier.height(4.dp))
@@ -812,7 +843,7 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 }
 
 @Composable
-private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets") {
+private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets", Icons.Filled.Thermostat) {
     val list = ui.presets[car.vin].orEmpty()
     var confirmDeleteId by remember(car.vin) { mutableStateOf<String?>(null) }
     if (list.isEmpty()) {
@@ -891,7 +922,7 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 }
 
 @Composable
-private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge") {
+private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge", Icons.Filled.Bolt) {
     MorphButton(
         label = if (car.charging == true) "Charging — stop" else "Start charge",
         icon = Icons.Filled.Bolt,
@@ -908,7 +939,7 @@ private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
 }
 
 @Composable
-private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge limits") {
+private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge limits", Icons.Filled.Bolt) {
     val ac = ui.acLimitDraft ?: car.acLimit ?: 80
     val dc = ui.dcLimitDraft ?: car.dcLimit ?: 90
     val isDirty = (ui.acLimitDraft != null && ui.acLimitDraft != car.acLimit) ||
@@ -935,7 +966,7 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
 }
 
 @Composable
-private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Location") {
+private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Location", Icons.Filled.LocationOn) {
     val lat = car.lat ?: 0.0
     val lon = car.lon ?: 0.0
     val context = LocalContext.current
@@ -1027,7 +1058,7 @@ private fun WeatherCard(ui: WearUi, car: CarView) = SectionCard("Weather") {
 }
 
 @Composable
-private fun InfoCard(car: CarView) = SectionCard("Info") {
+private fun InfoCard(car: CarView) = SectionCard("Info", Icons.Filled.DirectionsCar) {
     StatusRow("Engine", if (car.engineOn) "On" else "Off")
     car.tempSetting?.let { StatusRow("Set temp", "$it°") }
     StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
@@ -1052,7 +1083,7 @@ private fun InfoCard(car: CarView) = SectionCard("Info") {
 }
 
 @Composable
-private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics") {
+private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Filled.Build) {
     val err = MaterialTheme.colorScheme.error
     val anyIndividualTire = car.tireFl || car.tireFr || car.tireRl || car.tireRr
     if (car.tireAll != null) {
@@ -1088,7 +1119,7 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics") {
 }
 
 @Composable
-private fun AssistCard(car: CarView) = SectionCard("Assist") {
+private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) {
     val context = LocalContext.current
     val links = car.brand.links
     val accent = MaterialTheme.colorScheme.primary
@@ -1121,7 +1152,7 @@ private fun AssistCard(car: CarView) = SectionCard("Assist") {
 }
 
 @Composable
-private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit) = SectionCard("More") {
+private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit) = SectionCard("More", Icons.Filled.Settings) {
     val accent = MaterialTheme.colorScheme.primary
     val alertCount = car.alertCount
     if (alertCount > 0) {
