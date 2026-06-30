@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,8 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -42,6 +47,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +115,11 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var showBackground by remember { mutableStateOf(true) }
     var widgetShape by remember { mutableStateOf("rect") }
     var widgetStyle by remember { mutableStateOf("auto") }
+    var accentHex by remember { mutableStateOf<String?>(null) }
+    var showName by remember { mutableStateOf(true) }
+    var showRange by remember { mutableStateOf(true) }
+    var showState by remember { mutableStateOf(true) }
+    val metrics = remember { mutableStateListOf("battery", "range") }
     var requireAuth by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -126,6 +138,11 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         showBackground = SettingsStore(context).widgetShowBackground(widgetId)
         widgetShape = SettingsStore(context).widgetShape(widgetId)
         widgetStyle = SettingsStore(context).widgetStyle(widgetId)
+        accentHex = SettingsStore(context).widgetAccent(widgetId)
+        showName = SettingsStore(context).widgetShowName(widgetId)
+        showRange = SettingsStore(context).widgetShowRange(widgetId)
+        showState = SettingsStore(context).widgetShowState(widgetId)
+        SettingsStore(context).widgetMetrics(widgetId).let { metrics.clear(); metrics.addAll(it) }
         requireAuth = SettingsStore(context).widgetRequireAuth(widgetId)
         loaded = true
     }
@@ -265,18 +282,70 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 Column {
                     Text("Layout", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Auto adapts to the widget's size. Minimal shows one big number; " +
-                            "Stats shows a metric grid.",
+                        "Auto adapts to size. Minimal = one big number, Stats = metric grid, " +
+                            "Ring = charge ring, Photo = your car photo, Dual = two big metrics.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("auto" to "Auto", "minimal" to "Minimal", "stats" to "Stats").forEach { (key, label) ->
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "auto" to "Auto", "minimal" to "Minimal", "stats" to "Stats",
+                            "photo" to "Photo", "dual" to "Dual",
+                        ).forEach { (key, label) ->
                             FilterChip(
                                 selected = widgetStyle == key,
                                 onClick = { widgetStyle = key },
                                 label = { Text(label) },
+                            )
+                        }
+                    }
+                }
+
+                // Accent override.
+                Column {
+                    Text("Accent", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = accentHex == null, onClick = { accentHex = null }, label = { Text("Match app") })
+                        listOf("#005AC1", "#2EBD59", "#E5484D", "#7B4DFF", "#00696E", "#F5A623").forEach { hex ->
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(android.graphics.Color.parseColor(hex)))
+                                    .selectable(selected = accentHex == hex) { accentHex = hex },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (accentHex == hex) {
+                                    Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Show/hide elements.
+                Column {
+                    Text("Show", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = showName, onClick = { showName = !showName }, label = { Text("Name") })
+                        FilterChip(selected = showRange, onClick = { showRange = !showRange }, label = { Text("Range") })
+                        FilterChip(selected = showState, onClick = { showState = !showState }, label = { Text("State") })
+                    }
+                }
+
+                // Metrics shown by the Stats / Dual layouts.
+                Column {
+                    Text("Metrics (Stats / Dual)", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("battery", "range", "lock", "climate").forEach { m ->
+                            FilterChip(
+                                selected = m in metrics,
+                                onClick = { if (m in metrics) metrics.remove(m) else metrics.add(m) },
+                                label = { Text(m.replaceFirstChar { it.uppercase() }) },
                             )
                         }
                     }
@@ -293,6 +362,11 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     SettingsStore(context).setWidgetShowBackground(widgetId, showBackground)
                     SettingsStore(context).setWidgetShape(widgetId, widgetShape)
                     SettingsStore(context).setWidgetStyle(widgetId, widgetStyle)
+                    SettingsStore(context).setWidgetAccent(widgetId, accentHex)
+                    SettingsStore(context).setWidgetShowName(widgetId, showName)
+                    SettingsStore(context).setWidgetShowRange(widgetId, showRange)
+                    SettingsStore(context).setWidgetShowState(widgetId, showState)
+                    SettingsStore(context).setWidgetMetrics(widgetId, metrics.toList())
                     SettingsStore(context).setWidgetRequireAuth(widgetId, requireAuth)
                     onDone()
                 }

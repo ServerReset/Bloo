@@ -108,6 +108,11 @@ class BlooWidget : GlanceAppWidget() {
         val showBackground = cfg?.let { settings.widgetShowBackground(widgetId) } ?: true
         val widgetShape = cfg?.let { settings.widgetShape(widgetId) } ?: "rect"
         val widgetStyle = cfg?.let { settings.widgetStyle(widgetId) } ?: "auto"
+        val widgetAccentHex = cfg?.let { settings.widgetAccent(widgetId) }
+        val widgetShowName = cfg?.let { settings.widgetShowName(widgetId) } ?: true
+        val widgetShowRange = cfg?.let { settings.widgetShowRange(widgetId) } ?: true
+        val widgetShowState = cfg?.let { settings.widgetShowState(widgetId) } ?: true
+        val widgetMetrics = cfg?.let { settings.widgetMetrics(widgetId) } ?: listOf("battery", "range")
         val pendingAction = cfg?.let { settings.widgetPendingAction(widgetId) }
         val locationAddress = cfg?.let { settings.widgetLocationAddress(widgetId) }
 
@@ -123,7 +128,10 @@ class BlooWidget : GlanceAppWidget() {
         // dark-mode adaptation and dynamic color, so the widget always matches the app.
         val theme: WidgetTheme = run {
             val appearance = settings.appearance.first()
-            val accentColor: Color = resolveWidgetAccent(context, appearance, snap?.vin)
+            // Per-widget accent override (hex) wins; otherwise follow the app palette.
+            val accentColor: Color = widgetAccentHex
+                ?.let { hex -> runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrNull() }
+                ?: resolveWidgetAccent(context, appearance, snap?.vin)
             val hsv = FloatArray(3)
             android.graphics.Color.colorToHSV(accentColor.toArgb(), hsv)
             // Pending: desaturated + dimmed so in-flight buttons read as muted.
@@ -166,6 +174,10 @@ class BlooWidget : GlanceAppWidget() {
                         MinimalBody(widgetId, snap, w, h, showBackground, widgetShape, theme)
                     snap != null && widgetStyle == "stats" ->
                         StatsBody(widgetId, snap, w, h, showBackground, widgetShape, theme)
+                    snap != null && widgetStyle == "photo" ->
+                        PhotoBody(widgetId, snap, actions, w, h, photoBitmap, widgetShowName, widgetShowRange, widgetShowState, pendingAction, theme)
+                    snap != null && widgetStyle == "dual" ->
+                        DualBody(widgetId, snap, w, h, widgetMetrics, widgetShowName, theme)
                     h < 65.dp -> when {
                         snap != null -> CompactBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
@@ -401,6 +413,123 @@ class BlooWidget : GlanceAppWidget() {
                 maxLines = 1,
                 style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold),
             )
+        }
+    }
+
+    /** "Photo": the car photo full-bleed with name/% over a scrim, plus an optional
+     *  action row. Falls back to a tonal surface when no photo is set. */
+    @Composable
+    private fun PhotoBody(
+        widgetId: Int,
+        snap: VehicleSnapshot,
+        actions: List<WidgetAction>,
+        w: Dp,
+        h: Dp,
+        photoBitmap: Bitmap?,
+        showName: Boolean,
+        showRange: Boolean,
+        showState: Boolean,
+        pendingAction: String?,
+        theme: WidgetTheme,
+    ) {
+        val context = LocalContext.current
+        val open = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
+        val corner = if (w < 180.dp) 22.dp else 28.dp
+        Box(modifier = GlanceModifier.fillMaxSize().cornerRadius(corner)) {
+            if (photoBitmap != null) {
+                Image(
+                    provider = ImageProvider(photoBitmap),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = GlanceModifier.fillMaxSize().cornerRadius(corner),
+                )
+                Box(GlanceModifier.fillMaxSize().background(ColorProvider(Color(0f, 0f, 0f, 0.42f)))) {}
+            } else {
+                Box(GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)) {}
+            }
+            Column(
+                GlanceModifier.fillMaxSize().padding(14.dp).clickable(open),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                if (showName) {
+                    Text(
+                        snap.name,
+                        maxLines = 1,
+                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        snap.percent?.let { "$it%" } ?: "—",
+                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 30.sp, fontWeight = FontWeight.Bold),
+                    )
+                    if (showRange) snap.rangeMi?.let {
+                        Spacer(GlanceModifier.width(8.dp))
+                        Text("$it mi", style = TextStyle(color = ColorProvider(Color(1f, 1f, 1f, 0.78f)), fontSize = 12.sp))
+                    }
+                    if (showState) {
+                        Spacer(GlanceModifier.width(8.dp))
+                        val (l, c) = stateOf(snap, theme, hasPhoto = true)
+                        StateChip(l, c)
+                    }
+                }
+                if (actions.isNotEmpty() && h >= 130.dp) {
+                    Spacer(GlanceModifier.height(8.dp))
+                    Row(GlanceModifier.fillMaxWidth()) {
+                        actions.take(4).forEachIndexed { i, a ->
+                            if (i > 0) Spacer(GlanceModifier.width(6.dp))
+                            ActionPill(widgetId, snap.vin, a, 40.dp, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** "Dual": one or two big chosen metrics (battery/range/lock/climate). */
+    @Composable
+    private fun DualBody(
+        widgetId: Int,
+        snap: VehicleSnapshot,
+        w: Dp,
+        h: Dp,
+        metrics: List<String>,
+        showName: Boolean,
+        theme: WidgetTheme,
+    ) {
+        val context = LocalContext.current
+        val open = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
+        val corner = if (w < 180.dp) 22.dp else 24.dp
+        val base = GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        val pick = metrics.take(2).ifEmpty { listOf("battery", "range") }
+        fun valueOf(m: String) = when (m) {
+            "battery" -> snap.percent?.let { "$it%" } ?: "—"
+            "range" -> snap.rangeMi?.let { "$it mi" } ?: "—"
+            "lock" -> when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }
+            "climate" -> if (snap.climateOn == true) "On" else "Off"
+            else -> "—"
+        }
+        val cells: @Composable () -> Unit = {
+            pick.forEach { m ->
+                Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(m.uppercase(), maxLines = 1, style = TextStyle(color = theme.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold))
+                    Spacer(GlanceModifier.height(2.dp))
+                    Text(valueOf(m), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 32.sp, fontWeight = FontWeight.Bold))
+                }
+            }
+        }
+        Box(base.clickable(open).padding(14.dp)) {
+            Column(GlanceModifier.fillMaxSize()) {
+                if (showName) {
+                    Text(snap.name, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium))
+                    Spacer(GlanceModifier.height(6.dp))
+                }
+                if (w > h) {
+                    Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) { cells() }
+                } else {
+                    Column(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) { cells() }
+                }
+            }
         }
     }
 

@@ -561,13 +561,66 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_shape")] = shape }
     }
 
-    // "auto" = adaptive size-tier layout, "minimal" = big stat, "stats" = metric grid
+    // "auto" adaptive, "minimal", "stats", "ring", "photo", "dual"
     suspend fun widgetStyle(widgetId: Int): String =
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_style")] ?: "auto"
 
     suspend fun setWidgetStyle(widgetId: Int, style: String) {
         context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_style")] = style }
     }
+
+    // Accent override hex "#RRGGBB", or null = follow the app palette.
+    suspend fun widgetAccent(widgetId: Int): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_accent")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setWidgetAccent(widgetId: Int, hex: String?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("widget_${widgetId}_accent")
+            if (hex.isNullOrBlank()) it.remove(k) else it[k] = hex
+        }
+    }
+
+    // Corner radius override in dp, or null = use shape/auto.
+    suspend fun widgetCorner(widgetId: Int): Int? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_corner")]?.toIntOrNull()
+
+    suspend fun setWidgetCorner(widgetId: Int, dp: Int?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("widget_${widgetId}_corner")
+            if (dp == null) it.remove(k) else it[k] = dp.toString()
+        }
+    }
+
+    // Text scale 0.8..1.4 (default 1.0).
+    suspend fun widgetTextScale(widgetId: Int): Float =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_textscale")]?.toFloatOrNull() ?: 1f
+
+    suspend fun setWidgetTextScale(widgetId: Int, v: Float) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_textscale")] = v.toString() }
+    }
+
+    // Ordered metrics CSV from {battery,range,lock,climate}.
+    suspend fun widgetMetrics(widgetId: Int): List<String> =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_metrics")]
+            ?.split(",")?.filter { it.isNotBlank() } ?: listOf("battery", "range")
+
+    suspend fun setWidgetMetrics(widgetId: Int, metrics: List<String>) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_metrics")] = metrics.joinToString(",") }
+    }
+
+    private suspend fun widgetFlag(widgetId: Int, suffix: String): Boolean =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_$suffix")]?.toBooleanStrictOrNull() ?: true
+
+    private suspend fun setWidgetFlag(widgetId: Int, suffix: String, v: Boolean) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_$suffix")] = v.toString() }
+    }
+
+    suspend fun widgetShowName(widgetId: Int) = widgetFlag(widgetId, "showname")
+    suspend fun setWidgetShowName(widgetId: Int, v: Boolean) = setWidgetFlag(widgetId, "showname", v)
+    suspend fun widgetShowRange(widgetId: Int) = widgetFlag(widgetId, "showrange")
+    suspend fun setWidgetShowRange(widgetId: Int, v: Boolean) = setWidgetFlag(widgetId, "showrange", v)
+    suspend fun widgetShowState(widgetId: Int) = widgetFlag(widgetId, "showstate")
+    suspend fun setWidgetShowState(widgetId: Int, v: Boolean) = setWidgetFlag(widgetId, "showstate", v)
 
     suspend fun widgetPendingAction(widgetId: Int): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_pending")]?.takeIf { it.isNotBlank() }
