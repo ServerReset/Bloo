@@ -59,7 +59,7 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
             .focusRequester(focusRequester)
             .focusable(),
         state = state,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 30.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 30.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         item { ListHeader { Text("Recent trips", textAlign = TextAlign.Center) } }

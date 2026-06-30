@@ -70,7 +70,7 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
             .focusRequester(focusRequester)
             .focusable(),
         state = state,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 28.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         item { ListHeader { Text("Sign in to Bloo", textAlign = TextAlign.Center) } }

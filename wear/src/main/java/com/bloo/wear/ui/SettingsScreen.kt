@@ -77,7 +77,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             .focusRequester(focusRequester)
             .focusable(),
         state = state,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 30.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 30.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         item { ListHeader { Text("Settings", textAlign = TextAlign.Center) } }

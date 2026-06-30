@@ -77,6 +77,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -361,7 +362,12 @@ private fun CarColumn(
                 .focusable(active),
             state = state,
             flingBehavior = snapFling,
-            contentPadding = PaddingValues(vertical = 40.dp),
+            // Horizontal inset keeps card content (headers, right-aligned values)
+            // inside the round screen's safe area so nothing clips in the corners.
+            contentPadding = PaddingValues(
+                horizontal = if (round) 20.dp else 10.dp,
+                vertical = 40.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
@@ -381,11 +387,10 @@ private fun CarColumn(
                         (1f - (abs(ic - vc) / vc)).coerceIn(0f, 1f)
                     }
                 }
-                val edgeScale = if (round) 0.86f else 0.93f
+                val edgeScale = if (round) 0.90f else 0.94f
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = if (round) 3.dp else 1.dp)
                         .graphicsLayer {
                             val s = edgeScale + (1f - edgeScale) * centrality.value
                             scaleX = s
@@ -556,7 +561,9 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
     ) {
         Box(
             Modifier
+                .shadow(4.dp, RoundedCornerShape(50), clip = false)
                 .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -618,7 +625,7 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
                         }
                     }
                 }
-                .padding(horizontal = 12.dp, vertical = 3.dp),
+                .padding(horizontal = 14.dp, vertical = 5.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
