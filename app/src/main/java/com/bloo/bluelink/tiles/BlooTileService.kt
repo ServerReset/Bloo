@@ -77,6 +77,8 @@ abstract class BlooTileService : TileService() {
     }
 
     private fun iconFor(cmd: String, snap: VehicleSnapshot?): Int = when (cmd) {
+        // Only claim "open padlock" when we actually know it's unlocked; a closed
+        // padlock otherwise (locked, or state not yet synced).
         "doors" -> if (snap?.locked == false) R.drawable.ic_shortcut_unlock else R.drawable.ic_shortcut_lock
         "lock" -> R.drawable.ic_shortcut_lock
         "unlock" -> R.drawable.ic_shortcut_unlock
@@ -86,7 +88,12 @@ abstract class BlooTileService : TileService() {
     }
 
     private fun defaultLabel(cmd: String, snap: VehicleSnapshot?): String = when (cmd) {
-        "doors" -> if (snap?.locked == false) "Unlocked" else "Locked"
+        // Known state → state label; unknown → neutral "Lock / unlock".
+        "doors" -> when (snap?.locked) {
+            true -> "Locked"
+            false -> "Unlocked"
+            else -> "Lock / unlock"
+        }
         "lock" -> "Lock"
         "unlock" -> "Unlock"
         "climate" -> if (snap?.climateOn == true) "Climate on" else "Climate"

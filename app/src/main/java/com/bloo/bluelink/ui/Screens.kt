@@ -134,6 +134,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.LocationOn
@@ -6661,7 +6662,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(4.dp))
-                QuickTilesPerCar(state, vm)
+                QuickTilesManager(state, vm)
             }
 
             // Security
@@ -7218,7 +7219,7 @@ private val TileActions = listOf(
 
 /** One Quick Settings tile's car + action assignment, via two dropdowns. */
 @Composable
-private fun QuickTilesPerCar(state: UiState, vm: AppViewModel) {
+private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
     if (state.vehicles.isEmpty()) {
         Text(
             "Add a car to set up quick tiles.",
@@ -7229,109 +7230,157 @@ private fun QuickTilesPerCar(state: UiState, vm: AppViewModel) {
     }
     val count = com.bloo.bluelink.data.TILE_COUNT
     state.vehicles.forEach { car ->
-        Spacer(Modifier.height(6.dp))
-        Text(
-            car.name,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Spacer(Modifier.height(10.dp))
+        SectionLabel(car.name)
         val assigned = (0 until count).filter { state.tileConfigs.getOrNull(it)?.first == car.vin }
-        val slots = assigned.take(2)
-        slots.forEach { idx -> TileSlotRow(idx, car.vin, state, vm) }
-        if (slots.size < 2) {
-            val free = (0 until count).firstOrNull { state.tileConfigs.getOrNull(it) == null }
-            if (free != null) {
-                MorphTextButton(
-                    "+ Add quick tile",
-                    onClick = { vm.setTileAssignment(free, car.vin, if (slots.isEmpty()) "doors" else "climate") },
+        assigned.forEach { idx ->
+            key(idx) { QuickTileCard(idx, car.vin, state, vm) }
+        }
+        val free = (0 until count).firstOrNull { state.tileConfigs.getOrNull(it) == null }
+        if (free != null) {
+            AddTilePill(
+                label = if (assigned.isEmpty()) "Add a quick tile" else "Add another",
+                onClick = { vm.setTileAssignment(free, car.vin, if (assigned.isEmpty()) "doors" else "climate") },
+            )
+        } else if (assigned.isEmpty()) {
+            Text(
+                "All $count tiles are in use — remove one to add another.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun tileIconVector(cmd: String, climateTarget: String) = when (cmd) {
+    "doors" -> Icons.Filled.Lock
+    "climate" -> Icons.Filled.Thermostat
+    "charge" -> Icons.Filled.Bolt
+    "open" -> Icons.Filled.DirectionsCar
+    else -> Icons.Filled.Lock
+}
+
+private fun tileSummary(cmd: String, climateTarget: String, presetName: String?): String = when (cmd) {
+    "doors" -> "Lock / unlock"
+    "climate" -> when (climateTarget) {
+        "smart" -> "Climate · Smart"
+        "default" -> "Climate · Basic"
+        else -> "Climate · ${presetName ?: "Preset"}"
+    }
+    "charge" -> "Start / stop charge"
+    "open" -> "Opens the app"
+    else -> cmd
+}
+
+/**
+ * One configured tile, styled after the climate-preset cards: a tappable summary
+ * row (icon + name + what it does) that expands into an inline editor with chip
+ * pickers for the action, a custom name, and — for climate — what it runs.
+ */
+@Composable
+private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewModel) {
+    val cmd = state.tileConfigs.getOrNull(index)?.second ?: "doors"
+    val customName = state.tileLabels.getOrNull(index)?.takeIf { it.isNotBlank() }
+    val presets = state.climatePresets[vin].orEmpty()
+    val target = state.tileClimateTargets.getOrNull(index) ?: "default"
+    val presetName = presets.firstOrNull { it.id == target }?.name
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    tileIconVector(cmd, target),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
                 )
-            } else {
-                Text(
-                    "All $count tiles are in use — remove one to add another.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        customName ?: TileActions.firstOrNull { it.first == cmd }?.second ?: "Tile",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        tileSummary(cmd, target, presetName),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                MorphTextButton(if (expanded) "Done" else "Edit", onClick = { expanded = !expanded })
+            }
+
+            if (expanded) {
+                Spacer(Modifier.height(10.dp))
+                Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TileActions.forEach { (key, label) ->
+                        MorphChip(selected = cmd == key, onClick = { vm.setTileAssignment(index, vin, key) }, label = label)
+                    }
+                }
+
+                if (cmd != "open") {
+                    Spacer(Modifier.height(10.dp))
+                    var name by remember(state.tileLabels.getOrNull(index)) {
+                        mutableStateOf(customName.orEmpty())
+                    }
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it; vm.setTileLabel(index, it) },
+                        label = { Text("Custom name (optional)") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                if (cmd == "climate") {
+                    Spacer(Modifier.height(10.dp))
+                    Text("Runs", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MorphChip(selected = target == "default", onClick = { vm.setTileClimateTarget(index, "default") }, label = "Basic")
+                        MorphChip(selected = target == "smart", onClick = { vm.setTileClimateTarget(index, "smart") }, label = "Smart")
+                        presets.forEach { p ->
+                            MorphChip(selected = target == p.id, onClick = { vm.setTileClimateTarget(index, p.id) }, label = p.name)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                MorphTextButton("Remove tile", onClick = { vm.setTileAssignment(index, null, null) })
             }
         }
     }
 }
 
+/** A dashed-feel "add" affordance, mirroring the preset list's add control. */
 @Composable
-private fun TileSlotRow(index: Int, vin: String, state: UiState, vm: AppViewModel) {
-    val action = state.tileConfigs.getOrNull(index)?.second
-    var actMenu by remember { mutableStateOf(false) }
-    var climMenu by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Tile ${index + 1}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.weight(1f))
-            Box {
-                MorphTextButton(
-                    TileActions.firstOrNull { it.first == action }?.second ?: "Action",
-                    onClick = { actMenu = true },
-                )
-                DropdownMenu(expanded = actMenu, onDismissRequest = { actMenu = false }) {
-                    TileActions.forEach { (cmd, label) ->
-                        DropdownMenuItem(text = { Text(label) }, onClick = {
-                            vm.setTileAssignment(index, vin, cmd); actMenu = false
-                        })
-                    }
-                    DropdownMenuItem(text = { Text("Remove") }, onClick = {
-                        vm.setTileAssignment(index, null, null); actMenu = false
-                    })
-                }
-            }
-        }
-        if (action != null && action != "open") {
-            var name by remember(state.tileLabels.getOrNull(index)) {
-                mutableStateOf(state.tileLabels.getOrNull(index).orEmpty())
-            }
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it; vm.setTileLabel(index, it) },
-                label = { Text("Custom name (optional)") },
-                singleLine = true,
-                shape = FieldShape,
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            )
-            if (action == "climate") {
-                val presets = state.climatePresets[vin].orEmpty()
-                val target = state.tileClimateTargets.getOrNull(index) ?: "default"
-                val targetLabel = when (target) {
-                    "default" -> "Basic (72°F)"
-                    "smart" -> "Smart climate"
-                    else -> presets.firstOrNull { it.id == target }?.name ?: "Basic (72°F)"
-                }
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text("Runs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.weight(1f))
-                    Box {
-                        MorphTextButton(targetLabel, onClick = { climMenu = true })
-                        DropdownMenu(expanded = climMenu, onDismissRequest = { climMenu = false }) {
-                            DropdownMenuItem(text = { Text("Basic (72°F)") }, onClick = {
-                                vm.setTileClimateTarget(index, "default"); climMenu = false
-                            })
-                            DropdownMenuItem(text = { Text("Smart climate") }, onClick = {
-                                vm.setTileClimateTarget(index, "smart"); climMenu = false
-                            })
-                            presets.forEach { p ->
-                                DropdownMenuItem(text = { Text(p.name) }, onClick = {
-                                    vm.setTileClimateTarget(index, p.id); climMenu = false
-                                })
-                            }
-                        }
-                    }
-                }
-            }
-        }
+private fun AddTilePill(label: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .background(buttonContainer())
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
 }
 
