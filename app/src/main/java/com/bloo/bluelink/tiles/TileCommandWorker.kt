@@ -7,6 +7,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.bloo.bluelink.data.TileCommandRunner
+import com.bloo.bluelink.data.WearCommandRunner
 
 /**
  * Runs a Quick Settings tile command off the tile's own (very short-lived)
@@ -21,8 +22,13 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val cmd = inputData.getString(KEY_CMD) ?: return Result.failure()
-        val target = inputData.getString(KEY_TARGET) ?: "default"
-        runCatching { TileCommandRunner.run(applicationContext, vin, cmd, target) }
+        if (cmd == CMD_REFRESH) {
+            // Just re-fetch this car's status into the snapshot, then redraw tiles.
+            runCatching { WearCommandRunner.refresh(applicationContext, vin) }
+        } else {
+            val target = inputData.getString(KEY_TARGET) ?: "default"
+            runCatching { TileCommandRunner.run(applicationContext, vin, cmd, target) }
+        }
         runCatching { BlooTileService.requestUpdates(applicationContext) }
         return Result.success()
     }
@@ -31,6 +37,7 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
         const val KEY_VIN = "vin"
         const val KEY_CMD = "cmd"
         const val KEY_TARGET = "target"
+        const val CMD_REFRESH = "__refresh"
 
         fun enqueue(ctx: Context, vin: String, cmd: String, target: String) {
             val req = OneTimeWorkRequestBuilder<TileCommandWorker>()
@@ -38,5 +45,8 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
                 .build()
             WorkManager.getInstance(ctx).enqueue(req)
         }
+
+        /** Enqueue a lightweight status refresh for a tile's car. */
+        fun enqueueRefresh(ctx: Context, vin: String) = enqueue(ctx, vin, CMD_REFRESH, "default")
     }
 }

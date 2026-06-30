@@ -504,6 +504,23 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("tile_background")] = value }
     }
 
+    /** When true, a tile kicks a throttled status refresh when it becomes visible,
+     *  so its lock/climate state stays live (at some battery/rate-limit cost). */
+    suspend fun tileLiveRefresh(): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("tile_live_refresh")] ?: false
+
+    suspend fun setTileLiveRefresh(value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("tile_live_refresh")] = value }
+    }
+
+    /** Last time a tile-driven refresh ran for [vin] (epoch ms), for throttling. */
+    suspend fun tileRefreshedAt(vin: String): Long =
+        context.settingsDataStore.data.first()[stringPreferencesKey("tile_refreshed_$vin")]?.toLongOrNull() ?: 0L
+
+    suspend fun setTileRefreshedAt(vin: String, value: Long) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("tile_refreshed_$vin")] = value.toString() }
+    }
+
     // --- Home-screen widgets -------------------------------------------------
 
     /** Per-widget assignment: (pinned vin, ordered action keys) or null. */

@@ -61,6 +61,19 @@ abstract class BlooTileService : TileService() {
         tile.label = custom ?: defaultLabel(cmd, snap)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = snap?.name ?: "Car"
         tile.updateTile()
+
+        // Optional: kick a throttled live refresh so the shown state is current.
+        maybeLiveRefresh(ctx, vin)
+    }
+
+    /** If live refresh is on and this car hasn't refreshed recently, queue one. */
+    private suspend fun maybeLiveRefresh(ctx: Context, vin: String) {
+        val settings = SettingsStore(ctx)
+        if (!settings.tileLiveRefresh()) return
+        val now = System.currentTimeMillis()
+        if (now - settings.tileRefreshedAt(vin) < LIVE_REFRESH_THROTTLE_MS) return
+        settings.setTileRefreshedAt(vin, now)
+        TileCommandWorker.enqueueRefresh(ctx, vin)
     }
 
     /**
@@ -172,6 +185,9 @@ abstract class BlooTileService : TileService() {
     }
 
     companion object {
+        /** Don't kick a live refresh for the same car more than once per minute. */
+        private const val LIVE_REFRESH_THROTTLE_MS = 60_000L
+
         /** Ask the system to refresh all of Bloo's active tiles. */
         fun requestUpdates(context: Context) {
             val classes = listOf(

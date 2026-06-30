@@ -6661,6 +6661,13 @@ private fun SettingsScreen(vm: AppViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                ToggleRow("Live refresh when shown", state.tileLiveRefresh) { vm.setTileLiveRefresh(it) }
+                Text(
+                    "Pulls the car's latest lock/climate state when a tile appears, so it's " +
+                        "always current. Uses a little more battery/data (throttled to once a minute per car).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Spacer(Modifier.height(4.dp))
                 QuickTilesManager(state, vm)
             }

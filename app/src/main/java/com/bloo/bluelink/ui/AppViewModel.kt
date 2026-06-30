@@ -117,6 +117,8 @@ data class UiState(
     val tileClimateTargets: List<String> = List(12) { "default" },
     /** Quick tiles run the command in the background (vs opening the app). */
     val tileBackground: Boolean = false,
+    /** Quick tiles kick a throttled status refresh when shown. */
+    val tileLiveRefresh: Boolean = false,
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
     val shortcutSet: Set<String>? = null,
     /** On-device Gemini Nano availability + opt-in, and produced summaries. */
@@ -593,6 +595,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it) }
         val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it) }
         val tileBackground = settingsStore.tileBackground()
+        val tileLiveRefresh = settingsStore.tileLiveRefresh()
         val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
@@ -619,6 +622,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 tileLabels = tileLabels,
                 tileClimateTargets = tileClimateTargets,
                 tileBackground = tileBackground,
+                tileLiveRefresh = tileLiveRefresh,
                 shortcutSet = shortcutSet,
                 currentIndex = index,
                 screen = screen,
@@ -1180,6 +1184,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             settingsStore.setTileBackground(value)
             com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
         }
+    }
+
+    fun setTileLiveRefresh(value: Boolean) {
+        _state.update { it.copy(tileLiveRefresh = value) }
+        viewModelScope.launch { settingsStore.setTileLiveRefresh(value) }
     }
 
     /** Pin (or clear, with null) a pebble to the dual-column hot spot. */
