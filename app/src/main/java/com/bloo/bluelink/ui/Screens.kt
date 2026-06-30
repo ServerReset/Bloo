@@ -7294,12 +7294,13 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
     var expanded by remember { mutableStateOf(false) }
 
     Card(
-        Modifier
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Row(
                 Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
@@ -7365,29 +7366,36 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
-                MorphTextButton("Remove tile", onClick = { vm.setTileAssignment(index, null, null) })
+                Spacer(Modifier.height(12.dp))
+                MorphButton(
+                    onClick = { vm.setTileAssignment(index, null, null) },
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Remove tile", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
 }
 
-/** A dashed-feel "add" affordance, mirroring the preset list's add control. */
+/** An outlined "add" pill that morphs like the app's other buttons. */
 @Composable
 private fun AddTilePill(label: String, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .background(buttonContainer())
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    MorphButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
     ) {
-        Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontWeight = FontWeight.SemiBold)
     }
 }
 
