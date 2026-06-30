@@ -28,7 +28,9 @@ import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.wear.R
+import com.bloo.wear.TILE_CHIP_ACTIONS
 import com.bloo.wear.WearComms
+import com.bloo.wear.WearLocalStore
 import com.bloo.wear.WearSettingsStore
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -88,7 +90,7 @@ class BlooTileService : TileService() {
         // One pass off the disk: read the snapshot once, apply the optional command's
         // optimistic update (WearComms.send writes back to the store), re-read so the
         // rendered car reflects it, then resolve theme roles for that same car.
-        val (snapshot, roles) = runBlocking {
+        val result = runBlocking {
             val store = SnapshotStore(ctx)
             var data = store.current()
             if (clickId.startsWith(CMD_PREFIX)) {
@@ -99,11 +101,17 @@ class BlooTileService : TileService() {
                 data = store.current()
             }
             val sel = data.selected
-            sel to resolveRoles(ctx, sel?.vin)
+            val roles = resolveRoles(ctx, sel?.vin)
+            val actions = runCatching { WearLocalStore(ctx).flow.first().tileActions }
+                .getOrElse { listOf("lock", "climate") }
+            Triple(sel, roles, actions)
         }
+        val snapshot = result.first
+        val roles = result.second
+        val actions = result.third
 
         val device = params.deviceConfiguration
-        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles)
+        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles, actions)
 
         // Refresh faster while charging (percent moves quickly) than when idle.
         val freshness = if (snapshot?.charging == true) FRESHNESS_CHARGING_MS else FRESHNESS_MS
@@ -136,6 +144,7 @@ class BlooTileService : TileService() {
                     .setTypography(Typography.TYPOGRAPHY_BODY1)
                     .setColor(argb(CLR_DIM))
                     .setMaxLines(2)
+                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                     .build()
             )
             .setPrimaryChipContent(openChip(ctx, device))
@@ -148,6 +157,7 @@ class BlooTileService : TileService() {
         device: DeviceParameters,
         snap: VehicleSnapshot,
         roles: WearColorRoles,
+        actions: List<String>,
     ): LayoutElementBuilders.LayoutElement {
         val screenDp = device.screenWidthDp
         val isSmall  = screenDp < 193
@@ -229,49 +239,22 @@ class BlooTileService : TileService() {
             )
             .build()
 
-        // Lock chip: the unlocked car is the noteworthy state, so it's highlighted
-        // (accent fill) — matching the phone tile — while a locked car sits calm.
-        val lockImg    = if (locked) Img.LOCK else Img.UNLOCK
-        val lockLabel  = if (locked) "Unlock" else "Lock"
-        val lockColors = if (locked) ChipColors.secondaryChipColors(inactivePalette)
-                         else        ChipColors.primaryChipColors(activePalette)
-        val lockAction = if (locked) WearAction.UNLOCK else WearAction.LOCK
-
-        // Climate chip: active when climate is on (charge palette when charging, tertiary for climate).
-        val climateImg    = Img.CLIMATE
-        val climateLabel  = if (climate) "Stop" else "Climate"
-        val climateColors = when {
-            charging -> ChipColors.primaryChipColors(chargePalette)
-            climate  -> ChipColors.primaryChipColors(Colors(roles.tertiary, roles.onTertiary, roles.surfaceContainer, roles.onSurface))
-            else     -> ChipColors.secondaryChipColors(inactivePalette)
-        }
-        val climateAction = if (climate) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
-
-        // Chip width: fill available inner-circle width split evenly. Minimum 52dp.
+        // The user's chosen chips (1–2 of lock/climate/charge), split evenly across
+        // the inner-circle width. A single chip is allowed to grow wider.
+        val chosen = actions.filter { it in TILE_CHIP_ACTIONS }.distinct().take(2)
+            .ifEmpty { listOf("lock", "climate") }
         val chipGap = if (isTiny) 2f else 4f
         val innerW  = screenDp * 0.76f - chipGap
-        val chipW   = (innerW / 2).coerceIn(52f, 84f)
+        val chipW   = (innerW / chosen.size).coerceIn(52f, if (chosen.size == 1) 150f else 84f)
 
-        val lockChip = Chip.Builder(ctx, cmd(lockAction), device)
-            .setIconContent(lockImg)
-            .setPrimaryLabelContent(lockLabel)
-            .setChipColors(lockColors)
-            .setWidth(DimensionBuilders.dp(chipW))
-            .build()
-
-        val climateChip = Chip.Builder(ctx, cmd(climateAction), device)
-            .setIconContent(climateImg)
-            .setPrimaryLabelContent(climateLabel)
-            .setChipColors(climateColors)
-            .setWidth(DimensionBuilders.dp(chipW))
-            .build()
-
-        val chipRow = LayoutElementBuilders.Row.Builder()
-            .addContent(lockChip)
-            .addContent(spacer(chipGap))
-            .addContent(climateChip)
-            .setHeight(DimensionBuilders.wrap())
-            .build()
+        val chipRowBuilder = LayoutElementBuilders.Row.Builder().setHeight(DimensionBuilders.wrap())
+        chosen.forEachIndexed { i, action ->
+            if (i > 0) chipRowBuilder.addContent(spacer(chipGap))
+            chipRowBuilder.addContent(
+                actionChip(ctx, device, action, snap, roles, activePalette, inactivePalette, chargePalette, chipW),
+            )
+        }
+        val chipRow = chipRowBuilder.build()
 
         val gap = if (isTiny) 2f else if (isSmall) 3f else 5f
 
@@ -338,6 +321,61 @@ class BlooTileService : TileService() {
         .setId(CMD_PREFIX + action)
         .setOnClick(ActionBuilders.LoadAction.Builder().build())
         .build()
+
+    /** Build one state-reflecting action chip (lock / climate / charge). */
+    private fun actionChip(
+        ctx: android.content.Context,
+        device: DeviceParameters,
+        action: String,
+        snap: VehicleSnapshot,
+        roles: WearColorRoles,
+        activePalette: Colors,
+        inactivePalette: Colors,
+        chargePalette: Colors,
+        chipW: Float,
+    ): LayoutElementBuilders.LayoutElement {
+        val locked = snap.locked == true
+        val charging = snap.charging == true
+        val climate = snap.climateOn == true
+        val tertiaryPalette = Colors(roles.tertiary, roles.onTertiary, roles.surfaceContainer, roles.onSurface)
+
+        val img: String
+        val label: String
+        val colors: ChipColors
+        val act: String
+        when (action) {
+            "charge" -> {
+                img = Img.BOLT
+                label = if (charging) "Stop" else "Charge"
+                colors = if (charging) ChipColors.primaryChipColors(chargePalette)
+                         else ChipColors.secondaryChipColors(inactivePalette)
+                act = if (charging) WearAction.CHARGE_OFF else WearAction.CHARGE_ON
+            }
+            "climate" -> {
+                img = Img.CLIMATE
+                label = if (climate) "Stop" else "Climate"
+                colors = when {
+                    charging -> ChipColors.primaryChipColors(chargePalette)
+                    climate -> ChipColors.primaryChipColors(tertiaryPalette)
+                    else -> ChipColors.secondaryChipColors(inactivePalette)
+                }
+                act = if (climate) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
+            }
+            else -> { // lock — unlocked is the highlighted state
+                img = if (locked) Img.LOCK else Img.UNLOCK
+                label = if (locked) "Unlock" else "Lock"
+                colors = if (locked) ChipColors.secondaryChipColors(inactivePalette)
+                         else ChipColors.primaryChipColors(activePalette)
+                act = if (locked) WearAction.UNLOCK else WearAction.LOCK
+            }
+        }
+        return Chip.Builder(ctx, cmd(act), device)
+            .setIconContent(img)
+            .setPrimaryLabelContent(label)
+            .setChipColors(colors)
+            .setWidth(DimensionBuilders.dp(chipW))
+            .build()
+    }
 
     private fun spacer(dp: Float): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Spacer.Builder()

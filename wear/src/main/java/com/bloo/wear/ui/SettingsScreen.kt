@@ -45,6 +45,7 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.OutlinedButton
+import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
@@ -135,6 +136,32 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     max = 12,
                     step = 1,
                 ) { step -> vm.setFontScale(0.8f + step * 0.05f) }
+            }
+        }
+
+        item {
+            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                Text("Tile chips", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "Pick up to two actions for the glanceable Tile.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                val actions = ui.localSettings.tileActions
+                listOf("lock" to "Lock / unlock", "climate" to "Climate", "charge" to "Charge").forEach { (key, label) ->
+                    val checked = key in actions
+                    SwitchButton(
+                        checked = checked,
+                        onCheckedChange = { on ->
+                            val next = if (on) (actions + key).distinct().takeLast(2) else actions - key
+                            vm.setTileActions(next)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
             }
         }
 

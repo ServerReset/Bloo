@@ -558,6 +558,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Choose which action chips the glanceable Tile shows, then redraw it. */
+    fun setTileActions(actions: List<String>) {
+        viewModelScope.launch {
+            localStore.setTileActions(actions)
+            requestWidgetUpdates()
+        }
+    }
+
     /**
      * Persist a car's reordered pebble order: apply it optimistically so the
      * tiles rearrange instantly, then push it to the phone, which saves it as

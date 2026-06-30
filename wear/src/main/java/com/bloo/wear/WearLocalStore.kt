@@ -120,12 +120,18 @@ object WearPebbles {
 data class WearLocalSettings(
     val fontScale: Float = 1f,
     val tileOrder: List<String> = WearTiles.DEFAULT_ORDER,
+    /** Which action chips the glanceable Tile shows (subset of [TILE_CHIP_ACTIONS]). */
+    val tileActions: List<String> = listOf("lock", "climate"),
 )
+
+/** The actions a Tile chip can perform, in canonical order. */
+val TILE_CHIP_ACTIONS = listOf("lock", "climate", "charge")
 
 class WearLocalStore(private val context: Context) {
 
     private val keyFontScale = floatPreferencesKey("font_scale")
     private val keyTileOrder = stringPreferencesKey("tile_order")
+    private val keyTileActions = stringPreferencesKey("tile_actions")
 
     val flow: Flow<WearLocalSettings> = context.wearLocalStore.data.map { prefs ->
         val fontScale = (prefs[keyFontScale] ?: 1f).coerceIn(0.8f, 1.4f)
@@ -136,7 +142,12 @@ class WearLocalStore(private val context: Context) {
         // Merge: keep saved order, append any new keys not yet in the saved list.
         val merged = savedOrder.filter { it in WearTiles.DEFAULT_ORDER } +
             WearTiles.DEFAULT_ORDER.filter { it !in savedOrder }
-        WearLocalSettings(fontScale = fontScale, tileOrder = merged)
+        val actions = prefs[keyTileActions]
+            ?.split(",")
+            ?.filter { it in TILE_CHIP_ACTIONS }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf("lock", "climate")
+        WearLocalSettings(fontScale = fontScale, tileOrder = merged, tileActions = actions)
     }
 
     suspend fun setFontScale(f: Float) {
@@ -145,5 +156,10 @@ class WearLocalStore(private val context: Context) {
 
     suspend fun setTileOrder(order: List<String>) {
         context.wearLocalStore.edit { it[keyTileOrder] = order.joinToString(",") }
+    }
+
+    suspend fun setTileActions(actions: List<String>) {
+        val clean = actions.filter { it in TILE_CHIP_ACTIONS }.distinct().take(2).ifEmpty { listOf("lock") }
+        context.wearLocalStore.edit { it[keyTileActions] = clean.joinToString(",") }
     }
 }
