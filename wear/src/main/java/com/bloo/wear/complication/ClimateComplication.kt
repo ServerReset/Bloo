@@ -23,7 +23,8 @@ class ClimateComplication : SuspendingComplicationDataSourceService() {
         build(type, climateOn = true, vin = null)
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        val snap = SnapshotStore(applicationContext).current().selected ?: return null
+        val snap = resolveComplicationCar(applicationContext, "ClimateComplication", request.complicationInstanceId)
+            ?: return null
         return build(request.complicationType, snap.climateOn, snap.vin)
     }
 

@@ -27,7 +27,8 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         buildData(type, pct = 82, rangeMi = 210, isEv = true, charging = true)
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        val snap = SnapshotStore(applicationContext).current().selected ?: return null
+        val snap = resolveComplicationCar(applicationContext, "ChargeComplication", request.complicationInstanceId)
+            ?: return null
         return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.isEv, snap.charging == true)
     }
 

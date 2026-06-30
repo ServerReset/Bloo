@@ -23,7 +23,8 @@ class LockComplication : SuspendingComplicationDataSourceService() {
         build(type, locked = true, vin = null)
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        val snap = SnapshotStore(applicationContext).current().selected ?: return null
+        val snap = resolveComplicationCar(applicationContext, "LockComplication", request.complicationInstanceId)
+            ?: return null
         return build(request.complicationType, snap.locked, snap.vin)
     }
 
