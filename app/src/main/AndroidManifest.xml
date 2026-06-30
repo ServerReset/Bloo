@@ -78,7 +78,7 @@
         <service
             android:name=".tiles.BlooTile2"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_lock"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 2"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -88,7 +88,7 @@
         <service
             android:name=".tiles.BlooTile3"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_unlock"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 3"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -98,7 +98,7 @@
         <service
             android:name=".tiles.BlooTile4"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_climate"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 4"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -108,7 +108,7 @@
         <service
             android:name=".tiles.BlooTile5"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_lock"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 5"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -118,7 +118,7 @@
         <service
             android:name=".tiles.BlooTile6"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_climate"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 6"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -128,7 +128,7 @@
         <service
             android:name=".tiles.BlooTile7"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_lock"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 7"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -138,7 +138,7 @@
         <service
             android:name=".tiles.BlooTile8"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_climate"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 8"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -148,7 +148,7 @@
         <service
             android:name=".tiles.BlooTile9"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_lock"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 9"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -158,7 +158,7 @@
         <service
             android:name=".tiles.BlooTile10"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_climate"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 10"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -168,7 +168,7 @@
         <service
             android:name=".tiles.BlooTile11"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_lock"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 11"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -178,7 +178,7 @@
         <service
             android:name=".tiles.BlooTile12"
             android:exported="true"
-            android:icon="@drawable/ic_shortcut_climate"
+            android:icon="@drawable/ic_shortcut_car"
             android:label="Bloo tile 12"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
