@@ -528,14 +528,24 @@ class BlooWidget : GlanceAppWidget() {
         val base = GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
         val showActions = actions.isNotEmpty() && h >= 190.dp
         val reserve = if (showActions) 46.dp else 0.dp
-        val ringDp = minOf(w - 24.dp, h - 24.dp - reserve).coerceIn(56.dp, 168.dp)
+        // Was capped at 168dp regardless of how much space the placement actually
+        // had, so a big square widget just floated a modest ring in a sea of empty
+        // padding. 168 was sized for a small/medium square; scale it up so a large
+        // one (e.g. a 4x4 grid slot, which can easily be 280dp+ per side) actually
+        // uses the room it was given.
+        val ringDp = minOf(w - 24.dp, h - 24.dp - reserve).coerceIn(56.dp, 260.dp)
         val pct = (snap.percent ?: 0).coerceIn(0, 100)
         val ring = remember(pct, theme.accentArgb) { ringBitmap(pct, theme.accentArgb) }
+        val actionPillH = (ringDp * 0.16f).coerceIn(34.dp, 48.dp)
 
         Box(base.clickable(open).padding(12.dp)) {
             Column(GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (showName) {
-                    Text(ellipsize(snap.name, 14), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium))
+                    Text(
+                        ellipsize(snap.name, 14),
+                        maxLines = 1,
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = scaledSp(12f, theme), fontWeight = FontWeight.Medium),
+                    )
                     Spacer(GlanceModifier.height(4.dp))
                 }
                 Box(GlanceModifier.defaultWeight(), contentAlignment = Alignment.Center) {
@@ -545,12 +555,27 @@ class BlooWidget : GlanceAppWidget() {
                             Text(
                                 snap.percent?.let { "$it%" } ?: "—",
                                 maxLines = 1,
-                                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = if (ringDp > 100.dp) 26.sp else 18.sp, fontWeight = FontWeight.Bold),
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurface,
+                                    fontSize = scaledSp(
+                                        when {
+                                            ringDp >= 200.dp -> 44f
+                                            ringDp >= 140.dp -> 32f
+                                            ringDp > 100.dp  -> 26f
+                                            else             -> 18f
+                                        },
+                                        theme,
+                                    ),
+                                    fontWeight = FontWeight.Bold,
+                                ),
                             )
                             Text(
                                 if (snap.isEv) "Battery" else "Fuel",
                                 maxLines = 1,
-                                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurfaceVariant,
+                                    fontSize = scaledSp(if (ringDp >= 140.dp) 14f else 10f, theme),
+                                ),
                             )
                         }
                     }
@@ -560,7 +585,7 @@ class BlooWidget : GlanceAppWidget() {
                     Row(GlanceModifier.fillMaxWidth()) {
                         actions.take(2).forEachIndexed { i, a ->
                             if (i > 0) Spacer(GlanceModifier.width(8.dp))
-                            ActionPill(widgetId, snap.vin, a, 34.dp, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = false)
+                            ActionPill(widgetId, snap.vin, a, actionPillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = actionPillH >= 44.dp)
                         }
                     }
                 }
@@ -570,9 +595,11 @@ class BlooWidget : GlanceAppWidget() {
 
     /** Rasterize a ring gauge: a dim full-circle track plus an accent-colored arc
      *  swept to [pct]. Rendered once at a fixed pixel size so it stays crisp when
-     *  Glance scales it into whatever [Dp] box the layout gives it. */
+     *  Glance scales it into whatever [Dp] box the layout gives it — 480px covers
+     *  the ring's raised 260dp render cap without visible upscale blur on a
+     *  typical ~3x-density screen. */
     private fun ringBitmap(pct: Int, accentArgb: Int): Bitmap {
-        val size = 240
+        val size = 480
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bmp)
         val stroke = size * 0.11f
@@ -974,7 +1001,9 @@ class BlooWidget : GlanceAppWidget() {
         val pad = 8.dp
         val hPad = if (isPill) (h / 3).coerceIn(pad, 28.dp) else pad
         val gap = 6.dp
-        val pillH = (h - pad * 2).coerceIn(24.dp, 54.dp)
+        // Was capped at 54dp regardless of h, so a tall wide-row placement's buttons
+        // stayed short and squat instead of growing with the available height.
+        val pillH = (h - pad * 2).coerceIn(24.dp, 84.dp)
 
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
         val (stateLabel, stateColor) = stateOf(snap, theme)
@@ -986,7 +1015,7 @@ class BlooWidget : GlanceAppWidget() {
         }
 
         val showBar = h >= 80.dp
-        val barW = (w * 0.22f).coerceIn(60.dp, 110.dp)
+        val barW = (w * 0.22f).coerceIn(60.dp, 170.dp)
 
         Box(modifier = boxMod) {
             Row(
@@ -994,21 +1023,25 @@ class BlooWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Cap the info column so a long car name truncates instead of squeezing
-                // the action buttons off the row.
-                val infoW = (w * 0.4f).coerceIn(70.dp, 150.dp)
+                // the action buttons off the row. Was capped at 150dp regardless of w
+                // — name/percent now always ellipsize safely (see ellipsize() calls
+                // below), so a much wider ceiling is safe and lets this column grow
+                // on genuinely wide placements instead of the buttons alone soaking
+                // up all the freed width.
+                val infoW = (w * 0.4f).coerceIn(70.dp, 240.dp)
                 Column(
                     modifier = GlanceModifier.height(pillH).width(infoW).clickable(openAction),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        ellipsize(snap.name, 16),
+                        ellipsize(snap.name, 20),
                         maxLines = 1,
-                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = 10.sp),
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = scaledSp(10f, theme)),
                     )
                     Text(
                         snap.percent?.let { "$it%" } ?: "—",
                         maxLines = 1,
-                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp),
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = scaledSp(if (pillH >= 64.dp) 20f else 15f, theme)),
                     )
                     if (showBar) {
                         Spacer(GlanceModifier.height(3.dp))
@@ -1357,8 +1390,11 @@ class BlooWidget : GlanceAppWidget() {
                     // The column gets roughly half the remaining width (shared
                     // defaultWeight() with ButtonGrid) — derive the bar's width from
                     // that instead of a fixed guess, which could be wider than the
-                    // column actually receives on a narrow landscape widget.
-                    val statusW = ((w - hPad * 2 - 10.dp) / 2f).coerceIn(60.dp, 140.dp)
+                    // column actually receives on a narrow landscape widget. Raised
+                    // the ceiling from 140dp since a genuinely wide placement's half
+                    // can be much more than that, and the bar used to just stop
+                    // growing and sit centered in the unused remainder.
+                    val statusW = ((w - hPad * 2 - 10.dp) / 2f).coerceIn(60.dp, 260.dp)
                     LandscapeStatusColumn(
                         snap = snap,
                         h = h,
@@ -1409,7 +1445,12 @@ class BlooWidget : GlanceAppWidget() {
         val showRangeFit = h >= 76.dp && showRange
         val showBar = h >= 64.dp
         val showStateFit = h >= 70.dp && showState
+        // Used to top out at h>=200dp -> 38sp with nothing beyond, so a genuinely
+        // tall landscape placement (a wide widget can easily clear 250-300dp) still
+        // rendered small, left-hugging text with a big unused margin below it.
         val percentSize = when {
+            h >= 280.dp -> 52.sp
+            h >= 230.dp -> 44.sp
             h >= 200.dp -> 38.sp
             h >= 170.dp -> 33.sp
             h >= 140.dp -> 28.sp
@@ -1418,7 +1459,10 @@ class BlooWidget : GlanceAppWidget() {
             else        -> 17.sp
         }
 
-        Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        // Column had no horizontalAlignment, so its content (all narrower than the
+        // wide defaultWeight() slot it's given) hugged the left edge, leaving the
+        // rest of the slot as dead space instead of centering within it.
+        Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 ellipsize(snap.name, 16),
                 maxLines = 1,
@@ -1472,7 +1516,9 @@ class BlooWidget : GlanceAppWidget() {
         snap: VehicleSnapshot,
         theme: WidgetTheme,
     ) {
-        val pillH = ((contentH - gap) / 2).coerceIn(26.dp, 56.dp)
+        // Was capped at 56dp regardless of contentH, so a tall landscape placement's
+        // button grid stayed small and centered in a lot of unused vertical room.
+        val pillH = ((contentH - gap) / 2).coerceIn(26.dp, 84.dp)
         // Two columns are narrow — labels would truncate, so icon-only there.
         val allowLabel = cols == 1
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
@@ -1528,8 +1574,10 @@ class BlooWidget : GlanceAppWidget() {
         val corner = if (st.isLockAction && snap?.locked == false) pillH * 0.22f else baseCorner
 
         val showLabel = allowLabel && pillH >= 44.dp
-        val iconSize = if (showLabel) (pillH * 0.34f).coerceIn(14.dp, 20.dp)
-                       else (pillH * 0.46f).coerceIn(14.dp, 24.dp)
+        // Icon caps used to stay flat (20dp/24dp) even as pillH grew well past 56dp,
+        // leaving a big empty-looking pill around a small fixed icon.
+        val iconSize = if (showLabel) (pillH * 0.34f).coerceIn(14.dp, 30.dp)
+                       else (pillH * 0.46f).coerceIn(14.dp, 36.dp)
         val fg = theme.onAccent
         Box(
             modifier = modifier
@@ -1565,9 +1613,9 @@ class BlooWidget : GlanceAppWidget() {
                     Text(
                         displayLabel,
                         maxLines = 1,
-                        style = TextStyle(color = fg, fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        style = TextStyle(color = fg, fontSize = if (pillH >= 64.dp) 13.sp else 10.sp, fontWeight = FontWeight.Medium),
                     )
-                }
+}
             } else {
                 Image(
                     provider = ImageProvider(st.iconRes),
