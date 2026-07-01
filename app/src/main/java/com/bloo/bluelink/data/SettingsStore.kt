@@ -561,7 +561,9 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_shape")] = shape }
     }
 
-    // "auto" adaptive, "minimal", "stats", "ring", "photo", "dual"
+    // "auto" adaptive, "stats", "photo", "map" -- older configs may still have
+    // "minimal"/"dual"/"ring" saved from before those were removed as manual
+    // choices; the widget dispatch treats any unrecognized value as "auto".
     suspend fun widgetStyle(widgetId: Int): String =
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_style")] ?: "auto"
 
