@@ -9,9 +9,11 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.tiles.BlooTileService
 import com.bloo.bluelink.wear.WearBridge
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 /**
@@ -30,6 +32,11 @@ class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         runCatching { BlooWidget().updateAll(ctx) }
         runCatching { WearBridge.publishNow(ctx) }
         runCatching { WearBridge.publishAuth(ctx) }
+        // Safety net: appearance/settings are normally pushed the moment they change
+        // (AppViewModel collects the appearance flow), but re-publishing here on the
+        // same 15-min heartbeat as everything else means a missed push can't leave
+        // the watch's theme/units/pebble-order stale indefinitely.
+        runCatching { WearBridge.publishSettingsNow(ctx, SettingsStore(ctx).appearance.first()) }
         BlooTileService.requestUpdates(ctx)
         return Result.success()
     }
