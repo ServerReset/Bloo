@@ -7376,7 +7376,7 @@ private fun CarTilesHeader(name: String, img: String?, assignedCount: Int, total
     val scheme = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(
-            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(15.dp)),
+            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center,
         ) {
             if (!img.isNullOrBlank()) {
