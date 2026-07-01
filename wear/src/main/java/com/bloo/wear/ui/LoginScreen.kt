@@ -11,6 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Pin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,9 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.CircularProgressIndicator
-import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -109,14 +112,17 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                 )
             }
         } else {
-            item { FieldButton("Email", email, emailInput) }
-            item { FieldButton("Password", if (password.isBlank()) "" else "••••••", passwordInput) }
-            item { FieldButton("PIN", if (pin.isBlank()) "" else "••••", pinInput) }
+            item { FieldButton("Email", email, Icons.Filled.Email, emailInput) }
+            item { FieldButton("Password", if (password.isBlank()) "" else "••••••", Icons.Filled.Lock, passwordInput) }
+            item { FieldButton("PIN", if (pin.isBlank()) "" else "••••", Icons.Filled.Pin, pinInput) }
             item {
-                Button(
+                MorphButton(
+                    label = "Sign in",
+                    icon = Icons.Filled.Login,
+                    active = false,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = false,
                     onClick = { vm.login(brand, email, password, pin) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Sign in") },
                 )
             }
         }
@@ -145,11 +151,14 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
 }
 
 @Composable
-private fun FieldButton(label: String, value: String, onClick: () -> Unit) {
-    FilledTonalButton(
+private fun FieldButton(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    MorphButton(
+        label = value.ifBlank { label },
+        secondaryLabel = if (value.isNotBlank()) label else null,
+        icon = icon,
+        active = false,
+        activeColor = MaterialTheme.colorScheme.primary,
+        pending = false,
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(value.ifBlank { label }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        secondaryLabel = if (value.isNotBlank()) ({ Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }) else null,
     )
 }

@@ -12,12 +12,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,12 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
-import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.OutlinedButton
-import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
@@ -94,11 +95,13 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            FilledTonalButton(
+            MorphButton(
+                label = "Add account",
+                icon = Icons.Filled.PersonAdd,
+                active = false,
+                activeColor = MaterialTheme.colorScheme.primary,
+                pending = false,
                 onClick = onAddAccount,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Add account") },
-                icon = { Icon(Icons.Filled.PersonAdd, contentDescription = null) },
             )
         }
 
@@ -149,16 +152,23 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 )
                 Spacer(Modifier.height(6.dp))
                 val actions = ui.localSettings.tileActions
-                listOf("lock" to "Lock / unlock", "climate" to "Climate", "charge" to "Charge").forEach { (key, label) ->
+                listOf(
+                    Triple("lock", "Lock / unlock", Icons.Filled.Lock),
+                    Triple("climate", "Climate", Icons.Filled.Thermostat),
+                    Triple("charge", "Charge", Icons.Filled.Bolt),
+                ).forEach { (key, label, icon) ->
                     val checked = key in actions
-                    SwitchButton(
-                        checked = checked,
-                        onCheckedChange = { on ->
+                    MorphButton(
+                        label = label,
+                        icon = icon,
+                        active = checked,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        pending = false,
+                        onClick = {
+                            val on = !checked
                             val next = if (on) (actions + key).distinct().takeLast(2) else actions - key
                             vm.setTileActions(next)
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     )
                     Spacer(Modifier.height(4.dp))
                 }
@@ -185,20 +195,14 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         ?: ui.cars.getOrNull(index)?.vin
                     @Composable
                     fun carOption(label: String, vin: String?) {
-                        val active = vin == selectedVin
-                        if (active) {
-                            FilledTonalButton(
-                                onClick = { vm.setTileCarVin(index, vin) },
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            )
-                        } else {
-                            OutlinedButton(
-                                onClick = { vm.setTileCarVin(index, vin) },
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            )
-                        }
+                        MorphButton(
+                            label = label,
+                            icon = Icons.Filled.DirectionsCar,
+                            active = vin == selectedVin,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            pending = false,
+                            onClick = { vm.setTileCarVin(index, vin) },
+                        )
                         Spacer(Modifier.height(4.dp))
                     }
                     carOption("Follow selected", null)
@@ -237,31 +241,35 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            FilledTonalButton(
+            MorphButton(
+                label = "Re-sync from phone",
+                icon = Icons.Filled.Sync,
+                active = false,
+                activeColor = MaterialTheme.colorScheme.primary,
+                pending = false,
                 onClick = { vm.resync() },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Re-sync from phone") },
-                icon = { Icon(Icons.Filled.Sync, contentDescription = null) },
             )
         }
 
         item {
-            FilledTonalButton(
+            MorphButton(
+                label = "Refresh all cars",
+                icon = Icons.Filled.Refresh,
+                active = false,
+                activeColor = MaterialTheme.colorScheme.primary,
+                pending = false,
                 onClick = { vm.refreshAll() },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Refresh all cars") },
-                icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
             )
         }
 
         item {
-            OutlinedButton(
-                onClick = {
-                    if (confirmSignOut) vm.signOutAll() else confirmSignOut = true
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (confirmSignOut) "Tap again to confirm" else "Sign out") },
-                icon = { Icon(Icons.Filled.Logout, contentDescription = null) },
+            MorphButton(
+                label = if (confirmSignOut) "Tap again to confirm" else "Sign out",
+                icon = Icons.Filled.Logout,
+                active = confirmSignOut,
+                activeColor = MaterialTheme.colorScheme.error,
+                pending = false,
+                onClick = { if (confirmSignOut) vm.signOutAll() else confirmSignOut = true },
             )
         }
 

@@ -19,8 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.CircularProgressIndicator
-import androidx.wear.compose.material3.FilledTonalButton
-import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
@@ -56,11 +54,14 @@ fun WatchApp(vm: WearViewModel) {
                         textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(12.dp))
-                    FilledTonalButton(
+                    MorphButton(
+                        label = "Sync from phone",
+                        icon = Icons.Filled.Sync,
+                        active = false,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        pending = false,
                         onClick = { vm.resync() },
                         modifier = Modifier.fillMaxWidth(0.8f),
-                        label = { Text("Sync from phone") },
-                        icon = { Icon(Icons.Filled.Sync, contentDescription = null) },
                     )
                 }
             }

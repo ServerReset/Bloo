@@ -15,19 +15,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
-import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.wear.WearSettingsStore
 import com.bloo.wear.ui.BlooWearTheme
+import com.bloo.wear.ui.MorphButton
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -63,10 +65,13 @@ class ComplicationConfigActivity : ComponentActivity() {
                 ) {
                     item { ListHeader { Text("Show which car?", textAlign = TextAlign.Center) } }
                     items(cars, key = { it.vin }) { car ->
-                        FilledTonalButton(
+                        MorphButton(
+                            label = car.name,
+                            icon = Icons.Filled.DirectionsCar,
+                            active = false,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            pending = false,
                             onClick = { choose(dataSource, complicationId, component, car.vin) },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(car.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         )
                     }
                 }

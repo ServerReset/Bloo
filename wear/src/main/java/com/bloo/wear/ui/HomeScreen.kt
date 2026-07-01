@@ -32,6 +32,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
 import androidx.compose.material.icons.filled.Bolt
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Warning
@@ -112,7 +114,6 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
-import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WearWeather
@@ -840,7 +841,14 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     SliderRow("Temp", "${d.tempF}°F", d.tempF, 62, 82, 1, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
     SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
-    SwitchButton(checked = d.defrost, onCheckedChange = { vm.toggleDefrost(car.vin) }, modifier = Modifier.fillMaxWidth(), label = { Text("Defrost") })
+    MorphButton(
+        label = if (d.defrost) "Defrost on" else "Defrost",
+        icon = Icons.Filled.AcUnit,
+        active = d.defrost,
+        activeColor = MaterialTheme.colorScheme.tertiary,
+        pending = false,
+        onClick = { vm.toggleDefrost(car.vin) },
+    )
 }
 
 @Composable
@@ -876,7 +884,14 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
 @Composable
 private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort", Icons.Filled.AirlineSeatReclineNormal) {
     val d = ui.draftFor(car.vin)
-    SwitchButton(checked = d.steering, onCheckedChange = { vm.toggleSteering(car.vin) }, modifier = Modifier.fillMaxWidth(), label = { Text("Steering heat") })
+    MorphButton(
+        label = if (d.steering) "Steering heat on" else "Steering heat",
+        icon = Icons.Filled.Whatshot,
+        active = d.steering,
+        activeColor = WearColors.heat,
+        pending = false,
+        onClick = { vm.toggleSteering(car.vin) },
+    )
     Spacer(Modifier.height(4.dp))
     SliderRow("Driver seat", seatStepLabels[d.seatDriver], d.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(car.vin, it) }
     SliderRow("Passenger", seatStepLabels[d.seatPassenger], d.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(car.vin, it) }

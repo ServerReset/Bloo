@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -302,7 +303,12 @@ fun WiggleText(
     )
 }
 
-/** The app's pill→rounded-square morphing button, for Wear. Matches the phone's MorphButton. */
+/** The app's pill→rounded-square morphing button, for Wear. Matches the phone's MorphButton.
+ *  [secondaryLabel] adds a small caption line below [label] (e.g. a field name
+ *  under its current value) — every button-shaped control in the wear app
+ *  should go through this one component rather than a raw Wear Button/
+ *  FilledTonalButton/OutlinedButton/SwitchButton, so contrast, press feedback,
+ *  and the pill-morph motion stay consistent everywhere. */
 @Composable
 fun MorphButton(
     label: String,
@@ -312,6 +318,7 @@ fun MorphButton(
     pending: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    secondaryLabel: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -321,12 +328,24 @@ fun MorphButton(
     // 50% = true pill; 28% = rounded rectangle — phone's exact values with the same spring.
     val pct by animateFloatAsState(
         targetValue = if (active || pressed) 28f else 50f,
-        animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphCorner",
     )
-    // Inactive background mirrors buttonContainer() from Theme.kt.
-    // Wear ColorScheme has surfaceContainerHigh but not surfaceContainerHighest.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
+    // A quick, snappy press-punch independent of the (slower, shape-driven)
+    // morph above — corner-radius alone was too subtle to register as "the
+    // button reacted" against the dark, low-contrast card background.
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label = "morphPressScale",
+    )
+    // Phone's buttonContainer() lerps from surfaceContainerHighest (the most
+    // elevated tonal step) toward onSurface by 18-20%. Wear's ColorScheme has
+    // no surfaceContainerHighest, so this based off surfaceContainerHigh (one
+    // step darker) — lerping by the same 18% left buttons reading almost flat
+    // against the card behind them. Lerp further to compensate for the lower
+    // starting tone.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.32f)
     val bg by animateColorAsState(
         targetValue = if (active) activeColor else containerColor,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -338,9 +357,11 @@ fun MorphButton(
         onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick() },
         enabled = !pending,
         interactionSource = interaction,
-        modifier = modifier.fillMaxWidth().animateContentSize(
-            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        ),
+        modifier = modifier.fillMaxWidth()
+            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
+            .animateContentSize(
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            ),
         shape = RoundedCornerShape(percent = pct.roundToInt()),
         colors = ButtonDefaults.buttonColors(
             containerColor = bg,
@@ -348,8 +369,11 @@ fun MorphButton(
             disabledContainerColor = bg,
             disabledContentColor = resolvedContent.copy(alpha = 0.38f),
         ),
-        border = if (active || pending) null else BorderStroke(1.dp, scheme.outline.copy(alpha = 0.4f)),
+        border = if (active || pending) null else BorderStroke(1.dp, scheme.outline.copy(alpha = 0.6f)),
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold) },
+        secondaryLabel = secondaryLabel?.let { s ->
+            { Text(s, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        },
         icon = {
             if (pending) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp))
