@@ -57,10 +57,11 @@ import kotlinx.coroutines.flow.first
 /**
  * The Bloo home-screen widget (Jetpack Glance).
  *
- * Five layout tiers, chosen by aspect ratio and dimensions: Compact, NarrowTall,
- * WideRow, Portrait, Landscape. Every dimension is derived from [LocalSize] via
- * [SizeMode.Exact], so the layout recomposes at the widget's true pixel size on
- * every resize.
+ * Seven "Auto" layout tiers, chosen by aspect ratio and dimensions: Tiny, Compact,
+ * NarrowTall, WideRow, Square, Portrait, Landscape — plus six fixed alternate
+ * styles (Minimal/Stats/Photo/Dual/Ring/Map) the user can pin regardless of size.
+ * Every dimension is derived from [LocalSize] via [SizeMode.Exact], so the layout
+ * recomposes at the widget's true pixel size on every resize.
  *
  * Colour comes entirely from the app's selected palette (see [WidgetTheme]) rather
  * than the system Material You theme, so the widget always matches the app. Only
@@ -183,6 +184,14 @@ class BlooWidget : GlanceAppWidget() {
                 // slots). WideRow triggers earlier (> 2× width-to-height) so short banners
                 // never fall through to landscape.
                 val isSkinny = isPortrait && (w < 155.dp || h > w * 2.0f)
+                // True 1-cell placements (the widget's minResizeWidth/Height is 40dp) — too
+                // small for even Compact's narrow branch to stay legible.
+                val isTiny = w < 80.dp && h < 80.dp
+                // Roughly-square, non-portrait boxes (2x2/3x3/4x4-ish grid slots) used to
+                // fall through to Landscape or Portrait by default even though neither was
+                // designed for a 1:1 box — a centered ring gauge reads far better here.
+                val ratio = if (h.value > 0f) w.value / h.value else 1f
+                val isSquare = !isPortrait && !isTiny && ratio in 0.72f..1.35f
                 when {
                     // User-chosen alternate styles render the same at any size.
                     snap != null && widgetStyle == "minimal" ->
@@ -197,6 +206,11 @@ class BlooWidget : GlanceAppWidget() {
                         RingBody(widgetId, snap, actions, w, h, widgetShowName, pendingAction, theme)
                     snap != null && widgetStyle == "map" ->
                         MapBody(widgetId, snap, w, h, mapBitmap, locationAddress, widgetShowName, widgetShowState, theme)
+                    isTiny -> when {
+                        snap != null -> TinyBody(widgetId, snap, showBackground, widgetShape, theme)
+                        cfg == null  -> UnconfiguredCompact(widgetId)
+                        else         -> UnavailableCompact(showBackground, widgetShape, theme)
+                    }
                     h < 65.dp -> when {
                         snap != null -> CompactBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
@@ -211,6 +225,11 @@ class BlooWidget : GlanceAppWidget() {
                         snap != null -> WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
                         else         -> UnavailableCompact(showBackground, widgetShape, theme)
+                    }
+                    isSquare -> when {
+                        snap != null -> RingBody(widgetId, snap, actions, w, h, widgetShowName, pendingAction, theme)
+                        cfg == null  -> UnconfiguredFull(widgetId)
+                        else         -> UnavailableFull(showBackground, widgetShape, theme)
                     }
                     isPortrait -> when {
                         snap != null -> PortraitBody(widgetId, snap, actions, w, h, photoBitmap, mapBitmap, showBackground, widgetShape, widgetShowRange, widgetShowState, locationAddress, pendingAction, theme)
@@ -894,6 +913,41 @@ class BlooWidget : GlanceAppWidget() {
                 colorFilter = ColorFilter.tint(theme.onAccent),
                 modifier = GlanceModifier.size(size * 0.5f),
             )
+        }
+    }
+
+    // ── Tiny (icon-scale) layout ──────────────────────────────────────────────
+
+    /** Smaller than [CompactBody] can stay legible at — true 1-cell placements
+     *  (the widget's minResizeWidth/Height is 40dp). Just the percent and a
+     *  state-colored dot; a name label wouldn't read at this scale. */
+    @Composable
+    private fun TinyBody(
+        widgetId: Int,
+        snap: VehicleSnapshot,
+        showBackground: Boolean,
+        widgetShape: String,
+        theme: WidgetTheme,
+    ) {
+        val context = LocalContext.current
+        val corner = theme.cornerOverride ?: if (widgetShape == "pill") 999.dp else 18.dp
+        val base = if (showBackground) {
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        } else {
+            GlanceModifier.fillMaxSize().cornerRadius(corner)
+        }
+        val open = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
+        val (_, stateColor) = stateOf(snap, theme)
+        Box(base.clickable(open), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    snap.percent?.let { "$it%" } ?: "—",
+                    maxLines = 1,
+                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = scaledSp(17f, theme)),
+                )
+                Spacer(GlanceModifier.height(3.dp))
+                Box(GlanceModifier.size(6.dp).background(stateColor).cornerRadius(3.dp)) {}
+            }
         }
     }
 
