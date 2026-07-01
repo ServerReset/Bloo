@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
@@ -18,16 +19,22 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -351,6 +358,83 @@ fun MorphButton(
             }
         },
     )
+}
+
+/** One option in a [MorphSegmented] control. */
+data class WearSegmentOption(val key: String, val label: String)
+
+/**
+ * The watch equivalent of the phone's MorphSegmented: a full-width segmented
+ * selector with a single sliding, bouncy highlight — same visual language as
+ * MorphButton (pill-track container, spring-driven motion), just for a
+ * one-of-N choice between equal alternatives instead of a single action.
+ * Best suited to 2-4 short labels (e.g. brand pickers); a long or highly
+ * variable option list should stay a vertical list instead.
+ */
+@Composable
+fun MorphSegmented(
+    options: List<WearSegmentOption>,
+    selectedKey: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
+    val trackPad = 4.dp
+    val gap = 4.dp
+    val trackHeight = 40.dp
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
+    Box(
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(containerColor),
+    ) {
+        BoxWithConstraints(Modifier.padding(trackPad).height(trackHeight)) {
+            val n = options.size
+            val segWidth = (maxWidth - gap * (n - 1)) / n
+            val indicatorX by animateDpAsState(
+                targetValue = (segWidth + gap) * selectedIndex,
+                animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                label = "wearSegIndicatorX",
+            )
+            Box(
+                Modifier
+                    .offset(x = indicatorX)
+                    .width(segWidth)
+                    .fillMaxHeight()
+                    .background(scheme.primary, RoundedCornerShape(14.dp)),
+            )
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                options.forEachIndexed { i, opt ->
+                    val selected = i == selectedIndex
+                    val fg by animateColorAsState(
+                        if (selected) scheme.onPrimary else scheme.onSurfaceVariant,
+                        spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "wearSegFg",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(segWidth)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { onSelect(opt.key) },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            opt.label,
+                            color = fg,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ---- Weather helpers (mirror the phone's WeatherCode mapping) -------------

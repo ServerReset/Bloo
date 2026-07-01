@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.ListHeader
@@ -76,11 +75,15 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
         item { ListHeader { Text("Sign in to Bloo", textAlign = TextAlign.Center) } }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                BrandChip("Hyundai", brand == Brand.HYUNDAI, Modifier.weight(1f)) { brand = Brand.HYUNDAI }
-                BrandChip("Genesis", brand == Brand.GENESIS, Modifier.weight(1f)) { brand = Brand.GENESIS }
-                BrandChip("Kia", brand == Brand.KIA, Modifier.weight(1f)) { brand = Brand.KIA }
-            }
+            MorphSegmented(
+                options = listOf(
+                    WearSegmentOption(Brand.HYUNDAI.name, "Hyundai"),
+                    WearSegmentOption(Brand.GENESIS.name, "Genesis"),
+                    WearSegmentOption(Brand.KIA.name, "Kia"),
+                ),
+                selectedKey = brand.name,
+                onSelect = { key -> brand = Brand.valueOf(key) },
+            )
         }
 
         if (brand == Brand.KIA) {
@@ -126,16 +129,6 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
             )
         }
     }
-}
-
-@Composable
-private fun BrandChip(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        colors = if (selected) ButtonDefaults.buttonColors() else ButtonDefaults.filledTonalButtonColors(),
-        label = { Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-    )
 }
 
 @Composable
