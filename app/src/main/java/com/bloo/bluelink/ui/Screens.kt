@@ -3207,8 +3207,24 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val pebbles: @Composable ColumnScope.() -> Unit = {
         PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
     }
+    // Hoisted (not recreated on flip) so each column keeps its own scroll position
+    // when the columns swap sides, and so the floating name pill below can always
+    // watch the column that currently holds CarHeaderRow, wherever it is.
+    val controlsScroll = rememberScrollState()
+    val pebblesScroll = rememberScrollState()
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    // Mirrors the single-column view's floating name pill: appears once the header
+    // has scrolled out of view, so a wide-screen user never loses track of which
+    // car a long dual-column page belongs to.
+    val nameHidden by remember {
+        derivedStateOf { controlsScroll.value > with(density) { (topInset + 52.dp + 40.dp).toPx() } }
+    }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(v, state, vm) {
+        Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped.
         AnimatedContent(
             targetState = flipped,
@@ -3219,10 +3235,10 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             },
             label = "flipColumns",
         ) { isFlipped ->
-            val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val leftCol = if (isFlipped) pebbles else controls
             val rightCol = if (isFlipped) controls else pebbles
+            val leftScroll = if (isFlipped) pebblesScroll else controlsScroll
+            val rightScroll = if (isFlipped) controlsScroll else pebblesScroll
             // Inset spacers (not padding) so content scrolls *behind* the bars;
             // the leading spacer also clears the floating overlay buttons.
             val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + 52.dp)) }
@@ -3237,15 +3253,33 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Column(
-                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        Modifier.weight(1f).fillMaxHeight().verticalScroll(leftScroll),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { lead(); leftCol(); trail() }
                     Column(
-                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rightScroll),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { lead(); rightCol(); trail() }
                 }
             }
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = nameHidden,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
+        ) {
+            Surface(
+                onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                    Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
         }
     }
     }
@@ -3326,39 +3360,22 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         // The empty slot is both a drop target (drag any pebble onto it to pin)
         // and a tap target (tap to pick one from a menu). It highlights while a
         // dragged pebble hovers over it.
-        val borderWidth by animateDpAsState(if (hovered) 2.dp else 1.dp, label = "slotBorder")
-        val borderColor by androidx.compose.animation.animateColorAsState(
-            if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-            label = "slotBorderColor",
-        )
         Box(
             Modifier.onGloballyPositioned {
                 hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
             },
         ) {
-            OutlinedCard(
+            MorphButton(
                 onClick = { menu = true },
                 modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(borderWidth, borderColor),
+                active = hovered,
+                activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                contentPadding = PaddingValues(16.dp),
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Filled.PushPin,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = if (hovered) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        if (hovered) "Release to pin" else "Pin a pebble here",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hovered) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Icon(Icons.Filled.PushPin, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(if (hovered) "Release to pin" else "Pin a pebble here", style = MaterialTheme.typography.bodyMedium)
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 options.forEach { sec ->
