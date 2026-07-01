@@ -6583,11 +6583,6 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Logs
             SettingsCard("Logs") {
                 var logsExpanded by remember { mutableStateOf(false) }
-                val logsChevron by animateFloatAsState(
-                    if (logsExpanded) 180f else 0f,
-                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                    label = "logsChevron",
-                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "Activity log",
@@ -6604,13 +6599,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                             Spacer(Modifier.width(4.dp))
                         }
                     }
-                    IconButton(onClick = { logsExpanded = !logsExpanded }) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = if (logsExpanded) "Collapse" else "Expand",
-                            modifier = Modifier.rotate(logsChevron),
-                        )
-                    }
+                    MorphExpandButton(expanded = logsExpanded, onToggle = { logsExpanded = !logsExpanded })
                 }
                 AnimatedVisibility(
                     visible = logsExpanded,
@@ -6916,11 +6905,6 @@ private fun CarSettingsCard(
     showHandle: Boolean = true,
 ) {
     val seats = state.seatConfigs[v.vin] ?: SeatConfig()
-    val chevronAngle by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "carCardChevron",
-    )
     val cardBg by androidx.compose.animation.animateColorAsState(
         if (dragging) MaterialTheme.colorScheme.secondaryContainer
         else MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
@@ -6955,11 +6939,7 @@ private fun CarSettingsCard(
                     )
                 }
                 if (collapsible) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
-                        modifier = Modifier.rotate(chevronAngle),
-                    )
+                    MorphExpandButton(expanded = expanded, onToggle = onToggle)
                 }
             }
             AnimatedVisibility(visible = expanded) {
@@ -7494,7 +7474,9 @@ private fun TileShadePreview(
     }
 }
 
-/** Per-car Quick Settings tile manager with live previews. */
+/** Per-car Quick Settings tile manager with live previews. Each car gets its
+ *  own tonal card (mirroring CarSettingsCard's per-car container elsewhere in
+ *  Settings) so two cars' tile groups never read as one continuous list. */
 @Composable
 private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
     if (state.vehicles.isEmpty()) {
@@ -7506,26 +7488,34 @@ private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
         return
     }
     val count = com.bloo.bluelink.data.TILE_COUNT
-    state.vehicles.forEachIndexed { carIdx, car ->
-        Spacer(Modifier.height(if (carIdx == 0) 6.dp else 18.dp))
-        val assigned = (0 until count).filter { state.tileConfigs.getOrNull(it)?.first == car.vin }
-        CarTilesHeader(
-            name = car.name,
-            img = state.imageUrls[car.vin],
-            assignedCount = assigned.size,
-            totalTiles = count,
-        )
-        Spacer(Modifier.height(8.dp))
-        assigned.forEach { idx ->
-            key(idx) { QuickTileCard(idx, car.vin, state, vm) }
-        }
-        val free = (0 until count).firstOrNull { state.tileConfigs.getOrNull(it) == null }
-        when {
-            free != null -> AddTilePill(
-                label = if (assigned.isEmpty()) "Add a quick tile" else "Add another",
-                onClick = { vm.setTileAssignment(free, car.vin, if (assigned.isEmpty()) "doors" else "climate") },
-            )
-            assigned.isEmpty() -> TileEmptyHint("All $count tiles are in use — remove one to add another.")
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        state.vehicles.forEach { car ->
+            val assigned = (0 until count).filter { state.tileConfigs.getOrNull(it)?.first == car.vin }
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)),
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    CarTilesHeader(
+                        name = car.name,
+                        img = state.imageUrls[car.vin],
+                        assignedCount = assigned.size,
+                        totalTiles = count,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    assigned.forEach { idx ->
+                        key(idx) { QuickTileCard(idx, car.vin, state, vm) }
+                    }
+                    val free = (0 until count).firstOrNull { state.tileConfigs.getOrNull(it) == null }
+                    when {
+                        free != null -> AddTilePill(
+                            label = if (assigned.isEmpty()) "Add a quick tile" else "Add another",
+                            onClick = { vm.setTileAssignment(free, car.vin, if (assigned.isEmpty()) "doors" else "climate") },
+                        )
+                        assigned.isEmpty() -> TileEmptyHint("All $count tiles are in use — remove one to add another.")
+                    }
+                }
+            }
         }
     }
 }

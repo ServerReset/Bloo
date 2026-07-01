@@ -8,6 +8,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearExtras
 import com.bloo.bluelink.data.WearSync
+import androidx.glance.appwidget.updateAll
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
