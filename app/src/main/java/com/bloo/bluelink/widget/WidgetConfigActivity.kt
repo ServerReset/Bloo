@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -40,6 +41,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -121,6 +123,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var showState by remember { mutableStateOf(true) }
     val metrics = remember { mutableStateListOf("battery", "range") }
     var requireAuth by remember { mutableStateOf(true) }
+    var cornerDp by remember { mutableStateOf<Int?>(null) }
+    var textScale by remember { mutableFloatStateOf(1f) }
 
     LaunchedEffect(Unit) {
         cars = SnapshotStore(context).current().vehicles
@@ -144,6 +148,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         showState = SettingsStore(context).widgetShowState(widgetId)
         SettingsStore(context).widgetMetrics(widgetId).let { metrics.clear(); metrics.addAll(it) }
         requireAuth = SettingsStore(context).widgetRequireAuth(widgetId)
+        cornerDp = SettingsStore(context).widgetCorner(widgetId)
+        textScale = SettingsStore(context).widgetTextScale(widgetId)
         loaded = true
     }
 
@@ -283,7 +289,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     Text("Layout", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Text(
                         "Auto adapts to size. Minimal = one big number, Stats = metric grid, " +
-                            "Ring = charge ring, Photo = your car photo, Dual = two big metrics.",
+                            "Ring = charge ring, Photo = your car photo, Dual = two big metrics, " +
+                            "Map = last known location (needs the Location button assigned above).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -291,7 +298,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
                             "auto" to "Auto", "minimal" to "Minimal", "stats" to "Stats",
-                            "ring" to "Ring", "photo" to "Photo", "dual" to "Dual",
+                            "ring" to "Ring", "photo" to "Photo", "dual" to "Dual", "map" to "Map",
                         ).forEach { (key, label) ->
                             FilterChip(
                                 selected = widgetStyle == key,
@@ -300,6 +307,37 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                             )
                         }
                     }
+                }
+
+                // Corner radius override.
+                Column {
+                    Text("Corner shape", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf<Pair<Int?, String>>(
+                            null to "Auto", 8 to "Sharp", 16 to "Soft", 24 to "Round", 32 to "Full",
+                        ).forEach { (dp, label) ->
+                            FilterChip(
+                                selected = cornerDp == dp,
+                                onClick = { cornerDp = dp },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                }
+
+                // Text size.
+                Column {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Text size", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text("${"%.1f".format(textScale)}×", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Slider(
+                        value = textScale,
+                        onValueChange = { textScale = it },
+                        valueRange = 0.8f..1.4f,
+                        steps = 5,
+                    )
                 }
 
                 // Accent override.
@@ -368,6 +406,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     SettingsStore(context).setWidgetShowState(widgetId, showState)
                     SettingsStore(context).setWidgetMetrics(widgetId, metrics.toList())
                     SettingsStore(context).setWidgetRequireAuth(widgetId, requireAuth)
+                    SettingsStore(context).setWidgetCorner(widgetId, cornerDp)
+                    SettingsStore(context).setWidgetTextScale(widgetId, textScale)
                     onDone()
                 }
             },
