@@ -676,30 +676,39 @@ private fun SectionCard(
     icon: ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // Card had no internal padding at all — title/icon/content sat flush against
+    // its edges, which the round bezel's curvature then clipped whenever the tile
+    // scrolled away from dead-center (the corners narrow fastest there). A modest
+    // inset on every side keeps content clear of the curve at any scroll position.
+    val round = LocalConfiguration.current.isScreenRound
     Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-        if (title != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (icon != null) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+        Column(
+            Modifier.padding(horizontal = if (round) 10.dp else 6.dp, vertical = 8.dp),
+        ) {
+            if (title != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (icon != null) {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Text(
+                        title.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                Text(
-                    title.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Spacer(Modifier.height(5.dp))
             }
-            Spacer(Modifier.height(5.dp))
+            content()
         }
-        content()
     }
 }
 
