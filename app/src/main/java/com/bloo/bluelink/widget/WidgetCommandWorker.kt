@@ -12,6 +12,8 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearCommandRunner
+import com.bloo.bluelink.tiles.BlooTileService
+import com.bloo.bluelink.wear.WearBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -38,6 +40,9 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             SettingsStore(ctx).setWidgetPendingAction(widgetId, null)
             runCatching { BlooWidget().updateAll(ctx) }
         }
+        // Fan out the updated snapshot to all other surfaces after a successful command.
+        runCatching { WearBridge.publishNow(ctx) }
+        BlooTileService.requestUpdates(ctx)
         return Result.success()
     }
 

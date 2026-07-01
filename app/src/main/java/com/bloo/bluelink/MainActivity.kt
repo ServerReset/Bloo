@@ -18,6 +18,7 @@ import androidx.fragment.app.FragmentActivity
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
+import com.bloo.bluelink.widget.WidgetRefreshWorker
 import com.bloo.bluelink.work.AlertWorker
 
 class MainActivity : FragmentActivity() {
@@ -48,6 +49,9 @@ class MainActivity : FragmentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         AlertWorker.schedule(applicationContext)
+        // Keep widgets, the watch, and QS tiles fresh in the background even when
+        // the app is closed — the phone-hub heartbeat for all spokes.
+        WidgetRefreshWorker.schedule(applicationContext)
         ContextCompat.registerReceiver(
             this,
             screenReceiver,

@@ -57,7 +57,7 @@ class WearPhoneService : WearableListenerService() {
                 }
                 scope.launch {
                     val result = WearBridge.execute(applicationContext, command)
-                    // Tell the watch how it went, then push the updated snapshots.
+                    // Tell the watch how it went, then fan out to all surfaces.
                     runCatching {
                         Tasks.await(
                             Wearable.getMessageClient(applicationContext).sendMessage(
@@ -67,17 +67,23 @@ class WearPhoneService : WearableListenerService() {
                             )
                         )
                     }
-                    WearBridge.publishNow(applicationContext)
+                    val ctx = applicationContext
+                    WearBridge.publishNow(ctx)
+                    runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(ctx) }
+                    com.bloo.bluelink.tiles.BlooTileService.requestUpdates(ctx)
                 }
             }
 
             WearSync.PATH_SYNC_REQUEST -> {
                 val command = WearSync.decodeCommand(String(event.data))
                 scope.launch {
+                    val ctx = applicationContext
                     if (command?.action == WearAction.REFRESH) {
-                        WearBridge.refresh(applicationContext, command.vin)
+                        WearBridge.refresh(ctx, command.vin)
                     }
-                    WearBridge.publishNow(applicationContext)
+                    WearBridge.publishNow(ctx)
+                    runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(ctx) }
+                    com.bloo.bluelink.tiles.BlooTileService.requestUpdates(ctx)
                 }
             }
         }

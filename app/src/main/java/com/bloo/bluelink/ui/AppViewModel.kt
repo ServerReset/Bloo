@@ -808,6 +808,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
         // Refresh any home-screen widgets so their status reflects the new data.
         runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
+        // Refresh Quick Settings tiles too.
+        com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
     }
 
     private fun com.bloo.bluelink.data.Weather.toWear() = com.bloo.bluelink.data.WearWeather(

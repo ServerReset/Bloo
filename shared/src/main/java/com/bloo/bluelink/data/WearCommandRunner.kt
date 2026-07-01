@@ -68,8 +68,13 @@ object WearCommandRunner {
         else -> snap
     }
 
-    /** Refresh one car (blank [vin] → all), folding fresh status into snapshots. */
-    suspend fun refresh(context: Context, vin: String) {
+    /**
+     * Refresh one car (blank [vin] → all), folding fresh status into snapshots.
+     * [force] true wakes the car for a live pull (on-demand button); false reads
+     * the server's last-known status — light enough for frequent background polls
+     * that keep widgets/tiles fresh without draining the car's 12V battery.
+     */
+    suspend fun refresh(context: Context, vin: String, force: Boolean = true) {
         val store = SnapshotStore(context)
         val targets = store.current().vehicles.let { all ->
             if (vin.isBlank()) all else all.filter { it.vin == vin }
@@ -82,7 +87,7 @@ object WearCommandRunner {
                         Brand.fromIndicator(v.brandIndicator),
                         SessionStore(context), CredentialStore(context),
                     )
-                    repo.status(v, refresh = true)?.let { store.updateVehicle(snap.merged(it)) }
+                    repo.status(v, refresh = force)?.let { store.updateVehicle(snap.merged(it)) }
                 }
             }
         }
