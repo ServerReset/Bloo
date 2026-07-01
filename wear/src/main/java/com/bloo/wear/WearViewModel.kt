@@ -131,6 +131,10 @@ data class WearUi(
     /** Optimistic per-car pebble orders the watch just set, held until the phone
      *  echoes the same order back via [settings]. */
     val pebbleOverride: Map<String, List<String>> = emptyMap(),
+    /** A newer watch build has shipped. Informational only — Wear OS has no
+     *  reliable on-device sideload flow, so this just points the user at the
+     *  phone rather than offering to install anything itself. */
+    val updateAvailable: Boolean = false,
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
 
@@ -213,6 +217,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             WearClimateStore(ctx).flow.collect { remote -> mergeRemoteClimate(remote) }
+        }
+        // A lightweight, independent check (same GitHub-release endpoint the
+        // phone uses, in :shared) — Wear OS has no reliable on-device sideload
+        // flow, so this only surfaces a passive banner pointing at the phone,
+        // never a download/install action on the watch itself.
+        viewModelScope.launch {
+            val release = runCatching { com.bloo.bluelink.data.UpdateApi.fetchLatestRelease() }.getOrNull()
+            val remoteCode = release?.versionCode
+            if (remoteCode != null && remoteCode > com.bloo.wear.BuildConfig.VERSION_CODE) {
+                _ui.update { it.copy(updateAvailable = true) }
+            }
         }
         bootstrap()
     }

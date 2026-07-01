@@ -145,6 +145,11 @@ data class UiState(
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
     val message: String? = null,
+    /** A newer release than what's installed, if the update checker found one
+     *  the user hasn't already dismissed. */
+    val updateInfo: com.bloo.bluelink.update.UpdateInfo? = null,
+    /** True while the update APK is downloading (drives the prompt's button state). */
+    val updateDownloading: Boolean = false,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 
@@ -359,6 +364,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             }
+        }
+        // Bloo isn't on the Play Store, so check its own GitHub-release update
+        // channel once per cold start (debounced internally — see UpdateChecker).
+        viewModelScope.launch {
+            val info = runCatching { com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication()) }.getOrNull()
+            if (info != null) _state.update { it.copy(updateInfo = info) }
         }
         // Restore the last-known status/location from disk so the UI shows
         // stale-but-useful data immediately, before any network call returns.
@@ -980,6 +991,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
+    }
+
+    // --- App self-update (GitHub releases; Bloo isn't on the Play Store) ---
+
+    /** "Not now": stop nagging for this exact release; a newer one still prompts. */
+    fun dismissUpdate() {
+        val versionCode = _state.value.updateInfo?.release?.versionCode ?: return
+        _state.update { it.copy(updateInfo = null) }
+        viewModelScope.launch { com.bloo.bluelink.update.UpdateChecker.dismiss(getApplication(), versionCode) }
+    }
+
+    /** Download the phone APK, then hand it to the system installer. Permission
+     *  gating (unknown-sources) is the UI layer's job, since it needs an
+     *  Activity to launch the Settings screen from. */
+    fun downloadAndInstallUpdate() {
+        val url = _state.value.updateInfo?.phoneAsset?.downloadUrl ?: return
+        _state.update { it.copy(updateDownloading = true) }
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val apk = com.bloo.bluelink.update.UpdateDownloader.download(app, url)
+            _state.update { it.copy(updateDownloading = false) }
+            if (apk != null) {
+                com.bloo.bluelink.update.UpdateInstaller.install(app, apk)
+            } else {
+                _state.update { it.copy(message = "Update download failed — try again later.") }
+            }
+        }
     }
 
     // --- On-device AI (Gemini Nano) --------------------------------------

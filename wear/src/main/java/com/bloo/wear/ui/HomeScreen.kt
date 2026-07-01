@@ -1248,6 +1248,20 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         pending = false,
         onClick = { onReorder(car.vin) },
     )
+    // Informational only: Wear OS has no reliable on-device sideload flow, so
+    // this points the user at the phone rather than offering to install
+    // anything itself (see WearViewModel's update check).
+    if (ui.updateAvailable) {
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Filled.Refresh, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
+            Text(
+                "A watch update is ready — open Bloo on your phone to install it.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 // ---- Shared bits ---------------------------------------------------------

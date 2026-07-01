@@ -456,6 +456,13 @@ fun BlooApp(vm: AppViewModel) {
                 LockOverlay(vm)
             }
         }
+        // App-wide, not tied to any one screen; skipped while locked so a
+        // biometric prompt and an update prompt never compete for attention.
+        if (!state.locked) {
+            state.updateInfo?.let { info ->
+                UpdatePromptDialog(info = info, downloading = state.updateDownloading, vm = vm)
+            }
+        }
     }
     }
 
@@ -1610,6 +1617,76 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
         },
         dismissButton = {
             MorphTextButton("Cancel", vm::kiaCancelOtp, enabled = !loading)
+        },
+    )
+}
+
+/**
+ * Bloo isn't on the Play Store, so this is its own update surface: shown once
+ * per new GitHub release the user hasn't dismissed. "Update" downloads the APK
+ * via the system DownloadManager, then hands it to the Package Installer —
+ * requesting the "install unknown apps" grant first if it isn't already on.
+ * The watch can't sideload reliably (Wear OS has no general on-device install
+ * flow), so a wear asset is surfaced as a link to the release page instead of
+ * an in-app install action.
+ */
+@Composable
+private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, downloading: Boolean, vm: AppViewModel) {
+    val context = LocalContext.current
+    val unknownSourcesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (com.bloo.bluelink.update.UpdateInstaller.canInstall(context)) vm.downloadAndInstallUpdate()
+    }
+    AlertDialog(
+        onDismissRequest = { if (!downloading) vm.dismissUpdate() },
+        title = { Text("Update available") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("${info.release.name} is ready to install.")
+                if (info.release.notes.isNotBlank()) {
+                    Text(
+                        info.release.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (info.wearAsset != null) {
+                    Text(
+                        "A watch update is included too. Wear OS can't install it directly — " +
+                            "open the release page on a computer or the watch's browser and sideload " +
+                            "${info.wearAsset.name} the same way you installed Bloo.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    MorphTextButton(
+                        "Open release page",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.release.htmlUrl)))
+                            }
+                        },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            MorphButton(
+                onClick = {
+                    if (com.bloo.bluelink.update.UpdateInstaller.canInstall(context)) {
+                        vm.downloadAndInstallUpdate()
+                    } else {
+                        unknownSourcesLauncher.launch(com.bloo.bluelink.update.UpdateInstaller.unknownSourcesSettingsIntent(context))
+                    }
+                },
+                enabled = !downloading && info.phoneAsset != null,
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+            ) {
+                if (downloading) LoadingIndicator() else Text("Update", fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            MorphTextButton("Not now", vm::dismissUpdate, enabled = !downloading)
         },
     )
 }

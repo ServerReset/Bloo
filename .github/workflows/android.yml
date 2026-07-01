@@ -3,6 +3,7 @@ name: Build Android APK
 on:
   push:
     branches: [ "**" ]
+    tags: [ "v*" ]
   pull_request:
   workflow_dispatch:
 
@@ -50,3 +51,50 @@ jobs:
           name: bloo-wear-apk
           path: wear/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+  # Publishes a GitHub Release with both APKs attached, so UpdateApi (in-app
+  # self-update, since Bloo isn't on the Play Store) has something to check
+  # against. Only runs on a version tag push (e.g. "v3") — never on ordinary
+  # branch pushes or PRs, so it doesn't touch the build job above at all.
+  # Tag the number as the app's versionCode (app/build.gradle.kts,
+  # wear/build.gradle.kts) so UpdateChecker's tag -> versionCode comparison
+  # is well-formed: `git tag v3 && git push origin v3`.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # release build type also uses the checked-in debug signing config (see
+      # app/build.gradle.kts) so this is a normally-installable signed APK,
+      # not an unsigned one — same key as every debug build, so it installs
+      # over an existing debug install without an uninstall first.
+      - name: Build release APKs
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/apk/release/Bloo.apk
+            wear/build/outputs/apk/release/Bloo-Wear.apk
+          generate_release_notes: true
