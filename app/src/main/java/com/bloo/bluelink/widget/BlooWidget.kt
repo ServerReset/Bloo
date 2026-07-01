@@ -59,8 +59,12 @@ import kotlinx.coroutines.flow.first
  * The Bloo home-screen widget (Jetpack Glance).
  *
  * Seven "Auto" layout tiers, chosen by aspect ratio and dimensions: Tiny, Compact,
- * NarrowTall, WideRow, Square, Portrait, Landscape — plus six fixed alternate
- * styles (Minimal/Stats/Photo/Dual/Ring/Map) the user can pin regardless of size.
+ * NarrowTall, WideRow, Square (a ring gauge), Portrait, Landscape — plus three
+ * fixed alternate styles (Stats/Photo/Map) the user can pin regardless of size,
+ * for the cases Auto genuinely can't cover on its own (a full metric grid, a
+ * forced photo backdrop, a forced location map). Minimal/Dual/Ring used to also
+ * be manual choices but were dropped: Auto's own size tiers already produce an
+ * equivalent-or-better result at every size a user might have picked them for.
  * Every dimension is derived from [LocalSize] via [SizeMode.Exact], so the layout
  * recomposes at the widget's true pixel size on every resize.
  *
@@ -198,20 +202,23 @@ class BlooWidget : GlanceAppWidget() {
                 // Roughly-square, non-portrait boxes (2x2/3x3/4x4-ish grid slots) used to
                 // fall through to Landscape or Portrait by default even though neither was
                 // designed for a 1:1 box — a centered ring gauge reads far better here.
+                // Widened from the original 0.72-1.35 now that Ring is Auto-only (no
+                // longer separately selectable): more near-square slots should land here
+                // automatically instead of needing a manual style pick to get it.
                 val ratio = if (h.value > 0f) w.value / h.value else 1f
-                val isSquare = !isPortrait && !isTiny && ratio in 0.72f..1.35f
+                val isSquare = !isPortrait && !isTiny && ratio in 0.62f..1.45f
                 when {
-                    // User-chosen alternate styles render the same at any size.
-                    snap != null && widgetStyle == "minimal" ->
-                        MinimalBody(widgetId, snap, w, h, showBackground, widgetShape, theme)
+                    // User-chosen alternate styles render the same at any size. Minimal,
+                    // Dual and Ring were dropped as manual choices — Auto's own size tiers
+                    // (Tiny/Compact/NarrowTall centering name+number+state, and the
+                    // isSquare tier below) already produce an equivalent or better result
+                    // at every size, so keeping them as separate named styles was just
+                    // more choices with no distinct payoff. Ring lives on as Auto's own
+                    // pick for square slots (see isSquare below) — just not a manual style.
                     snap != null && widgetStyle == "stats" ->
                         StatsBody(widgetId, snap, w, h, widgetMetrics, showBackground, widgetShape, theme)
                     snap != null && widgetStyle == "photo" ->
                         PhotoBody(widgetId, snap, actions, w, h, photoBitmap, widgetShowName, widgetShowRange, widgetShowState, pendingAction, theme)
-                    snap != null && widgetStyle == "dual" ->
-                        DualBody(widgetId, snap, w, h, widgetMetrics, widgetShowName, theme)
-                    snap != null && widgetStyle == "ring" ->
-                        RingBody(widgetId, snap, actions, w, h, widgetShowName, pendingAction, theme)
                     snap != null && widgetStyle == "map" ->
                         MapBody(widgetId, snap, w, h, mapBitmap, locationAddress, widgetShowName, widgetShowState, theme)
                     isTiny -> when {
@@ -344,62 +351,6 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     // ── Alternate user-selectable styles ──────────────────────────────────────
-
-    /** "Minimal": car name + one big number (charge or range) + a state chip,
-     *  centered. No photo/map/buttons — a clean glance. Tap opens the app. */
-    @Composable
-    private fun MinimalBody(
-        widgetId: Int,
-        snap: VehicleSnapshot,
-        w: Dp,
-        h: Dp,
-        showBackground: Boolean,
-        widgetShape: String,
-        theme: WidgetTheme,
-    ) {
-        val context = LocalContext.current
-        val corner = theme.cornerOverride ?: if (widgetShape == "pill") 28.dp else 24.dp
-        val base = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
-        val (stateLabel, stateColor) = stateOf(snap, theme)
-        val big = snap.percent?.let { "$it%" } ?: snap.rangeMi?.let { "$it mi" } ?: "—"
-        // Scale with the smaller of the two dimensions so a big square/landscape
-        // widget doesn't just get a proportionally huge number floating in space.
-        val minSide = minOf(w, h)
-        val bigBase = when {
-            minSide >= 260.dp -> 64f
-            minSide >= 180.dp -> 52f
-            minSide >= 120.dp -> 40f
-            h < 95.dp         -> 28f
-            else              -> 34f
-        }
-        Box(
-            modifier = base.clickable(actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN)))
-                .padding(14.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    ellipsize(snap.name, 16),
-                    maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = scaledSp(12f, theme), fontWeight = FontWeight.Medium),
-                )
-                Spacer(GlanceModifier.height(2.dp))
-                Text(
-                    big,
-                    maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = scaledSp(bigBase, theme), fontWeight = FontWeight.Bold),
-                )
-                if (h >= 80.dp) {
-                    Spacer(GlanceModifier.height(8.dp))
-                    StateChip(stateLabel, stateColor)
-                }
-            }
-        }
-    }
 
     /** "Stats": car name + a grid of the user's chosen metrics (up to 4, from
      *  Battery/Range/Lock/Climate). Info-dense at a glance; tap opens the app. */
@@ -550,74 +501,6 @@ class BlooWidget : GlanceAppWidget() {
                         actions.take(4).forEachIndexed { i, a ->
                             if (i > 0) Spacer(GlanceModifier.width(6.dp))
                             ActionPill(widgetId, snap.vin, a, 40.dp, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = false)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /** "Dual": one or two big chosen metrics (battery/range/lock/climate). */
-    @Composable
-    private fun DualBody(
-        widgetId: Int,
-        snap: VehicleSnapshot,
-        w: Dp,
-        h: Dp,
-        metrics: List<String>,
-        showName: Boolean,
-        theme: WidgetTheme,
-    ) {
-        val context = LocalContext.current
-        val open = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
-        val corner = theme.cornerOverride ?: if (w < 180.dp) 22.dp else 24.dp
-        val base = GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        val pick = metrics.take(2).ifEmpty { listOf("battery", "range") }
-        fun valueOf(m: String) = when (m) {
-            "battery" -> snap.percent?.let { "$it%" } ?: "—"
-            "range" -> snap.rangeMi?.let { "$it mi" } ?: "—"
-            "lock" -> when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }
-            "climate" -> if (snap.climateOn == true) "On" else "Off"
-            else -> "—"
-        }
-        // Tier by the actual per-cell space (not a flat 32sp) and shrink further for
-        // longer strings ("Unlocked" vs "82%") so a value never has to fight its cell.
-        val cellDim = (if (w > h) w else h) / pick.size.coerceAtLeast(1)
-        fun valueSizeFor(text: String): Float {
-            val base = when {
-                cellDim >= 140.dp -> 36f
-                cellDim >= 100.dp -> 28f
-                cellDim >= 70.dp  -> 22f
-                else              -> 16f
-            }
-            return if (text.length > 5) base * 0.72f else base
-        }
-        Box(base.clickable(open).padding(14.dp)) {
-            Column(GlanceModifier.fillMaxSize()) {
-                if (showName) {
-                    Text(ellipsize(snap.name, 16), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = scaledSp(12f, theme), fontWeight = FontWeight.Medium))
-                    Spacer(GlanceModifier.height(6.dp))
-                }
-                if (w > h) {
-                    Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                        pick.forEach { m ->
-                            Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(m.uppercase(), maxLines = 1, style = TextStyle(color = theme.accent, fontSize = scaledSp(10f, theme), fontWeight = FontWeight.Bold))
-                                Spacer(GlanceModifier.height(2.dp))
-                                val v = valueOf(m)
-                                Text(v, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = scaledSp(valueSizeFor(v), theme), fontWeight = FontWeight.Bold))
-                            }
-                        }
-                    }
-                } else {
-                    Column(GlanceModifier.fillMaxWidth().defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        pick.forEach { m ->
-                            Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(m.uppercase(), maxLines = 1, style = TextStyle(color = theme.accent, fontSize = scaledSp(10f, theme), fontWeight = FontWeight.Bold))
-                                Spacer(GlanceModifier.height(2.dp))
-                                val v = valueOf(m)
-                                Text(v, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = scaledSp(valueSizeFor(v), theme), fontWeight = FontWeight.Bold))
-                            }
                         }
                     }
                 }

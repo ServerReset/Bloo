@@ -280,19 +280,19 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 Column {
                     Text("Layout", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Auto adapts to size — including dedicated Tiny and Square layouts for " +
-                            "the smallest and most square placements. Minimal = one big number, " +
-                            "Stats = metric grid, Ring = charge ring, Photo = your car photo, " +
-                            "Dual = two big metrics, Map = last known location (needs the " +
-                            "Location button assigned above).",
+                        "Auto picks the best layout for the widget's actual size — including a " +
+                            "ring gauge for square placements and dedicated tiny/compact layouts " +
+                            "for the smallest ones. Stats = a fixed metric grid, Photo = always " +
+                            "shows your car photo, Map = last known location (needs the Location " +
+                            "button assigned above) — pick one of these only if you specifically " +
+                            "want that look at every size.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
-                            "auto" to "Auto", "minimal" to "Minimal", "stats" to "Stats",
-                            "ring" to "Ring", "photo" to "Photo", "dual" to "Dual", "map" to "Map",
+                            "auto" to "Auto", "stats" to "Stats", "photo" to "Photo", "map" to "Map",
                         ).forEach { (key, label) ->
                             MorphChip(selected = widgetStyle == key, onClick = { widgetStyle = key }, label = label)
                         }
@@ -362,7 +362,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
 
                 // Metrics shown by the Stats / Dual layouts.
                 Column {
-                    Text("Metrics (Stats / Dual)", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Text("Metrics (Stats)", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("battery", "range", "lock", "climate").forEach { m ->
