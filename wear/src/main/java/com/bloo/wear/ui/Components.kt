@@ -54,7 +54,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -286,8 +285,8 @@ fun AnimatedSlider(
         dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
         dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
         reduceMotion = LocalReduceMotion.current,
-        onStepTick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
-        onSettle = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+        onStepTick = { haptics.tick() },
+        onSettle = { haptics.click() },
     )
 }
 
@@ -360,7 +359,7 @@ fun MorphButton(
     val resolvedContent = if (active) scheme.onPrimary else scheme.onSurface
 
     Button(
-        onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick() },
+        onClick = { haptics.click(); onClick() },
         enabled = !pending,
         interactionSource = interaction,
         modifier = modifier.fillMaxWidth()
@@ -462,7 +461,7 @@ fun MorphSegmented(
                                 val idx = indexFor(x)
                                 dragXPx = null
                                 if (options[idx].key != selectedKey) {
-                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    haptics.tick()
                                     onSelect(options[idx].key)
                                 }
                             },
@@ -488,7 +487,7 @@ fun MorphSegmented(
                                 indication = null,
                                 onClick = {
                                     if (opt.key != selectedKey) {
-                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        haptics.tick()
                                         onSelect(opt.key)
                                     }
                                 },
