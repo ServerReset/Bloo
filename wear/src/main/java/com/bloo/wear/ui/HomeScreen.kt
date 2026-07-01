@@ -2,7 +2,9 @@ package com.bloo.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -1300,6 +1302,11 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
             .focusRequester(focusRequester)
             .focusable(),
         state = state,
+        // Without this, the list's own built-in centre-scaling fights the drag's
+        // own scale/translation feedback — a row visibly grows/shrinks as it
+        // crosses the vertical middle mid-drag, independent of the actual drag,
+        // which read as "buggy". Flatten it so drag feedback is the only motion.
+        scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -1307,11 +1314,32 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         items(order, key = { it }) { key ->
             val dragging = draggingKey == key
             val lift by animateFloatAsState(if (dragging) 1.04f else 1f, label = "lift")
+
+            // Rows displaced by the drag (not the dragged row itself) had no
+            // placement animation at all — they teleported straight to their new
+            // slot the instant the swap threshold was crossed. Slide them in from
+            // their previous slot instead, since ScalingLazyColumn doesn't support
+            // Modifier.animateItem() the way LazyColumn does.
+            val idx = order.indexOf(key)
+            var prevIdx by remember(key) { mutableIntStateOf(idx) }
+            val slideOffset = remember(key) { Animatable(0f) }
+            LaunchedEffect(idx) {
+                if (!dragging && idx != prevIdx && prevIdx >= 0) {
+                    val rowH = (heights[key] ?: 64).toFloat()
+                    slideOffset.snapTo((prevIdx - idx) * rowH)
+                    slideOffset.animateTo(
+                        0f,
+                        spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                    )
+                }
+                prevIdx = idx
+            }
+
             Box(
                 Modifier
                     .zIndex(if (dragging) 1f else 0f)
                     .graphicsLayer {
-                        translationY = if (dragging) offsetY else 0f
+                        translationY = if (dragging) offsetY else slideOffset.value
                         scaleX = lift; scaleY = lift
                     }
                     .onSizeChanged { heights[key] = it.height }
