@@ -6797,21 +6797,29 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Security
             SettingsCard("Security") {
                 if (canBio) {
-                    ToggleRow("Require fingerprint to open", appearance.biometricLock) { enable ->
-                        if (enable) {
-                            context.findFragmentActivity()?.let { activity ->
-                                showBiometricPrompt(
-                                    activity = activity,
-                                    title = "Enable fingerprint lock",
-                                    subtitle = "Confirm to require it on launch",
-                                    onSuccess = { vm.setBiometricLock(true) },
-                                    onError = { },
-                                )
+                    SettingsSegmentedRow(
+                        label = "Require fingerprint to open",
+                        options = listOf(
+                            SegmentOption("off", "Off", null),
+                            SegmentOption("on", "On", null),
+                        ),
+                        selectedKey = if (appearance.biometricLock) "on" else "off",
+                        onSelect = { key ->
+                            if (key == "on") {
+                                context.findFragmentActivity()?.let { activity ->
+                                    showBiometricPrompt(
+                                        activity = activity,
+                                        title = "Enable fingerprint lock",
+                                        subtitle = "Confirm to require it on launch",
+                                        onSuccess = { vm.setBiometricLock(true) },
+                                        onError = { },
+                                    )
+                                }
+                            } else {
+                                vm.setBiometricLock(false)
                             }
-                        } else {
-                            vm.setBiometricLock(false)
-                        }
-                    }
+                        },
+                    )
                     if (appearance.biometricLock) {
                         Spacer(Modifier.height(4.dp))
                         Text(
@@ -7023,12 +7031,7 @@ private fun CarSettingsCard(
             AnimatedVisibility(visible = expanded) {
                 Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SettingsGroup("Powertrain") {
-                        val current = state.powertrainOf(v)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Powertrain.entries.forEach { pt ->
-                                MorphChip(selected = current == pt, onClick = { vm.setPowertrain(v, pt) }, label = pt.name)
-                            }
-                        }
+                        PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
                     }
 
                     SettingsGroup("Climate features") {
@@ -7258,11 +7261,7 @@ private fun SettingsSearchResults(
             add("Location · ${v.name}", "location where place gps ${v.name}") { StatusRow("Location", loc) }
         }
         add("Powertrain · ${v.name}", "powertrain ev gas hybrid phev ${v.name}") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Powertrain.entries.forEach { pt ->
-                    MorphChip(selected = state.powertrainOf(v) == pt, onClick = { vm.setPowertrain(v, pt) }, label = pt.name)
-                }
-            }
+            PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
         }
         add("Last service · ${v.name}", "service maintenance mileage ${v.name}") {
             OutlinedTextField(
@@ -7461,6 +7460,24 @@ private fun MorphSegmented(
             }
         }
     }
+}
+
+/** A car's powertrain (Gas/Hybrid/PHEV/EV) is a fixed 4-way choice between
+ *  equal alternatives — one shared MorphSegmented instead of the MorphChip
+ *  row this was duplicated as in both CarSettingsCard and its settings-search
+ *  mirror. */
+@Composable
+private fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSelect: (com.bloo.bluelink.data.Powertrain) -> Unit) {
+    MorphSegmented(
+        options = listOf(
+            SegmentOption(com.bloo.bluelink.data.Powertrain.GAS.name, "Gas", null),
+            SegmentOption(com.bloo.bluelink.data.Powertrain.HYBRID.name, "Hybrid", null),
+            SegmentOption(com.bloo.bluelink.data.Powertrain.PHEV.name, "PHEV", null),
+            SegmentOption(com.bloo.bluelink.data.Powertrain.EV.name, "EV", null),
+        ),
+        selectedKey = current.name,
+        onSelect = { key -> onSelect(com.bloo.bluelink.data.Powertrain.valueOf(key)) },
+    )
 }
 
 /**
