@@ -41,3 +41,29 @@ fun weatherLabel(code: Int): String = when (code) {
 /** Formats a Celsius temperature as °F or °C based on the user preference. */
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     if (fahrenheit) "${(tempC * 9 / 5 + 32).toInt()}°F" else "${tempC.toInt()}°C"
+
+/**
+ * The canonical "what's this car doing right now" label, in priority order
+ * (driving beats charging beats climate beats lock state). Every surface that
+ * shows a one-line vehicle state — the phone widget, phone Quick Settings
+ * tiles, the wear tile, and wear complications — used to reimplement this same
+ * priority chain independently, and they'd drifted slightly out of sync with
+ * each other. Colors stay local to each surface since phone/wear use
+ * different color systems (a Compose theme vs. Wear ProtoLayout roles), but
+ * the label — and the priority order that decides which state "wins" when
+ * several are true at once — is exactly the kind of logic that should only
+ * exist in one place.
+ */
+fun vehicleStateLabel(
+    engineOn: Boolean?,
+    charging: Boolean?,
+    climateOn: Boolean?,
+    locked: Boolean?,
+): String = when {
+    engineOn == true  -> "Driving"
+    charging == true  -> "Charging"
+    climateOn == true -> "Climate on"
+    locked == true    -> "Locked"
+    locked == false   -> "Unlocked"
+    else              -> "—"
+}

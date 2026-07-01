@@ -51,6 +51,7 @@ import com.bloo.bluelink.R
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.vehicleStateLabel
 import com.bloo.bluelink.ui.resolveWidgetAccent
 import kotlinx.coroutines.flow.first
 
@@ -1733,13 +1734,16 @@ class BlooWidget : GlanceAppWidget() {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     @Composable
-    private fun stateOf(snap: VehicleSnapshot, theme: WidgetTheme, hasPhoto: Boolean = false): Pair<String, ColorProvider> = when {
-        snap.engineOn == true  -> "Driving"    to theme.accent
-        snap.charging == true  -> "Charging"   to theme.charge
-        snap.climateOn == true -> "Climate on" to theme.climate
-        snap.locked == true    -> "Locked"     to theme.accentMuted
-        snap.locked == false   -> "Unlocked"   to theme.unlocked
-        else                   -> "—"          to ColorProvider(Color(0.42f, 0.42f, 0.46f, 1f))
+    private fun stateOf(snap: VehicleSnapshot, theme: WidgetTheme, hasPhoto: Boolean = false): Pair<String, ColorProvider> {
+        val color = when {
+            snap.engineOn == true  -> theme.accent
+            snap.charging == true  -> theme.charge
+            snap.climateOn == true -> theme.climate
+            snap.locked == true    -> theme.accentMuted
+            snap.locked == false   -> theme.unlocked
+            else                   -> ColorProvider(Color(0.42f, 0.42f, 0.46f, 1f))
+        }
+        return vehicleStateLabel(snap.engineOn, snap.charging, snap.climateOn, snap.locked) to color
     }
 
     private fun authIntent(context: Context, widgetId: Int, vin: String, action: WidgetAction): Intent =

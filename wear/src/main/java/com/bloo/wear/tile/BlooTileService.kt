@@ -28,6 +28,7 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearCommand
+import com.bloo.bluelink.data.vehicleStateLabel
 import com.bloo.wear.R
 import com.bloo.wear.TILE_CHIP_ACTIONS
 import com.bloo.wear.WearComms
@@ -206,17 +207,21 @@ abstract class BlooTileService : TileService() {
             )
             .build()
 
-        val statusLine = when {
-            charging -> "Charging" + if (rngText.isNotEmpty()) " · $rngText" else ""
-            climate  -> "Climate on"
-            locked   -> "Locked"
-            else     -> "Unlocked"
-        }
+        // Shared with the phone widget/tiles so "what's this car doing" always
+        // agrees on the same priority order (driving > charging > climate > lock);
+        // the range suffix on "Charging" is a wear-tile-specific addition.
+        val baseStatus = vehicleStateLabel(snap.engineOn, snap.charging, snap.climateOn, snap.locked)
+        val statusLine = if (charging && rngText.isNotEmpty()) "$baseStatus · $rngText" else baseStatus
+        // Mirrors vehicleStateLabel's own priority order exactly (driving > charging >
+        // climate > locked > unlocked > unknown) so the color never disagrees with
+        // which state the text actually settled on.
         val statusArgb = when {
+            snap.engineOn == true -> roles.primary
             charging -> CLR_CHARGE
             climate  -> roles.tertiary
-            locked   -> CLR_DIM
-            else     -> CLR_UNLOCKED
+            snap.locked == true  -> CLR_DIM
+            snap.locked == false -> CLR_UNLOCKED
+            else -> CLR_DIM
         }
 
         // Percentage typography: shrink for tiny watches.
