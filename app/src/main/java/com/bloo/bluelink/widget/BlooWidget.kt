@@ -9,6 +9,7 @@ import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,6 +83,7 @@ class BlooWidget : GlanceAppWidget() {
         val charge: ColorProvider,        // charging (semantic green)
         val unlocked: ColorProvider,      // unlocked (semantic red)
         val climate: ColorProvider,       // climate-on (teal blended toward accent)
+        val accentArgb: Int,              // raw accent, for bodies that draw to a Canvas (e.g. RingBody)
         // background is NOT stored here — callers use GlanceTheme.colors.widgetBackground
         // so the system handles dark/light adaptation automatically.
     )
@@ -156,6 +158,7 @@ class BlooWidget : GlanceAppWidget() {
                 charge = ColorProvider(chargeGreen),
                 unlocked = ColorProvider(unlockedRed),
                 climate = ColorProvider(climateColor),
+                accentArgb = accentColor.toArgb(),
             )
         }
 
@@ -178,6 +181,8 @@ class BlooWidget : GlanceAppWidget() {
                         PhotoBody(widgetId, snap, actions, w, h, photoBitmap, widgetShowName, widgetShowRange, widgetShowState, pendingAction, theme)
                     snap != null && widgetStyle == "dual" ->
                         DualBody(widgetId, snap, w, h, widgetMetrics, widgetShowName, theme)
+                    snap != null && widgetStyle == "ring" ->
+                        RingBody(widgetId, snap, actions, w, h, widgetShowName, pendingAction, theme)
                     h < 65.dp -> when {
                         snap != null -> CompactBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
@@ -538,6 +543,88 @@ class BlooWidget : GlanceAppWidget() {
                 }
             }
         }
+    }
+
+    /** "Ring": a circular charge/fuel ring with the percent centered, name above,
+     *  and up to 2 action pills below when there's room. Glance has no native arc
+     *  drawing, so the ring itself is rasterized once per render onto a Bitmap. */
+    @Composable
+    private fun RingBody(
+        widgetId: Int,
+        snap: VehicleSnapshot,
+        actions: List<WidgetAction>,
+        w: Dp,
+        h: Dp,
+        showName: Boolean,
+        pendingAction: String?,
+        theme: WidgetTheme,
+    ) {
+        val context = LocalContext.current
+        val open = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
+        val corner = if (w < 180.dp) 22.dp else 24.dp
+        val base = GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        val showActions = actions.isNotEmpty() && h >= 190.dp
+        val reserve = if (showActions) 46.dp else 0.dp
+        val ringDp = minOf(w - 24.dp, h - 24.dp - reserve).coerceIn(56.dp, 168.dp)
+        val pct = (snap.percent ?: 0).coerceIn(0, 100)
+        val ring = remember(pct, theme.accentArgb) { ringBitmap(pct, theme.accentArgb) }
+
+        Box(base.clickable(open).padding(12.dp)) {
+            Column(GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (showName) {
+                    Text(snap.name, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium))
+                    Spacer(GlanceModifier.height(4.dp))
+                }
+                Box(GlanceModifier.defaultWeight(), contentAlignment = Alignment.Center) {
+                    Box(GlanceModifier.size(ringDp), contentAlignment = Alignment.Center) {
+                        Image(provider = ImageProvider(ring), contentDescription = null, modifier = GlanceModifier.fillMaxSize())
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                snap.percent?.let { "$it%" } ?: "—",
+                                maxLines = 1,
+                                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = if (ringDp > 100.dp) 26.sp else 18.sp, fontWeight = FontWeight.Bold),
+                            )
+                            Text(
+                                if (snap.isEv) "Battery" else "Fuel",
+                                maxLines = 1,
+                                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp),
+                            )
+                        }
+                    }
+                }
+                if (showActions) {
+                    Spacer(GlanceModifier.height(8.dp))
+                    Row(GlanceModifier.fillMaxWidth()) {
+                        actions.take(2).forEachIndexed { i, a ->
+                            if (i > 0) Spacer(GlanceModifier.width(8.dp))
+                            ActionPill(widgetId, snap.vin, a, 34.dp, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Rasterize a ring gauge: a dim full-circle track plus an accent-colored arc
+     *  swept to [pct]. Rendered once at a fixed pixel size so it stays crisp when
+     *  Glance scales it into whatever [Dp] box the layout gives it. */
+    private fun ringBitmap(pct: Int, accentArgb: Int): Bitmap {
+        val size = 240
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bmp)
+        val stroke = size * 0.11f
+        val inset = stroke / 2f + 4f
+        val rect = android.graphics.RectF(inset, inset, size - inset, size - inset)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = stroke
+            strokeCap = android.graphics.Paint.Cap.ROUND
+        }
+        paint.color = android.graphics.Color.argb(60, 128, 128, 128)
+        canvas.drawArc(rect, 0f, 360f, false, paint)
+        paint.color = accentArgb
+        canvas.drawArc(rect, -90f, 360f * (pct / 100f), false, paint)
+        return bmp
     }
 
     // ── Compact single-row layout ─────────────────────────────────────────────

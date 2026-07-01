@@ -291,7 +291,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
                             "auto" to "Auto", "minimal" to "Minimal", "stats" to "Stats",
-                            "photo" to "Photo", "dual" to "Dual",
+                            "ring" to "Ring", "photo" to "Photo", "dual" to "Dual",
                         ).forEach { (key, label) ->
                             FilterChip(
                                 selected = widgetStyle == key,

@@ -7316,7 +7316,7 @@ private fun MorphSegmented(
             val segWidth = (maxWidth - gap * (n - 1)) / n
             val indicatorX by animateDpAsState(
                 targetValue = (segWidth + gap) * selectedIndex,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
                 label = "segIndicatorX",
             )
             Box(
@@ -7466,6 +7466,7 @@ private fun TileShadePreview(
     subtitle: String,
     active: Boolean,
     modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(28.dp),
 ) {
     val scheme = MaterialTheme.colorScheme
     val container by androidx.compose.animation.animateColorAsState(
@@ -7476,7 +7477,7 @@ private fun TileShadePreview(
     val onContainer = if (active) scheme.onPrimary else scheme.onSurface
     val bubble = if (active) scheme.onPrimary.copy(alpha = 0.20f) else scheme.surface
     val bubbleIcon = if (active) scheme.onPrimary else scheme.onSurfaceVariant
-    Surface(shape = RoundedCornerShape(28.dp), color = container, contentColor = onContainer, modifier = modifier) {
+    Surface(shape = shape, color = container, contentColor = onContainer, modifier = modifier) {
         Row(
             Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -7617,10 +7618,15 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
             .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
+            // Split button: the preview is the wide "value" half, the chevron gets
+            // its own holding shape as the narrow half — same pill<->rounded-rect
+            // morph convention as PresetPill/ChargeLimitPill, so a row with a
+            // dropdown reads as one deliberate two-part control instead of a bare
+            // floating arrow icon.
             Row(
-                Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 // A faithful preview of the shade tile itself, so users see exactly
                 // what the QS tile will read (mirrors BlooTileService state rendering).
@@ -7629,14 +7635,24 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                     title = if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd)),
                     subtitle = liveLabel ?: tileSummary(cmd, target, presetName),
                     active = active,
-                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 12.dp, bottomEnd = 12.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight().clickable { expanded = !expanded },
                 )
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Edit tile",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.rotate(chevron),
-                )
+                Surface(
+                    onClick = { expanded = !expanded },
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp, topEnd = 28.dp, bottomEnd = 28.dp),
+                    modifier = Modifier.fillMaxHeight(),
+                ) {
+                    Box(Modifier.fillMaxHeight().padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (expanded) "Collapse" else "Edit tile",
+                            modifier = Modifier.size(20.dp).rotate(chevron),
+                        )
+                    }
+                }
             }
 
             if (expanded) {
@@ -7867,6 +7883,10 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     Row(
         Modifier
             .fillMaxWidth()
+            // The checked-state scale bump below draws outside the Switch's own
+            // layout bounds; without this trailing reserve it got clipped by the
+            // screen/card edge.
+            .padding(end = 3.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
