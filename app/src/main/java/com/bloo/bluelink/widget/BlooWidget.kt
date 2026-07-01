@@ -97,6 +97,13 @@ class BlooWidget : GlanceAppWidget() {
     private fun scaledSp(base: Float, theme: WidgetTheme) =
         (base * theme.textScale).coerceIn(7f, base * 1.6f).sp
 
+    /** Glance's Text has maxLines but no TextOverflow/widthIn to lean on for
+     *  horizontal ellipsis, so any string that could realistically run long
+     *  (car names, addresses) is pre-truncated here in code — guaranteed-safe
+     *  regardless of a given launcher's RemoteViews clipping behavior. */
+    private fun ellipsize(s: String, max: Int): String =
+        if (s.length > max) s.take(max - 1) + "…" else s
+
     private val chargeGreen = Color(0xFF2EBD59)
     private val unlockedRed = Color(0xFFE5484D)
 
@@ -375,7 +382,7 @@ class BlooWidget : GlanceAppWidget() {
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    snap.name,
+                    ellipsize(snap.name, 16),
                     maxLines = 1,
                     style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = scaledSp(12f, theme), fontWeight = FontWeight.Medium),
                 )
@@ -432,7 +439,7 @@ class BlooWidget : GlanceAppWidget() {
                 .padding(14.dp),
         ) {
             Text(
-                snap.name,
+                ellipsize(snap.name, 20),
                 maxLines = 1,
                 style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = scaledSp(14f, theme), fontWeight = FontWeight.Bold),
             )
@@ -515,7 +522,7 @@ class BlooWidget : GlanceAppWidget() {
             ) {
                 if (showName) {
                     Text(
-                        snap.name,
+                        ellipsize(snap.name, 20),
                         maxLines = 1,
                         style = TextStyle(color = ColorProvider(Color.White), fontSize = 15.sp, fontWeight = FontWeight.Bold),
                     )
@@ -587,7 +594,7 @@ class BlooWidget : GlanceAppWidget() {
         Box(base.clickable(open).padding(14.dp)) {
             Column(GlanceModifier.fillMaxSize()) {
                 if (showName) {
-                    Text(snap.name, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = scaledSp(12f, theme), fontWeight = FontWeight.Medium))
+                    Text(ellipsize(snap.name, 16), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = scaledSp(12f, theme), fontWeight = FontWeight.Medium))
                     Spacer(GlanceModifier.height(6.dp))
                 }
                 if (w > h) {
@@ -644,7 +651,7 @@ class BlooWidget : GlanceAppWidget() {
         Box(base.clickable(open).padding(12.dp)) {
             Column(GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (showName) {
-                    Text(snap.name, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium))
+                    Text(ellipsize(snap.name, 14), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium))
                     Spacer(GlanceModifier.height(4.dp))
                 }
                 Box(GlanceModifier.defaultWeight(), contentAlignment = Alignment.Center) {
@@ -765,14 +772,14 @@ class BlooWidget : GlanceAppWidget() {
                         Column {
                             if (showName) {
                                 Text(
-                                    snap.name,
+                                    ellipsize(snap.name, 20),
                                     maxLines = 1,
                                     style = TextStyle(color = ColorProvider(Color.White), fontSize = scaledSp(13f, theme), fontWeight = FontWeight.Bold),
                                 )
                             }
                             if (mapBitmap != null && !locationAddress.isNullOrBlank() && h >= 110.dp) {
                                 Text(
-                                    if (locationAddress.length > 32) locationAddress.take(31) + "…" else locationAddress,
+                                    ellipsize(locationAddress, 32),
                                     maxLines = 1,
                                     style = TextStyle(color = ColorProvider(Color(1f, 1f, 1f, 0.85f)), fontSize = scaledSp(11f, theme)),
                                 )
@@ -805,9 +812,12 @@ class BlooWidget : GlanceAppWidget() {
         // On a narrow compact strip show numbers vertically with no buttons.
         val isNarrow = w < 120.dp
         val maxButtons = if (isNarrow) 0 else ((w - 110.dp) / 39.dp).toInt().coerceIn(0, 4)
-        val showState = w >= 150.dp
-        // Show range inline when there's enough width but not enough for a state chip.
-        val showRange = w in 190.dp..249.dp && snap.rangeMi != null
+        // Range and state used to both check "w >= 150dp"-ish windows that overlapped
+        // (190-249dp had both on at once), crowding the percent/name column and
+        // squeezing the fixed-size action buttons off the row. Mutually exclusive now:
+        // range is the cheaper fallback below the point state has room to breathe.
+        val showState = w >= 250.dp
+        val showRange = w in 150.dp..249.dp && snap.rangeMi != null
 
         val boxMod = if (showBackground) {
             GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
@@ -828,7 +838,7 @@ class BlooWidget : GlanceAppWidget() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        snap.name,
+                        ellipsize(snap.name, 10),
                         maxLines = 1,
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = 9.sp),
                     )
@@ -848,7 +858,7 @@ class BlooWidget : GlanceAppWidget() {
                 ) {
                     Column(modifier = GlanceModifier.defaultWeight()) {
                         Text(
-                            snap.name,
+                            ellipsize(snap.name, 18),
                             maxLines = 1,
                             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = 10.sp),
                         )
@@ -1017,7 +1027,7 @@ class BlooWidget : GlanceAppWidget() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        snap.name,
+                        ellipsize(snap.name, if (ultraNarrow) 10 else 14),
                         maxLines = 1,
                         style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = nameFontSize),
                     )
@@ -1107,7 +1117,7 @@ class BlooWidget : GlanceAppWidget() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        snap.name,
+                        ellipsize(snap.name, 16),
                         maxLines = 1,
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = 10.sp),
                     )
@@ -1265,7 +1275,7 @@ class BlooWidget : GlanceAppWidget() {
                                 // reverse-geocoded address is truncated here in code —
                                 // guaranteed-safe regardless of a given launcher's exact
                                 // RemoteViews clipping behavior, rather than relying on it.
-                                if (address.length > 32) address.take(31) + "…" else address,
+                                ellipsize(address, 32),
                                 maxLines = 1,
                                 style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp, fontWeight = FontWeight.Medium),
                             )
@@ -1314,7 +1324,7 @@ class BlooWidget : GlanceAppWidget() {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                snap.name,
+                ellipsize(snap.name, if (availH >= 120.dp) 18 else 14),
                 maxLines = 1,
                 style = TextStyle(color = onSurface, fontWeight = FontWeight.Bold, fontSize = nameFontSize),
             )
@@ -1526,7 +1536,7 @@ class BlooWidget : GlanceAppWidget() {
 
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
             Text(
-                snap.name,
+                ellipsize(snap.name, 16),
                 maxLines = 1,
                 style = TextStyle(color = onSurface, fontWeight = FontWeight.Bold, fontSize = scaledSp(14f, theme)),
             )
@@ -1551,7 +1561,7 @@ class BlooWidget : GlanceAppWidget() {
                 }
             }
             if (locationAddress != null && h >= 100.dp) {
-                Text(locationAddress, maxLines = 1, style = TextStyle(color = onVariant, fontSize = 10.sp))
+                Text(ellipsize(locationAddress, 28), maxLines = 1, style = TextStyle(color = onVariant, fontSize = 10.sp))
             }
             if (showKind) {
                 Text(
