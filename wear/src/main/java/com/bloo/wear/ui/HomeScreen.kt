@@ -316,11 +316,13 @@ private fun CarColumn(
 
     val centerItemIndex by remember {
         derivedStateOf {
-            val info = state.layoutInfo
-            val viewportCenter = info.viewportSize.height / 2
-            info.visibleItemsInfo.minByOrNull {
-                abs(it.offset + it.size / 2 - viewportCenter)
-            }?.index ?: 0
+            // Under the library's default ScalingLazyListAnchorType.ItemCenter (never
+            // overridden here), ScalingLazyListItemInfo.offset is ALREADY center-line
+            // relative (0 == exactly centered) — convertToCenterOffset in the library
+            // bakes itemSizeInPx/2 in itself. Adding it.size/2 again here was double-
+            // counting, which systematically picked the tile ~half an item-height away
+            // from center as "focused" instead of the one actually centered on screen.
+            state.layoutInfo.visibleItemsInfo.minByOrNull { abs(it.offset) }?.index ?: 0
         }
     }
     val centerTile = if (tileCount > 0) tiles[centerItemIndex % tileCount] else ""
@@ -397,8 +399,10 @@ private fun CarColumn(
                         val vc = vh / 2f
                         val item = info.visibleItemsInfo.firstOrNull { it.index == i }
                             ?: return@derivedStateOf 0f
-                        val ic = item.offset.toFloat() + item.size.toFloat() / 2f
-                        (1f - (abs(ic - vc) / vc)).coerceIn(0f, 1f)
+                        // item.offset is already center-relative under the library's
+                        // default ItemCenter anchoring (see centerItemIndex above) — 0
+                        // means exactly centered, so no size/2 re-addition is needed.
+                        (1f - (abs(item.offset.toFloat()) / vc)).coerceIn(0f, 1f)
                     }
                 }
                 val edgeScale = if (round) 0.74f else 0.84f
