@@ -215,7 +215,8 @@ abstract class BlooTileService : TileService() {
         val statusArgb = when {
             charging -> CLR_CHARGE
             climate  -> roles.tertiary
-            else     -> CLR_DIM
+            locked   -> CLR_DIM
+            else     -> CLR_UNLOCKED
         }
 
         // Percentage typography: shrink for tiny watches.
@@ -359,12 +360,12 @@ abstract class BlooTileService : TileService() {
                 desc = if (charging) "Stop charging" else "Start charging"
             }
             "climate" -> {
+                // Color reflects the climate button's OWN state only — it used to also
+                // check `charging` first and would borrow the charge button's green
+                // whenever both happened to be true at once, which read as "this button
+                // controls charging" rather than climate.
                 img = Img.CLIMATE
-                colors = when {
-                    charging -> ButtonColors(CLR_CHARGE, CLR_WHITE)
-                    climate  -> ButtonColors(roles.tertiary, roles.onTertiary)
-                    else     -> offColors
-                }
+                colors = if (climate) ButtonColors(roles.tertiary, roles.onTertiary) else offColors
                 act = if (climate) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
                 desc = if (climate) "Turn climate off" else "Turn climate on"
             }
@@ -400,6 +401,9 @@ abstract class BlooTileService : TileService() {
         const val CLR_CHARGE = 0xFF2EBD59.toInt()
         const val CLR_WARN   = 0xFFF5A623.toInt()
         const val CLR_TRACK  = 0xFF3C3C3C.toInt()
+        // Matches the phone widget's unlockedRed (BlooWidget.kt) so "unlocked" reads
+        // as the same semantic red everywhere instead of drifting to a neutral gray.
+        const val CLR_UNLOCKED = 0xFFE5484D.toInt()
 
         /** Fallback roles when no phone sync has occurred yet. */
         val DEFAULT_ROLES = WearColorRoles(

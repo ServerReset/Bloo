@@ -1215,7 +1215,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (index in list.indices) list[index] = target
             it.copy(tileClimateTargets = list)
         }
-        viewModelScope.launch { settingsStore.setTileClimateTarget(index, target) }
+        viewModelScope.launch {
+            settingsStore.setTileClimateTarget(index, target)
+            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
+        }
     }
 
     fun setTileBackground(value: Boolean) {
@@ -1228,7 +1231,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setTileLiveRefresh(value: Boolean) {
         _state.update { it.copy(tileLiveRefresh = value) }
-        viewModelScope.launch { settingsStore.setTileLiveRefresh(value) }
+        viewModelScope.launch {
+            settingsStore.setTileLiveRefresh(value)
+            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
+        }
     }
 
     /** Pin (or clear, with null) a pebble to the dual-column hot spot. */
