@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -77,6 +78,7 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
 import coil.compose.AsyncImage
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.roundToInt
@@ -450,31 +452,60 @@ fun MorphSegmented(
             Row(
                 Modifier
                     .fillMaxSize()
-                    // detectHorizontalDragGestures negotiates touch-slop with ancestors
-                    // (SwipeDismissableNavHost, ScalingLazyColumn's bezel scroll) and can
-                    // lose that race in just one direction, since an ancestor scrollable
-                    // only pre-consumes the direction it can still move in. Claiming the
-                    // pointer on first-down wins the gesture outright both ways. A tap is
-                    // just a drag that ends near where it started, so this one handler
-                    // covers both taps and drags — no separate clickable needed.
+                    // Same touch-slop race the phone version uses (mirroring the shared
+                    // AnimatedSlider's own gesture handling): don't consume anything
+                    // until the gesture is confirmed. detectHorizontalDragGestures used
+                    // to negotiate slop with ancestors (SwipeDismissableNavHost, the
+                    // bezel scroll) and could lose that race in one direction only; an
+                    // "always consume from frame one" fix broke scrolling the settings
+                    // list past this control instead. This only claims the gesture once
+                    // movement is confirmed horizontal (dx > slop && dx >= dy); a release
+                    // before that is a tap (selects immediately at that position), and
+                    // confirmed vertical movement (dy > slop) cedes the whole gesture to
+                    // the ancestor scroll.
                     .pointerInput(n, stepPx) {
                         awaitEachGesture {
-                            val down = awaitFirstDown()
-                            down.consume()
-                            dragXPx = down.position.x.coerceIn(0f, maxXPx)
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val slop = viewConfiguration.touchSlop
+                            var claimed = false
                             while (true) {
-                                val ev = awaitPointerEvent()
-                                val ch = ev.changes.firstOrNull() ?: break
-                                if (!ch.pressed) break
-                                ch.consume()
-                                dragXPx = ch.position.x.coerceIn(0f, maxXPx)
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) {
+                                    if (!claimed) {
+                                        change.consume()
+                                        val idx = indexFor(down.position.x.coerceIn(0f, maxXPx))
+                                        if (options[idx].key != selectedKey) {
+                                            haptics.tick()
+                                            onSelect(options[idx].key)
+                                        }
+                                    }
+                                    break
+                                }
+                                if (!claimed) {
+                                    val dx = abs(change.position.x - down.position.x)
+                                    val dy = abs(change.position.y - down.position.y)
+                                    when {
+                                        dx > slop && dx >= dy -> {
+                                            claimed = true
+                                            change.consume()
+                                            dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                        }
+                                        dy > slop -> break
+                                    }
+                                } else if (change.positionChanged()) {
+                                    change.consume()
+                                    dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                }
                             }
-                            val x = dragXPx ?: return@awaitEachGesture
-                            val idx = indexFor(x)
-                            dragXPx = null
-                            if (options[idx].key != selectedKey) {
-                                haptics.tick()
-                                onSelect(options[idx].key)
+                            if (claimed) {
+                                val x = dragXPx ?: down.position.x.coerceIn(0f, maxXPx)
+                                val idx = indexFor(x)
+                                dragXPx = null
+                                if (options[idx].key != selectedKey) {
+                                    haptics.tick()
+                                    onSelect(options[idx].key)
+                                }
                             }
                         }
                     },

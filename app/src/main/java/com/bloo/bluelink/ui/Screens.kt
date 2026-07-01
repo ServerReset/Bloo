@@ -7418,32 +7418,62 @@ fun MorphSegmented(
             Row(
                 Modifier
                     .fillMaxSize()
-                    // A plain detectHorizontalDragGestures negotiates touch-slop with
-                    // ancestors (e.g. a HorizontalPager for switching cars), and a
-                    // scrollable ancestor only pre-consumes the direction it can still
-                    // scroll in — so this control could drag one way but not the other.
-                    // Claiming the pointer on first-down (like the color picker above)
-                    // wins the gesture outright, in both directions, from frame one.
-                    // A tap is just a drag that ends near where it started, so this one
-                    // handler covers both taps and drags — no separate clickable needed.
+                    // Same touch-slop race AnimatedSlider uses (see the color-picker/
+                    // settings sliders above): don't consume anything until the gesture
+                    // is confirmed. A plain detectHorizontalDragGestures negotiated slop
+                    // with ancestors and lost the race in one direction (a scrollable
+                    // ancestor only pre-consumes the direction it can still move in), so
+                    // a naive "consume everything from frame one" fix was tried instead —
+                    // but that broke scrolling a settings screen past this control, since
+                    // ANY touch here (including a vertical scroll) got hijacked. This
+                    // version only claims the gesture once movement is confirmed
+                    // horizontal (dx > slop && dx >= dy); a release before that is a tap
+                    // (selects immediately at that position) and confirmed vertical
+                    // movement (dy > slop) cedes the gesture entirely to an ancestor
+                    // scroll, exactly like the slider.
                     .pointerInput(n, stepPx) {
                         awaitEachGesture {
-                            val down = awaitFirstDown()
-                            down.consume()
-                            dragXPx = down.position.x.coerceIn(0f, maxXPx)
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val slop = viewConfiguration.touchSlop
+                            var claimed = false
                             while (true) {
-                                val ev = awaitPointerEvent()
-                                val ch = ev.changes.firstOrNull() ?: break
-                                if (!ch.pressed) break
-                                ch.consume()
-                                dragXPx = ch.position.x.coerceIn(0f, maxXPx)
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) {
+                                    if (!claimed) {
+                                        change.consume()
+                                        val idx = indexFor(down.position.x.coerceIn(0f, maxXPx))
+                                        if (options[idx].key != selectedKey) {
+                                            haptics?.tick()
+                                            onSelect(options[idx].key)
+                                        }
+                                    }
+                                    break
+                                }
+                                if (!claimed) {
+                                    val dx = abs(change.position.x - down.position.x)
+                                    val dy = abs(change.position.y - down.position.y)
+                                    when {
+                                        dx > slop && dx >= dy -> {
+                                            claimed = true
+                                            change.consume()
+                                            dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                        }
+                                        dy > slop -> break
+                                    }
+                                } else if (change.positionChanged()) {
+                                    change.consume()
+                                    dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                }
                             }
-                            val x = dragXPx ?: return@awaitEachGesture
-                            val idx = indexFor(x)
-                            dragXPx = null
-                            if (options[idx].key != selectedKey) {
-                                haptics?.tick()
-                                onSelect(options[idx].key)
+                            if (claimed) {
+                                val x = dragXPx ?: down.position.x.coerceIn(0f, maxXPx)
+                                val idx = indexFor(x)
+                                dragXPx = null
+                                if (options[idx].key != selectedKey) {
+                                    haptics?.tick()
+                                    onSelect(options[idx].key)
+                                }
                             }
                         }
                     },
