@@ -311,7 +311,6 @@ private fun CarColumn(
 
     var rotaryJob: Job? by remember { mutableStateOf(null) }
     var rotaryTargetIdx by remember { mutableIntStateOf(-1) }
-    val snapFling = ScalingLazyColumnDefaults.snapFlingBehavior(state)
 
     val centerItemIndex by remember {
         derivedStateOf {
@@ -349,7 +348,17 @@ private fun CarColumn(
                     val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
                     val dir = if (e.verticalScrollPixels > 0) 1 else -1
                     val base = if (rotaryTargetIdx >= 0) rotaryTargetIdx else centerItemIndex
-                    val newTarget = if (infinite) base + dir else (base + dir).coerceIn(0, maxIdx)
+                    var newTarget = if (infinite) base + dir else (base + dir).coerceIn(0, maxIdx)
+                    // Remap near the virtual-list boundary immediately (not after the
+                    // scroll settles) so a long continuous bezel roll never actually
+                    // reaches index 0/total-1 and gets stuck — the previous idle-gated
+                    // guardian only fired once isScrollInProgress went false, which a
+                    // continuous roll never does, so the user had to reverse direction
+                    // to unstick it.
+                    if (infinite && (newTarget < tileCount * 2 || newTarget > total - tileCount * 2)) {
+                        val phase = ((newTarget % tileCount) + tileCount) % tileCount
+                        newTarget = (cycles / 2) * tileCount + phase
+                    }
                     rotaryTargetIdx = newTarget
                     rotaryJob?.cancel()
                     rotaryJob = scope.launch {
@@ -361,7 +370,6 @@ private fun CarColumn(
                 .focusRequester(focusRequester)
                 .focusable(active),
             state = state,
-            flingBehavior = snapFling,
             // Flatten the built-in SLC scaling so our own focus-zoom is the single,
             // predictable source of the shrink/fade (no double-scaling).
             scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
