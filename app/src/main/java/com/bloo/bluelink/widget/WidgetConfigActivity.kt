@@ -290,26 +290,30 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(
-                            "auto" to "Auto", "stats" to "Stats", "photo" to "Photo", "map" to "Map",
-                        ).forEach { (key, label) ->
-                            MorphChip(selected = widgetStyle == key, onClick = { widgetStyle = key }, label = label)
-                        }
-                    }
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("auto", "Auto", null),
+                            SegmentOption("stats", "Stats", null),
+                            SegmentOption("photo", "Photo", null),
+                            SegmentOption("map", "Map", null),
+                        ),
+                        selectedKey = widgetStyle,
+                        onSelect = { widgetStyle = it },
+                    )
                 }
 
                 // Corner radius override.
                 Column {
                     Text("Corner shape", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf<Pair<Int?, String>>(
-                            null to "Auto", 8 to "Sharp", 16 to "Soft", 24 to "Round", 32 to "Full",
-                        ).forEach { (dp, label) ->
-                            MorphChip(selected = cornerDp == dp, onClick = { cornerDp = dp }, label = label)
-                        }
-                    }
+                    val cornerOptions = listOf<Pair<Int?, String>>(
+                        null to "Auto", 8 to "Sharp", 16 to "Soft", 24 to "Round", 32 to "Full",
+                    )
+                    MorphSegmented(
+                        options = cornerOptions.map { (dp, label) -> SegmentOption(dp?.toString() ?: "auto", label, null) },
+                        selectedKey = cornerDp?.toString() ?: "auto",
+                        onSelect = { key -> cornerDp = key.toIntOrNull() },
+                    )
                 }
 
                 // Text size.

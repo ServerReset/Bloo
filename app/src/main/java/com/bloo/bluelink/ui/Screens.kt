@@ -594,33 +594,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
                                 fontWeight = FontWeight.SemiBold,
                             )
                             val currentPt = state.powertrainOf(vehicle)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                com.bloo.bluelink.data.Powertrain.entries.forEach { pt ->
-                                    val selected = currentPt == pt
-                                    val (icon, label) = when (pt) {
-                                        com.bloo.bluelink.data.Powertrain.GAS -> "⛽" to "Gas"
-                                        com.bloo.bluelink.data.Powertrain.HYBRID -> "🔋" to "Hybrid"
-                                        com.bloo.bluelink.data.Powertrain.PHEV -> "🔌" to "Plug-in"
-                                        com.bloo.bluelink.data.Powertrain.EV -> "⚡" to "Electric"
-                                    }
-                                    Surface(
-                                        onClick = { vm.setPowertrain(vehicle, pt) },
-                                        shape = RoundedCornerShape(50),
-                                        color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHighest,
-                                        contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
-                                        border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
-                                    ) {
-                                        Row(
-                                            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            Text(icon, style = MaterialTheme.typography.bodyMedium)
-                                            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
-                                        }
-                                    }
-                                }
-                            }
+                            PowertrainPicker(current = currentPt) { pt -> vm.setPowertrain(vehicle, pt) }
                             // Seats — individual row per position with heat / cool toggles
                             Text(
                                 "Seats",
@@ -1435,11 +1409,11 @@ private fun LoginScreen(
                         style = MaterialTheme.typography.labelLarge,
                         color = scheme.onSurface,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Brand.entries.forEach { b ->
-                            MorphChip(selected = brand == b, onClick = { brand = b }, label = b.label)
-                        }
-                    }
+                    MorphSegmented(
+                        options = Brand.entries.map { b -> SegmentOption(b.name, b.label, null) },
+                        selectedKey = brand.name,
+                        onSelect = { key -> brand = Brand.valueOf(key) },
+                    )
 
                     // Email field — label and placeholder animate with brand.
                     AnimatedContent(
@@ -7852,16 +7826,14 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                 Spacer(Modifier.height(10.dp))
                 Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TileActions.forEach { (key, label, icon) ->
-                        MorphChip(
-                            selected = cmd == key,
-                            onClick = { vm.setTileAssignment(index, vin, key) },
-                            label = label,
-                            icon = icon,
-                        )
-                    }
-                }
+                // TileActions is a fixed 4-option list (unlike "Runs" below, whose
+                // preset count is user-defined and unbounded) — a real one-of-a-few
+                // single-select, so it gets the segmented control like the others.
+                MorphSegmented(
+                    options = TileActions.map { (key, label, icon) -> SegmentOption(key, label, icon) },
+                    selectedKey = cmd,
+                    onSelect = { key -> vm.setTileAssignment(index, vin, key) },
+                )
 
                 if (cmd != "open") {
                     Spacer(Modifier.height(10.dp))
