@@ -402,7 +402,11 @@ private fun CarColumn(
                     }
                 }
                 val edgeScale = if (round) 0.74f else 0.84f
-                val edgeAlpha = 0.45f
+                // Bold white text at the old 0.45 was still legible enough that a
+                // barely-peeking adjacent tile near the top/bottom edge (behind the
+                // always-on-top CarNameOverlay pill and the system clock) read as
+                // overlapping "ghost" content rather than a faded-out neighbor.
+                val edgeAlpha = 0.16f
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -680,12 +684,16 @@ private fun SectionCard(
 ) {
     // Card had no internal padding at all — title/icon/content sat flush against
     // its edges, which the round bezel's curvature then clipped whenever the tile
-    // scrolled away from dead-center (the corners narrow fastest there). A modest
-    // inset on every side keeps content clear of the curve at any scroll position.
-    val round = LocalConfiguration.current.isScreenRound
+    // scrolled away from dead-center (the corners narrow fastest there). The
+    // outer ScalingLazyColumn already reserves a round-safe horizontal inset
+    // (22dp), so this only needs a small top-up — a big horizontal value here
+    // double-stacks with that and starves button labels of width, truncating
+    // text like "Heat to ~65°F" mid-number. Vertical is the one that actually
+    // matters for the curve, since it affects how a tile fits at any scroll
+    // position, not just at rest.
     Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
         Column(
-            Modifier.padding(horizontal = if (round) 10.dp else 6.dp, vertical = 8.dp),
+            Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
         ) {
             if (title != null) {
                 Row(
