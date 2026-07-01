@@ -21,7 +21,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -449,24 +450,33 @@ fun MorphSegmented(
             Row(
                 Modifier
                     .fillMaxSize()
+                    // detectHorizontalDragGestures negotiates touch-slop with ancestors
+                    // (SwipeDismissableNavHost, ScalingLazyColumn's bezel scroll) and can
+                    // lose that race in just one direction, since an ancestor scrollable
+                    // only pre-consumes the direction it can still move in. Claiming the
+                    // pointer on first-down wins the gesture outright both ways. A tap is
+                    // just a drag that ends near where it started, so this one handler
+                    // covers both taps and drags — no separate clickable needed.
                     .pointerInput(n, stepPx) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { offset -> dragXPx = offset.x.coerceIn(0f, maxXPx) },
-                            onHorizontalDrag = { change, _ ->
-                                change.consume()
-                                dragXPx = change.position.x.coerceIn(0f, maxXPx)
-                            },
-                            onDragEnd = {
-                                val x = dragXPx ?: return@detectHorizontalDragGestures
-                                val idx = indexFor(x)
-                                dragXPx = null
-                                if (options[idx].key != selectedKey) {
-                                    haptics.tick()
-                                    onSelect(options[idx].key)
-                                }
-                            },
-                            onDragCancel = { dragXPx = null },
-                        )
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            down.consume()
+                            dragXPx = down.position.x.coerceIn(0f, maxXPx)
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val ch = ev.changes.firstOrNull() ?: break
+                                if (!ch.pressed) break
+                                ch.consume()
+                                dragXPx = ch.position.x.coerceIn(0f, maxXPx)
+                            }
+                            val x = dragXPx ?: return@awaitEachGesture
+                            val idx = indexFor(x)
+                            dragXPx = null
+                            if (options[idx].key != selectedKey) {
+                                haptics.tick()
+                                onSelect(options[idx].key)
+                            }
+                        }
                     },
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
@@ -481,17 +491,7 @@ fun MorphSegmented(
                         modifier = Modifier
                             .width(segWidth)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {
-                                    if (opt.key != selectedKey) {
-                                        haptics.tick()
-                                        onSelect(opt.key)
-                                    }
-                                },
-                            ),
+                            .clip(RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(

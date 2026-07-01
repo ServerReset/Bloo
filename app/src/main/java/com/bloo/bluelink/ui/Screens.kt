@@ -7418,24 +7418,34 @@ fun MorphSegmented(
             Row(
                 Modifier
                     .fillMaxSize()
+                    // A plain detectHorizontalDragGestures negotiates touch-slop with
+                    // ancestors (e.g. a HorizontalPager for switching cars), and a
+                    // scrollable ancestor only pre-consumes the direction it can still
+                    // scroll in — so this control could drag one way but not the other.
+                    // Claiming the pointer on first-down (like the color picker above)
+                    // wins the gesture outright, in both directions, from frame one.
+                    // A tap is just a drag that ends near where it started, so this one
+                    // handler covers both taps and drags — no separate clickable needed.
                     .pointerInput(n, stepPx) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { offset -> dragXPx = offset.x.coerceIn(0f, maxXPx) },
-                            onHorizontalDrag = { change, _ ->
-                                change.consume()
-                                dragXPx = change.position.x.coerceIn(0f, maxXPx)
-                            },
-                            onDragEnd = {
-                                val x = dragXPx ?: return@detectHorizontalDragGestures
-                                val idx = indexFor(x)
-                                dragXPx = null
-                                if (options[idx].key != selectedKey) {
-                                    haptics?.tick()
-                                    onSelect(options[idx].key)
-                                }
-                            },
-                            onDragCancel = { dragXPx = null },
-                        )
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            down.consume()
+                            dragXPx = down.position.x.coerceIn(0f, maxXPx)
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val ch = ev.changes.firstOrNull() ?: break
+                                if (!ch.pressed) break
+                                ch.consume()
+                                dragXPx = ch.position.x.coerceIn(0f, maxXPx)
+                            }
+                            val x = dragXPx ?: return@awaitEachGesture
+                            val idx = indexFor(x)
+                            dragXPx = null
+                            if (options[idx].key != selectedKey) {
+                                haptics?.tick()
+                                onSelect(options[idx].key)
+                            }
+                        }
                     },
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
@@ -7450,12 +7460,7 @@ fun MorphSegmented(
                         modifier = Modifier
                             .width(segWidth)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { if (opt.key != selectedKey) { haptics?.tick(); onSelect(opt.key) } },
-                            ),
+                            .clip(RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
