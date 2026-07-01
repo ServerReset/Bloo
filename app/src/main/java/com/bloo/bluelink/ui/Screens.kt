@@ -7300,48 +7300,66 @@ private fun MorphSegmented(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
+    val trackPad = 4.dp
+    val gap = 4.dp
+    val trackHeight = if (options.any { it.icon != null }) 48.dp else 44.dp
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = buttonContainer(),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            options.forEach { opt ->
-                val selected = opt.key == selectedKey
-                val corner by animateDpAsState(
-                    if (selected) 12.dp else 18.dp,
-                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
-                    label = "segCorner",
-                )
-                val bg by androidx.compose.animation.animateColorAsState(
-                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    spring(stiffness = Spring.StiffnessMediumLow),
-                    label = "segBg",
-                )
-                val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                Surface(
-                    onClick = { onSelect(opt.key) },
-                    shape = RoundedCornerShape(corner),
-                    color = bg,
-                    contentColor = fg,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Row(
-                        Modifier.padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
+        BoxWithConstraints(Modifier.padding(trackPad).height(trackHeight)) {
+            val n = options.size
+            // Exact per-segment width so the highlight is flush with each pill's own
+            // edges — no residual gap between the highlight and the track border.
+            val segWidth = (maxWidth - gap * (n - 1)) / n
+            val indicatorX by animateDpAsState(
+                targetValue = (segWidth + gap) * selectedIndex,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                label = "segIndicatorX",
+            )
+            Box(
+                Modifier
+                    .offset(x = indicatorX)
+                    .width(segWidth)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp)),
+            )
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                options.forEachIndexed { i, opt ->
+                    val selected = i == selectedIndex
+                    val fg by androidx.compose.animation.animateColorAsState(
+                        if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "segFg",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(segWidth)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { onSelect(opt.key) },
+                            ),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        if (opt.icon != null) {
-                            Icon(opt.icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
+                        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                            if (opt.icon != null) {
+                                Icon(opt.icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(
+                                opt.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = fg,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
-                        Text(
-                            opt.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
                     }
                 }
             }

@@ -845,19 +845,19 @@ class BlooWidget : GlanceAppWidget() {
                     }
                 }
                 Spacer(GlanceModifier.width(8.dp))
-                // Narrow pills → icon only (labels would truncate).
-                Row(
-                    modifier = GlanceModifier.defaultWeight(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    actions.take(4).forEachIndexed { i, action ->
-                        if (i > 0) Spacer(GlanceModifier.width(gap))
-                        ActionPill(widgetId, snap.vin, action, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = pillH >= 52.dp && w >= 280.dp)
-                    }
-                    repeat((4 - actions.size).coerceAtLeast(0)) { i ->
-                        if (actions.isNotEmpty() || i > 0) Spacer(GlanceModifier.width(gap))
-                        ActionPill(widgetId, snap.vin, null, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = false)
-                    }
+                // Pills sit directly in the outer Row (not a nested weighted Row) —
+                // RemoteViews weight distribution is unreliable two levels deep on
+                // some launchers, which left pills undersized and text clipped.
+                val allowLabel = pillH >= 52.dp && w >= 280.dp
+                val shown = actions.take(4)
+                val padCount = (4 - shown.size).coerceAtLeast(0)
+                shown.forEachIndexed { i, action ->
+                    if (i > 0) Spacer(GlanceModifier.width(gap))
+                    ActionPill(widgetId, snap.vin, action, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = allowLabel)
+                }
+                repeat(padCount) { i ->
+                    if (shown.isNotEmpty() || i > 0) Spacer(GlanceModifier.width(gap))
+                    ActionPill(widgetId, snap.vin, null, pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = false)
                 }
             }
         }
