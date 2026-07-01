@@ -3953,7 +3953,7 @@ private fun PaletteEditorDialog(
  * e.g. the label flips Start -> Stop.
  */
 @Composable
-private fun MorphButton(
+fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -4010,7 +4010,7 @@ private fun MorphButton(
  * the pill-morphs-to-rounded-square press feel.
  */
 @Composable
-private fun MorphTextButton(
+fun MorphTextButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -4035,7 +4035,7 @@ private fun MorphTextButton(
  * spinner while [pending], so the button width never changes just from loading.
  */
 @Composable
-private fun MorphButtonLabel(
+fun MorphButtonLabel(
     icon: ImageVector,
     label: String,
     pending: Boolean,
@@ -4086,7 +4086,7 @@ private fun MorphButtonLabel(
  * feels the same everywhere.
  */
 @Composable
-private fun MorphChip(
+fun MorphChip(
     selected: Boolean,
     onClick: () -> Unit,
     label: String,
@@ -7342,7 +7342,7 @@ private fun tileActionLabel(cmd: String): String =
     TileActions.firstOrNull { it.first == cmd }?.second ?: cmd
 
 /** One option in a [MorphSegmented] control. */
-private data class SegmentOption(val key: String, val label: String, val icon: ImageVector?)
+data class SegmentOption(val key: String, val label: String, val icon: ImageVector?)
 
 /**
  * A full-width segmented selector built from the app's MorphChip vocabulary: a
@@ -7351,7 +7351,7 @@ private data class SegmentOption(val key: String, val label: String, val icon: I
  * where the choice is really one-of-two behaviors.
  */
 @Composable
-private fun MorphSegmented(
+fun MorphSegmented(
     options: List<SegmentOption>,
     selectedKey: String,
     onSelect: (String) -> Unit,
@@ -7486,7 +7486,7 @@ private fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSelec
  * choice between two equal alternatives (°C/°F, in-app/browser) rather than on/off.
  */
 @Composable
-private fun SettingsSegmentedRow(
+fun SettingsSegmentedRow(
     label: String,
     options: List<SegmentOption>,
     selectedKey: String,
@@ -7996,7 +7996,7 @@ private fun StepRow(label: String, value: String, valueColor: Color = Color.Unsp
 }
 
 @Composable
-private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val haptics = LocalHaptics.current
     val scale by animateFloatAsState(
         if (checked) 1.04f else 1f,

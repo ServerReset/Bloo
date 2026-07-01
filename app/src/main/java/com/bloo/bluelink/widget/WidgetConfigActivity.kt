@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,22 +24,18 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -62,6 +59,15 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.ui.BlooTheme
+import com.bloo.bluelink.ui.Haptics
+import com.bloo.bluelink.ui.LocalHaptics
+import com.bloo.bluelink.ui.MorphButton
+import com.bloo.bluelink.ui.MorphButtonLabel
+import com.bloo.bluelink.ui.MorphChip
+import com.bloo.bluelink.ui.MorphSegmented
+import com.bloo.bluelink.ui.MorphTextButton
+import com.bloo.bluelink.ui.SegmentOption
+import com.bloo.bluelink.ui.ToggleRow
 import kotlinx.coroutines.launch
 
 /**
@@ -69,6 +75,11 @@ import kotlinx.coroutines.launch
  * buttons do. Launched both on first placement and from the launcher's long-press
  * "settings" (the provider is declared reconfigurable). Preloads any existing
  * config so reconfiguring is non-destructive.
+ *
+ * Every control here is one of the app's shared components (MorphButton/MorphChip/
+ * MorphSegmented/ToggleRow from com.bloo.bluelink.ui) rather than a bespoke widget,
+ * so this screen looks and feels like the rest of the app instead of a stock
+ * Material form.
  */
 class WidgetConfigActivity : FragmentActivity() {
 
@@ -104,6 +115,8 @@ class WidgetConfigActivity : FragmentActivity() {
         }
     }
 }
+
+private val ShapeOptions = listOf(SegmentOption("rect", "Rounded", null), SegmentOption("pill", "Pill", null))
 
 @Composable
 private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -> Unit) {
@@ -153,6 +166,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         loaded = true
     }
 
+    val haptics = remember { Haptics(context.applicationContext) }
+    CompositionLocalProvider(LocalHaptics provides haptics) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -175,32 +190,25 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+            MorphButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Close", fontWeight = FontWeight.SemiBold) }
             return@Column
         }
 
         // ── Car ────────────────────────────────────────────────────────────────
         SectionHeader("Car")
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(vertical = 6.dp)) {
-                cars.forEach { car ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(selected = car.vin == selectedVin, onClick = { selectedVin = car.vin })
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = car.vin == selectedVin, onClick = { selectedVin = car.vin })
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text(car.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                car.model,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            cars.forEach { car ->
+                MorphButton(
+                    onClick = { selectedVin = car.vin },
+                    active = car.vin == selectedVin,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+                ) {
+                    Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(car.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
+                        Text(car.model, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -244,53 +252,39 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         SectionHeader("Appearance")
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Background", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Show the system widget background tint",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(checked = showBackground, onCheckedChange = { showBackground = it })
+                Column {
+                    ToggleRow(label = "Background", checked = showBackground, onChange = { showBackground = it })
+                    Text(
+                        "Show the system widget background tint",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Require authentication", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Authenticate before running widget commands",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(checked = requireAuth, onCheckedChange = { requireAuth = it })
+                Column {
+                    ToggleRow(label = "Require authentication", checked = requireAuth, onChange = { requireAuth = it })
+                    Text(
+                        "Authenticate before running widget commands",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Column {
                     Text("Shape", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("rect" to "Rounded", "pill" to "Pill").forEach { (key, label) ->
-                            FilterChip(
-                                selected = widgetShape == key,
-                                onClick = { widgetShape = key },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
+                    MorphSegmented(
+                        options = ShapeOptions,
+                        selectedKey = widgetShape,
+                        onSelect = { widgetShape = it },
+                    )
                 }
                 Column {
                     Text("Layout", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Auto adapts to size. Minimal = one big number, Stats = metric grid, " +
-                            "Ring = charge ring, Photo = your car photo, Dual = two big metrics, " +
-                            "Map = last known location (needs the Location button assigned above).",
+                        "Auto adapts to size — including dedicated Tiny and Square layouts for " +
+                            "the smallest and most square placements. Minimal = one big number, " +
+                            "Stats = metric grid, Ring = charge ring, Photo = your car photo, " +
+                            "Dual = two big metrics, Map = last known location (needs the " +
+                            "Location button assigned above).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -300,11 +294,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                             "auto" to "Auto", "minimal" to "Minimal", "stats" to "Stats",
                             "ring" to "Ring", "photo" to "Photo", "dual" to "Dual", "map" to "Map",
                         ).forEach { (key, label) ->
-                            FilterChip(
-                                selected = widgetStyle == key,
-                                onClick = { widgetStyle = key },
-                                label = { Text(label) },
-                            )
+                            MorphChip(selected = widgetStyle == key, onClick = { widgetStyle = key }, label = label)
                         }
                     }
                 }
@@ -317,11 +307,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                         listOf<Pair<Int?, String>>(
                             null to "Auto", 8 to "Sharp", 16 to "Soft", 24 to "Round", 32 to "Full",
                         ).forEach { (dp, label) ->
-                            FilterChip(
-                                selected = cornerDp == dp,
-                                onClick = { cornerDp = dp },
-                                label = { Text(label) },
-                            )
+                            MorphChip(selected = cornerDp == dp, onClick = { cornerDp = dp }, label = label)
                         }
                     }
                 }
@@ -344,8 +330,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 Column {
                     Text("Accent", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = accentHex == null, onClick = { accentHex = null }, label = { Text("Match app") })
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MorphChip(selected = accentHex == null, onClick = { accentHex = null }, label = "Match app")
                         listOf("#005AC1", "#2EBD59", "#E5484D", "#7B4DFF", "#00696E", "#F5A623").forEach { hex ->
                             Box(
                                 modifier = Modifier
@@ -368,9 +354,9 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     Text("Show", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = showName, onClick = { showName = !showName }, label = { Text("Name") })
-                        FilterChip(selected = showRange, onClick = { showRange = !showRange }, label = { Text("Range") })
-                        FilterChip(selected = showState, onClick = { showState = !showState }, label = { Text("State") })
+                        MorphChip(selected = showName, onClick = { showName = !showName }, label = "Name")
+                        MorphChip(selected = showRange, onClick = { showRange = !showRange }, label = "Range")
+                        MorphChip(selected = showState, onClick = { showState = !showState }, label = "State")
                     }
                 }
 
@@ -380,10 +366,10 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     Spacer(Modifier.height(8.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("battery", "range", "lock", "climate").forEach { m ->
-                            FilterChip(
+                            MorphChip(
                                 selected = m in metrics,
                                 onClick = { if (m in metrics) metrics.remove(m) else metrics.add(m) },
-                                label = { Text(m.replaceFirstChar { it.uppercase() }) },
+                                label = m.replaceFirstChar { it.uppercase() },
                             )
                         }
                     }
@@ -392,9 +378,9 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         }
 
         Spacer(Modifier.height(28.dp))
-        Button(
+        MorphButton(
             onClick = {
-                val vin = selectedVin ?: return@Button
+                val vin = selectedVin ?: return@MorphButton
                 scope.launch {
                     SettingsStore(context).setWidgetConfig(widgetId, vin, actions.toList())
                     SettingsStore(context).setWidgetShowBackground(widgetId, showBackground)
@@ -413,10 +399,11 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             },
             enabled = selectedVin != null,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+        ) { MorphButtonLabel(Icons.Default.Check, "Save", pending = false, iconSize = 18.dp) }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+        MorphTextButton("Cancel", onCancel, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(16.dp))
+    }
     }
 }
 
@@ -431,9 +418,10 @@ private fun ActionPicker(currentKey: String, onPick: (String) -> Unit, modifier:
     var open by remember { mutableStateOf(false) }
     val current = WidgetAction.fromKey(currentKey) ?: WidgetAction.OPEN
     Box(modifier) {
-        OutlinedButton(
+        MorphButton(
             onClick = { open = true },
             modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Icon(
                 painter = painterResource(current.icon),
