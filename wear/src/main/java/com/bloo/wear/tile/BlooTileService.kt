@@ -44,8 +44,15 @@ import java.util.concurrent.Executors
  * Bloo Wear OS Tile — charge arc, car name, big %, status line, lock + climate chips.
  * Uses the same icon drawables as the phone widget. Colors come from the synced
  * WearColorRoles so the tile always matches the phone app theme.
+ *
+ * Concrete [poolIndex]ed subclasses ([BlooTile1]..[BlooTile4]) form a fixed pool —
+ * mirroring the phone's BlooTile1..12 Quick Settings pool — so a user with
+ * multiple cars can add one Tile per car to their watch face, each pinned
+ * independently via Settings.
  */
-class BlooTileService : TileService() {
+abstract class BlooTileService : TileService() {
+
+    protected abstract val poolIndex: Int
 
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -95,10 +102,11 @@ class BlooTileService : TileService() {
             val store = SnapshotStore(ctx)
             val local = runCatching { WearLocalStore(ctx).flow.first() }.getOrNull()
             val actions = local?.tileActions ?: listOf("lock", "climate")
-            val tileVin = local?.tileCarVin
+            val tileVin = local?.tileCarVins?.getOrNull(poolIndex)
 
-            // The Tile shows the user's pinned car if it still exists, else the
-            // app/widget's selected car.
+            // The Tile shows the car pinned to this pool slot if it still exists,
+            // else the app/widget's selected car (so an unconfigured/new slot is
+            // never blank).
             fun pick(d: SnapshotStore.SnapshotData): VehicleSnapshot? =
                 tileVin?.let { v -> d.vehicles.firstOrNull { it.vin == v } } ?: d.selected
 
@@ -423,3 +431,8 @@ class BlooTileService : TileService() {
         )
     }
 }
+
+class BlooTile1 : BlooTileService() { override val poolIndex = 0 }
+class BlooTile2 : BlooTileService() { override val poolIndex = 1 }
+class BlooTile3 : BlooTileService() { override val poolIndex = 2 }
+class BlooTile4 : BlooTileService() { override val poolIndex = 3 }

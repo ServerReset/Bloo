@@ -566,10 +566,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Choose which car the glanceable Tile shows (null = follow selected), then redraw it. */
-    fun setTileCarVin(vin: String?) {
+    /** Pin pool slot [index]'s Tile to a car (null = follow selected), then redraw it. */
+    fun setTileCarVin(index: Int, vin: String?) {
         viewModelScope.launch {
-            localStore.setTileCarVin(vin)
+            localStore.setTileCarVin(index, vin)
             requestWidgetUpdates()
         }
     }
@@ -691,12 +691,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         statuses = statuses + (vin to change(cur))
     }
 
-    /** Nudge the tile and watch-face complication to re-read the updated snapshot. */
+    /** Nudge every pool Tile and the watch-face complications to re-read the
+     *  updated snapshot. */
     private fun requestWidgetUpdates() {
-        runCatching {
-            androidx.wear.tiles.TileService.getUpdater(ctx)
-                .requestUpdate(com.bloo.wear.tile.BlooTileService::class.java)
-        }
+        val updater = runCatching { androidx.wear.tiles.TileService.getUpdater(ctx) }.getOrNull()
+        listOf(
+            com.bloo.wear.tile.BlooTile1::class.java,
+            com.bloo.wear.tile.BlooTile2::class.java,
+            com.bloo.wear.tile.BlooTile3::class.java,
+            com.bloo.wear.tile.BlooTile4::class.java,
+        ).forEach { cls -> runCatching { updater?.requestUpdate(cls) } }
         com.bloo.wear.complication.ComplicationLink.requestUpdate(ctx)
     }
 

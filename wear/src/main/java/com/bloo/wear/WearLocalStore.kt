@@ -117,13 +117,20 @@ object WearPebbles {
     }
 }
 
+/** A pool of concrete Tile services the user can add to their watch face — one
+ *  per car, mirroring the phone's BlooTile1..12 Quick Settings pool. */
+object WearTilePool {
+    const val SIZE = 4
+}
+
 data class WearLocalSettings(
     val fontScale: Float = 1f,
     val tileOrder: List<String> = WearTiles.DEFAULT_ORDER,
     /** Which action chips the glanceable Tile shows (subset of [TILE_CHIP_ACTIONS]). */
     val tileActions: List<String> = listOf("lock", "climate"),
-    /** VIN the Tile should show; null = follow the app/widget's selected car. */
-    val tileCarVin: String? = null,
+    /** Per pool-slot pinned car VIN; null = unconfigured (follows the selected car).
+     *  Sized [WearTilePool.SIZE]. */
+    val tileCarVins: List<String?> = List(WearTilePool.SIZE) { null },
 )
 
 /** The actions a Tile chip can perform, in canonical order. */
@@ -134,7 +141,11 @@ class WearLocalStore(private val context: Context) {
     private val keyFontScale = floatPreferencesKey("font_scale")
     private val keyTileOrder = stringPreferencesKey("tile_order")
     private val keyTileActions = stringPreferencesKey("tile_actions")
-    private val keyTileCarVin = stringPreferencesKey("tile_car_vin")
+    private fun keyTileCarVin(index: Int) = stringPreferencesKey("tile_car_vin_$index")
+
+    // Pre-pool single-tile setting; migrated into slot 0 the first time that slot
+    // is touched, and read as a fallback for slot 0 until then.
+    private val keyTileCarVinLegacy = stringPreferencesKey("tile_car_vin")
 
     val flow: Flow<WearLocalSettings> = context.wearLocalStore.data.map { prefs ->
         val fontScale = (prefs[keyFontScale] ?: 1f).coerceIn(0.8f, 1.4f)
@@ -150,12 +161,15 @@ class WearLocalStore(private val context: Context) {
             ?.filter { it in TILE_CHIP_ACTIONS }
             ?.takeIf { it.isNotEmpty() }
             ?: listOf("lock", "climate")
-        val tileCarVin = prefs[keyTileCarVin]?.takeIf { it.isNotBlank() }
+        val tileCarVins = (0 until WearTilePool.SIZE).map { i ->
+            val v = prefs[keyTileCarVin(i)]?.takeIf { it.isNotBlank() }
+            if (v == null && i == 0) prefs[keyTileCarVinLegacy]?.takeIf { it.isNotBlank() } else v
+        }
         WearLocalSettings(
             fontScale = fontScale,
             tileOrder = merged,
             tileActions = actions,
-            tileCarVin = tileCarVin,
+            tileCarVins = tileCarVins,
         )
     }
 
@@ -172,10 +186,11 @@ class WearLocalStore(private val context: Context) {
         context.wearLocalStore.edit { it[keyTileActions] = clean.joinToString(",") }
     }
 
-    /** Pick the car the Tile shows. Pass null to follow the selected car. */
-    suspend fun setTileCarVin(vin: String?) {
+    /** Pin pool slot [index] to a car. Pass null to unconfigure/clear that slot. */
+    suspend fun setTileCarVin(index: Int, vin: String?) {
         context.wearLocalStore.edit { prefs ->
-            if (vin.isNullOrBlank()) prefs.remove(keyTileCarVin) else prefs[keyTileCarVin] = vin
+            if (vin.isNullOrBlank()) prefs.remove(keyTileCarVin(index)) else prefs[keyTileCarVin(index)] = vin
+            if (index == 0) prefs.remove(keyTileCarVinLegacy)
         }
     }
 }

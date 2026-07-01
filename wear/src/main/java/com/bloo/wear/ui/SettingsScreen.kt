@@ -166,28 +166,35 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         if (ui.cars.size > 1) {
-            item {
+            // One card per pool slot (up to WearTilePool.SIZE, or one per car if
+            // fewer) so a multi-car household can add a separate glanceable Tile
+            // for each car to their watch face, pinned independently.
+            val slotCount = minOf(com.bloo.wear.WearTilePool.SIZE, ui.cars.size)
+            for (index in 0 until slotCount) item(key = "tileSlot$index") {
                 Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                    Text("Tile car", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("Tile ${index + 1}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        "Which car the glanceable Tile shows.",
+                        "Which car this glanceable Tile shows on your watch face.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(6.dp))
-                    val selectedVin = ui.localSettings.tileCarVin
+                    // Unconfigured slots default to their same-index car so a fresh
+                    // multi-car setup is pre-wired sensibly (slot 1→car 1, etc.).
+                    val selectedVin = ui.localSettings.tileCarVins.getOrNull(index)
+                        ?: ui.cars.getOrNull(index)?.vin
                     @Composable
                     fun carOption(label: String, vin: String?) {
                         val active = vin == selectedVin
                         if (active) {
                             FilledTonalButton(
-                                onClick = { vm.setTileCarVin(vin) },
+                                onClick = { vm.setTileCarVin(index, vin) },
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             )
                         } else {
                             OutlinedButton(
-                                onClick = { vm.setTileCarVin(vin) },
+                                onClick = { vm.setTileCarVin(index, vin) },
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             )
