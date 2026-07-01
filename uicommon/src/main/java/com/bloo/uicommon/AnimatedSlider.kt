@@ -67,9 +67,20 @@ fun AnimatedSlider(
     val anim = remember { Animatable(value) }
     var dragging by remember { mutableStateOf(false) }
     var prevStep by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
+    // settleTo() below calls onValueChange(target) synchronously, which recomposes
+    // with the new `value` and re-triggers this effect, racing the scope.launch{}
+    // bounce animation settleTo just started: if this effect's snapTo(value) runs
+    // before that launched coroutine has actually started animating (a scheduling
+    // gap, not a guaranteed ordering), it jumps anim.value straight to the target
+    // and the just-started spring then animates from target to target -- a no-op
+    // that reads as the bounce snapping partway through instead of completing.
+    // isRunning alone can't detect this window reliably since it doesn't flip
+    // true until the launched coroutine actually starts; an explicit flag set
+    // synchronously inside settleTo (before any suspension point) closes it.
+    var settling by remember { mutableStateOf(false) }
 
     LaunchedEffect(value) {
-        if (!dragging && !anim.isRunning && anim.value != value) anim.snapTo(value)
+        if (!dragging && !settling && !anim.isRunning && anim.value != value) anim.snapTo(value)
     }
 
     val trackThickness = 14.dp
@@ -102,6 +113,7 @@ fun AnimatedSlider(
     fun settleTo(target: Float) {
         prevStep = target
         onSettle()
+        settling = true
         onValueChange(target)
         scope.launch {
             if (reduceMotion) {
@@ -112,6 +124,7 @@ fun AnimatedSlider(
                     animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
                 )
             }
+            settling = false
         }
     }
 

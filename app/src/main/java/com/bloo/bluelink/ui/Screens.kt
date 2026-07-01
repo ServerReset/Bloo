@@ -201,6 +201,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -7379,6 +7380,21 @@ fun MorphSegmented(
     val gap = 4.dp
     val trackHeight = if (options.any { it.icon != null }) 48.dp else 44.dp
     val haptics = LocalHaptics.current
+    // pointerInput below is keyed on (n, stepPx) only, so its gesture-handling
+    // coroutine is launched once and then keeps running (awaitEachGesture loops
+    // internally) across many recompositions without restarting. A plain closure
+    // over selectedKey/onSelect/haptics would freeze at whatever those were on
+    // that first launch — every read inside the gesture handler would silently
+    // use the ORIGINAL selection forever, not the current one. That's exactly
+    // what "stops working after a couple of taps, can't reselect the original
+    // option" looks like: the frozen selectedKey happens to still equal the
+    // very first option, so tapping back to it looks like a no-op change to the
+    // stale closure, and taps to already-selected-per-the-stale-value options
+    // silently do nothing. rememberUpdatedState keeps these reads live without
+    // relaunching (and thereby interrupting) an in-progress gesture.
+    val currentSelectedKey by rememberUpdatedState(selectedKey)
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentHaptics by rememberUpdatedState(haptics)
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = buttonContainer(),
@@ -7443,9 +7459,9 @@ fun MorphSegmented(
                                     if (!claimed) {
                                         change.consume()
                                         val idx = indexFor(down.position.x.coerceIn(0f, maxXPx))
-                                        if (options[idx].key != selectedKey) {
-                                            haptics?.tick()
-                                            onSelect(options[idx].key)
+                                        if (options[idx].key != currentSelectedKey) {
+                                            currentHaptics?.tick()
+                                            currentOnSelect(options[idx].key)
                                         }
                                     }
                                     break
@@ -7470,9 +7486,9 @@ fun MorphSegmented(
                                 val x = dragXPx ?: down.position.x.coerceIn(0f, maxXPx)
                                 val idx = indexFor(x)
                                 dragXPx = null
-                                if (options[idx].key != selectedKey) {
-                                    haptics?.tick()
-                                    onSelect(options[idx].key)
+                                if (options[idx].key != currentSelectedKey) {
+                                    currentHaptics?.tick()
+                                    currentOnSelect(options[idx].key)
                                 }
                             }
                         }
