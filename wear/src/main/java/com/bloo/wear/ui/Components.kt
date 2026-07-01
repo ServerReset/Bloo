@@ -8,6 +8,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
@@ -20,6 +21,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +43,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,7 +55,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -407,18 +413,33 @@ fun MorphSegmented(
     val trackPad = 4.dp
     val gap = 4.dp
     val trackHeight = 40.dp
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
+    val haptics = LocalHapticFeedback.current
+    // Same fix as MorphButton: surfaceContainerHigh lerped by only 18% read
+    // almost flat against the card behind it.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.32f)
     Box(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(containerColor),
     ) {
         BoxWithConstraints(Modifier.padding(trackPad).height(trackHeight)) {
             val n = options.size
             val segWidth = (maxWidth - gap * (n - 1)) / n
+            val density = LocalDensity.current
+            val stepPx = with(density) { (segWidth + gap).toPx() }
+            val maxXPx = with(density) { (segWidth * (n - 1) + gap * (n - 1)).toPx() }
+
+            // Drag it and it bounces to wherever you let go — same interaction as
+            // the phone's version, not just a tap target.
+            var dragXPx by remember { mutableStateOf<Float?>(null) }
+            val restingX = (segWidth + gap) * selectedIndex
             val indicatorX by animateDpAsState(
-                targetValue = (segWidth + gap) * selectedIndex,
-                animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
+                animationSpec = if (dragXPx != null) snap()
+                                else spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
                 label = "wearSegIndicatorX",
             )
+
+            fun indexFor(xPx: Float): Int = (xPx / stepPx).roundToInt().coerceIn(0, n - 1)
+
             Box(
                 Modifier
                     .offset(x = indicatorX)
@@ -426,7 +447,30 @@ fun MorphSegmented(
                     .fillMaxHeight()
                     .background(scheme.primary, RoundedCornerShape(14.dp)),
             )
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(n, stepPx) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { offset -> dragXPx = offset.x.coerceIn(0f, maxXPx) },
+                            onHorizontalDrag = { change, _ ->
+                                change.consume()
+                                dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                            },
+                            onDragEnd = {
+                                val x = dragXPx ?: return@detectHorizontalDragGestures
+                                val idx = indexFor(x)
+                                dragXPx = null
+                                if (options[idx].key != selectedKey) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSelect(options[idx].key)
+                                }
+                            },
+                            onDragCancel = { dragXPx = null },
+                        )
+                    },
+                horizontalArrangement = Arrangement.spacedBy(gap),
+            ) {
                 options.forEachIndexed { i, opt ->
                     val selected = i == selectedIndex
                     val fg by animateColorAsState(
@@ -442,7 +486,12 @@ fun MorphSegmented(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                                onClick = { onSelect(opt.key) },
+                                onClick = {
+                                    if (opt.key != selectedKey) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelect(opt.key)
+                                    }
+                                },
                             ),
                         contentAlignment = Alignment.Center,
                     ) {

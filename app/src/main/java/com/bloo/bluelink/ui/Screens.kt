@@ -46,6 +46,7 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -7361,6 +7362,7 @@ private fun MorphSegmented(
     val trackPad = 4.dp
     val gap = 4.dp
     val trackHeight = if (options.any { it.icon != null }) 48.dp else 44.dp
+    val haptics = LocalHaptics.current
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = buttonContainer(),
@@ -7371,11 +7373,25 @@ private fun MorphSegmented(
             // Exact per-segment width so the highlight is flush with each pill's own
             // edges — no residual gap between the highlight and the track border.
             val segWidth = (maxWidth - gap * (n - 1)) / n
+            val density = LocalDensity.current
+            val stepPx = with(density) { (segWidth + gap).toPx() }
+            val maxXPx = with(density) { (segWidth * (n - 1) + gap * (n - 1)).toPx() }
+
+            // While the finger is down, the highlight tracks it 1:1 (no spring lag);
+            // on release it snaps to a real selection and springs — "drag it and it
+            // bounces to wherever you let go" — instead of only responding to a tap.
+            var dragXPx by remember { mutableStateOf<Float?>(null) }
+            val restingX = (segWidth + gap) * selectedIndex
             val indicatorX by animateDpAsState(
-                targetValue = (segWidth + gap) * selectedIndex,
-                animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
+                animationSpec = if (dragXPx != null) snap()
+                                else spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
                 label = "segIndicatorX",
             )
+
+            fun indexFor(xPx: Float): Int =
+                (xPx / stepPx).roundToInt().coerceIn(0, n - 1)
+
             Box(
                 Modifier
                     .offset(x = indicatorX)
@@ -7383,7 +7399,30 @@ private fun MorphSegmented(
                     .fillMaxHeight()
                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp)),
             )
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(n, stepPx) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { offset -> dragXPx = offset.x.coerceIn(0f, maxXPx) },
+                            onHorizontalDrag = { change, _ ->
+                                change.consume()
+                                dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                            },
+                            onDragEnd = {
+                                val x = dragXPx ?: return@detectHorizontalDragGestures
+                                val idx = indexFor(x)
+                                dragXPx = null
+                                if (options[idx].key != selectedKey) {
+                                    haptics?.tick()
+                                    onSelect(options[idx].key)
+                                }
+                            },
+                            onDragCancel = { dragXPx = null },
+                        )
+                    },
+                horizontalArrangement = Arrangement.spacedBy(gap),
+            ) {
                 options.forEachIndexed { i, opt ->
                     val selected = i == selectedIndex
                     val fg by androidx.compose.animation.animateColorAsState(
@@ -7399,7 +7438,7 @@ private fun MorphSegmented(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                                onClick = { onSelect(opt.key) },
+                                onClick = { if (opt.key != selectedKey) { haptics?.tick(); onSelect(opt.key) } },
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
