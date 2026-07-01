@@ -1056,7 +1056,14 @@ class BlooWidget : GlanceAppWidget() {
                 // Pills sit directly in the outer Row (not a nested weighted Row) —
                 // RemoteViews weight distribution is unreliable two levels deep on
                 // some launchers, which left pills undersized and text clipped.
-                val allowLabel = pillH >= 52.dp && w >= 280.dp
+                // allowLabel used to gate on total widget width alone, not how much
+                // of that width each of the (always exactly 4) button slots actually
+                // gets once infoW and the gaps are subtracted — a wide-enough widget
+                // with a wide infoW could still hand each button too little room for
+                // a label like "Unlocked", overflowing past the pill's own edge.
+                val buttonAreaW = (w - hPad * 2 - infoW - 8.dp - gap * 3).coerceAtLeast(0.dp)
+                val perButtonW = buttonAreaW / 4
+                val allowLabel = pillH >= 52.dp && perButtonW >= 76.dp
                 val shown = actions.take(4)
                 val padCount = (4 - shown.size).coerceAtLeast(0)
                 shown.forEachIndexed { i, action ->
@@ -1574,10 +1581,17 @@ class BlooWidget : GlanceAppWidget() {
         val corner = if (st.isLockAction && snap?.locked == false) pillH * 0.22f else baseCorner
 
         val showLabel = allowLabel && pillH >= 44.dp
-        // Icon caps used to stay flat (20dp/24dp) even as pillH grew well past 56dp,
-        // leaving a big empty-looking pill around a small fixed icon.
-        val iconSize = if (showLabel) (pillH * 0.34f).coerceIn(14.dp, 30.dp)
-                       else (pillH * 0.46f).coerceIn(14.dp, 36.dp)
+        // Sizing here is height-driven (pillH) but the pill's actual WIDTH is
+        // decided independently by the caller (a defaultWeight() share of
+        // whatever's left after the info column and up to 3 sibling buttons) —
+        // scaling icons up too aggressively from height alone risks overflowing
+        // a narrow multi-button row's actual width, which is exactly the "cut
+        // off" symptom text clipping and icon overflow both look like. Kept
+        // modest: callers now gate showLabel on an estimated per-button width
+        // (see allowLabel in WideRowBody/ButtonGrid) rather than icon size
+        // trying to compensate after the fact.
+        val iconSize = if (showLabel) (pillH * 0.30f).coerceIn(14.dp, 22.dp)
+                       else (pillH * 0.36f).coerceIn(14.dp, 26.dp)
         val fg = theme.onAccent
         Box(
             modifier = modifier
@@ -1611,11 +1625,15 @@ class BlooWidget : GlanceAppWidget() {
                     )
                     Spacer(GlanceModifier.height(3.dp))
                     Text(
+                        // Flat 10sp regardless of pillH: allowLabel is now gated on
+                        // estimated per-button width (not just height), so a taller
+                        // pill no longer implies there's horizontal room to spare —
+                        // scaling this up risked overflowing a narrow multi-button row.
                         displayLabel,
                         maxLines = 1,
-                        style = TextStyle(color = fg, fontSize = if (pillH >= 64.dp) 13.sp else 10.sp, fontWeight = FontWeight.Medium),
+                        style = TextStyle(color = fg, fontSize = 10.sp, fontWeight = FontWeight.Medium),
                     )
-}
+                }
             } else {
                 Image(
                     provider = ImageProvider(st.iconRes),
