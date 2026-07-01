@@ -31,7 +31,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +60,7 @@ import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.ui.BlooTheme
 import com.bloo.bluelink.ui.Haptics
 import com.bloo.bluelink.ui.LocalHaptics
+import com.bloo.bluelink.ui.LocalReduceMotion
 import com.bloo.bluelink.ui.MorphButton
 import com.bloo.bluelink.ui.MorphButtonLabel
 import com.bloo.bluelink.ui.MorphChip
@@ -318,11 +318,18 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                         Text("Text size", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         Text("${"%.1f".format(textScale)}×", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Slider(
+                    com.bloo.uicommon.AnimatedSlider(
                         value = textScale,
                         onValueChange = { textScale = it },
                         valueRange = 0.8f..1.4f,
                         steps = 5,
+                        accent = MaterialTheme.colorScheme.primary,
+                        inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        dotOnActive = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                        dotOnInactive = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        reduceMotion = LocalReduceMotion.current,
+                        onStepTick = { haptics.tick() },
+                        onSettle = { haptics.click() },
                     )
                 }
 
