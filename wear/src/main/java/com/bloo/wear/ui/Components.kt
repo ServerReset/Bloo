@@ -348,12 +348,14 @@ fun MorphButton(
         label = "morphPressScale",
     )
     // Phone's buttonContainer() lerps from surfaceContainerHighest (the most
-    // elevated tonal step) toward onSurface by 18-20%. Wear's ColorScheme has
-    // no surfaceContainerHighest, so this based off surfaceContainerHigh (one
-    // step darker) — lerping by the same 18% left buttons reading almost flat
-    // against the card behind them. Lerp further to compensate for the lower
-    // starting tone.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.32f)
+    // elevated tonal step) toward onSurface by 18-20%. Wear's ColorScheme has no
+    // surfaceContainerHighest, so this is based on surfaceContainerHigh (one step
+    // darker) — matching the phone's 18-20% left buttons reading almost flat
+    // against the card behind them, and even the first bump to 32% still wasn't
+    // enough against a dark SectionCard background. Lerp substantially further —
+    // the button needs to read as a clearly distinct, tappable surface, not just
+    // a slightly-different shade of the same card.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
     val bg by animateColorAsState(
         targetValue = if (active) activeColor else containerColor,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -377,7 +379,7 @@ fun MorphButton(
             disabledContainerColor = bg,
             disabledContentColor = resolvedContent.copy(alpha = 0.38f),
         ),
-        border = if (active || pending) null else BorderStroke(1.dp, scheme.outline.copy(alpha = 0.6f)),
+        border = if (active || pending) null else BorderStroke(1.5.dp, scheme.outline.copy(alpha = 0.85f)),
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold) },
         secondaryLabel = secondaryLabel?.let { s ->
             { Text(s, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -416,9 +418,10 @@ fun MorphSegmented(
     val gap = 4.dp
     val trackHeight = 40.dp
     val haptics = LocalHapticFeedback.current
-    // Same fix as MorphButton: surfaceContainerHigh lerped by only 18% read
-    // almost flat against the card behind it.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.32f)
+    // Same fix as MorphButton, and the same higher 0.45 value now that 0.32
+    // still wasn't enough — surfaceContainerHigh lerped too little read almost
+    // flat against the card behind it.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
     Box(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(containerColor),
     ) {
