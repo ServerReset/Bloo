@@ -2333,6 +2333,7 @@ private fun VerticalPagerDots(
     val pxPerPage = with(density) { 14.dp.toPx() }
     // Shared flag so the parent HorizontalPager can lock car-switching swipes.
     val coverScrubbing = LocalCoverScrubbing.current
+    val haptics = LocalHaptics.current
 
     // Drag down → higher page index (later tiles); drag up → lower index (earlier tiles).
     val scrubTargetPage by remember {
@@ -2340,8 +2341,11 @@ private fun VerticalPagerDots(
             (scrubStartPage + (scrubAccumY / pxPerPage).roundToInt()).coerceIn(0, count - 1)
         }
     }
+    // Same tick-per-step convention as AnimatedSlider/MorphSegmented; the first
+    // firing (right as scrubbing starts) doubles as a "scrub mode entered" tick,
+    // matching ReorderColumn's onDragStart tick for the analogous pebble-drag gesture.
     LaunchedEffect(scrubTargetPage, scrubbing) {
-        if (scrubbing) onPageJump(scrubTargetPage)
+        if (scrubbing) { haptics?.tick(); onPageJump(scrubTargetPage) }
     }
 
     fun tileName(t: String) = when (t) {
@@ -2458,7 +2462,9 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     // (otherwise text on the cover screen falls back to the default black).
     Surface(
         modifier = Modifier.fillMaxSize().graphicsLayer(alpha = alpha.value, translationY = offsetY.value),
-        shape = RoundedCornerShape(18.dp),
+        // Matches PebbleCornerExpanded so the "main" tile's corners agree with the
+        // other (Pebble-wrapped) tiles it shares the same VerticalPager with.
+        shape = RoundedCornerShape(PebbleCornerExpanded),
         color = scheme.surfaceContainer,
         contentColor = scheme.onSurface,
     ) {
@@ -2487,12 +2493,8 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                         color = scheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = { vm.refreshStatus(v) }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = scheme.onSurface)
-                    }
-                    IconButton(onClick = { vm.openSettings() }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = scheme.onSurface)
-                    }
+                    FloatingIcon(Icons.Filled.Refresh, "Refresh", { vm.refreshStatus(v) })
+                    FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() })
                 }
                 // Centre the live-status + lock group so the tile reads as one
                 // balanced block instead of top-clustered with a big gap below.
@@ -2500,7 +2502,10 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                 LastUpdatedLabel(v, state)
                 ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
                 Spacer(Modifier.height(6.dp))
-                PrimaryActions(v, state, vm)
+                // Flush with the 14 dp tile padding already on this Column, unlike
+                // the dual-column/pebble callers' extra 26 dp start inset - cover
+                // screens are narrow enough that the label text needs the width.
+                PrimaryActions(v, state, vm, contentPadding = PaddingValues(0.dp))
                 Spacer(Modifier.weight(1f))
             }
         }
@@ -3586,7 +3591,12 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 }
 
 @Composable
-private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
+private fun PrimaryActions(
+    v: Vehicle,
+    state: UiState,
+    vm: AppViewModel,
+    contentPadding: PaddingValues = PaddingValues(start = 26.dp, end = 8.dp),
+) {
     val status = state.statusFor(v)
     // Was lock/unlock only despite the plural name — the dual-column expanded
     // view and the cover-screen main tile both lean on this for "the car's quick
@@ -3598,7 +3608,7 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     // itself does.
     var savedClimate by remember(v.vin) { mutableStateOf<ClimateRequest?>(null) }
     LaunchedEffect(v.vin) { savedClimate = vm.loadSavedClimate(v) }
-    Column(Modifier.fillMaxWidth().padding(start = 26.dp, end = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(contentPadding)) {
         StateControl(
             name = "",
             isOn = status?.doorLock,
