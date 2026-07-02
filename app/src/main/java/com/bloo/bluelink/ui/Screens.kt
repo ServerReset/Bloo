@@ -3006,12 +3006,21 @@ private fun AnimatedSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
     accent: Color = MaterialTheme.colorScheme.primary,
+    // Fired once, with the final value, when the drag/tap settles — for callers
+    // whose real commit is expensive (see the Vibrancy/UI-scale sliders, which
+    // otherwise call onValueChange on every drag tick and each one recomposes
+    // the whole app since they feed BlooTheme's colorScheme/LocalDensity). Those
+    // should update local/visual state cheaply in onValueChange and do the
+    // actual expensive write here instead, matching "sync on commit" everywhere
+    // else in the app.
+    onValueSettled: ((Float) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
+    var latestValue by remember { mutableFloatStateOf(value) }
     com.bloo.uicommon.AnimatedSlider(
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = { latestValue = it; onValueChange(it) },
         valueRange = valueRange,
         steps = steps,
         accent = accent,
@@ -3020,7 +3029,7 @@ private fun AnimatedSlider(
         dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
         reduceMotion = LocalReduceMotion.current,
         onStepTick = { haptics?.tick() },
-        onSettle = { haptics?.click() },
+        onSettle = { haptics?.click(); onValueSettled?.invoke(latestValue) },
     )
 }
 
@@ -6580,12 +6589,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                StepRow("Vibrancy", vibrancyLabel(appearance.vibrancy))
+                // Vibrancy feeds BlooTheme's colorScheme, which wraps ~the whole app --
+                // committing on every drag tick (vm.setVibrancy -> DataStore -> Flow ->
+                // recompose everything under MaterialTheme) made every tick an app-wide
+                // recompose, dropping frames badly enough that the settle bounce looked
+                // like it cut short. Draft locally while dragging; only commit on release.
+                var vibrancyDraft by remember(appearance.vibrancy) { mutableFloatStateOf(appearance.vibrancy) }
+                StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
                 AnimatedSlider(
-                    value = appearance.vibrancy,
-                    onValueChange = { vm.setVibrancy((it * 10).roundToInt() / 10f) },
+                    value = vibrancyDraft,
+                    onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
                     valueRange = 0f..2f,
                     steps = 19,
+                    onValueSettled = { vm.setVibrancy(vibrancyDraft) },
                 )
 
                 if (showEditor) {
@@ -6603,12 +6619,18 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Display scale
             SettingsCard("Display") {
-                StepRow("Text & layout scale", "${(appearance.uiScale * 100).roundToInt()}%")
+                // Same deferred-commit pattern as Vibrancy above: uiScale feeds
+                // BlooTheme's LocalDensity override for ~the whole app, so committing
+                // every drag tick recomposed everything and dropped frames badly
+                // enough to look like the settle bounce cut short.
+                var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
+                StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
                 AnimatedSlider(
-                    value = appearance.uiScale,
-                    onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
+                    value = uiScaleDraft,
+                    onValueChange = { uiScaleDraft = (it * 20).roundToInt() / 20f },
                     valueRange = 0.85f..1.3f,
                     steps = 8,
+                    onValueSettled = { vm.setUiScale(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
                 // Global temperature unit, applied everywhere temperatures show.
@@ -7182,21 +7204,30 @@ private fun SettingsSearchResults(
         ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
     }
     add("Text & layout scale", "display size zoom bigger") {
-        StepRow("Scale", "${(appearance.uiScale * 100).roundToInt()}%")
+        // Deferred-commit, same as the main Display card's slider: uiScale feeds
+        // BlooTheme's LocalDensity for ~the whole app, so committing every drag
+        // tick recomposed everything and dropped frames badly enough to look
+        // like the settle bounce cut short.
+        var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
+        StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
         AnimatedSlider(
-            value = appearance.uiScale,
-            onValueChange = { vm.setUiScale((it * 20).roundToInt() / 20f) },
+            value = uiScaleDraft,
+            onValueChange = { uiScaleDraft = (it * 20).roundToInt() / 20f },
             valueRange = 0.85f..1.3f,
             steps = 8,
+            onValueSettled = { vm.setUiScale(uiScaleDraft) },
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
-        StepRow("Vibrancy", vibrancyLabel(appearance.vibrancy))
+        // Deferred-commit, same as the main Appearance card's slider — see there.
+        var vibrancyDraft by remember(appearance.vibrancy) { mutableFloatStateOf(appearance.vibrancy) }
+        StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
         AnimatedSlider(
-            value = appearance.vibrancy,
-            onValueChange = { vm.setVibrancy((it * 10).roundToInt() / 10f) },
+            value = vibrancyDraft,
+            onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
             valueRange = 0f..2f,
             steps = 19,
+            onValueSettled = { vm.setVibrancy(vibrancyDraft) },
         )
     }
     add("Open links in app", "browser tab links") {
