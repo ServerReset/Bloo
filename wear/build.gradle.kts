@@ -17,6 +17,9 @@ android {
         versionCode = 1
         versionName = "0.1"
         vectorDrawables { useSupportLibrary = true }
+        // See app/build.gradle.kts - same CI run produces both APKs, so this is
+        // the same value baked into the phone build.
+        buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     signingConfigs {

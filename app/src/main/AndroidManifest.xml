@@ -9,11 +9,6 @@
          The app works fine without it (a place can be typed in Settings instead). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Bloo isn't distributed via Play Store, so in-app self-update installs a
-         downloaded APK directly — this is the per-app "install unknown apps"
-         grant the system requires for that (still gated by a user toggle). -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-
     <!-- So we can detect the official apps and open web/dial/custom-tab links.
          Android 11+ hides other packages unless declared here; without these the
          digital-key and wallet apps can't be launched and we'd fall back to URLs. -->
@@ -234,18 +229,6 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@style/Theme.Bloo.Transparent" />
-
-        <!-- Serves the downloaded update APK to the system Package Installer as a
-             content:// URI (installers on API 24+ can't be handed a raw file://). -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
 
     </application>
 

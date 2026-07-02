@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Matches Context.getExternalFilesDir(DIRECTORY_DOWNLOADS), where
-         UpdateDownloader writes the downloaded APK via DownloadManager. -->
-    <external-files-path name="updates" path="Download/" />
-</paths>

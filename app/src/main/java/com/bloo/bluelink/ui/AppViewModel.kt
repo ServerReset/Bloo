@@ -145,11 +145,9 @@ data class UiState(
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
     val message: String? = null,
-    /** A newer release than what's installed, if the update checker found one
-     *  the user hasn't already dismissed. */
+    /** A newer CI build than what's installed, if the update checker found one
+     *  and it hasn't been dismissed this session or snoozed. */
     val updateInfo: com.bloo.bluelink.update.UpdateInfo? = null,
-    /** True while the update APK is downloading (drives the prompt's button state). */
-    val updateDownloading: Boolean = false,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 
@@ -291,6 +289,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SettingsStore.NotificationPrefs(),
         )
 
+    private val updateStore = com.bloo.bluelink.data.UpdateStore(app)
+
+    val updateChecksEnabled: StateFlow<Boolean> =
+        updateStore.checksEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
         alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions) }
@@ -365,7 +368,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-        // Bloo isn't on the Play Store, so check its own GitHub-release update
+        // Bloo isn't on the Play Store, so check its own GitHub Actions build
         // channel once per cold start (debounced internally — see UpdateChecker).
         viewModelScope.launch {
             val info = runCatching { com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication()) }.getOrNull()
@@ -993,31 +996,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
     }
 
-    // --- App self-update (GitHub releases; Bloo isn't on the Play Store) ---
+    // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
 
-    /** "Not now": stop nagging for this exact release; a newer one still prompts. */
-    fun dismissUpdate() {
-        val versionCode = _state.value.updateInfo?.release?.versionCode ?: return
+    /** "Not now": the checker only ever runs once per cold start anyway (its
+     *  own debounce), so just clearing the in-memory prompt is enough - no
+     *  persisted state needed. */
+    fun dismissUpdate() = _state.update { it.copy(updateInfo = null) }
+
+    /** "Remind me in a few days": persists a snooze that outlasts the checker's
+     *  normal debounce window too. */
+    fun snoozeUpdate() {
         _state.update { it.copy(updateInfo = null) }
-        viewModelScope.launch { com.bloo.bluelink.update.UpdateChecker.dismiss(getApplication(), versionCode) }
+        viewModelScope.launch { com.bloo.bluelink.update.UpdateChecker.snooze(getApplication()) }
     }
 
-    /** Download the phone APK, then hand it to the system installer. Permission
-     *  gating (unknown-sources) is the UI layer's job, since it needs an
-     *  Activity to launch the Settings screen from. */
-    fun downloadAndInstallUpdate() {
-        val url = _state.value.updateInfo?.phoneAsset?.downloadUrl ?: return
-        _state.update { it.copy(updateDownloading = true) }
-        viewModelScope.launch {
-            val app = getApplication<Application>()
-            val apk = com.bloo.bluelink.update.UpdateDownloader.download(app, url)
-            _state.update { it.copy(updateDownloading = false) }
-            if (apk != null) {
-                com.bloo.bluelink.update.UpdateInstaller.install(app, apk)
-            } else {
-                _state.update { it.copy(message = "Update download failed — try again later.") }
-            }
-        }
+    fun setUpdateChecksEnabled(enabled: Boolean) {
+        viewModelScope.launch { updateStore.setChecksEnabled(enabled) }
+        if (!enabled) _state.update { it.copy(updateInfo = null) }
     }
 
     // --- On-device AI (Gemini Nano) --------------------------------------

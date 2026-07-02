@@ -52,13 +52,13 @@ jobs:
           path: wear/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-  # Publishes a GitHub Release with both APKs attached, so UpdateApi (in-app
-  # self-update, since Bloo isn't on the Play Store) has something to check
-  # against. Only runs on a version tag push (e.g. "v3") — never on ordinary
-  # branch pushes or PRs, so it doesn't touch the build job above at all.
-  # Tag the number as the app's versionCode (app/build.gradle.kts,
-  # wear/build.gradle.kts) so UpdateChecker's tag -> versionCode comparison
-  # is well-formed: `git tag v3 && git push origin v3`.
+  # Publishes a GitHub Release with both APKs attached, for anyone who wants a
+  # stable, tagged build to grab directly. Only runs on a version tag push
+  # (e.g. "v3") — never on ordinary branch pushes or PRs, so it doesn't touch
+  # the build job above at all. The in-app update checker does NOT use this —
+  # tagged releases are rare/manual, so it instead compares against the build
+  # job's own run_number (baked into BuildConfig.BUILD_RUN_NUMBER), which
+  # exists for every ordinary push. See UpdateApi/UpdateChecker.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build

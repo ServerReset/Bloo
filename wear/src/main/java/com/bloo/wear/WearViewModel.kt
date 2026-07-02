@@ -31,6 +31,7 @@ import com.bloo.bluelink.data.repositoryFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -41,6 +42,9 @@ import java.util.Locale
 import kotlin.coroutines.resume
 
 enum class WearScreen { Loading, SignedOut, Ready }
+
+private const val UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
+private const val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L // 3 days
 
 /** A fully resolved per-car view, merging live status with the phone snapshot. */
 data class CarView(
@@ -131,10 +135,11 @@ data class WearUi(
     /** Optimistic per-car pebble orders the watch just set, held until the phone
      *  echoes the same order back via [settings]. */
     val pebbleOverride: Map<String, List<String>> = emptyMap(),
-    /** A newer watch build has shipped. Informational only — Wear OS has no
-     *  reliable on-device sideload flow, so this just points the user at the
-     *  phone rather than offering to install anything itself. */
-    val updateAvailable: Boolean = false,
+    /** A newer CI build than what's installed, if found and not snoozed/disabled.
+     *  Wear OS has no reliable on-device sideload flow, so acting on this opens
+     *  the run's page on the connected phone rather than installing anything
+     *  on the watch itself. */
+    val updateRun: com.bloo.bluelink.data.WorkflowRun? = null,
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
 
@@ -218,15 +223,23 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             WearClimateStore(ctx).flow.collect { remote -> mergeRemoteClimate(remote) }
         }
-        // A lightweight, independent check (same GitHub-release endpoint the
+        // A lightweight, independent check (same GitHub Actions endpoint the
         // phone uses, in :shared) — Wear OS has no reliable on-device sideload
-        // flow, so this only surfaces a passive banner pointing at the phone,
-        // never a download/install action on the watch itself.
+        // flow, so acting on this opens the run page on the connected phone
+        // rather than downloading/installing anything on the watch itself.
         viewModelScope.launch {
-            val release = runCatching { com.bloo.bluelink.data.UpdateApi.fetchLatestRelease() }.getOrNull()
-            val remoteCode = release?.versionCode
-            if (remoteCode != null && remoteCode > com.bloo.wear.BuildConfig.VERSION_CODE) {
-                _ui.update { it.copy(updateAvailable = true) }
+            if (com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER <= 0) return@launch
+            val settings = localStore.flow.first()
+            if (!settings.updateChecksEnabled) return@launch
+            val now = System.currentTimeMillis()
+            if (now - settings.updateLastCheckedAt < UPDATE_CHECK_INTERVAL_MS) return@launch
+            localStore.setUpdateLastCheckedAt(now)
+            if (now < settings.updateSnoozeUntil) return@launch
+            val run = runCatching {
+                com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH)
+            }.getOrNull()
+            if (run != null && run.runNumber > com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER) {
+                _ui.update { it.copy(updateRun = run) }
             }
         }
         bootstrap()
@@ -563,6 +576,31 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setAcLimit(value: Int) { _ui.update { it.copy(acLimitDraft = value.coerceIn(50, 100)) } }
     fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
     fun dismissMessage() { _ui.update { it.copy(message = null) } }
+
+    // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
+
+    /** "Not now": the checker only runs once per cold start anyway (its own
+     *  debounce), so clearing the in-memory banner is enough. */
+    fun dismissUpdate() = _ui.update { it.copy(updateRun = null) }
+
+    /** "Remind me in a few days": persists a snooze that outlasts the checker's
+     *  normal debounce window too. */
+    fun snoozeUpdate() {
+        _ui.update { it.copy(updateRun = null) }
+        viewModelScope.launch { localStore.setUpdateSnoozeUntil(System.currentTimeMillis() + UPDATE_SNOOZE_MS) }
+    }
+
+    fun setUpdateChecksEnabled(enabled: Boolean) {
+        viewModelScope.launch { localStore.setUpdateChecksEnabled(enabled) }
+        if (!enabled) _ui.update { it.copy(updateRun = null) }
+    }
+
+    /** Wear OS has no reliable on-device sideload flow, so this opens the
+     *  build's page on the connected phone instead. */
+    fun openUpdateOnPhone() {
+        val url = _ui.value.updateRun?.htmlUrl ?: return
+        com.bloo.wear.WearRemote.openOnPhone(ctx, url)
+    }
 
     fun setFontScale(scale: Float) {
         viewModelScope.launch {

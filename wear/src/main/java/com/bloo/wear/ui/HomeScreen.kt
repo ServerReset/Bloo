@@ -1231,21 +1231,32 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         pending = false,
         onClick = { onReorder(car.vin) },
     )
-    // Informational only: Wear OS has no reliable on-device sideload flow, so
-    // this points the user at the phone rather than offering to install
-    // anything itself (see WearViewModel's update check).
-    if (ui.updateAvailable) {
+    // Wear OS has no reliable on-device sideload flow, so tapping this opens
+    // the build's GitHub Actions page on the connected phone instead of
+    // downloading/installing anything on the watch itself. "Remind me later"
+    // is the only dismiss offered here (vs. phone's "Not now" + snooze) -
+    // this banner sits passively in an already-scrollable list rather than
+    // interrupting like a dialog, so simply scrolling past it already serves
+    // as a lightweight "not now"; full opt-out is the Settings toggle.
+    if (ui.updateRun != null) {
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Filled.Refresh, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
-            Text(
-                "A watch update is ready — open Bloo on your phone to install it.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        MorphButton(
+            label = "Update available",
+            icon = Icons.Filled.Refresh,
+            active = true,
+            activeColor = accent,
+            pending = false,
+            onClick = { vm.openUpdateOnPhone() },
+        )
+        Spacer(Modifier.height(4.dp))
+        MorphButton(
+            label = "Remind me later",
+            icon = Icons.Filled.Close,
+            active = false,
+            activeColor = accent,
+            pending = false,
+            onClick = { vm.snoozeUpdate() },
+        )
     }
 }
 

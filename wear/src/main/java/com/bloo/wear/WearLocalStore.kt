@@ -1,8 +1,10 @@
 package com.bloo.wear
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -131,6 +133,10 @@ data class WearLocalSettings(
     /** Per pool-slot pinned car VIN; null = unconfigured (follows the selected car).
      *  Sized [WearTilePool.SIZE]. */
     val tileCarVins: List<String?> = List(WearTilePool.SIZE) { null },
+    /** Update-check debounce/snooze/enable state - see WearViewModel's check. */
+    val updateChecksEnabled: Boolean = true,
+    val updateLastCheckedAt: Long = 0L,
+    val updateSnoozeUntil: Long = 0L,
 )
 
 /** The actions a Tile chip can perform, in canonical order. */
@@ -142,6 +148,9 @@ class WearLocalStore(private val context: Context) {
     private val keyTileOrder = stringPreferencesKey("tile_order")
     private val keyTileActions = stringPreferencesKey("tile_actions")
     private fun keyTileCarVin(index: Int) = stringPreferencesKey("tile_car_vin_$index")
+    private val keyUpdateChecksEnabled = booleanPreferencesKey("update_checks_enabled")
+    private val keyUpdateLastCheckedAt = longPreferencesKey("update_last_checked_at")
+    private val keyUpdateSnoozeUntil = longPreferencesKey("update_snooze_until")
 
     // Pre-pool single-tile setting; migrated into slot 0 the first time that slot
     // is touched, and read as a fallback for slot 0 until then.
@@ -170,11 +179,26 @@ class WearLocalStore(private val context: Context) {
             tileOrder = merged,
             tileActions = actions,
             tileCarVins = tileCarVins,
+            updateChecksEnabled = prefs[keyUpdateChecksEnabled] ?: true,
+            updateLastCheckedAt = prefs[keyUpdateLastCheckedAt] ?: 0L,
+            updateSnoozeUntil = prefs[keyUpdateSnoozeUntil] ?: 0L,
         )
     }
 
     suspend fun setFontScale(f: Float) {
         context.wearLocalStore.edit { it[keyFontScale] = f.coerceIn(0.8f, 1.4f) }
+    }
+
+    suspend fun setUpdateChecksEnabled(enabled: Boolean) {
+        context.wearLocalStore.edit { it[keyUpdateChecksEnabled] = enabled }
+    }
+
+    suspend fun setUpdateLastCheckedAt(millis: Long) {
+        context.wearLocalStore.edit { it[keyUpdateLastCheckedAt] = millis }
+    }
+
+    suspend fun setUpdateSnoozeUntil(millis: Long) {
+        context.wearLocalStore.edit { it[keyUpdateSnoozeUntil] = millis }
     }
 
     suspend fun setTileOrder(order: List<String>) {

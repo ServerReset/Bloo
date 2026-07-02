@@ -462,7 +462,7 @@ fun BlooApp(vm: AppViewModel) {
         // biometric prompt and an update prompt never compete for attention.
         if (!state.locked) {
             state.updateInfo?.let { info ->
-                UpdatePromptDialog(info = info, downloading = state.updateDownloading, vm = vm)
+                UpdatePromptDialog(info = info, vm = vm)
             }
         }
     }
@@ -1599,70 +1599,48 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 
 /**
  * Bloo isn't on the Play Store, so this is its own update surface: shown once
- * per new GitHub release the user hasn't dismissed. "Update" downloads the APK
- * via the system DownloadManager, then hands it to the Package Installer —
- * requesting the "install unknown apps" grant first if it isn't already on.
- * The watch can't sideload reliably (Wear OS has no general on-device install
- * flow), so a wear asset is surfaced as a link to the release page instead of
- * an in-app install action.
+ * per cold start when a newer GitHub Actions build than this one has landed
+ * on the default branch. Actions artifacts need a GitHub-authenticated
+ * browser session to download (the app itself has no token to fetch them
+ * with), so the primary action opens the run's page rather than downloading
+ * anything in-app — both the phone and watch APKs are attached there.
  */
 @Composable
-private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, downloading: Boolean, vm: AppViewModel) {
+private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: AppViewModel) {
     val context = LocalContext.current
-    val unknownSourcesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (com.bloo.bluelink.update.UpdateInstaller.canInstall(context)) vm.downloadAndInstallUpdate()
-    }
     AlertDialog(
-        onDismissRequest = { if (!downloading) vm.dismissUpdate() },
+        onDismissRequest = vm::dismissUpdate,
         title = { Text("Update available") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("${info.release.name} is ready to install.")
-                if (info.release.notes.isNotBlank()) {
-                    Text(
-                        info.release.notes,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (info.wearAsset != null) {
-                    Text(
-                        "A watch update is included too. Wear OS can't install it directly — " +
-                            "open the release page on a computer or the watch's browser and sideload " +
-                            "${info.wearAsset.name} the same way you installed Bloo.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    MorphTextButton(
-                        "Open release page",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.release.htmlUrl)))
-                            }
-                        },
-                    )
-                }
+                Text("Build #${info.run.runNumber} is ready on GitHub Actions.")
+                Text(
+                    "Open the run page to download the phone and watch APKs and install " +
+                        "them the same way you installed Bloo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                MorphTextButton(
+                    "Remind me in 3 days",
+                    onClick = vm::snoozeUpdate,
+                )
             }
         },
         confirmButton = {
             MorphButton(
                 onClick = {
-                    if (com.bloo.bluelink.update.UpdateInstaller.canInstall(context)) {
-                        vm.downloadAndInstallUpdate()
-                    } else {
-                        unknownSourcesLauncher.launch(com.bloo.bluelink.update.UpdateInstaller.unknownSourcesSettingsIntent(context))
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
                     }
+                    vm.dismissUpdate()
                 },
-                enabled = !downloading && info.phoneAsset != null,
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
             ) {
-                if (downloading) LoadingIndicator() else Text("Update", fontWeight = FontWeight.SemiBold)
+                Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
-            MorphTextButton("Not now", vm::dismissUpdate, enabled = !downloading)
+            MorphTextButton("Not now", vm::dismissUpdate)
         },
     )
 }
@@ -6254,6 +6232,7 @@ private fun SettingsScreen(vm: AppViewModel) {
     val notif by vm.notifications.collectAsState()
     val state by vm.state.collectAsState()
     val logs by vm.logs.collectAsState()
+    val updateChecksEnabled by vm.updateChecksEnabled.collectAsState()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val canBio = remember { vm.canUseBiometrics() }
@@ -6802,6 +6781,18 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
+            // Updates
+            SettingsCard("Updates") {
+                ToggleRow("Check for updates", updateChecksEnabled) { vm.setUpdateChecksEnabled(it) }
+                Text(
+                    "Bloo isn't on the Play Store, so this checks GitHub Actions for newer " +
+                        "builds instead. When one's found, a prompt lets you open it, snooze " +
+                        "for a few days, or dismiss it for now.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             // Quick Settings tiles
             SettingsCard("Quick tiles") {
                 Text(
@@ -7277,6 +7268,10 @@ private fun SettingsSearchResults(
     }
     add("Open links in app", "browser tab links") {
         ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
+    }
+    add("Check for updates", "update github actions build version") {
+        val updateChecksEnabled by vm.updateChecksEnabled.collectAsState()
+        ToggleRow("Check for updates", updateChecksEnabled) { vm.setUpdateChecksEnabled(it) }
     }
     add("Service due alerts", "notification reminder service") {
         ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }

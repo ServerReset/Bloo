@@ -15,6 +15,12 @@ android {
         versionCode = 1
         versionName = "0.1"
         vectorDrawables { useSupportLibrary = true }
+        // The GitHub Actions run number that produced this APK (0 for a local/dev
+        // build, which UpdateChecker treats as "nothing to compare against" and
+        // skips). Bloo isn't on the Play Store and doesn't reliably cut tagged
+        // Releases, so this - not versionCode - is what "is there a newer build"
+        // actually compares.
+        buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     signingConfigs {
