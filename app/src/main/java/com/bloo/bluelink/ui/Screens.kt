@@ -7851,7 +7851,14 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                 // preset count is user-defined and unbounded) — a real one-of-a-few
                 // single-select, so it gets the segmented control like the others.
                 MorphSegmented(
-                    options = TileActions.map { (key, label, icon) -> SegmentOption(key, label, icon) },
+                    // TileActions' own label ("Lock / unlock") is meant for contexts
+                    // with a full line to itself (the tile's own title); squeezed into
+                    // one of 4 equal segments here it truncated to "Lock / …" with
+                    // barely any of the word actually showing. Short, segment-specific
+                    // label instead — the icon already carries the doors/lock meaning.
+                    options = TileActions.map { (key, label, icon) ->
+                        SegmentOption(key, if (key == "doors") "Lock" else label, icon)
+                    },
                     selectedKey = cmd,
                     onSelect = { key -> vm.setTileAssignment(index, vin, key) },
                 )
