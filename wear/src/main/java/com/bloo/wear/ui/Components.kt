@@ -476,6 +476,13 @@ fun MorphSegmented(
             // rounded up into the next one (e.g. tapping option 3 landing on 4).
             fun indexFor(offsetXPx: Float): Int = (offsetXPx / stepPx).roundToInt().coerceIn(0, n - 1)
 
+            // Which segment reads as "selected" (bold, primary-tinted text) while
+            // dragging — was always selectedIndex (the prop, which only actually
+            // changes once onSelect fires on release), so mid-drag the indicator
+            // pill visibly slid under the finger while the label highlight stayed
+            // frozen on wherever it started. Same fix as the phone version.
+            val visualIndex = dragXPx?.let { indexFor(it) } ?: selectedIndex
+
             Box(
                 Modifier
                     .offset(x = indicatorX)
@@ -546,7 +553,7 @@ fun MorphSegmented(
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
                 options.forEachIndexed { i, opt ->
-                    val selected = i == selectedIndex
+                    val selected = i == visualIndex
                     val fg by animateColorAsState(
                         if (selected) scheme.onPrimary else scheme.onSurfaceVariant,
                         spring(stiffness = Spring.StiffnessMediumLow),

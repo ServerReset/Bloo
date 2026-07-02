@@ -7496,6 +7496,15 @@ fun MorphSegmented(
             fun indexFor(offsetXPx: Float): Int =
                 (offsetXPx / stepPx).roundToInt().coerceIn(0, n - 1)
 
+            // Which segment reads as "selected" (bold, primary-tinted text) while
+            // dragging. Was always selectedIndex — the prop, which only actually
+            // changes once onSelect fires on release — so mid-drag the indicator
+            // pill visibly slid under your finger while every label's bold/dim
+            // state stayed frozen on wherever it started. That mismatch between
+            // "the box that's moving" and "the text that's highlighted" is what
+            // made dragging feel like it wasn't really responding.
+            val visualIndex = dragXPx?.let { indexFor(it) } ?: selectedIndex
+
             Box(
                 Modifier
                     .offset(x = indicatorX)
@@ -7568,7 +7577,7 @@ fun MorphSegmented(
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
                 options.forEachIndexed { i, opt ->
-                    val selected = i == selectedIndex
+                    val selected = i == visualIndex
                     val fg by androidx.compose.animation.animateColorAsState(
                         if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         spring(stiffness = Spring.StiffnessMediumLow),

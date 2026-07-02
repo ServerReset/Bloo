@@ -76,7 +76,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -373,8 +372,7 @@ private fun CarColumn(
                 .focusRequester(focusRequester)
                 .focusable(active),
             state = state,
-            // Flatten the built-in SLC scaling so our own focus-zoom is the single,
-            // predictable source of the shrink/fade (no double-scaling).
+            // No built-in per-item shrink/fade - tiles render at a flat, plain scale.
             scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
             // Horizontal inset keeps card content (headers, right-aligned values)
             // inside the round screen's safe area so nothing clips in the corners.
@@ -382,64 +380,17 @@ private fun CarColumn(
                 horizontal = if (round) 22.dp else 12.dp,
                 vertical = 60.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            // Tighter than the library default (12dp) - tiles are already full-size
+            // now that the shrink-toward-the-edges effect is gone, so the gap
+            // between them is what mostly determines how much fits on screen.
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
-                // Focus-zoom: each tile's whole content is largest when centred and
-                // smoothly shrinks + fades toward BOTH the top and bottom edges, driven
-                // purely by screen position (not card size). `centrality` is a State read
-                // INSIDE graphicsLayer so the per-frame effect runs in the draw phase only
-                // — no recomposition or remeasure of any tile while scrolling.
-                // Second value is the SIGNED center-relative offset (negative = above
-                // the viewport's centerline, positive = below) — used below to pick
-                // which edge the scale-down pivots from.
-                val centrality = remember {
-                    derivedStateOf {
-                        val info = state.layoutInfo
-                        val vh = info.viewportSize.height.toFloat()
-                        if (vh == 0f) return@derivedStateOf 0f to 0f
-                        val vc = vh / 2f
-                        val item = info.visibleItemsInfo.firstOrNull { it.index == i }
-                            ?: return@derivedStateOf 0f to 0f
-                        // item.offset is already center-relative under the library's
-                        // default ItemCenter anchoring (see centerItemIndex above) — 0
-                        // means exactly centered, so no size/2 re-addition is needed.
-                        val signed = item.offset.toFloat() / vc
-                        (1f - abs(signed)).coerceIn(0f, 1f) to signed
-                    }
-                }
-                val edgeScale = if (round) 0.74f else 0.84f
-                // Bold white text at the old 0.45 was still legible enough that a
-                // barely-peeking adjacent tile near the top/bottom edge (behind the
-                // always-on-top CarNameOverlay pill and the system clock) read as
-                // overlapping "ghost" content rather than a faded-out neighbor.
-                val edgeAlpha = 0.16f
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            // Smoothstep the position curve for a softer focus falloff.
-                            val (c, signed) = centrality.value
-                            val eased = c * c * (3f - 2f * c)
-                            val s = edgeScale + (1f - edgeScale) * eased
-                            scaleX = s
-                            scaleY = s
-                            alpha = edgeAlpha + (1f - edgeAlpha) * eased
-                            // A graphicsLayer scale is purely visual — it never changes
-                            // this tile's LAID-OUT height, so the fixed spacedBy() gap to
-                            // its neighbor stays the same regardless of scale. Scaling
-                            // from the tile's own center (the default) shrinks BOTH edges
-                            // inward as it leaves focus, so the edge facing its neighbor
-                            // recedes too — that's the "goes into the background, dead
-                            // space before the next one comes up" gap during a scroll.
-                            // Pivoting from the edge nearest the viewport's centerline
-                            // instead keeps that edge flush against the neighbor closer
-                            // to focus, and only the far edge shrinks away.
-                            transformOrigin = TransformOrigin(0.5f, if (signed < 0f) 1f else 0f)
-                        },
-                ) {
-                    TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
-                }
+                // Plain vertical scroll - tiles render at a fixed scale/alpha regardless
+                // of position. A previous focus-zoom effect (shrink + fade toward the
+                // edges as a tile scrolled off-center) read as tiles receding into the
+                // background with dead space opening up before the next one arrived.
+                TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
 
@@ -711,7 +662,7 @@ private fun SectionCard(
     // position, not just at rest.
     Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
         Column(
-            Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+            Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
         ) {
             if (title != null) {
                 Row(
@@ -733,7 +684,7 @@ private fun SectionCard(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(4.dp))
             }
             content()
         }
@@ -851,7 +802,9 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         onClick = { vm.toggleClimate(car.vin) },
     )
     Spacer(Modifier.height(6.dp))
-    SliderRow("Temp", "${d.tempF}°F", d.tempF, 62, 82, 1, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
+    // 2°F steps, not 1° - the round screen only has room for so many dots before
+    // they crowd into an unreadable smear; halving the count (11 vs 21) fixes that.
+    SliderRow("Temp", "${d.tempF}°F", d.tempF, 62, 82, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
     SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
     MorphButton(
