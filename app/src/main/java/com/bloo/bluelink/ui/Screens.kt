@@ -3459,27 +3459,35 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
-    PrimaryActions(v, state, vm)
+    // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
+    // CompactMainTile) which always wrap it in a Surface that establishes a
+    // readable contentColor. StateControl's status label falls back to
+    // LocalContentColor when not highlighted/off-tinted, and Compose's own
+    // default for that (when nothing upstream ever sets it - the dual-column
+    // controls column isn't itself Surfaced) is opaque black, invisible against
+    // this app's dark theme. That's what read as "no status text next to the
+    // button" here even though the exact same StateControl shows it fine
+    // everywhere else.
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        PrimaryActions(v, state, vm)
+    }
 }
 
 /**
- * The lock/unlock + climate quick controls. Deliberately *not* styled like the
- * other pebbles - it's just the morphing StateControls with their status on the
- * left, with no card, header or expand chevron. It can still be long-pressed
- * and dragged to reorder, like a pebble, even though it doesn't look like one.
- * Was a fixed single-ControlHeight Surface sized for lock/unlock alone; now
- * that PrimaryActions has a second StateControl (climate), it sizes to content
- * instead of clipping the new row.
+ * The lock/unlock quick control. Deliberately *not* styled like the other
+ * pebbles - it's just the morphing StateControl with its status on the left,
+ * with no card, header or expand chevron. It can still be long-pressed and
+ * dragged to reorder, like a pebble, even though it doesn't look like one.
  */
 @Composable
 private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     Surface(
-        modifier = Modifier.fillMaxWidth().then(dragHandle),
+        modifier = Modifier.fillMaxWidth().height(ControlHeight).then(dragHandle),
         shape = RoundedCornerShape(PebbleCornerCollapsed),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
             PrimaryActions(v, state, vm)
         }
     }
@@ -3598,16 +3606,6 @@ private fun PrimaryActions(
     contentPadding: PaddingValues = PaddingValues(start = 26.dp, end = 8.dp),
 ) {
     val status = state.statusFor(v)
-    // Was lock/unlock only despite the plural name — the dual-column expanded
-    // view and the cover-screen main tile both lean on this for "the car's quick
-    // controls," and having just one control here read as if the whole rest of
-    // the status/actions picture had gone missing. Climate is the one other
-    // control every car has (charge is EV/PHEV-only and already gets its own
-    // pebble), so it's the natural second entry — same StateControl vocabulary,
-    // starting from the car's last-used climate settings like the Climate pebble
-    // itself does.
-    var savedClimate by remember(v.vin) { mutableStateOf<ClimateRequest?>(null) }
-    LaunchedEffect(v.vin) { savedClimate = vm.loadSavedClimate(v) }
     Column(Modifier.fillMaxWidth().padding(contentPadding)) {
         StateControl(
             name = "",
@@ -3619,19 +3617,6 @@ private fun PrimaryActions(
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
             highlightWhenOff = true,
             offTextColor = MaterialTheme.colorScheme.error,
-        )
-        Spacer(Modifier.height(4.dp))
-        StateControl(
-            name = "",
-            isOn = status?.airCtrlOn,
-            stateOn = "Climate on", stateOff = "Climate off",
-            turnOn = "Start", turnOff = "Stop",
-            icon = Icons.Filled.AcUnit,
-            pending = state.isPending(v.vin, "climate"),
-            onActivate = {
-                vm.startClimate(v, savedClimate ?: ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
-            },
-            onDeactivate = { vm.stopClimate(v) },
         )
     }
 }
@@ -5120,9 +5105,21 @@ private fun ClimatePebble(
         seatRearLeft = rearLeft,
         seatRearRight = rearRight,
     )
-    // Persist every change so the sliders/toggles are where you left them next open.
+    // Persist once settings stop changing, not on every drag tick - each of the
+    // temp/duration/seat sliders above sets currentReq's backing state directly,
+    // so without a debounce this relaunches (cancelling the previous save) on
+    // every single frame of a drag. saveClimate itself is a cheap async write,
+    // but the sibling publishClimateState effect below updates the shared
+    // ViewModel StateFlow, which the whole screen collects - firing that on
+    // every tick recomposes far more than the slider being dragged and is
+    // exactly what read as "the sliders don't react until long after you
+    // change them." A short delay before either write means once the user
+    // stops moving a control, not every intermediate value it passed through.
     LaunchedEffect(currentReq) {
-        if (settingsLoaded) vm.saveClimate(v, currentReq)
+        if (settingsLoaded) {
+            delay(400)
+            vm.saveClimate(v, currentReq)
+        }
     }
 
     val presets = state.climatePresets[v.vin].orEmpty()
@@ -5162,9 +5159,15 @@ private fun ClimatePebble(
         rearRight = SeatLevel.fromApi(r.seatRearRight)
         activePresetId = r.activePresetId
     }
-    // Publish our draft so the watch mirrors it (no-ops when unchanged).
+    // Publish our draft so the watch mirrors it (no-ops when unchanged). This
+    // writes to the shared ViewModel StateFlow that the whole screen collects,
+    // so - like saveClimate above - it's debounced to fire once settings stop
+    // changing rather than recomposing the entire screen on every drag tick.
     LaunchedEffect(currentReq, activePresetId) {
-        if (settingsLoaded) vm.publishClimateState(v.vin, activePresetId, currentReq)
+        if (settingsLoaded) {
+            delay(400)
+            vm.publishClimateState(v.vin, activePresetId, currentReq)
+        }
     }
 
     val climateOn = status?.airCtrlOn == true
@@ -6637,7 +6640,12 @@ private fun SettingsScreen(vm: AppViewModel) {
                     onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
                     valueRange = 0f..2f,
                     steps = 19,
-                    onValueSettled = { vm.setVibrancy(vibrancyDraft) },
+                    // A beat after release, not synchronously in onSettle: firing the
+                    // app-wide recompose in the same instant the settle-bounce spring
+                    // starts made that recompose compete with the bounce for frame
+                    // budget, which is what read as the bounce stalling/cutting short
+                    // even with the commit already limited to once-per-release.
+                    onValueSettled = { settingsScope.launch { delay(150); vm.setVibrancy(vibrancyDraft) } },
                 )
 
                 if (showEditor) {
@@ -6666,7 +6674,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     onValueChange = { uiScaleDraft = (it * 20).roundToInt() / 20f },
                     valueRange = 0.85f..1.3f,
                     steps = 8,
-                    onValueSettled = { vm.setUiScale(uiScaleDraft) },
+                    onValueSettled = { settingsScope.launch { delay(150); vm.setUiScale(uiScaleDraft) } },
                 )
                 Spacer(Modifier.height(12.dp))
                 // Global temperature unit, applied everywhere temperatures show.
@@ -7227,6 +7235,7 @@ private fun SettingsSearchResults(
     appearance: SettingsStore.Appearance,
     notif: SettingsStore.NotificationPrefs,
 ) {
+    val searchScope = rememberCoroutineScope()
     val tokens = query.lowercase().split(Regex("[^a-z0-9%]+"))
         .filter { it.isNotBlank() && it !in SearchStopwords }
 
@@ -7251,7 +7260,7 @@ private fun SettingsSearchResults(
             onValueChange = { uiScaleDraft = (it * 20).roundToInt() / 20f },
             valueRange = 0.85f..1.3f,
             steps = 8,
-            onValueSettled = { vm.setUiScale(uiScaleDraft) },
+            onValueSettled = { searchScope.launch { delay(150); vm.setUiScale(uiScaleDraft) } },
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
@@ -7263,7 +7272,7 @@ private fun SettingsSearchResults(
             onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
             valueRange = 0f..2f,
             steps = 19,
-            onValueSettled = { vm.setVibrancy(vibrancyDraft) },
+            onValueSettled = { searchScope.launch { delay(150); vm.setVibrancy(vibrancyDraft) } },
         )
     }
     add("Open links in app", "browser tab links") {
@@ -7458,11 +7467,12 @@ fun MorphSegmented(
             val indicatorX by animateDpAsState(
                 targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
                 animationSpec = if (dragXPx != null) snap()
-                                // Was SoftDamping (0.82, close to critical -- barely any
-                                // overshoot) at StiffnessMediumLow (slow): read as sluggish
-                                // with no bounce despite the "bounces to wherever you let
-                                // go" intent. Genuinely bouncy and quicker to settle now.
-                                else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                // MediumBouncy (0.4) at StiffnessMedium overshot noticeably on
+                                // every selection change. LowBouncy keeps the same quick
+                                // StiffnessMedium settle speed (the fix for the earlier
+                                // "sluggish" complaint) with just a light touch of overshoot
+                                // instead of a pronounced wobble.
+                                else spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
                 label = "segIndicatorX",
             )
 

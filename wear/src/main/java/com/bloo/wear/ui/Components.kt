@@ -451,11 +451,11 @@ fun MorphSegmented(
             val restingX = (segWidth + gap) * selectedIndex
             val indicatorX by animateDpAsState(
                 targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
-                // Was SoftDamping (0.82, barely any overshoot) at StiffnessMediumLow
-                // (slow) — read as sluggish with no bounce. Genuinely bouncy and
-                // quicker to settle now, matching the phone version.
+                // MediumBouncy (0.4) at StiffnessMedium overshot noticeably on every
+                // selection change. LowBouncy keeps the same quick settle speed with
+                // just a light touch of overshoot instead, matching the phone version.
                 animationSpec = if (dragXPx != null) snap()
-                                else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                else spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
                 label = "wearSegIndicatorX",
             )
 
