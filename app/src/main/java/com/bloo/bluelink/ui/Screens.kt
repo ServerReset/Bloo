@@ -7391,12 +7391,33 @@ fun MorphSegmented(
             val indicatorX by animateDpAsState(
                 targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
                 animationSpec = if (dragXPx != null) snap()
-                                else spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                                // Was SoftDamping (0.82, close to critical -- barely any
+                                // overshoot) at StiffnessMediumLow (slow): read as sluggish
+                                // with no bounce despite the "bounces to wherever you let
+                                // go" intent. Genuinely bouncy and quicker to settle now.
+                                else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                 label = "segIndicatorX",
             )
 
-            fun indexFor(xPx: Float): Int =
-                (xPx / stepPx).roundToInt().coerceIn(0, n - 1)
+            val segWidthPx = with(density) { segWidth.toPx() }
+            // Raw touch/drag X is where the finger physically is; the indicator's
+            // rendered position is its LEFT edge. Using the raw X as that left-edge
+            // offset directly (the old behavior) made the box jump so its edge — not
+            // its center — sat under the finger, up to half a segment off from where
+            // you'd expect it, which is exactly what "tracks your finger but not
+            // really" looks like. Centering the indicator on the touch point instead.
+            fun offsetFor(touchXPx: Float): Float = (touchXPx - segWidthPx / 2f).coerceIn(0f, maxXPx)
+
+            // stepPx is the pitch (segment + gap); indexFor expects an X already in
+            // "indicator left-edge" terms (i.e. already run through offsetFor), so a
+            // segment's own center lands on an exact multiple of stepPx. Applying the
+            // /stepPx rounding to a RAW (un-shifted) touch position instead — the old
+            // bug — put the rounding boundary at each segment's trailing edge rather
+            // than its center, so a tap anywhere in roughly the back third of a
+            // segment rounded up into the NEXT one (e.g. tapping option 3 landing on
+            // option 4).
+            fun indexFor(offsetXPx: Float): Int =
+                (offsetXPx / stepPx).roundToInt().coerceIn(0, n - 1)
 
             Box(
                 Modifier
@@ -7432,7 +7453,7 @@ fun MorphSegmented(
                                 if (!change.pressed) {
                                     if (!claimed) {
                                         change.consume()
-                                        val idx = indexFor(down.position.x.coerceIn(0f, maxXPx))
+                                        val idx = indexFor(offsetFor(down.position.x))
                                         if (options[idx].key != currentSelectedKey) {
                                             currentHaptics?.tick()
                                             currentOnSelect(options[idx].key)
@@ -7447,17 +7468,17 @@ fun MorphSegmented(
                                         dx > slop && dx >= dy -> {
                                             claimed = true
                                             change.consume()
-                                            dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                            dragXPx = offsetFor(change.position.x)
                                         }
                                         dy > slop -> break
                                     }
                                 } else if (change.positionChanged()) {
                                     change.consume()
-                                    dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                    dragXPx = offsetFor(change.position.x)
                                 }
                             }
                             if (claimed) {
-                                val x = dragXPx ?: down.position.x.coerceIn(0f, maxXPx)
+                                val x = dragXPx ?: offsetFor(down.position.x)
                                 val idx = indexFor(x)
                                 dragXPx = null
                                 if (options[idx].key != currentSelectedKey) {

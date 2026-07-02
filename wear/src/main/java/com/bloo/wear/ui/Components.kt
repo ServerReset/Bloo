@@ -451,12 +451,30 @@ fun MorphSegmented(
             val restingX = (segWidth + gap) * selectedIndex
             val indicatorX by animateDpAsState(
                 targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
+                // Was SoftDamping (0.82, barely any overshoot) at StiffnessMediumLow
+                // (slow) — read as sluggish with no bounce. Genuinely bouncy and
+                // quicker to settle now, matching the phone version.
                 animationSpec = if (dragXPx != null) snap()
-                                else spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                                else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                 label = "wearSegIndicatorX",
             )
 
-            fun indexFor(xPx: Float): Int = (xPx / stepPx).roundToInt().coerceIn(0, n - 1)
+            val segWidthPx = with(density) { segWidth.toPx() }
+            // Raw touch X is where the finger is; the indicator's rendered position
+            // is its LEFT edge. Using raw touch X as that left-edge offset directly
+            // (the old behavior) made the box jump so its edge, not its center, sat
+            // under the finger — up to half a segment off, which is exactly "tracks
+            // your finger but not really." Centering the indicator on the touch
+            // point instead.
+            fun offsetFor(touchXPx: Float): Float = (touchXPx - segWidthPx / 2f).coerceIn(0f, maxXPx)
+
+            // indexFor expects an X already in "indicator left-edge" terms (already
+            // run through offsetFor), so a segment's own center lands on an exact
+            // multiple of stepPx. Applying /stepPx rounding to a RAW touch position
+            // instead put the rounding boundary at each segment's trailing edge
+            // rather than its center — a tap in roughly the back third of a segment
+            // rounded up into the next one (e.g. tapping option 3 landing on 4).
+            fun indexFor(offsetXPx: Float): Int = (offsetXPx / stepPx).roundToInt().coerceIn(0, n - 1)
 
             Box(
                 Modifier
@@ -490,7 +508,7 @@ fun MorphSegmented(
                                 if (!change.pressed) {
                                     if (!claimed) {
                                         change.consume()
-                                        val idx = indexFor(down.position.x.coerceIn(0f, maxXPx))
+                                        val idx = indexFor(offsetFor(down.position.x))
                                         if (options[idx].key != currentSelectedKey) {
                                             currentHaptics.tick()
                                             currentOnSelect(options[idx].key)
@@ -505,17 +523,17 @@ fun MorphSegmented(
                                         dx > slop && dx >= dy -> {
                                             claimed = true
                                             change.consume()
-                                            dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                            dragXPx = offsetFor(change.position.x)
                                         }
                                         dy > slop -> break
                                     }
                                 } else if (change.positionChanged()) {
                                     change.consume()
-                                    dragXPx = change.position.x.coerceIn(0f, maxXPx)
+                                    dragXPx = offsetFor(change.position.x)
                                 }
                             }
                             if (claimed) {
-                                val x = dragXPx ?: down.position.x.coerceIn(0f, maxXPx)
+                                val x = dragXPx ?: offsetFor(down.position.x)
                                 val idx = indexFor(x)
                                 dragXPx = null
                                 if (options[idx].key != currentSelectedKey) {
