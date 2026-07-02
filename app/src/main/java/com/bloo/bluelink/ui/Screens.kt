@@ -3278,7 +3278,7 @@ private fun sectionLabel(section: String): String = when (section) {
     "trips" -> "Trips"
     "info" -> "Car info"
     "diagnostics" -> "Diagnostics"
-    "controls" -> "Lock / unlock"
+    "controls" -> "Lock / climate"
     else -> section.replaceFirstChar { it.uppercase() }
 }
 
@@ -3458,20 +3458,23 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
 }
 
 /**
- * The lock/unlock control. Deliberately *not* styled like the other pebbles -
- * it's just the morphing Lock/Unlock button with its status on the left, with no
- * card, header or expand chevron. It can still be long-pressed and dragged to
- * reorder, like a pebble, even though it doesn't look like one.
+ * The lock/unlock + climate quick controls. Deliberately *not* styled like the
+ * other pebbles - it's just the morphing StateControls with their status on the
+ * left, with no card, header or expand chevron. It can still be long-pressed
+ * and dragged to reorder, like a pebble, even though it doesn't look like one.
+ * Was a fixed single-ControlHeight Surface sized for lock/unlock alone; now
+ * that PrimaryActions has a second StateControl (climate), it sizes to content
+ * instead of clipping the new row.
  */
 @Composable
 private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     Surface(
-        modifier = Modifier.fillMaxWidth().then(dragHandle).height(ControlHeight),
+        modifier = Modifier.fillMaxWidth().then(dragHandle),
         shape = RoundedCornerShape(PebbleCornerCollapsed),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             PrimaryActions(v, state, vm)
         }
     }
@@ -3585,7 +3588,17 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
 @Composable
 private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    Box(Modifier.fillMaxWidth().padding(start = 26.dp, end = 8.dp)) {
+    // Was lock/unlock only despite the plural name — the dual-column expanded
+    // view and the cover-screen main tile both lean on this for "the car's quick
+    // controls," and having just one control here read as if the whole rest of
+    // the status/actions picture had gone missing. Climate is the one other
+    // control every car has (charge is EV/PHEV-only and already gets its own
+    // pebble), so it's the natural second entry — same StateControl vocabulary,
+    // starting from the car's last-used climate settings like the Climate pebble
+    // itself does.
+    var savedClimate by remember(v.vin) { mutableStateOf<ClimateRequest?>(null) }
+    LaunchedEffect(v.vin) { savedClimate = vm.loadSavedClimate(v) }
+    Column(Modifier.fillMaxWidth().padding(start = 26.dp, end = 8.dp)) {
         StateControl(
             name = "",
             isOn = status?.doorLock,
@@ -3596,6 +3609,19 @@ private fun PrimaryActions(v: Vehicle, state: UiState, vm: AppViewModel) {
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
             highlightWhenOff = true,
             offTextColor = MaterialTheme.colorScheme.error,
+        )
+        Spacer(Modifier.height(4.dp))
+        StateControl(
+            name = "",
+            isOn = status?.airCtrlOn,
+            stateOn = "Climate on", stateOff = "Climate off",
+            turnOn = "Start", turnOff = "Stop",
+            icon = Icons.Filled.AcUnit,
+            pending = state.isPending(v.vin, "climate"),
+            onActivate = {
+                vm.startClimate(v, savedClimate ?: ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+            },
+            onDeactivate = { vm.stopClimate(v) },
         )
     }
 }
