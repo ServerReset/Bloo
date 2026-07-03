@@ -223,6 +223,33 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             WearClimateStore(ctx).flow.collect { remote -> mergeRemoteClimate(remote) }
         }
+        viewModelScope.launch {
+            // Live-collect snapshot updates: WearListenerService persists phone
+            // pushes into SnapshotStore, and standalone command results land there
+            // too. The store used to be read exactly once at bootstrap (and on
+            // manual resync), so a relayed Refresh spun briefly and the screen then
+            // kept showing the old data until an app restart.
+            snapshotStore.payload.collect { data ->
+                if (data.vehicles.isEmpty()) return@collect
+                snapshots = data.vehicles.associateBy { it.vin }
+                // buildCarView prefers a cached in-memory status over the snapshot,
+                // so fold the snapshot's core fields into any status we hold -
+                // otherwise the fresh push stays masked for lock/climate/charge.
+                data.vehicles.forEach { snap ->
+                    statuses[snap.vin]?.let { s ->
+                        statuses = statuses + (snap.vin to s.copy(
+                            doorLock = snap.locked ?: s.doorLock,
+                            airCtrlOn = snap.climateOn ?: s.airCtrlOn,
+                            evStatus = s.evStatus?.let { ev ->
+                                ev.copy(batteryCharge = snap.charging ?: ev.batteryCharge)
+                            },
+                        ))
+                    }
+                }
+                if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage()
+                else publish()
+            }
+        }
         // A lightweight, independent check (same GitHub Actions endpoint the
         // phone uses, in :shared) — Wear OS has no reliable on-device sideload
         // flow, so acting on this opens the run page on the connected phone
@@ -306,6 +333,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             repos.clear()
             sessionFetched.clear(); tripsFetched.clear()
             vehicles = emptyList(); statuses = emptyMap(); trips = emptyMap()
+            // Also drop the snapshots (in-memory AND on disk): loadGarage builds
+            // the garage from them, so leaving the old account's cars here made a
+            // later sign-in to a DIFFERENT account show the previous owner's
+            // vehicles, states and locations.
+            snapshots = emptyMap()
+            runCatching { snapshotStore.saveVehicles(emptyList()) }
+            requestWidgetUpdates()
             _ui.update { it.copy(screen = WearScreen.SignedOut, cars = emptyList(), trips = emptyMap(), accounts = emptyList()) }
         }
     }
@@ -318,7 +352,27 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             snapshots.values.map { it.toVehicle() }
         } else {
             runCatching { WearComms.requestSync(ctx, "", refresh = false) }
-            emptyList()
+            // Standalone (no phone to push snapshots): fetch the vehicle list over
+            // the watch's own connection and seed the snapshot store - otherwise a
+            // watch-only sign-in landed on a permanently empty garage, since
+            // nothing else on the watch ever calls the vehicle-list API.
+            if (WearComms.phoneNodeId(ctx) == null) {
+                val fetched = sessionStore.loggedInBrands().flatMap { b ->
+                    runCatching { repoFor(b).vehicles() }.getOrDefault(emptyList())
+                }
+                if (fetched.isNotEmpty()) {
+                    val snaps = fetched.map {
+                        com.bloo.bluelink.data.VehicleSnapshot(
+                            vin = it.vin, name = it.name, model = it.model, isEv = it.isEv,
+                            regId = it.regId, generation = it.generation,
+                            brandIndicator = it.brandIndicator,
+                        )
+                    }
+                    runCatching { snapshotStore.saveVehicles(snaps) }
+                    snapshots = snaps.associateBy { s -> s.vin }
+                }
+                fetched
+            } else emptyList()
         }
         publish(WearScreen.Ready)
         // Status is fetched lazily, per car, as pages are shown (see onCarShown).
@@ -675,7 +729,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val normalized = WearPebbles.normalize(order)
         _ui.update { it.copy(pebbleOverride = it.pebbleOverride + (vin to normalized)) }
         viewModelScope.launch {
-            runCatching { WearComms.publishPebbleOrder(ctx, vin, normalized) }
+            val ok = runCatching { WearComms.publishPebbleOrder(ctx, vin, normalized) }.getOrDefault(false)
+            if (!ok) {
+                // The phone never received this order, so its echo can never match
+                // and the exact-match clear in init would hold the override forever
+                // - masking every later phone-side reorder for the rest of the
+                // session. Drop it and fall back to the synced order.
+                _ui.update { u -> u.copy(pebbleOverride = u.pebbleOverride - vin) }
+            }
         }
     }
 

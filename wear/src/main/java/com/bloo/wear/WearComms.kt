@@ -140,8 +140,10 @@ object WearComms {
     }
 
     /** Publish a car's reordered pebble order so the phone saves it as that car's
-     *  section order and mirrors it back to every device. */
-    suspend fun publishPebbleOrder(context: Context, vin: String, order: List<String>) {
+     *  section order and mirrors it back to every device. Returns whether the
+     *  Data Layer write succeeded, so the caller can drop its optimistic override
+     *  when the phone will never see (and thus never echo) this order. */
+    suspend fun publishPebbleOrder(context: Context, vin: String, order: List<String>): Boolean =
         withContext(Dispatchers.IO) {
             runCatching {
                 val payload = com.bloo.bluelink.data.WearPebbleOrder(vin, order)
@@ -150,9 +152,8 @@ object WearComms {
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request))
-            }
+            }.isSuccess
         }
-    }
 
     /** Push the watch's local display scale back to the phone so the phone's
      *  Settings → Text scale slider stays in sync when changed on the watch. */
