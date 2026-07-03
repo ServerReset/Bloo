@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -173,10 +174,20 @@ class BlooWidget : GlanceAppWidget() {
             val climateColor = Color(android.graphics.Color.HSVToColor(
                 floatArrayOf(climateHue, (hsv[1] * 0.75f).coerceIn(0.35f, 0.85f), (hsv[2] * 0.8f).coerceAtLeast(0.38f))
             ))
+            // Dark-mode M3 accents are light tone-80 pastels (DarkExpressive.primary
+            // is 0xFFADC6FF; dynamic dark schemes match) - hardcoded white on them
+            // was ~1.7:1 contrast, washing out every button icon/label whenever the
+            // phone was in dark theme. Pick the foreground by accent luminance: a
+            // dark hue-matched tone on light accents, white on dark accents.
+            val onAccentColor = if (accentColor.luminance() > 0.5f) {
+                Color(android.graphics.Color.HSVToColor(
+                    floatArrayOf(hsv[0], (hsv[1] * 0.9f).coerceIn(0.3f, 1f), 0.22f)
+                ))
+            } else Color.White
             WidgetTheme(
                 accent = ColorProvider(accentColor),
                 accentMuted = ColorProvider(accentMuted),
-                onAccent = ColorProvider(Color.White),
+                onAccent = ColorProvider(onAccentColor),
                 pending = ColorProvider(pendingColor),
                 charge = ColorProvider(chargeGreen),
                 unlocked = ColorProvider(unlockedRed),
@@ -224,37 +235,37 @@ class BlooWidget : GlanceAppWidget() {
                     isTiny -> when {
                         snap != null -> TinyBody(widgetId, snap, showBackground, widgetShape, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
-                        else         -> UnavailableCompact(showBackground, widgetShape, theme)
+                        else         -> UnavailableCompact(widgetId, showBackground, widgetShape, theme)
                     }
                     h < 65.dp -> when {
                         snap != null -> CompactBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
-                        else         -> UnavailableCompact(showBackground, widgetShape, theme)
+                        else         -> UnavailableCompact(widgetId, showBackground, widgetShape, theme)
                     }
                     isSkinny -> when {
                         snap != null -> NarrowTallBody(widgetId, snap, actions, w, h, showBackground, widgetShape, widgetShowRange, widgetShowState, pendingAction, theme)
                         cfg == null  -> UnconfiguredFull(widgetId)
-                        else         -> UnavailableFull(showBackground, widgetShape, theme)
+                        else         -> UnavailableFull(widgetId, showBackground, widgetShape, theme)
                     }
                     !isPortrait && w > h * 2.0f -> when {
                         snap != null -> WideRowBody(widgetId, snap, actions, w, h, showBackground, widgetShape, pendingAction, theme)
                         cfg == null  -> UnconfiguredCompact(widgetId)
-                        else         -> UnavailableCompact(showBackground, widgetShape, theme)
+                        else         -> UnavailableCompact(widgetId, showBackground, widgetShape, theme)
                     }
                     isSquare -> when {
                         snap != null -> RingBody(widgetId, snap, actions, w, h, widgetShowName, pendingAction, theme)
                         cfg == null  -> UnconfiguredFull(widgetId)
-                        else         -> UnavailableFull(showBackground, widgetShape, theme)
+                        else         -> UnavailableFull(widgetId, showBackground, widgetShape, theme)
                     }
                     isPortrait -> when {
                         snap != null -> PortraitBody(widgetId, snap, actions, w, h, photoBitmap, mapBitmap, showBackground, widgetShape, widgetShowRange, widgetShowState, locationAddress, pendingAction, theme)
                         cfg == null  -> UnconfiguredFull(widgetId)
-                        else         -> UnavailableFull(showBackground, widgetShape, theme)
+                        else         -> UnavailableFull(widgetId, showBackground, widgetShape, theme)
                     }
                     else -> when {
                         snap != null -> LandscapeBody(widgetId, snap, actions, w, h, photoBitmap, mapBitmap, showBackground, widgetShape, widgetShowRange, widgetShowState, locationAddress, pendingAction, theme)
                         cfg == null  -> UnconfiguredFull(widgetId)
-                        else         -> UnavailableFull(showBackground, widgetShape, theme)
+                        else         -> UnavailableFull(widgetId, showBackground, widgetShape, theme)
                     }
                 }
             }
@@ -300,23 +311,35 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    // Reached when the widget IS configured but its car has no snapshot — either
+    // signed out, or the configured VIN left the garage (car sold, account
+    // switched). The old "Sign in to Bloo" copy was wrong and confusing for the
+    // second, signed-in case, and the box wasn't tappable, giving no way forward.
     @Composable
-    private fun UnavailableFull(showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
+    private fun UnavailableFull(widgetId: Int, showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
+        val context = LocalContext.current
         val corner = theme.cornerOverride ?: if (widgetShape == "pill") 28.dp else 22.dp
         val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
                   else GlanceModifier.fillMaxSize().cornerRadius(corner)
-        Box(modifier = mod, contentAlignment = Alignment.Center) {
-            Text("Sign in to Bloo", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
+        Box(
+            modifier = mod.clickable(actionStartActivity(configIntent(context, widgetId))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Car unavailable — tap to set up", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
         }
     }
 
     @Composable
-    private fun UnavailableCompact(showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
+    private fun UnavailableCompact(widgetId: Int, showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
+        val context = LocalContext.current
         val corner = theme.cornerOverride ?: if (widgetShape == "pill") 28.dp else 22.dp
         val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
                   else GlanceModifier.fillMaxSize().cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
-        Box(modifier = mod, contentAlignment = Alignment.Center) {
-            Text("Sign in", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
+        Box(
+            modifier = mod.clickable(actionStartActivity(configIntent(context, widgetId))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Tap to set up", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontWeight = FontWeight.Medium))
         }
     }
 
@@ -373,7 +396,10 @@ class BlooWidget : GlanceAppWidget() {
             GlanceModifier.fillMaxSize().cornerRadius(corner)
         }
         val pick = metrics.take(4).ifEmpty { listOf("battery", "range", "lock", "climate") }
-        fun labelOf(m: String) = m.replaceFirstChar { it.uppercase() }
+        // snap.percent holds the FUEL level for gas cars (see SnapshotStore) -
+        // every other body switches this caption on isEv; Stats must too.
+        fun labelOf(m: String) =
+            if (m == "battery" && !snap.isEv) "Fuel" else m.replaceFirstChar { it.uppercase() }
         fun valueOf(m: String) = when (m) {
             "battery" -> snap.percent?.let { "$it%" } ?: "—"
             "range" -> snap.rangeMi?.let { "$it mi" } ?: "—"
@@ -468,6 +494,13 @@ class BlooWidget : GlanceAppWidget() {
             } else {
                 Box(GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)) {}
             }
+            // White text is only safe over the photo + dark scrim; the no-photo
+            // fallback sits on widgetBackground (near-white in light theme), which
+            // made the whole name/percent/range block invisible there. Same switch
+            // PortraitStatusSection already does.
+            val hasPhoto = photoBitmap != null
+            val onBg = if (hasPhoto) ColorProvider(Color.White) else GlanceTheme.colors.onSurface
+            val onBgDim = if (hasPhoto) ColorProvider(Color(1f, 1f, 1f, 0.78f)) else GlanceTheme.colors.onSurfaceVariant
             Column(
                 GlanceModifier.fillMaxSize().padding(14.dp).clickable(open),
                 verticalAlignment = Alignment.Bottom,
@@ -476,22 +509,22 @@ class BlooWidget : GlanceAppWidget() {
                     Text(
                         ellipsize(snap.name, 20),
                         maxLines = 1,
-                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                        style = TextStyle(color = onBg, fontSize = 15.sp, fontWeight = FontWeight.Bold),
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         snap.percent?.let { "$it%" } ?: "—",
                         maxLines = 1,
-                        style = TextStyle(color = ColorProvider(Color.White), fontSize = scaledSp(30f, theme), fontWeight = FontWeight.Bold),
+                        style = TextStyle(color = onBg, fontSize = scaledSp(30f, theme), fontWeight = FontWeight.Bold),
                     )
                     if (showRange) snap.rangeMi?.let {
                         Spacer(GlanceModifier.width(8.dp))
-                        Text("$it mi", style = TextStyle(color = ColorProvider(Color(1f, 1f, 1f, 0.78f)), fontSize = 12.sp))
+                        Text("$it mi", style = TextStyle(color = onBgDim, fontSize = 12.sp))
                     }
                     if (showState) {
                         Spacer(GlanceModifier.width(8.dp))
-                        val (l, c) = stateOf(snap, theme, hasPhoto = true)
+                        val (l, c) = stateOf(snap, theme, hasPhoto = hasPhoto)
                         StateChip(l, c)
                     }
                 }
@@ -1098,8 +1131,6 @@ class BlooWidget : GlanceAppWidget() {
         theme: WidgetTheme,
     ) {
         val context = LocalContext.current
-        val showMap = mapBitmap != null && h >= 200.dp
-        val showPhoto = !showMap && photoBitmap != null && h >= 200.dp
         val isPill = widgetShape == "pill"
         val basePad = when {
             h >= 220.dp -> 16.dp
@@ -1109,10 +1140,19 @@ class BlooWidget : GlanceAppWidget() {
         val pad = if (isPill) (basePad + (w / 5).coerceAtMost(22.dp)) else basePad
         val corner = theme.cornerOverride ?: if (isPill) w / 2 else (w / 4).coerceIn(20.dp, 32.dp)
         val gap = 7.dp
-        val mapCardH = if (showMap) 112.dp else 0.dp
         // Use 2-column grid when the widget is wide enough; otherwise single column with labels.
         val gridCols = if (w >= 130.dp) 2 else 1
         val gridRows = if (gridCols == 2) 2 else 4
+        // Only show the map when its fixed 112dp card genuinely fits above a
+        // minimum-height button grid. The old raw h >= 200dp gate ignored the
+        // shape padding and pillH's 30dp floor, so tight placements (especially
+        // pill shape, whose padding is much larger) emitted more content than the
+        // widget's height and clipped the grid's bottom button row.
+        val minGridH = 30.dp * gridRows + gap * (gridRows - 1)
+        val showMap = mapBitmap != null && h >= 200.dp &&
+            (h - pad * 2) >= (112.dp + gap + minGridH)
+        val showPhoto = !showMap && photoBitmap != null && h >= 200.dp
+        val mapCardH = if (showMap) 112.dp else 0.dp
         val pillH = ((h - pad * 2 - gap * (gridRows - 1) - mapCardH) / (gridRows + 1.8f)).coerceIn(30.dp, 54.dp)
         val gridH = pillH * gridRows + gap * (gridRows - 1)
         val statusH = h - pad * 2 - gridH - gap - (if (showMap) mapCardH + gap else 0.dp)
@@ -1159,7 +1199,10 @@ class BlooWidget : GlanceAppWidget() {
                     LocationCard(mapBitmap!!, locationAddress, mapCardH, openAction)
                     Spacer(GlanceModifier.height(gap))
                 }
-                PortraitButtonGrid(widgetId, snap.vin, actions, pillH, gap, pendingAction, snap, theme, gridCols)
+                PortraitButtonGrid(
+                    widgetId, snap.vin, actions, pillH, gap, pendingAction, snap, theme, gridCols,
+                    cellW = (w - pad * 2 - gap) / 2,
+                )
             }
         }
     }
@@ -1309,6 +1352,7 @@ class BlooWidget : GlanceAppWidget() {
         snap: VehicleSnapshot,
         theme: WidgetTheme,
         cols: Int = 1,
+        cellW: Dp = 0.dp,
     ) {
         if (cols == 1) {
             Column(
@@ -1321,13 +1365,19 @@ class BlooWidget : GlanceAppWidget() {
                 }
             }
         } else {
+            // Labels need WIDTH, not just height: pillH is derived from h alone
+            // while each cell's width is an independent half of the row, so a
+            // tall-but-narrow (e.g. pill-shape) placement passed the height gate
+            // with ~38dp cells and hard-clipped "Unlocked" mid-glyph. Same
+            // 76dp-per-cell floor WideRowBody uses.
+            val allowLabel = pillH >= 44.dp && cellW >= 76.dp
             Column(modifier = GlanceModifier.fillMaxWidth()) {
                 repeat(2) { row ->
                     if (row > 0) Spacer(GlanceModifier.height(gap))
                     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        ActionPill(widgetId, vin, actions.getOrNull(row * 2), pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = pillH >= 44.dp)
+                        ActionPill(widgetId, vin, actions.getOrNull(row * 2), pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = allowLabel)
                         Spacer(GlanceModifier.width(gap))
-                        ActionPill(widgetId, vin, actions.getOrNull(row * 2 + 1), pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = pillH >= 44.dp)
+                        ActionPill(widgetId, vin, actions.getOrNull(row * 2 + 1), pillH, GlanceModifier.defaultWeight(), pendingAction, snap, theme, allowLabel = allowLabel)
                     }
                 }
             }
@@ -1528,10 +1578,13 @@ class BlooWidget : GlanceAppWidget() {
         val pillH = ((contentH - gap) / 2).coerceIn(26.dp, 84.dp)
         // Two columns are narrow — labels would truncate, so icon-only there.
         val allowLabel = cols == 1
+        // Row indices follow the column count: GridRow drops its `second` pill when
+        // cols == 1, so hardcoded (0,1)/(2,3) rows rendered actions[0] and [2] there,
+        // silently skipping the user's 2nd configured button.
         Column(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
             GridRow(widgetId, vin, actions.getOrNull(0), actions.getOrNull(1), cols, pillH, gap, pendingAction, snap, theme, allowLabel)
             Spacer(GlanceModifier.height(gap))
-            GridRow(widgetId, vin, actions.getOrNull(2), actions.getOrNull(3), cols, pillH, gap, pendingAction, snap, theme, allowLabel)
+            GridRow(widgetId, vin, actions.getOrNull(cols), actions.getOrNull(cols + 1), cols, pillH, gap, pendingAction, snap, theme, allowLabel)
         }
     }
 

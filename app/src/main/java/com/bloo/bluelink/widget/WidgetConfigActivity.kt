@@ -143,7 +143,12 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         cars = SnapshotStore(context).current().vehicles
         val existing = SettingsStore(context).widgetConfig(widgetId)
         if (existing != null) {
-            selectedVin = existing.first
+            // A stored VIN whose car left the garage (sold, account switched) would
+            // otherwise show no selected row yet leave Save enabled — one tap
+            // re-persisted the ghost VIN and put the widget right back in its dead
+            // "unavailable" state. Fall back to the first real car instead.
+            selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } }
+                ?: cars.firstOrNull()?.vin
             if (existing.second.isNotEmpty()) {
                 actions.clear()
                 actions.addAll(existing.second.take(4))
