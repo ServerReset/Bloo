@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -311,6 +312,9 @@ private fun CarColumn(
 
     var rotaryJob: Job? by remember { mutableStateOf(null) }
     var rotaryTargetIdx by remember { mutableIntStateOf(-1) }
+    // Accumulated rotary travel toward the next one-tile step (see the handler).
+    var rotaryAccumPx by remember { mutableFloatStateOf(0f) }
+    val rotaryStepPx = with(LocalDensity.current) { 24.dp.toPx() }
 
     val centerItemIndex by remember {
         derivedStateOf {
@@ -327,8 +331,13 @@ private fun CarColumn(
 
     // Wrap-around guardian: once the user drifts near the ends of the virtual
     // list, silently teleport to the equivalent position in the centre segment
-    // so infinite scrolling never hits a hard stop.
-    LaunchedEffect(Unit) {
+    // so infinite scrolling never hits a hard stop. Keyed on the counts it
+    // closes over: the visible tile set changes while this stays composed
+    // (alerts appear/disappear, weather tiles arrive async), and a Unit-keyed
+    // effect kept judging boundaries with the ORIGINAL tileCount/total - a
+    // shrunken list could dead-end without teleporting, a grown one teleported
+    // to the wrong tile.
+    LaunchedEffect(tileCount, total) {
         if (!infinite) return@LaunchedEffect
         snapshotFlow { centerItemIndex to state.isScrollInProgress }
             .collect { (idx, scrolling) ->
@@ -347,8 +356,17 @@ private fun CarColumn(
                 .fillMaxSize()
                 .onRotaryScrollEvent { e ->
                     if (!active) return@onRotaryScrollEvent false
+                    // Accumulate travel instead of stepping per raw event: a low-res
+                    // bezel emits one large event per detent (still exactly one tile
+                    // per detent), but a high-res crown streams many small-delta
+                    // events - stepping on each one made a gentle crown turn fly
+                    // across the whole tile ring. Reset (not carry) on step so one
+                    // oversized detent can never double-step.
+                    rotaryAccumPx += e.verticalScrollPixels
+                    if (abs(rotaryAccumPx) < rotaryStepPx) return@onRotaryScrollEvent true
+                    val dir = if (rotaryAccumPx > 0) 1 else -1
+                    rotaryAccumPx = 0f
                     val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                    val dir = if (e.verticalScrollPixels > 0) 1 else -1
                     val base = if (rotaryTargetIdx >= 0) rotaryTargetIdx else centerItemIndex
                     var newTarget = if (infinite) base + dir else (base + dir).coerceIn(0, maxIdx)
                     // Remap near the virtual-list boundary immediately (not after the
@@ -527,6 +545,13 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
     val hapticFeedback = LocalHapticFeedback.current
     // 0f = pill only, 1f = full screen filled
     val expandProgress = remember { Animatable(0f) }
+    // Hoisted out of the gesture so a COMPLETED hold's fade-out tail (delay +
+    // animateTo(0f)) can be cancelled by the next hold. Left gesture-local, that
+    // tail outlived its gesture, and when its animateTo(0f) fired mid-way through
+    // a quick second hold it stole the Animatable's mutator - collapsing the new
+    // progress ring, killing that hold before onRefresh(), and leaving the
+    // escalating haptics buzzing until finger-up.
+    var holdJob by remember { mutableStateOf<Job?>(null) }
 
     // Circular progress ring that fills clockwise as the user holds.
     // Only composed while the hold is active (saves a layer at rest).
@@ -560,7 +585,9 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         down.consume()
-                        var holdJob: Job? = null
+                        // Kill any previous hold's lingering fade-out tail before
+                        // starting this one (see holdJob's declaration).
+                        holdJob?.cancel()
                         var completed = false
                         var hapticJob: Job? = null
                         hapticJob = scope.launch {

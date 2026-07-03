@@ -188,10 +188,12 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(6.dp))
-                    // Unconfigured slots default to their same-index car so a fresh
-                    // multi-car setup is pre-wired sensibly (slot 1→car 1, etc.).
+                    // null = "Follow selected" - BlooTileService resolves a null
+                    // slot to the app's selected car, NOT the same-index car. The
+                    // old same-index fallback here made "Follow selected"
+                    // impossible to show as active and highlighted a car the Tile
+                    // wasn't actually going to render.
                     val selectedVin = ui.localSettings.tileCarVins.getOrNull(index)
-                        ?: ui.cars.getOrNull(index)?.vin
                     @Composable
                     fun carOption(label: String, vin: String?) {
                         MorphButton(

@@ -380,6 +380,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Called when a car page becomes visible — fetch its status once per session. */
     fun onCarShown(vin: String) {
+        // The charge-limit drafts are app-wide, not per-vin: drop them when the
+        // shown car changes so half-adjusted sliders from car A don't render (and
+        // apply) as car B's values. Before the once-per-session guard on purpose -
+        // the UI calls this on every settled car switch.
+        if (_ui.value.acLimitDraft != null || _ui.value.dcLimitDraft != null) {
+            _ui.update { it.copy(acLimitDraft = null, dcLimitDraft = null) }
+        }
         if (vin in sessionFetched) return
         if (vehicles.none { it.vin == vin }) return
         sessionFetched.add(vin)
@@ -552,8 +559,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     /** Push the AC/DC charge-limit sliders to the car. */
     fun applyChargeLimits(vin: String) {
         val u = _ui.value
-        val ac = u.acLimitDraft ?: 80
-        val dc = u.dcLimitDraft ?: 90
+        // Send exactly what LimitsCard DISPLAYS: draft, else the car's actual
+        // current limit. The old `draft ?: 80/90` fallback silently changed the
+        // untouched slider - e.g. car reporting DC 100%, user adjusts only AC,
+        // taps Apply, and the DC limit drops from the displayed 100 to 90.
+        val car = u.cars.firstOrNull { it.vin == vin }
+        val ac = u.acLimitDraft ?: car?.acLimit ?: 80
+        val dc = u.dcLimitDraft ?: car?.dcLimit ?: 90
+        // Applied - the drafts' job is done; clearing them also stops them
+        // bleeding onto another car's Limits tile (they're app-wide, not per-vin).
+        _ui.update { it.copy(acLimitDraft = null, dcLimitDraft = null) }
         command(
             vin, "chargeLimit",
             // Explicit verb: "chargeLimit" fell into toWearCommand's else branch
