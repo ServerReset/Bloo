@@ -25,6 +25,11 @@ object WearCommandRunner {
             tempF = command.tempF,
             defrost = command.defrost,
             durationMinutes = command.durationMinutes,
+            steeringWheelHeat = command.steeringWheelHeat,
+            seatFrontLeft = SeatLevel.fromApi(command.seatFrontLeft),
+            seatFrontRight = SeatLevel.fromApi(command.seatFrontRight),
+            seatRearLeft = SeatLevel.fromApi(command.seatRearLeft),
+            seatRearRight = SeatLevel.fromApi(command.seatRearRight),
         )
         return runCatching {
             val updated = when (command.action) {
@@ -43,6 +48,7 @@ object WearCommandRunner {
                     else { repo.startCharge(v); snap.copy(charging = true) }
                 WearAction.CHARGE_ON -> { repo.startCharge(v); snap.copy(charging = true) }
                 WearAction.CHARGE_OFF -> { repo.stopCharge(v); snap.copy(charging = false) }
+                WearAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
                 else -> return WearCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
             }
             store.updateVehicle(updated)
@@ -52,6 +58,37 @@ object WearCommandRunner {
             AppLog.log("Command failed (${command.action}): ${e.message}")
             WearCommandResult(command.vin, command.action, ok = false, message = e.message ?: "Command failed")
         }
+    }
+
+    /**
+     * Resolve a TOGGLE_* verb into its explicit direction from [snap]. Any caller
+     * that persists [optimistic] BEFORE the command executes MUST resolve first:
+     * [execute] decides toggle direction by re-reading the store, so a snapshot
+     * that was already optimistically flipped would invert the command (tap
+     * "unlock" on a locked car -> store flips to unlocked -> execute sees
+     * unlocked -> sends LOCK).
+     */
+    fun resolveToggle(snap: VehicleSnapshot, action: String): String = when (action) {
+        WearAction.TOGGLE_LOCK ->
+            if (snap.locked == true) WearAction.UNLOCK else WearAction.LOCK
+        WearAction.TOGGLE_CLIMATE ->
+            if (snap.climateOn == true) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
+        WearAction.TOGGLE_CHARGE ->
+            if (snap.charging == true) WearAction.CHARGE_OFF else WearAction.CHARGE_ON
+        else -> action
+    }
+
+    /** The verb whose [optimistic] write undoes [action]'s — for reverting a
+     *  failed command's optimistic flip. (TOGGLE_* maps to itself since a second
+     *  flip restores the original state.) */
+    fun inverse(action: String): String = when (action) {
+        WearAction.LOCK -> WearAction.UNLOCK
+        WearAction.UNLOCK -> WearAction.LOCK
+        WearAction.CLIMATE_ON -> WearAction.CLIMATE_OFF
+        WearAction.CLIMATE_OFF -> WearAction.CLIMATE_ON
+        WearAction.CHARGE_ON -> WearAction.CHARGE_OFF
+        WearAction.CHARGE_OFF -> WearAction.CHARGE_ON
+        else -> action
     }
 
     /** The snapshot a command is expected to produce, for instant optimistic UI. */

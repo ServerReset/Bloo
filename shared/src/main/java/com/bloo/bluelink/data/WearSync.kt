@@ -164,6 +164,9 @@ object WearAction {
     const val CHARGE_ON = "charge_on"
     const val CHARGE_OFF = "charge_off"
 
+    /** Apply the AC/DC charge-limit targets in [WearCommand.acLimit]/[WearCommand.dcLimit]. */
+    const val SET_CHARGE_LIMITS = "set_charge_limits"
+
     /** Re-fetch a single car's status (or all, when [WearCommand.vin] is blank). */
     const val REFRESH = "refresh"
 
@@ -176,10 +179,19 @@ object WearAction {
 data class WearCommand(
     val vin: String,
     val action: String,
-    /** Climate setpoint to use for [WearAction.CLIMATE_ON]/[WearAction.TOGGLE_CLIMATE]. */
+    /** Climate settings to use for [WearAction.CLIMATE_ON]/[WearAction.TOGGLE_CLIMATE].
+     *  Seats are [SeatLevel.apiValue] ints (0 = off) so the wire format stays flat. */
     val tempF: Int = 72,
     val durationMinutes: Int = 10,
     val defrost: Boolean = false,
+    val steeringWheelHeat: Boolean = false,
+    val seatFrontLeft: Int = 0,
+    val seatFrontRight: Int = 0,
+    val seatRearLeft: Int = 0,
+    val seatRearRight: Int = 0,
+    /** Targets for [WearAction.SET_CHARGE_LIMITS]. */
+    val acLimit: Int = 80,
+    val dcLimit: Int = 90,
 )
 
 /** The phone's reply after attempting a [WearCommand]. */

@@ -32,13 +32,21 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val actionKey = inputData.getString(KEY_ACTION) ?: return Result.failure()
         val action = WidgetAction.fromKey(actionKey) ?: return Result.failure()
+        // The toggle verb WidgetAuthActivity resolved from the pre-flip snapshot;
+        // falls back to the action's own verb for enqueues that didn't resolve.
+        val wearAction = inputData.getString(KEY_WEAR_ACTION) ?: action.wearAction
 
         val ctx = applicationContext
         try {
-            execute(ctx, widgetId, vin, action)
+            execute(ctx, widgetId, vin, action, wearAction)
         } finally {
-            SettingsStore(ctx).setWidgetPendingAction(widgetId, null)
-            runCatching { BlooWidget().updateAll(ctx) }
+            // NonCancellable: if WorkManager stops this worker, the cleanup below is
+            // the first suspension after cancellation and would otherwise throw
+            // immediately - leaving the spinner overlay stuck on the widget forever.
+            withContext(kotlinx.coroutines.NonCancellable) {
+                SettingsStore(ctx).setWidgetPendingAction(widgetId, null)
+                runCatching { BlooWidget().updateAll(ctx) }
+            }
         }
         // Fan out the updated snapshot to all other surfaces after a successful command.
         runCatching { WearBridge.publishNow(ctx) }
@@ -46,10 +54,26 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         return Result.success()
     }
 
-    private suspend fun execute(ctx: Context, widgetId: Int, vin: String, action: WidgetAction) {
+    private suspend fun execute(ctx: Context, widgetId: Int, vin: String, action: WidgetAction, wearAction: String?) {
         when (action.kind) {
             WidgetAction.Kind.COMMAND -> {
-                action.wearAction?.let { WearCommandRunner.execute(ctx, WearCommand(vin, it)) }
+                if (wearAction != null) {
+                    val result = WearCommandRunner.execute(ctx, WearCommand(vin, wearAction))
+                    if (!result.ok) {
+                        // The car never got the command: undo WidgetAuthActivity's
+                        // optimistic flip so the widget doesn't keep asserting a
+                        // lock/climate state that isn't true (refresh below can't be
+                        // counted on to correct it - offline/expired-session failures
+                        // fail the refresh too, silently).
+                        runCatching {
+                            val store = SnapshotStore(ctx)
+                            store.current().vehicles.firstOrNull { it.vin == vin }?.let {
+                                store.updateVehicle(WearCommandRunner.optimistic(it, WearCommandRunner.inverse(wearAction)))
+                            }
+                        }
+                        return
+                    }
+                }
                 // Brief pause for the car to process the command, then fetch actual state.
                 kotlinx.coroutines.delay(4000)
                 WearCommandRunner.refresh(ctx, vin)
@@ -170,13 +194,31 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         const val KEY_WIDGET_ID = "widget_id"
         const val KEY_VIN = "vin"
         const val KEY_ACTION = "action"
+        const val KEY_WEAR_ACTION = "wear_action"
 
-        fun enqueue(ctx: Context, widgetId: Int, vin: String, action: WidgetAction) {
-            val data = workDataOf(KEY_WIDGET_ID to widgetId, KEY_VIN to vin, KEY_ACTION to action.key)
+        fun enqueue(
+            ctx: Context,
+            widgetId: Int,
+            vin: String,
+            action: WidgetAction,
+            wearAction: String? = action.wearAction,
+        ) {
+            val data = workDataOf(
+                KEY_WIDGET_ID to widgetId,
+                KEY_VIN to vin,
+                KEY_ACTION to action.key,
+                KEY_WEAR_ACTION to wearAction,
+            )
             val request = OneTimeWorkRequestBuilder<WidgetCommandWorker>()
                 .setInputData(data)
                 .build()
-            WorkManager.getInstance(ctx).enqueue(request)
+            // One command at a time per widget: the pending spinner covers the whole
+            // widget, so a second tap while one is in flight raced the first worker
+            // for the shared pending flag (first to finish cleared the other's
+            // spinner) and stacked duplicate car commands.
+            WorkManager.getInstance(ctx).enqueueUniqueWork(
+                "widget_cmd_$widgetId", androidx.work.ExistingWorkPolicy.KEEP, request,
+            )
         }
     }
 }

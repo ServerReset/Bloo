@@ -403,10 +403,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Apply a saved climate preset (start climate with its exact settings). Also
      *  seeds the sliders so the controls reflect what's running. */
-    fun applyPreset(vin: String, preset: ClimatePreset) = command(vin, "climate") { v, repo, _ ->
-        repo.startClimate(v, preset.request)
-        flip(vin) { it.copy(airCtrlOn = true) }
+    fun applyPreset(vin: String, preset: ClimatePreset) {
         val r = preset.request
+        // Seed the sliders + active highlight up front: the relay path never runs
+        // the block below, so seeding inside it never happened with a phone
+        // connected - the preset started but the UI never showed it as active.
         updateDraft(vin) {
             it.copy(
                 activePresetId = preset.id,
@@ -419,6 +420,28 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 seatRearLeft = seatStepOf(r.seatRearLeft),
                 seatRearRight = seatStepOf(r.seatRearRight),
             )
+        }
+        command(
+            vin, "climate",
+            // Explicit CLIMATE_ON with the preset's full settings. The generic
+            // toggle relay used to turn climate OFF when it was already running
+            // (preset tap while on -> phone saw climateOn=true -> stopClimate) and
+            // carried only the old draft's temp/defrost even when it started.
+            explicit = com.bloo.bluelink.data.WearCommand(
+                vin = vin,
+                action = com.bloo.bluelink.data.WearAction.CLIMATE_ON,
+                tempF = r.tempF,
+                durationMinutes = r.durationMinutes,
+                defrost = r.defrost,
+                steeringWheelHeat = r.steeringWheelHeat,
+                seatFrontLeft = r.seatFrontLeft.apiValue,
+                seatFrontRight = r.seatFrontRight.apiValue,
+                seatRearLeft = r.seatRearLeft.apiValue,
+                seatRearRight = r.seatRearRight.apiValue,
+            ),
+        ) { v, repo, _ ->
+            repo.startClimate(v, preset.request)
+            flip(vin) { it.copy(airCtrlOn = true) }
         }
     }
 
@@ -473,9 +496,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Push the AC/DC charge-limit sliders to the car. */
-    fun applyChargeLimits(vin: String) = command(vin, "chargeLimit") { v, repo, _ ->
+    fun applyChargeLimits(vin: String) {
         val u = _ui.value
-        repo.setChargeTargets(v, u.acLimitDraft ?: 80, u.dcLimitDraft ?: 90)
+        val ac = u.acLimitDraft ?: 80
+        val dc = u.dcLimitDraft ?: 90
+        command(
+            vin, "chargeLimit",
+            // Explicit verb: "chargeLimit" fell into toWearCommand's else branch
+            // and relayed as a plain REFRESH, so with a phone connected the
+            // limits were never actually applied - the phone just re-fetched
+            // status while the block holding setChargeTargets never ran.
+            explicit = com.bloo.bluelink.data.WearCommand(
+                vin = vin,
+                action = com.bloo.bluelink.data.WearAction.SET_CHARGE_LIMITS,
+                acLimit = ac,
+                dcLimit = dc,
+            ),
+        ) { v, repo, _ ->
+            repo.setChargeTargets(v, ac, dc)
+        }
     }
 
     private fun updateDraft(vin: String, f: (ClimateDraft) -> ClimateDraft) {
@@ -654,12 +693,37 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).toInt()
         val targetF = if (ambientF >= 70) (ambientF - offset).coerceIn(60, 85)
                       else (ambientF + offset).coerceIn(60, 85)
-        command(vin, "climate") { v, repo, st ->
-            if (st?.airCtrlOn == true) {
+        // Decide on/off HERE (same statuses-then-snapshots priority buildCarView
+        // uses) rather than inside the block: the relay path never runs the block,
+        // so the computed targetF used to be silently discarded - the phone got a
+        // generic toggle at the stale draft temp (or just turned climate off).
+        val isOn = statuses[vin]?.airCtrlOn ?: snapshots[vin]?.climateOn ?: false
+        val d = _ui.value.draftFor(vin)
+        if (isOn) {
+            updateDraft(vin) { it.copy(activePresetId = null) }
+            command(
+                vin, "climate",
+                explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.CLIMATE_OFF),
+            ) { v, repo, _ ->
                 repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
-                updateDraft(vin) { it.copy(activePresetId = null) }
-            } else {
-                val d = _ui.value.draftFor(vin)
+            }
+        } else {
+            updateDraft(vin) { it.copy(tempF = targetF, activePresetId = null) }
+            command(
+                vin, "climate",
+                explicit = com.bloo.bluelink.data.WearCommand(
+                    vin = vin,
+                    action = com.bloo.bluelink.data.WearAction.CLIMATE_ON,
+                    tempF = targetF,
+                    durationMinutes = d.duration,
+                    defrost = false,
+                    steeringWheelHeat = d.steering,
+                    seatFrontLeft = seatLevelOf(d.seatDriver).apiValue,
+                    seatFrontRight = seatLevelOf(d.seatPassenger).apiValue,
+                    seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,
+                    seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
+                ),
+            ) { v, repo, _ ->
                 repo.startClimate(v, ClimateRequest(
                     tempF = targetF,
                     defrost = false,
@@ -671,16 +735,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     seatRearRight = seatLevelOf(d.seatRearRight),
                 ))
                 flip(vin) { it.copy(airCtrlOn = true) }
-                updateDraft(vin) { it.copy(tempF = targetF, activePresetId = null) }
             }
         }
     }
 
-    private fun command(vin: String, action: String, block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit) {
+    private fun command(
+        vin: String,
+        action: String,
+        // An explicit pre-built command (e.g. CLIMATE_ON with a preset's full
+        // settings). Without it the generic draft-based toWearCommand is used.
+        explicit: com.bloo.bluelink.data.WearCommand? = null,
+        block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit,
+    ) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {
             // Companion-first: relay to phone. Only execute locally if no phone is reachable.
-            val wearCommand = toWearCommand(vin, action)
+            val wearCommand = explicit ?: toWearCommand(vin, action)
             val relayed = runCatching { WearComms.send(ctx, wearCommand) }.isSuccess
             if (relayed) {
                 val currentSnap = snapshots[vin]
@@ -727,17 +797,29 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun toWearCommand(vin: String, action: String) = com.bloo.bluelink.data.WearCommand(
-        vin = vin,
-        action = when (action) {
-            "doors" -> com.bloo.bluelink.data.WearAction.TOGGLE_LOCK
-            "climate" -> com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE
-            "charge" -> com.bloo.bluelink.data.WearAction.TOGGLE_CHARGE
-            else -> com.bloo.bluelink.data.WearAction.REFRESH
-        },
-        tempF = _ui.value.draftFor(vin).tempF,
-        defrost = _ui.value.draftFor(vin).defrost,
-    )
+    private fun toWearCommand(vin: String, action: String): com.bloo.bluelink.data.WearCommand {
+        // Carry the FULL climate draft, not just temp/defrost - a relayed climate
+        // start used to run for the wire default of 10 minutes with no steering or
+        // seat heat no matter what the user had set on the watch.
+        val d = _ui.value.draftFor(vin)
+        return com.bloo.bluelink.data.WearCommand(
+            vin = vin,
+            action = when (action) {
+                "doors" -> com.bloo.bluelink.data.WearAction.TOGGLE_LOCK
+                "climate" -> com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE
+                "charge" -> com.bloo.bluelink.data.WearAction.TOGGLE_CHARGE
+                else -> com.bloo.bluelink.data.WearAction.REFRESH
+            },
+            tempF = d.tempF,
+            durationMinutes = d.duration,
+            defrost = d.defrost,
+            steeringWheelHeat = d.steering,
+            seatFrontLeft = seatLevelOf(d.seatDriver).apiValue,
+            seatFrontRight = seatLevelOf(d.seatPassenger).apiValue,
+            seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,
+            seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
+        )
+    }
 
     private fun flip(vin: String, change: (VehicleStatus) -> VehicleStatus) {
         val cur = statuses[vin] ?: VehicleStatus()

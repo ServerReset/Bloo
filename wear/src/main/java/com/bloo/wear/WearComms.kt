@@ -37,11 +37,20 @@ object WearComms {
      *  it standalone). */
     suspend fun send(context: Context, command: WearCommand) {
         withContext(Dispatchers.IO) {
-            // Optimistic update so the tile reacts the instant it's tapped.
+            // Resolve TOGGLE_* to an explicit LOCK/UNLOCK etc. from the PRE-flip
+            // snapshot. The standalone fallback's executor decides toggle direction
+            // by re-reading the same store the optimistic write below lands in, so
+            // relaying the raw toggle after flipping made every standalone toggle
+            // execute the OPPOSITE action (tap Unlock -> car re-locks). Resolving
+            // here also means the phone relay carries the direction the user
+            // actually saw on the watch.
+            var resolved = command
             runCatching {
                 val store = SnapshotStore(context)
-                store.current().vehicles.firstOrNull { it.vin == command.vin }?.let {
-                    store.updateVehicle(WearCommandRunner.optimistic(it, command.action))
+                store.current().vehicles.firstOrNull { it.vin == command.vin }?.let { snap ->
+                    resolved = command.copy(action = WearCommandRunner.resolveToggle(snap, command.action))
+                    // Optimistic update so the tile reacts the instant it's tapped.
+                    store.updateVehicle(WearCommandRunner.optimistic(snap, resolved.action))
                 }
             }
             val node = phoneNodeId(context)
@@ -49,15 +58,15 @@ object WearComms {
                 runCatching {
                     Tasks.await(
                         Wearable.getMessageClient(context).sendMessage(
-                            node, WearSync.PATH_COMMAND, WearSync.encodeCommand(command).toByteArray(),
+                            node, WearSync.PATH_COMMAND, WearSync.encodeCommand(resolved).toByteArray(),
                         )
                     )
                 }.onFailure {
                     // Phone dropped mid-send — fall back to standalone.
-                    runStandalone(context, command)
+                    runStandalone(context, resolved)
                 }
             } else {
-                runStandalone(context, command)
+                runStandalone(context, resolved)
             }
         }
     }
@@ -67,6 +76,14 @@ object WearComms {
     private suspend fun runStandalone(context: Context, command: WearCommand) {
         val result = WearCommandRunner.execute(context, command)
         if (!result.ok) {
+            // The car never got the command: undo send()'s optimistic flip so the
+            // tile/app don't keep asserting a state that isn't true.
+            runCatching {
+                val store = SnapshotStore(context)
+                store.current().vehicles.firstOrNull { it.vin == command.vin }?.let {
+                    store.updateVehicle(WearCommandRunner.optimistic(it, WearCommandRunner.inverse(command.action)))
+                }
+            }
             WearNotifications.post(
                 context,
                 ("cmd" + command.vin).hashCode(),
