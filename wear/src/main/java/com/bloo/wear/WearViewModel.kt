@@ -156,6 +156,20 @@ private fun seatLevelOf(step: Int): SeatLevel = when (step) {
     else -> SeatLevel.OFF
 }
 
+/** Build a [ClimateRequest] from this draft. [tempF]/[defrost] default to the
+ *  draft's own but can be overridden (smart climate supplies a computed temp). */
+private fun ClimateDraft.toRequest(tempF: Int = this.tempF, defrost: Boolean = this.defrost) =
+    ClimateRequest(
+        tempF = tempF,
+        defrost = defrost,
+        durationMinutes = duration,
+        steeringWheelHeat = steering,
+        seatFrontLeft = seatLevelOf(seatDriver),
+        seatFrontRight = seatLevelOf(seatPassenger),
+        seatRearLeft = seatLevelOf(seatRearLeft),
+        seatRearRight = seatLevelOf(seatRearRight),
+    )
+
 /** Inverse of [seatLevelOf]: map a seat level back to the watch's 0–3 heat step
  *  (the watch UI is heat-only, so cooling collapses to off). */
 private fun seatStepOf(level: SeatLevel): Int = when (level) {
@@ -455,16 +469,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             updateDraft(vin) { it.copy(activePresetId = null) }
         } else {
             val d = _ui.value.draftFor(vin)
-            repo.startClimate(v, ClimateRequest(
-                tempF = d.tempF,
-                defrost = d.defrost,
-                durationMinutes = d.duration,
-                steeringWheelHeat = d.steering,
-                seatFrontLeft = seatLevelOf(d.seatDriver),
-                seatFrontRight = seatLevelOf(d.seatPassenger),
-                seatRearLeft = seatLevelOf(d.seatRearLeft),
-                seatRearRight = seatLevelOf(d.seatRearRight),
-            ))
+            repo.startClimate(v, d.toRequest())
             // A manual start isn't a saved preset.
             flip(vin) { it.copy(airCtrlOn = true) }
             updateDraft(vin) { it.copy(activePresetId = null) }
@@ -632,16 +637,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  Skips saving if an identical preset already exists for this car. */
     fun saveCurrentAsPreset(vin: String, name: String) {
         val d = _ui.value.draftFor(vin)
-        val request = ClimateRequest(
-            tempF = d.tempF,
-            defrost = d.defrost,
-            durationMinutes = d.duration,
-            steeringWheelHeat = d.steering,
-            seatFrontLeft = seatLevelOf(d.seatDriver),
-            seatFrontRight = seatLevelOf(d.seatPassenger),
-            seatRearLeft = seatLevelOf(d.seatRearLeft),
-            seatRearRight = seatLevelOf(d.seatRearRight),
-        )
+        val request = d.toRequest()
         // Don't create a duplicate if the current draft matches an existing preset.
         val existing = _ui.value.presets[vin].orEmpty()
         if (existing.any { it.request == request }) return
@@ -661,11 +657,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         persistAndPublishPresets(updated)
     }
 
-    fun reorderPresets(vin: String, ordered: List<ClimatePreset>) {
-        val updated = _ui.value.presets + (vin to ordered)
-        _ui.update { it.copy(presets = updated) }
-        persistAndPublishPresets(updated)
-    }
 
     private fun persistAndPublishPresets(byVin: Map<String, List<ClimatePreset>>) {
         val wp = com.bloo.bluelink.data.WearPresets(byVin)
@@ -829,16 +820,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
                 ),
             ) { v, repo, _ ->
-                repo.startClimate(v, ClimateRequest(
-                    tempF = targetF,
-                    defrost = false,
-                    durationMinutes = d.duration,
-                    steeringWheelHeat = d.steering,
-                    seatFrontLeft = seatLevelOf(d.seatDriver),
-                    seatFrontRight = seatLevelOf(d.seatPassenger),
-                    seatRearLeft = seatLevelOf(d.seatRearLeft),
-                    seatRearRight = seatLevelOf(d.seatRearRight),
-                ))
+                repo.startClimate(v, d.toRequest(tempF = targetF, defrost = false))
                 flip(vin) { it.copy(airCtrlOn = true) }
             }
         }
