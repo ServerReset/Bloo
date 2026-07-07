@@ -37,7 +37,7 @@ object WearImage {
         return ImageLoader.Builder(context)
             .okHttpClient(client)
             .memoryCache {
-                MemoryCache.Builder()
+                MemoryCache.Builder(context)
                     .maxSizePercent(0.01)
                     .build()
             }
