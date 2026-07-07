@@ -32,6 +32,10 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.isEv, snap.charging == true, snap.vin)
     }
 
+    override fun onComplicationDeactivated(complicationInstanceId: Int) {
+        clearComplicationConfig(applicationContext, "ChargeComplication", complicationInstanceId)
+    }
+
     private fun buildData(
         type: ComplicationType,
         pct: Int?,

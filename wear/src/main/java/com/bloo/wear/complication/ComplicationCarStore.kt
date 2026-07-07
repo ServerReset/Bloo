@@ -6,7 +6,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 private val Context.complicationCarStore by preferencesDataStore(name = "bloo_complication_cars")
 
@@ -26,6 +30,22 @@ class ComplicationCarStore(private val context: Context) {
 
     suspend fun setVin(dataSource: String, instanceId: Int, vin: String) {
         context.complicationCarStore.edit { it[key(dataSource, instanceId)] = vin }
+    }
+
+    suspend fun clear(dataSource: String, instanceId: Int) {
+        context.complicationCarStore.edit { it.remove(key(dataSource, instanceId)) }
+    }
+}
+
+private val complicationCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+/** Drop a complication instance's per-slot car pin. Called from
+ *  onComplicationDeactivated so a removed complication doesn't leave a stale
+ *  pin that a future slot reusing the same id would inherit. Fire-and-forget on
+ *  an IO scope - the DataStore write completes independently of the service. */
+fun clearComplicationConfig(context: Context, dataSource: String, instanceId: Int) {
+    complicationCleanupScope.launch {
+        runCatching { ComplicationCarStore(context.applicationContext).clear(dataSource, instanceId) }
     }
 }
 

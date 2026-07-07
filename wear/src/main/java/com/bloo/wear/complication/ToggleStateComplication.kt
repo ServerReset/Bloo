@@ -44,6 +44,10 @@ abstract class ToggleStateComplication : SuspendingComplicationDataSourceService
         return build(request.complicationType, stateOf(snap), snap.vin)
     }
 
+    final override fun onComplicationDeactivated(complicationInstanceId: Int) {
+        clearComplicationConfig(applicationContext, dataSourceName, complicationInstanceId)
+    }
+
     private fun build(type: ComplicationType, on: Boolean?, vin: String?): ComplicationData? {
         val isOn = on == true
         val image = MonochromaticImage.Builder(Icon.createWithResource(this, iconRes(isOn))).build()
