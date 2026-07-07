@@ -223,13 +223,22 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
                 Text("Updates", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "Bloo isn't on the Play Store, so this checks GitHub Actions for newer builds.",
+                    if (vm.currentBuildNumber > 0) "Build #${vm.currentBuildNumber}" else "Local build",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(6.dp))
                 MorphButton(
-                    label = if (ui.localSettings.updateChecksEnabled) "Checking for updates" else "Checks off",
+                    label = if (ui.updateChecking) "Checking…" else "Check now",
+                    icon = Icons.Filled.Refresh,
+                    active = false,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = ui.updateChecking,
+                    onClick = { vm.checkForUpdatesNow() },
+                )
+                Spacer(Modifier.height(4.dp))
+                MorphButton(
+                    label = if (ui.localSettings.updateChecksEnabled) "Auto-check on" else "Auto-check off",
                     icon = Icons.Filled.Refresh,
                     active = ui.localSettings.updateChecksEnabled,
                     activeColor = MaterialTheme.colorScheme.primary,

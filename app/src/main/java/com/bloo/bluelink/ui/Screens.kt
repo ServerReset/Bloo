@@ -6726,7 +6726,21 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Updates
             SettingsCard("Updates") {
-                ToggleRow("Check for updates", updateChecksEnabled) { vm.setUpdateChecksEnabled(it) }
+                val build = vm.currentBuildNumber
+                StepRow(
+                    "Current build",
+                    if (build > 0) "#$build" else "Local build",
+                )
+                Spacer(Modifier.height(8.dp))
+                ToggleRow("Check automatically", updateChecksEnabled) { vm.setUpdateChecksEnabled(it) }
+                Spacer(Modifier.height(8.dp))
+                MorphTextButton(
+                    if (state.updateChecking) "Checking…" else "Check now",
+                    onClick = { vm.checkForUpdatesNow() },
+                    enabled = !state.updateChecking && build > 0,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
                 Text(
                     "Bloo isn't on the Play Store, so this checks GitHub Actions for newer " +
                         "builds instead. When one's found, a prompt lets you open it, snooze " +

@@ -28,7 +28,10 @@ object UpdateChecker {
         // A locally-built (non-CI) install has no run number to compare against.
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return null
         val store = UpdateStore(context)
-        if (!store.checksEnabled.first()) return null
+        // force = a manual "Check now" tap: bypass every gate (disabled, debounce,
+        // snooze) so it always actually checks; only the automatic cold-start path
+        // honors them.
+        if (!force && !store.checksEnabled.first()) return null
         val now = System.currentTimeMillis()
         if (!force && now - store.lastCheckedAt() < CHECK_INTERVAL_MS) return null
         if (!force && now < store.snoozeUntil()) return null

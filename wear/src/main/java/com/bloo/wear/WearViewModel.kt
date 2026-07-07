@@ -140,6 +140,8 @@ data class WearUi(
      *  the run's page on the connected phone rather than installing anything
      *  on the watch itself. */
     val updateRun: com.bloo.bluelink.data.WorkflowRun? = null,
+    /** True while a manual "Check now" is in flight. */
+    val updateChecking: Boolean = false,
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
 
@@ -268,25 +270,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // phone uses, in :shared) — Wear OS has no reliable on-device sideload
         // flow, so acting on this opens the run page on the connected phone
         // rather than downloading/installing anything on the watch itself.
-        viewModelScope.launch {
-            if (com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER <= 0) return@launch
-            val settings = localStore.flow.first()
-            if (!settings.updateChecksEnabled) return@launch
-            val now = System.currentTimeMillis()
-            if (now - settings.updateLastCheckedAt < UPDATE_CHECK_INTERVAL_MS) return@launch
-            if (now < settings.updateSnoozeUntil) return@launch
-            // Same-branch comparison + consume the 12h window only on a successful
-            // fetch - mirrors UpdateChecker.checkPhone (see there for why).
-            val branch = com.bloo.wear.BuildConfig.BUILD_BRANCH
-                .ifBlank { com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH }
-            val run = runCatching {
-                com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(branch)
-            }.getOrNull() ?: return@launch
-            localStore.setUpdateLastCheckedAt(now)
-            if (run.runNumber > com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER) {
-                _ui.update { it.copy(updateRun = run) }
-            }
-        }
+        viewModelScope.launch { runUpdateCheck(force = false) }
         bootstrap()
     }
 
@@ -713,6 +697,49 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { localStore.setUpdateChecksEnabled(enabled) }
         if (!enabled) _ui.update { it.copy(updateRun = null) }
     }
+
+    /** Manual "Check now": forces past the disabled/debounce/snooze gates and
+     *  reports the outcome (banner if newer, else a brief message). */
+    fun checkForUpdatesNow() {
+        if (_ui.value.updateChecking) return
+        _ui.update { it.copy(updateChecking = true) }
+        viewModelScope.launch {
+            val found = runUpdateCheck(force = true)
+            _ui.update {
+                it.copy(
+                    updateChecking = false,
+                    message = if (!found) "You're on the latest build." else it.message,
+                )
+            }
+        }
+    }
+
+    /** The single update-check path, shared by the cold-start check (force=false,
+     *  honors enabled/debounce/snooze) and the manual "Check now" (force=true,
+     *  bypasses them). Returns whether a newer build was surfaced. */
+    private suspend fun runUpdateCheck(force: Boolean): Boolean {
+        if (com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER <= 0) return false
+        val settings = localStore.flow.first()
+        if (!force && !settings.updateChecksEnabled) return false
+        val now = System.currentTimeMillis()
+        if (!force && now - settings.updateLastCheckedAt < UPDATE_CHECK_INTERVAL_MS) return false
+        if (!force && now < settings.updateSnoozeUntil) return false
+        // Same-branch comparison + consume the 12h window only on a successful
+        // fetch - mirrors UpdateChecker.checkPhone (see there for why).
+        val branch = com.bloo.wear.BuildConfig.BUILD_BRANCH
+            .ifBlank { com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH }
+        val run = runCatching {
+            com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(branch)
+        }.getOrNull() ?: return false
+        localStore.setUpdateLastCheckedAt(now)
+        return if (run.runNumber > com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER) {
+            _ui.update { it.copy(updateRun = run) }
+            true
+        } else false
+    }
+
+    /** The GitHub Actions build number this watch app was compiled from. */
+    val currentBuildNumber: Int get() = com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER
 
     /** Wear OS has no reliable on-device sideload flow, so this opens the
      *  build's page on the connected phone instead. */

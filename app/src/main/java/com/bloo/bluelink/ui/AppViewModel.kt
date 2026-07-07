@@ -148,6 +148,8 @@ data class UiState(
     /** A newer CI build than what's installed, if the update checker found one
      *  and it hasn't been dismissed this session or snoozed. */
     val updateInfo: com.bloo.bluelink.update.UpdateInfo? = null,
+    /** True while a manual "Check now" request is in flight. */
+    val updateChecking: Boolean = false,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 
@@ -1014,6 +1016,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { updateStore.setChecksEnabled(enabled) }
         if (!enabled) _state.update { it.copy(updateInfo = null) }
     }
+
+    /** Manual "Check now": ignores the debounce/snooze/enabled gates (force), and
+     *  reports the outcome - the prompt appears if there's a newer build, else a
+     *  brief "you're up to date" message. */
+    fun checkForUpdatesNow() {
+        if (_state.value.updateChecking) return
+        _state.update { it.copy(updateChecking = true) }
+        viewModelScope.launch {
+            val info = runCatching {
+                com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = true)
+            }.getOrNull()
+            _state.update {
+                it.copy(
+                    updateChecking = false,
+                    updateInfo = info ?: it.updateInfo,
+                    message = if (info == null) "You're on the latest build." else it.message,
+                )
+            }
+        }
+    }
+
+    /** The GitHub Actions build number this app was compiled from (0 = local build). */
+    val currentBuildNumber: Int get() = com.bloo.bluelink.BuildConfig.BUILD_RUN_NUMBER
 
     // --- On-device AI (Gemini Nano) --------------------------------------
 
