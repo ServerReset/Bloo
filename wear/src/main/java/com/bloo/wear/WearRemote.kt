@@ -12,7 +12,20 @@ object WearRemote {
             val intent = Intent(Intent.ACTION_VIEW)
                 .addCategory(Intent.CATEGORY_BROWSABLE)
                 .setData(Uri.parse(url))
-            RemoteActivityHelper(context).startRemoteActivity(intent)
+            val future = RemoteActivityHelper(context).startRemoteActivity(intent)
+            // startRemoteActivity resolves asynchronously; ignoring the future made
+            // a tap silently do nothing when the phone was unreachable. Surface it
+            // as a watch notification, the same way standalone command failures do.
+            future.addListener({
+                runCatching { future.get() }.onFailure {
+                    WearNotifications.post(
+                        context,
+                        ("open$url").hashCode(),
+                        "Couldn't open on phone",
+                        "Bring your phone nearby and try again.",
+                    )
+                }
+            }, com.google.common.util.concurrent.MoreExecutors.directExecutor())
         }
     }
 

@@ -2,7 +2,6 @@ package com.bloo.wear
 
 import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.WearSync
-import com.bloo.wear.tile.BlooTileService
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
@@ -44,10 +43,22 @@ class WearListenerService : WearableListenerService() {
                 }
             }
         }
-        // Push a tile refresh so the glanceable tile updates immediately when the
-        // phone publishes new vehicle state.
+        // Push a tile + complication refresh so the glanceable surfaces update
+        // immediately when the phone publishes new vehicle state. Must target the
+        // CONCRETE pool classes: TileUpdateRequester matches by exact ComponentName,
+        // and the abstract BlooTileService isn't in the manifest — requesting an
+        // update for it matched nothing, so with the app closed the tiles kept
+        // rendering stale lock/charge state (with the stale action baked into the
+        // tap target) until their 10-minute freshness timeout.
         if (tileNeedsRefresh) {
-            TileService.getUpdater(applicationContext).requestUpdate(BlooTileService::class.java)
+            val updater = TileService.getUpdater(applicationContext)
+            listOf(
+                com.bloo.wear.tile.BlooTile1::class.java,
+                com.bloo.wear.tile.BlooTile2::class.java,
+                com.bloo.wear.tile.BlooTile3::class.java,
+                com.bloo.wear.tile.BlooTile4::class.java,
+            ).forEach { cls -> runCatching { updater.requestUpdate(cls) } }
+            com.bloo.wear.complication.ComplicationLink.requestUpdate(applicationContext)
         }
     }
 }

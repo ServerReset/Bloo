@@ -216,6 +216,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
@@ -310,13 +311,19 @@ fun BlooApp(vm: AppViewModel) {
 
     // While a command is in flight (or the garage is loading), loop a soft
     // left-to-right sweep so progress is felt until it completes. The effect is
-    // keyed on `busy`, so it cancels as soon as work finishes.
+    // keyed on `busy`, so it cancels as soon as work finishes. Gated on the
+    // STARTED lifecycle state: a backgrounded Activity keeps its composition
+    // (and its LaunchedEffects) alive, so without the gate a slow command kept
+    // vibrating the phone in the user's pocket after they switched apps.
     val busy = state.loading || state.pending.isNotEmpty()
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     LaunchedEffect(busy) {
         if (!busy) return@LaunchedEffect
-        while (true) {
-            haptics.loadingSweep()
-            delay(560)
+        lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                haptics.loadingSweep()
+                delay(560)
+            }
         }
     }
 
@@ -2439,7 +2446,13 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     // A themed Surface establishes the correct content colour for ALL text inside
     // (otherwise text on the cover screen falls back to the default black).
     Surface(
-        modifier = Modifier.fillMaxSize().graphicsLayer(alpha = alpha.value, translationY = offsetY.value),
+        // Lambda graphicsLayer: the non-lambda overload read alpha/offsetY in
+        // composition, recomposing this full-screen Surface every frame of the
+        // entrance animation; the lambda form re-reads them in the draw phase only.
+        modifier = Modifier.fillMaxSize().graphicsLayer {
+            this.alpha = alpha.value
+            translationY = offsetY.value
+        },
         // Matches PebbleCornerExpanded so the "main" tile's corners agree with the
         // other (Pebble-wrapped) tiles it shares the same VerticalPager with.
         shape = RoundedCornerShape(PebbleCornerExpanded),
@@ -2471,8 +2484,8 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                         color = scheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
-                    FloatingIcon(Icons.Filled.Refresh, "Refresh", { vm.refreshStatus(v) })
-                    FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() })
+                    FloatingIcon(Icons.Filled.Refresh, "Refresh", { vm.refreshStatus(v) }, outerPadding = 2.dp)
+                    FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() }, outerPadding = 2.dp)
                 }
                 // Centre the live-status + lock group so the tile reads as one
                 // balanced block instead of top-clustered with a big gap below.
@@ -2490,13 +2503,17 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     }
 }
 
-/** A small translucent circular icon button used as a floating overlay control. */
+/** A small translucent circular icon button used as a floating overlay control.
+ *  [outerPadding] is the breathing room around the 44dp circle - the default
+ *  suits free-floating overlay corners; tight rows (the cover screen's title
+ *  row) pass less so the row doesn't inflate to 68dp on a ~260dp-tall screen. */
 @Composable
 private fun FloatingIcon(
     icon: ImageVector,
     description: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    outerPadding: Dp = 12.dp,
 ) {
     val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
@@ -2512,7 +2529,7 @@ private fun FloatingIcon(
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         interactionSource = interaction,
-        modifier = modifier.padding(12.dp).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
+        modifier = modifier.padding(outerPadding).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = description)
@@ -4596,7 +4613,11 @@ private fun SplitExpandButton(
                     Icon(
                         action.icon,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp).rotate(spinAngle.value),
+                        // graphicsLayer lambda, not rotate(): rotate() reads the
+                        // Animatable in composition, and the spin runs for as long
+                        // as climate is on - recomposing this button every frame
+                        // indefinitely. The lambda defers the read to the draw phase.
+                        modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = spinAngle.value },
                     )
                 }
                 if (action.label.isNotEmpty()) {
@@ -5083,22 +5104,9 @@ private fun ClimatePebble(
         seatRearLeft = rearLeft,
         seatRearRight = rearRight,
     )
-    // Persist once settings stop changing, not on every drag tick - each of the
-    // temp/duration/seat sliders above sets currentReq's backing state directly,
-    // so without a debounce this relaunches (cancelling the previous save) on
-    // every single frame of a drag. saveClimate itself is a cheap async write,
-    // but the sibling publishClimateState effect below updates the shared
-    // ViewModel StateFlow, which the whole screen collects - firing that on
-    // every tick recomposes far more than the slider being dragged and is
-    // exactly what read as "the sliders don't react until long after you
-    // change them." A short delay before either write means once the user
-    // stops moving a control, not every intermediate value it passed through.
-    LaunchedEffect(currentReq) {
-        if (settingsLoaded) {
-            delay(400)
-            vm.saveClimate(v, currentReq)
-        }
-    }
+    // Persist + watch-mirror is handled by ONE debounced call further down
+    // (after activePresetId exists) - see the LaunchedEffect near the climate
+    // sync block.
 
     val presets = state.climatePresets[v.vin].orEmpty()
     var showAddPreset by remember { mutableStateOf(false) }
@@ -5137,15 +5145,16 @@ private fun ClimatePebble(
         rearRight = SeatLevel.fromApi(r.seatRearRight)
         activePresetId = r.activePresetId
     }
-    // Publish our draft so the watch mirrors it (no-ops when unchanged). This
-    // writes to the shared ViewModel StateFlow that the whole screen collects,
-    // so - like saveClimate above - it's debounced to fire once settings stop
-    // changing rather than recomposing the entire screen on every drag tick.
+    // Persist + publish-to-watch once settings stop changing, not on every drag
+    // tick: publishClimateState updates the shared ViewModel StateFlow the whole
+    // screen collects, so per-tick commits recomposed far more than the slider
+    // being dragged (read as "the sliders don't react until long after you
+    // change them"). The 400ms debounce lives in the ViewModel (viewModelScope),
+    // NOT here: an effect-side delay was cancelled whenever this pebble left
+    // composition within 400ms of the last adjustment (cover-screen tile swipe,
+    // car switch, collapse), silently reverting the user's change.
     LaunchedEffect(currentReq, activePresetId) {
-        if (settingsLoaded) {
-            delay(400)
-            vm.publishClimateState(v.vin, activePresetId, currentReq)
-        }
+        if (settingsLoaded) vm.saveClimateDebounced(v, currentReq, activePresetId)
     }
 
     val climateOn = status?.airCtrlOn == true
@@ -6624,7 +6633,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     // starts made that recompose compete with the bounce for frame
                     // budget, which is what read as the bounce stalling/cutting short
                     // even with the commit already limited to once-per-release.
-                    onValueSettled = { settingsScope.launch { delay(150); vm.setVibrancy(vibrancyDraft) } },
+                    onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
                 )
 
                 if (showEditor) {
@@ -6653,7 +6662,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     onValueChange = { uiScaleDraft = (it * 20).roundToInt() / 20f },
                     valueRange = 0.85f..1.3f,
                     steps = 8,
-                    onValueSettled = { settingsScope.launch { delay(150); vm.setUiScale(uiScaleDraft) } },
+                    onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
                 // Global temperature unit, applied everywhere temperatures show.
@@ -7226,7 +7235,6 @@ private fun SettingsSearchResults(
     appearance: SettingsStore.Appearance,
     notif: SettingsStore.NotificationPrefs,
 ) {
-    val searchScope = rememberCoroutineScope()
     val tokens = query.lowercase().split(Regex("[^a-z0-9%]+"))
         .filter { it.isNotBlank() && it !in SearchStopwords }
 
@@ -7251,7 +7259,7 @@ private fun SettingsSearchResults(
             onValueChange = { uiScaleDraft = (it * 20).roundToInt() / 20f },
             valueRange = 0.85f..1.3f,
             steps = 8,
-            onValueSettled = { searchScope.launch { delay(150); vm.setUiScale(uiScaleDraft) } },
+            onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
@@ -7263,7 +7271,7 @@ private fun SettingsSearchResults(
             onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
             valueRange = 0f..2f,
             steps = 19,
-            onValueSettled = { searchScope.launch { delay(150); vm.setVibrancy(vibrancyDraft) } },
+            onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
         )
     }
     add("Open links in app", "browser tab links") {

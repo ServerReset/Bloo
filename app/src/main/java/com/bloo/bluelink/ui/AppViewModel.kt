@@ -1271,6 +1271,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.saveClimate(v.vin, req) }
     }
 
+    private val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
+
+    /**
+     * Debounced persist + watch-mirror of the live climate draft. Lives in
+     * viewModelScope on purpose: a LaunchedEffect-side debounce is cancelled when
+     * the ClimatePebble leaves composition (cover-screen tile swipe, car switch,
+     * collapse), silently dropping any change made in the final 400ms - the
+     * sliders then reverted to the stale persisted value on the next open.
+     */
+    fun saveClimateDebounced(v: Vehicle, req: ClimateRequest, activePresetId: String?) {
+        climateSaveJobs[v.vin]?.cancel()
+        climateSaveJobs[v.vin] = viewModelScope.launch {
+            kotlinx.coroutines.delay(400)
+            settingsStore.saveClimate(v.vin, req)
+            publishClimateState(v.vin, activePresetId, req)
+        }
+    }
+
     fun saveClimatePreset(v: Vehicle, name: String, req: ClimateRequest) {
         val preset = ClimatePreset(
             id = System.currentTimeMillis().toString(),
@@ -1656,6 +1674,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
     fun setUiScale(value: Float) = viewModelScope.launch { settingsStore.setUiScale(value) }
     fun setVibrancy(value: Float) = viewModelScope.launch { settingsStore.setVibrancy(value) }
+
+    // Deferred variants for the settings sliders: these two values recompose
+    // ~the whole app (colorScheme / LocalDensity), so the commit waits a beat
+    // past slider release to let the settle-bounce animation get a clean run.
+    // In viewModelScope, not a screen-tied scope, so closing Settings inside
+    // that beat can't drop the change.
+    fun setUiScaleSoon(value: Float) =
+        viewModelScope.launch { kotlinx.coroutines.delay(150); settingsStore.setUiScale(value) }
+    fun setVibrancySoon(value: Float) =
+        viewModelScope.launch { kotlinx.coroutines.delay(150); settingsStore.setVibrancy(value) }
     fun setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
     fun clearLogs() = AppLog.clear()

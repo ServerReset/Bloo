@@ -31,10 +31,17 @@ object UpdateChecker {
         if (!store.checksEnabled.first()) return null
         val now = System.currentTimeMillis()
         if (!force && now - store.lastCheckedAt() < CHECK_INTERVAL_MS) return null
-        store.setLastCheckedAt(now)
         if (!force && now < store.snoozeUntil()) return null
 
-        val run = UpdateApi.fetchLatestSuccessfulRun(UpdateApi.DEFAULT_BRANCH) ?: return null
+        // Compare against the branch THIS build came from: run_number increments
+        // globally across branches, so a fixed branch both missed newer builds of
+        // the installed branch and could offer a higher-numbered build of a
+        // different branch (an effective downgrade).
+        val branch = BuildConfig.BUILD_BRANCH.ifBlank { UpdateApi.DEFAULT_BRANCH }
+        val run = UpdateApi.fetchLatestSuccessfulRun(branch) ?: return null
+        // Only consume the 12h window on a successful fetch — a failed check
+        // (offline cold start) should retry next launch, not go quiet for 12h.
+        store.setLastCheckedAt(now)
         if (run.runNumber <= BuildConfig.BUILD_RUN_NUMBER) return null
 
         return UpdateInfo(run)

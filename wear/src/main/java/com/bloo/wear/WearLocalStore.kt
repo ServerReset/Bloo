@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.wearLocalStore by preferencesDataStore(name = "bloo_wear_local")
@@ -199,6 +200,21 @@ class WearLocalStore(private val context: Context) {
 
     suspend fun setUpdateSnoozeUntil(millis: Long) {
         context.wearLocalStore.edit { it[keyUpdateSnoozeUntil] = millis }
+    }
+
+    // The last tile chip clickable id that was actually executed. Tile State
+    // (including lastClickableId) is persisted by the system and re-delivered on
+    // every subsequent onTileRequest - including freshness/push refreshes - so
+    // BlooTileService must dedupe or a single tap's command re-fires on every
+    // later background render. Ids carry a per-render nonce, so equality here
+    // means "this exact tap was already handled".
+    private val keyTileLastClick = stringPreferencesKey("tile_last_click")
+
+    suspend fun tileLastClick(): String? =
+        context.wearLocalStore.data.first()[keyTileLastClick]
+
+    suspend fun setTileLastClick(id: String) {
+        context.wearLocalStore.edit { it[keyTileLastClick] = id }
     }
 
     suspend fun setTileOrder(order: List<String>) {

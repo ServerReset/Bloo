@@ -260,12 +260,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             if (!settings.updateChecksEnabled) return@launch
             val now = System.currentTimeMillis()
             if (now - settings.updateLastCheckedAt < UPDATE_CHECK_INTERVAL_MS) return@launch
-            localStore.setUpdateLastCheckedAt(now)
             if (now < settings.updateSnoozeUntil) return@launch
+            // Same-branch comparison + consume the 12h window only on a successful
+            // fetch - mirrors UpdateChecker.checkPhone (see there for why).
+            val branch = com.bloo.wear.BuildConfig.BUILD_BRANCH
+                .ifBlank { com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH }
             val run = runCatching {
-                com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH)
-            }.getOrNull()
-            if (run != null && run.runNumber > com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER) {
+                com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(branch)
+            }.getOrNull() ?: return@launch
+            localStore.setUpdateLastCheckedAt(now)
+            if (run.runNumber > com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER) {
                 _ui.update { it.copy(updateRun = run) }
             }
         }
@@ -386,6 +390,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // the UI calls this on every settled car switch.
         if (_ui.value.acLimitDraft != null || _ui.value.dcLimitDraft != null) {
             _ui.update { it.copy(acLimitDraft = null, dcLimitDraft = null) }
+        }
+        // Persist the viewed car as the snapshot store's selection: "Follow
+        // selected" tiles/complications resolve from SnapshotStore.selected, and
+        // nothing on the watch ever wrote it (persistState deliberately ignores
+        // the phone's), so saveVehicles' first-car default was permanent - every
+        // follow-selected surface showed (and commanded!) car #1 forever.
+        viewModelScope.launch {
+            runCatching { snapshotStore.setSelected(vin) }
+            requestWidgetUpdates()
         }
         if (vin in sessionFetched) return
         if (vehicles.none { it.vin == vin }) return

@@ -21,6 +21,12 @@ android {
         // Releases, so this - not versionCode - is what "is there a newer build"
         // actually compares.
         buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        // The branch this build came from, so the update checker compares against
+        // builds of the SAME branch. run_number increments globally across all
+        // branches, so checking a fixed branch both missed newer builds of the
+        // installed branch and could offer a higher-numbered build of a different
+        // branch that lacks the code the user is running.
+        buildConfigField("String", "BUILD_BRANCH", "\"${System.getenv("GITHUB_REF_NAME") ?: ""}\"")
     }
 
     signingConfigs {

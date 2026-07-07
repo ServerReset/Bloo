@@ -113,8 +113,15 @@ abstract class BlooTileService : TileService() {
 
             var data = store.current()
             var car = pick(data)
-            if (clickId.startsWith(CMD_PREFIX)) {
-                val action = clickId.removePrefix(CMD_PREFIX)
+            // The system persists tile State (incl. lastClickableId) and re-delivers
+            // it on EVERY later onTileRequest - freshness refreshes, push refreshes -
+            // not just taps. Without dedupe, one tap on Unlock kept re-sending the
+            // unlock command to the car on every background render. Ids carry a
+            // per-render nonce (see cmd()), so "same id as last handled" means this
+            // exact tap was already executed.
+            if (clickId.startsWith(CMD_PREFIX) && clickId != WearLocalStore(ctx).tileLastClick()) {
+                WearLocalStore(ctx).setTileLastClick(clickId)
+                val action = clickId.removePrefix(CMD_PREFIX).substringBefore(':')
                 car?.let { c -> runCatching { WearComms.send(ctx, WearCommand(c.vin, action)) } }
                 data = store.current()
                 car = pick(data)
@@ -126,7 +133,10 @@ abstract class BlooTileService : TileService() {
         val actions = result.third
 
         val device = params.deviceConfiguration
-        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles, actions)
+        // Per-render nonce baked into chip clickable ids so a handled tap's id can
+        // never equal a fresh render's id (see the dedupe above).
+        val nonce = System.currentTimeMillis().toString(36)
+        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles, actions, nonce)
 
         // Refresh faster while charging (percent moves quickly) than when idle.
         val freshness = if (snapshot?.charging == true) FRESHNESS_CHARGING_MS else FRESHNESS_MS
@@ -173,6 +183,7 @@ abstract class BlooTileService : TileService() {
         snap: VehicleSnapshot,
         roles: WearColorRoles,
         actions: List<String>,
+        nonce: String,
     ): LayoutElementBuilders.LayoutElement {
         val screenDp = device.screenWidthDp
         val isSmall  = screenDp < 193
@@ -268,7 +279,7 @@ abstract class BlooTileService : TileService() {
         val chipRowBuilder = LayoutElementBuilders.Row.Builder().setHeight(DimensionBuilders.wrap())
         chosen.forEachIndexed { i, action ->
             if (i > 0) chipRowBuilder.addContent(spacer(chipGap))
-            chipRowBuilder.addContent(actionButton(ctx, action, snap, roles, btnSize))
+            chipRowBuilder.addContent(actionButton(ctx, action, snap, roles, btnSize, nonce))
         }
         val chipRow = chipRowBuilder.build()
 
@@ -333,8 +344,11 @@ abstract class BlooTileService : TileService() {
             )
             .build()
 
-    private fun cmd(action: String): Clickable = Clickable.Builder()
-        .setId(CMD_PREFIX + action)
+    /** Chip click id: "cmd:<action>:<nonce>". The nonce makes each render's ids
+     *  unique so buildTile's last-handled dedupe can tell a fresh tap from the
+     *  system replaying a stale lastClickableId on a background refresh. */
+    private fun cmd(action: String, nonce: String): Clickable = Clickable.Builder()
+        .setId(CMD_PREFIX + action + ":" + nonce)
         .setOnClick(ActionBuilders.LoadAction.Builder().build())
         .build()
 
@@ -347,6 +361,7 @@ abstract class BlooTileService : TileService() {
         snap: VehicleSnapshot,
         roles: WearColorRoles,
         size: DimensionBuilders.DpProp,
+        nonce: String,
     ): LayoutElementBuilders.LayoutElement {
         val locked = snap.locked == true
         val charging = snap.charging == true
@@ -381,7 +396,7 @@ abstract class BlooTileService : TileService() {
                 desc = if (locked) "Unlock" else "Lock"
             }
         }
-        return Button.Builder(ctx, cmd(act))
+        return Button.Builder(ctx, cmd(act, nonce))
             .setButtonColors(colors)
             .setIconContent(img)
             .setContentDescription(desc)

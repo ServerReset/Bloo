@@ -171,7 +171,12 @@ fun AnimatedSlider(
                     }
                 }
             }
-            .progressSemantics(anim.value, valueRange, steps),
+            // The LOGICAL value, not anim.value: reading the Animatable here
+            // invalidated composition on every frame of a drag or settle bounce
+            // just to keep semantics fresh (the Canvas below reads anim.value in
+            // its own draw scope, which redraws without recomposing). The stepped
+            // value is also what assistive tech should announce.
+            .progressSemantics(value, valueRange, steps),
     ) {
         Canvas(Modifier.fillMaxWidth().height(thumbH)) {
             val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
