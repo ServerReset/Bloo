@@ -140,6 +140,7 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
     }
 
     private suspend fun downloadAndCacheMapTile(ctx: Context, widgetId: Int, lat: Double, lon: Double) {
+        withContext(Dispatchers.IO) {
         runCatching {
             val zoom = 15
             val n = 1 shl zoom
@@ -150,8 +151,12 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             val yt = yFull.toInt()
             val xOff = xFull - xt
             val yOff = yFull - yt
-            val x0 = if (xOff > 0.5) xt else xt - 1
-            val y0 = if (yOff > 0.5) yt else yt - 1
+            // Clamp tile coords so we never request tile -1 or n, which tile servers
+            // return 404 for. When flush against the edge we can only fetch 1×2 or 2×1.
+            val x0 = (if (xOff > 0.5) xt else xt - 1).coerceAtLeast(0)
+            val y0 = (if (yOff > 0.5) yt else yt - 1).coerceAtLeast(0)
+            val x1 = (x0 + 1).coerceAtMost(n - 1)
+            val y1 = (y0 + 1).coerceAtMost(n - 1)
 
             val stitched = android.graphics.Bitmap.createBitmap(512, 512, android.graphics.Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(stitched)
@@ -159,7 +164,10 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             for (dy in 0..1) {
                 for (dx in 0..1) {
                     runCatching {
-                        val url = java.net.URL("https://tile.openstreetmap.org/$zoom/${x0 + dx}/${y0 + dy}.png")
+                        val tx = x0 + dx
+                        val ty = y0 + dy
+                        if (tx > n - 1 || ty > n - 1) return@runCatching
+                        val url = java.net.URL("https://tile.openstreetmap.org/$zoom/$tx/$ty.png")
                         val conn = url.openConnection() as java.net.HttpURLConnection
                         conn.setRequestProperty("User-Agent", "Bloo/1.0 (Android; widget location map)")
                         conn.connectTimeout = 5000
@@ -187,6 +195,7 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             val file = java.io.File(ctx.cacheDir, "widget_map_$widgetId.png")
             file.outputStream().use { out -> stitched.compress(android.graphics.Bitmap.CompressFormat.PNG, 85, out) }
             stitched.recycle()
+        }
         }
     }
 
