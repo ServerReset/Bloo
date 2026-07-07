@@ -1,11 +1,7 @@
 package com.bloo.wear
 
-import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.WearSync
-import com.bloo.wear.tile.BlooTile1
-import com.bloo.wear.tile.BlooTile2
-import com.bloo.wear.tile.BlooTile3
-import com.bloo.wear.tile.BlooTile4
+import com.bloo.wear.tile.refreshWearGlanceables
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
@@ -59,16 +55,7 @@ class WearListenerService : WearableListenerService() {
             }
             // Push a tile + complication refresh so the glanceable surfaces update
             // immediately when the phone publishes new vehicle state.
-            if (tileNeedsRefresh) {
-                val updater = runCatching { TileService.getUpdater(applicationContext) }.getOrNull() ?: return@launch
-                listOf(
-                    BlooTile1::class.java,
-                    BlooTile2::class.java,
-                    BlooTile3::class.java,
-                    BlooTile4::class.java,
-                ).forEach { cls -> runCatching { updater.requestUpdate(cls) } }
-                com.bloo.wear.complication.ComplicationLink.requestUpdate(applicationContext)
-            }
+            if (tileNeedsRefresh) refreshWearGlanceables(applicationContext)
         }
     }
 

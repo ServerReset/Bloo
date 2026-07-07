@@ -1266,11 +1266,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Restore the last-used climate settings for a car (null if never saved). */
     suspend fun loadSavedClimate(v: Vehicle): ClimateRequest? = settingsStore.savedClimate(v.vin)
 
-    /** Persist the current climate slider/toggle state so it survives app restarts. */
-    fun saveClimate(v: Vehicle, req: ClimateRequest) {
-        viewModelScope.launch { settingsStore.saveClimate(v.vin, req) }
-    }
-
     private val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
     /**

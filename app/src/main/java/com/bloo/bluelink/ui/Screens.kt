@@ -54,12 +54,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -134,7 +132,6 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Thermostat
@@ -182,7 +179,6 @@ import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -212,14 +208,12 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
@@ -239,7 +233,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.ui.text.AnnotatedString
@@ -257,7 +250,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.R
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.Brand
@@ -488,17 +480,6 @@ private data class WizardPage(
     val carIndex: Int = 0,
     val totalCars: Int = 1,
 )
-
-private fun buildOnboardingPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
-    add(WizardPage(WizardStepKind.WELCOME))
-    vehicles.forEachIndexed { i, v ->
-        val lbl = if (vehicles.size > 1) "${v.name} (${i + 1}/${vehicles.size})" else v.name
-        add(WizardPage(WizardStepKind.POWERTRAIN, v.vin, lbl, i, vehicles.size))
-        add(WizardPage(WizardStepKind.SEATS, v.vin, lbl, i, vehicles.size))
-        add(WizardPage(WizardStepKind.STEERING, v.vin, lbl, i, vehicles.size))
-    }
-    add(WizardPage(WizardStepKind.FINISH))
-}
 
 private fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
     vehicles.forEachIndexed { i, v ->
@@ -1083,7 +1064,6 @@ private fun WizardSeatRow(
     onHeat: (Boolean) -> Unit,
     onCool: (Boolean) -> Unit,
 ) {
-    val scheme = MaterialTheme.colorScheme
     Row(
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2661,7 +2641,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
     val statusColor = when {
         charging -> ChargeGreen
         drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
-        else -> LocalContentColor.current.copy(alpha = 0.7f)
+        else -> LocalContentColor.current.copy(alpha = MutedContentAlpha)
     }
 
     Column {
@@ -3582,13 +3562,13 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
             Text(
                 "Summarize this car's last-refreshed status, generated privately on your device.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = LocalContentColor.current.copy(alpha = 0.7f),
+                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
             )
         }
         Text(
             "Reflects the last refresh. Tap Summarize to update.",
             style = MaterialTheme.typography.bodySmall,
-            color = LocalContentColor.current.copy(alpha = 0.7f),
+            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
         )
     }
 }
@@ -4193,10 +4173,10 @@ private fun StateControl(
                 else -> "Unknown"
             }
             val stateColorTarget = when {
-                !enabled -> LocalContentColor.current.copy(alpha = 0.7f)
+                !enabled -> LocalContentColor.current.copy(alpha = MutedContentAlpha)
                 isOn == false && offTextColor != null -> offTextColor
                 highlighted -> highlightColor
-                else -> LocalContentColor.current.copy(alpha = 0.7f)
+                else -> LocalContentColor.current.copy(alpha = MutedContentAlpha)
             }
             val stateColor by androidx.compose.animation.animateColorAsState(
                 stateColorTarget,
@@ -4370,7 +4350,7 @@ private fun Pebble(
                             Text(
                                 s,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = LocalContentColor.current.copy(alpha = 0.7f),
+                                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                                 maxLines = 1,
                             )
                         }
@@ -4428,6 +4408,9 @@ private fun Pebble(
     }
 }
 
+/** The app's muted/secondary-text alpha, applied over LocalContentColor. */
+private const val MutedContentAlpha = 0.7f
+
 /** Shared control height: a collapsed pebble matches the lock/unlock button. */
 private val ControlHeight = 76.dp
 
@@ -4435,61 +4418,6 @@ private val ControlHeight = 76.dp
 private val PebbleHeaderHeight = ControlHeight
 private val PebbleCornerCollapsed = 38.dp
 private val PebbleCornerExpanded = 20.dp
-
-/**
- * A pebble-header action button (climate/charge/locate/AI), shown even when the
- * pebble is collapsed. A pill that becomes a rounded rectangle (in
- * [activeContainer]) when [active] - e.g. climate on, charging. The width is
- * stable while loading and springs when the label flips Start <-> Stop.
- */
-@Composable
-private fun PebbleActionButton(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    pending: Boolean = false,
-    active: Boolean = false,
-    spinning: Boolean = false,
-    bounceIcon: Boolean = false,
-    activeContainer: Color = MaterialTheme.colorScheme.primary,
-    activeContent: Color = MaterialTheme.colorScheme.onPrimary,
-) {
-    val bounceInteraction = remember { MutableInteractionSource() }
-    // One-shot bounce: a tap fires a quick hop up that springs back down, so the
-    // jump is always visible regardless of how briefly the button is pressed.
-    val bounceY = remember { Animatable(0f) }
-    val bounceScope = rememberCoroutineScope()
-    // While the bounce is mid-flight, keep showing the (bouncing) icon and hold
-    // off the loading indicator - otherwise pending=true swaps the icon for the
-    // spinner the instant you click and the hop is never seen.
-    var bouncing by remember { mutableStateOf(false) }
-    MorphButton(
-        onClick = {
-            if (bounceIcon) bounceScope.launch {
-                bouncing = true
-                bounceY.animateTo(-9f, spring(stiffness = Spring.StiffnessHigh))
-                bounceY.animateTo(
-                    0f,
-                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                )
-                bouncing = false
-            }
-            onClick()
-        },
-        enabled = enabled && !pending,
-        active = active,
-        activeContainerColor = activeContainer,
-        activeContentColor = activeContent,
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-        modifier = Modifier
-            .heightIn(min = 50.dp)
-            .graphicsLayer { translationY = bounceY.value },
-        interactionSource = bounceInteraction,
-    ) {
-        MorphButtonLabel(icon, label, pending = pending && !bouncing, spinning = spinning)
-    }
-}
 
 private class PebbleHeaderAction(
     val label: String,
@@ -5192,7 +5120,7 @@ private fun ClimatePebble(
                 Text(
                     "Climate is on at the car. It ignores app commands while you're driving, so this is read-only.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LocalContentColor.current.copy(alpha = 0.7f),
+                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                 )
                 status?.airTemp?.value?.let { StatusRow("Set to", degLabel(it, fahrenheit)) }
                 status?.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
@@ -5205,7 +5133,7 @@ private fun ClimatePebble(
                 Text(
                     "Climate can't be started while the car is driving.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LocalContentColor.current.copy(alpha = 0.7f),
+                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                 )
             }
             return@Pebble
@@ -5262,7 +5190,7 @@ private fun ClimatePebble(
             Text(
                 "It's $ambientLabel where your car is — Smart climate runs 10° ${if (ambientF >= 70) "cooler" else "warmer"}.",
                 style = MaterialTheme.typography.bodySmall,
-                color = LocalContentColor.current.copy(alpha = 0.7f),
+                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
             )
         }
 
@@ -5571,7 +5499,7 @@ private fun PresetPill(
                         Text(
                             detail,
                             style = MaterialTheme.typography.labelSmall,
-                            color = LocalContentColor.current.copy(alpha = 0.7f),
+                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                             maxLines = 1,
                         )
                     }
@@ -8112,7 +8040,7 @@ private fun StatusRow(label: String, value: String) {
             label,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
-            color = LocalContentColor.current.copy(alpha = 0.7f),
+            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
         )
         AnimatedContent(
             targetState = value,

@@ -27,10 +27,6 @@ class ComplicationCarStore(private val context: Context) {
     suspend fun setVin(dataSource: String, instanceId: Int, vin: String) {
         context.complicationCarStore.edit { it[key(dataSource, instanceId)] = vin }
     }
-
-    suspend fun clear(dataSource: String, instanceId: Int) {
-        context.complicationCarStore.edit { it.remove(key(dataSource, instanceId)) }
-    }
 }
 
 /**

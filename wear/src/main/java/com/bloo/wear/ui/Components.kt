@@ -335,24 +335,6 @@ fun AnimatedSlider(
     )
 }
 
-@Composable
-fun WiggleText(
-    text: String,
-    style: TextStyle = MaterialTheme.typography.bodyMedium,
-    color: Color = Color.Unspecified,
-    fontWeight: FontWeight? = null,
-    maxLines: Int = 1,
-) {
-    val resolvedColor = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color
-    val mergedStyle = if (fontWeight != null) style.copy(fontWeight = fontWeight) else style
-    com.bloo.uicommon.WiggleText(
-        text = text,
-        style = mergedStyle.copy(color = resolvedColor),
-        maxLines = maxLines,
-        reduceMotion = LocalReduceMotion.current,
-    )
-}
-
 /** The app's pill→rounded-square morphing button, for Wear. Matches the phone's MorphButton.
  *  [secondaryLabel] adds a small caption line below [label] (e.g. a field name
  *  under its current value) — every button-shaped control in the wear app

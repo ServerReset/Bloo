@@ -479,3 +479,15 @@ class BlooTile1 : BlooTileService() { override val poolIndex = 0 }
 class BlooTile2 : BlooTileService() { override val poolIndex = 1 }
 class BlooTile3 : BlooTileService() { override val poolIndex = 2 }
 class BlooTile4 : BlooTileService() { override val poolIndex = 3 }
+
+/** Nudge every pool Tile and the watch-face complications to re-read the latest
+ *  snapshot. The single source of truth for "which glanceable surfaces exist" -
+ *  called from the ViewModel (app open) and WearListenerService (phone push,
+ *  app closed). Must target the CONCRETE tile classes: the updater matches by
+ *  exact ComponentName, so the abstract BlooTileService would match nothing. */
+fun refreshWearGlanceables(context: android.content.Context) {
+    val updater = runCatching { TileService.getUpdater(context) }.getOrNull()
+    listOf(BlooTile1::class.java, BlooTile2::class.java, BlooTile3::class.java, BlooTile4::class.java)
+        .forEach { cls -> runCatching { updater?.requestUpdate(cls) } }
+    com.bloo.wear.complication.ComplicationLink.requestUpdate(context)
+}

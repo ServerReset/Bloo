@@ -930,16 +930,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Nudge every pool Tile and the watch-face complications to re-read the
      *  updated snapshot. */
-    private fun requestWidgetUpdates() {
-        val updater = runCatching { androidx.wear.tiles.TileService.getUpdater(ctx) }.getOrNull()
-        listOf(
-            com.bloo.wear.tile.BlooTile1::class.java,
-            com.bloo.wear.tile.BlooTile2::class.java,
-            com.bloo.wear.tile.BlooTile3::class.java,
-            com.bloo.wear.tile.BlooTile4::class.java,
-        ).forEach { cls -> runCatching { updater?.requestUpdate(cls) } }
-        com.bloo.wear.complication.ComplicationLink.requestUpdate(ctx)
-    }
+    private fun requestWidgetUpdates() = com.bloo.wear.tile.refreshWearGlanceables(ctx)
 
     // ---- Plumbing ---------------------------------------------------------
 
