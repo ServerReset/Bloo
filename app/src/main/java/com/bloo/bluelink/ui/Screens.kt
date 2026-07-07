@@ -597,17 +597,11 @@ private fun OnboardingScreen(vm: AppViewModel) {
                                     .background(scheme.surfaceContainerHighest)
                                     .padding(horizontal = 12.dp, vertical = 4.dp),
                             ) {
-                                WizardSeatRow("Driver", sc.driverHeat, sc.driverCool,
-                                    { vm.setSeatFlag(vehicle, "dh", it) }, { vm.setSeatFlag(vehicle, "dc", it) })
-                                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
-                                WizardSeatRow("Front passenger", sc.passHeat, sc.passCool,
-                                    { vm.setSeatFlag(vehicle, "ph", it) }, { vm.setSeatFlag(vehicle, "pc", it) })
-                                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
-                                WizardSeatRow("Rear left", sc.rearLeftHeat, sc.rearLeftCool,
-                                    { vm.setSeatFlag(vehicle, "rlh", it) }, { vm.setSeatFlag(vehicle, "rlc", it) })
-                                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
-                                WizardSeatRow("Rear right", sc.rearRightHeat, sc.rearRightCool,
-                                    { vm.setSeatFlag(vehicle, "rrh", it) }, { vm.setSeatFlag(vehicle, "rrc", it) })
+                                SeatPositions.forEachIndexed { i, pos ->
+                                    if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+                                    WizardSeatRow(pos.label, pos.heat(sc), pos.cool(sc),
+                                        { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
+                                }
                             }
                             // Steering wheel heat
                             Text(
@@ -1037,17 +1031,11 @@ private fun WizardSeatsPage(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        WizardSeatRow("Driver", seats.driverHeat, seats.driverCool,
-            { vm.setSeatFlag(vehicle, "dh", it) }, { vm.setSeatFlag(vehicle, "dc", it) })
-        HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-        WizardSeatRow("Front passenger", seats.passHeat, seats.passCool,
-            { vm.setSeatFlag(vehicle, "ph", it) }, { vm.setSeatFlag(vehicle, "pc", it) })
-        HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-        WizardSeatRow("Rear left", seats.rearLeftHeat, seats.rearLeftCool,
-            { vm.setSeatFlag(vehicle, "rlh", it) }, { vm.setSeatFlag(vehicle, "rlc", it) })
-        HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-        WizardSeatRow("Rear right", seats.rearRightHeat, seats.rearRightCool,
-            { vm.setSeatFlag(vehicle, "rrh", it) }, { vm.setSeatFlag(vehicle, "rrc", it) })
+        SeatPositions.forEachIndexed { i, pos ->
+            if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+            WizardSeatRow(pos.label, pos.heat(seats), pos.cool(seats),
+                { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
+        }
     }
     Text(
         "💡 You can change these any time in Settings → car card.",
@@ -1055,6 +1043,24 @@ private fun WizardSeatsPage(
         color = scheme.onSurfaceVariant,
     )
 }
+
+/** The four seat positions, each pairing its persisted heat/cool flag keys with
+ *  the matching [SeatConfig] fields — the seat matrix lives here once instead of
+ *  being hand-written at each of the three places seats are configured. */
+private data class SeatPosition(
+    val label: String,
+    val heatKey: String,
+    val coolKey: String,
+    val heat: (SeatConfig) -> Boolean,
+    val cool: (SeatConfig) -> Boolean,
+)
+
+private val SeatPositions = listOf(
+    SeatPosition("Driver", "dh", "dc", { it.driverHeat }, { it.driverCool }),
+    SeatPosition("Front passenger", "ph", "pc", { it.passHeat }, { it.passCool }),
+    SeatPosition("Rear left", "rlh", "rlc", { it.rearLeftHeat }, { it.rearLeftCool }),
+    SeatPosition("Rear right", "rrh", "rrc", { it.rearRightHeat }, { it.rearRightCool }),
+)
 
 @Composable
 private fun WizardSeatRow(
@@ -7027,14 +7033,10 @@ private fun CarSettingsCard(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        SeatConfigRow("Driver", seats.driverHeat, seats.driverCool,
-                            { vm.setSeatFlag(v, "dh", it) }, { vm.setSeatFlag(v, "dc", it) })
-                        SeatConfigRow("Front passenger", seats.passHeat, seats.passCool,
-                            { vm.setSeatFlag(v, "ph", it) }, { vm.setSeatFlag(v, "pc", it) })
-                        SeatConfigRow("Rear left", seats.rearLeftHeat, seats.rearLeftCool,
-                            { vm.setSeatFlag(v, "rlh", it) }, { vm.setSeatFlag(v, "rlc", it) })
-                        SeatConfigRow("Rear right", seats.rearRightHeat, seats.rearRightCool,
-                            { vm.setSeatFlag(v, "rrh", it) }, { vm.setSeatFlag(v, "rrc", it) })
+                        SeatPositions.forEach { pos ->
+                            SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
+                                { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
+                        }
                         ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
                     }
 
