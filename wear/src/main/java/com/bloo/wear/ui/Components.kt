@@ -111,7 +111,8 @@ fun rememberWearTextInput(label: String, onResult: (String) -> Unit): () -> Unit
 private const val KEY = "bloo_input"
 
 /** Charge/fuel percentage as a ring with the value centred. The ring colour
- *  reflects state: green while charging, red when critically low, else accent. */
+ *  reflects state: green while charging, red when critically low, else accent.
+ *  Percentage ring and color animate smoothly on value change. */
 @Composable
 fun ChargeRing(
     percent: Int?,
@@ -125,14 +126,24 @@ fun ChargeRing(
         (percent ?: 100) < 15 -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
+    val animatedProgress by animateFloatAsState(
+        targetValue = (percent ?: 0).coerceIn(0, 100) / 100f,
+        animationSpec = tween(800),
+        label = "chargeProgress",
+    )
+    val animatedColor by animateColorAsState(
+        targetValue = ringColor,
+        animationSpec = tween(400),
+        label = "chargeColor",
+    )
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.size(size).semantics { contentDescription = ringDesc },
     ) {
         CircularProgressIndicator(
-            progress = { (percent ?: 0).coerceIn(0, 100) / 100f },
+            progress = { animatedProgress },
             modifier = Modifier.size(size),
-            colors = ProgressIndicatorDefaults.colors(indicatorColor = ringColor),
+            colors = ProgressIndicatorDefaults.colors(indicatorColor = animatedColor),
         )
         AnimatedContent(
             targetState = percent?.let { "$it%" } ?: "—",

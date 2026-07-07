@@ -1339,7 +1339,12 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
 
     // Persist (summary first) to the car's pebble order, synced to the phone.
-    fun commit() = vm.savePebbleOrder(vin, listOf("summary") + order)
+    fun commit() {
+        vm.savePebbleOrder(vin, listOf("summary") + order)
+        // Also persist the expanded watch-tile order locally so it takes effect
+        // immediately without waiting for the phone to echo back via settings.
+        vm.setTileOrder(WearPebbles.tilesFor(listOf("summary") + order))
+    }
 
     ScalingLazyColumn(
         modifier = Modifier
@@ -1351,15 +1356,22 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
             .focusRequester(focusRequester)
             .focusable(),
         state = state,
-        // Without this, the list's own built-in centre-scaling fights the drag's
-        // own scale/translation feedback — a row visibly grows/shrinks as it
-        // crosses the vertical middle mid-drag, independent of the actual drag,
-        // which read as "buggy". Flatten it so drag feedback is the only motion.
         scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        item { ListHeader { Text("Reorder Tiles", textAlign = TextAlign.Center) } }
+        item {
+            Column(horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                ListHeader { Text("Reorder Tiles", textAlign = TextAlign.Center) }
+                Text(
+                    "Long-press a row then drag to reorder",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
         items(order, key = { it }) { key ->
             val dragging = draggingKey == key
             val lift by animateFloatAsState(if (dragging) 1.04f else 1f, label = "lift")
@@ -1372,6 +1384,7 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
             val idx = order.indexOf(key)
             var prevIdx by remember(key) { mutableIntStateOf(idx) }
             val slideOffset = remember(key) { Animatable(0f) }
+            val haptics = LocalHapticFeedback.current
             LaunchedEffect(idx) {
                 if (!dragging && idx != prevIdx && prevIdx >= 0) {
                     val rowH = (heights[key] ?: 64).toFloat()
@@ -1393,13 +1406,16 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                     }
                     .onSizeChanged { heights[key] = it.height }
             ) {
-                Card(
-                    onClick = {},
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pointerInput(key) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggingKey = key; offsetY = 0f },
+                    Card(
+                        onClick = {},
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pointerInput(key) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggingKey = key; offsetY = 0f
+                                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    },
                                 onDragEnd = { draggingKey = null; offsetY = 0f; commit() },
                                 onDragCancel = { draggingKey = null; offsetY = 0f },
                                 onDrag = { change, dragAmount ->

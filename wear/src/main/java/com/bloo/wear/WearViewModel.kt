@@ -747,6 +747,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Persist the watch-side tile display order. Called after a pebble reorder
+     *  so the tile order takes effect locally without waiting for phone echo. */
+    fun setTileOrder(order: List<String>) {
+        viewModelScope.launch {
+            localStore.setTileOrder(order)
+            requestWidgetUpdates()
+        }
+    }
+
     /** Pin pool slot [index]'s Tile to a car (null = follow selected), then redraw it. */
     fun setTileCarVin(index: Int, vin: String?) {
         viewModelScope.launch {
