@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -66,7 +67,7 @@ fun WatchApp(vm: WearViewModel) {
                 }
             }
 
-            WearScreen.SignedOut -> LoginScreen(vm, ui)
+            WearScreen.SignedOut -> key(ui.accounts.size) { LoginScreen(vm, ui) }
 
             WearScreen.Ready -> {
                 val nav = rememberSwipeDismissableNavController()

@@ -530,13 +530,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (!Geocoder.isPresent()) return
         geocoded.add(vin)
         viewModelScope.launch {
-            val name = reverseGeocode(lat, lon)
-            if (!name.isNullOrBlank()) {
-                placeNames = placeNames + (vin to name)
-                publish()
-            } else {
-                // Allow a later retry (e.g. coords updated) if this attempt found nothing.
-                geocoded.remove(vin)
+            runCatching {
+                val name = reverseGeocode(lat, lon)
+                if (!name.isNullOrBlank()) {
+                    placeNames = placeNames + (vin to name)
+                    publish()
+                } else {
+                    geocoded.remove(vin)
+                }
             }
         }
     }
@@ -588,6 +589,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // and relayed as a plain REFRESH, so with a phone connected the
             // limits were never actually applied - the phone just re-fetched
             // status while the block holding setChargeTargets never ran.
+            successMessage = "Charge limits applied",
             explicit = com.bloo.bluelink.data.WearCommand(
                 vin = vin,
                 action = com.bloo.bluelink.data.WearAction.SET_CHARGE_LIMITS,
@@ -626,24 +628,29 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Save the current draft as a new named preset, then sync it to the phone. */
+    /** Save the current draft as a new named preset, then sync it to the phone.
+     *  Skips saving if an identical preset already exists for this car. */
     fun saveCurrentAsPreset(vin: String, name: String) {
         val d = _ui.value.draftFor(vin)
+        val request = ClimateRequest(
+            tempF = d.tempF,
+            defrost = d.defrost,
+            durationMinutes = d.duration,
+            steeringWheelHeat = d.steering,
+            seatFrontLeft = seatLevelOf(d.seatDriver),
+            seatFrontRight = seatLevelOf(d.seatPassenger),
+            seatRearLeft = seatLevelOf(d.seatRearLeft),
+            seatRearRight = seatLevelOf(d.seatRearRight),
+        )
+        // Don't create a duplicate if the current draft matches an existing preset.
+        val existing = _ui.value.presets[vin].orEmpty()
+        if (existing.any { it.request == request }) return
         val preset = ClimatePreset(
             id = java.util.UUID.randomUUID().toString(),
             name = name.trim().ifBlank { "Preset" },
-            request = ClimateRequest(
-                tempF = d.tempF,
-                defrost = d.defrost,
-                durationMinutes = d.duration,
-                steeringWheelHeat = d.steering,
-                seatFrontLeft = seatLevelOf(d.seatDriver),
-                seatFrontRight = seatLevelOf(d.seatPassenger),
-                seatRearLeft = seatLevelOf(d.seatRearLeft),
-                seatRearRight = seatLevelOf(d.seatRearRight),
-            ),
+            request = request,
         )
-        val updated = _ui.value.presets + (vin to (_ui.value.presets[vin].orEmpty() + preset))
+        val updated = _ui.value.presets + (vin to (existing + preset))
         _ui.update { it.copy(presets = updated) }
         persistAndPublishPresets(updated)
     }
@@ -831,14 +838,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private fun command(
         vin: String,
         action: String,
-        // An explicit pre-built command (e.g. CLIMATE_ON with a preset's full
-        // settings). Without it the generic draft-based toWearCommand is used.
         explicit: com.bloo.bluelink.data.WearCommand? = null,
+        successMessage: String? = null,
         block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit,
     ) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {
-            // Companion-first: relay to phone. Only execute locally if no phone is reachable.
             val wearCommand = explicit ?: toWearCommand(vin, action)
             val relayed = runCatching { WearComms.send(ctx, wearCommand) }.isSuccess
             if (relayed) {
@@ -846,8 +851,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 if (currentSnap != null) {
                     val newSnap = com.bloo.bluelink.data.WearCommandRunner.optimistic(currentSnap, wearCommand.action)
                     snapshots = snapshots + (vin to newSnap)
-                    // statuses takes priority over snapshots in buildCarView(); flip the relevant
-                    // field so the button label/color reflects the command outcome instantly.
                     statuses[vin]?.let { s ->
                         statuses = statuses + (vin to when (wearCommand.action) {
                             com.bloo.bluelink.data.WearAction.TOGGLE_LOCK,
@@ -867,14 +870,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 publish()
+                if (successMessage != null) _ui.update { it.copy(message = successMessage) }
                 sessionFetched.remove(vin)
                 requestWidgetUpdates()
             } else {
-                // Phone unreachable — fall back to standalone
                 runCatching {
                     BlueLinkGate.statusMutex.withLock { block(v, repoFor(v.brand), statuses[vin]) }
                 }.onSuccess {
                     publish()
+                    if (successMessage != null) _ui.update { it.copy(message = successMessage) }
                     sessionFetched.remove(vin)
                     refreshStatus(vin, surface = false)
                     requestWidgetUpdates()
