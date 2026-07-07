@@ -42,7 +42,7 @@ object WearImage {
                     .build()
             }
             .diskCache {
-                DiskCache.Builder()
+                DiskCache.Builder(context)
                     .directory(cacheDir)
                     .maxSizePercent(0.02)
                     .build()
