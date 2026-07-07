@@ -377,12 +377,13 @@ fun MorphButton(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "morphPressScale",
     )
-    // Match the phone's buttonContainer(): push the highest surface tone a small
-    // step toward onSurface so the button reads clearly against its card background
-    // without needing a border (the phone uses surfaceContainerHighest + 0.18f for
-    // dark themes; Wear's scheme has no surfaceContainerHighest, so surfaceContainerHigh
-    // fills that role — it's already one step darker, so the lerp stays the same).
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
+    // Phone's buttonContainer() lerps from surfaceContainerHighest (the most
+    // elevated tonal step) toward onSurface by 18-20% to get a fill that reads
+    // clearly against the card behind it. Wear's ColorScheme has no
+    // surfaceContainerHighest, so this uses surfaceContainerHigh (one step
+    // darker) — a higher lerp factor (45%) compensates so the visual result
+    // matches the phone exactly.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
     val bg by animateColorAsState(
         targetValue = if (active) activeColor else containerColor,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -457,8 +458,10 @@ fun MorphSegmented(
     val currentSelectedKey by rememberUpdatedState(selectedKey)
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentHaptics by rememberUpdatedState(haptics)
-    // Match the phone's buttonContainer() formula — same rationale as MorphButton.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
+    // Same rationale as MorphButton: wear's surfaceContainerHigh is one step
+    // darker than the phone's surfaceContainerHighest, so 45% compensation
+    // matches the phone's 18-20% visual result exactly.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
     Box(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(containerColor),
     ) {
