@@ -36,6 +36,7 @@ import com.bloo.wear.WearLocalStore
 import com.bloo.wear.WearSettingsStore
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -63,7 +64,7 @@ abstract class BlooTileService : TileService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        tileScope.coroutineContext[kotlinx.coroutines.SupervisorJob]?.cancel()
+        tileScope.cancel()
     }
 
     /** Resource ID strings referenced in the tile layout. */

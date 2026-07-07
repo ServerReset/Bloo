@@ -12,6 +12,7 @@ import com.google.android.gms.wearable.WearableListenerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -28,7 +29,7 @@ class WearListenerService : WearableListenerService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        serviceScope.coroutineContext[SupervisorJob]?.cancel()
+        serviceScope.cancel()
     }
 
     override fun onDataChanged(events: com.google.android.gms.wearable.DataEventBuffer) {
@@ -76,7 +77,7 @@ class WearListenerService : WearableListenerService() {
         val raw = String(event.data ?: ByteArray(0))
         serviceScope.launch {
             runCatching {
-                val result = WearSync.decodeCommandResult(raw) ?: return@launch
+                val result = WearSync.decodeResult(raw) ?: return@launch
                 WearNotifications.post(
                     applicationContext,
                     ("result" + result.vin + result.action).hashCode(),

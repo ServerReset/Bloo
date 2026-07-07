@@ -77,6 +77,9 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
+import coil.annotation.ExperimentalCoilApi
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -163,14 +166,13 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var retryKey by remember(url) { mutableStateOf(0) }
     val loadUrl = if (retryKey > 0) "$url?retry=$retryKey" else url
-    val asyncPainter = coil.compose.rememberAsyncImagePainter(
+    val asyncPainter = rememberAsyncImagePainter(
         model = loadUrl,
         imageLoader = com.bloo.wear.WearImage.loader(context),
     )
-    @OptIn(coil.annotation.ExperimentalCoilApi::class)
-    val paintState = asyncPainter.state
-    val isError = paintState is coil.compose.AsyncImagePainter.State.Error
-    val isLoading = paintState is coil.compose.AsyncImagePainter.State.Loading
+    val paintState = (asyncPainter as? AsyncImagePainter)?.state
+    val isError = paintState is AsyncImagePainter.State.Error
+    val isLoading = paintState is AsyncImagePainter.State.Loading
     Box(
         modifier
             .size(116.dp)
