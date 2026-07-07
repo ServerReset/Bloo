@@ -77,7 +77,6 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
-import coil.compose.AsyncImage
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -141,10 +140,11 @@ fun ChargeRing(
     }
 }
 
-/** A small OSM map thumbnail centred on the car, with a marker. */
+/** A small OSM map thumbnail centred on the car, with a marker. Shows a
+ *  loading indicator while the tile downloads and an error state on failure
+ *  with tap-to-retry. */
 @Composable
 fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
-    // Tile coords + marker offset only depend on lat/lon — compute once per location.
     val tile = remember(lat, lon) {
         val z = 15
         val n = (1 shl z).toDouble()
@@ -161,29 +161,58 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val marker = MaterialTheme.colorScheme.error
     val placeholder = MaterialTheme.colorScheme.surfaceContainerHigh
     val context = androidx.compose.ui.platform.LocalContext.current
+    var retryKey by remember(url) { mutableStateOf(0) }
+    val loadUrl = if (retryKey > 0) "$url?retry=$retryKey" else url
+    val asyncPainter = coil.compose.rememberAsyncImagePainter(
+        model = loadUrl,
+        imageLoader = com.bloo.wear.WearImage.loader(context),
+    )
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
+    val paintState = asyncPainter.state
+    val isError = paintState is coil.compose.AsyncImagePainter.State.Error
+    val isLoading = paintState is coil.compose.AsyncImagePainter.State.Loading
     Box(
         modifier
             .size(116.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(placeholder),
+            .background(placeholder)
+            .clickable(enabled = isError) { retryKey++ },
         contentAlignment = Alignment.Center,
     ) {
-        // A pin shows even before the tile loads / when offline, so it's never blank.
-        Icon(
-            Icons.Filled.LocationOn,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(28.dp),
-        )
-        AsyncImage(
-            model = url,
-            contentDescription = "Map of car location",
-            contentScale = ContentScale.Crop,
-            imageLoader = com.bloo.wear.WearImage.loader(context),
-            modifier = Modifier.matchParentSize(),
-        )
-        Canvas(Modifier.matchParentSize()) {
-            drawCircle(marker, radius = 6.dp.toPx(), center = Offset(mx * size.width, my * size.height))
+        if (isError) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Tap to retry",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Icon(
+                Icons.Filled.LocationOn,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(28.dp),
+            )
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            }
+            androidx.compose.foundation.Image(
+                painter = asyncPainter,
+                contentDescription = "Map of car location",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            Canvas(Modifier.matchParentSize()) {
+                drawCircle(marker, radius = 6.dp.toPx(), center = Offset(mx * size.width, my * size.height))
+            }
         }
     }
 }
@@ -348,15 +377,12 @@ fun MorphButton(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "morphPressScale",
     )
-    // Phone's buttonContainer() lerps from surfaceContainerHighest (the most
-    // elevated tonal step) toward onSurface by 18-20%. Wear's ColorScheme has no
-    // surfaceContainerHighest, so this is based on surfaceContainerHigh (one step
-    // darker) — matching the phone's 18-20% left buttons reading almost flat
-    // against the card behind them, and even the first bump to 32% still wasn't
-    // enough against a dark SectionCard background. Lerp substantially further —
-    // the button needs to read as a clearly distinct, tappable surface, not just
-    // a slightly-different shade of the same card.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
+    // Match the phone's buttonContainer(): push the highest surface tone a small
+    // step toward onSurface so the button reads clearly against its card background
+    // without needing a border (the phone uses surfaceContainerHighest + 0.18f for
+    // dark themes; Wear's scheme has no surfaceContainerHighest, so surfaceContainerHigh
+    // fills that role — it's already one step darker, so the lerp stays the same).
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
     val bg by animateColorAsState(
         targetValue = if (active) activeColor else containerColor,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -417,7 +443,7 @@ fun MorphSegmented(
     val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
     val trackPad = 4.dp
     val gap = 4.dp
-    val trackHeight = 40.dp
+    val trackHeight = 48.dp
     val haptics = LocalHapticFeedback.current
     // pointerInput below is keyed on (n, stepPx) only, so its gesture-handling
     // coroutine is launched once and keeps running (awaitEachGesture loops
@@ -431,10 +457,8 @@ fun MorphSegmented(
     val currentSelectedKey by rememberUpdatedState(selectedKey)
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentHaptics by rememberUpdatedState(haptics)
-    // Same fix as MorphButton, and the same higher 0.45 value now that 0.32
-    // still wasn't enough — surfaceContainerHigh lerped too little read almost
-    // flat against the card behind it.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
+    // Match the phone's buttonContainer() formula — same rationale as MorphButton.
+    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.18f)
     Box(
         modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(containerColor),
     ) {

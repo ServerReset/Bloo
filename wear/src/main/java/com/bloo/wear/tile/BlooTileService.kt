@@ -37,6 +37,7 @@ import com.bloo.wear.WearSettingsStore
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -56,6 +57,14 @@ abstract class BlooTileService : TileService() {
     protected abstract val poolIndex: Int
 
     private val executor = Executors.newSingleThreadExecutor()
+    private val tileScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
+
+    override fun onDestroy() {
+        super.onDestroy()
+        tileScope.coroutineContext[kotlinx.coroutines.SupervisorJob]?.cancel()
+    }
 
     /** Resource ID strings referenced in the tile layout. */
     private object Img {
@@ -122,7 +131,16 @@ abstract class BlooTileService : TileService() {
             if (clickId.startsWith(CMD_PREFIX) && clickId != WearLocalStore(ctx).tileLastClick()) {
                 WearLocalStore(ctx).setTileLastClick(clickId)
                 val action = clickId.removePrefix(CMD_PREFIX).substringBefore(':')
-                car?.let { c -> runCatching { WearComms.send(ctx, WearCommand(c.vin, action)) } }
+                val c = car
+                if (c != null) {
+                    // Dispatch in background so the tile renders immediately — the
+                    // optimistic snapshot update in WearComms.send will be picked up
+                    // on the next tile render pass.
+                    tileScope.launch {
+                        runCatching { WearComms.send(ctx, WearCommand(c.vin, action)) }
+                    }
+                }
+                // Re-read immediately so any in-line optimistic update is reflected.
                 data = store.current()
                 car = pick(data)
             }

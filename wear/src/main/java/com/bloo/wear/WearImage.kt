@@ -2,7 +2,10 @@ package com.bloo.wear
 
 import android.content.Context
 import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import okhttp3.OkHttpClient
+import java.io.File
 
 /**
  * A Coil image loader that sends a real, identifying User-Agent. OpenStreetMap's
@@ -21,6 +24,7 @@ object WearImage {
         }
 
     private fun build(context: Context): ImageLoader {
+        val cacheDir = File(context.cacheDir, "coil").also { it.mkdirs() }
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 chain.proceed(
@@ -32,6 +36,17 @@ object WearImage {
             .build()
         return ImageLoader.Builder(context)
             .okHttpClient(client)
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(0.01)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir)
+                    .maxSizePercent(0.02)
+                    .build()
+            }
             .build()
     }
 }

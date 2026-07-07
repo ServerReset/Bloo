@@ -86,7 +86,7 @@ object WearComms {
             }
             WearNotifications.post(
                 context,
-                ("cmd" + command.vin).hashCode(),
+                ("cmd" + command.vin + command.action).hashCode(),
                 "Command failed",
                 result.message ?: "Couldn't reach your car. Try again when your phone is nearby.",
             )
