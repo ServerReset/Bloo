@@ -3,6 +3,8 @@ package com.bloo.wear
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.Context
 import android.os.Build
@@ -14,7 +16,7 @@ import androidx.core.content.ContextCompat
  * Native watch-side notifications. The watch normally surfaces the phone's
  * bridged alerts, but when it runs a command standalone (no phone reachable —
  * e.g. a Tile or complication tap on Wi-Fi/cell) there's no phone to report the
- * outcome, so the watch posts its own.
+ * outcome, so the watch posts its own. Tapping the notification opens the app.
  */
 object WearNotifications {
     private const val CHANNEL = "bloo_wear_alerts"
@@ -25,7 +27,7 @@ object WearNotifications {
             val mgr = context.getSystemService(NotificationManager::class.java)
             if (mgr.getNotificationChannel(CHANNEL) == null) {
                 mgr.createNotificationChannel(
-                    NotificationChannel(CHANNEL, "Car alerts", NotificationManager.IMPORTANCE_DEFAULT)
+                    NotificationChannel(CHANNEL, "Car alerts", NotificationManager.IMPORTANCE_HIGH)
                         .apply { description = "Command results and alerts from the watch" },
                 )
             }
@@ -40,6 +42,13 @@ object WearNotifications {
     fun post(context: Context, id: Int, title: String, text: String) {
         if (!hasPermission(context)) return
         ensureChannel(context)
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val contentIntent = PendingIntent.getActivity(
+            context, id, openIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         val n = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setColor(ACCENT)
@@ -48,6 +57,7 @@ object WearNotifications {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(contentIntent)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(id, n) }
     }

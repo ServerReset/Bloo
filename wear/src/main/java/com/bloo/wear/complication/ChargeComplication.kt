@@ -29,7 +29,7 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         val snap = resolveComplicationCar(applicationContext, "ChargeComplication", request.complicationInstanceId)
             ?: return null
-        return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.isEv, snap.charging == true)
+        return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.isEv, snap.charging == true, snap.vin)
     }
 
     private fun buildData(
@@ -38,6 +38,7 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         rangeMi: Int?,
         isEv: Boolean,
         charging: Boolean,
+        vin: String? = null,
     ): ComplicationData? {
         val label = if (isEv) "Battery" else "Fuel"
         val text = pct?.let { "$it%" } ?: "—%"
@@ -49,7 +50,7 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         val desc = PlainComplicationText.Builder(descText).build()
         val plainText = PlainComplicationText.Builder(text).build()
         val rangeTitle = rangeMi?.let { PlainComplicationText.Builder("$it mi").build() }
-        val tap = openAppIntent()
+        val tap = openAppIntent(vin)
         val bolt = if (charging) {
             MonochromaticImage.Builder(Icon.createWithResource(this, R.drawable.ic_widget_bolt)).build()
         } else null
@@ -79,12 +80,13 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         }
     }
 
-    private fun openAppIntent(): PendingIntent {
+    private fun openAppIntent(vin: String? = null): PendingIntent {
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            vin?.let { putExtra("vin", it) }
         }
         return PendingIntent.getActivity(
-            this, 0, intent,
+            this, (vin ?: "").hashCode(), intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
     }

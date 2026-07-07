@@ -34,10 +34,12 @@ class LockComplication : SuspendingComplicationDataSourceService() {
         val iconRes = if (isLocked) R.drawable.ic_shortcut_lock else R.drawable.ic_shortcut_unlock
         val image = MonochromaticImage.Builder(Icon.createWithResource(this, iconRes)).build()
         val desc = PlainComplicationText.Builder(text).build()
+        val title = PlainComplicationText.Builder("Lock").build()
         val tap = vin?.let { ComplicationTapReceiver.pendingIntent(this, it, WearAction.TOGGLE_LOCK) }
         return when (type) {
             ComplicationType.SHORT_TEXT ->
                 ShortTextComplicationData.Builder(PlainComplicationText.Builder(text).build(), desc)
+                    .setTitle(title)
                     .setMonochromaticImage(image)
                     .apply { tap?.let { setTapAction(it) } }
                     .build()
