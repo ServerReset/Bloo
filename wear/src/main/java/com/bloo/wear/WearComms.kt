@@ -27,9 +27,8 @@ object WearComms {
     /** The id of a connected phone node, or null when none is reachable. */
     suspend fun phoneNodeId(context: Context): String? = withContext(Dispatchers.IO) {
         runCatching {
-            Tasks.await(Wearable.getNodeClient(context).connectedNodes)
-                .firstOrNull { it.isNearby }?.id
-                ?: Tasks.await(Wearable.getNodeClient(context).connectedNodes).firstOrNull()?.id
+            val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
+            nodes.firstOrNull { it.isNearby }?.id ?: nodes.firstOrNull()?.id
         }.getOrNull()
     }
 
