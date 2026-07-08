@@ -392,7 +392,14 @@ fun MorphButton(
             disabledContentColor = resolvedContent.copy(alpha = 0.38f),
         ),
         border = if (active || pending) null else BorderStroke(1.5.dp, scheme.outline.copy(alpha = 0.85f)),
-        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold) },
+        label = {
+            AnimatedContent(targetState = label, transitionSpec = {
+                (fadeIn(tween(150)) + slideInVertically(tween(150)) { -it / 3 }) togetherWith
+                    (fadeOut(tween(100)) + slideOutVertically(tween(100)) { it / 3 })
+            }, label = "btnLabel") { lbl ->
+                Text(lbl, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+            }
+        },
         secondaryLabel = secondaryLabel?.let { s ->
             { Text(s, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         },

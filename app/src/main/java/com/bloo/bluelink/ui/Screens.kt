@@ -1941,15 +1941,31 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     snapshotFlow { exPager.settledPage }.collect { vm.expand(it) }
                 }
                 Box(Modifier.fillMaxSize()) {
-                    HorizontalPager(state = exPager, modifier = Modifier.fillMaxSize()) { page ->
-                        val pv = vehicles[page]
-                        CarThemeOverride(
-                            paletteId = appearance.carCustomPaletteIds[pv.vin],
-                            customPalettes = appearance.customPalettes,
-                            themeMode = appearance.themeMode,
-                            vibrancy = appearance.vibrancy,
-                        ) {
-                            ExpandedCar(pv, state, vm, flipped = appearance.columnsFlipped)
+                    HorizontalPager(
+                        state = exPager,
+                        modifier = Modifier.fillMaxSize(),
+                        beyondViewportPageCount = 1,
+                        pageSize = androidx.compose.foundation.pager.PageSize.Fill,
+                    ) { page ->
+                        val pageOff by remember(page) {
+                            derivedStateOf {
+                                ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+                            }
+                        }
+                        Box(Modifier.fillMaxSize().graphicsLayer {
+                            alpha = 1f - pageOff * 0.15f
+                            scaleX = 1f - pageOff * 0.04f
+                            scaleY = 1f - pageOff * 0.04f
+                        }) {
+                            val pv = vehicles[page]
+                            CarThemeOverride(
+                                paletteId = appearance.carCustomPaletteIds[pv.vin],
+                                customPalettes = appearance.customPalettes,
+                                themeMode = appearance.themeMode,
+                                vibrancy = appearance.vibrancy,
+                            ) {
+                                ExpandedCar(pv, state, vm, flipped = appearance.columnsFlipped)
+                            }
                         }
                     }
                     if (count > 1) {
