@@ -33,7 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
@@ -155,7 +154,6 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                         else if (actions.size < 4) actions.add(action.key)
                     },
                     label = action.label,
-                    icon = painterResource(action.icon),
                 )
             }
         }

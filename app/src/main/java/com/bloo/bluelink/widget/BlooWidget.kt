@@ -33,7 +33,6 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.layout.defaultWeight
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.text.FontWeight
@@ -153,7 +152,7 @@ class BlooWidget : GlanceAppWidget() {
         val maxBtns = if (narrow) 0 else min(actions.size, ((w - 100.dp) / 44.dp).toInt().coerceIn(0, 4))
         Box(base.padding(horizontal = 8.dp, vertical = 4.dp).clickable(open)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(GlanceModifier.defaultWeight()) {
+                Column(GlanceModifier.weight(1f).padding(end = 4.dp)) {
                     if (!narrow) Text(snap.name.take(16), maxLines = 1,
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -179,9 +178,9 @@ class BlooWidget : GlanceAppWidget() {
         val perRow = if (portrait) 2 else 4
 
         Column(base.padding(12.dp).clickable(open)) {
-            // Name + state chip row
+            // Name row — state chip right-aligned via spacer
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(snap.name.take(20), maxLines = 1, modifier = GlanceModifier.defaultWeight(),
+                Text(snap.name.take(20), maxLines = 1, modifier = GlanceModifier.weight(1f).padding(end = 4.dp),
                     style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold))
                 StateChip(stateLabel, stateColor)
             }
@@ -200,14 +199,14 @@ class BlooWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.height(4.dp))
             val pct = (snap.percent ?: 0).coerceIn(0, 100)
             Box(GlanceModifier.fillMaxWidth().height(5.dp).background(ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.25f))).cornerRadius(3.dp)) {
-                if (pct > 0) Box(GlanceModifier.fillMaxWidth(pct / 100f).height(5.dp).background(theme.accent).cornerRadius(3.dp)) {}
+                if (pct > 0) Box(GlanceModifier.fillMaxWidth().height(5.dp).background(theme.accent).cornerRadius(3.dp)) {}
             }
             // Detail row
             Spacer(GlanceModifier.height(6.dp))
             Row {
-                DetailCell("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }, GlanceModifier.defaultWeight())
+                DetailCell("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }, GlanceModifier.weight(1f))
                 Spacer(GlanceModifier.width(6.dp))
-                DetailCell("Climate", if (snap.climateOn == true) "On" else "Off", GlanceModifier.defaultWeight())
+                DetailCell("Climate", if (snap.climateOn == true) "On" else "Off", GlanceModifier.weight(1f))
             }
             // Action buttons
             if (actions.isNotEmpty()) {
@@ -245,7 +244,7 @@ class BlooWidget : GlanceAppWidget() {
             else -> R.drawable.ic_shortcut_car
         }
         Box(
-            GlanceModifier.height(h).defaultWeight()
+            GlanceModifier.height(h).weight(1f)
                 .background(theme.accent).cornerRadius(h / 2)
                 .clickable(actionStartActivity(authIntent(context, widgetId, vin, action))),
             contentAlignment = Alignment.Center,
