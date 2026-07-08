@@ -83,18 +83,17 @@ class BlooWidget : GlanceAppWidget() {
      * render from the app's active palette so the widget mirrors the app theme.
      */
     private class WidgetTheme(
-        val accent: ColorProvider,        // primary button fill + locked/active states
-        val accentMuted: ColorProvider,   // slightly muted accent for secondary surfaces
-        val onAccent: ColorProvider,      // foreground on accent / semantic fills
-        val pending: ColorProvider,       // in-flight command fill
-        val charge: ColorProvider,        // charging (semantic green)
-        val unlocked: ColorProvider,      // unlocked (semantic red)
-        val climate: ColorProvider,       // climate-on (teal blended toward accent)
-        val accentArgb: Int,              // raw accent, for bodies that draw to a Canvas (e.g. RingBody)
-        val textScale: Float,             // user text-size multiplier, applied to every tiered font size
-        val cornerOverride: Dp?,          // user corner-radius override; null = each body's own default
-        // background is NOT stored here — callers use GlanceTheme.colors.widgetBackground
-        // so the system handles dark/light adaptation automatically.
+        val accent: ColorProvider,
+        val accentMuted: ColorProvider,
+        val onAccent: ColorProvider,
+        val pending: ColorProvider,
+        val charge: ColorProvider,
+        val unlocked: ColorProvider,
+        val climate: ColorProvider,
+        val accentArgb: Int,
+        val textScale: Float,
+        val cornerOverride: Dp?,
+        val maxButtons: Int,
     )
 
     /** Apply the user's text-scale preference to a base size, clamped to a sane
@@ -155,6 +154,7 @@ class BlooWidget : GlanceAppWidget() {
         val locationAddress = cfg?.let { settings.widgetLocationAddress(widgetId) }
         val widgetCorner = cfg?.let { settings.widgetCorner(widgetId) }?.dp
         val widgetTextScale = cfg?.let { settings.widgetTextScale(widgetId) } ?: 1f
+        val widgetMaxButtons = cfg?.let { settings.widgetMaxButtons(widgetId) } ?: 4
 
         // Cached location-map tile, present only after a Location action has run.
         val hasLocationAction = actions.any { it == WidgetAction.LOCATION }
@@ -209,6 +209,7 @@ class BlooWidget : GlanceAppWidget() {
                 accentArgb = accentColor.toArgb(),
                 textScale = widgetTextScale.coerceIn(0.75f, 1.5f),
                 cornerOverride = widgetCorner,
+                maxButtons = widgetMaxButtons,
             )
         }
 

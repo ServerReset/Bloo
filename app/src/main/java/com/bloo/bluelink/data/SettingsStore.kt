@@ -641,6 +641,16 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_auth")] = value }
     }
 
+    suspend fun widgetMaxButtons(widgetId: Int): Int =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_maxbtns")]
+            ?.toIntOrNull()?.coerceIn(2, 6) ?: 4
+
+    suspend fun setWidgetMaxButtons(widgetId: Int, count: Int) {
+        context.settingsDataStore.edit {
+            it[stringPreferencesKey("widget_${widgetId}_maxbtns")] = count.coerceIn(2, 6).toString()
+        }
+    }
+
     suspend fun widgetLocationAddress(widgetId: Int): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_addr")]?.takeIf { it.isNotBlank() }
 

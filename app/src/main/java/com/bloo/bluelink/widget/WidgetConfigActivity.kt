@@ -38,6 +38,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +70,7 @@ import com.bloo.bluelink.ui.MorphTextButton
 import com.bloo.bluelink.ui.SegmentOption
 import com.bloo.bluelink.ui.ToggleRow
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Configures one home-screen widget: which car it's pinned to and what its four
@@ -138,6 +140,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var requireAuth by remember { mutableStateOf(true) }
     var cornerDp by remember { mutableStateOf<Int?>(null) }
     var textScale by remember { mutableFloatStateOf(1f) }
+    var maxButtons by remember { mutableIntStateOf(4) }
 
     LaunchedEffect(Unit) {
         cars = SnapshotStore(context).current().vehicles
@@ -168,6 +171,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         requireAuth = SettingsStore(context).widgetRequireAuth(widgetId)
         cornerDp = SettingsStore(context).widgetCorner(widgetId)
         textScale = SettingsStore(context).widgetTextScale(widgetId)
+        maxButtons = SettingsStore(context).widgetMaxButtons(widgetId)
         loaded = true
     }
 
@@ -272,6 +276,32 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                Column {
+                    Text("Max buttons", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "More buttons may overflow on compact layouts",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${maxButtons}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(12.dp))
+                        com.bloo.uicommon.AnimatedSlider(
+                            value = maxButtons.toFloat(),
+                            onValueChange = { maxButtons = it.roundToInt() },
+                            valueRange = 2f..6f,
+                            steps = 3,
+                            accent = MaterialTheme.colorScheme.primary,
+                            inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            dotOnActive = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                            dotOnInactive = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            reduceMotion = LocalReduceMotion.current,
+                            onStepTick = { haptics.tick() },
+                            onSettle = { haptics.click() },
+                        )
+                    }
                 }
                 Column {
                     Text("Shape", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
@@ -410,6 +440,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     SettingsStore(context).setWidgetRequireAuth(widgetId, requireAuth)
                     SettingsStore(context).setWidgetCorner(widgetId, cornerDp)
                     SettingsStore(context).setWidgetTextScale(widgetId, textScale)
+                    SettingsStore(context).setWidgetMaxButtons(widgetId, maxButtons)
                     onDone()
                 }
             },

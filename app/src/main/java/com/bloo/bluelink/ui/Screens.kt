@@ -5274,7 +5274,10 @@ private fun ClimatePebble(
             label = "tempColor",
         )
         if (fahrenheit) {
-            StepRow("Temperature", "$tempF°F", valueColor = tempColor)
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                AnimatedValue("$tempF°F", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
+            }
             AnimatedSlider(
                 value = tempF.toFloat(),
                 onValueChange = { tempF = it.roundToInt() },
@@ -5286,7 +5289,10 @@ private fun ClimatePebble(
             // Celsius: drive the slider in whole °C but keep tempF canonical for
             // the command, converting on each side.
             val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
-            StepRow("Temperature", "$tempC°C", valueColor = tempColor)
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                AnimatedValue("$tempC°C", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
+            }
             AnimatedSlider(
                 value = tempC.toFloat(),
                 onValueChange = { tempF = (it * 9 / 5f + 32).roundToInt() },
