@@ -35,7 +35,17 @@ object WearRemote {
             val intent = Intent(Intent.ACTION_VIEW)
                 .addCategory(Intent.CATEGORY_BROWSABLE)
                 .setData(Uri.parse("tel:$number"))
-            RemoteActivityHelper(context).startRemoteActivity(intent)
+            val future = RemoteActivityHelper(context).startRemoteActivity(intent)
+            future.addListener({
+                runCatching { future.get() }.onFailure {
+                    WearNotifications.post(
+                        context,
+                        ("dial$number").hashCode(),
+                        "Couldn't open dialer on phone",
+                        "Bring your phone nearby and try again.",
+                    )
+                }
+            }, com.google.common.util.concurrent.MoreExecutors.directExecutor())
         }
     }
 }

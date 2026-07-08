@@ -115,19 +115,24 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
      * the worker — and the pending-spinner clear — indefinitely).
      */
     private suspend fun geocode(ctx: Context, lat: Double, lon: Double): android.location.Address? {
+        // Skip geocoding for default/null coordinates — the car is not at (0, 0).
+        if (lat == 0.0 && lon == 0.0) return null
+        if (!android.location.Geocoder.isPresent()) return null
         val geocoder = android.location.Geocoder(ctx, java.util.Locale.getDefault())
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             withTimeoutOrNull(6000) {
-                suspendCancellableCoroutine { cont ->
-                    geocoder.getFromLocation(lat, lon, 1, object : android.location.Geocoder.GeocodeListener {
-                        override fun onGeocode(addresses: MutableList<android.location.Address>) {
-                            if (cont.isActive) cont.resume(addresses.firstOrNull())
-                        }
-                        override fun onError(message: String?) {
-                            if (cont.isActive) cont.resume(null)
-                        }
-                    })
-                }
+                runCatching {
+                    suspendCancellableCoroutine { cont ->
+                        geocoder.getFromLocation(lat, lon, 1, object : android.location.Geocoder.GeocodeListener {
+                            override fun onGeocode(addresses: MutableList<android.location.Address>) {
+                                if (cont.isActive) cont.resume(addresses.firstOrNull())
+                            }
+                            override fun onError(message: String?) {
+                                if (cont.isActive) cont.resume(null)
+                            }
+                        })
+                    }
+                }.getOrNull()
             }
         } else {
             withContext(Dispatchers.IO) {

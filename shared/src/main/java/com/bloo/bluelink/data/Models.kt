@@ -193,8 +193,8 @@ data class Battery12V(
     /** Coarse 12V battery health from state of charge / state flag. */
     val health: String?
         get() = when {
-            batState == 0 -> "Needs attention"
             batSoc == null -> null
+            batState == 0 -> "Needs attention"
             batSoc >= 75 -> "Good"
             batSoc >= 50 -> "Fair"
             else -> "Low"
