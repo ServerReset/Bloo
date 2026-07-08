@@ -9,6 +9,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.TimeZone
+import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 /**
@@ -316,14 +317,14 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      * Like [call], but retries once after a short pause when the server returns a
      * transient 5xx. Used for HVAC, where Hyundai occasionally 502s a valid call.
      */
-    private fun callWithRetry(request: Request): String {
+    private suspend fun callWithRetry(request: Request): String {
         return try {
             call(request)
         } catch (e: BlueLinkException) {
             val transient = e.code != null && e.code in 500..599
             if (!transient) throw e
             AppLog.log("Retrying ${request.method} ${request.url.encodedPath} after ${e.code}…")
-            Thread.sleep(1500)
+            delay(1500)
             call(request)
         }
     }

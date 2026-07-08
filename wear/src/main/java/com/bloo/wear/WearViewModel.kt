@@ -199,12 +199,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val repos = mutableMapOf<Brand, VehicleRepository>()
     private val localStore = WearLocalStore(ctx)
 
+    @Volatile
     private var vehicles: List<Vehicle> = emptyList()
+    @Volatile
     private var statuses: Map<String, VehicleStatus> = emptyMap()
+    @Volatile
     private var snapshots: Map<String, com.bloo.bluelink.data.VehicleSnapshot> = emptyMap()
+    @Volatile
     private var fetchedAt: Map<String, Long> = emptyMap()
+    @Volatile
     private var trips: Map<String, List<EvTrip>> = emptyMap()
+    @Volatile
     private var placeNames: Map<String, String> = emptyMap()
+    @Volatile
     private var pending: Set<String> = emptySet()
 
     // Cars whose status we've already fetched this session, so paging back and
