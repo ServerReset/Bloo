@@ -3,6 +3,7 @@ package com.bloo.bluelink.wear
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.ui.graphics.toArgb
+import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearSettingsPayload
