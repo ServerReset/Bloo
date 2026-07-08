@@ -737,15 +737,16 @@ private fun AlertsCard(car: CarView) {
     val errColor = MaterialTheme.colorScheme.error
     AnimatedVisibility(visible = true, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 4 }) {
         SectionCard(null) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(15.dp), tint = errColor)
-            Text("ALERTS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = errColor)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(15.dp), tint = errColor)
+                Text("ALERTS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = errColor)
+            }
+            Spacer(Modifier.height(5.dp))
+            warnings.forEach { (label, value) -> StatusRow(label, value, valueColor = errColor) }
         }
-        Spacer(Modifier.height(5.dp))
-        warnings.forEach { (label, value) -> StatusRow(label, value, valueColor = errColor) }
     }
 }
 
