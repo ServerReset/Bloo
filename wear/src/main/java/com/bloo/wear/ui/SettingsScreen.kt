@@ -4,6 +4,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -80,8 +81,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         item { ListHeader { Text("Settings", textAlign = TextAlign.Center) } }
 
         item {
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Text("Accounts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SettingSection("Accounts") {
                 if (ui.accounts.isEmpty()) {
                     Text("Synced from phone", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
@@ -102,8 +102,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Text("Appearance", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SettingSection("Appearance") {
                 Text(
                     "Theme and units synced from phone",
                     style = MaterialTheme.typography.bodySmall,
@@ -120,8 +119,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Text("Watch text size", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SettingSection("Watch text size") {
                 Text(
                     "${"%.1f".format(ui.localSettings.fontScale)}×",
                     style = MaterialTheme.typography.bodySmall,
@@ -139,8 +137,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Text("Tile chips", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SettingSection("Tile chips") {
                 Text(
                     "Pick up to two actions for the glanceable Tile.",
                     style = MaterialTheme.typography.labelSmall,
@@ -177,8 +174,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             // for each car to their watch face, pinned independently.
             val slotCount = minOf(com.bloo.wear.WearTilePool.SIZE, ui.cars.size)
             for (index in 0 until slotCount) item(key = "tileSlot$index") {
-                Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                    Text("Tile ${index + 1}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                SettingSection("Tile ${index + 1}") {
                     Text(
                         "Which car this glanceable Tile shows on your watch face.",
                         style = MaterialTheme.typography.labelSmall,
@@ -210,8 +206,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Text("Tile order", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SettingSection("Tile order") {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Reorder a car's tiles from its More tile → Reorder tiles. The order stays in sync with that car on your phone.",
@@ -222,8 +217,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Text("Updates", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            SettingSection("Updates") {
                 Text(
                     if (vm.currentBuildNumber > 0) "Build #${vm.currentBuildNumber}" else "Local build",
                     style = MaterialTheme.typography.labelSmall,
@@ -312,5 +306,15 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         // Surfaces "Check now" results (and any other message) while in Settings -
         // the home snackbar isn't on screen here.
         MessageSnackbar(ui.message) { vm.dismissMessage() }
+    }
+}
+
+/** A settings section: a card with a consistent bold title header, then content.
+ *  One place for the header styling every settings group repeated inline. */
+@Composable
+private fun SettingSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        content()
     }
 }
