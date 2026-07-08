@@ -69,9 +69,7 @@ class WearPhoneService : WearableListenerService() {
                         )
                     }
                     val ctx = applicationContext
-                    WearBridge.publishNow(ctx)
-                    runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(ctx) }
-                    com.bloo.bluelink.tiles.BlooTileService.requestUpdates(ctx)
+                    WearBridge.refreshAllSurfaces(ctx)
                 }
             }
 
@@ -82,9 +80,7 @@ class WearPhoneService : WearableListenerService() {
                     if (command?.action == WearAction.REFRESH) {
                         WearBridge.refresh(ctx, command.vin)
                     }
-                    WearBridge.publishNow(ctx)
-                    runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(ctx) }
-                    com.bloo.bluelink.tiles.BlooTileService.requestUpdates(ctx)
+                    WearBridge.refreshAllSurfaces(ctx)
                 }
             }
         }

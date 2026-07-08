@@ -13,10 +13,7 @@ import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.tiles.BlooTileService
 import com.bloo.bluelink.wear.WearBridge
-import com.bloo.bluelink.widget.BlooWidget
-import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
 
@@ -49,9 +46,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         }
         // The 30-min alert poll also constitutes a data refresh — fan out to all
         // surfaces so widgets and tiles don't wait for the 15-min WidgetRefreshWorker.
-        runCatching { WearBridge.publishNow(applicationContext) }
-        runCatching { BlooWidget().updateAll(applicationContext) }
-        BlooTileService.requestUpdates(applicationContext)
+        WearBridge.refreshAllSurfaces(applicationContext)
         return Result.success()
     }
 

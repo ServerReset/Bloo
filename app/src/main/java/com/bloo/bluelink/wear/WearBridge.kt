@@ -61,6 +61,15 @@ object WearBridge {
         runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
     }
 
+    /** Fan the latest snapshot out to every downstream surface (home widget, QS
+     *  tiles, and the watch) after a data change - the single place that knows
+     *  which surfaces exist, called from the workers/services that mutate state. */
+    suspend fun refreshAllSurfaces(context: Context) {
+        runCatching { publishNow(context) }
+        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(context) }
+        runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
+    }
+
     /**
      * Publish the signed-in sessions so the watch can operate standalone on its
      * own Wi-Fi/cell. Sent as a separate item with no timestamp, so the Data
