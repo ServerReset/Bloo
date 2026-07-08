@@ -68,12 +68,14 @@ class BlooWidget : GlanceAppWidget() {
         if (path.isBlank()) return null
         val file = java.io.File(path)
         if (!file.exists()) return null
-        return bitmapCache.getOrPut(file.absolutePath) {
-            try {
-                BitmapFactory.Options().apply { inSampleSize = sample }
-                    .let { opts -> BitmapFactory.decodeFile(path, opts) }
-            } catch (e: SecurityException) { null }
-        }
+        // Only cache non-null results — null means a corrupt/unreadable file.
+        bitmapCache[file.absolutePath]?.let { return it }
+        val bmp = try {
+            BitmapFactory.Options().apply { inSampleSize = sample }
+                .let { opts -> BitmapFactory.decodeFile(path, opts) }
+        } catch (e: SecurityException) { null }
+        if (bmp != null) bitmapCache[file.absolutePath] = bmp
+        return bmp
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
