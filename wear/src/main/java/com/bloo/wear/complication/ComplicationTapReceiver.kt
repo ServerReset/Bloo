@@ -9,6 +9,7 @@ import com.bloo.bluelink.data.WearCommand
 import com.bloo.wear.WearComms
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
@@ -19,13 +20,15 @@ import kotlinx.coroutines.launch
  */
 class ComplicationTapReceiver : BroadcastReceiver() {
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_TAP) return
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
         val ctx = context.applicationContext
         val pending = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             try {
                 runCatching { WearComms.send(ctx, WearCommand(vin, action)) }
                 ComplicationLink.requestUpdate(ctx)

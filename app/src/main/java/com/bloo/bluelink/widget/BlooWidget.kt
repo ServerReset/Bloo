@@ -59,17 +59,20 @@ class BlooWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
     private class Theme(val accent: ColorProvider, val onAccent: ColorProvider)
 
-    /** Decode a bitmap from disk, cached by path+mtime. */
-    private data class CacheKey(val path: String, val mtime: Long)
-    private val bitmapCache = HashMap<CacheKey, Bitmap>()
+    /** LIFO cache for car photo bitmaps — max 8 entries, evicts oldest on overflow. */
+    private val bitmapCache = object : LinkedHashMap<String, Bitmap>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>): Boolean = size > 8
+    }
 
     private fun decodeCached(path: String, sample: Int = 1): Bitmap? {
+        if (path.isBlank()) return null
         val file = java.io.File(path)
         if (!file.exists()) return null
-        val key = CacheKey(path, file.lastModified())
-        return bitmapCache.getOrPut(key) {
-            BitmapFactory.Options().apply { inSampleSize = sample }
-                .let { opts -> BitmapFactory.decodeFile(path, opts) }
+        return bitmapCache.getOrPut(file.absolutePath) {
+            try {
+                BitmapFactory.Options().apply { inSampleSize = sample }
+                    .let { opts -> BitmapFactory.decodeFile(path, opts) }
+            } catch (e: SecurityException) { null }
         }
     }
 

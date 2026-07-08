@@ -65,6 +65,7 @@ abstract class BlooTileService : TileService() {
     override fun onDestroy() {
         super.onDestroy()
         tileScope.cancel()
+        executor.shutdown()
     }
 
     /** Resource ID strings referenced in the tile layout. */
@@ -129,7 +130,7 @@ abstract class BlooTileService : TileService() {
             // unlock command to the car on every background render. Ids carry a
             // per-render nonce (see cmd()), so "same id as last handled" means this
             // exact tap was already executed.
-            if (clickId.startsWith(CMD_PREFIX) && clickId != WearLocalStore(ctx).tileLastClick()) {
+            if (clickId?.startsWith(CMD_PREFIX) == true && clickId != WearLocalStore(ctx).tileLastClick()) {
                 WearLocalStore(ctx).setTileLastClick(clickId)
                 val action = clickId.removePrefix(CMD_PREFIX).substringBefore(':')
                 val c = car

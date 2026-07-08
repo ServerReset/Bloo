@@ -15,6 +15,8 @@ import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * The watch's link to the car. Prefers relaying through a connected phone (which
@@ -27,7 +29,7 @@ object WearComms {
     /** The id of a connected phone node, or null when none is reachable. */
     suspend fun phoneNodeId(context: Context): String? = withContext(Dispatchers.IO) {
         runCatching {
-            val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
+            val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes, 10, TimeUnit.SECONDS)
             nodes.firstOrNull { it.isNearby }?.id ?: nodes.firstOrNull()?.id
         }.getOrNull()
     }
@@ -55,11 +57,11 @@ object WearComms {
             val node = phoneNodeId(context)
             if (node != null) {
                 runCatching {
-                    Tasks.await(
-                        Wearable.getMessageClient(context).sendMessage(
-                            node, WearSync.PATH_COMMAND, WearSync.encodeCommand(resolved).toByteArray(),
+                        Tasks.await(
+                            Wearable.getMessageClient(context).sendMessage(
+                                node, WearSync.PATH_COMMAND, WearSync.encodeCommand(resolved).toByteArray(),
+                            ), 10, TimeUnit.SECONDS,
                         )
-                    )
                 }.onFailure {
                     // Phone dropped mid-send — fall back to standalone.
                     runStandalone(context, resolved)
@@ -102,7 +104,7 @@ object WearComms {
                     Tasks.await(
                         Wearable.getMessageClient(context).sendMessage(
                             node, WearSync.PATH_SYNC_REQUEST, WearSync.encodeCommand(command).toByteArray(),
-                        )
+                        ), 10, TimeUnit.SECONDS,
                     )
                 }.onFailure { if (refresh) WearCommandRunner.refresh(context, vin) }
             } else if (refresh) {
@@ -120,7 +122,7 @@ object WearComms {
                     dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeClimate(state))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
             }
         }
     }
@@ -133,7 +135,7 @@ object WearComms {
                     dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodePresets(presets))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
             }
         }
     }
@@ -150,7 +152,7 @@ object WearComms {
                     dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodePebbleOrder(payload))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
             }.isSuccess
         }
 
@@ -163,7 +165,7 @@ object WearComms {
                     dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeLocal(WearLocalPayload(uiScale)))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(context).putDataItem(request))
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
             }
         }
     }
@@ -173,7 +175,7 @@ object WearComms {
     suspend fun pullLatest(context: Context) {
         withContext(Dispatchers.IO) {
             runCatching {
-                val items = Tasks.await(Wearable.getDataClient(context).dataItems)
+                val items = Tasks.await(Wearable.getDataClient(context).dataItems, 10, TimeUnit.SECONDS)
                 try {
                     items.forEach { item ->
                         val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
