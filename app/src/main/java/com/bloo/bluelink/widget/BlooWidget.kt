@@ -109,7 +109,7 @@ class BlooWidget : GlanceAppWidget() {
                 w < 120.dp -> NarrowBody(snap, actions, w, h, base, theme, btnH)
                 ratio in 0.8f..1.25f && h >= 120.dp -> SquareBody(snap, actions, base, theme, btnH, hasMedia, photoBitmap)
                 w > 250.dp && h > 170.dp -> LargeBody(snap, actions, w, base, theme, btnH, hasMedia, photoBitmap)
-                w > 2f * h && w >= 200.dp -> WideBody(snap, actions, w, base, theme, btnH, hasMedia, photoBitmap)
+                w > h * 2f && w >= 200.dp -> WideBody(snap, actions, w, base, theme, btnH, hasMedia, photoBitmap)
                 h >= 130.dp -> FullBody(snap, actions, w, base, theme, btnH, hasMedia, photoBitmap)
                 else -> CompactBody(snap, actions, w, base, theme, btnH)
             }
