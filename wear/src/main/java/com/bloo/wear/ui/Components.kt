@@ -6,9 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
@@ -21,13 +19,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,7 +30,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
@@ -46,7 +40,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,8 +49,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -80,7 +71,6 @@ import androidx.wear.input.RemoteInputIntentHelper
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.roundToInt
@@ -416,16 +406,15 @@ fun MorphButton(
     )
 }
 
-/** One option in a [MorphSegmented] control. */
-data class WearSegmentOption(val key: String, val label: String)
+/** One option in a [MorphSegmented] control; re-exported from :uicommon.
+ *  (Watch options carry no icon.) */
+typealias WearSegmentOption = com.bloo.uicommon.SegmentOption
 
 /**
- * The watch equivalent of the phone's MorphSegmented: a full-width segmented
- * selector with a single sliding, bouncy highlight — same visual language as
- * MorphButton (pill-track container, spring-driven motion), just for a
- * one-of-N choice between equal alternatives instead of a single action.
- * Best suited to 2-4 short labels (e.g. brand pickers); a long or highly
- * variable option list should stay a vertical list instead.
+ * The watch's full-width segmented selector. Thin wrapper over the shared
+ * :uicommon [com.bloo.uicommon.MorphSegmented], supplying the watch's Material 3
+ * colours (surfaceContainerHigh lerped toward onSurface for the track, matching
+ * MorphButton), label typography and haptics.
  */
 @Composable
 fun MorphSegmented(
@@ -435,171 +424,20 @@ fun MorphSegmented(
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
-    val trackPad = 4.dp
-    val gap = 4.dp
-    val trackHeight = 48.dp
     val haptics = LocalHapticFeedback.current
-    // pointerInput below is keyed on (n, stepPx) only, so its gesture-handling
-    // coroutine is launched once and keeps running (awaitEachGesture loops
-    // internally) across many recompositions without restarting. A plain
-    // closure over selectedKey/onSelect/haptics would freeze at whatever those
-    // were on that first launch, so every subsequent tap/drag would compare
-    // against the ORIGINAL selection forever — exactly "stops working after a
-    // couple of taps, can't reselect the original option." rememberUpdatedState
-    // keeps these reads live without relaunching (and thereby interrupting) an
-    // in-progress gesture.
-    val currentSelectedKey by rememberUpdatedState(selectedKey)
-    val currentOnSelect by rememberUpdatedState(onSelect)
-    val currentHaptics by rememberUpdatedState(haptics)
-    // Same rationale as MorphButton: wear's surfaceContainerHigh is one step
-    // darker than the phone's surfaceContainerHighest, so 45% compensation
-    // matches the phone's 18-20% visual result exactly.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
-    Box(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(containerColor),
-    ) {
-        BoxWithConstraints(Modifier.padding(trackPad).height(trackHeight)) {
-            val n = options.size
-            val segWidth = (maxWidth - gap * (n - 1)) / n
-            val density = LocalDensity.current
-            val stepPx = with(density) { (segWidth + gap).toPx() }
-            val maxXPx = with(density) { (segWidth * (n - 1) + gap * (n - 1)).toPx() }
-
-            // Drag it and it bounces to wherever you let go — same interaction as
-            // the phone's version, not just a tap target.
-            var dragXPx by remember { mutableStateOf<Float?>(null) }
-            val restingX = (segWidth + gap) * selectedIndex
-            val indicatorX by animateDpAsState(
-                targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
-                // MediumBouncy (0.4) at StiffnessMedium overshot noticeably on every
-                // selection change. LowBouncy keeps the same quick settle speed with
-                // just a light touch of overshoot instead, matching the phone version.
-                animationSpec = if (dragXPx != null) snap()
-                                else spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
-                label = "wearSegIndicatorX",
-            )
-
-            val segWidthPx = with(density) { segWidth.toPx() }
-            // Raw touch X is where the finger is; the indicator's rendered position
-            // is its LEFT edge. Using raw touch X as that left-edge offset directly
-            // (the old behavior) made the box jump so its edge, not its center, sat
-            // under the finger — up to half a segment off, which is exactly "tracks
-            // your finger but not really." Centering the indicator on the touch
-            // point instead.
-            fun offsetFor(touchXPx: Float): Float = (touchXPx - segWidthPx / 2f).coerceIn(0f, maxXPx)
-
-            // indexFor expects an X already in "indicator left-edge" terms (already
-            // run through offsetFor), so a segment's own center lands on an exact
-            // multiple of stepPx. Applying /stepPx rounding to a RAW touch position
-            // instead put the rounding boundary at each segment's trailing edge
-            // rather than its center — a tap in roughly the back third of a segment
-            // rounded up into the next one (e.g. tapping option 3 landing on 4).
-            fun indexFor(offsetXPx: Float): Int = (offsetXPx / stepPx).roundToInt().coerceIn(0, n - 1)
-
-            // Which segment reads as "selected" (bold, primary-tinted text) while
-            // dragging — was always selectedIndex (the prop, which only actually
-            // changes once onSelect fires on release), so mid-drag the indicator
-            // pill visibly slid under the finger while the label highlight stayed
-            // frozen on wherever it started. Same fix as the phone version.
-            val visualIndex = dragXPx?.let { indexFor(it) } ?: selectedIndex
-
-            Box(
-                Modifier
-                    .offset(x = indicatorX)
-                    .width(segWidth)
-                    .fillMaxHeight()
-                    .background(scheme.primary, RoundedCornerShape(14.dp)),
-            )
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    // Same touch-slop race the phone version uses (mirroring the shared
-                    // AnimatedSlider's own gesture handling): don't consume anything
-                    // until the gesture is confirmed. detectHorizontalDragGestures used
-                    // to negotiate slop with ancestors (SwipeDismissableNavHost, the
-                    // bezel scroll) and could lose that race in one direction only; an
-                    // "always consume from frame one" fix broke scrolling the settings
-                    // list past this control instead. This only claims the gesture once
-                    // movement is confirmed horizontal (dx > slop && dx >= dy); a release
-                    // before that is a tap (selects immediately at that position), and
-                    // confirmed vertical movement (dy > slop) cedes the whole gesture to
-                    // the ancestor scroll.
-                    .pointerInput(n, stepPx) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val slop = viewConfiguration.touchSlop
-                            var claimed = false
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) {
-                                    if (!claimed) {
-                                        change.consume()
-                                        val idx = indexFor(offsetFor(down.position.x))
-                                        if (options[idx].key != currentSelectedKey) {
-                                            currentHaptics.tick()
-                                            currentOnSelect(options[idx].key)
-                                        }
-                                    }
-                                    break
-                                }
-                                if (!claimed) {
-                                    val dx = abs(change.position.x - down.position.x)
-                                    val dy = abs(change.position.y - down.position.y)
-                                    when {
-                                        dx > slop && dx >= dy -> {
-                                            claimed = true
-                                            change.consume()
-                                            dragXPx = offsetFor(change.position.x)
-                                        }
-                                        dy > slop -> break
-                                    }
-                                } else if (change.positionChanged()) {
-                                    change.consume()
-                                    dragXPx = offsetFor(change.position.x)
-                                }
-                            }
-                            if (claimed) {
-                                val x = dragXPx ?: offsetFor(down.position.x)
-                                val idx = indexFor(x)
-                                dragXPx = null
-                                if (options[idx].key != currentSelectedKey) {
-                                    currentHaptics.tick()
-                                    currentOnSelect(options[idx].key)
-                                }
-                            }
-                        }
-                    },
-                horizontalArrangement = Arrangement.spacedBy(gap),
-            ) {
-                options.forEachIndexed { i, opt ->
-                    val selected = i == visualIndex
-                    val fg by animateColorAsState(
-                        if (selected) scheme.onPrimary else scheme.onSurfaceVariant,
-                        spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "wearSegFg",
-                    )
-                    Box(
-                        modifier = Modifier
-                            .width(segWidth)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            opt.label,
-                            color = fg,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
+    com.bloo.uicommon.MorphSegmented(
+        options = options,
+        selectedKey = selectedKey,
+        onSelect = onSelect,
+        containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f),
+        indicatorColor = scheme.primary,
+        selectedTextColor = scheme.onPrimary,
+        unselectedTextColor = scheme.onSurfaceVariant,
+        textStyle = MaterialTheme.typography.labelMedium,
+        onTick = { haptics.tick() },
+        modifier = modifier,
+        trackHeight = 48.dp,
+    )
 }
 
 // ---- Weather helpers (mirror the phone's WeatherCode mapping) -------------

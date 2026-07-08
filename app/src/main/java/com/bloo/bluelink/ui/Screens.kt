@@ -7356,14 +7356,15 @@ private val TileActions = listOf(
 private fun tileActionLabel(cmd: String): String =
     TileActions.firstOrNull { it.first == cmd }?.second ?: cmd
 
-/** One option in a [MorphSegmented] control. */
-data class SegmentOption(val key: String, val label: String, val icon: ImageVector?)
+/** One option in a [MorphSegmented] control; re-exported from :uicommon. */
+typealias SegmentOption = com.bloo.uicommon.SegmentOption
 
 /**
- * A full-width segmented selector built from the app's MorphChip vocabulary: a
+ * A full-width segmented selector built from the app's button vocabulary: a
  * tonal track whose active segment fills with the primary accent and morphs to a
- * rounded-square, the rest staying pill-calm. Replaces pairs of raw switches
- * where the choice is really one-of-two behaviors.
+ * rounded-square, the rest staying pill-calm. Thin wrapper over the shared
+ * :uicommon [com.bloo.uicommon.MorphSegmented], supplying the phone's Material 3
+ * colours, label typography and haptics.
  */
 @Composable
 fun MorphSegmented(
@@ -7372,191 +7373,22 @@ fun MorphSegmented(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
-    val trackPad = 4.dp
-    val gap = 4.dp
-    val trackHeight = if (options.any { it.icon != null }) 48.dp else 44.dp
     val haptics = LocalHaptics.current
-    // pointerInput below is keyed on (n, stepPx) only, so its gesture-handling
-    // coroutine is launched once and then keeps running (awaitEachGesture loops
-    // internally) across many recompositions without restarting. A plain closure
-    // over selectedKey/onSelect/haptics would freeze at whatever those were on
-    // that first launch — every read inside the gesture handler would silently
-    // use the ORIGINAL selection forever, not the current one. That's exactly
-    // what "stops working after a couple of taps, can't reselect the original
-    // option" looks like: the frozen selectedKey happens to still equal the
-    // very first option, so tapping back to it looks like a no-op change to the
-    // stale closure, and taps to already-selected-per-the-stale-value options
-    // silently do nothing. rememberUpdatedState keeps these reads live without
-    // relaunching (and thereby interrupting) an in-progress gesture.
-    val currentSelectedKey by rememberUpdatedState(selectedKey)
-    val currentOnSelect by rememberUpdatedState(onSelect)
-    val currentHaptics by rememberUpdatedState(haptics)
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = buttonContainer(),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        BoxWithConstraints(Modifier.padding(trackPad).height(trackHeight)) {
-            val n = options.size
-            // Exact per-segment width so the highlight is flush with each pill's own
-            // edges — no residual gap between the highlight and the track border.
-            val segWidth = (maxWidth - gap * (n - 1)) / n
-            val density = LocalDensity.current
-            val stepPx = with(density) { (segWidth + gap).toPx() }
-            val maxXPx = with(density) { (segWidth * (n - 1) + gap * (n - 1)).toPx() }
-
-            // While the finger is down, the highlight tracks it 1:1 (no spring lag);
-            // on release it snaps to a real selection and springs — "drag it and it
-            // bounces to wherever you let go" — instead of only responding to a tap.
-            var dragXPx by remember { mutableStateOf<Float?>(null) }
-            val restingX = (segWidth + gap) * selectedIndex
-            val indicatorX by animateDpAsState(
-                targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
-                animationSpec = if (dragXPx != null) snap()
-                                // MediumBouncy (0.4) at StiffnessMedium overshot noticeably on
-                                // every selection change. LowBouncy keeps the same quick
-                                // StiffnessMedium settle speed (the fix for the earlier
-                                // "sluggish" complaint) with just a light touch of overshoot
-                                // instead of a pronounced wobble.
-                                else spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
-                label = "segIndicatorX",
-            )
-
-            val segWidthPx = with(density) { segWidth.toPx() }
-            // Raw touch/drag X is where the finger physically is; the indicator's
-            // rendered position is its LEFT edge. Using the raw X as that left-edge
-            // offset directly (the old behavior) made the box jump so its edge — not
-            // its center — sat under the finger, up to half a segment off from where
-            // you'd expect it, which is exactly what "tracks your finger but not
-            // really" looks like. Centering the indicator on the touch point instead.
-            fun offsetFor(touchXPx: Float): Float = (touchXPx - segWidthPx / 2f).coerceIn(0f, maxXPx)
-
-            // stepPx is the pitch (segment + gap); indexFor expects an X already in
-            // "indicator left-edge" terms (i.e. already run through offsetFor), so a
-            // segment's own center lands on an exact multiple of stepPx. Applying the
-            // /stepPx rounding to a RAW (un-shifted) touch position instead — the old
-            // bug — put the rounding boundary at each segment's trailing edge rather
-            // than its center, so a tap anywhere in roughly the back third of a
-            // segment rounded up into the NEXT one (e.g. tapping option 3 landing on
-            // option 4).
-            fun indexFor(offsetXPx: Float): Int =
-                (offsetXPx / stepPx).roundToInt().coerceIn(0, n - 1)
-
-            // Which segment reads as "selected" (bold, primary-tinted text) while
-            // dragging. Was always selectedIndex — the prop, which only actually
-            // changes once onSelect fires on release — so mid-drag the indicator
-            // pill visibly slid under your finger while every label's bold/dim
-            // state stayed frozen on wherever it started. That mismatch between
-            // "the box that's moving" and "the text that's highlighted" is what
-            // made dragging feel like it wasn't really responding.
-            val visualIndex = dragXPx?.let { indexFor(it) } ?: selectedIndex
-
-            Box(
-                Modifier
-                    .offset(x = indicatorX)
-                    .width(segWidth)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp)),
-            )
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    // Same touch-slop race AnimatedSlider uses (see the color-picker/
-                    // settings sliders above): don't consume anything until the gesture
-                    // is confirmed. A plain detectHorizontalDragGestures negotiated slop
-                    // with ancestors and lost the race in one direction (a scrollable
-                    // ancestor only pre-consumes the direction it can still move in), so
-                    // a naive "consume everything from frame one" fix was tried instead —
-                    // but that broke scrolling a settings screen past this control, since
-                    // ANY touch here (including a vertical scroll) got hijacked. This
-                    // version only claims the gesture once movement is confirmed
-                    // horizontal (dx > slop && dx >= dy); a release before that is a tap
-                    // (selects immediately at that position) and confirmed vertical
-                    // movement (dy > slop) cedes the gesture entirely to an ancestor
-                    // scroll, exactly like the slider.
-                    .pointerInput(n, stepPx) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val slop = viewConfiguration.touchSlop
-                            var claimed = false
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) {
-                                    if (!claimed) {
-                                        change.consume()
-                                        val idx = indexFor(offsetFor(down.position.x))
-                                        if (options[idx].key != currentSelectedKey) {
-                                            currentHaptics?.tick()
-                                            currentOnSelect(options[idx].key)
-                                        }
-                                    }
-                                    break
-                                }
-                                if (!claimed) {
-                                    val dx = abs(change.position.x - down.position.x)
-                                    val dy = abs(change.position.y - down.position.y)
-                                    when {
-                                        dx > slop && dx >= dy -> {
-                                            claimed = true
-                                            change.consume()
-                                            dragXPx = offsetFor(change.position.x)
-                                        }
-                                        dy > slop -> break
-                                    }
-                                } else if (change.positionChanged()) {
-                                    change.consume()
-                                    dragXPx = offsetFor(change.position.x)
-                                }
-                            }
-                            if (claimed) {
-                                val x = dragXPx ?: offsetFor(down.position.x)
-                                val idx = indexFor(x)
-                                dragXPx = null
-                                if (options[idx].key != currentSelectedKey) {
-                                    currentHaptics?.tick()
-                                    currentOnSelect(options[idx].key)
-                                }
-                            }
-                        }
-                    },
-                horizontalArrangement = Arrangement.spacedBy(gap),
-            ) {
-                options.forEachIndexed { i, opt ->
-                    val selected = i == visualIndex
-                    val fg by androidx.compose.animation.animateColorAsState(
-                        if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "segFg",
-                    )
-                    Box(
-                        modifier = Modifier
-                            .width(segWidth)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            if (opt.icon != null) {
-                                Icon(opt.icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                            }
-                            Text(
-                                opt.label,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = fg,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    val scheme = MaterialTheme.colorScheme
+    com.bloo.uicommon.MorphSegmented(
+        options = options,
+        selectedKey = selectedKey,
+        onSelect = onSelect,
+        containerColor = buttonContainer(),
+        indicatorColor = scheme.primary,
+        selectedTextColor = scheme.onPrimary,
+        unselectedTextColor = scheme.onSurfaceVariant,
+        textStyle = MaterialTheme.typography.labelLarge,
+        onTick = { haptics?.tick() },
+        modifier = modifier,
+    )
 }
+
 
 /** A car's powertrain (Gas/Hybrid/PHEV/EV) is a fixed 4-way choice between
  *  equal alternatives — one shared MorphSegmented instead of the MorphChip
