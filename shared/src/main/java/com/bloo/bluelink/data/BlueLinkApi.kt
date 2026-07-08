@@ -354,7 +354,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         return message?.takeIf { it.isNotBlank() } ?: "Request failed (HTTP $code)"
     }
 
-    private suspend fun <T> execute(block: () -> T): T = withContext(Dispatchers.IO) {
+    private suspend fun <T> execute(block: suspend () -> T): T = withContext(Dispatchers.IO) {
         try {
             block()
         } catch (e: BlueLinkException) {
