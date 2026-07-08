@@ -855,6 +855,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             lat = status?.vehicleLocation?.coord?.lat,
             lon = status?.vehicleLocation?.coord?.lon,
             updated = status?.dateTime,
+            // A non-null status is freshly-fetched data; null means we're building a
+            // placeholder snapshot with no live status yet (leave fetchedAt unknown).
+            fetchedAt = if (status != null) System.currentTimeMillis() else 0L,
         )
     }
 

@@ -33,6 +33,10 @@ data class VehicleSnapshot(
     val lat: Double? = null,
     val lon: Double? = null,
     val updated: String? = null,
+    /** Wall-clock (ms) when this snapshot last got fresh data from the car; 0 =
+     *  unknown. Lets glanceable surfaces flag stale data instead of showing an
+     *  hours-old lock/charge state as if it were live. */
+    val fetchedAt: Long = 0L,
 ) {
     /** Rebuild the command-capable Vehicle (used by widgets/tiles). */
     fun toVehicle(): Vehicle = Vehicle(
@@ -61,6 +65,8 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
         lat = status.vehicleLocation?.coord?.lat ?: lat,
         lon = status.vehicleLocation?.coord?.lon ?: lon,
         updated = status.dateTime ?: updated,
+        // merged() folds in a status we JUST fetched, so this data is now current.
+        fetchedAt = System.currentTimeMillis(),
     )
 }
 

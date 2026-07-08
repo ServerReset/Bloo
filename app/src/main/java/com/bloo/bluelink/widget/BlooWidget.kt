@@ -112,6 +112,9 @@ class BlooWidget : GlanceAppWidget() {
 
     private val chargeGreen = Color(0xFF2EBD59)
     private val unlockedRed = Color(0xFFE5484D)
+    // Data older than this (6× the 15-min background refresh) is flagged stale so a
+    // night offline / expired session doesn't show an hours-old lock state as live.
+    private val staleAfterMs = 90L * 60 * 1000
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         // Construct each store once — these were previously rebuilt ~7× per render.
@@ -218,6 +221,11 @@ class BlooWidget : GlanceAppWidget() {
                 // automatically instead of needing a manual style pick to get it.
                 val ratio = if (h.value > 0f) w.value / h.value else 1f
                 val isSquare = !isPortrait && !isTiny && ratio in 0.62f..1.45f
+                // Data is "stale" once it's older than staleAfterMs (0 = never fetched,
+                // so don't flag). A small amber dot then overlays whichever body renders.
+                val stale = snap != null && snap.fetchedAt > 0 &&
+                    System.currentTimeMillis() - snap.fetchedAt > staleAfterMs
+                Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
                 when {
                     // User-chosen alternate styles render the same at any size. Minimal,
                     // Dual and Ring were dropped as manual choices — Auto's own size tiers
@@ -267,6 +275,17 @@ class BlooWidget : GlanceAppWidget() {
                         cfg == null  -> UnconfiguredFull(widgetId)
                         else         -> UnavailableFull(widgetId, showBackground, widgetShape, theme)
                     }
+                }
+                if (stale) {
+                    // Subtle amber "stale data" dot in the top-end corner, over
+                    // whatever body rendered. Padding keeps it clear of the corner
+                    // radius and content; it only appears when data is genuinely old.
+                    Box(
+                        GlanceModifier.padding(6.dp).size(8.dp)
+                            .cornerRadius(4.dp)
+                            .background(ColorProvider(Color(0xE0E0A020))),
+                    ) {}
+                }
                 }
             }
         }
