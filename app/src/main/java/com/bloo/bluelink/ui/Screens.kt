@@ -5276,7 +5276,7 @@ private fun ClimatePebble(
         if (fahrenheit) {
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AnimatedValue("$tempF°F", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
+                com.bloo.uicommon.AnimatedValue("$tempF°F", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
             }
             AnimatedSlider(
                 value = tempF.toFloat(),
@@ -5291,7 +5291,7 @@ private fun ClimatePebble(
             val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AnimatedValue("$tempC°C", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
+                com.bloo.uicommon.AnimatedValue("$tempC°C", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
             }
             AnimatedSlider(
                 value = tempC.toFloat(),
