@@ -717,7 +717,8 @@ private fun SectionCard(
     }
 }
 
-/** Alert card — shown only when there are open doors/windows/warnings. */
+/** Alert card — shown only when there are open doors/windows/warnings.
+ *  Fades in with a subtle vertical slide when alerts appear. */
 @Composable
 private fun AlertsCard(car: CarView) {
     fun openSummary(items: List<String>) = if (items.size == 1) items.first() else "${items.size} open"
@@ -734,7 +735,8 @@ private fun AlertsCard(car: CarView) {
     }
     if (warnings.isEmpty()) return
     val errColor = MaterialTheme.colorScheme.error
-    SectionCard(null) {
+    AnimatedVisibility(visible = true, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 4 }) {
+        SectionCard(null) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
