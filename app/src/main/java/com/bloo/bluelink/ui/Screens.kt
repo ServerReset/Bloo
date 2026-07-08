@@ -35,6 +35,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateDpAsState
@@ -59,6 +60,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -1950,7 +1952,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         }
                     }
                     if (count > 1) {
-                        PagerDots(exPager.currentPage, count, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
+                        PagerDots(
+                            current = exPager.currentPage,
+                            count = count,
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha),
+                            onRefresh = { vm.refreshStatus(vehicles[exPager.settledPage]) },
+                        )
                     }
                 }
             } else {
@@ -1998,7 +2005,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
-                        PagerDots(pager.currentPage, pageCount, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha))
+                        PagerDots(
+                            current = pager.currentPage,
+                            count = pageCount,
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha),
+                            onRefresh = { vm.refreshStatus(vehicles[state.currentIndex]) },
+                        )
                     }
                     // Hoisted car-name pill — centered at top, slides in/out vertically.
                     if (perPage == 1) {
@@ -2263,6 +2275,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                     .statusBarsPadding()
                     .padding(top = 10.dp)
                     .alpha(dotsAlpha),
+                onRefresh = { vm.refreshStatus(v) },
             )
         }
         // Vertical page dots on the right edge - show which pebble tile is visible.
@@ -2523,28 +2536,73 @@ private fun FloatingIcon(
     }
 }
 
+/** Page indicator dots with long-press-to-refresh — holding the indicator for
+ *  one second triggers [onRefresh] (mirrors the watch's CarNameOverlay pattern). */
 @Composable
-private fun PagerDots(current: Int, count: Int, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
-        shadowElevation = 2.dp,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+private fun PagerDots(
+    current: Int,
+    count: Int,
+    modifier: Modifier = Modifier,
+    onRefresh: (() -> Unit)? = null,
+) {
+    val haptics = LocalHaptics.current
+    val expandProgress = remember { Animatable(0f) }
+    var holding by remember { mutableStateOf(false) }
+
+    LaunchedEffect(holding) {
+        if (holding) {
+            expandProgress.snapTo(0f)
+            expandProgress.animateTo(
+                1f,
+                animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            )
+            onRefresh?.invoke()
+            holding = false
+            delay(300)
+            expandProgress.animateTo(0f, tween(200))
+        }
+    }
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        // Overlay ring that fills as the user holds
+        if (expandProgress.value > 0.01f) {
+            CircularProgressIndicator(
+                progress = { expandProgress.value.coerceIn(0f, 1f) },
+                modifier = Modifier.size(36.dp),
+                strokeWidth = 3.dp,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+        }
+        Surface(
+            modifier = Modifier.pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    haptics?.tick()
+                    holding = true
+                    try { waitForUpOrCancellation() }
+                    finally { holding = false }
+                }
+            },
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
+            shadowElevation = 2.dp,
         ) {
-            repeat(count) { i ->
-                val selected = i == current
-                // The active page stretches into a pill; others are small dots.
-                val w by animateDpAsState(if (selected) 20.dp else 7.dp, label = "dotW")
-                val color by androidx.compose.animation.animateColorAsState(
-                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                    label = "dotC",
-                )
-                Box(Modifier.height(7.dp).width(w).clip(CircleShape).background(color))
+            Row(
+                Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                repeat(count) { i ->
+                    val selected = i == current
+                    val w by animateDpAsState(if (selected) 20.dp else 7.dp, label = "dotW")
+                    val color by androidx.compose.animation.animateColorAsState(
+                        if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant,
+                        label = "dotC",
+                    )
+                    Box(Modifier.height(7.dp).width(w).clip(CircleShape).background(color))
+                }
             }
         }
     }
