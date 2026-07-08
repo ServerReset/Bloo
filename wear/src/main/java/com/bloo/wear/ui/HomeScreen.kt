@@ -997,10 +997,11 @@ private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
 
 @Composable
 private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge limits", Icons.Filled.Bolt) {
-    val ac = ui.acLimitDraft ?: car.acLimit ?: 80
-    val dc = ui.dcLimitDraft ?: car.dcLimit ?: 90
-    val isDirty = (ui.acLimitDraft != null && ui.acLimitDraft != car.acLimit) ||
-                  (ui.dcLimitDraft != null && ui.dcLimitDraft != car.dcLimit)
+    val draft = ui.chargeDraftFor(car.vin)
+    val ac = draft.ac ?: car.acLimit ?: 80
+    val dc = draft.dc ?: car.dcLimit ?: 90
+    val isDirty = (draft.ac != null && draft.ac != car.acLimit) ||
+                  (draft.dc != null && draft.dc != car.dcLimit)
     if (isDirty) {
         Text(
             "Unsaved changes",
@@ -1009,8 +1010,8 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
         )
         Spacer(Modifier.height(2.dp))
     }
-    SliderRow("AC", "$ac%", ac, 50, 100, 10) { vm.setAcLimit(it) }
-    SliderRow("DC", "$dc%", dc, 50, 100, 10) { vm.setDcLimit(it) }
+    SliderRow("AC", "$ac%", ac, 50, 100, 10) { vm.setAcLimit(car.vin, it) }
+    SliderRow("DC", "$dc%", dc, 50, 100, 10) { vm.setDcLimit(car.vin, it) }
     Spacer(Modifier.height(4.dp))
     MorphButton(
         label = "Apply limits",

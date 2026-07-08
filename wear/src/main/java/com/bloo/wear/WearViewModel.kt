@@ -115,6 +115,10 @@ data class ClimateDraft(
     val activePresetId: String? = null,
 )
 
+/** Unsaved AC/DC charge-limit slider values for one car; null = "show the car's
+ *  actual current limit" (the sliders only override once the user drags them). */
+data class ChargeLimitDraft(val ac: Int? = null, val dc: Int? = null)
+
 data class WearUi(
     val screen: WearScreen = WearScreen.Loading,
     val cars: List<CarView> = emptyList(),
@@ -128,8 +132,9 @@ data class WearUi(
     val phoneConnected: Boolean = false,
     /** Per-car climate draft (sliders/toggles), so each car remembers its own. */
     val climateDrafts: Map<String, ClimateDraft> = emptyMap(),
-    val acLimitDraft: Int? = null,
-    val dcLimitDraft: Int? = null,
+    /** Per-car charge-limit sliders, unsaved until Apply. Per-VIN so dragging on
+     *  one car can't bleed onto another's Limits tile. */
+    val chargeLimitDrafts: Map<String, ChargeLimitDraft> = emptyMap(),
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
     val localSettings: WearLocalSettings = WearLocalSettings(),
     /** Optimistic per-car pebble orders the watch just set, held until the phone
@@ -144,6 +149,7 @@ data class WearUi(
     val updateChecking: Boolean = false,
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
+    fun chargeDraftFor(vin: String): ChargeLimitDraft = chargeLimitDrafts[vin] ?: ChargeLimitDraft()
 
     /** This car's effective pebble order: a pending local change wins, else the
      *  phone-synced order, else the default. */
@@ -382,13 +388,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Called when a car page becomes visible — fetch its status once per session. */
     fun onCarShown(vin: String) {
-        // The charge-limit drafts are app-wide, not per-vin: drop them when the
-        // shown car changes so half-adjusted sliders from car A don't render (and
-        // apply) as car B's values. Before the once-per-session guard on purpose -
-        // the UI calls this on every settled car switch.
-        if (_ui.value.acLimitDraft != null || _ui.value.dcLimitDraft != null) {
-            _ui.update { it.copy(acLimitDraft = null, dcLimitDraft = null) }
-        }
         // Persist the viewed car as the snapshot store's selection: "Follow
         // selected" tiles/complications resolve from SnapshotStore.selected, and
         // nothing on the watch ever wrote it (persistState deliberately ignores
@@ -562,16 +561,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     /** Push the AC/DC charge-limit sliders to the car. */
     fun applyChargeLimits(vin: String) {
         val u = _ui.value
-        // Send exactly what LimitsCard DISPLAYS: draft, else the car's actual
+        // Send exactly what LimitsCard DISPLAYS: this car's draft, else its actual
         // current limit. The old `draft ?: 80/90` fallback silently changed the
         // untouched slider - e.g. car reporting DC 100%, user adjusts only AC,
         // taps Apply, and the DC limit drops from the displayed 100 to 90.
         val car = u.cars.firstOrNull { it.vin == vin }
-        val ac = u.acLimitDraft ?: car?.acLimit ?: 80
-        val dc = u.dcLimitDraft ?: car?.dcLimit ?: 90
-        // Applied - the drafts' job is done; clearing them also stops them
-        // bleeding onto another car's Limits tile (they're app-wide, not per-vin).
-        _ui.update { it.copy(acLimitDraft = null, dcLimitDraft = null) }
+        val draft = u.chargeDraftFor(vin)
+        val ac = draft.ac ?: car?.acLimit ?: 80
+        val dc = draft.dc ?: car?.dcLimit ?: 90
+        // Applied - drop this car's draft so the sliders track the car's fresh state.
+        _ui.update { it.copy(chargeLimitDrafts = it.chargeLimitDrafts - vin) }
         command(
             vin, "chargeLimit",
             // Explicit verb: "chargeLimit" fell into toWearCommand's else branch
@@ -676,8 +675,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setSeatPassenger(vin: String, step: Int) = updateDraft(vin) { it.copy(seatPassenger = step.coerceIn(0, 3), activePresetId = null) }
     fun setSeatRearLeft(vin: String, step: Int) = updateDraft(vin) { it.copy(seatRearLeft = step.coerceIn(0, 3), activePresetId = null) }
     fun setSeatRearRight(vin: String, step: Int) = updateDraft(vin) { it.copy(seatRearRight = step.coerceIn(0, 3), activePresetId = null) }
-    fun setAcLimit(value: Int) { _ui.update { it.copy(acLimitDraft = value.coerceIn(50, 100)) } }
-    fun setDcLimit(value: Int) { _ui.update { it.copy(dcLimitDraft = value.coerceIn(50, 100)) } }
+    fun setAcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(ac = value.coerceIn(50, 100)) }
+    fun setDcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(dc = value.coerceIn(50, 100)) }
+
+    private fun updateChargeDraft(vin: String, f: (ChargeLimitDraft) -> ChargeLimitDraft) {
+        _ui.update { u -> u.copy(chargeLimitDrafts = u.chargeLimitDrafts + (vin to f(u.chargeDraftFor(vin)))) }
+    }
     fun dismissMessage() { _ui.update { it.copy(message = null) } }
 
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
