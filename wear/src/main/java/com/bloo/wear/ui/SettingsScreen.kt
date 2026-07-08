@@ -3,6 +3,7 @@ package com.bloo.wear.ui
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -62,6 +63,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
     }
 
+    Box(Modifier.fillMaxSize()) {
     ScalingLazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -306,5 +308,9 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
         }
+    }
+        // Surfaces "Check now" results (and any other message) while in Settings -
+        // the home snackbar isn't on screen here.
+        MessageSnackbar(ui.message) { vm.dismissMessage() }
     }
 }

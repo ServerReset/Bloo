@@ -434,7 +434,7 @@ private fun CarColumn(
  * pages don't each spin up their own copy + dismiss timer.
  */
 @Composable
-private fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
+internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
     if (message != null) {
         LaunchedEffect(message) {
             delay(3500)
