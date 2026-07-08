@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.bloo.bluelink.data.WearClimateState
 import com.bloo.bluelink.data.WearExtras
 import com.bloo.bluelink.data.WearPresets
+import com.bloo.bluelink.data.WearSettingsPayload
 import com.bloo.bluelink.data.WearSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
