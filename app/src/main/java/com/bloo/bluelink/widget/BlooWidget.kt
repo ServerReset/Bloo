@@ -103,6 +103,17 @@ class BlooWidget : GlanceAppWidget() {
     private fun scaledSp(base: Float, theme: WidgetTheme) =
         (base * theme.textScale).coerceIn(7f, base * 1.6f).sp
 
+    /** The fill-the-widget root modifier every body starts from: the themed
+     *  background + rounded corner when [showBackground] is on, else just the
+     *  corner clip. (Bodies that need inner padding chain .padding() on the result.) */
+    @Composable
+    private fun bodyBackground(showBackground: Boolean, corner: Dp): GlanceModifier =
+        if (showBackground) {
+            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+        } else {
+            GlanceModifier.fillMaxSize().cornerRadius(corner)
+        }
+
     /** Glance's Text has maxLines but no TextOverflow/widthIn to lean on for
      *  horizontal ellipsis, so any string that could realistically run long
      *  (car names, addresses) is pre-truncated here in code — guaranteed-safe
@@ -338,8 +349,7 @@ class BlooWidget : GlanceAppWidget() {
     private fun UnavailableFull(widgetId: Int, showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
         val context = LocalContext.current
         val corner = theme.cornerOverride ?: if (widgetShape == "pill") 28.dp else 22.dp
-        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-                  else GlanceModifier.fillMaxSize().cornerRadius(corner)
+        val mod = bodyBackground(showBackground, corner)
         Box(
             modifier = mod.clickable(actionStartActivity(configIntent(context, widgetId))),
             contentAlignment = Alignment.Center,
@@ -352,8 +362,7 @@ class BlooWidget : GlanceAppWidget() {
     private fun UnavailableCompact(widgetId: Int, showBackground: Boolean, widgetShape: String, theme: WidgetTheme) {
         val context = LocalContext.current
         val corner = theme.cornerOverride ?: if (widgetShape == "pill") 28.dp else 22.dp
-        val mod = if (showBackground) GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
-                  else GlanceModifier.fillMaxSize().cornerRadius(corner).padding(horizontal = 12.dp, vertical = 4.dp)
+        val mod = bodyBackground(showBackground, corner).padding(horizontal = 12.dp, vertical = 4.dp)
         Box(
             modifier = mod.clickable(actionStartActivity(configIntent(context, widgetId))),
             contentAlignment = Alignment.Center,
@@ -409,11 +418,7 @@ class BlooWidget : GlanceAppWidget() {
     ) {
         val context = LocalContext.current
         val corner = theme.cornerOverride ?: if (widgetShape == "pill") 28.dp else 24.dp
-        val base = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
+        val base = bodyBackground(showBackground, corner)
         val pick = metrics.take(4).ifEmpty { listOf("battery", "range", "lock", "climate") }
         // snap.percent holds the FUEL level for gas cars (see SnapshotStore) -
         // every other body switches this caption on isEv; Stats must too.
@@ -782,11 +787,7 @@ class BlooWidget : GlanceAppWidget() {
         val showState = w >= 250.dp
         val showRange = w in 150.dp..249.dp && snap.rangeMi != null
 
-        val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
+        val boxMod = bodyBackground(showBackground, corner)
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
 
         Box(modifier = boxMod) {
@@ -904,11 +905,7 @@ class BlooWidget : GlanceAppWidget() {
     ) {
         val context = LocalContext.current
         val corner = theme.cornerOverride ?: if (widgetShape == "pill") 999.dp else 18.dp
-        val base = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
+        val base = bodyBackground(showBackground, corner)
         val open = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
         val (_, stateColor) = stateOf(snap, theme)
         Box(base.clickable(open), contentAlignment = Alignment.Center) {
@@ -973,11 +970,7 @@ class BlooWidget : GlanceAppWidget() {
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
         val (stateLabel, stateColor) = stateOf(snap, theme)
 
-        val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
+        val boxMod = bodyBackground(showBackground, corner)
 
         Box(modifier = boxMod) {
             Column(
@@ -1060,11 +1053,7 @@ class BlooWidget : GlanceAppWidget() {
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
         val (stateLabel, stateColor) = stateOf(snap, theme)
 
-        val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
+        val boxMod = bodyBackground(showBackground, corner)
 
         val showBar = h >= 80.dp
         val barW = (w * 0.22f).coerceIn(60.dp, 170.dp)
@@ -1180,11 +1169,7 @@ class BlooWidget : GlanceAppWidget() {
 
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
 
-        val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
+        val boxMod = bodyBackground(showBackground, corner)
 
         Box(modifier = boxMod) {
             if (showPhoto) {
@@ -1441,11 +1426,7 @@ class BlooWidget : GlanceAppWidget() {
 
         val openAction = actionStartActivity(authIntent(context, widgetId, snap.vin, WidgetAction.OPEN))
 
-        val boxMod = if (showBackground) {
-            GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
-        } else {
-            GlanceModifier.fillMaxSize().cornerRadius(corner)
-        }
+        val boxMod = bodyBackground(showBackground, corner)
 
         Box(modifier = boxMod) {
             if (showPhoto) {
