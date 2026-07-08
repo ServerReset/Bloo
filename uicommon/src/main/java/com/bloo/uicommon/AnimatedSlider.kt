@@ -77,6 +77,7 @@ fun AnimatedSlider(
     // true until the launched coroutine actually starts; an explicit flag set
     // synchronously inside settleTo (before any suspension point) closes it.
     var settling by remember { mutableStateOf(false) }
+    var settleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     LaunchedEffect(value) {
         if (!dragging && !settling && !anim.isRunning && anim.value != value) anim.snapTo(value)
@@ -114,7 +115,8 @@ fun AnimatedSlider(
         onSettle()
         settling = true
         onValueChange(target)
-        scope.launch {
+        settleJob?.cancel()
+        settleJob = scope.launch {
             if (reduceMotion) {
                 anim.snapTo(target)
             } else {
