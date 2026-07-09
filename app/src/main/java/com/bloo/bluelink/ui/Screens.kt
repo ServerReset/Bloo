@@ -444,7 +444,6 @@ fun BlooApp(vm: AppViewModel) {
                     state.kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = state.loading, vm = vm) }
                 }
                 // Lock is an overlay (see LockOverlay), not a full screen.
-                Screen.Locked -> Box(Modifier.fillMaxSize())
                 Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
                 Screen.Onboarding -> OnboardingScreen(vm)
                 is Screen.CarSetup -> CarSetupWizardScreen(vm, screen.vins)
@@ -474,22 +473,18 @@ fun BlooApp(vm: AppViewModel) {
 
 // --- Onboarding wizard (first run + new-car detection) --------------------
 
-private enum class WizardStepKind { WELCOME, POWERTRAIN, SEATS, STEERING, FINISH }
+private enum class WizardStepKind { POWERTRAIN, SEATS, STEERING }
 
 private data class WizardPage(
     val kind: WizardStepKind,
     val vin: String? = null,
-    val carLabel: String = "",
-    val carIndex: Int = 0,
-    val totalCars: Int = 1,
 )
 
 private fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
-    vehicles.forEachIndexed { i, v ->
-        val lbl = if (vehicles.size > 1) "${v.name} (${i + 1}/${vehicles.size})" else v.name
-        add(WizardPage(WizardStepKind.POWERTRAIN, v.vin, lbl, i, vehicles.size))
-        add(WizardPage(WizardStepKind.SEATS, v.vin, lbl, i, vehicles.size))
-        add(WizardPage(WizardStepKind.STEERING, v.vin, lbl, i, vehicles.size))
+    vehicles.forEach { v ->
+        add(WizardPage(WizardStepKind.POWERTRAIN, v.vin))
+        add(WizardPage(WizardStepKind.SEATS, v.vin))
+        add(WizardPage(WizardStepKind.STEERING, v.vin))
     }
 }
 
@@ -758,7 +753,6 @@ private fun CarSetupWizardScreen(vm: AppViewModel, vins: List<String>) {
     CarFeatureWizard(
         vm = vm,
         pages = pages,
-        showFireworks = false,
         onComplete = { vm.finishCarSetup(vins) },
     )
 }
@@ -767,13 +761,10 @@ private fun CarSetupWizardScreen(vm: AppViewModel, vins: List<String>) {
 private fun CarFeatureWizard(
     vm: AppViewModel,
     pages: List<WizardPage>,
-    showFireworks: Boolean,
     onComplete: () -> Unit,
 ) {
-    val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
     val state by vm.state.collectAsState()
-    val canBio = remember { vm.canUseBiometrics() }
 
     var pageIndex by remember { mutableIntStateOf(0) }
 
@@ -837,15 +828,9 @@ private fun CarFeatureWizard(
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (pg.kind) {
-                            WizardStepKind.WELCOME -> WizardWelcomePage()
                             WizardStepKind.POWERTRAIN -> WizardPowertrainPage(veh, state, vm)
                             WizardStepKind.SEATS -> WizardSeatsPage(veh, sc, vm)
                             WizardStepKind.STEERING -> WizardSteeringPage(veh, sc, vm)
-                            WizardStepKind.FINISH -> WizardFinishPage(
-                                vm = vm,
-                                canBio = canBio,
-                                context = context,
-                            )
                         }
                     }
                 }
@@ -876,7 +861,7 @@ private fun CarFeatureWizard(
                     contentPadding = PaddingValues(vertical = 14.dp),
                 ) {
                     val isLast = pageIndex == pages.lastIndex
-                    val lastLabel = if (pages.lastOrNull()?.kind == WizardStepKind.FINISH) "Enter Bloo" else "Done"
+                    val lastLabel = "Done"
                     Icon(
                         if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
                         contentDescription = null,
@@ -892,53 +877,6 @@ private fun CarFeatureWizard(
             }
         }
 
-        if (showFireworks) FireworksOverlay(Modifier.fillMaxSize())
-    }
-}
-
-@Composable
-private fun WizardWelcomePage() {
-    val scheme = MaterialTheme.colorScheme
-    Spacer(Modifier.height(16.dp))
-    Text("👋", style = MaterialTheme.typography.displayMedium)
-    Text(
-        "Welcome to Bloo",
-        style = MaterialTheme.typography.displaySmall,
-        fontWeight = FontWeight.Black,
-    )
-    Text(
-        "Your Hyundai, Kia, or Genesis in your pocket.",
-        style = MaterialTheme.typography.titleMedium,
-        color = scheme.onSurfaceVariant,
-    )
-    WizardFeatureRow("🚗", "Swipe between cars", "Each car gets its own screen. Pull down to fetch live status.")
-    WizardFeatureRow("🧩", "Pebbles", "Controls live in cards: lock, charge limits, climate, location and more.")
-    WizardFeatureRow("🌡", "Climate presets", "Save temperature, defrost, seat heat and steering wheel as a named preset.")
-    WizardFeatureRow("⚡", "Tiles and shortcuts", "Quick Settings tiles and long-press shortcuts for one-tap control.")
-    Text(
-        "Next: tell Bloo what features your car has — it can't read this from the API.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = scheme.primary,
-        fontWeight = FontWeight.SemiBold,
-    )
-}
-
-@Composable
-private fun WizardFeatureRow(emoji: String, title: String, body: String) {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(scheme.surfaceContainerHighest)
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(emoji, style = MaterialTheme.typography.titleLarge)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-        }
     }
 }
 
@@ -1176,91 +1114,6 @@ private fun WizardFeatureToggle(
     }
 }
 
-@Composable
-private fun WizardFinishPage(
-    vm: AppViewModel,
-    canBio: Boolean,
-    context: Context,
-) {
-    val scheme = MaterialTheme.colorScheme
-    Text("✅", style = MaterialTheme.typography.displaySmall)
-    Text(
-        "All set!",
-        style = MaterialTheme.typography.headlineLarge,
-        fontWeight = FontWeight.Black,
-    )
-    Text(
-        "A couple of optional extras before you dive in:",
-        style = MaterialTheme.typography.bodyLarge,
-        color = scheme.onSurfaceVariant,
-    )
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        var notifGranted by remember {
-            mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context))
-        }
-        val notifLauncher = rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission(),
-        ) { granted -> notifGranted = granted }
-        MorphButton(
-            onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
-            active = notifGranted,
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
-        ) {
-            Icon(
-                if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (notifGranted) "Notifications enabled" else "Enable notifications",
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
-
-    if (canBio) {
-        var bioEnabled by remember { mutableStateOf(false) }
-        MorphButton(
-            onClick = {
-                if (!bioEnabled) {
-                    context.findFragmentActivity()?.let { activity ->
-                        showBiometricPrompt(
-                            activity = activity,
-                            title = "Enable fingerprint lock",
-                            subtitle = "Confirm to require it when opening Bloo",
-                            onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
-                            onError = {},
-                        )
-                    }
-                }
-            },
-            active = bioEnabled,
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
-        ) {
-            Icon(
-                if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (bioEnabled) "Fingerprint lock enabled" else "Lock with fingerprint",
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
-
-    Text(
-        "Tap Enter Bloo below — you can fine-tune everything later in Settings.",
-        style = MaterialTheme.typography.bodySmall,
-        color = scheme.onSurfaceVariant,
-    )
-}
-
 private class Burst(val x: Float, val y: Float, val start: Float, val life: Float, val hue: Float, val count: Int, val maxR: Float)
 
 /** A short, lightweight particle-burst fireworks animation drawn on a Canvas. */
@@ -1359,7 +1212,7 @@ private fun LoginScreen(
                         "Bloo",
                         style = if (shortScreen) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
                         fontWeight = FontWeight.Black,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     AnimatedContent(
                         targetState = brandSubtitle,
@@ -1372,7 +1225,7 @@ private fun LoginScreen(
                         Text(
                             subtitle,
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White.copy(alpha = 0.85f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                         )
                     }
                 }

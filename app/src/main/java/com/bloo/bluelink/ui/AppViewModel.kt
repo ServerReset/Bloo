@@ -57,7 +57,6 @@ private const val WEATHER_TTL_MS = 15 * 60 * 1000L
 
 sealed interface Screen {
     data object Login : Screen
-    data object Locked : Screen
     /** No vehicles enrolled (or still loading the first time). */
     data object Empty : Screen
     /** First-run welcome wizard that sets up car features before reaching the app. */
