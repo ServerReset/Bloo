@@ -47,7 +47,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -361,13 +360,12 @@ fun MorphButton(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "morphPressScale",
     )
-    // Phone's buttonContainer() lerps from surfaceContainerHighest (the most
-    // elevated tonal step) toward onSurface by 18-20% to get a fill that reads
-    // clearly against the card behind it. Wear's ColorScheme has no
-    // surfaceContainerHighest, so this uses surfaceContainerHigh (one step
-    // darker) — a higher lerp factor (45%) compensates so the visual result
-    // matches the phone exactly.
-    val containerColor = lerp(scheme.surfaceContainerHigh, scheme.onSurface, 0.45f)
+    // Shared buttonContainer formula — phone uses surfaceContainerHighest,
+    // watch has only surfaceContainerHigh. Passing the closest available
+    // surface + onSurface gives a consistent visual result across platforms.
+    val containerColor = com.bloo.uicommon.BlooColors.buttonContainer(
+        scheme.surfaceContainerHigh, scheme.onSurface
+    )
     val bg by animateColorAsState(
         targetValue = if (active) activeColor else containerColor,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
