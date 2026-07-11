@@ -2162,11 +2162,11 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    androidx.compose.foundation.gestures.awaitEachGesture {
-                        val down = androidx.compose.foundation.gestures.awaitFirstDown(requireUnconsumed = false)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
                         edgeTraceHolding = true
                         down.consume()
-                        try { androidx.compose.foundation.gestures.waitForUpOrCancellation() }
+                        try { waitForUpOrCancellation() }
                         finally { if (edgeTraceHolding) edgeTraceHolding = false }
                     }
                 },
