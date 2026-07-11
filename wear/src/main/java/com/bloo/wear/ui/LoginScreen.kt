@@ -1,5 +1,9 @@
 package com.bloo.wear.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -8,8 +12,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Login
@@ -84,10 +91,27 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
             .focusable(),
         state = state,
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item { ListHeader { Text("Sign in to Bloo", textAlign = TextAlign.Center) } }
+        // Title fades in from top
+        item {
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { -it / 4 },
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    ListHeader { Text("Sign in to Bloo", textAlign = TextAlign.Center) }
+                    Text(
+                        "Pick your brand and enter your details",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
 
+        // Brand selector
         item {
             MorphSegmented(
                 options = listOf(
@@ -102,29 +126,31 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
 
         if (brand == Brand.KIA) {
             item {
-                Text(
+                InfoCallout(
                     "Kia sign-in uses a one-time code — sign in on your phone and it syncs to the watch.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
                 )
             }
         } else {
-            item { FieldButton("Email", email, Icons.Filled.Email, emailInput) }
-            item { FieldButton("Password", if (password.isBlank()) "" else "••••••", Icons.Filled.Lock, passwordInput) }
-            item { FieldButton("PIN", if (pin.isBlank()) "" else "••••", Icons.Filled.Pin, pinInput) }
-            item {
-                MorphButton(
-                    label = "Sign in",
-                    icon = Icons.Filled.Login,
-                    active = false,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    pending = false,
-                    onClick = { vm.login(brand, email, password, pin) },
-                )
-            }
+            // Each field button: tap to launch IME, shows current value
+            item { FieldRow("Email", email, Icons.Filled.Email, emailInput) }
+            item { FieldRow("Password", if (password.isBlank()) "" else "••••••", Icons.Filled.Lock, passwordInput) }
+            item { FieldRow("PIN", if (pin.isBlank()) "" else "••••", Icons.Filled.Pin, pinInput) }
         }
 
+        // Sign-in button
+        item {
+            MorphButton(
+                label = "Sign in",
+                icon = Icons.Filled.Login,
+                active = false,
+                activeColor = MaterialTheme.colorScheme.primary,
+                pending = false,
+                enabled = email.isNotBlank() && password.isNotBlank() && pin.isNotBlank() && brand != Brand.KIA,
+                onClick = { vm.login(brand, email, password, pin) },
+            )
+        }
+
+        // Error message
         ui.message?.let { msg ->
             item {
                 Text(
@@ -137,6 +163,8 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                 )
             }
         }
+
+        // Tip at the bottom
         item {
             Text(
                 "Tip: open Bloo on your phone to set up without typing.",
@@ -148,8 +176,14 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
     }
 }
 
+/** A field row: icon + label above + value, taps open the keyboard. */
 @Composable
-private fun FieldButton(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun FieldRow(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
     MorphButton(
         label = value.ifBlank { label },
         secondaryLabel = if (value.isNotBlank()) label else null,
@@ -158,5 +192,17 @@ private fun FieldButton(label: String, value: String, icon: androidx.compose.ui.
         activeColor = MaterialTheme.colorScheme.primary,
         pending = false,
         onClick = onClick,
+    )
+}
+
+/** A subtle, centered info callout — used for non-blocking instructions. */
+@Composable
+private fun InfoCallout(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
     )
 }
