@@ -2069,6 +2069,27 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     // Decorative ring color — subtle outline that acknowledges the camera hole.
     val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
 
+    // ---- Edge-trace refresh gesture ----
+    // Long-press anywhere on the cover screen to trace a line around the edge.
+    // When the line completes its full circuit, trigger a refresh. This is a
+    // cover-screen-only interaction (the normal phone layout doesn't use it).
+    val edgeTraceProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    var edgeTraceHolding by remember { mutableStateOf(false) }
+    LaunchedEffect(edgeTraceHolding) {
+        if (edgeTraceHolding) {
+            edgeTraceProgress.snapTo(0f)
+            edgeTraceProgress.animateTo(
+                1f,
+                animationSpec = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            )
+            if (edgeTraceHolding) {
+                // Only refresh if the user is still holding (didn't release early).
+                vm.refreshStatus(v)
+            }
+            edgeTraceHolding = false
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         // Native vertical paging. The pager owns the swipe gesture and pages on
         // any vertical drag; tall tiles scroll their own content first and the
@@ -2133,6 +2154,43 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                     center = androidx.compose.ui.geometry.Offset(cx, cy),
                     style = Stroke(width = with(density) { 1.dp.toPx() }),
                 )
+            }
+        }
+        // Edge-trace overlay: when holding, a line traces the screen edge clockwise
+        // from the top-left. Full circuit = refresh. Drawn on top of everything.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    androidx.compose.foundation.gestures.awaitEachGesture {
+                        val down = androidx.compose.foundation.gestures.awaitFirstDown(requireUnconsumed = false)
+                        edgeTraceHolding = true
+                        down.consume()
+                        try { androidx.compose.foundation.gestures.waitForUpOrCancellation() }
+                        finally { if (edgeTraceHolding) edgeTraceHolding = false }
+                    }
+                },
+        ) {
+            if (edgeTraceProgress.value > 0.001f) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val stroke = with(density) { 3.dp.toPx() }
+                    val inset = stroke / 2f
+                    val rect = androidx.compose.ui.geometry.Rect(
+                        inset, inset, size.width - stroke, size.height - stroke
+                    )
+                    val accent = MaterialTheme.colorScheme.primary
+                    // Full perimeter: 2*(w+h). Sweep starts at -90deg (12 o'clock)
+                    // and goes clockwise; -90 to 270deg = 360deg.
+                    drawArc(
+                        color = accent.copy(alpha = edgeTraceProgress.value.coerceIn(0f, 1f) * 0.85f),
+                        startAngle = -90f,
+                        sweepAngle = 360f * edgeTraceProgress.value,
+                        useCenter = false,
+                        topLeft = rect.topLeft,
+                        size = rect.size,
+                        style = Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                    )
+                }
             }
         }
         // Car-switching dots, always at top-center (every tile, including main).
