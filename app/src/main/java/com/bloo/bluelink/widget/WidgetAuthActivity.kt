@@ -1,6 +1,7 @@
 package com.bloo.bluelink.widget
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -75,6 +76,26 @@ class WidgetAuthActivity : FragmentActivity() {
         if (action.kind == WidgetAction.Kind.OPEN) {
             openApp(vin)
             finishNoAnim()
+            return
+        }
+        if (action.kind == WidgetAction.Kind.LOCATION) {
+            // Show the car on the map right away — the user asked "where's my car",
+            // not "refresh in the background".
+            lifecycleScope.launch {
+                val snap = withContext(Dispatchers.IO) {
+                    SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin }
+                }
+                val lat = snap?.lat
+                val lon = snap?.lon
+                if (lat != null && lon != null && !(lat == 0.0 && lon == 0.0)) {
+                    val label = Uri.encode(snap.name.ifBlank { "My car" })
+                    val maps = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon($label)"))
+                    runCatching { startActivity(maps) }.onFailure { openApp(vin) }
+                } else {
+                    openApp(vin)
+                }
+                finishNoAnim()
+            }
             return
         }
         lifecycleScope.launch {

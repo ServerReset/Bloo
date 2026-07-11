@@ -1,6 +1,8 @@
 package com.bloo.wear
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -12,6 +14,15 @@ import com.bloo.bluelink.data.WearSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+// DataStore requires exactly ONE instance per file for the whole process, so the
+// delegates must live at top level. Holding them inside WearSyncedStore instances
+// crashes with "There are multiple DataStores active for the same file" as soon as
+// a ViewModel collector and a listener-service writer coexist.
+private val Context.wearSettingsStore by preferencesDataStore(name = "bloo_wear_settings")
+private val Context.wearClimateStore by preferencesDataStore(name = "bloo_wear_climate")
+private val Context.wearPresetsStore by preferencesDataStore(name = "bloo_wear_presets")
+private val Context.wearExtrasStore by preferencesDataStore(name = "bloo_wear_extras")
+
 /**
  * Generic single-key DataStore wrapper that replaces the structurally identical
  * WearSettingsStore/WearClimateStore/WearPresetsStore/WearExtrasStore.
@@ -22,24 +33,22 @@ import kotlinx.coroutines.flow.map
  *   store.save(rawJson)
  */
 class WearSyncedStore<T> private constructor(
-    private val context: Context,
-    name: String,
+    private val store: DataStore<Preferences>,
     private val decode: (String?) -> T,
 ) {
-    private val Context.store by preferencesDataStore(name = name)
     private val key = stringPreferencesKey("payload")
 
-    val flow: Flow<T> = context.store.data.map { decode(it[key]) }
+    val flow: Flow<T> = store.data.map { decode(it[key]) }
 
     suspend fun save(raw: String) {
-        context.store.edit { it[key] = raw }
+        store.edit { it[key] = raw }
     }
 
     companion object {
-        fun settings(ctx: Context) = WearSyncedStore(ctx, "bloo_wear_settings", WearSync::decodeSettings)
-        fun climate(ctx: Context) = WearSyncedStore(ctx, "bloo_wear_climate", WearSync::decodeClimate)
-        fun presets(ctx: Context) = WearSyncedStore(ctx, "bloo_wear_presets", WearSync::decodePresets)
-        fun extras(ctx: Context) = WearSyncedStore(ctx, "bloo_wear_extras", WearSync::decodeExtras)
+        fun settings(ctx: Context) = WearSyncedStore(ctx.wearSettingsStore, WearSync::decodeSettings)
+        fun climate(ctx: Context) = WearSyncedStore(ctx.wearClimateStore, WearSync::decodeClimate)
+        fun presets(ctx: Context) = WearSyncedStore(ctx.wearPresetsStore, WearSync::decodePresets)
+        fun extras(ctx: Context) = WearSyncedStore(ctx.wearExtrasStore, WearSync::decodeExtras)
     }
 }
 
