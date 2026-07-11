@@ -27,6 +27,7 @@ import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
@@ -162,7 +163,7 @@ class BlooWidget : GlanceAppWidget() {
             putExtra(WidgetAuthActivity.EXTRA_ACTION, WidgetAction.OPEN.key)
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        Row(base.padding(horizontal = 8.dp).clickable(actionStartActivity(intent)), verticalAlignment = Alignment.CenterVertically) {
+        Row(base.padding(horizontal = 8.dp).clickable(actionStartActivity(intent)).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.padding(end = 6.dp)) {
                 if (!narrow) Text(snap.name.take(14), maxLines = 1,
                     style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp))
@@ -187,7 +188,7 @@ class BlooWidget : GlanceAppWidget() {
             putExtra(WidgetAuthActivity.EXTRA_ACTION, WidgetAction.OPEN.key)
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        Column(base.padding(12.dp).clickable(actionStartActivity(intent))) {
+        Column(base.padding(12.dp).clickable(actionStartActivity(intent)).fillMaxSize()) {
             // Name + state chip
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(snap.name.take(18), maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
@@ -239,7 +240,7 @@ class BlooWidget : GlanceAppWidget() {
             putExtra(WidgetAuthActivity.EXTRA_ACTION, WidgetAction.OPEN.key)
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        Row(base.padding(10.dp).clickable(actionStartActivity(intent)), verticalAlignment = Alignment.CenterVertically) {
+        Row(base.padding(10.dp).clickable(actionStartActivity(intent)).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.padding(end = 10.dp)) {
                 Text(snap.name.take(16), maxLines = 1,
                     style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold))

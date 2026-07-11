@@ -15,7 +15,7 @@ enum class WidgetAction(
     val kind: Kind,
     val wearAction: String? = null,
 ) {
-    DOORS("doors", "Lock / unlock", R.drawable.ic_shortcut_lock, true, Kind.COMMAND, WearAction.TOGGLE_LOCK),
+    DOORS("doors", "Doors", R.drawable.ic_shortcut_lock, true, Kind.COMMAND, WearAction.TOGGLE_LOCK),
     LOCK("lock", "Lock", R.drawable.ic_shortcut_lock, true, Kind.COMMAND, WearAction.LOCK),
     UNLOCK("unlock", "Unlock", R.drawable.ic_shortcut_unlock, true, Kind.COMMAND, WearAction.UNLOCK),
     CLIMATE("climate", "Climate", R.drawable.ic_shortcut_climate, true, Kind.COMMAND, WearAction.TOGGLE_CLIMATE),
