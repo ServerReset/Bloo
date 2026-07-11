@@ -2172,13 +2172,13 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 },
         ) {
             if (edgeTraceProgress.value > 0.001f) {
+                val accent = MaterialTheme.colorScheme.primary
                 Canvas(Modifier.fillMaxSize()) {
                     val stroke = with(density) { 3.dp.toPx() }
                     val inset = stroke / 2f
                     val rect = androidx.compose.ui.geometry.Rect(
                         inset, inset, size.width - stroke, size.height - stroke
                     )
-                    val accent = MaterialTheme.colorScheme.primary
                     // Full perimeter: 2*(w+h). Sweep starts at -90deg (12 o'clock)
                     // and goes clockwise; -90 to 270deg = 360deg.
                     drawArc(
