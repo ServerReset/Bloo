@@ -66,8 +66,8 @@ class BlooWidget : GlanceAppWidget() {
         val appearance = settings.appearance.first()
         val accentColor = resolveWidgetAccent(context, appearance, snap?.vin)
         val onAccent = if (accentColor.luminance() > 0.5f)
-            Color(android.graphics.Color.HSVToColor(floatArrayOf(0f, 0f, 0.22f)))
-        else Color.White
+            ColorProvider(Color(android.graphics.Color.HSVToColor(floatArrayOf(0f, 0f, 0.22f))))
+        else ColorProvider(Color.White)
         val chargeGreen = ColorProvider(Color(0xFF2EBD59))
 
         provideContent { GlanceTheme {
