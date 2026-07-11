@@ -288,12 +288,12 @@ class BlooWidget : GlanceAppWidget() {
             }
             if (actions.isNotEmpty()) {
                 Spacer(GlanceModifier.height(10.dp))
-                val take = actions.take(4)
+                // One chunky row (up to 3) so the hero above always keeps its height.
+                val take = actions.take(3)
                 ButtonGrid(
-                    widgetId, snap, take, theme, pending,
-                    cols = if (take.size >= 2) 2 else 1,
+                    widgetId, snap, take, theme, pending, cols = take.size,
                     showLabel = false, iconSize = 22.dp,
-                    modifier = GlanceModifier.fillMaxWidth().height(if (take.size > 2) 92.dp else 48.dp),
+                    modifier = GlanceModifier.fillMaxWidth().height(48.dp),
                 )
             }
         }
@@ -355,14 +355,15 @@ class BlooWidget : GlanceAppWidget() {
         val take = actions.take(4)
         val hasPhoto = photo != null && w >= 240.dp
         val trackW = (w * (if (hasPhoto) 0.5f else 0.62f)).coerceAtLeast(80.dp)
-        // Chunky footer: 2-column grid of tall labelled buttons fills the lower panel.
-        val footerCols = if (take.size >= 2) 2 else 1
-        val footerRows = if (take.isEmpty()) 0 else (take.size + footerCols - 1) / footerCols
-        val footerH = when (footerRows) {
-            0 -> 0.dp
-            1 -> (h * 0.24f).coerceIn(60.dp, 84.dp)
-            else -> (h * 0.42f).coerceIn(120.dp, 200.dp)
-        }
+        // Content scales with height so a short 4x3 doesn't clip and a tall 5x5
+        // doesn't look sparse.
+        val tall = h >= 250.dp
+        val pctSize = if (h >= 280.dp) 46.sp else if (h >= 220.dp) 40.sp else 34.sp
+        val showTiles = h >= 290.dp
+        // Footer: a tall 2-col grid when there's height for it, else a single
+        // chunky row. Both hero and footer take a weight share so the cell is
+        // always full and neither can be squeezed to nothing.
+        val footerCols = if (tall && take.size >= 3) 2 else take.size.coerceAtLeast(1)
         Column(
             base.clickable(actionStartActivity(authIntent(ctx, widgetId, snap.vin, WidgetAction.OPEN)))
                 .padding(16.dp),
@@ -370,18 +371,18 @@ class BlooWidget : GlanceAppWidget() {
             // Header
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    snap.name.take(20), maxLines = 1, modifier = GlanceModifier.padding(end = 8.dp),
+                    snap.name.take(20), maxLines = 1, modifier = GlanceModifier.defaultWeight(),
                     style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold),
                 )
                 StateChip(snap, theme)
             }
-            // Hero — grows to fill everything above the footer.
+            // Hero — a weight share, vertically centered so it fills evenly.
             Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = GlanceModifier.defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
                             snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
-                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 46.sp),
+                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = pctSize),
                         )
                         Spacer(GlanceModifier.width(8.dp))
                         Column(modifier = GlanceModifier.padding(bottom = 6.dp)) {
@@ -391,13 +392,15 @@ class BlooWidget : GlanceAppWidget() {
                             Text(if (snap.isEv) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp))
                         }
                     }
-                    Spacer(GlanceModifier.height(12.dp))
-                    BatteryMeter(snap.percent, trackW, theme, thickness = 12.dp, withThumb = true)
-                    Spacer(GlanceModifier.height(12.dp))
-                    Row {
-                        DetailTile("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }, theme)
-                        Spacer(GlanceModifier.width(8.dp))
-                        DetailTile("Climate", if (snap.climateOn == true) "On" else "Off", theme)
+                    Spacer(GlanceModifier.height(10.dp))
+                    BatteryMeter(snap.percent, trackW, theme, thickness = if (tall) 12.dp else 10.dp, withThumb = true)
+                    if (showTiles) {
+                        Spacer(GlanceModifier.height(12.dp))
+                        Row {
+                            DetailTile("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }, theme)
+                            Spacer(GlanceModifier.width(8.dp))
+                            DetailTile("Climate", if (snap.climateOn == true) "On" else "Off", theme)
+                        }
                     }
                 }
                 if (hasPhoto) {
@@ -419,8 +422,8 @@ class BlooWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.height(14.dp))
                 ButtonGrid(
                     widgetId, snap, take, theme, pending, cols = footerCols,
-                    showLabel = true, iconSize = 24.dp,
-                    modifier = GlanceModifier.fillMaxWidth().height(footerH),
+                    showLabel = h >= 290.dp, iconSize = 24.dp,
+                    modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 )
             }
         }
