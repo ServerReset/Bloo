@@ -14,9 +14,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Login
@@ -145,7 +144,6 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                 active = false,
                 activeColor = MaterialTheme.colorScheme.primary,
                 pending = false,
-                enabled = email.isNotBlank() && password.isNotBlank() && pin.isNotBlank() && brand != Brand.KIA,
                 onClick = { vm.login(brand, email, password, pin) },
             )
         }
