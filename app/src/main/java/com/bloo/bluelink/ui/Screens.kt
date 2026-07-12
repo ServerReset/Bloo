@@ -6714,23 +6714,23 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Updates
             SettingsCard("Updates") {
-                val pkgInfo = runCatching {
-                    context.packageManager.getPackageInfo(context.packageName, 0)
-                }.getOrNull()
-                val versionName = pkgInfo?.versionName ?: "0.1"
-                val versionCode = pkgInfo?.longVersionCode ?: 1
-                val installDate = pkgInfo?.firstInstallTime?.let { ms ->
-                    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(ms))
-                } ?: "unknown"
                 val build = vm.currentBuildNumber
-                StepRow("App version", "$versionName  (build $versionCode)")
-                StepRow("Release date", installDate)
                 StepRow("CI build", if (build > 0) "#$build" else "Local build")
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(2.dp))
+                // Star of David with spin animation on tap
+                var starRot by remember { mutableStateOf(0f) }
+                val starAngle by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = starRot,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = 0.4f, stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
+                    ),
+                    label = "starSpin",
+                )
                 Text(
-                    "Built for the community by Lord Reset with OpenCode.",
+                    "Built by Lord Reset with OpenCode \u2721",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { starRot += 360f },
                 )
                 Spacer(Modifier.height(8.dp))
                 ToggleRow("Check automatically", updateChecksEnabled) { vm.setUpdateChecksEnabled(it) }
