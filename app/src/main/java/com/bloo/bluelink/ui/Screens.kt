@@ -6360,22 +6360,23 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
-            // Backup
-            SettingsCard("Backup") {
+            // Backup / Sync
+            SettingsCard("Backup & sync") {
                 val settingsImportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent(),
                 ) { uri -> uri?.let { vm.importSettings(context, it) } }
                 Text(
-                    "Export your theme, palettes and preferences to a file — " +
-                        "restore anytime or move to a new device. " +
-                        "Sign-in credentials are never saved.",
+                    "Export your theme, palettes and preferences to a file. " +
+                        "Save it to Google Drive or anywhere else. Restore on any " +
+                        "device to carry your setup with you. Sign-in credentials " +
+                        "are never included.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MorphTextButton(
-                        "Export all",
+                        "Export",
                         modifier = Modifier.weight(1f),
                         onClick = { vm.exportSettings(context) },
                     )
