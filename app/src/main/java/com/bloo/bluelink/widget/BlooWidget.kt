@@ -131,6 +131,7 @@ class BlooWidget : GlanceAppWidget() {
         val photoBgActive = photoBgOn && photo != null
         val pillShape = settings.widgetPillShape(widgetId)
         val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
+        val bgAlphaLevel = settings.widgetBackgroundAlpha(widgetId) // 0 (opaque) - 9 (transparent)
 
         provideContent {
             GlanceTheme {
@@ -144,6 +145,9 @@ class BlooWidget : GlanceAppWidget() {
                 }
                 // Pill shape only for 1-2 unit widgets; push content in to avoid clipping
                 val pillPad = if (pillShape && (w < 180.dp || h < 180.dp)) 8.dp else 0.dp
+                val bgAlpha = 1f - bgAlphaLevel / 9f // 1.0 (opaque) -> 0.1 (transparent)
+                val themeBg = if (appearance.themeMode.name == "AMOLED") ColorProvider(Color(0xFF000000))
+                              else GlanceTheme.colors.widgetBackground
                 Box(GlanceModifier.fillMaxSize().cornerRadius(corner)) {
                     // Photo background (optional): the car image full-bleed, with a
                     // scrim so the white text/buttons stay legible.
@@ -153,12 +157,20 @@ class BlooWidget : GlanceAppWidget() {
                             contentScale = ContentScale.Crop,
                             modifier = GlanceModifier.fillMaxSize().cornerRadius(corner),
                         )
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, 0.42f)))) {}
+                        val scrimAlpha = 0.42f * bgAlpha
+                        if (scrimAlpha > 0.01f) {
+                            Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
+                        }
                     }
-                    val themeBg = if (appearance.themeMode.name == "AMOLED") ColorProvider(Color(0xFF000000))
-                                  else GlanceTheme.colors.widgetBackground
+                    // Background layer: at level 0 (opaque) use the solid theme color;
+                    // at higher levels the widget becomes transparent so the home
+                    // screen wallpaper shows through (glass effect).
                     val base = GlanceModifier.fillMaxSize()
-                        .let { if (photoBgActive) it else it.background(themeBg) }
+                        .let { m ->
+                            if (photoBgActive) m
+                            else if (bgAlphaLevel == 0) m.background(themeBg)
+                            else m.background(ColorProvider(Color(0.10f, 0.10f, 0.12f, bgAlpha)))
+                        }
                         .cornerRadius(corner)
                         .padding(pillPad)
 

@@ -4,7 +4,11 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,6 +21,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -94,6 +99,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var showLocation by remember { mutableStateOf(false) }
     var pillShape by remember { mutableStateOf(false) }
     var layoutMode by remember { mutableStateOf("info") }
+    var backgroundAlpha by remember { mutableStateOf(0) }
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
 
     LaunchedEffect(Unit) {
@@ -104,6 +110,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         showLocation = store.widgetShowLocation(widgetId)
         pillShape = store.widgetPillShape(widgetId)
         layoutMode = store.widgetLayoutMode(widgetId)
+        backgroundAlpha = store.widgetBackgroundAlpha(widgetId)
         val existing = store.widgetConfig(widgetId)
         if (existing != null) {
             selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } } ?: cars.firstOrNull()?.vin
@@ -176,6 +183,42 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         MorphChip(showLocation, { showLocation = !showLocation }, "Show location map (large widgets)", Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
         MorphChip(pillShape, { pillShape = !pillShape }, "Pill shape (extreme rounding)", Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        Text("Background transparency", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            val scheme = MaterialTheme.colorScheme
+            for (level in 0..9) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .let { m ->
+                            if (level == backgroundAlpha) m
+                                .background(scheme.primary.copy(alpha = 0.25f), CircleShape)
+                                .border(2.dp, scheme.primary, CircleShape)
+                            else m
+                                .background(scheme.surfaceContainerHighest, CircleShape)
+                                .clickable { backgroundAlpha = level }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "$level",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (level == backgroundAlpha) scheme.primary else scheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Text(
+            when (backgroundAlpha) {
+                0 -> "Opaque"
+                9 -> "Nearly transparent (glass)"
+                else -> "Level ${backgroundAlpha}/9"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.height(6.dp))
         Text("When small", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(4.dp))
@@ -200,6 +243,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     store.setWidgetShowLocation(widgetId, showLocation)
                     store.setWidgetPillShape(widgetId, pillShape)
                     store.setWidgetLayoutMode(widgetId, layoutMode)
+                    store.setWidgetBackgroundAlpha(widgetId, backgroundAlpha)
                     onDone()
                 }
             },
