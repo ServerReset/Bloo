@@ -155,8 +155,10 @@ class BlooWidget : GlanceAppWidget() {
                         )
                         Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, 0.42f)))) {}
                     }
+                    val themeBg = if (appearance.themeMode.name == "AMOLED") ColorProvider(Color(0xFF000000))
+                                  else GlanceTheme.colors.widgetBackground
                     val base = GlanceModifier.fillMaxSize()
-                        .let { if (photoBgActive) it else it.background(GlanceTheme.colors.widgetBackground) }
+                        .let { if (photoBgActive) it else it.background(themeBg) }
                         .cornerRadius(corner)
                         .padding(pillPad)
 
