@@ -13,13 +13,10 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.Action
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.ActionParameters
-import androidx.glance.appwidget.action.actionRunAsync
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -86,24 +83,12 @@ class BlooWidget : GlanceAppWidget() {
             val large = w > 220.dp && h > 130.dp
             val base = GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
 
-            // Build click action for a widget button — if auth is off, skip the activity
-            fun pillAction(vin: String, action: WidgetAction): Action {
-                if (!requireAuth && action.kind != WidgetAction.Kind.OPEN) {
-                    return actionRunAsync<WidgetCommandWorker>(ActionParameters.of(
-                        WidgetCommandWorker.KEY_WIDGET_ID to widgetId,
-                        WidgetCommandWorker.KEY_VIN to vin,
-                        WidgetCommandWorker.KEY_ACTION to action.key,
-                    ))
-                }
-                return actionStartActivity(authIntentRuntime(context, widgetId, vin, action))
-            }
-
             when {
                 snap == null -> TapBox(base, configIntent(context, widgetId))
-                w < 70.dp && h < 70.dp -> TinyBody(snap, base, chargeGreen, widgetId, requireAuth)
-                h < 65.dp -> CompactRow(snap, actions, base, chargeGreen, onAccent, pillAction)
-                w > 200.dp && w > h * 1.5f -> WideRow(snap, actions, base, chargeGreen, onAccent, large, hasLocation, lat, lon, pillAction)
-                else -> StandardCol(snap, actions, w, h, base, chargeGreen, onAccent, large, hasLocation, lat, lon, bgBitmap, pillAction)
+                w < 70.dp && h < 70.dp -> TinyBody(snap, base, chargeGreen, widgetId, requireAuth, context)
+                h < 65.dp -> CompactRow(snap, actions, base, chargeGreen, onAccent, widgetId, context)
+                w > 200.dp && w > h * 1.5f -> WideRow(snap, actions, base, chargeGreen, onAccent, large, hasLocation, lat, lon, widgetId, context)
+                else -> StandardCol(snap, actions, w, h, base, chargeGreen, onAccent, large, hasLocation, lat, lon, bgBitmap, widgetId, context)
             }
         }}
     }
@@ -145,7 +130,8 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun ActionRow(actions: List<WidgetAction>, vin: String, h: Dp, accent: ColorProvider, onAccent: ColorProvider, max: Int, pillAction: (String, WidgetAction) -> Action) {
+    private fun ActionRow(actions: List<WidgetAction>, vin: String, h: Dp, accent: ColorProvider, onAccent: ColorProvider, max: Int, widgetId: Int) {
+        val ctx = LocalContext.current
         actions.take(max).forEach { a ->
             val icon = when (a) {
                 WidgetAction.DOORS, WidgetAction.LOCK, WidgetAction.UNLOCK -> R.drawable.ic_shortcut_lock
@@ -153,7 +139,14 @@ class BlooWidget : GlanceAppWidget() {
                 WidgetAction.CHARGE -> R.drawable.ic_widget_bolt
                 else -> R.drawable.ic_shortcut_car
             }
-            Pill(h, icon, a.label, pillAction(vin, a), accent, onAccent)
+            val intent = Intent(ctx, WidgetAuthActivity::class.java).apply {
+                this.action = WidgetAuthActivity.ACTION_RUN
+                putExtra(WidgetAuthActivity.EXTRA_WIDGET_ID, widgetId)
+                putExtra(WidgetAuthActivity.EXTRA_VIN, vin)
+                putExtra(WidgetAuthActivity.EXTRA_ACTION, a.key)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            Pill(h, icon, a.label, actionStartActivity(intent), accent, onAccent)
         }
     }
 
@@ -192,7 +185,7 @@ class BlooWidget : GlanceAppWidget() {
         when { snap.charging == true -> chargeGreen; else -> ColorProvider(Color(0.6f, 0.6f, 0.65f, 0.5f)) }
 
     @Composable
-    private fun CompactRow(snap: VehicleSnapshot, actions: List<WidgetAction>, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, pillAction: (String, WidgetAction) -> Action) {
+    private fun CompactRow(snap: VehicleSnapshot, actions: List<WidgetAction>, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, widgetId: Int, context: Context) {
         val ctx = LocalContext.current; val sc = stateColor(snap, chargeGreen)
         val narrow = LocalSize.current.width < 120.dp
         val action = authIntentRuntime(ctx, 0, snap.vin, WidgetAction.OPEN)
@@ -207,12 +200,12 @@ class BlooWidget : GlanceAppWidget() {
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp)) }
                 }
             }
-            ActionRow(actions, snap.vin, 26.dp, sc, onAccent, max = 2, pillAction)
+            ActionRow(actions, snap.vin, 26.dp, sc, onAccent, max = 2, widgetId)
         }
     }
 
     @Composable
-    private fun StandardCol(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, h: Dp, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, large: Boolean, hasLocation: Boolean, lat: Double?, lon: Double?, bgBitmap: android.graphics.Bitmap?, pillAction: (String, WidgetAction) -> Action) {
+    private fun StandardCol(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, h: Dp, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, large: Boolean, hasLocation: Boolean, lat: Double?, lon: Double?, bgBitmap: android.graphics.Bitmap?, widgetId: Int, context: Context) {
         val ctx = LocalContext.current; val sc = stateColor(snap, chargeGreen)
         val stLabel = vehicleStateLabel(snap.engineOn, snap.charging, snap.climateOn, snap.locked)
         val btnH = if (h < 120.dp) 28.dp else 34.dp
@@ -259,7 +252,7 @@ class BlooWidget : GlanceAppWidget() {
             if (actions.isNotEmpty()) {
                 val perRow = if (h > w * 1.1f) 2 else 4
                 actions.take(perRow * 2).chunked(perRow).forEach { chunk ->
-                    Row { chunk.forEachIndexed { i, a -> if (i > 0) Spacer(GlanceModifier.width(6.dp)); ActionRow(listOf(a), snap.vin, btnH, sc, onAccent, 1, pillAction) } }
+                    Row { chunk.forEachIndexed { i, a -> if (i > 0) Spacer(GlanceModifier.width(6.dp)); ActionRow(listOf(a), snap.vin, btnH, sc, onAccent, 1, widgetId) } }
                     Spacer(GlanceModifier.height(6.dp))
                 }
             }
@@ -278,7 +271,7 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun WideRow(snap: VehicleSnapshot, actions: List<WidgetAction>, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, large: Boolean, hasLocation: Boolean, lat: Double?, lon: Double?, pillAction: (String, WidgetAction) -> Action) {
+    private fun WideRow(snap: VehicleSnapshot, actions: List<WidgetAction>, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, large: Boolean, hasLocation: Boolean, lat: Double?, lon: Double?, widgetId: Int, context: Context) {
         val ctx = LocalContext.current; val sc = stateColor(snap, chargeGreen)
         val intent = authIntentRuntime(ctx, 0, snap.vin, WidgetAction.OPEN)
         Row(base.padding(10.dp).clickable(actionStartActivity(intent)).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
@@ -296,7 +289,7 @@ class BlooWidget : GlanceAppWidget() {
                 }
                 if (large && hasLocation) LocationBox(lat ?: 0.0, lon ?: 0.0, 60.dp)
             }
-            ActionRow(actions, snap.vin, 30.dp, sc, onAccent, max = 4, pillAction)
+            ActionRow(actions, snap.vin, 30.dp, sc, onAccent, max = 4, widgetId)
         }
     }
 }
