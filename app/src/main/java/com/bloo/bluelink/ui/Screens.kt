@@ -705,33 +705,47 @@ private fun OnboardingScreen(vm: AppViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            // --- Enter Bloo CTA (gated by 15 s so users actually read the onboarding) ---
+            // --- Enter Bloo CTA ---
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = scheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null,
+                            tint = scheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Sync across devices",
+                                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Back up your settings to Google Drive for automatic sync.",
+                                style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    val driveSyncLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.CreateDocument("application/json"),
+                    ) { uri -> uri?.let { vm.setSyncUri(it) } }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MorphTextButton("Set up Drive sync",
+                            modifier = Modifier.weight(1f),
+                            onClick = { driveSyncLauncher.launch("bloo_settings.json") })
+                        MorphTextButton("Skip",
+                            modifier = Modifier.weight(1f),
+                            onClick = { /* do nothing */ })
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
             MorphButton(
                 onClick = { vm.finishOnboarding() },
-                enabled = countdown == 0,
-                active = countdown == 0,
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 16.dp),
             ) {
-                AnimatedContent(
-                    targetState = countdown,
-                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
-                    label = "onboardCta",
-                ) { cd ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (cd > 0) {
-                            Text(
-                                "Almost there… $cd",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        } else {
-                            Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(22.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text("Enter Bloo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Enter Bloo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.height(32.dp))
@@ -2893,9 +2907,19 @@ private fun <T> ReorderColumn(
     var draggingKey by remember { mutableStateOf<Any?>(null) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
+    var dropRipple by remember { mutableStateOf(0L) }
 
     // Sync with upstream changes only while not actively dragging.
     LaunchedEffect(items) { if (draggingKey == null) order = items }
+    // Ripple animation when a tile is dropped (shows the "weight" of the move).
+    val maxRippleScale = remember { Animatable(0f) }
+    LaunchedEffect(dropRipple) {
+        if (dropRipple != 0L) {
+            maxRippleScale.snapTo(0f)
+            maxRippleScale.animateTo(1f, tween(300))
+            maxRippleScale.animateTo(0f, tween(200))
+        }
+    }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
         order.forEach { item ->
@@ -2904,7 +2928,13 @@ private fun <T> ReorderColumn(
             // changes (instead of reusing nodes by slot, which looks janky).
             key(k) {
                 val dragging = draggingKey == k
-                val lift by animateFloatAsState(if (dragging) 1.03f else 1f, label = "lift")
+                val dragState = draggingKey != null
+                val lift by animateFloatAsState(
+                    targetValue = if (dragging) 1.05f else 1f,
+                    animationSpec = if (dragging) spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
+                                   else spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow),
+                    label = "lift"
+                )
                 Box(
                     Modifier
                         .zIndex(if (dragging) 1f else 0f)
@@ -4149,7 +4179,7 @@ private fun StateControl(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Fill the button's height so the status reads as one tall control.
-        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Center) {
+        Column(Modifier.weight(1f).fillMaxHeight().widthIn(min = 120.dp), verticalArrangement = Arrangement.Center) {
             if (name.isNotBlank()) {
                 Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
