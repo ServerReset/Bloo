@@ -114,6 +114,9 @@ import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WearWeather
+import com.bloo.bluelink.data.degLabel
+import com.bloo.bluelink.data.formatDistance
+import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.links
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
@@ -785,8 +788,9 @@ private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
             }
         }
         Column {
+            val metric = ui.localSettings.unitSystem == "metric"
             AnimatedValue(
-                value = car.rangeMi?.let { "$it mi" } ?: "—",
+                value = car.rangeMi?.let { formatDistance(it, metric) } ?: "—",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -841,7 +845,8 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     Spacer(Modifier.height(6.dp))
     // 2°F steps, not 1° - the round screen only has room for so many dots before
     // they crowd into an unreadable smear; halving the count (11 vs 21) fixes that.
-    SliderRow("Temp", "${d.tempF}°F", d.tempF, 62, 82, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
+    val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
+    SliderRow("Temp", degLabel(d.tempF.toString(), fahrenheit), d.tempF, 62, 82, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
     SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
     MorphButton(
@@ -856,13 +861,14 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 
 @Composable
 private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate", Icons.Filled.Thermostat) {
+    val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
     val weather: WearWeather? = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
     val ambientF = weather?.let { ((it.tempC * 9.0 / 5.0) + 32).toInt() }
     val label = if (ambientF != null) {
         val action = if (ambientF >= 70) "Cool" else "Heat"
         if (car.climateOn == true) "Smart climate on" else "$action to ~${
-            if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85) else (ambientF + 10).coerceIn(60, 85)
-        }°F"
+            degLabel((if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85) else (ambientF + 10).coerceIn(60, 85)).toString(), fahrenheit)
+        }"
     } else {
         "No weather data"
     }
@@ -877,7 +883,7 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
     if (ambientF != null) {
         Spacer(Modifier.height(4.dp))
         Text(
-            "Ambient: $ambientF°F · adjusts ±10°F",
+            "Ambient: ${weatherTemp(weather!!.tempC, fahrenheit)} · adjusts ±10°${if (fahrenheit) "F" else "C"}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
@@ -1123,7 +1129,7 @@ private fun WeatherCard(ui: WearUi, car: CarView) = SectionCard("Weather") {
     Spacer(Modifier.height(2.dp))
     StatusRow("Feels", weatherTemp(w.feelsLikeC, f))
     w.humidity?.let { StatusRow("Humidity", "$it%") }
-    if (w.windKph > 0) StatusRow("Wind", "${w.windKph.toInt()} km/h")
+    if (w.windKph > 0) StatusRow("Wind", formatSpeed(w.windKph.toDouble(), ui.localSettings.unitSystem == "metric"))
 }
 
 @Composable

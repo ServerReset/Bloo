@@ -144,6 +144,7 @@ object WearBridge {
         val payload = WearSettingsPayload(
             dark = dark,
             useFahrenheit = appearance.useFahrenheit,
+            unitSystem = appearance.unitSystem,
             uiScale = appearance.uiScale,
             colors = rolesOf(s),
             carColors = carColors,

@@ -42,6 +42,24 @@ fun weatherLabel(code: Int): String = when (code) {
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     if (fahrenheit) "${(tempC * 9 / 5 + 32).toInt()}°F" else "${tempC.toInt()}°C"
 
+/** Format a distance in miles as "mi" or "km" based on the unit system. */
+fun formatDistance(mi: Double, metric: Boolean): String =
+    if (metric) "${(mi * 1.609).toInt()} km" else "${mi.toInt()} mi"
+
+/** Format speed in km/h based on the unit system. */
+fun formatSpeed(kph: Double, metric: Boolean): String =
+    if (metric) "${kph.toInt()} km/h" else "${(kph / 1.609).toInt()} mph"
+
+/** Format trip distance in miles to the user's preferred unit. */
+fun formatTripDistance(mi: Double, metric: Boolean): String =
+    if (metric) "%.1f km".format(mi * 1.609) else "%.1f mi".format(mi)
+
+/** Format efficiency (miles per kWh or km per kWh). */
+fun formatEfficiency(mi: Double, kwh: Double, metric: Boolean): String {
+    val eff = if (metric) (mi * 1.609) / kwh else mi / kwh
+    return "${"%.1f".format(eff)} ${if (metric) "km" else "mi"}/kWh"
+}
+
 /**
  * The canonical "what's this car doing right now" label, in priority order
  * (driving beats charging beats climate beats lock state). Every surface that

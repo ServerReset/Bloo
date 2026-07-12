@@ -1,9 +1,11 @@
 package com.bloo.wear.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -104,15 +106,26 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         item {
             SettingSection("Appearance") {
                 Text(
-                    "Theme and units synced from phone",
+                    "Theme synced from phone",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    "Units: ${if (ui.settings?.useFahrenheit != false) "°F" else "°C"}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Spacer(Modifier.height(4.dp))
+                val metric = ui.localSettings.unitSystem == "metric"
+                Row(
+                    Modifier.fillMaxWidth().clickable { vm.setUnitSystem(if (metric) "imperial" else "metric") },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Units", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (metric) "Metric (km, °C)" else "Imperial (mi, °F)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 ui.settings?.uiScale?.let {
+                    Spacer(Modifier.height(4.dp))
                     Text("Text scale: ${"%.2f".format(it)}×", style = MaterialTheme.typography.bodySmall)
                 }
             }

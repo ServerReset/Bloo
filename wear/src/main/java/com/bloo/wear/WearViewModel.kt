@@ -773,8 +773,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val clamped = scale.coerceIn(0.8f, 1.4f)
             localStore.setFontScale(clamped)
-            // Push back to phone so its Settings slider stays in sync.
             WearComms.publishLocalSettings(ctx, clamped)
+        }
+    }
+
+    /** Set the unit system locally and push to phone. */
+    fun setUnitSystem(value: String) {
+        viewModelScope.launch {
+            localStore.setUnitSystem(value)
+            WearComms.publishLocalSettings(ctx, localStore.flow.first().fontScale, value)
         }
     }
 

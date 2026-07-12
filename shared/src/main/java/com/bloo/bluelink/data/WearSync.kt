@@ -281,6 +281,7 @@ data class WearColorRoles(
 data class WearSettingsPayload(
     val dark: Boolean = true,
     val useFahrenheit: Boolean = true,
+    val unitSystem: String = "imperial",
     val uiScale: Float = 1f,
     val colors: WearColorRoles? = null,
     /** Per-VIN resolved colours for cars with a custom palette override. */
@@ -294,6 +295,7 @@ data class WearSettingsPayload(
 @Serializable
 data class WearLocalPayload(
     val uiScale: Float = 1f,
+    val unitSystem: String? = null,
 )
 
 /** A single car's reordered pebble order, sent watch → phone. */

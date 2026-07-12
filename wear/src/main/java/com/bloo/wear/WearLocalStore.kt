@@ -128,6 +128,7 @@ object WearTilePool {
 
 data class WearLocalSettings(
     val fontScale: Float = 1f,
+    val unitSystem: String = "imperial",
     val tileOrder: List<String> = WearTiles.DEFAULT_ORDER,
     /** Which action chips the glanceable Tile shows (subset of [TILE_CHIP_ACTIONS]). */
     val tileActions: List<String> = listOf("lock", "climate"),
@@ -149,6 +150,7 @@ class WearLocalStore(private val context: Context) {
     private val keyTileOrder = stringPreferencesKey("tile_order")
     private val keyTileActions = stringPreferencesKey("tile_actions")
     private fun keyTileCarVin(index: Int) = stringPreferencesKey("tile_car_vin_$index")
+    private val keyUnitSystem = stringPreferencesKey("unit_system")
     private val keyUpdateChecksEnabled = booleanPreferencesKey("update_checks_enabled")
     private val keyUpdateLastCheckedAt = longPreferencesKey("update_last_checked_at")
     private val keyUpdateSnoozeUntil = longPreferencesKey("update_snooze_until")
@@ -177,6 +179,7 @@ class WearLocalStore(private val context: Context) {
         }
         WearLocalSettings(
             fontScale = fontScale,
+            unitSystem = prefs[keyUnitSystem] ?: "imperial",
             tileOrder = merged,
             tileActions = actions,
             tileCarVins = tileCarVins,
@@ -188,6 +191,10 @@ class WearLocalStore(private val context: Context) {
 
     suspend fun setFontScale(f: Float) {
         context.wearLocalStore.edit { it[keyFontScale] = f.coerceIn(0.8f, 1.4f) }
+    }
+
+    suspend fun setUnitSystem(value: String) {
+        context.wearLocalStore.edit { it[keyUnitSystem] = value }
     }
 
     suspend fun setUpdateChecksEnabled(enabled: Boolean) {

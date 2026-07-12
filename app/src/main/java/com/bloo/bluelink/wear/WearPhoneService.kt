@@ -129,7 +129,9 @@ class WearPhoneService : WearableListenerService() {
                     }
                     WearSync.PATH_LOCAL -> {
                         val payload = WearSync.decodeLocal(raw) ?: return@forEach
-                        SettingsStore(applicationContext).setUiScale(payload.uiScale.coerceIn(0.8f, 1.4f))
+                        val store = SettingsStore(applicationContext)
+                        store.setUiScale(payload.uiScale.coerceIn(0.8f, 1.4f))
+                        payload.unitSystem?.let { store.setUnitSystem(it) }
                     }
                 }
               }

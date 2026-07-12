@@ -9,21 +9,23 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bloo.bluelink.data.formatEfficiency
+import com.bloo.bluelink.data.formatTripDistance
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
@@ -94,7 +96,8 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                         t.startdate?.take(16)?.replace('T', ' ')?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        t.distance?.let { StatusRow("Distance", "%.1f mi".format(it)) }
+                        val metric = ui.localSettings.unitSystem == "metric"
+                        t.distance?.let { StatusRow("Distance", formatTripDistance(it, metric)) }
                         t.driveMinutes?.let { StatusRow("Drive", fmtMinutes(it)) }
                         t.idleMinutes?.takeIf { it > 0 }?.let { StatusRow("Idle", fmtMinutes(it)) }
                         t.usedKwh?.let { StatusRow("Used", "$it kWh") }
@@ -102,8 +105,7 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                         t.distance?.let { d ->
                             t.usedKwh?.let { k ->
                                 if (k > 0) {
-                                    val miPerKwh = d / k
-                                    StatusRow("Efficiency", "${"%.1f".format(miPerKwh)} mi/kWh")
+                                    StatusRow("Efficiency", formatEfficiency(d, k, metric))
                                 }
                             }
                         }

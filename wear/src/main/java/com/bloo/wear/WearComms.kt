@@ -158,11 +158,11 @@ object WearComms {
 
     /** Push the watch's local display scale back to the phone so the phone's
      *  Settings → Text scale slider stays in sync when changed on the watch. */
-    suspend fun publishLocalSettings(context: Context, uiScale: Float) {
+    suspend fun publishLocalSettings(context: Context, uiScale: Float, unitSystem: String? = null) {
         withContext(Dispatchers.IO) {
             runCatching {
                 val request = PutDataMapRequest.create(WearSync.PATH_LOCAL).apply {
-                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeLocal(WearLocalPayload(uiScale)))
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeLocal(WearLocalPayload(uiScale = uiScale, unitSystem = unitSystem)))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
