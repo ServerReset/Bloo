@@ -627,10 +627,11 @@ class SettingsStore(private val context: Context) {
 
     /** Widget background transparency level (0 = opaque, 9 = very transparent). */
     suspend fun widgetBackgroundAlpha(widgetId: Int): Int =
-        context.settingsDataStore.data.first()[intPreferencesKey("widget_${widgetId}_alpha")] ?: 0
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_alpha")]
+            ?.toIntOrNull() ?: 0
 
     suspend fun setWidgetBackgroundAlpha(widgetId: Int, value: Int) {
-        context.settingsDataStore.edit { it[intPreferencesKey("widget_${widgetId}_alpha")] = value.coerceIn(0, 9) }
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_alpha")] = value.coerceIn(0, 9).toString() }
     }
 
     /** Show a map/location box on large widgets (default off). */
