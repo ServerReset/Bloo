@@ -590,6 +590,14 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_loc")] = value }
     }
 
+    /** Much more rounded corners (pill-like) for small widgets (default false). */
+    suspend fun widgetPillShape(widgetId: Int): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_pill")] ?: false
+
+    suspend fun setWidgetPillShape(widgetId: Int, value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_pill")] = value }
+    }
+
     // The car's last known address + coordinates, refreshed by the Location action
     // and rendered in the widget's location box.
     suspend fun widgetLocationAddress(widgetId: Int): String? =

@@ -92,6 +92,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var requireAuth by remember { mutableStateOf(true) }
     var photoBg by remember { mutableStateOf(false) }
     var showLocation by remember { mutableStateOf(false) }
+    var pillShape by remember { mutableStateOf(false) }
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
 
     LaunchedEffect(Unit) {
@@ -100,6 +101,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         requireAuth = store.widgetRequireAuth(widgetId)
         photoBg = store.widgetPhotoBackground(widgetId)
         showLocation = store.widgetShowLocation(widgetId)
+        pillShape = store.widgetPillShape(widgetId)
         val existing = store.widgetConfig(widgetId)
         if (existing != null) {
             selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } } ?: cars.firstOrNull()?.vin
@@ -170,6 +172,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         MorphChip(photoBg, { photoBg = !photoBg }, "Use car photo as background", Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
         MorphChip(showLocation, { showLocation = !showLocation }, "Show location map (large widgets)", Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+        MorphChip(pillShape, { pillShape = !pillShape }, "Pill shape (extreme rounding)", Modifier.fillMaxWidth())
 
         Spacer(Modifier.height(18.dp))
         MorphButton(
@@ -181,6 +185,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     store.setWidgetRequireAuth(widgetId, requireAuth)
                     store.setWidgetPhotoBackground(widgetId, photoBg)
                     store.setWidgetShowLocation(widgetId, showLocation)
+                    store.setWidgetPillShape(widgetId, pillShape)
                     onDone()
                 }
             },

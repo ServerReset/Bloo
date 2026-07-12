@@ -128,12 +128,14 @@ class BlooWidget : GlanceAppWidget() {
         val address = if (showLocation) settings.widgetLocationAddress(widgetId) else null
         val pending = settings.widgetPendingAction(widgetId)
         val photoBgActive = photoBgOn && photo != null
+        val pillShape = settings.widgetPillShape(widgetId)
 
         provideContent {
             GlanceTheme {
                 val w = LocalSize.current.width
                 val h = LocalSize.current.height
                 val corner = when {
+                    pillShape -> 999.dp
                     w < 90.dp || h < 90.dp -> 16.dp
                     w < 180.dp || h < 130.dp -> 22.dp
                     else -> 28.dp
@@ -232,20 +234,36 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun TallNarrowTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
+        val narrow = LocalSize.current.width < 90.dp
         Column(
             base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(c.snap.name.take(10), maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 12.sp))
+            Text(c.snap.name.take(10), maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = if (narrow) 10.sp else 12.sp))
             Spacer(GlanceModifier.height(2.dp))
-            Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 26.sp))
+            // Stack percent digits vertically when very narrow to avoid clipping
+            if (narrow && c.snap.percent != null) {
+                VerticalNumber(c.snap.percent.toString() + "%", onBg(c))
+            } else {
+                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 26.sp))
+            }
             Spacer(GlanceModifier.height(2.dp))
-            c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
+            c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = if (narrow) 9.sp else 11.sp)) }
             Spacer(GlanceModifier.height(8.dp))
             if (c.actions.isNotEmpty()) {
-                // Stack buttons vertically (1 column) for tall narrow layout
-                ButtonGrid(c, c.actions.take(4), cols = 1, showLabel = false, iconSize = 26.dp,
+                ButtonGrid(c, c.actions.take(4), cols = 1, showLabel = false, iconSize = 24.dp,
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight())
+            }
+        }
+    }
+
+    /** Render a short string as a vertical stack of characters (one per line).
+     *  Used on narrow widgets where horizontal text would clip. */
+    @Composable
+    private fun VerticalNumber(text: String, color: ColorProvider) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            text.forEach { ch ->
+                Text(ch.toString(), maxLines = 1, style = TextStyle(color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp))
             }
         }
     }
