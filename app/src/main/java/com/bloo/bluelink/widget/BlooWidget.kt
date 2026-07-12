@@ -42,7 +42,6 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.align
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
@@ -454,7 +453,7 @@ class BlooWidget : GlanceAppWidget() {
                         contentScale = ContentScale.Fit, modifier = GlanceModifier.fillMaxSize().cornerRadius(18.dp))
                     val addr = c.address
                     if (addr != null) {
-                        Box(GlanceModifier.fillMaxWidth().padding(8.dp).align(Alignment.BottomCenter)) {
+                        Box(GlanceModifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.BottomCenter) {
                             Text(addr.take(35), maxLines = 1, style = TextStyle(color = ColorProvider(Color(0xE0000000)), fontSize = 9.sp))
                         }
                     }
