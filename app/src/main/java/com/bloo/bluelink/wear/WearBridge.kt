@@ -67,6 +67,10 @@ object WearBridge {
      *  which surfaces exist, called from the workers/services that mutate state. */
     suspend fun refreshAllSurfaces(context: Context) {
         runCatching { publishNow(context) }
+        runCatching {
+            val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
+            publishSettingsNow(context, appearance)
+        }
         runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(context) }
         runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }

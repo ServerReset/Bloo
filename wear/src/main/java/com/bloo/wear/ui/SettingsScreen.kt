@@ -259,6 +259,19 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
+            SettingSection("Sync") {
+                MorphButton(
+                    label = "Sync from phone",
+                    icon = Icons.Filled.Sync,
+                    active = false,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = false,
+                    onClick = { vm.resync() },
+                )
+            }
+        }
+
+        item {
             Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
                 StatusRow(
                     label = "Phone",
