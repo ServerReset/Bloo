@@ -237,7 +237,9 @@ class BlooWidget : GlanceAppWidget() {
             c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
             Spacer(GlanceModifier.height(8.dp))
             if (c.actions.isNotEmpty()) {
-                ButtonGrid(c, c.actions.take(3), cols = 1, showLabel = false, iconSize = 22.dp,
+                val take = c.actions.take(4)
+                val cols = if (take.size >= 3) 2 else 1
+                ButtonGrid(c, take, cols = cols, showLabel = false, iconSize = 22.dp,
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight())
             }
         }
