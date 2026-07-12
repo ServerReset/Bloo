@@ -6968,22 +6968,13 @@ private fun SettingsScreen(vm: AppViewModel) {
                         },
                     )
                     if (appearance.biometricLock) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Lock the app",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Spacer(Modifier.height(6.dp))
+                        SettingsSegmentedRow(
+                            label = "Lock the app",
+                            options = LockTiming.entries.map { t -> SegmentOption(t.name, t.label, null) },
+                            selectedKey = appearance.lockTiming.name,
+                            onSelect = { key -> runCatching { vm.setLockTiming(LockTiming.valueOf(key)) } },
                         )
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LockTiming.entries.forEach { t ->
-                                MorphChip(
-                                    selected = appearance.lockTiming == t,
-                                    onClick = { vm.setLockTiming(t) },
-                                    label = t.label,
-                                )
-                            }
-                        }
                     }
                 } else {
                     Text(
