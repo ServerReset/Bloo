@@ -35,7 +35,7 @@ class WearPhoneService : WearableListenerService() {
     override fun onMessageReceived(event: MessageEvent) {
         when (event.path) {
             WearSync.PATH_COMMAND -> {
-                val command = WearSync.decodeCommand(String(event.data)) ?: return
+                val command = WearSync.decodeCommand(String(event.data ?: ByteArray(0))) ?: return
                 if (command.action == WearAction.AI_SUMMARY) {
                     scope.launch {
                         val ctx = applicationContext
@@ -74,7 +74,7 @@ class WearPhoneService : WearableListenerService() {
             }
 
             WearSync.PATH_SYNC_REQUEST -> {
-                val command = WearSync.decodeCommand(String(event.data))
+                val command = WearSync.decodeCommand(String(event.data ?: ByteArray(0)))
                 scope.launch {
                     val ctx = applicationContext
                     if (command?.action == WearAction.REFRESH) {
@@ -106,6 +106,7 @@ class WearPhoneService : WearableListenerService() {
         if (updates.isEmpty()) return
         scope.launch {
             updates.forEach { (path, raw) ->
+              runCatching {
                 when (path) {
                     WearSync.PATH_CLIMATE -> ClimateSyncStore(applicationContext).save(raw)
                     WearSync.PATH_PRESETS -> {
@@ -131,6 +132,7 @@ class WearPhoneService : WearableListenerService() {
                         SettingsStore(applicationContext).setUiScale(payload.uiScale.coerceIn(0.8f, 1.4f))
                     }
                 }
+              }
             }
         }
     }

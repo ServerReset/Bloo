@@ -30,7 +30,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         if (!prefs.service && !prefs.doorOpen) return Result.success()
 
         for (brand in store.loggedInBrands()) {
-            val repo = repositoryFor(brand, store, CredentialStore(applicationContext))
+            val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue
             // Share the app-wide status gate so a foregrounded app and this worker
             // never issue overlapping requests (Blue Link 502s otherwise).
             val vehicles = runCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }
@@ -39,8 +39,10 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 val status = runCatching {
                     BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
                 }.getOrNull()
-                CarAlerts.evaluate(settings, v, status).forEach {
-                    Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
+                runCatching {
+                    CarAlerts.evaluate(settings, v, status).forEach {
+                        Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
+                    }
                 }
             }
         }

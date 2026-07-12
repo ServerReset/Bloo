@@ -102,7 +102,7 @@ class BlooWidget : GlanceAppWidget() {
         )
 
         val photoPath = snap?.let { settings.imageUrl(it.vin) }
-        val photoBitmap = photoPath?.takeIf { it.startsWith("/") }?.let { decodeCached(it, sample = 2) }
+        val photoBitmap = photoPath?.takeIf { it.startsWith("/") }?.let { decodeCached(it) }
         // Set by WidgetAuthActivity when a command is queued, cleared by the worker
         // — drives both the per-button "working" tint and the corner spinner.
         val pending = settings.widgetPendingAction(widgetId)
@@ -620,21 +620,31 @@ class BlooWidget : GlanceAppWidget() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-    /** Decode a file-backed bitmap, memoised by path + last-modified so a resize or
-     *  refresh doesn't re-decode the same image every render. */
-    private fun decodeCached(path: String, sample: Int): Bitmap? {
+    /** Decode a file-backed bitmap downsampled so its longest edge is <= [maxPx],
+     *  memoised by path + last-modified. The photo path is an arbitrary user-set
+     *  image; decoding a full-size phone photo (e.g. 4032x3024 ~= 48MB) and handing
+     *  it to RemoteViews throws 'exceeds maximum bitmap memory usage' in the widget
+     *  host and blanks the widget — so always scale down to widget-appropriate size. */
+    private fun decodeCached(path: String, maxPx: Int = 400): Bitmap? {
         val file = java.io.File(path)
         if (!file.exists()) return null
-        val key = "$path:${file.lastModified()}:$sample"
+        val key = "$path:${file.lastModified()}:$maxPx"
         bitmapCache.get(key)?.let { return it }
         return runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, bounds)
+            var sample = 1
+            val longest = maxOf(bounds.outWidth, bounds.outHeight)
+            while (longest > 0 && longest / sample > maxPx) sample *= 2
             BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
         }.getOrNull()?.also { bitmapCache.put(key, it) }
     }
 
     companion object {
-        private val bitmapCache = object : android.util.LruCache<String, Bitmap>(6) {
-            override fun sizeOf(key: String, value: Bitmap) = 1
+        // Sized by bytes (not entry count) so the static cache can never pin more
+        // than a few MB of decoded bitmaps for the process lifetime.
+        private val bitmapCache = object : android.util.LruCache<String, Bitmap>(4 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: Bitmap) = value.byteCount
         }
         private val CLIMATE_KEYS = setOf("climate", "climate_on", "climate_off")
         private val LOCK_KEYS = setOf("doors", "lock", "unlock")

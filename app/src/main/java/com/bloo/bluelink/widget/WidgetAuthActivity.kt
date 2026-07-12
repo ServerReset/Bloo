@@ -82,25 +82,29 @@ class WidgetAuthActivity : FragmentActivity() {
             // Show the car on the map right away — the user asked "where's my car",
             // not "refresh in the background".
             lifecycleScope.launch {
-                val snap = withContext(Dispatchers.IO) {
-                    SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin }
+                try {
+                    val snap = withContext(Dispatchers.IO) {
+                        runCatching { SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin } }.getOrNull()
+                    }
+                    val lat = snap?.lat
+                    val lon = snap?.lon
+                    if (lat != null && lon != null && !(lat == 0.0 && lon == 0.0)) {
+                        val label = Uri.encode(snap.name.ifBlank { "My car" })
+                        val maps = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon($label)"))
+                        runCatching { startActivity(maps) }.onFailure { openApp(vin) }
+                    } else {
+                        openApp(vin)
+                    }
+                } finally {
+                    finishNoAnim()
                 }
-                val lat = snap?.lat
-                val lon = snap?.lon
-                if (lat != null && lon != null && !(lat == 0.0 && lon == 0.0)) {
-                    val label = Uri.encode(snap.name.ifBlank { "My car" })
-                    val maps = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon($label)"))
-                    runCatching { startActivity(maps) }.onFailure { openApp(vin) }
-                } else {
-                    openApp(vin)
-                }
-                finishNoAnim()
             }
             return
         }
         lifecycleScope.launch {
             val ctx = applicationContext
             var resolvedWearAction = action.wearAction
+            try {
             // DataStore writes off the main thread so the transparent activity dismisses
             // without waiting on disk.
             withContext(Dispatchers.IO) {
@@ -125,12 +129,16 @@ class WidgetAuthActivity : FragmentActivity() {
                     }
                 }
                 // Mark pending so the widget overlays the refresh spinner.
-                SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key)
+                runCatching { SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key) }
             }
             runCatching { BlooWidget().updateAll(ctx) }
             // Queue the actual work; finish right away so the home screen is unblocked.
-            WidgetCommandWorker.enqueue(ctx, widgetId, vin, action, resolvedWearAction)
-            finishNoAnim()
+            runCatching { WidgetCommandWorker.enqueue(ctx, widgetId, vin, action, resolvedWearAction) }
+            } finally {
+                // Always dismiss — a thrown DataStore/enqueue error must not strand
+                // this transparent activity on top of the home screen swallowing taps.
+                finishNoAnim()
+            }
         }
     }
 

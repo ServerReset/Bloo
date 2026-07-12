@@ -69,7 +69,7 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
 
             ComplicationType.RANGED_VALUE ->
                 RangedValueComplicationData.Builder(
-                    value = (pct ?: 0).toFloat(),
+                    value = (pct ?: 0).coerceIn(0, 100).toFloat(),
                     min = 0f,
                     max = 100f,
                     contentDescription = desc,

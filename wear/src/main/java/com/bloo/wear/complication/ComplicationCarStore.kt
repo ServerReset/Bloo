@@ -58,7 +58,10 @@ suspend fun resolveComplicationCar(
     dataSource: String,
     instanceId: Int,
 ): VehicleSnapshot? {
-    val data = SnapshotStore(context).current()
+    // The DataStore read itself can throw (corrupt/unreadable prefs) — an uncaught
+    // exception out of onComplicationRequest crashes the data-source process, so
+    // degrade to "no data" instead.
+    val data = runCatching { SnapshotStore(context).current() }.getOrNull() ?: return null
     val vin = runCatching { ComplicationCarStore(context).vinFor(dataSource, instanceId) }.getOrNull()
     return vin?.let { v -> data.vehicles.firstOrNull { it.vin == v } } ?: data.selected
 }

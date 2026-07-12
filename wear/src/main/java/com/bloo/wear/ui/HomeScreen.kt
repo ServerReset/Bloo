@@ -175,6 +175,11 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
 
     // Kept outside key() so scroll positions survive when the VIN list refreshes.
     val listStates = remember { mutableStateMapOf<String, ScalingLazyListState>() }
+    LaunchedEffect(ui.cars) {
+        // Evict scroll state for removed cars so the map can't grow unbounded
+        // across a session of adding/removing cars.
+        listStates.keys.retainAll(ui.cars.map { it.vin }.toSet())
+    }
 
     key(ui.cars.map { it.vin }) {
         val carPager = rememberPagerState(initialPage = 0) { count }
@@ -291,7 +296,10 @@ private fun CarColumn(
     // new order is immediately visible. `initialised` skips the first composition
     // (state was just initialised to initialIndex). Keys are stable primitives.
     var initialised by remember(car.vin) { mutableStateOf(false) }
-    LaunchedEffect(ui.pebbleOverride, tileCount) {
+    // Key on THIS car's own tile order (structurally compared), not the whole
+    // pebbleOverride map — otherwise reordering one car snapped every other
+    // on-screen car back to its Summary tile.
+    LaunchedEffect(tiles) {
         if (initialised) {
             state.scrollToItem((cycles / 2) * tileCount + summaryIdx)
         }
