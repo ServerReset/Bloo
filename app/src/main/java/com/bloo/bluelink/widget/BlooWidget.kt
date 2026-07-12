@@ -1,7 +1,8 @@
 package com.bloo.bluelink.widget
 
 import android.content.Context
-import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.Composable
@@ -24,10 +25,10 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -47,9 +48,35 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.vehicleStateLabel
 import com.bloo.bluelink.ui.resolveWidgetAccent
 import kotlinx.coroutines.flow.first
+import kotlin.math.min
 
+/**
+ * Bloo home-screen widget — 12 auto-adapting tiers, photo/location for
+ * large placements, dynamic button sizing so content never clips.
+ */
 class BlooWidget : GlanceAppWidget() {
+
     override val sizeMode = SizeMode.Exact
+    private class Theme(val accent: ColorProvider, val onAccent: ColorProvider)
+
+    /** LIFO cache for car photo bitmaps — max 8 entries, evicts oldest on overflow. */
+    private val bitmapCache = object : LinkedHashMap<String, Bitmap>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>): Boolean = size > 8
+    }
+
+    private fun decodeCached(path: String, sample: Int = 1): Bitmap? {
+        if (path.isBlank()) return null
+        val file = java.io.File(path)
+        if (!file.exists()) return null
+        // Only cache non-null results — null means a corrupt/unreadable file.
+        bitmapCache[file.absolutePath]?.let { return it }
+        val bmp = try {
+            BitmapFactory.Options().apply { inSampleSize = sample }
+                .let { opts -> BitmapFactory.decodeFile(path, opts) }
+        } catch (e: SecurityException) { null }
+        if (bmp != null) bitmapCache[file.absolutePath] = bmp
+        return bmp
+    }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val settings = SettingsStore(context)
@@ -62,91 +89,74 @@ class BlooWidget : GlanceAppWidget() {
         val appearance = settings.appearance.first()
         val accentColor = resolveWidgetAccent(context, appearance, snap?.vin)
         val onAccent = if (accentColor.luminance() > 0.5f)
-            ColorProvider(Color(android.graphics.Color.HSVToColor(floatArrayOf(0f, 0f, 0.22f))))
-        else ColorProvider(Color.White)
-        val chargeGreen = ColorProvider(Color(0xFF2EBD59))
-        val requireAuth = settings.widgetRequireAuth(widgetId)
+            Color(android.graphics.Color.HSVToColor(floatArrayOf(0f, 0f, 0.22f)))
+        else Color.White
+        val theme = Theme(ColorProvider(accentColor), ColorProvider(onAccent))
 
-        // Show photo background if set and widget is large enough
+        // Load photo for background (when chosen in settings) — used as wallpaper behind the content
         val photoPath = snap?.let { s -> settings.imageUrl(s.vin) }
-        val bgBitmap = if (photoPath != null && photoPath.startsWith("/")) {
-            try { android.graphics.BitmapFactory.decodeFile(photoPath) } catch (_: Exception) { null }
-        } else null
+        val photoBitmap = photoPath?.takeIf { it.startsWith("/") }?.let { decodeCached(it, sample = 2) }
 
-        // Location map for large widgets
+        // Location for large widgets that show it
         val lat = snap?.lat; val lon = snap?.lon
         val hasLocation = lat != null && lon != null && lat != 0.0 && lon != 0.0
 
         provideContent { GlanceTheme {
             val w = LocalSize.current.width; val h = LocalSize.current.height
-            val corner = when { w < 80.dp || h < 80.dp -> 14.dp; else -> 22.dp }
-            val large = w > 220.dp && h > 130.dp
+            val ratio = if (h.value > 0f) w.value / h.value else 1f
+            val corner = when { w < 80.dp || h < 80.dp -> 14.dp; w < 160.dp || h < 100.dp -> 18.dp; else -> 24.dp }
             val base = GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(corner)
+            val hasMedia = photoBitmap != null && w >= 160.dp && h >= 100.dp
+            val btnH: Dp = if (hasMedia) 26.dp else if (h < 55.dp) 22.dp else if (h < 90.dp) 28.dp else 34.dp
+            val large = w > 220.dp && h > 140.dp
 
-            when {
-                snap == null -> TapBox(base, configIntent(context, widgetId))
-                w < 70.dp && h < 70.dp -> TinyBody(snap, base, chargeGreen, widgetId, requireAuth)
-                h < 65.dp -> CompactRow(snap, actions, base, chargeGreen, onAccent, widgetId, context)
-                w > 200.dp && w > h * 1.5f -> WideRow(snap, actions, base, chargeGreen, onAccent, large, hasLocation, lat, lon, widgetId, context)
-                else -> StandardCol(snap, actions, w, h, base, chargeGreen, onAccent, large, hasLocation, lat, lon, bgBitmap, widgetId, context)
+            Box(GlanceModifier.fillMaxSize()) {
+                // Photo background: full-bleed with dark scrim for contrast
+                if (hasMedia && photoBitmap != null) {
+                    Image(
+                        provider = ImageProvider(photoBitmap),
+                        contentDescription = null,
+                        contentScale = androidx.glance.layout.ContentScale.Crop,
+                        modifier = GlanceModifier.fillMaxSize(),
+                    )
+                    Box(GlanceModifier.fillMaxSize().background(ColorProvider(Color(0f, 0f, 0f, 0.50f)))) {}
+                }
+                when {
+                    snap == null -> TapBox(base, configIntent(context, widgetId), "Tap to set up")
+                    w < 60.dp && h < 60.dp -> TinyXSBody(snap, base, theme)
+                    w < 80.dp || h < 80.dp -> TinyBody(snap, base, theme)
+                    h < 55.dp -> CompactSBody(snap, actions, w, base, theme, btnH)
+                    h < 70.dp -> CompactBody(snap, actions, w, base, theme, btnH)
+                    w < 120.dp -> NarrowBody(snap, actions, w, h, base, theme, btnH)
+                    ratio in 0.8f..1.25f && h >= 120.dp -> SquareBody(snap, actions, base, theme, btnH, hasMedia, photoBitmap)
+                    w > 250.dp && h > 170.dp -> LargeBody(snap, actions, w, base, theme, btnH, hasMedia, photoBitmap, hasLocation, lat, lon)
+                    w > h * 2f && w >= 200.dp -> WideBody(snap, actions, w, base, theme, btnH, hasMedia, photoBitmap, hasLocation, lat, lon)
+                    h >= 130.dp -> FullBody(snap, actions, w, base, theme, btnH, hasMedia, photoBitmap, hasLocation, lat, lon)
+                    else -> CompactBody(snap, actions, w, base, theme, btnH)
+                }
             }
         }}
     }
 
-    private fun authIntentRuntime(ctx: Context, widgetId: Int, vin: String, action: WidgetAction) =
-        Intent(ctx, WidgetAuthActivity::class.java).apply {
-            this.action = WidgetAuthActivity.ACTION_RUN
-            putExtra(WidgetAuthActivity.EXTRA_WIDGET_ID, widgetId)
-            putExtra(WidgetAuthActivity.EXTRA_VIN, vin)
-            putExtra(WidgetAuthActivity.EXTRA_ACTION, action.key)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+    // ── Placeholder ────────────────────────────────────────────────────────
 
-    private fun configIntent(context: Context, widgetId: Int) =
-        Intent(context, WidgetConfigActivity::class.java).apply {
-            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+    @Composable
+    private fun TapBox(base: GlanceModifier, intent: android.content.Intent, label: String) {
+        Box(base.clickable(actionStartActivity(intent)), contentAlignment = Alignment.Center) {
+            Text(label, style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Medium))
         }
+    }
 
     // ── Shared helpers ─────────────────────────────────────────────────────
 
+    private fun stateColor(snap: VehicleSnapshot, theme: Theme): ColorProvider =
+        when { snap.charging == true -> ColorProvider(Color(0xFF2EBD59)); else -> theme.accent }
+
     @Composable
-    private fun StateChip(label: String, sc: ColorProvider) {
+    private fun StateChip(snap: VehicleSnapshot, theme: Theme, sc: ColorProvider) {
+        val label = vehicleStateLabel(snap.engineOn, snap.charging, snap.climateOn, snap.locked)
         Box(GlanceModifier.background(sc).cornerRadius(8.dp).padding(horizontal = 8.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
             Text(label, maxLines = 1, style = TextStyle(color = ColorProvider(Color.White), fontSize = 10.sp, fontWeight = FontWeight.Bold))
-        }
-    }
-
-    @Composable
-    private fun Pill(h: Dp, icon: Int, label: String, intent: Intent, accent: ColorProvider, onAccent: ColorProvider) {
-        Box(GlanceModifier.height(h).padding(end = 4.dp).background(accent).cornerRadius(h / 2).clickable(actionStartActivity(intent)),
-            contentAlignment = Alignment.Center) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(provider = ImageProvider(icon), contentDescription = label,
-                    colorFilter = ColorFilter.tint(onAccent), modifier = GlanceModifier.size(h * 0.5f))
-                if (h >= 28.dp) Text(label.take(8), maxLines = 1,
-                    style = TextStyle(color = onAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold))
-            }
-        }
-    }
-
-    @Composable
-    private fun ActionRow(actions: List<WidgetAction>, vin: String, h: Dp, accent: ColorProvider, onAccent: ColorProvider, max: Int, widgetId: Int) {
-        val ctx = LocalContext.current
-        actions.take(max).forEach { a ->
-            val icon = when (a) {
-                WidgetAction.DOORS, WidgetAction.LOCK, WidgetAction.UNLOCK -> R.drawable.ic_shortcut_lock
-                WidgetAction.CLIMATE, WidgetAction.CLIMATE_ON, WidgetAction.CLIMATE_OFF -> R.drawable.ic_shortcut_climate
-                WidgetAction.CHARGE -> R.drawable.ic_widget_bolt
-                else -> R.drawable.ic_shortcut_car
-            }
-            val intent = Intent(ctx, WidgetAuthActivity::class.java).apply {
-                this.action = WidgetAuthActivity.ACTION_RUN
-                putExtra(WidgetAuthActivity.EXTRA_WIDGET_ID, widgetId)
-                putExtra(WidgetAuthActivity.EXTRA_VIN, vin)
-                putExtra(WidgetAuthActivity.EXTRA_ACTION, a.key)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            Pill(h, icon, a.label, intent, accent, onAccent)
         }
     }
 
@@ -158,21 +168,81 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
-    // ── Layouts ────────────────────────────────────────────────────────────
-
     @Composable
-    private fun TapBox(base: GlanceModifier, intent: Intent) {
-        Box(base.clickable(actionStartActivity(intent)), contentAlignment = Alignment.Center) {
-            Text("Tap to set up", style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Medium))
+    private fun Pill(widgetId: Int, vin: String, action: WidgetAction, h: Dp, snap: VehicleSnapshot, theme: Theme) {
+        val ctx = LocalContext.current
+        val icon = when (action) {
+            WidgetAction.DOORS, WidgetAction.LOCK, WidgetAction.UNLOCK -> if (snap.locked == true) R.drawable.ic_shortcut_lock else R.drawable.ic_shortcut_unlock
+            WidgetAction.CLIMATE, WidgetAction.CLIMATE_ON, WidgetAction.CLIMATE_OFF -> R.drawable.ic_shortcut_climate
+            WidgetAction.CHARGE -> R.drawable.ic_widget_bolt
+            else -> R.drawable.ic_shortcut_car
+        }
+        Box(GlanceModifier.height(h).padding(end = 4.dp).background(theme.accent).cornerRadius(h / 2)
+            .clickable(actionStartActivity(authIntent(ctx, widgetId, vin, action))),
+            contentAlignment = Alignment.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(provider = ImageProvider(icon), contentDescription = action.label, colorFilter = ColorFilter.tint(theme.onAccent), modifier = GlanceModifier.size(h * 0.5f))
+                if (h >= 28.dp) Text(action.label.take(6), maxLines = 1, style = TextStyle(color = theme.onAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold))
+            }
+        }
+    }
+
+    /** Photo or fallback location icon box. */
+    @Composable
+    private fun MediaBox(photoBitmap: Bitmap?, size: Dp) {
+        Box(GlanceModifier.size(size).cornerRadius(12.dp).background(ColorProvider(Color(0.4f, 0.4f, 0.5f, 0.15f))),
+            contentAlignment = Alignment.Center) {
+            if (photoBitmap != null) {
+                Image(provider = ImageProvider(photoBitmap), contentDescription = "Car photo",
+                    contentScale = ContentScale.Crop, modifier = GlanceModifier.fillMaxSize().cornerRadius(12.dp))
+            } else {
+                Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = null,
+                    colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.size(size * 0.4f))
+            }
         }
     }
 
     @Composable
-    private fun TinyBody(snap: VehicleSnapshot, base: GlanceModifier, chargeGreen: ColorProvider, widgetId: Int, requireAuth: Boolean) {
-        val sc = stateColor(snap, chargeGreen)
-        val intent = if (!requireAuth) configIntent(LocalContext.current, widgetId)
-                     else authIntentRuntime(LocalContext.current, widgetId, snap.vin, WidgetAction.OPEN)
-        Box(base.clickable(actionStartActivity(intent)), contentAlignment = Alignment.Center) {
+    private fun InfoRows(snap: VehicleSnapshot, w: Dp, theme: Theme, pct: Int, compact: Boolean = false) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold,
+                    fontSize = if (w > 180.dp) 32.sp else if (compact) 20.sp else 26.sp))
+            Spacer(GlanceModifier.width(6.dp))
+            Column {
+                val rangeSize = if (compact) 11.sp else 13.sp
+                snap.rangeMi?.let { Text("${it} mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = rangeSize)) }
+                Text(if (snap.isEv) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp))
+            }
+        }
+    }
+
+    @Composable
+    private fun ActionRow(actions: List<WidgetAction>, snap: VehicleSnapshot, btnH: Dp, theme: Theme, limit: Int = 4) {
+        if (actions.isNotEmpty()) {
+            Spacer(GlanceModifier.height(6.dp))
+            actions.take(limit).forEach { a ->
+                Pill(0, snap.vin, a, btnH, snap, theme)
+                Spacer(GlanceModifier.height(4.dp))
+            }
+        }
+    }
+
+    // ── Layout tiers ───────────────────────────────────────────────────────
+
+    @Composable
+    private fun TinyXSBody(snap: VehicleSnapshot, base: GlanceModifier, theme: Theme) {
+        val ctx = LocalContext.current; val sc = stateColor(snap, theme)
+        Box(base.clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN))), contentAlignment = Alignment.Center) {
+            Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 11.sp))
+        }
+    }
+
+    @Composable
+    private fun TinyBody(snap: VehicleSnapshot, base: GlanceModifier, theme: Theme) {
+        val ctx = LocalContext.current; val sc = stateColor(snap, theme)
+        Box(base.clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN))), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
                     style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp))
@@ -181,115 +251,157 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
-    private fun stateColor(snap: VehicleSnapshot, chargeGreen: ColorProvider) =
-        when { snap.charging == true -> chargeGreen; else -> ColorProvider(Color(0.6f, 0.6f, 0.65f, 0.5f)) }
+    @Composable
+    private fun CompactSBody(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, base: GlanceModifier, theme: Theme, btnH: Dp) {
+        val ctx = LocalContext.current
+        Row(base.padding(horizontal = 8.dp).clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN))),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp))
+            snap.rangeMi?.let { Text("· ${it}mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp)) }
+            actions.take(1).forEach { a -> Pill(0, snap.vin, a, btnH, snap, theme) }
+        }
+    }
 
     @Composable
-    private fun CompactRow(snap: VehicleSnapshot, actions: List<WidgetAction>, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, widgetId: Int, context: Context) {
-        val ctx = LocalContext.current; val sc = stateColor(snap, chargeGreen)
-        val narrow = LocalSize.current.width < 120.dp
-        val action = authIntentRuntime(ctx, 0, snap.vin, WidgetAction.OPEN)
-        Row(base.padding(horizontal = 8.dp).clickable(actionStartActivity(action)).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+    private fun CompactBody(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, base: GlanceModifier, theme: Theme, btnH: Dp) {
+        val ctx = LocalContext.current; val narrow = w < 120.dp; val maxBtns = min(actions.size, if (narrow) 1 else 3)
+        Row(base.padding(horizontal = 8.dp, vertical = 4.dp).clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN))),
+            verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.padding(end = 6.dp)) {
-                if (!narrow) Text(snap.name.take(14), maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp))
+                if (!narrow) Text(snap.name.take(14), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
                         style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = if (narrow) 14.sp else 16.sp))
-                    snap.rangeMi?.let { Spacer(GlanceModifier.width(4.dp)); Text("· ${it}mi", maxLines = 1,
-                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp)) }
+                    snap.rangeMi?.let { Spacer(GlanceModifier.width(4.dp)); Text("· ${it}mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp)) }
                 }
             }
-            ActionRow(actions, snap.vin, 26.dp, sc, onAccent, max = 2, widgetId)
+            actions.take(maxBtns).forEach { a -> Pill(0, snap.vin, a, btnH, snap, theme) }
         }
     }
 
     @Composable
-    private fun StandardCol(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, h: Dp, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, large: Boolean, hasLocation: Boolean, lat: Double?, lon: Double?, bgBitmap: android.graphics.Bitmap?, widgetId: Int, context: Context) {
-        val ctx = LocalContext.current; val sc = stateColor(snap, chargeGreen)
-        val stLabel = vehicleStateLabel(snap.engineOn, snap.charging, snap.climateOn, snap.locked)
-        val btnH = if (h < 120.dp) 28.dp else 34.dp
-        val intent = authIntentRuntime(ctx, 0, snap.vin, WidgetAction.OPEN)
-
-        Column(base.padding(12.dp).clickable(actionStartActivity(intent)).fillMaxSize()) {
-            // Name + state chip
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(snap.name.take(18), maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
-                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold))
-                StateChip(stLabel, sc)
-            }
+    private fun NarrowBody(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, h: Dp, base: GlanceModifier, theme: Theme, btnH: Dp) {
+        val ctx = LocalContext.current
+        Column(base.padding(10.dp).clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN))),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(snap.name.take(12), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 11.sp, fontWeight = FontWeight.Bold))
             Spacer(GlanceModifier.height(4.dp))
-            // Percent + range
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = if (w > 180.dp) 36.sp else 28.sp))
-                Spacer(GlanceModifier.width(6.dp))
-                Column {
-                    snap.rangeMi?.let { Text("${it} mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp)) }
-                    Text(if (snap.isEv) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp))
+            Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 24.sp))
+            snap.rangeMi?.let { Text("${it} mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp)) }
+            ActionRow(actions, snap, btnH, theme, limit = 3)
+        }
+    }
+
+    @Composable
+    private fun SquareBody(snap: VehicleSnapshot, actions: List<WidgetAction>, base: GlanceModifier, theme: Theme, btnH: Dp, hasMedia: Boolean, photo: Bitmap?) {
+        val ctx = LocalContext.current
+        val pct = (snap.percent ?: 0).coerceIn(0, 100)
+        Row(base.padding(12.dp).clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN)))) {
+            Column(modifier = GlanceModifier.padding(end = 10.dp)) {
+                Text(snap.name.take(14), maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold))
+                Text(if (snap.isEv) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp))
+                Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 30.sp))
+                snap.rangeMi?.let { Text("${it} mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp)) }
+            }
+            Column {
+                if (hasMedia && photo != null) MediaBox(photo, 80.dp)
+                else {
+                    DetailBox("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" })
+                    Spacer(GlanceModifier.height(4.dp))
+                    DetailBox("Climate", if (snap.climateOn == true) "On" else "Off")
                 }
-            }
-            Spacer(GlanceModifier.height(4.dp))
-            // Details row
-            Row {
-                Box(GlanceModifier.padding(end = 6.dp)) { DetailBox("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }) }
-                DetailBox("Climate", if (snap.climateOn == true) "On" else "Off")
-            }
-            Spacer(GlanceModifier.height(6.dp))
-            // Location box for large widgets
-            if (large && hasLocation) {
-                LocationBox(lat ?: 0.0, lon ?: 0.0, 70.dp)
-                Spacer(GlanceModifier.height(6.dp))
-            }
-            // Text on photo background
-            if (large && bgBitmap != null) {
-                Image(provider = ImageProvider(bgBitmap), contentDescription = "Car photo",
-                    contentScale = androidx.glance.layout.ContentScale.Crop,
-                    modifier = GlanceModifier.fillMaxWidth().height(50.dp).cornerRadius(8.dp))
-                Spacer(GlanceModifier.height(6.dp))
-            }
-            // Buttons
-            if (actions.isNotEmpty()) {
-                val perRow = if (h > w * 1.1f) 2 else 4
-                actions.take(perRow * 2).chunked(perRow).forEach { chunk ->
-                    Row { chunk.forEachIndexed { i, a -> if (i > 0) Spacer(GlanceModifier.width(6.dp)); ActionRow(listOf(a), snap.vin, btnH, sc, onAccent, 1, widgetId) } }
-                    Spacer(GlanceModifier.height(6.dp))
-                }
+                ActionRow(actions, snap, btnH, theme, limit = 2)
             }
         }
     }
 
     @Composable
-    private fun LocationBox(lat: Double, lon: Double, size: Dp) {
-        Box(GlanceModifier.height(size).fillMaxWidth().cornerRadius(10.dp).background(ColorProvider(Color(0.4f, 0.4f, 0.5f, 0.15f))),
-            contentAlignment = Alignment.Center) {
-            Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = "Car location",
-                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.size(size * 0.4f))
-            Text("${"%.4f".format(lat)}, ${"%.4f".format(lon)}", maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 8.sp))
-        }
-    }
-
-    @Composable
-    private fun WideRow(snap: VehicleSnapshot, actions: List<WidgetAction>, base: GlanceModifier, chargeGreen: ColorProvider, onAccent: ColorProvider, large: Boolean, hasLocation: Boolean, lat: Double?, lon: Double?, widgetId: Int, context: Context) {
-        val ctx = LocalContext.current; val sc = stateColor(snap, chargeGreen)
-        val intent = authIntentRuntime(ctx, 0, snap.vin, WidgetAction.OPEN)
-        Row(base.padding(10.dp).clickable(actionStartActivity(intent)).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = GlanceModifier.padding(end = 8.dp)) {
-                Text(snap.name.take(16), maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold))
+    private fun FullBody(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, base: GlanceModifier, theme: Theme, btnH: Dp, hasMedia: Boolean, photo: Bitmap?, hasLocation: Boolean, lat: Double?, lon: Double?) {
+        val ctx = LocalContext.current; val sc = stateColor(snap, theme); val pct = (snap.percent ?: 0).coerceIn(0, 100)
+        Row(base.padding(12.dp).clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN)))) {
+            Column(modifier = GlanceModifier.padding(end = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
-                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 28.sp))
-                    Spacer(GlanceModifier.width(6.dp))
-                    Column {
-                        snap.rangeMi?.let { Text("${it} mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp)) }
-                        Text(if (snap.isEv) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp))
-                    }
+                    Text(snap.name.take(16), maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+                    StateChip(snap, theme, sc)
                 }
-                if (large && hasLocation) LocationBox(lat ?: 0.0, lon ?: 0.0, 60.dp)
+                Spacer(GlanceModifier.height(6.dp))
+                InfoRows(snap, w, theme, pct)
+                Spacer(GlanceModifier.height(4.dp))
+                val barW = w * (pct / 100f) * 0.55f
+                Box(GlanceModifier.fillMaxWidth().height(5.dp).background(ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.25f))).cornerRadius(3.dp)) {
+                    if (pct > 0) Box(GlanceModifier.width(barW).height(5.dp).background(theme.accent).cornerRadius(3.dp)) {}
+                }
+                Spacer(GlanceModifier.height(6.dp))
+                Row { DetailBox("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }); Spacer(GlanceModifier.width(6.dp)); DetailBox("Climate", if (snap.climateOn == true) "On" else "Off") }
+                ActionRow(actions, snap, btnH, theme, limit = 3)
             }
-            ActionRow(actions, snap.vin, 30.dp, sc, onAccent, max = 4, widgetId)
+            if (hasMedia && photo != null) MediaBox(photo, 80.dp)
         }
     }
+
+    @Composable
+    private fun WideBody(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, base: GlanceModifier, theme: Theme, btnH: Dp, hasMedia: Boolean, photo: Bitmap?, hasLocation: Boolean, lat: Double?, lon: Double?) {
+        val ctx = LocalContext.current; val sc = stateColor(snap, theme)
+        val mediaSz = 72.dp
+        Row(base.padding(10.dp).clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN))),
+            verticalAlignment = Alignment.CenterVertically) {
+            if (hasMedia && photo != null) { MediaBox(photo, mediaSz); Spacer(GlanceModifier.width(10.dp)) }
+            Column(modifier = GlanceModifier.padding(end = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(snap.name.take(12), maxLines = 1, modifier = GlanceModifier.padding(end = 4.dp),
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold))
+                    StateChip(snap, theme, sc)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 24.sp))
+                    Spacer(GlanceModifier.width(6.dp))
+                    snap.rangeMi?.let { Text("${it} mi", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp)) }
+                }
+            }
+            actions.take(4).forEach { a -> Pill(0, snap.vin, a, btnH, snap, theme) }
+        }
+    }
+
+    @Composable
+    private fun LargeBody(snap: VehicleSnapshot, actions: List<WidgetAction>, w: Dp, base: GlanceModifier, theme: Theme, btnH: Dp, hasMedia: Boolean, photo: Bitmap?, hasLocation: Boolean, lat: Double?, lon: Double?) {
+        val ctx = LocalContext.current; val sc = stateColor(snap, theme); val pct = (snap.percent ?: 0).coerceIn(0, 100)
+        val mediaSz = if (w > 300.dp) 100.dp else 80.dp
+        Column(base.padding(14.dp).clickable(actionStartActivity(authIntent(ctx, 0, snap.vin, WidgetAction.OPEN)))) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = GlanceModifier.padding(end = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(snap.name.take(20), maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
+                            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold))
+                        StateChip(snap, theme, sc)
+                    }
+                    Spacer(GlanceModifier.height(6.dp))
+                    InfoRows(snap, w, theme, pct)
+                    Spacer(GlanceModifier.height(4.dp))
+                    val trackW = w * 0.55f
+                    val barW = trackW * (pct / 100f)
+                    Box(GlanceModifier.width(trackW).height(6.dp).background(ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.25f))).cornerRadius(3.dp)) {
+                        if (pct > 0) Box(GlanceModifier.width(barW).height(6.dp).background(theme.accent).cornerRadius(3.dp)) {}
+                    }
+                    Spacer(GlanceModifier.height(6.dp))
+                    Row { DetailBox("Lock", when (snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" }); Spacer(GlanceModifier.width(6.dp)); DetailBox("Climate", if (snap.climateOn == true) "On" else "Off") }
+                }
+                if (hasMedia && photo != null) MediaBox(photo, mediaSz)
+            }
+            ActionRow(actions, snap, btnH, theme, limit = 6)
+        }
+    }
+
+    private fun authIntent(ctx: Context, widgetId: Int, vin: String, action: WidgetAction): android.content.Intent =
+        android.content.Intent(ctx, WidgetAuthActivity::class.java).apply {
+            this.action = WidgetAuthActivity.ACTION_RUN; putExtra(WidgetAuthActivity.EXTRA_WIDGET_ID, widgetId)
+            putExtra(WidgetAuthActivity.EXTRA_VIN, vin); putExtra(WidgetAuthActivity.EXTRA_ACTION, action.key)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+    private fun configIntent(context: Context, widgetId: Int): android.content.Intent =
+        android.content.Intent(context, WidgetConfigActivity::class.java).apply {
+            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+        }
 }

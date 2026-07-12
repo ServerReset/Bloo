@@ -77,8 +77,6 @@ class WidgetAuthActivity : FragmentActivity() {
             finishNoAnim()
             return
         }
-        // Launch the work in the background and finish the activity immediately
-        // so there is never even a flash of the transparent activity.
         lifecycleScope.launch {
             val ctx = applicationContext
             var resolvedWearAction = action.wearAction
@@ -100,7 +98,7 @@ class WidgetAuthActivity : FragmentActivity() {
             runCatching { BlooWidget().updateAll(ctx) }
             WidgetCommandWorker.enqueue(ctx, widgetId, vin, action, resolvedWearAction)
         }
-        // Finish immediately — the coroutine above runs in the background.
+        // Finish immediately — the coroutine above runs the work in the background.
         finishNoAnim()
     }
 
