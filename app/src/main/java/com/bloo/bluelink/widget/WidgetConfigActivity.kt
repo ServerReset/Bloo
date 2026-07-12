@@ -93,6 +93,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var photoBg by remember { mutableStateOf(false) }
     var showLocation by remember { mutableStateOf(false) }
     var pillShape by remember { mutableStateOf(false) }
+    var layoutMode by remember { mutableStateOf("info") }
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
 
     LaunchedEffect(Unit) {
@@ -102,6 +103,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         photoBg = store.widgetPhotoBackground(widgetId)
         showLocation = store.widgetShowLocation(widgetId)
         pillShape = store.widgetPillShape(widgetId)
+        layoutMode = store.widgetLayoutMode(widgetId)
         val existing = store.widgetConfig(widgetId)
         if (existing != null) {
             selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } } ?: cars.firstOrNull()?.vin
@@ -174,6 +176,12 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         MorphChip(showLocation, { showLocation = !showLocation }, "Show location map (large widgets)", Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
         MorphChip(pillShape, { pillShape = !pillShape }, "Pill shape (extreme rounding)", Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+        Text("Small layout mode", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(4.dp))
+        MorphChip(layoutMode == "info", { layoutMode = "info" }, "Show info (percent, range)", Modifier.fillMaxWidth())
+        Spacer(Modifier.height(4.dp))
+        MorphChip(layoutMode == "controls", { layoutMode = "controls" }, "Show controls (buttons)", Modifier.fillMaxWidth())
 
         Spacer(Modifier.height(18.dp))
         MorphButton(
@@ -186,6 +194,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     store.setWidgetPhotoBackground(widgetId, photoBg)
                     store.setWidgetShowLocation(widgetId, showLocation)
                     store.setWidgetPillShape(widgetId, pillShape)
+                    store.setWidgetLayoutMode(widgetId, layoutMode)
                     onDone()
                 }
             },

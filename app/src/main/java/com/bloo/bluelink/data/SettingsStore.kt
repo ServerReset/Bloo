@@ -598,6 +598,15 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_pill")] = value }
     }
 
+    /** Layout preference: "info" (show percent/range) or "controls" (show buttons). */
+    suspend fun widgetLayoutMode(widgetId: Int): String =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_layout")]
+            ?: "info"
+
+    suspend fun setWidgetLayoutMode(widgetId: Int, value: String) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_layout")] = value.takeIf { it in setOf("info", "controls") } ?: "info" }
+    }
+
     // The car's last known address + coordinates, refreshed by the Location action
     // and rendered in the widget's location box.
     suspend fun widgetLocationAddress(widgetId: Int): String? =

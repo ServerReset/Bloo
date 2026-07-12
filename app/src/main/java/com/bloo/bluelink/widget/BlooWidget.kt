@@ -96,6 +96,7 @@ class BlooWidget : GlanceAppWidget() {
         val map: Bitmap?,
         val photo: Bitmap?,
         val address: String?,
+        val layoutMode: String,  // "info" shows data, "controls" shows buttons
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -129,6 +130,7 @@ class BlooWidget : GlanceAppWidget() {
         val pending = settings.widgetPendingAction(widgetId)
         val photoBgActive = photoBgOn && photo != null
         val pillShape = settings.widgetPillShape(widgetId)
+        val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
 
         provideContent {
             GlanceTheme {
@@ -161,13 +163,17 @@ class BlooWidget : GlanceAppWidget() {
                     if (snap == null) {
                         SetupTile(base, configIntent(context, widgetId))
                     } else {
-                        val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address)
+                        val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address, layoutMode)
                         when {
-                            w < 70.dp || (w < 90.dp && h < 90.dp) -> TinyTile(c, base)
+                            w < 70.dp || (w < 90.dp && h < 90.dp) ->
+                                if (layoutMode == "controls") ButtonStripTile(c, base) else TinyTile(c, base)
                             h < 70.dp -> ButtonStripTile(c, base)
-                            h < 100.dp -> ShortWideTile(c, base)
-                            w < 110.dp -> TallNarrowTile(c, base)
-                            w < 220.dp && h < 130.dp -> SquareTile(c, w, base)
+                            h < 100.dp ->
+                                if (layoutMode == "controls") ButtonStripTile(c, base) else ShortWideTile(c, base)
+                            w < 110.dp ->
+                                if (layoutMode == "controls") ButtonStripTile(c, base) else TallNarrowTile(c, base)
+                            w < 220.dp && h < 130.dp ->
+                                if (layoutMode == "controls") ButtonStripTile(c, base) else SquareTile(c, w, base)
                             w < 220.dp -> MediumTallTile(c, w, h, base)
                             h < 190.dp -> WideTile(c, w, h, base)
                             else -> LargeTile(c, w, h, base)
@@ -442,7 +448,7 @@ class BlooWidget : GlanceAppWidget() {
         Box(modifier.cornerRadius(18.dp).background(c.theme.tile), contentAlignment = Alignment.Center) {
             if (map != null) {
                 Image(provider = ImageProvider(map), contentDescription = "Car location",
-                    contentScale = ContentScale.Crop, modifier = GlanceModifier.fillMaxSize().cornerRadius(18.dp))
+                    contentScale = ContentScale.Fit, modifier = GlanceModifier.fillMaxSize().cornerRadius(18.dp))
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = null,
