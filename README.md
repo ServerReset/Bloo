@@ -8,13 +8,13 @@ Bloo is a third-party Android app for controlling **Hyundai**, **Genesis**, and 
 
 | Brand   | Service             | Login       | Gen5W (pre-CCNC) | CCNC (gen 3+, 2023+) |
 |---------|---------------------|-------------|-------------------|----------------------|
-| Hyundai | Blue Link           | Email + PIN | All features | No trips, limited climate |
-| Genesis | Genesis Connected   | Email + PIN | All features | No trips, limited climate |
-| Kia     | Kia Connect         | OTP only    | All features | All features (no gen field exposed) |
+| Hyundai | Blue Link           | Email + PIN | No trips, limited climate | All features |
+| Genesis | Genesis Connected   | Email + PIN | No trips, limited climate | All features |
+| Kia     | Kia Connect         | OTP only    | All features | All features (no gen field) |
 
-- **Gen5W** (pre-2023, generation code 1-2): The older head unit. Full API support for all features including trip history, seat heat, and climate duration.
-- **CCNC** (2023+, generation code 3+, Connected Car Navigation Cockpit): The newer head unit. Trips are not available through the API. Climate controls are limited to temperature and defrost only. Seat heat and custom duration values are rejected by the server.
-- **Kia**: The Kia Connect API does not expose the head unit generation, so all features work across all model years. One-time code sign-in instead of PIN.
+- **Gen5W** (pre-2023, generation code 1-2): The older head unit. Trip history is not available through the API. Climate controls are limited to temperature and defrost only. Seat heat and custom duration values are rejected by the server.
+- **CCNC** (2023+, generation code 3+, Connected Car Navigation Cockpit): The newer head unit. Full API support for all features including trip history, seat heat, and climate duration.
+- **Kia**: Does not expose the head unit generation, so all features work across all model years. One-time code sign-in instead of PIN.
 
 Multiple brands can be signed in at the same time. Credentials are stored encrypted on-device.
 
