@@ -10,6 +10,10 @@ package com.bloo.bluelink.ui
 import android.app.StatusBarManager
 import android.content.Context
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.graphics.BitmapFactory
@@ -185,6 +189,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -450,7 +455,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Garage -> {
                     val appearance by vm.appearance.collectAsState()
                     Box(Modifier.fillMaxSize()) {
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize())
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance)
                         GarageScreen(state, vm)
                     }
                 }
@@ -1515,8 +1520,68 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
  * backdrop. Three blobs ease back and forth on different periods.
  */
 @Composable
-private fun AuroraBackground(modifier: Modifier = Modifier) {
+private fun AuroraBackground(
+    modifier: Modifier = Modifier,
+    appearance: SettingsStore.Appearance? = null,
+) {
     val scheme = MaterialTheme.colorScheme
+    val motionMode = appearance?.auroraMotion ?: "static"
+    val colorMode = appearance?.auroraColorMode ?: "complementary"
+    val customHex = appearance?.auroraCustomColor
+
+    var tiltX by remember { mutableFloatStateOf(0f) }
+    var tiltY by remember { mutableFloatStateOf(0f) }
+    if (motionMode == "motion") {
+        val ctx = LocalContext.current
+        DisposableEffect(ctx) {
+            val mgr = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+            val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+            val listener = object : SensorEventListener {
+                override fun onSensorChanged(event: SensorEvent) {
+                    val alpha = 0.15f
+                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.06f) * alpha
+                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.06f) * alpha
+                }
+                override fun onAccuracyChanged(s: Sensor, acc: Int) {}
+            }
+            mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
+            onDispose { mgr.unregisterListener(listener) }
+        }
+    }
+
+    val basePrimary = when (colorMode) {
+        "material" -> scheme.primary
+        "custom" -> customHex?.let { hx -> runCatching { Color(android.graphics.Color.parseColor(hx)) }.getOrNull() } ?: scheme.primary
+        else -> {
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(scheme.surface.toArgb(), hsv)
+            hsv[0] = (hsv[0] + 180f) % 360f
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }
+    }
+    val baseTertiary = when (colorMode) {
+        "material" -> scheme.tertiary
+        "custom" -> customHex?.let { hx -> runCatching {
+            val c = android.graphics.Color.parseColor(hx)
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(c, hsv)
+            hsv[0] = (hsv[0] + 180f) % 360f
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }.getOrNull() } ?: scheme.tertiary
+        else -> scheme.tertiary
+    }
+    val baseSecondary = when (colorMode) {
+        "material" -> scheme.secondary
+        "custom" -> customHex?.let { hx -> runCatching {
+            val c = android.graphics.Color.parseColor(hx)
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(c, hsv)
+            hsv[0] = (hsv[0] + 90f) % 360f
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }.getOrNull() } ?: scheme.secondary
+        else -> scheme.secondary
+    }
+
     val t = rememberInfiniteTransition(label = "aurora")
     val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
     val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
@@ -1529,9 +1594,9 @@ private fun AuroraBackground(modifier: Modifier = Modifier) {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
                     drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
-                blob(scheme.primary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1), mix(0.2f, 0.45f, p2), 0.6f)
-                blob(scheme.tertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2), mix(0.75f, 0.5f, p3), 0.55f)
-                blob(scheme.secondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3), mix(0.35f, 0.95f, p1), 0.55f)
+                blob(basePrimary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1) + tiltX, mix(0.2f, 0.45f, p2) + tiltY, 0.6f)
+                blob(baseTertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2) - tiltX, mix(0.75f, 0.5f, p3) - tiltY, 0.55f)
+                blob(baseSecondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3) + tiltX * 0.6f, mix(0.35f, 0.95f, p1) + tiltY * 0.6f, 0.55f)
             },
     )
 }
@@ -6955,6 +7020,41 @@ private fun SettingsScreen(vm: AppViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (appearance.auroraBackground) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("static", "Static", null),
+                            SegmentOption("motion", "Motion", null),
+                        ),
+                        selectedKey = appearance.auroraMotion,
+                        onSelect = { vm.setAuroraMotion(it) },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("Colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("complementary", "Complementary", null),
+                            SegmentOption("material", "Material You", null),
+                            SegmentOption("custom", "Custom", null),
+                        ),
+                        selectedKey = appearance.auroraColorMode,
+                        onSelect = { vm.setAuroraColorMode(it) },
+                    )
+                    if (appearance.auroraColorMode == "custom") {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = appearance.auroraCustomColor ?: "",
+                            onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
+                            label = { Text("Hex colour") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
 
             // Weather
@@ -7002,6 +7102,17 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Text("My location", fontWeight = FontWeight.SemiBold)
                     }
                 }
+                Spacer(Modifier.height(12.dp))
+                Text("Units", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(6.dp))
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("imperial", "Imperial", null),
+                        SegmentOption("metric", "Metric", null),
+                    ),
+                    selectedKey = appearance.unitSystem,
+                    onSelect = { vm.setUnitSystem(it) },
+                )
             }
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
