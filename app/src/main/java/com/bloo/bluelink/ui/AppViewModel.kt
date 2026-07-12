@@ -1685,6 +1685,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(syncUri = null) }
     }
 
+    /** Import settings from a Drive file and set up auto-sync to that file. */
+    fun importSettingsAndSync(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
+        val json = withContext(Dispatchers.IO) {
+            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
+        }
+        if (json != null) {
+            settingsStore.importSettingsJson(json)
+        }
+        runCatching {
+            getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
+        settingsStore.setSyncUri(uri.toString())
+        _state.update { it.copy(syncUri = uri.toString(), message = if (json != null) "Settings imported and auto-sync enabled" else "Auto-sync enabled") }
+    }
+
     /** Set Wi-Fi only vs any network for auto-sync. */
     fun setSyncWifiOnly(wifiOnly: Boolean) = viewModelScope.launch {
         settingsStore.setSyncWifiOnly(wifiOnly)

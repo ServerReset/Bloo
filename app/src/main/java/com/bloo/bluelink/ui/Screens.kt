@@ -735,13 +735,47 @@ private fun OnboardingScreen(vm: AppViewModel) {
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    val driveSyncLauncher = rememberLauncherForActivityResult(
+                    var showDriveDialog by remember { mutableStateOf(false) }
+                    val driveSaveLauncher = rememberLauncherForActivityResult(
                         ActivityResultContracts.CreateDocument("application/json"),
                     ) { uri -> uri?.let { vm.setSyncUri(it) } }
+                    val driveOpenLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument(),
+                    ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
+                    if (showDriveDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDriveDialog = false },
+                            title = { Text("Google Drive sync") },
+                            text = {
+                                Text(
+                                    "Sync your settings across devices using Google Drive.\n\n" +
+                                        "Save to Drive: pick a folder in Google Drive to " +
+                                        "store your settings. Changes sync automatically.\n\n" +
+                                        "Open from Drive: pick the settings file from " +
+                                        "Google Drive on another device.",
+                                )
+                            },
+                            confirmButton = {
+                                MorphTextButton("Save to Drive", onClick = {
+                                    showDriveDialog = false
+                                    driveSaveLauncher.launch("bloo_settings.json")
+                                })
+                            },
+                            dismissButton = {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    MorphTextButton("Open from Drive", onClick = {
+                                        showDriveDialog = false
+                                        driveOpenLauncher.launch(arrayOf("application/json"))
+                                    })
+                                    MorphTextButton("Cancel", onClick = { showDriveDialog = false })
+                                }
+                            },
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MorphTextButton("Set up Drive sync",
                             modifier = Modifier.weight(1f),
-                            onClick = { driveSyncLauncher.launch("bloo_settings.json") })
+                            onClick = { showDriveDialog = true })
                         MorphTextButton("Skip",
                             modifier = Modifier.weight(1f),
                             onClick = { /* do nothing */ })
@@ -6463,14 +6497,16 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Backup / Sync
             SettingsCard("Backup & sync") {
+                var showDriveDialog by remember { mutableStateOf(false) }
                 val settingsImportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent(),
                 ) { uri -> uri?.let { vm.importSettings(context, it) } }
-                val drivePickerLauncher = rememberLauncherForActivityResult(
+                val driveSaveLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/json"),
-                ) { uri ->
-                    uri?.let { vm.setSyncUri(it) }
-                }
+                ) { uri -> uri?.let { vm.setSyncUri(it) } }
+                val driveOpenLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument(),
+                ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
                 Text(
                     "Export your settings to a file. Save it to Google Drive to " +
                         "keep your theme, palettes, tile order and preferences " +
@@ -6492,12 +6528,48 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                // Auto-sync setup: pick a Drive location to auto-save on refresh
+                if (showDriveDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDriveDialog = false },
+                        title = { Text("Google Drive sync") },
+                        text = {
+                            Text(
+                                "Sync your settings across devices using Google Drive.\n\n" +
+                                    "Save to Drive: pick a folder in Google Drive to " +
+                                    "store your settings. Changes sync automatically.\n\n" +
+                                    "Open from Drive: pick the settings file from " +
+                                    "Google Drive on another device.",
+                            )
+                        },
+                        confirmButton = {
+                            MorphTextButton("Save to Drive", onClick = {
+                                showDriveDialog = false
+                                driveSaveLauncher.launch("bloo_settings.json")
+                            })
+                        },
+                        dismissButton = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                MorphTextButton("Open from Drive", onClick = {
+                                    showDriveDialog = false
+                                    driveOpenLauncher.launch(arrayOf("application/json"))
+                                })
+                                MorphTextButton("Cancel", onClick = { showDriveDialog = false })
+                            }
+                        },
+                    )
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MorphTextButton(
                         if (state.syncUri != null) "Auto-sync: on" else "Set up auto-sync",
                         modifier = Modifier.weight(1f),
-                        onClick = { drivePickerLauncher.launch("bloo_settings.json") },
+                        onClick = {
+                            if (state.syncUri != null) {
+                                // Already set up; show dialog to re-pick or open from another device
+                                showDriveDialog = true
+                            } else {
+                                showDriveDialog = true
+                            }
+                        },
                     )
                     if (state.syncUri != null) {
                         MorphTextButton(
