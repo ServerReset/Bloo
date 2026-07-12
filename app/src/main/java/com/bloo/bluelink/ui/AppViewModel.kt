@@ -151,6 +151,10 @@ data class UiState(
     val updateChecking: Boolean = false,
     /** Drive URI (content://...) for auto-backup; null when not configured. */
     val syncUri: String? = null,
+    /** Last time settings were synced with Drive (ms), for merge decisions. */
+    val lastSyncMs: Long = 0L,
+    /** Wi-Fi only sync (true) or any network (false). */
+    val syncWifiOnly: Boolean = true,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 
@@ -788,26 +792,57 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
             }
         }
-        // Restore auto-sync Drive URI from preferences
+        // Restore auto-sync Drive URI and last sync timestamp from preferences
         viewModelScope.launch {
             val uri = settingsStore.syncUri()
-            if (uri != null) _state.update { it.copy(syncUri = uri) }
+            val lastSync = settingsStore.lastSyncMs()
+            val wifiOnly = settingsStore.syncWifiOnly()
+            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncWifiOnly = wifiOnly) }
         }
-        // Auto-export settings to Drive on refresh (when syncUri is set)
+        // Bidirectional auto-sync on refresh: download newer settings from Drive,
+        // then upload our current settings (merge loop for cross-device sync).
         viewModelScope.launch {
             _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
                 if (!wasRefreshing) {
                     withContext(Dispatchers.IO) {
-                    val uri = settingsStore.syncUri()
-                    if (uri != null) {
-                        runCatching {
-                            val out = getApplication<android.app.Application>().contentResolver.openOutputStream(
-                                android.net.Uri.parse(uri),
-                                "wt",
-                            )
-                            out?.use { it.write(settingsStore.exportSettingsJson().toByteArray()) }
+                        val uri = settingsStore.syncUri()
+                        if (uri == null) return@withContext
+                        // Check network: skip if Wi-Fi only and not on Wi-Fi
+                        val wifiOnly = _state.value.syncWifiOnly
+                        if (wifiOnly) {
+                            val cm = getApplication<android.app.Application>()
+                                .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
+                                as android.net.ConnectivityManager
+                            val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
+                                ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+                            if (!wifi) return@withContext
                         }
-                    }
+                        val app = getApplication<android.app.Application>()
+                        val parsed = android.net.Uri.parse(uri)
+                        // Download: read the existing file from Drive
+                        val remoteJson = runCatching {
+                            app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                        }.getOrNull()
+                        // If remote is newer, merge it into our settings
+                        val remoteTs = remoteJson?.let {
+                            runCatching { kotlinx.serialization.json.Json.decodeFromString(SyncPayload.serializer(), it).ts }.getOrNull()
+                        } ?: 0L
+                        if (remoteTs > _state.value.lastSyncMs) {
+                            settingsStore.importSettingsJson(remoteJson.orEmpty())
+                            _state.update { it.copy(syncUri = uri) }
+                        }
+                        // Upload our current settings with current timestamp
+                        val now = System.currentTimeMillis()
+                        val syncJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                        val payload = SyncPayload(ts = now, data = settingsStore.exportSettingsJson())
+                        val body = syncJson.encodeToString(SyncPayload.serializer(), payload)
+                        runCatching {
+                            app.contentResolver.openOutputStream(parsed, "wt")?.use {
+                                it.write(body.toByteArray())
+                            }
+                        }
+                        settingsStore.setLastSyncMs(now)
+                        _state.update { it.copy(lastSyncMs = now) }
                     }
                 }
             }
@@ -1650,6 +1685,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun clearSyncUri() = viewModelScope.launch {
         settingsStore.setSyncUri(null)
         _state.update { it.copy(syncUri = null) }
+    }
+
+    /** Set Wi-Fi only vs any network for auto-sync. */
+    fun setSyncWifiOnly(wifiOnly: Boolean) = viewModelScope.launch {
+        settingsStore.setSyncWifiOnly(wifiOnly)
+        _state.update { it.copy(syncWifiOnly = wifiOnly) }
     }
 
     // --- Weather ---------------------------------------------------------

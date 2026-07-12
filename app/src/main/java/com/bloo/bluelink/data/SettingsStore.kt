@@ -618,6 +618,24 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** Timestamp (ms) of the last successful bidirectional sync. */
+    suspend fun lastSyncMs(): Long =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_last_ms")]
+            ?.toLongOrNull() ?: 0L
+
+    suspend fun setLastSyncMs(ms: Long) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("sync_last_ms")] = ms.toString() }
+    }
+
+    /** Wi-Fi only sync (true) or any network (false). */
+    suspend fun syncWifiOnly(): Boolean =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_wifi")]
+            ?.toBooleanStrictOrNull() ?: true
+
+    suspend fun setSyncWifiOnly(value: Boolean) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("sync_wifi")] = value.toString() }
+    }
+
     // The car's last known address + coordinates, refreshed by the Location action
     // and rendered in the widget's location box.
     suspend fun widgetLocationAddress(widgetId: Int): String? =
@@ -881,3 +899,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[Keys.WEATHER_FAHRENHEIT] = value.toString() }
     }
 }
+
+/** Timestamped wrapper for sync payloads (used for Drive sync merge decisions). */
+@Serializable
+data class SyncPayload(val ts: Long, val data: String)

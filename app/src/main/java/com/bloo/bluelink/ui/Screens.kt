@@ -6409,10 +6409,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                 if (state.syncUri != null) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Settings will auto-save to your chosen Drive location " +
-                            "whenever the app refreshes data from the car.",
+                        "Settings auto-sync to Drive on every refresh. Changes made on " +
+                            "another device are merged automatically.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("wifi", "Wi-Fi only", null),
+                            SegmentOption("any", "Any network", null),
+                        ),
+                        selectedKey = if (state.syncWifiOnly) "wifi" else "any",
+                        onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
                 }
             }
