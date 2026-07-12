@@ -140,6 +140,8 @@ class BlooWidget : GlanceAppWidget() {
                     w < 180.dp || h < 130.dp -> 22.dp
                     else -> 28.dp
                 }
+                // Pill shape only for 1-2 unit widgets; push content in to avoid clipping
+                val pillPad = if (pillShape && (w < 180.dp || h < 180.dp)) 8.dp else 0.dp
                 Box(GlanceModifier.fillMaxSize().cornerRadius(corner)) {
                     // Photo background (optional): the car image full-bleed, with a
                     // scrim so the white text/buttons stay legible.
@@ -154,6 +156,7 @@ class BlooWidget : GlanceAppWidget() {
                     val base = GlanceModifier.fillMaxSize()
                         .let { if (photoBgActive) it else it.background(GlanceTheme.colors.widgetBackground) }
                         .cornerRadius(corner)
+                        .padding(pillPad)
 
                     if (snap == null) {
                         SetupTile(base, configIntent(context, widgetId))
@@ -272,22 +275,26 @@ class BlooWidget : GlanceAppWidget() {
     private fun SquareTile(c: Ctx, w: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
         Column(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(c.snap.name.take(14), maxLines = 1, modifier = GlanceModifier.defaultWeight(),
-                    style = TextStyle(color = onBg(c), fontSize = 13.sp, fontWeight = FontWeight.Bold))
-                StateChip(c)
-            }
+            Text(c.snap.name.take(12), maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 12.sp, fontWeight = FontWeight.Bold))
+            Spacer(GlanceModifier.height(4.dp))
             Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 34.sp))
-                c.snap.rangeMi?.let {
-                    Text("$it mi ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1,
+                        style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 30.sp))
+                    Spacer(GlanceModifier.width(6.dp))
+                    Column(modifier = GlanceModifier.padding(bottom = 4.dp)) {
+                        c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 12.sp)) }
+                    }
                 }
             }
+            Spacer(GlanceModifier.height(2.dp))
+            StateChip(c)
             if (c.actions.isNotEmpty()) {
-                Spacer(GlanceModifier.height(10.dp))
-                val take = c.actions.take(3)
-                ButtonGrid(c, take, cols = take.size, showLabel = false, iconSize = 22.dp,
-                    modifier = GlanceModifier.fillMaxWidth().height(48.dp))
+                Spacer(GlanceModifier.height(8.dp))
+                val take = c.actions.take(4)
+                val cols = if (take.size >= 3) 2 else take.size.coerceAtLeast(1)
+                ButtonGrid(c, take, cols = cols, showLabel = false, iconSize = 22.dp,
+                    modifier = GlanceModifier.fillMaxWidth().defaultWeight())
             }
         }
     }
@@ -295,25 +302,21 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun WideTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
-        val infoW = w * 0.52f
-        Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(14.dp)) {
+        val infoW = w * 0.48f
+        Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(12.dp)) {
             Column(modifier = GlanceModifier.fillMaxHeight().width(infoW), verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(c.snap.name.take(14), maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
-                        style = TextStyle(color = onBg(c), fontSize = 14.sp, fontWeight = FontWeight.Bold))
-                    StateChip(c)
-                }
-                Spacer(GlanceModifier.height(6.dp))
-                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 34.sp))
-                c.snap.rangeMi?.let {
-                    Text("$it mi ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
-                }
+                Text(c.snap.name.take(10), maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 12.sp, fontWeight = FontWeight.Bold))
+                Spacer(GlanceModifier.height(4.dp))
+                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = if (h >= 160.dp) 30.sp else 24.sp))
+                c.snap.rangeMi?.let { Text("$it mi ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
+                Spacer(GlanceModifier.height(4.dp))
+                StateChip(c)
             }
             if (c.actions.isNotEmpty()) {
-                Spacer(GlanceModifier.width(12.dp))
+                Spacer(GlanceModifier.width(10.dp))
                 val take = c.actions.take(4)
                 val cols = if (take.size >= 3 && h >= 150.dp) 2 else 1
-                ButtonGrid(c, take, cols = cols, showLabel = cols == 1 && w >= 300.dp, iconSize = 22.dp,
+                ButtonGrid(c, take, cols = cols, showLabel = false, iconSize = 24.dp,
                     modifier = GlanceModifier.fillMaxHeight().defaultWeight())
             }
         }
@@ -334,7 +337,7 @@ class BlooWidget : GlanceAppWidget() {
         val footerCols = if (tall && take.size >= 3) 2 else take.size.coerceAtLeast(1)
         Column(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(c.snap.name.take(20), maxLines = 1, modifier = GlanceModifier.defaultWeight(),
+                Text(c.snap.name.take(16), maxLines = 1, modifier = GlanceModifier.defaultWeight(),
                     style = TextStyle(color = onBg(c), fontSize = 18.sp, fontWeight = FontWeight.Bold))
                 StateChip(c)
             }
