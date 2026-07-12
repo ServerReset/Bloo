@@ -163,10 +163,12 @@ class BlooWidget : GlanceAppWidget() {
                     } else {
                         val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address)
                         when {
-                            w < 110.dp && h < 110.dp -> TinyTile(c, base)
-                            h < 110.dp -> ShortWideTile(c, base)
+                            w < 70.dp || (w < 90.dp && h < 90.dp) -> TinyTile(c, base)
+                            h < 70.dp -> ButtonStripTile(c, base)
+                            h < 100.dp -> ShortWideTile(c, base)
                             w < 110.dp -> TallNarrowTile(c, base)
-                            w < 220.dp && h < 220.dp -> SquareTile(c, w, base)
+                            w < 220.dp && h < 130.dp -> SquareTile(c, w, base)
+                            w < 220.dp -> MediumTallTile(c, w, h, base)
                             h < 190.dp -> WideTile(c, w, h, base)
                             else -> LargeTile(c, w, h, base)
                         }
@@ -267,6 +269,52 @@ class BlooWidget : GlanceAppWidget() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             text.forEach { ch ->
                 Text(ch.toString(), maxLines = 1, style = TextStyle(color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp))
+            }
+        }
+    }
+
+    /** Split a name into two lines at a space or mid-way if no space. */
+    private fun splitName(name: String): Pair<String, String> {
+        val trimmed = name.trim()
+        if (trimmed.length <= 8) return trimmed to ""
+        val space = trimmed.indexOf(' ', 4).takeIf { it > 0 && it < trimmed.length - 2 }
+        return if (space != null) trimmed.substring(0, space) to trimmed.substring(space + 1)
+        else trimmed.substring(0, trimmed.length / 2) to trimmed.substring(trimmed.length / 2)
+    }
+
+    /** Strip of chunky buttons with no info (for the tiniest placements). */
+    @Composable
+    private fun ButtonStripTile(c: Ctx, base: GlanceModifier) {
+        val ctx = LocalContext.current
+        Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(6.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            if (c.actions.isNotEmpty()) {
+                ButtonGrid(c, c.actions.take(4), cols = c.actions.take(4).size, showLabel = false, iconSize = 20.dp,
+                    modifier = GlanceModifier.fillMaxHeight().defaultWeight())
+            }
+        }
+    }
+
+    /** Tallish but moderately-wide widget: stacked name (2 lines), percent, 2×2 buttons. */
+    @Composable
+    private fun MediumTallTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
+        val ctx = LocalContext.current
+        val (firstLine, secondLine) = splitName(c.snap.name)
+        Column(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(firstLine, maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 13.sp, fontWeight = FontWeight.Bold))
+            if (secondLine.isNotEmpty()) Text(secondLine, maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp))
+            Spacer(GlanceModifier.height(6.dp))
+            Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 34.sp))
+            c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
+            Spacer(GlanceModifier.height(4.dp))
+            StateChip(c)
+            if (c.actions.isNotEmpty()) {
+                Spacer(GlanceModifier.height(8.dp))
+                val take = c.actions.take(4)
+                val cols = if (take.size >= 3) 2 else take.size.coerceAtLeast(1)
+                ButtonGrid(c, take, cols = cols, showLabel = false, iconSize = 22.dp,
+                    modifier = GlanceModifier.fillMaxWidth().defaultWeight())
             }
         }
     }
