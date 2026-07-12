@@ -268,7 +268,9 @@ fun SliderRow(
     onValue: (Int) -> Unit,
 ) {
     val fill = accent ?: MaterialTheme.colorScheme.primary
-    val steps = ((max - min) / step - 1).coerceAtLeast(0)
+    // Guard the divisor: a step of 0 would throw ArithmeticException in composition.
+    val safeStep = step.coerceAtLeast(1)
+    val steps = ((max - min) / safeStep - 1).coerceAtLeast(0)
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -291,15 +291,23 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             runCatching { WearComms.pullLatest(ctx) }
             refreshConnection()
-            snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
-            val cached = statusCache.load()
-            statuses = cached.statuses
-            fetchedAt = cached.fetched
+            snapshots = runCatching { snapshotStore.current().vehicles.associateBy { it.vin } }.getOrElse { snapshots }
+            runCatching {
+                val cached = statusCache.load()
+                statuses = cached.statuses
+                fetchedAt = cached.fetched
+            }
             val brands = sessionStore.loggedInBrands()
             if (brands.isEmpty()) {
                 _ui.update { it.copy(screen = WearScreen.SignedOut) }
             } else {
-                _ui.update { it.copy(accounts = credentialStore.loadAll().map { c -> c.email }) }
+                // Keystore-backed EncryptedSharedPreferences init is disk + crypto IO —
+                // do it off the main thread, and resolve before update{} so a lost CAS
+                // race can't re-run the blocking read inside the retry lambda.
+                val emails = withContext(Dispatchers.IO) {
+                    runCatching { credentialStore.loadAll().map { c -> c.email } }.getOrDefault(emptyList())
+                }
+                _ui.update { it.copy(accounts = emails) }
                 loadGarage()
             }
         }
@@ -307,7 +315,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshConnection() {
         viewModelScope.launch {
-            _ui.update { it.copy(phoneConnected = WearComms.phoneNodeId(ctx) != null) }
+            // Resolve the (up to 10s) node lookup BEFORE update{}, so a lost CAS race
+            // can't re-run the network round-trip inside the inline retry lambda.
+            val connected = WearComms.phoneNodeId(ctx) != null
+            _ui.update { it.copy(phoneConnected = connected) }
         }
     }
 

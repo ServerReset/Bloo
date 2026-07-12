@@ -39,6 +39,7 @@ class WearListenerService : WearableListenerService() {
         if (updates.isEmpty()) return
 
         serviceScope.launch {
+          runCatching {
             var tileNeedsRefresh = false
             updates.forEach { (path, raw) ->
                 when (path) {
@@ -56,6 +57,7 @@ class WearListenerService : WearableListenerService() {
             // Push a tile + complication refresh so the glanceable surfaces update
             // immediately when the phone publishes new vehicle state.
             if (tileNeedsRefresh) refreshWearGlanceables(applicationContext)
+          }
         }
     }
 

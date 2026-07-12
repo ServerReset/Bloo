@@ -2,6 +2,11 @@ package com.bloo.bluelink.data
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * The wire protocol shared by the phone ([:app]) and the watch ([:wear]) over
@@ -80,9 +85,26 @@ object WearSync {
     fun encodeState(payload: WearStatePayload): String =
         json.encodeToString(WearStatePayload.serializer(), payload)
 
-    fun decodeState(raw: String?): WearStatePayload =
-        raw?.let { runCatching { json.decodeFromString(WearStatePayload.serializer(), it) }.getOrNull() }
-            ?: WearStatePayload()
+    fun decodeState(raw: String?): WearStatePayload {
+        if (raw == null) return WearStatePayload()
+        // Fast path: whole payload decodes cleanly.
+        runCatching { json.decodeFromString(WearStatePayload.serializer(), raw) }.getOrNull()?.let { return it }
+        // Recovery: if one vehicle is malformed or version-skewed (e.g. the phone
+        // updated to a schema the watch doesn't have yet), decode the list
+        // element-by-element so the watch/tiles keep every car that still parses
+        // instead of blanking all of them.
+        return runCatching {
+            val obj = json.parseToJsonElement(raw).jsonObject
+            val vehicles = obj["vehicles"]?.jsonArray?.mapNotNull { el ->
+                runCatching { json.decodeFromJsonElement(VehicleSnapshot.serializer(), el) }.getOrNull()
+            } ?: emptyList()
+            WearStatePayload(
+                vehicles = vehicles,
+                selectedVin = obj["selectedVin"]?.jsonPrimitive?.contentOrNull,
+                producedAt = obj["producedAt"]?.jsonPrimitive?.longOrNull ?: 0L,
+            )
+        }.getOrDefault(WearStatePayload())
+    }
 
     fun encodeAuth(bundle: WearAuthBundle): String =
         json.encodeToString(WearAuthBundle.serializer(), bundle)

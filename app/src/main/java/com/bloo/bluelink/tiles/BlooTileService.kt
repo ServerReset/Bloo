@@ -42,10 +42,10 @@ abstract class BlooTileService : TileService() {
     private suspend fun render() {
         val tile = qsTile ?: return
         val ctx = applicationContext
-        val cfg = SettingsStore(ctx).tileConfig(index)
+        val cfg = runCatching { SettingsStore(ctx).tileConfig(index) }.getOrNull()
         if (cfg == null) {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = SettingsStore(ctx).tileLabel(index) ?: "Bloo tile ${index + 1}"
+            tile.label = runCatching { SettingsStore(ctx).tileLabel(index) }.getOrNull() ?: "Bloo tile ${index + 1}"
             tile.icon = Icon.createWithResource(ctx, R.drawable.ic_shortcut_car)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = "Unassigned"
             tile.updateTile()
@@ -55,7 +55,7 @@ abstract class BlooTileService : TileService() {
         val snap = runCatching {
             SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
         }.getOrNull()
-        val custom = SettingsStore(ctx).tileLabel(index)
+        val custom = runCatching { SettingsStore(ctx).tileLabel(index) }.getOrNull()
 
         tile.state = if (isActiveState(cmd, snap)) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.icon = Icon.createWithResource(ctx, iconFor(cmd, snap))
