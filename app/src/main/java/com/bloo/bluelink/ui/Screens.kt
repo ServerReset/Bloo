@@ -523,20 +523,27 @@ private fun OnboardingScreen(vm: AppViewModel) {
         ) {
             Spacer(Modifier.height(24.dp))
 
-            // --- Welcome header ---
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Welcome to Bloo",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Black,
-                color = scheme.onSurface,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Control your Hyundai, Genesis, or Kia from this app. Set up your car details below.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = scheme.onSurfaceVariant,
-            )
+            // --- Welcome header (with background surface for contrast) ---
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = scheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        "Welcome to Bloo",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Black,
+                        color = scheme.onSurface,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Control your Hyundai, Genesis, or Kia from this app. Set up your car details below.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             Spacer(Modifier.height(28.dp))
 
@@ -1211,12 +1218,15 @@ private fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Wordmark hero — subtitle crossfades when the brand changes.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(heroHeight),
-                contentAlignment = Alignment.BottomStart,
+            Surface(
+                shape = RoundedCornerShape(0.dp),
+                color = scheme.surface.copy(alpha = 0.88f),
+                modifier = Modifier.fillMaxWidth().height(heroHeight),
             ) {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.BottomStart,
+                ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(
                         "Bloo",
@@ -1239,6 +1249,7 @@ private fun LoginScreen(
                         )
                     }
                 }
+            }
             }
 
             // Form slides up from below on first composition.
