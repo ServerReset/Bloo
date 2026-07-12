@@ -85,7 +85,7 @@ class BlooWidget : GlanceAppWidget() {
 
             when {
                 snap == null -> TapBox(base, configIntent(context, widgetId))
-                w < 70.dp && h < 70.dp -> TinyBody(snap, base, chargeGreen, widgetId, requireAuth, context)
+                w < 70.dp && h < 70.dp -> TinyBody(snap, base, chargeGreen, widgetId, requireAuth)
                 h < 65.dp -> CompactRow(snap, actions, base, chargeGreen, onAccent, widgetId, context)
                 w > 200.dp && w > h * 1.5f -> WideRow(snap, actions, base, chargeGreen, onAccent, large, hasLocation, lat, lon, widgetId, context)
                 else -> StandardCol(snap, actions, w, h, base, chargeGreen, onAccent, large, hasLocation, lat, lon, bgBitmap, widgetId, context)
@@ -117,8 +117,8 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Pill(h: Dp, icon: Int, label: String, action: Action, accent: ColorProvider, onAccent: ColorProvider) {
-        Box(GlanceModifier.height(h).padding(end = 4.dp).background(accent).cornerRadius(h / 2).clickable(action),
+    private fun Pill(h: Dp, icon: Int, label: String, intent: Intent, accent: ColorProvider, onAccent: ColorProvider) {
+        Box(GlanceModifier.height(h).padding(end = 4.dp).background(accent).cornerRadius(h / 2).clickable(actionStartActivity(intent)),
             contentAlignment = Alignment.Center) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(provider = ImageProvider(icon), contentDescription = label,
@@ -146,7 +146,7 @@ class BlooWidget : GlanceAppWidget() {
                 putExtra(WidgetAuthActivity.EXTRA_ACTION, a.key)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            Pill(h, icon, a.label, actionStartActivity(intent), accent, onAccent)
+            Pill(h, icon, a.label, intent, accent, onAccent)
         }
     }
 
