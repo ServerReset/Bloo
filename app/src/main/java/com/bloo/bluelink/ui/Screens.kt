@@ -450,7 +450,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Garage -> {
                     val appearance by vm.appearance.collectAsState()
                     Box(Modifier.fillMaxSize()) {
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance)
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize())
                         GarageScreen(state, vm)
                     }
                 }
@@ -725,32 +725,21 @@ private fun OnboardingScreen(vm: AppViewModel) {
                         Column(Modifier.weight(1f)) {
                             Text("Sync across devices",
                                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Back up your settings to Google Drive or restore from a file.",
+                            Text("Back up your settings to Google Drive for automatic sync.",
                                 style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "On your primary phone, set up Drive sync to export your settings. " +
-                            "On a secondary phone or new device, use Restore instead to pick " +
-                            "the same backup file.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant,
-                    )
                     Spacer(Modifier.height(10.dp))
                     val driveSyncLauncher = rememberLauncherForActivityResult(
                         ActivityResultContracts.CreateDocument("application/json"),
                     ) { uri -> uri?.let { vm.setSyncUri(it) } }
-                    val importLauncher = rememberLauncherForActivityResult(
-                        ActivityResultContracts.GetContent(),
-                    ) { uri -> uri?.let { vm.importSettings(context, it) } }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MorphTextButton("Set up Drive sync",
                             modifier = Modifier.weight(1f),
                             onClick = { driveSyncLauncher.launch("bloo_settings.json") })
-                        MorphTextButton("Restore from file",
+                        MorphTextButton("Skip",
                             modifier = Modifier.weight(1f),
-                            onClick = { importLauncher.launch("application/json") })
+                            onClick = { /* do nothing */ })
                     }
                 }
             }
@@ -1488,117 +1477,46 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
         onDismissRequest = vm::dismissUpdate,
         title = { Text("Update available") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Build #${info.run.runNumber} is ready on GitHub Actions.")
                 Text(
-                    "Build #${info.run.runNumber} is ready on GitHub Actions.",
+                    "Open the run page to download the phone and watch APKs and install " +
+                        "them the same way you installed Bloo.",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("How to install", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        listOf(
-                            "1. Tap the button below to open the build on GitHub",
-                            "2. Download the zipped APK for your phone (and watch if needed)",
-                            "3. Unzip the file on your device",
-                            "4. Open the APK and tap Install anyway (you may need to expand Play Protect warning)",
-                            "5. Confirm with your biometrics to finish the install",
-                        ).forEach { step ->
-                            Text(step, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
                 MorphTextButton(
                     "Remind me in 3 days",
                     onClick = vm::snoozeUpdate,
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
             MorphButton(
                 onClick = {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
+                    }
                     vm.dismissUpdate()
                 },
-                modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-            ) { Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold) }
+            ) {
+                Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
+            }
         },
         dismissButton = {
-            MorphTextButton("Not now", vm::dismissUpdate, modifier = Modifier.fillMaxWidth())
+            MorphTextButton("Not now", vm::dismissUpdate)
         },
     )
 }
 
 /**
- * A softly-blurred, slowly-drifting "aurora" of colour blobs. Supports three
- * motion modes and three colour-source modes via [appearance].
+ * A softly-blurred, slowly-drifting "aurora" of colour blobs - the animated login
+ * backdrop. Three blobs ease back and forth on different periods.
  */
 @Composable
-private fun AuroraBackground(
-    modifier: Modifier = Modifier,
-    appearance: SettingsStore.Appearance? = null,
-) {
+private fun AuroraBackground(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val motionMode = appearance?.auroraMotion ?: "static"
-    val colorMode = appearance?.auroraColorMode ?: "complementary"
-    val customHex = appearance?.auroraCustomColor
-
-    // Gyroscope / accelerometer tilt tracking for motion mode
-    var tiltX by remember { mutableFloatStateOf(0f) }
-    var tiltY by remember { mutableFloatStateOf(0f) }
-    if (motionMode == "motion") {
-        val ctx = LocalContext.current
-        DisposableEffect(ctx) {
-            val mgr = ctx.getSystemService(android.content.Context.SENSOR_SERVICE) as android.hardware.SensorManager
-            val sensor = mgr.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
-            val listener = object : android.hardware.SensorEventListener {
-                override fun onSensorChanged(event: android.hardware.SensorEvent) {
-                    // Low-pass filter: smooth raw accelerometer values
-                    val alpha = 0.15f
-                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.06f) * alpha
-                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.06f) * alpha
-                }
-                override fun onAccuracyChanged(s: android.hardware.Sensor, acc: Int) {}
-            }
-            mgr.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_GAME)
-            onDispose { mgr.unregisterListener(listener) }
-        }
-    }
-
-    // Compute blob colours based on the selected colour mode
-    val basePrimary = when (colorMode) {
-        "material" -> scheme.primary
-        "custom" -> customHex?.let { hx -> runCatching { Color(android.graphics.Color.parseColor(hx)) }.getOrNull() }
-            ?: scheme.primary
-        else -> { // "complementary": invert the surface hue
-            val hsv = FloatArray(3)
-            android.graphics.Color.colorToHSV(scheme.surface.toArgb(), hsv)
-            hsv[0] = (hsv[0] + 180f) % 360f
-            Color(android.graphics.Color.HSVToColor(hsv))
-        }
-    }
-    val baseTertiary = when (colorMode) {
-        "material" -> scheme.tertiary
-        "custom" -> basePrimary
-        else -> {
-            val hsv = FloatArray(3); android.graphics.Color.colorToHSV(basePrimary.toArgb(), hsv)
-            hsv[0] = (hsv[0] + 30f) % 360f; hsv[1] = (hsv[1] * 0.6f).coerceAtMost(1f); hsv[2] = (hsv[2] * 0.85f).coerceAtMost(1f)
-            Color(android.graphics.Color.HSVToColor(hsv))
-        }
-    }
-    val baseSecondary = when (colorMode) {
-        "material" -> scheme.secondary
-        "custom", "complementary" -> {
-            val hsv = FloatArray(3); android.graphics.Color.colorToHSV(basePrimary.toArgb(), hsv)
-            hsv[0] = (hsv[0] + 60f) % 360f; hsv[1] = (hsv[1] * 0.5f).coerceAtMost(1f); hsv[2] = (hsv[2] * 0.7f).coerceAtMost(1f)
-            Color(android.graphics.Color.HSVToColor(hsv))
-        }
-    }
-
     val t = rememberInfiniteTransition(label = "aurora")
     val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
     val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
@@ -1609,14 +1527,11 @@ private fun AuroraBackground(
             .blur(90.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
-                val ox = if (motionMode == "motion") tiltX else 0f
-                val oy = if (motionMode == "motion") tiltY else 0f
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
-                    drawCircle(c, radius = size.minDimension * r,
-                        center = Offset(size.width * (fx + ox), size.height * (fy + oy)))
-                blob(basePrimary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1) + ox, mix(0.2f, 0.45f, p2) + oy, 0.6f)
-                blob(baseTertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2) + ox, mix(0.75f, 0.5f, p3) + oy, 0.55f)
-                blob(baseSecondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3) + ox, mix(0.35f, 0.95f, p1) + oy, 0.55f)
+                    drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
+                blob(scheme.primary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1), mix(0.2f, 0.45f, p2), 0.6f)
+                blob(scheme.tertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2), mix(0.75f, 0.5f, p3), 0.55f)
+                blob(scheme.secondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3), mix(0.35f, 0.95f, p1), 0.55f)
             },
     )
 }
@@ -3351,9 +3266,10 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
+            }
+        }
+        }
+    }
     }
 }
 
@@ -7039,42 +6955,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (appearance.auroraBackground) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("Aurora motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(6.dp))
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("static", "Static", null),
-                            SegmentOption("motion", "Motion", null),
-                        ),
-                        selectedKey = appearance.auroraMotion,
-                        onSelect = { vm.setAuroraMotion(it) },
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text("Aurora colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(6.dp))
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("complementary", "Complement", null),
-                            SegmentOption("material", "Material You", null),
-                            SegmentOption("custom", "Custom", null),
-                        ),
-                        selectedKey = appearance.auroraColorMode,
-                        onSelect = { vm.setAuroraColorMode(it) },
-                    )
-                    if (appearance.auroraColorMode == "custom") {
-                        Spacer(Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = appearance.auroraCustomColor ?: "",
-                            onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
-                            label = { Text("Colour hex (#RRGGBB)") },
-                            singleLine = true,
-                            shape = FieldShape,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
             }
 
             // Weather
@@ -7123,17 +7003,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                 }
             }
-                Spacer(Modifier.height(12.dp))
-                Text("Units", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(6.dp))
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("imperial", "Imperial", null),
-                        SegmentOption("metric", "Metric", null),
-                    ),
-                    selectedKey = appearance.unitSystem,
-                    onSelect = { vm.setUnitSystem(it) },
-                )
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
         }
