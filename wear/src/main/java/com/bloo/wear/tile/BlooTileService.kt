@@ -105,7 +105,9 @@ abstract class BlooTileService : TileService() {
 
     private fun buildTile(params: RequestBuilders.TileRequest): TileBuilders.Tile {
         val ctx = applicationContext
+        val device = params.deviceConfiguration
         val clickId = params.currentState.lastClickableId
+        try {
 
         // One pass off the disk: read the snapshot once, apply the optional command's
         // optimistic update (WearComms.send writes back to the store), re-read so the
@@ -152,7 +154,6 @@ abstract class BlooTileService : TileService() {
         val roles = result.second
         val actions = result.third
 
-        val device = params.deviceConfiguration
         // Per-render nonce baked into chip clickable ids so a handled tap's id can
         // never equal a fresh render's id (see the dedupe above).
         val nonce = System.currentTimeMillis().toString(36)
@@ -166,6 +167,16 @@ abstract class BlooTileService : TileService() {
             .setFreshnessIntervalMillis(freshness)
             .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layout))
             .build()
+        } catch (t: Throwable) {
+            // A corrupt/failed DataStore read or a layout-builder error must never
+            // crash the tile — returning a failed future gives the user a broken,
+            // blank tile. Fall back to the safe "Open Bloo" layout instead.
+            return TileBuilders.Tile.Builder()
+                .setResourcesVersion(RES_VERSION)
+                .setFreshnessIntervalMillis(FRESHNESS_MS)
+                .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(emptyLayout(ctx, device)))
+                .build()
+        }
     }
 
     /** Resolve the full color roles from the phone-synced settings. Falls back to dark defaults. */
