@@ -144,6 +144,8 @@ data class UiState(
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
     val message: String? = null,
+    /** "error" (default), "success", or "info" — controls snackbar colour. */
+    val messageType: String = "error",
     /** A newer CI build than what's installed, if the update checker found one
      *  and it hasn't been dismissed this session or snoozed. */
     val updateInfo: com.bloo.bluelink.update.UpdateInfo? = null,
@@ -1098,7 +1100,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     is com.bloo.bluelink.update.UpdateCheckResult.Available ->
                         it.copy(updateChecking = false, updateInfo = result.info, updateCheckFailed = null)
                     is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
-                        it.copy(updateChecking = false, message = "You're on the latest build.")
+                        it.copy(updateChecking = false, message = "You're on the latest build.", messageType = "success")
                     is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
                         it.copy(updateChecking = false, updateCheckFailed = result.error)
                 }
@@ -1642,7 +1644,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
         val error = settingsStore.importPalettesJson(json)
-        _state.update { it.copy(message = error ?: "Palettes imported") }
+        _state.update { it.copy(message = error ?: "Palettes imported", messageType = if (error == null) "success" else "error") }
     }
 
     /** Share a full settings backup (includes colours and palettes) via the share sheet. */
@@ -1672,7 +1674,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
         val error = settingsStore.importSettingsJson(json)
-        _state.update { it.copy(message = error ?: "Settings restored") }
+        _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) "success" else "error") }
     }
 
     /** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */
@@ -1833,12 +1835,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Surface (and log) an error raised by the UI layer. */
     fun reportError(msg: String) {
         AppLog.log("⚠ $msg")
-        _state.update { it.copy(message = msg) }
+        _state.update { it.copy(message = msg, messageType = "error") }
     }
 
     /** A neutral, non-error snackbar message (e.g. a setup nudge). */
     fun reportInfo(msg: String) {
-        _state.update { it.copy(message = msg) }
+        _state.update { it.copy(message = msg, messageType = "info") }
     }
 
     private fun launchBusy(block: suspend () -> Unit) {

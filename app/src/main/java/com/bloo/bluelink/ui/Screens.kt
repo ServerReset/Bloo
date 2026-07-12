@@ -368,18 +368,19 @@ fun BlooApp(vm: AppViewModel) {
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = {
-            // imePadding so the toast rises above the keyboard when it's open.
             SnackbarHost(snackbar, modifier = Modifier.imePadding()) { data ->
-                // Swipe the toast left or right to dismiss it; otherwise it snaps
-                // back. Fades out as it slides.
                 val offsetX = remember(data) { Animatable(0f) }
                 val swipeScope = rememberCoroutineScope()
                 val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
-                // Themed, rounded, copyable "toast" - used for errors/notices.
+                val snackColors = when (state.messageType) {
+                    "success" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                    "info" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+                    else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+                }
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    color = snackColors.first,
+                    contentColor = snackColors.second,
                     tonalElevation = 6.dp,
                     shadowElevation = 6.dp,
                     modifier = Modifier
@@ -1519,8 +1520,9 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Build #${info.run.runNumber} is ready on GitHub Actions.")
                 Text(
-                    "Open the run page to download the phone and watch APKs and install " +
-                        "them the same way you installed Bloo.",
+                    "Open the run page to download the phone and watch APKs. " +
+                        "Android will warn that the app is from an unknown source — " +
+                        "tap \"More details\", then \"Install without scanning\".",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1572,9 +1574,9 @@ private fun AuroraBackground(
             val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    val alpha = 0.15f
-                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.06f) * alpha
-                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.06f) * alpha
+                    val alpha = 0.08f
+                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.12f) * alpha
+                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.12f) * alpha
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
@@ -1871,12 +1873,18 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val widthDp = cfg.screenWidthDp
     val heightDp = cfg.screenHeightDp
     val large = widthDp >= 600
-    // Very small screens (e.g. flip-phone cover): tile layout, one section at a
-    // time, swipe up/down between them; swipe left/right between cars.
     val compact = !large && heightDp < 520
+    var coverToastShown by remember { mutableStateOf(false) }
+    val hasCars = vehicles.isNotEmpty()
+    LaunchedEffect(compact, hasCars) {
+        if (!coverToastShown) {
+            coverToastShown = true
+            if (compact && !hasCars) vm.reportInfo("Open your phone for the full Bloo setup experience")
+            else if (compact) vm.reportInfo("Try opening your phone for the full Bloo experience")
+            else if (!large && hasCars) vm.reportInfo("Try the cover screen for quick glances")
+        }
+    }
     if (compact) {
-        // The cover screen hosts Settings (and refresh) inside the main tile, so
-        // there is no floating overlay here.
         CompactGarage(state, vm, appearance)
         return
     }
@@ -6974,15 +6982,12 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Quick Settings tiles
             SettingsCard("Quick tiles") {
                 Text(
-                    "Set up quick tiles per car (e.g. Lock and Climate), then add the " +
-                        "tiles from your notification shade's edit screen.",
+                    "Each car can have up to 12 tiles in your Quick Settings shade. " +
+                        "Configure them below, then tap \"Add to Quick Settings\" to place each one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(12.dp))
-
-                Text("When a tile is tapped", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 MorphSegmented(
                     options = listOf(
                         SegmentOption("background", "Run in background", Icons.Filled.Bolt),
@@ -8012,13 +8017,15 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                     Spacer(Modifier.height(10.dp))
                     Text("Runs", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MorphChip(selected = target == "default", onClick = { vm.setTileClimateTarget(index, "default") }, label = "Basic")
-                        MorphChip(selected = target == "smart", onClick = { vm.setTileClimateTarget(index, "smart") }, label = "Smart")
-                        presets.forEach { p ->
-                            MorphChip(selected = target == p.id, onClick = { vm.setTileClimateTarget(index, p.id) }, label = p.name)
-                        }
-                    }
+                    MorphSegmented(
+                        options = buildList {
+                            add(SegmentOption("default", "Basic", null))
+                            add(SegmentOption("smart", "Smart", null))
+                            presets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
+                        },
+                        selectedKey = target,
+                        onSelect = { vm.setTileClimateTarget(index, it) },
+                    )
                 }
 
                 Spacer(Modifier.height(12.dp))
