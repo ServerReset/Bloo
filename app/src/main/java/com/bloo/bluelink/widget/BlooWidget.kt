@@ -165,15 +165,12 @@ class BlooWidget : GlanceAppWidget() {
                     } else {
                         val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address, layoutMode)
                         when {
-                            w < 70.dp || (w < 90.dp && h < 90.dp) ->
-                                if (layoutMode == "controls") ButtonStripTile(c, base) else TinyTile(c, base)
-                            h < 70.dp -> ButtonStripTile(c, base)
-                            h < 100.dp ->
-                                if (layoutMode == "controls") ButtonStripTile(c, base) else ShortWideTile(c, base)
-                            w < 110.dp ->
-                                if (layoutMode == "controls") ButtonStripTile(c, base) else TallNarrowTile(c, base)
-                            w < 220.dp && h < 130.dp ->
-                                if (layoutMode == "controls") ButtonStripTile(c, base) else SquareTile(c, w, base)
+                            w < 70.dp || (w < 80.dp && h < 80.dp) ->
+                                if (layoutMode == "controls") ControlsTile(c, base) else InfoTile(c, base)
+                            h < 70.dp -> ControlsTile(c, base)
+                            h < 110.dp -> ShortWideTile(c, base)
+                            w < 110.dp -> TallNarrowTile(c, base)
+                            w < 220.dp && h < 130.dp -> SquareTile(c, w, base)
                             w < 220.dp -> MediumTallTile(c, w, h, base)
                             h < 190.dp -> WideTile(c, w, h, base)
                             else -> LargeTile(c, w, h, base)
@@ -190,6 +187,31 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     // ── Tiers ──────────────────────────────────────────────────────────────
+
+    /** Info-only: just the percent and a state dot (for the smallest 1x1). */
+    @Composable
+    private fun InfoTile(c: Ctx, base: GlanceModifier) {
+        val ctx = LocalContext.current
+        Box(
+            base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(c.snap.name.take(6), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 8.sp))
+                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 20.sp))
+                Box(GlanceModifier.size(5.dp).background(stateColor(c.snap, c.theme)).cornerRadius(3.dp)) {}
+            }
+        }
+    }
+
+    /** Controls-only: chunky buttons filling the tile edge-to-edge (for tiny controls-mode). */
+    @Composable
+    private fun ControlsTile(c: Ctx, base: GlanceModifier) {
+        if (c.actions.isEmpty()) return
+        val take = c.actions.take(4)
+        ButtonGrid(c, take, cols = take.size.coerceAtMost(2), showLabel = false, iconSize = 18.dp,
+            modifier = GlanceModifier.fillMaxSize().padding(4.dp))
+    }
 
     @Composable
     private fun SetupTile(base: GlanceModifier, intent: Intent) {
@@ -245,6 +267,11 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun TallNarrowTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
+        if (c.layoutMode == "controls") {
+            // Controls mode: buttons stacked vertically in 1 column
+            ControlsTile(c, base)
+            return
+        }
         val narrow = LocalSize.current.width < 90.dp
         Column(
             base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(10.dp),

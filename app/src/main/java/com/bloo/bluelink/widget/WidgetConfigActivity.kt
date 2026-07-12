@@ -177,11 +177,16 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         Spacer(Modifier.height(6.dp))
         MorphChip(pillShape, { pillShape = !pillShape }, "Pill shape (extreme rounding)", Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
-        Text("Small layout mode", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text("When small", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(4.dp))
-        MorphChip(layoutMode == "info", { layoutMode = "info" }, "Show info (percent, range)", Modifier.fillMaxWidth())
-        Spacer(Modifier.height(4.dp))
-        MorphChip(layoutMode == "controls", { layoutMode = "controls" }, "Show controls (buttons)", Modifier.fillMaxWidth())
+        com.bloo.bluelink.ui.MorphSegmented(
+            options = listOf(
+                com.bloo.bluelink.ui.SegmentOption("info", "Info", null),
+                com.bloo.bluelink.ui.SegmentOption("controls", "Controls", null),
+            ),
+            selectedKey = layoutMode,
+            onSelect = { layoutMode = it },
+        )
 
         Spacer(Modifier.height(18.dp))
         MorphButton(
