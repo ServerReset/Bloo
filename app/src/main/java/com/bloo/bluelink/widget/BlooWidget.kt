@@ -42,6 +42,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.align
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
@@ -440,16 +441,34 @@ class BlooWidget : GlanceAppWidget() {
 
     // ── Shared pieces ────────────────────────────────────────────────────────
 
-    /** The car's current location as a map thumbnail (with a pin), falling back to
-     *  a pin + address prompt before the first Location refresh. */
+    /** The car's current location: a map thumbnail with the address overlaying the
+     *  bottom. Before the first Location action a pin-and-label placeholder is shown. */
     @Composable
     private fun LocationBox(c: Ctx, modifier: GlanceModifier) {
         val map = c.map
         Box(modifier.cornerRadius(18.dp).background(c.theme.tile), contentAlignment = Alignment.Center) {
             if (map != null) {
-                Image(provider = ImageProvider(map), contentDescription = "Car location",
-                    contentScale = ContentScale.Fit, modifier = GlanceModifier.fillMaxSize().cornerRadius(18.dp))
+                // Map bitmap with address overlay at the bottom
+                Box(GlanceModifier.fillMaxSize()) {
+                    Image(provider = ImageProvider(map), contentDescription = "Car location",
+                        contentScale = ContentScale.Fit, modifier = GlanceModifier.fillMaxSize().cornerRadius(18.dp))
+                    val addr = c.address
+                    if (addr != null) {
+                        Box(GlanceModifier.fillMaxWidth().padding(8.dp).align(Alignment.BottomCenter)) {
+                            Text(addr.take(35), maxLines = 1, style = TextStyle(color = ColorProvider(Color(0xE0000000)), fontSize = 9.sp))
+                        }
+                    }
+                }
+            } else if (c.address != null) {
+                // Address text when map isn't available yet
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+                    Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = null,
+                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.size(20.dp))
+                    Spacer(GlanceModifier.height(4.dp))
+                    Text(c.address.take(35), maxLines = 2, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp))
+                }
             } else {
+                // No data yet — prompt to run the Location action
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = null,
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.size(26.dp))
