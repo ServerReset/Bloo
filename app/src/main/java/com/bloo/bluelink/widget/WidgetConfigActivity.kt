@@ -1,7 +1,6 @@
 package com.bloo.bluelink.widget
 
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -92,8 +92,6 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var requireAuth by remember { mutableStateOf(true) }
     var photoBg by remember { mutableStateOf(false) }
     var showLocation by remember { mutableStateOf(false) }
-    // VINs already claimed by another widget, so we can steer toward one-per-car.
-    var usedVins by remember { mutableStateOf<Set<String>>(emptySet()) }
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
 
     LaunchedEffect(Unit) {
@@ -102,30 +100,21 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         requireAuth = store.widgetRequireAuth(widgetId)
         photoBg = store.widgetPhotoBackground(widgetId)
         showLocation = store.widgetShowLocation(widgetId)
-        // Which cars already have a widget (excluding this one)?
-        val used = mutableSetOf<String>()
-        runCatching {
-            val ids = AppWidgetManager.getInstance(context)
-                .getAppWidgetIds(ComponentName(context, BlooWidgetReceiver::class.java))
-            for (id in ids) if (id != widgetId) store.widgetConfig(id)?.first?.let { used.add(it) }
-        }
-        usedVins = used
         val existing = store.widgetConfig(widgetId)
         if (existing != null) {
             selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } } ?: cars.firstOrNull()?.vin
             if (existing.second.isNotEmpty()) { actions.clear(); actions.addAll(existing.second.take(4)) }
         } else {
-            // Default to a car that doesn't already have a widget → one widget per car.
-            selectedVin = cars.firstOrNull { it.vin !in used }?.vin ?: cars.firstOrNull()?.vin
+            selectedVin = cars.firstOrNull()?.vin
         }
         loaded = true
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp).safeDrawingPadding(),
     ) {
         Text("Widget setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text("One car per widget · up to 4 buttons", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Choose a car and up to 4 actions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         if (loaded && cars.isEmpty()) {
             Spacer(Modifier.height(14.dp))
@@ -137,7 +126,6 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
 
         SectionLabel("Car")
         cars.forEach { car ->
-            val taken = car.vin != selectedVin && car.vin in usedVins
             MorphButton(
                 onClick = { selectedVin = car.vin },
                 active = car.vin == selectedVin,
@@ -148,10 +136,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(car.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        if (taken) "${car.model} · already on a widget" else car.model,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    Text(car.model, style = MaterialTheme.typography.bodySmall)
                 }
             }
             Spacer(Modifier.height(5.dp))
