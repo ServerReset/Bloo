@@ -32,7 +32,7 @@ object UpdateApi {
     private const val WORKFLOW_FILE = "android.yml"
 
     /** The branch new builds land on — see UpdateChecker/WearViewModel. */
-    const val DEFAULT_BRANCH = "claude/Bloo"
+    const val DEFAULT_BRANCH = "claude/great-faraday-QuX3x"
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 

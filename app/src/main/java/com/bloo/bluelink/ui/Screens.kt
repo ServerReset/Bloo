@@ -6961,6 +6961,14 @@ private fun SettingsScreen(vm: AppViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                state.updateCheckFailed?.let { err ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Check failed: $err",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
 
             // Quick Settings tiles
