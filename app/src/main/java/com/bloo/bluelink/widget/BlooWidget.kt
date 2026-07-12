@@ -292,10 +292,11 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun ButtonStripTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
-        Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(6.dp),
-            verticalAlignment = Alignment.CenterVertically) {
+        // Just buttons, no info text, fills the entire widget area
+        Row(base.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (c.actions.isNotEmpty()) {
-                ButtonGrid(c, c.actions.take(4), cols = c.actions.take(4).size, showLabel = false, iconSize = 20.dp,
+                val take = c.actions.take(4)
+                ButtonGrid(c, take, cols = take.size, showLabel = false, iconSize = 18.dp,
                     modifier = GlanceModifier.fillMaxHeight().defaultWeight())
             }
         }
@@ -356,21 +357,25 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun WideTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
-        val infoW = w * 0.48f
-        Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(12.dp)) {
+        val infoW = w * 0.52f
+        Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(14.dp)) {
             Column(modifier = GlanceModifier.fillMaxHeight().width(infoW), verticalAlignment = Alignment.CenterVertically) {
-                Text(c.snap.name.take(10), maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 12.sp, fontWeight = FontWeight.Bold))
-                Spacer(GlanceModifier.height(4.dp))
-                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = if (h >= 160.dp) 30.sp else 24.sp))
-                c.snap.rangeMi?.let { Text("$it mi ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
-                Spacer(GlanceModifier.height(4.dp))
-                StateChip(c)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(c.snap.name.take(14), maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
+                        style = TextStyle(color = onBg(c), fontSize = 14.sp, fontWeight = FontWeight.Bold))
+                    StateChip(c)
+                }
+                Spacer(GlanceModifier.height(6.dp))
+                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 34.sp))
+                c.snap.rangeMi?.let {
+                    Text("$it mi ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
+                }
             }
             if (c.actions.isNotEmpty()) {
-                Spacer(GlanceModifier.width(10.dp))
+                Spacer(GlanceModifier.width(12.dp))
                 val take = c.actions.take(4)
                 val cols = if (take.size >= 3 && h >= 150.dp) 2 else 1
-                ButtonGrid(c, take, cols = cols, showLabel = false, iconSize = 24.dp,
+                ButtonGrid(c, take, cols = cols, showLabel = false, iconSize = 22.dp,
                     modifier = GlanceModifier.fillMaxHeight().defaultWeight())
             }
         }
@@ -440,26 +445,16 @@ class BlooWidget : GlanceAppWidget() {
 
     // ── Shared pieces ────────────────────────────────────────────────────────
 
-    /** The car's current location: a map thumbnail with the address overlaying the
-     *  bottom. Before the first Location action a pin-and-label placeholder is shown. */
+    /** The car's current location: a map thumbnail with a pin. Before the first
+     *  Location action a pin-and-label placeholder is shown. */
     @Composable
     private fun LocationBox(c: Ctx, modifier: GlanceModifier) {
         val map = c.map
         Box(modifier.cornerRadius(18.dp).background(c.theme.tile), contentAlignment = Alignment.Center) {
             if (map != null) {
-                // Map bitmap with address overlay at the bottom
-                Box(GlanceModifier.fillMaxSize()) {
-                    Image(provider = ImageProvider(map), contentDescription = "Car location",
-                        contentScale = ContentScale.Fit, modifier = GlanceModifier.fillMaxSize().cornerRadius(18.dp))
-                    val addr = c.address
-                    if (addr != null) {
-                        Box(GlanceModifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.BottomCenter) {
-                            Text(addr.take(35), maxLines = 1, style = TextStyle(color = ColorProvider(Color(0xE0000000)), fontSize = 9.sp))
-                        }
-                    }
-                }
+                Image(provider = ImageProvider(map), contentDescription = "Car location",
+                    contentScale = ContentScale.Crop, modifier = GlanceModifier.fillMaxSize().cornerRadius(18.dp))
             } else if (c.address != null) {
-                // Address text when map isn't available yet
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
                     Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = null,
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.size(20.dp))
@@ -467,7 +462,6 @@ class BlooWidget : GlanceAppWidget() {
                     Text(c.address.take(35), maxLines = 2, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp))
                 }
             } else {
-                // No data yet — prompt to run the Location action
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = null,
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.size(26.dp))
