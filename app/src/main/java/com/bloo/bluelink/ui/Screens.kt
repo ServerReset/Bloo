@@ -3354,18 +3354,6 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Text("Units", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(6.dp))
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("imperial", "Imperial", null),
-                        SegmentOption("metric", "Metric", null),
-                    ),
-                    selectedKey = appearance.unitSystem,
-                    onSelect = { vm.setUnitSystem(it) },
-                )
-            }
     }
     }
 }
@@ -7135,6 +7123,17 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Text("My location", fontWeight = FontWeight.SemiBold)
                     }
                 }
+                Spacer(Modifier.height(12.dp))
+                Text(Units, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(6.dp))
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("imperial", "Imperial", null),
+                        SegmentOption("metric", "Metric", null),
+                    ),
+                    selectedKey = appearance.unitSystem,
+                    onSelect = { vm.setUnitSystem(it) },
+                )
             }
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
