@@ -524,8 +524,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
             Spacer(Modifier.height(24.dp))
 
             // --- Welcome header ---
-            Text("👋", style = MaterialTheme.typography.displayMedium)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 "Welcome to Bloo",
                 style = MaterialTheme.typography.displaySmall,
@@ -534,7 +533,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Your Hyundai, Kia, or Genesis in your pocket. Let's get you set up.",
+                "Control your Hyundai, Genesis, or Kia from this app. Set up your car details below.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = scheme.onSurfaceVariant,
             )
@@ -550,7 +549,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
                     color = scheme.onSurface,
                 )
                 Text(
-                    "Bloo can't read powertrain or feature info from the API — tell it once so the right controls appear.",
+                    "Bloo cannot read powertrain or feature info from the API. Set them once here so the right controls appear.",
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
                 )
@@ -913,7 +912,7 @@ private fun WizardPowertrainPage(
                 com.bloo.bluelink.data.Powertrain.GAS -> Triple("⛽", "Gasoline", "Combustion engine only")
                 com.bloo.bluelink.data.Powertrain.HYBRID -> Triple("🔋", "Hybrid", "Gas + small electric motor (no plug)")
                 com.bloo.bluelink.data.Powertrain.PHEV -> Triple("🔌", "Plug-in Hybrid", "Gas + large battery you can charge")
-                com.bloo.bluelink.data.Powertrain.EV -> Triple("⚡", "Electric", "Battery-only, no fuel tank")
+                com.bloo.bluelink.data.Powertrain.EV -> Triple("", "Electric", "Battery-only, no fuel tank")
             }
             Surface(
                 onClick = { vm.setPowertrain(vehicle, pt) },
@@ -979,7 +978,7 @@ private fun WizardSeatsPage(
         }
     }
     Text(
-        "💡 You can change these any time in Settings → car card.",
+                "You can change these any time in Settings under your car card.",
         style = MaterialTheme.typography.bodySmall,
         color = scheme.onSurfaceVariant,
     )
@@ -1017,7 +1016,7 @@ private fun WizardSeatRow(
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WizardToggleChip(label = "Heat 🔥", selected = heat, onClick = { onHeat(!heat) })
+            WizardToggleChip(label = "Heat", selected = heat, onClick = { onHeat(!heat) })
             WizardToggleChip(label = "Cool ❄️", selected = cool, onClick = { onCool(!cool) })
         }
     }
@@ -1074,7 +1073,6 @@ private fun WizardSteeringPage(
             .padding(vertical = 8.dp),
     ) {
         WizardFeatureToggle(
-            emoji = "🌡",
             title = "Heated steering wheel",
             body = "Warm the steering wheel via the remote climate command",
             checked = seats.steeringWheel,
@@ -1090,7 +1088,6 @@ private fun WizardSteeringPage(
 
 @Composable
 private fun WizardFeatureToggle(
-    emoji: String,
     title: String,
     body: String,
     checked: Boolean,
@@ -1105,7 +1102,6 @@ private fun WizardFeatureToggle(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(emoji, style = MaterialTheme.typography.titleLarge)
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
@@ -1708,7 +1704,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             // data, currentFetchedAt changes → this effect restarts → delay is
             // cancelled → user never sees a spurious "stale" toast.
             delay(25_000)
-            vm.reportError("Data is over 15 min old — pull down to refresh")
+            vm.reportError("Data is over 15 min old. Pull down to refresh")
         }
     }
 
@@ -6911,6 +6907,25 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Text("My location", fontWeight = FontWeight.SemiBold)
                     }
                 }
+            }
+            // Build info
+            SettingsCard("About") {
+                val pkgInfo = runCatching {
+                    context.packageManager.getPackageInfo(context.packageName, 0)
+                }.getOrNull()
+                val versionName = pkgInfo?.versionName ?: "0.1"
+                val versionCode = pkgInfo?.longVersionCode ?: 1
+                val installTime = pkgInfo?.firstInstallTime?.let { ms ->
+                    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(ms))
+                } ?: "unknown"
+                StepRow("Version", "$versionName  (build $versionCode)")
+                StepRow("Release date", installTime)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Built for the community by Lord Reset with OpenCode on Claude.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
