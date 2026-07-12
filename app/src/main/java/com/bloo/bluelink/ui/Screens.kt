@@ -185,6 +185,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -1552,12 +1553,11 @@ private fun AuroraBackground(
     var tiltY by remember { mutableFloatStateOf(0f) }
     if (motionMode == "motion") {
         val ctx = LocalContext.current
-        DisposableEffect(ctx) {
+        androidx.compose.runtime.DisposableEffect(ctx) {
             val mgr = ctx.getSystemService(android.content.Context.SENSOR_SERVICE) as android.hardware.SensorManager
             val sensor = mgr.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
             val listener = object : android.hardware.SensorEventListener {
                 override fun onSensorChanged(event: android.hardware.SensorEvent) {
-                    // Low-pass filter: smooth raw accelerometer values
                     val alpha = 0.15f
                     tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.06f) * alpha
                     tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.06f) * alpha
@@ -1597,6 +1597,7 @@ private fun AuroraBackground(
             hsv[0] = (hsv[0] + 60f) % 360f; hsv[1] = (hsv[1] * 0.5f).coerceAtMost(1f); hsv[2] = (hsv[2] * 0.7f).coerceAtMost(1f)
             Color(android.graphics.Color.HSVToColor(hsv))
         }
+        else -> scheme.secondary
     }
 
     val t = rememberInfiniteTransition(label = "aurora")
