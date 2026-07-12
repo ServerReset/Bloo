@@ -450,7 +450,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Garage -> {
                     val appearance by vm.appearance.collectAsState()
                     Box(Modifier.fillMaxSize()) {
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize())
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance)
                         GarageScreen(state, vm)
                     }
                 }
@@ -1534,12 +1534,71 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
 }
 
 /**
- * A softly-blurred, slowly-drifting "aurora" of colour blobs - the animated login
- * backdrop. Three blobs ease back and forth on different periods.
+ * A softly-blurred, slowly-drifting "aurora" of colour blobs. Supports three
+ * motion modes and three colour-source modes via [appearance].
  */
 @Composable
-private fun AuroraBackground(modifier: Modifier = Modifier) {
+private fun AuroraBackground(
+    modifier: Modifier = Modifier,
+    appearance: SettingsStore.Appearance? = null,
+) {
     val scheme = MaterialTheme.colorScheme
+    val motionMode = appearance?.auroraMotion ?: "static"
+    val colorMode = appearance?.auroraColorMode ?: "complementary"
+    val customHex = appearance?.auroraCustomColor
+
+    // Gyroscope / accelerometer tilt tracking for motion mode
+    var tiltX by remember { mutableFloatStateOf(0f) }
+    var tiltY by remember { mutableFloatStateOf(0f) }
+    if (motionMode == "motion") {
+        val ctx = LocalContext.current
+        DisposableEffect(ctx) {
+            val mgr = ctx.getSystemService(android.content.Context.SENSOR_SERVICE) as android.hardware.SensorManager
+            val sensor = mgr.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+            val listener = object : android.hardware.SensorEventListener {
+                override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                    // Low-pass filter: smooth raw accelerometer values
+                    val alpha = 0.15f
+                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.06f) * alpha
+                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.06f) * alpha
+                }
+                override fun onAccuracyChanged(s: android.hardware.Sensor, acc: Int) {}
+            }
+            mgr.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_GAME)
+            onDispose { mgr.unregisterListener(listener) }
+        }
+    }
+
+    // Compute blob colours based on the selected colour mode
+    val basePrimary = when (colorMode) {
+        "material" -> scheme.primary
+        "custom" -> customHex?.let { hx -> runCatching { Color(android.graphics.Color.parseColor(hx)) }.getOrNull() }
+            ?: scheme.primary
+        else -> { // "complementary": invert the surface hue
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(scheme.surface.toArgb(), hsv)
+            hsv[0] = (hsv[0] + 180f) % 360f
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }
+    }
+    val baseTertiary = when (colorMode) {
+        "material" -> scheme.tertiary
+        "custom" -> basePrimary
+        else -> {
+            val hsv = FloatArray(3); android.graphics.Color.colorToHSV(basePrimary.toArgb(), hsv)
+            hsv[0] = (hsv[0] + 30f) % 360f; hsv[1] = (hsv[1] * 0.6f).coerceAtMost(1f); hsv[2] = (hsv[2] * 0.85f).coerceAtMost(1f)
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }
+    }
+    val baseSecondary = when (colorMode) {
+        "material" -> scheme.secondary
+        "custom", "complementary" -> {
+            val hsv = FloatArray(3); android.graphics.Color.colorToHSV(basePrimary.toArgb(), hsv)
+            hsv[0] = (hsv[0] + 60f) % 360f; hsv[1] = (hsv[1] * 0.5f).coerceAtMost(1f); hsv[2] = (hsv[2] * 0.7f).coerceAtMost(1f)
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }
+    }
+
     val t = rememberInfiniteTransition(label = "aurora")
     val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
     val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
@@ -1550,11 +1609,14 @@ private fun AuroraBackground(modifier: Modifier = Modifier) {
             .blur(90.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
+                val ox = if (motionMode == "motion") tiltX else 0f
+                val oy = if (motionMode == "motion") tiltY else 0f
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
-                    drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
-                blob(scheme.primary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1), mix(0.2f, 0.45f, p2), 0.6f)
-                blob(scheme.tertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2), mix(0.75f, 0.5f, p3), 0.55f)
-                blob(scheme.secondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3), mix(0.35f, 0.95f, p1), 0.55f)
+                    drawCircle(c, radius = size.minDimension * r,
+                        center = Offset(size.width * (fx + ox), size.height * (fy + oy)))
+                blob(basePrimary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1) + ox, mix(0.2f, 0.45f, p2) + oy, 0.6f)
+                blob(baseTertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2) + ox, mix(0.75f, 0.5f, p3) + oy, 0.55f)
+                blob(baseSecondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3) + ox, mix(0.35f, 0.95f, p1) + oy, 0.55f)
             },
     )
 }
@@ -3289,9 +3351,20 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Units", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(6.dp))
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("imperial", "Imperial", null),
+                        SegmentOption("metric", "Metric", null),
+                    ),
+                    selectedKey = appearance.unitSystem,
+                    onSelect = { vm.setUnitSystem(it) },
+                )
             }
-        }
-        }
     }
     }
 }
@@ -6978,6 +7051,42 @@ private fun SettingsScreen(vm: AppViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (appearance.auroraBackground) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Aurora motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("static", "Static", null),
+                            SegmentOption("motion", "Motion", null),
+                        ),
+                        selectedKey = appearance.auroraMotion,
+                        onSelect = { vm.setAuroraMotion(it) },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("Aurora colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(6.dp))
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("complementary", "Complement", null),
+                            SegmentOption("material", "Material You", null),
+                            SegmentOption("custom", "Custom", null),
+                        ),
+                        selectedKey = appearance.auroraColorMode,
+                        onSelect = { vm.setAuroraColorMode(it) },
+                    )
+                    if (appearance.auroraColorMode == "custom") {
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = appearance.auroraCustomColor ?: "",
+                            onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
+                            label = { Text("Colour hex (#RRGGBB)") },
+                            singleLine = true,
+                            shape = FieldShape,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
 
             // Weather

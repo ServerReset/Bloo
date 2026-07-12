@@ -105,6 +105,10 @@ class SettingsStore(private val context: Context) {
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val AURORA = stringPreferencesKey("aurora_background")
+        val AURORA_MOTION = stringPreferencesKey("aurora_motion")
+        val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
+        val AURORA_CUSTOM_COLOR = stringPreferencesKey("aurora_custom_color")
+        val UNIT_SYSTEM = stringPreferencesKey("unit_system")
     }
 
     data class Appearance(
@@ -138,6 +142,14 @@ class SettingsStore(private val context: Context) {
         val vibrancy: Float = 1f,
         /** Show an aurora gradient as the app background instead of solid surface. */
         val auroraBackground: Boolean = false,
+        /** Aurora motion mode: "off", "static", "motion". */
+        val auroraMotion: String = "static",
+        /** Aurora color mode: "complementary", "material", "custom". */
+        val auroraColorMode: String = "complementary",
+        /** Custom color hex for aurora (only used when auroraColorMode is "custom"). */
+        val auroraCustomColor: String? = null,
+        /** Unit system: "imperial" (miles, mph, F) or "metric" (km, km/h, C). */
+        val unitSystem: String = "imperial",
         /** Haptic feedback across the UI. */
         val hapticsEnabled: Boolean = true,
     )
@@ -175,6 +187,10 @@ class SettingsStore(private val context: Context) {
             vibrancy = prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f,
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
+            auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",
+            auroraColorMode = prefs[Keys.AURORA_COLOR_MODE] ?: "complementary",
+            auroraCustomColor = prefs[Keys.AURORA_CUSTOM_COLOR],
+            unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
         )
     }
 
@@ -282,6 +298,25 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setAuroraBackground(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.AURORA] = value.toString() }
+    }
+
+    suspend fun setAuroraMotion(value: String) {
+        context.settingsDataStore.edit { it[Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
+    }
+
+    suspend fun setAuroraColorMode(value: String) {
+        context.settingsDataStore.edit { it[Keys.AURORA_COLOR_MODE] = value.takeIf { it in setOf("complementary", "material", "custom") } ?: "complementary" }
+    }
+
+    suspend fun setAuroraCustomColor(value: String?) {
+        context.settingsDataStore.edit {
+            val key = Keys.AURORA_CUSTOM_COLOR
+            if (value.isNullOrBlank()) it.remove(key) else it[key] = value
+        }
+    }
+
+    suspend fun setUnitSystem(value: String) {
+        context.settingsDataStore.edit { it[Keys.UNIT_SYSTEM] = value.takeIf { it in setOf("imperial", "metric") } ?: "imperial" }
     }
 
     // --- Per-car identity + service (the API has no service-history fields) ---

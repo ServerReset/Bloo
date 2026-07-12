@@ -1793,6 +1793,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
 
+    fun setAuroraMotion(value: String) = viewModelScope.launch { settingsStore.setAuroraMotion(value) }
+
+    fun setAuroraColorMode(value: String) = viewModelScope.launch { settingsStore.setAuroraColorMode(value) }
+
+    fun setAuroraCustomColor(value: String?) = viewModelScope.launch { settingsStore.setAuroraCustomColor(value) }
+
+    fun setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }
+
     fun clearLogs() = AppLog.clear()
     fun clearMessage() = _state.update { it.copy(message = null) }
 
