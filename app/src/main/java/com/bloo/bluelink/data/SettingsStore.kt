@@ -607,6 +607,17 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_layout")] = value.takeIf { it in setOf("info", "controls") } ?: "info" }
     }
 
+    /** Drive URI for auto-backup; null when not configured. */
+    suspend fun syncUri(): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_uri")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setSyncUri(uri: String?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("sync_uri")
+            if (uri.isNullOrBlank()) it.remove(key) else it[key] = uri
+        }
+    }
+
     // The car's last known address + coordinates, refreshed by the Location action
     // and rendered in the widget's location box.
     suspend fun widgetLocationAddress(widgetId: Int): String? =

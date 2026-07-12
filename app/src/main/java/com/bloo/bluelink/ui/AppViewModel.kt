@@ -149,6 +149,8 @@ data class UiState(
     val updateInfo: com.bloo.bluelink.update.UpdateInfo? = null,
     /** True while a manual "Check now" request is in flight. */
     val updateChecking: Boolean = false,
+    /** Drive URI (content://...) for auto-backup; null when not configured. */
+    val syncUri: String? = null,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 
@@ -784,9 +786,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         statusLoc?.let { loc ->
                             reverseGeocode(loc)?.let { place ->
                                 _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
-                            }
+            }
+        }
+        // Restore auto-sync Drive URI from preferences
+        viewModelScope.launch {
+            val uri = settingsStore.syncUri()
+            if (uri != null) _state.update { it.copy(syncUri = uri) }
+        }
+        // Auto-export settings to Drive on refresh (when syncUri is set)
+        viewModelScope.launch {
+            _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
+                if (!wasRefreshing) {
+                    withContext(Dispatchers.IO) {
+                    val uri = settingsStore.syncUri()
+                    if (uri != null) {
+                        runCatching {
+                            val out = getApplication<android.app.Application>().contentResolver.openOutputStream(
+                                android.net.Uri.parse(uri),
+                                "wt",
+                            )
+                            out?.use { it.write(settingsStore.exportSettingsJson().toByteArray()) }
                         }
                     }
+                    }
+                }
+            }
+        }
+    }
                 }
                 sessionFetched.add(v.vin)
                 logSuccess?.let { AppLog.log(it) }
@@ -1606,6 +1632,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         val error = settingsStore.importSettingsJson(json)
         _state.update { it.copy(message = error ?: "Settings restored") }
+    }
+
+    /** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */
+    fun setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
+        runCatching {
+            // Take persistable permission so the URI survives restarts
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
+        settingsStore.setSyncUri(uri.toString())
+        _state.update { it.copy(syncUri = uri.toString()) }
+    }
+
+    /** Disable auto-sync. */
+    fun clearSyncUri() = viewModelScope.launch {
+        settingsStore.setSyncUri(null)
+        _state.update { it.copy(syncUri = null) }
     }
 
     // --- Weather ---------------------------------------------------------

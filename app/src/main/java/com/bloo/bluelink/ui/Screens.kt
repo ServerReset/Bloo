@@ -6365,11 +6365,15 @@ private fun SettingsScreen(vm: AppViewModel) {
                 val settingsImportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent(),
                 ) { uri -> uri?.let { vm.importSettings(context, it) } }
+                val drivePickerLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/json"),
+                ) { uri ->
+                    uri?.let { vm.setSyncUri(it) }
+                }
                 Text(
-                    "Export your theme, palettes and preferences to a file. " +
-                        "Save it to Google Drive or anywhere else. Restore on any " +
-                        "device to carry your setup with you. Sign-in credentials " +
-                        "are never included.",
+                    "Export your settings to a file. Save it to Google Drive to " +
+                        "keep your theme, palettes, tile order and preferences " +
+                        "synced across devices. Sign-in credentials are never included.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -6384,6 +6388,31 @@ private fun SettingsScreen(vm: AppViewModel) {
                         "Restore",
                         modifier = Modifier.weight(1f),
                         onClick = { settingsImportLauncher.launch("application/json") },
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                // Auto-sync setup: pick a Drive location to auto-save on refresh
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton(
+                        if (state.syncUri != null) "Auto-sync: on" else "Set up auto-sync",
+                        modifier = Modifier.weight(1f),
+                        onClick = { drivePickerLauncher.launch("bloo_settings.json") },
+                    )
+                    if (state.syncUri != null) {
+                        MorphTextButton(
+                            "Disable",
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.clearSyncUri() },
+                        )
+                    }
+                }
+                if (state.syncUri != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Settings will auto-save to your chosen Drive location " +
+                            "whenever the app refreshes data from the car.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
                     )
                 }
             }
