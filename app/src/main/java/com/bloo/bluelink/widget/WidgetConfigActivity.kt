@@ -1,12 +1,14 @@
 package com.bloo.bluelink.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -87,96 +90,103 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var loaded by remember { mutableStateOf(false) }
     var selectedVin by remember { mutableStateOf<String?>(null) }
     var requireAuth by remember { mutableStateOf(true) }
-    val actions = remember { mutableStateListOf<String>().apply {
-        addAll(WidgetAction.DEFAULTS.map { it.key })
-    }}
+    var photoBg by remember { mutableStateOf(false) }
+    var showLocation by remember { mutableStateOf(false) }
+    // VINs already claimed by another widget, so we can steer toward one-per-car.
+    var usedVins by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
 
     LaunchedEffect(Unit) {
+        val store = SettingsStore(context)
         cars = SnapshotStore(context).current().vehicles
-        requireAuth = SettingsStore(context).widgetRequireAuth(widgetId)
-        val existing = SettingsStore(context).widgetConfig(widgetId)
+        requireAuth = store.widgetRequireAuth(widgetId)
+        photoBg = store.widgetPhotoBackground(widgetId)
+        showLocation = store.widgetShowLocation(widgetId)
+        // Which cars already have a widget (excluding this one)?
+        val used = mutableSetOf<String>()
+        runCatching {
+            val ids = AppWidgetManager.getInstance(context)
+                .getAppWidgetIds(ComponentName(context, BlooWidgetReceiver::class.java))
+            for (id in ids) if (id != widgetId) store.widgetConfig(id)?.first?.let { used.add(it) }
+        }
+        usedVins = used
+        val existing = store.widgetConfig(widgetId)
         if (existing != null) {
-            selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } }
-                ?: cars.firstOrNull()?.vin
-            if (existing.second.isNotEmpty()) {
-                actions.clear()
-                actions.addAll(existing.second.take(4))
-            }
+            selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } } ?: cars.firstOrNull()?.vin
+            if (existing.second.isNotEmpty()) { actions.clear(); actions.addAll(existing.second.take(4)) }
         } else {
-            selectedVin = cars.firstOrNull()?.vin
+            // Default to a car that doesn't already have a widget → one widget per car.
+            selectedVin = cars.firstOrNull { it.vin !in used }?.vin ?: cars.firstOrNull()?.vin
         }
         loaded = true
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
-        Text("Widget Setup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
-        Text("Pick a car and up to 4 actions.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(20.dp))
+        Text("Widget setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("One car per widget · up to 4 buttons", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         if (loaded && cars.isEmpty()) {
+            Spacer(Modifier.height(14.dp))
             Text("No cars yet — sign in to Bloo first.", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             MorphButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Close", fontWeight = FontWeight.SemiBold) }
             return@Column
         }
 
-        Text("Car", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(8.dp))
+        SectionLabel("Car")
         cars.forEach { car ->
+            val taken = car.vin != selectedVin && car.vin in usedVins
             MorphButton(
                 onClick = { selectedVin = car.vin },
                 active = car.vin == selectedVin,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
             ) {
-                Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(car.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
-                    Text(car.model, style = MaterialTheme.typography.bodySmall)
+                Column(Modifier.weight(1f)) {
+                    Text(car.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (taken) "${car.model} · already on a widget" else car.model,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
+            }
+            Spacer(Modifier.height(5.dp))
+        }
+
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("Buttons")
+        // Two-column chip grid — far more compact than one chip per row.
+        WidgetAction.ALL.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                pair.forEach { action ->
+                    MorphChip(
+                        selected = action.key in actions,
+                        onClick = {
+                            if (action.key in actions) actions.remove(action.key)
+                            else if (actions.size < 4) actions.add(action.key)
+                        },
+                        label = action.label,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
             Spacer(Modifier.height(6.dp))
         }
 
-        Spacer(Modifier.height(20.dp))
-
-        Text("Buttons", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            WidgetAction.ALL.forEach { action ->
-                MorphChip(
-                    selected = action.key in actions,
-                    onClick = {
-                        if (action.key in actions) actions.remove(action.key)
-                        else if (actions.size < 4) actions.add(action.key)
-                    },
-                    label = action.label,
-                )
-            }
-        }
+        SectionLabel("Options")
+        MorphChip(requireAuth, { requireAuth = !requireAuth }, "Require unlock for actions", Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+        MorphChip(photoBg, { photoBg = !photoBg }, "Use car photo as background", Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+        MorphChip(showLocation, { showLocation = !showLocation }, "Show location map (large widgets)", Modifier.fillMaxWidth())
 
-        Spacer(Modifier.height(20.dp))
-
-        Text("Security", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(8.dp))
-        MorphChip(
-            selected = requireAuth,
-            onClick = { requireAuth = !requireAuth },
-            label = "Require unlock for actions",
-        )
-        Text(
-            "Ask for fingerprint or PIN before lock, climate, and charge buttons run.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(18.dp))
         MorphButton(
             onClick = {
                 val vin = selectedVin ?: return@MorphButton
@@ -184,14 +194,27 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                     val store = SettingsStore(context)
                     store.setWidgetConfig(widgetId, vin, actions.toList())
                     store.setWidgetRequireAuth(widgetId, requireAuth)
+                    store.setWidgetPhotoBackground(widgetId, photoBg)
+                    store.setWidgetShowLocation(widgetId, showLocation)
                     onDone()
                 }
             },
             enabled = selectedVin != null,
             modifier = Modifier.fillMaxWidth(),
         ) { MorphButtonLabel(Icons.Default.Check, "Save", pending = false, iconSize = 18.dp) }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         MorphTextButton("Cancel", onCancel, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Spacer(Modifier.height(6.dp))
 }

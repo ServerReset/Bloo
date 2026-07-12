@@ -1,8 +1,10 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bloo.bluelink.ui.ColorPalette
@@ -25,7 +27,13 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-private val Context.settingsDataStore by preferencesDataStore(name = "bloo_settings")
+// A corruption handler so a settings file damaged by an interrupted write / power
+// loss resets to empty prefs instead of rethrowing IOException out of every read
+// (which crashed the app on launch, since `appearance` is collected eagerly).
+private val Context.settingsDataStore by preferencesDataStore(
+    name = "bloo_settings",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /**
  * Which seat heat/cool functions a specific car actually has (user-configured).
@@ -541,8 +549,11 @@ class SettingsStore(private val context: Context) {
 
     suspend fun clearWidgetConfig(widgetId: Int) {
         context.settingsDataStore.edit {
-            it.remove(stringPreferencesKey("widget_${widgetId}_vin"))
-            it.remove(stringPreferencesKey("widget_${widgetId}_actions"))
+            // Remove every per-widget key so a re-used widget id starts clean.
+            listOf("vin", "actions", "pending", "auth", "photobg", "loc", "addr", "lat", "lon").forEach { suffix ->
+                it.remove(stringPreferencesKey("widget_${widgetId}_$suffix"))
+                it.remove(booleanPreferencesKey("widget_${widgetId}_$suffix"))
+            }
         }
     }
 
@@ -561,6 +572,50 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setWidgetRequireAuth(widgetId: Int, value: Boolean) {
         context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_auth")] = value }
+    }
+
+    /** Use the car's set photo as a full-bleed widget background (default off). */
+    suspend fun widgetPhotoBackground(widgetId: Int): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_photobg")] ?: false
+
+    suspend fun setWidgetPhotoBackground(widgetId: Int, value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_photobg")] = value }
+    }
+
+    /** Show a map/location box on large widgets (default off). */
+    suspend fun widgetShowLocation(widgetId: Int): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_loc")] ?: false
+
+    suspend fun setWidgetShowLocation(widgetId: Int, value: Boolean) {
+        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_loc")] = value }
+    }
+
+    // The car's last known address + coordinates, refreshed by the Location action
+    // and rendered in the widget's location box.
+    suspend fun widgetLocationAddress(widgetId: Int): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_addr")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setWidgetLocationAddress(widgetId: Int, address: String?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey("widget_${widgetId}_addr")
+            if (address.isNullOrBlank()) it.remove(key) else it[key] = address
+        }
+    }
+
+    suspend fun widgetLocationLatLon(widgetId: Int): Pair<Double, Double>? {
+        val data = context.settingsDataStore.data.first()
+        val lat = data[stringPreferencesKey("widget_${widgetId}_lat")]?.toDoubleOrNull() ?: return null
+        val lon = data[stringPreferencesKey("widget_${widgetId}_lon")]?.toDoubleOrNull() ?: return null
+        return lat to lon
+    }
+
+    suspend fun setWidgetLocationLatLon(widgetId: Int, lat: Double?, lon: Double?) {
+        context.settingsDataStore.edit {
+            val latKey = stringPreferencesKey("widget_${widgetId}_lat")
+            val lonKey = stringPreferencesKey("widget_${widgetId}_lon")
+            if (lat != null) it[latKey] = lat.toString() else it.remove(latKey)
+            if (lon != null) it[lonKey] = lon.toString() else it.remove(lonKey)
+        }
     }
 
     // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----

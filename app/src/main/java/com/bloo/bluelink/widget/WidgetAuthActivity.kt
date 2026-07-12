@@ -1,7 +1,6 @@
 package com.bloo.bluelink.widget
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -11,12 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.SnapshotStore
-import com.bloo.bluelink.data.WearCommandRunner
-import androidx.glance.appwidget.updateAll
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * A transparent activity that gates a widget button behind a biometric / device-
@@ -78,65 +72,13 @@ class WidgetAuthActivity : FragmentActivity() {
             finishNoAnim()
             return
         }
-        if (action.kind == WidgetAction.Kind.LOCATION) {
-            // Show the car on the map right away — the user asked "where's my car",
-            // not "refresh in the background".
-            lifecycleScope.launch {
-                try {
-                    val snap = withContext(Dispatchers.IO) {
-                        runCatching { SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin } }.getOrNull()
-                    }
-                    val lat = snap?.lat
-                    val lon = snap?.lon
-                    if (lat != null && lon != null && !(lat == 0.0 && lon == 0.0)) {
-                        val label = Uri.encode(snap.name.ifBlank { "My car" })
-                        val maps = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon($label)"))
-                        runCatching { startActivity(maps) }.onFailure { openApp(vin) }
-                    } else {
-                        openApp(vin)
-                    }
-                } finally {
-                    finishNoAnim()
-                }
-            }
-            return
-        }
+        // Auth passed (or wasn't required): optimistically flip + queue the command
+        // in the background, then always dismiss so this transparent activity can
+        // never linger on top of the home screen swallowing taps.
         lifecycleScope.launch {
-            val ctx = applicationContext
-            var resolvedWearAction = action.wearAction
             try {
-            // DataStore writes off the main thread so the transparent activity dismisses
-            // without waiting on disk.
-            withContext(Dispatchers.IO) {
-                // Optimistic snapshot update so the widget immediately shows the expected
-                // new state (behind the loading icon) once the home screen comes forward.
-                val wa = action.wearAction
-                if (wa != null) {
-                    runCatching {
-                        val store = SnapshotStore(ctx)
-                        val snap = store.current().vehicles.firstOrNull { it.vin == vin }
-                        if (snap != null) {
-                            // Resolve TOGGLE_* to an explicit LOCK/UNLOCK etc. from the
-                            // PRE-flip snapshot. The worker's executor decides toggle
-                            // direction by re-reading this same store, so writing the
-                            // optimistic flip first and passing the raw toggle through
-                            // made every toggle button re-assert the current state
-                            // instead of changing it.
-                            val resolved = WearCommandRunner.resolveToggle(snap, wa)
-                            resolvedWearAction = resolved
-                            store.updateVehicle(WearCommandRunner.optimistic(snap, resolved))
-                        }
-                    }
-                }
-                // Mark pending so the widget overlays the refresh spinner.
-                runCatching { SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key) }
-            }
-            runCatching { BlooWidget().updateAll(ctx) }
-            // Queue the actual work; finish right away so the home screen is unblocked.
-            runCatching { WidgetCommandWorker.enqueue(ctx, widgetId, vin, action, resolvedWearAction) }
+                WidgetCommandWorker.dispatch(applicationContext, widgetId, vin, action)
             } finally {
-                // Always dismiss — a thrown DataStore/enqueue error must not strand
-                // this transparent activity on top of the home screen swallowing taps.
                 finishNoAnim()
             }
         }
