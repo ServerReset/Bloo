@@ -1637,8 +1637,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */
     fun setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
         runCatching {
-            // Take persistable permission so the URI survives restarts
-            context.contentResolver.takePersistableUriPermission(
+            getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
                 uri,
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
             )
