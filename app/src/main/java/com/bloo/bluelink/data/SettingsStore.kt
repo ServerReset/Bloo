@@ -104,6 +104,7 @@ class SettingsStore(private val context: Context) {
         val UI_SCALE = stringPreferencesKey("ui_scale")
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
+        val AURORA = stringPreferencesKey("aurora_background")
     }
 
     data class Appearance(
@@ -135,6 +136,8 @@ class SettingsStore(private val context: Context) {
         val uiScale: Float = 1f,
         /** Colour vibrancy multiplier (0.5–1.6, 1 = default). */
         val vibrancy: Float = 1f,
+        /** Show an aurora gradient as the app background instead of solid surface. */
+        val auroraBackground: Boolean = false,
         /** Haptic feedback across the UI. */
         val hapticsEnabled: Boolean = true,
     )
@@ -171,6 +174,7 @@ class SettingsStore(private val context: Context) {
             uiScale = prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f,
             vibrancy = prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f,
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
+            auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
         )
     }
 
@@ -274,6 +278,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setLinksInApp(value: Boolean) {
         context.settingsDataStore.edit { it[Keys.LINKS_IN_APP] = value.toString() }
+    }
+
+    suspend fun setAuroraBackground(value: Boolean) {
+        context.settingsDataStore.edit { it[Keys.AURORA] = value.toString() }
     }
 
     // --- Per-car identity + service (the API has no service-history fields) ---

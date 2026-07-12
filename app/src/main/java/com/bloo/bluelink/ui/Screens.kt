@@ -447,7 +447,13 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
                 Screen.Onboarding -> OnboardingScreen(vm)
                 is Screen.CarSetup -> CarSetupWizardScreen(vm, screen.vins)
-                Screen.Garage -> GarageScreen(state, vm)
+                Screen.Garage -> {
+                    val appearance by vm.appearance.collectAsState()
+                    Box(Modifier.fillMaxSize()) {
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize())
+                        GarageScreen(state, vm)
+                    }
+                }
                 Screen.Settings -> SettingsScreen(vm)
             }
         }
@@ -2930,9 +2936,9 @@ private fun <T> ReorderColumn(
                 val dragging = draggingKey == k
                 val dragState = draggingKey != null
                 val lift by animateFloatAsState(
-                    targetValue = if (dragging) 1.05f else 1f,
-                    animationSpec = if (dragging) spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
-                                   else spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow),
+                    targetValue = if (dragging) 1.08f else 1f,
+                    animationSpec = if (dragging) spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)
+                                   else spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMediumLow),
                     label = "lift"
                 )
                 Box(
@@ -6941,6 +6947,13 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ),
                     selectedKey = appearance.themeMode.name,
                     onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
+                )
+                Spacer(Modifier.height(10.dp))
+                ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
+                Text(
+                    "Show a gradient aurora behind the content instead of a solid surface.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 

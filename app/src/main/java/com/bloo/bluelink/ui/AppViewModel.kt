@@ -1791,6 +1791,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { kotlinx.coroutines.delay(150); settingsStore.setVibrancy(value) }
     fun setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
+    fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
+
     fun clearLogs() = AppLog.clear()
     fun clearMessage() = _state.update { it.copy(message = null) }
 
