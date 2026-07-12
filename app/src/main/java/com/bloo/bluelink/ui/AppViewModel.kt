@@ -820,22 +820,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val app = getApplication<android.app.Application>()
                         val parsed = android.net.Uri.parse(uri)
                         // Download: read the existing file from Drive
-                        val remoteJson = runCatching {
+                        val remoteContent = runCatching {
                             app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
                         }.getOrNull()
-                        // If remote is newer, merge it into our settings
-                        val remoteTs = remoteJson?.let {
-                            runCatching { kotlinx.serialization.json.Json.decodeFromString(SyncPayload.serializer(), it).ts }.getOrNull()
-                        } ?: 0L
+                        // First line = timestamp, rest = settings JSON
+                        val remoteTs = remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L
+                        val remoteJson = remoteContent?.substringAfter('\n', "")
                         if (remoteTs > _state.value.lastSyncMs) {
                             settingsStore.importSettingsJson(remoteJson.orEmpty())
                             _state.update { it.copy(syncUri = uri) }
                         }
                         // Upload our current settings with current timestamp
                         val now = System.currentTimeMillis()
-                        val syncJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                        val payload = SyncPayload(ts = now, data = settingsStore.exportSettingsJson())
-                        val body = syncJson.encodeToString(SyncPayload.serializer(), payload)
+                        // Simple format: first line = timestamp, rest = settings JSON
+                        val body = "$now\n${settingsStore.exportSettingsJson()}"
                         runCatching {
                             app.contentResolver.openOutputStream(parsed, "wt")?.use {
                                 it.write(body.toByteArray())

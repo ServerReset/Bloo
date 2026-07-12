@@ -899,7 +899,3 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[Keys.WEATHER_FAHRENHEIT] = value.toString() }
     }
 }
-
-/** Timestamped wrapper for sync payloads (used for Drive sync merge decisions). */
-@Serializable
-data class SyncPayload(val ts: Long, val data: String)
