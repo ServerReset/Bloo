@@ -725,21 +725,32 @@ private fun OnboardingScreen(vm: AppViewModel) {
                         Column(Modifier.weight(1f)) {
                             Text("Sync across devices",
                                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Back up your settings to Google Drive for automatic sync.",
+                            Text("Back up your settings to Google Drive or restore from a file.",
                                 style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "On your primary phone, set up Drive sync to export your settings. " +
+                            "On a secondary phone or new device, use Restore instead to pick " +
+                            "the same backup file.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
                     Spacer(Modifier.height(10.dp))
                     val driveSyncLauncher = rememberLauncherForActivityResult(
                         ActivityResultContracts.CreateDocument("application/json"),
                     ) { uri -> uri?.let { vm.setSyncUri(it) } }
+                    val importLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.GetContent(),
+                    ) { uri -> uri?.let { vm.importSettings(context, it) } }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MorphTextButton("Set up Drive sync",
                             modifier = Modifier.weight(1f),
                             onClick = { driveSyncLauncher.launch("bloo_settings.json") })
-                        MorphTextButton("Skip",
+                        MorphTextButton("Restore from file",
                             modifier = Modifier.weight(1f),
-                            onClick = { /* do nothing */ })
+                            onClick = { importLauncher.launch("application/json") })
                     }
                 }
             }
@@ -1477,35 +1488,47 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
         onDismissRequest = vm::dismissUpdate,
         title = { Text("Update available") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Build #${info.run.runNumber} is ready on GitHub Actions.")
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "Open the run page to download the phone and watch APKs and install " +
-                        "them the same way you installed Bloo.",
+                    "Build #${info.run.runNumber} is ready on GitHub Actions.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("How to install", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        listOf(
+                            "1. Tap the button below to open the build on GitHub",
+                            "2. Download the zipped APK for your phone (and watch if needed)",
+                            "3. Unzip the file on your device",
+                            "4. Open the APK and tap Install anyway (you may need to expand Play Protect warning)",
+                            "5. Confirm with your biometrics to finish the install",
+                        ).forEach { step ->
+                            Text(step, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
                 MorphTextButton(
                     "Remind me in 3 days",
                     onClick = vm::snoozeUpdate,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
             MorphButton(
                 onClick = {
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
-                    }
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
                     vm.dismissUpdate()
                 },
+                modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-            ) {
-                Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
-            }
+            ) { Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold) }
         },
         dismissButton = {
-            MorphTextButton("Not now", vm::dismissUpdate)
+            MorphTextButton("Not now", vm::dismissUpdate, modifier = Modifier.fillMaxWidth())
         },
     )
 }
