@@ -3353,7 +3353,6 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
     }
 }
 
@@ -7122,7 +7121,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Text("My location", fontWeight = FontWeight.SemiBold)
                     }
                 }
-            }
                 Spacer(Modifier.height(12.dp))
                 Text("Units", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(6.dp))
@@ -7134,6 +7132,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     selectedKey = appearance.unitSystem,
                     onSelect = { vm.setUnitSystem(it) },
                 )
+            }
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
         }
