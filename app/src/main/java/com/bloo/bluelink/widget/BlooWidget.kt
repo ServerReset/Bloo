@@ -222,8 +222,9 @@ class BlooWidget : GlanceAppWidget() {
             if (c.actions.isNotEmpty()) {
                 Spacer(GlanceModifier.width(8.dp))
                 val take = c.actions.take(4)
-                ButtonGrid(c, take, cols = take.size.coerceAtMost(2), showLabel = false, iconSize = 24.dp,
-                    modifier = GlanceModifier.fillMaxHeight().width((take.size.coerceAtMost(2) * 52).dp))
+                // Horizontal row on short widgets — one row only
+                ButtonGrid(c, take, cols = take.size, showLabel = false, iconSize = 22.dp,
+                    modifier = GlanceModifier.fillMaxHeight().width((take.size * 50).dp))
             }
         }
     }
@@ -238,12 +239,12 @@ class BlooWidget : GlanceAppWidget() {
             Text(c.snap.name.take(10), maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 12.sp))
             Spacer(GlanceModifier.height(2.dp))
             Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 26.sp))
+            Spacer(GlanceModifier.height(2.dp))
             c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
             Spacer(GlanceModifier.height(8.dp))
             if (c.actions.isNotEmpty()) {
-                val take = c.actions.take(4)
-                val cols = if (take.size >= 3) 2 else 1
-                ButtonGrid(c, take, cols = cols, showLabel = false, iconSize = 26.dp,
+                // Stack buttons vertically (1 column) for tall narrow layout
+                ButtonGrid(c, c.actions.take(4), cols = 1, showLabel = false, iconSize = 26.dp,
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight())
             }
         }
