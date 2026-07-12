@@ -43,8 +43,8 @@ fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     if (fahrenheit) "${(tempC * 9 / 5 + 32).toInt()}°F" else "${tempC.toInt()}°C"
 
 /** Format a distance in miles as "mi" or "km" based on the unit system. */
-fun formatDistance(mi: Double, metric: Boolean): String =
-    if (metric) "${(mi * 1.609).toInt()} km" else "${mi.toInt()} mi"
+fun formatDistance(mi: Number, metric: Boolean): String =
+    if (metric) "${(mi.toDouble() * 1.609).toInt()} km" else "${mi.toInt()} mi"
 
 /** Format speed in km/h based on the unit system. */
 fun formatSpeed(kph: Double, metric: Boolean): String =
