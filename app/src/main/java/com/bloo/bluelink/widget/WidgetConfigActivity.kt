@@ -86,12 +86,14 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var cars by remember { mutableStateOf<List<VehicleSnapshot>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
     var selectedVin by remember { mutableStateOf<String?>(null) }
+    var requireAuth by remember { mutableStateOf(true) }
     val actions = remember { mutableStateListOf<String>().apply {
         addAll(WidgetAction.DEFAULTS.map { it.key })
     }}
 
     LaunchedEffect(Unit) {
         cars = SnapshotStore(context).current().vehicles
+        requireAuth = SettingsStore(context).widgetRequireAuth(widgetId)
         val existing = SettingsStore(context).widgetConfig(widgetId)
         if (existing != null) {
             selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } }
@@ -158,12 +160,30 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             }
         }
 
+        Spacer(Modifier.height(20.dp))
+
+        Text("Security", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(8.dp))
+        MorphChip(
+            selected = requireAuth,
+            onClick = { requireAuth = !requireAuth },
+            label = "Require unlock for actions",
+        )
+        Text(
+            "Ask for fingerprint or PIN before lock, climate, and charge buttons run.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+
         Spacer(Modifier.height(28.dp))
         MorphButton(
             onClick = {
                 val vin = selectedVin ?: return@MorphButton
                 scope.launch {
-                    SettingsStore(context).setWidgetConfig(widgetId, vin, actions.toList())
+                    val store = SettingsStore(context)
+                    store.setWidgetConfig(widgetId, vin, actions.toList())
+                    store.setWidgetRequireAuth(widgetId, requireAuth)
                     onDone()
                 }
             },
