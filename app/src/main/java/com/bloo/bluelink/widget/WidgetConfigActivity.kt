@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -55,6 +56,7 @@ import com.bloo.bluelink.ui.MorphButtonLabel
 import com.bloo.bluelink.ui.MorphChip
 import com.bloo.bluelink.ui.MorphTextButton
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class WidgetConfigActivity : FragmentActivity() {
 
@@ -185,35 +187,22 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         MorphChip(pillShape, { pillShape = !pillShape }, "Pill shape (extreme rounding)", Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
         Text("Background transparency", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            val scheme = MaterialTheme.colorScheme
-            for (level in 0..9) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .let { m ->
-                            if (level == backgroundAlpha) m
-                                .background(scheme.primary.copy(alpha = 0.25f), CircleShape)
-                                .border(2.dp, scheme.primary, CircleShape)
-                            else m
-                                .background(scheme.surfaceContainerHighest, CircleShape)
-                                .clickable { backgroundAlpha = level }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "$level",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (level == backgroundAlpha) scheme.primary else scheme.onSurfaceVariant,
-                    )
-                }
-            }
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Opaque", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Slider(
+                value = backgroundAlpha.toFloat(),
+                onValueChange = { backgroundAlpha = it.roundToInt() },
+                valueRange = 0f..9f,
+                steps = 8,
+                modifier = Modifier.weight(1f),
+            )
+            Text("Glass", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
             when (backgroundAlpha) {
                 0 -> "Opaque"
-                9 -> "Nearly transparent (glass)"
+                9 -> "Nearly transparent"
                 else -> "Level ${backgroundAlpha}/9"
             },
             style = MaterialTheme.typography.bodySmall,
