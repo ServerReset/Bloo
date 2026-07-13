@@ -248,16 +248,23 @@ object WearBridge {
     suspend fun driveSync(context: Context) {
         runCatching {
             val store = SettingsStore(context)
-            val uri = store.syncUri() ?: return@runCatching
+            val uri = store.syncUri()
+            if (uri == null) {
+                com.bloo.bluelink.data.AppLog.log("⚠ Drive sync: not configured")
+                return@runCatching
+            }
             val app = context.applicationContext
             val parsed = android.net.Uri.parse(uri)
-            // Respect Wi-Fi only setting
             if (store.syncWifiOnly()) {
                 val cm = app.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
                 val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
                     ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
-                if (!wifi) return@runCatching
+                if (!wifi) {
+                    com.bloo.bluelink.data.AppLog.log("⚠ Drive sync: skipped (Wi-Fi only, on cellular)")
+                    return@runCatching
+                }
             }
+            com.bloo.bluelink.data.AppLog.log("Drive sync: starting")
             val fileModifiedMs = runCatching {
                 if (android.provider.DocumentsContract.isDocumentUri(app, parsed)) {
                     val cursor = app.contentResolver.query(
@@ -275,11 +282,15 @@ object WearBridge {
             val remoteTs = fileModifiedMs ?: (remoteContent.substringBefore('\n').toLongOrNull() ?: 0L)
             val lastSync = store.lastSyncMs()
             if (remoteTs > lastSync) {
+                com.bloo.bluelink.data.AppLog.log("Drive sync: importing newer settings")
                 store.importSettingsJson(remoteJson)
             }
             val now = System.currentTimeMillis()
             val body = "$now\n${store.exportSettingsJson()}"
-            runCatching { app.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) } }
+            runCatching {
+                app.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
+                com.bloo.bluelink.data.AppLog.log("Drive sync: complete")
+            }.onFailure { com.bloo.bluelink.data.AppLog.log("⚠ Drive sync: upload failed: ${it.message}") }
             store.setLastSyncMs(now)
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)

@@ -65,10 +65,11 @@ enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
 /** When the biometric app-lock re-engages after the app leaves the foreground. */
 enum class LockTiming(val label: String) {
-    IMMEDIATE("Immediately"),
-    AFTER_1_MIN("After 1 minute"),
-    AFTER_5_MIN("After 5 minutes"),
-    SCREEN_OFF("When the screen turns off"),
+    OFF("Off"),
+    IMMEDIATE("Immediate"),
+    AFTER_1_MIN("1 min"),
+    AFTER_5_MIN("5 min"),
+    AFTER_10_MIN("10 min"),
 }
 
 /** Reorderable detail sections (pebbles), in their default order. */

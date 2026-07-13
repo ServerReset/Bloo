@@ -6849,9 +6849,12 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Logs
             SettingsCard("Logs") {
                 var logsExpanded by remember { mutableStateOf(false) }
+                val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        "Activity log",
+                        "Activity log  ·  $lineCount lines",
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -6872,18 +6875,31 @@ private fun SettingsScreen(vm: AppViewModel) {
                     enter = fadeIn(tween(200)) + expandVertically(),
                     exit = fadeOut(tween(150)) + shrinkVertically(),
                 ) {
-                    val logScroll = rememberScrollState()
-                    SelectionContainer {
-                        Text(
-                            text = logs.joinToString("\n").ifBlank { "No activity yet." },
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 280.dp)
-                                .fadingEdges(logScroll)
-                                .verticalScroll(logScroll),
-                        )
+                    Column {
+                        Spacer(Modifier.height(6.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        Spacer(Modifier.height(4.dp))
+                        val logScroll = rememberScrollState()
+                        SelectionContainer {
+                            Text(
+                                text = logs.joinToString("\n").ifBlank { "No activity yet." },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 300.dp)
+                                    .fadingEdges(logScroll)
+                                    .verticalScroll(logScroll),
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        if (lineCount > 0) {
+                            Text(
+                                "Earliest entries at the top — the newest $lineCount lines are shown.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            )
+                        }
                     }
                 }
             }
@@ -6981,48 +6997,61 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Quick Settings tiles
             SettingsCard("Quick tiles") {
-                Text(
-                    "Each car can have up to 12 tiles in your Quick Settings shade. " +
-                        "Configure them below, then tap \"Add to Quick Settings\" to place each one.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("background", "Run in background", Icons.Filled.Bolt),
-                        SegmentOption("open", "Open the app", Icons.Filled.OpenInNew),
-                    ),
-                    selectedKey = if (state.tileBackground) "background" else "open",
-                    onSelect = { vm.setTileBackground(it == "background") },
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Each car can have up to 12 tiles in your Quick Settings shade. " +
+                            "Configure below, then tap \"Add to Quick Settings\" to place each one.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("On tap:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(60.dp))
+                    Spacer(Modifier.width(8.dp))
+                    MorphSegmented(
+                        modifier = Modifier.weight(1f),
+                        options = listOf(
+                            SegmentOption("background", "Run in background", Icons.Filled.Bolt),
+                            SegmentOption("open", "Open the app", Icons.Filled.OpenInNew),
+                        ),
+                        selectedKey = if (state.tileBackground) "background" else "open",
+                        onSelect = { vm.setTileBackground(it == "background") },
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (state.tileBackground) "Tiles fire the command directly, then toast what was sent."
-                    else "Tiles briefly open Bloo to send, then close.",
+                    if (state.tileBackground) "Tiles fire the command directly and show a confirmation."
+                    else "Tiles briefly open Bloo to send the command, then close.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
 
-                Spacer(Modifier.height(14.dp))
-                Text("Live refresh when shown", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(6.dp))
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("off", "Off", null),
-                        SegmentOption("on", "On", Icons.Filled.Refresh),
-                    ),
-                    selectedKey = if (state.tileLiveRefresh) "on" else "off",
-                    onSelect = { vm.setTileLiveRefresh(it == "on") },
-                )
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Refresh:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(60.dp))
+                    Spacer(Modifier.width(8.dp))
+                    MorphSegmented(
+                        modifier = Modifier.weight(1f),
+                        options = listOf(
+                            SegmentOption("off", "Off", null),
+                            SegmentOption("on", "On", Icons.Filled.Refresh),
+                        ),
+                        selectedKey = if (state.tileLiveRefresh) "on" else "off",
+                        onSelect = { vm.setTileLiveRefresh(it == "on") },
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Pulls the car's latest lock/climate state when a tile appears, so it's " +
-                        "always current. Uses a little more battery/data (throttled to once a minute per car).",
+                    "Pulls the car's latest state when the tile appears (throttled to once a minute per car).",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 QuickTilesManager(state, vm)
             }
 

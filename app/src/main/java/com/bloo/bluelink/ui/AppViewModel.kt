@@ -559,10 +559,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (!a.biometricLock || !canUseBiometrics()) return@launch
             val elapsed = System.currentTimeMillis() - backgroundedAtMs
             val shouldLock = when (a.lockTiming) {
+                LockTiming.OFF -> false
                 LockTiming.IMMEDIATE -> true
                 LockTiming.AFTER_1_MIN -> elapsed >= 60_000
                 LockTiming.AFTER_5_MIN -> elapsed >= 300_000
-                LockTiming.SCREEN_OFF -> screenOff
+                LockTiming.AFTER_10_MIN -> elapsed >= 600_000
             }
             if (shouldLock) _state.update { it.copy(locked = true) }
         }
@@ -848,17 +849,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val remoteJson = remoteContent?.substringAfter('\n', "")
                         val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
                         if (remoteTs > _state.value.lastSyncMs && remoteJson != null) {
+                            AppLog.log("Drive sync: imported newer settings")
                             settingsStore.importSettingsJson(remoteJson)
                             _state.update { it.copy(syncUri = uri) }
                         }
-                        // Upload our current settings with current timestamp
                         val now = System.currentTimeMillis()
                         val body = "$now\n${settingsStore.exportSettingsJson()}"
                         runCatching {
                             app.contentResolver.openOutputStream(parsed, "wt")?.use {
                                 it.write(body.toByteArray())
                             }
-                        }
+                            AppLog.log("Drive sync: uploaded settings")
+                        }.onFailure { AppLog.log("⚠ Drive sync: upload failed: ${it.message}") }
                         settingsStore.setLastSyncMs(now)
                         _state.update { it.copy(lastSyncMs = now) }
                     }
@@ -1655,6 +1657,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
         val error = settingsStore.importPalettesJson(json)
+        AppLog.log(if (error == null) "Palettes imported" else "⚠ Palette import: $error")
         _state.update { it.copy(message = error ?: "Palettes imported", messageType = if (error == null) "success" else "error") }
     }
 
@@ -1672,6 +1675,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 android.content.Intent.createChooser(intent, "Export settings")
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
             )
+            AppLog.log("Settings exported")
         }.onFailure { _state.update { s -> s.copy(message = "Couldn't open the share sheet") } }
     }
 
@@ -1682,9 +1686,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (json == null) {
             _state.update { it.copy(message = "Couldn't read that file") }
+            AppLog.log("⚠ Settings import: could not read file")
             return@launch
         }
         val error = settingsStore.importSettingsJson(json)
+        AppLog.log(if (error == null) "Settings imported from backup" else "⚠ Settings import: $error")
         _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) "success" else "error") }
     }
 
@@ -1695,7 +1701,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 uri,
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
             )
-        }
+            AppLog.log("Drive auto-sync enabled")
+        }.onFailure { AppLog.log("⚠ Drive sync: could not take URI permission") }
         settingsStore.setSyncUri(uri.toString())
         _state.update { it.copy(syncUri = uri.toString()) }
     }
@@ -1704,6 +1711,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun clearSyncUri() = viewModelScope.launch {
         settingsStore.setSyncUri(null)
         _state.update { it.copy(syncUri = null) }
+        AppLog.log("Drive auto-sync disabled")
     }
 
     /** Import settings from a Drive file and set up auto-sync to that file. */
@@ -1713,6 +1721,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (json != null) {
             settingsStore.importSettingsJson(json)
+            AppLog.log("Settings imported from Drive")
         }
         runCatching {
             getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
@@ -1726,6 +1735,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Set Wi-Fi only vs any network for auto-sync. */
     fun setSyncWifiOnly(wifiOnly: Boolean) = viewModelScope.launch {
+        AppLog.log("Drive sync: ${if (wifiOnly) "Wi-Fi only" else "any network"}")
+    }
         settingsStore.setSyncWifiOnly(wifiOnly)
         _state.update { it.copy(syncWifiOnly = wifiOnly) }
     }
