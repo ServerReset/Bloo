@@ -153,7 +153,7 @@ class KiaUsaApi {
             if (sid != null) {
                 return@withContext KiaAuth.LoggedIn(KiaSession(sid, rmtoken, deviceId, pin))
             }
-            val payload = json.parseToJsonElement(text).obj()?.get("payload")?.obj()
+            val payload = parseJson(text, resp.code).obj()?.get("payload")?.obj()
             val otpKey = payload?.get("otpKey")?.str()
             if (otpKey != null) {
                 return@withContext KiaAuth.OtpRequired(
@@ -473,7 +473,7 @@ class KiaUsaApi {
             AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")
             throw BlueLinkException(msg, code = resp.code)
         }
-        val root = if (text.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(text)
+        val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
         val status = root.path("status")
         val statusCode = status.path("statusCode").int()
         if (statusCode != null && statusCode != 0) {
@@ -498,6 +498,16 @@ class KiaUsaApi {
         }.getOrNull()
         return msg?.takeIf { it.isNotBlank() } ?: "Kia request failed (HTTP $code)"
     }
+
+    /**
+     * Parse a response body to JSON, converting a malformed/empty/non-JSON body
+     * (WAF HTML block page, gateway 5xx, truncated response) into a
+     * [BlueLinkException] — which the repository layer already catches — instead of
+     * letting a raw SerializationException/IOException crash the app.
+     */
+    private fun parseJson(text: String, code: Int): JsonElement =
+        runCatching { json.parseToJsonElement(text) }
+            .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
 
     // --- JSON helpers ----------------------------------------------------
 
