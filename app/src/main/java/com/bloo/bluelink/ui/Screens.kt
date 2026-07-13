@@ -202,6 +202,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1874,14 +1875,24 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val heightDp = cfg.screenHeightDp
     val large = widthDp >= 600
     val compact = !large && heightDp < 520
-    var coverToastShown by remember { mutableStateOf(false) }
-    val hasCars = vehicles.isNotEmpty()
-    LaunchedEffect(compact, hasCars) {
-        if (!coverToastShown) {
-            coverToastShown = true
-            if (compact && !hasCars) vm.reportInfo("Open your phone for the full Bloo setup experience")
-            else if (compact) vm.reportInfo("Try opening your phone for the full Bloo experience")
-            else if (!large && hasCars) vm.reportInfo("Try the cover screen for quick glances")
+    // Only show cover-screen hints once per session.
+    var coverHintShown by rememberSaveable { mutableStateOf(false) }
+    // Detect a device that likely has a cover screen: look for a camera cutout
+    // (punch-hole) on a short screen, indicating a flip/fold cover display.
+    val view = LocalView.current
+    val hasCameraCutout = remember(view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            view.rootWindowInsets?.displayCutout?.boundingRects?.isNotEmpty() == true
+        else false
+    }
+    val likelyCoverScreen = compact && hasCameraCutout
+    LaunchedEffect(compact, hasCameraCutout) {
+        if (!coverHintShown && hasCameraCutout) {
+            coverHintShown = true
+            if (compact && vehicles.isEmpty())
+                vm.reportInfo("Open your phone for the full Bloo setup experience")
+            else if (compact)
+                vm.reportInfo("Open your phone for the full Bloo experience")
         }
     }
     if (compact) {
