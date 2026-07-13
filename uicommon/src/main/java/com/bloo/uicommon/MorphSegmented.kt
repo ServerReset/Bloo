@@ -154,7 +154,7 @@ fun MorphSegmented(
                     .offset(x = indicatorX)
                     .width(segWidth)
                     .fillMaxHeight()
-                    .then(if (motionBlurX > 0.5f) Modifier.blur(motionBlurX.dp, androidx.compose.ui.unit.Dp.Zero) else Modifier)
+                    .then(if (motionBlurX > 0.5f) Modifier.blur(motionBlurX.dp, 0.dp) else Modifier)
                     .background(indicatorColor, RoundedCornerShape(14.dp)),
             )
             Row(

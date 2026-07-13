@@ -2,6 +2,7 @@ package com.bloo.uicommon
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -140,7 +141,7 @@ fun AnimatedSlider(
         Modifier
             .fillMaxWidth()
             .height(thumbH)
-            .then(if (settleBlur > 0.5f) Modifier.blur(settleBlur.dp, androidx.compose.ui.unit.Dp.Zero) else Modifier)
+            .then(if (settleBlur > 0.5f) Modifier.blur(settleBlur.dp, 0.dp) else Modifier)
             .onSizeChanged { widthPx = it.width.toFloat() }
             .pointerInput(valueRange, steps) {
                 awaitEachGesture {
