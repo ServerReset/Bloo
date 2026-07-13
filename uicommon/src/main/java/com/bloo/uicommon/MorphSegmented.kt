@@ -116,7 +116,7 @@ fun MorphSegmented(
                 // LowBouncy keeps a quick StiffnessMedium settle with just a light
                 // touch of overshoot (MediumBouncy wobbled too much on every change).
                 animationSpec = if (dragXPx != null) snap()
-                                else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumHigh),
+                                else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                 label = "segIndicatorX",
             )
 
