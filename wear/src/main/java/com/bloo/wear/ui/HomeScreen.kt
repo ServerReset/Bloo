@@ -495,7 +495,7 @@ private fun TileContent(
 ) {
     when (key) {
         TILE_ALERTS -> AlertsCard(car)
-        WearTiles.SUMMARY -> SummaryCard(car, ui)
+        WearTiles.SUMMARY -> SummaryCard(vm, ui, car)
         WearTiles.LOCK -> MorphButton(
             // The unlocked car is the noteworthy state, so it's the highlighted one
             // (consistent with the phone tile and the watch Tile).
@@ -761,7 +761,7 @@ private fun AlertsCard(car: CarView) {
 }
 
 @Composable
-private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
+private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard(null) {
     val alertCount = car.alertCount
     val isStale = car.fetchedAt != null && System.currentTimeMillis() - car.fetchedAt > 30 * 60 * 1000L
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -827,6 +827,30 @@ private fun SummaryCard(car: CarView, ui: WearUi) = SectionCard(null) {
         Spacer(Modifier.height(4.dp))
         val c = if (v12 < 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
         StatusRow("12V battery", "$v12%", valueColor = c)
+    }
+    // Quick actions right on the hero — the two most-used controls, so the first
+    // screen is actionable without swiping to a dedicated tile.
+    Spacer(Modifier.height(8.dp))
+    val locked = car.locked == true
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        MorphButton(
+            label = if (locked) "Locked" else "Unlocked",
+            icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+            active = locked,
+            activeColor = MaterialTheme.colorScheme.primary,
+            pending = "${car.vin}:doors" in ui.pending,
+            onClick = { vm.toggleLock(car.vin) },
+            modifier = Modifier.weight(1f),
+        )
+        MorphButton(
+            label = "Climate",
+            icon = Icons.Filled.Thermostat,
+            active = car.climateOn == true,
+            activeColor = MaterialTheme.colorScheme.tertiary,
+            pending = "${car.vin}:climate" in ui.pending,
+            onClick = { vm.toggleClimate(car.vin) },
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
