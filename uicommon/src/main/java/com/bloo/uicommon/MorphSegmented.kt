@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -32,6 +33,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -138,11 +140,21 @@ fun MorphSegmented(
             // release) — otherwise the moving highlight and the bold label disagree.
             val visualIndex = dragXPx?.let { indexFor(it) } ?: selectedIndex
 
+            // Motion blur on the indicator: subtle while still, intensifies during drag
+            // and fades as the spring settles — gives the sliding highlight a fluid,
+            // refractive feel without a real directional blur.
+            val isMoving = dragXPx != null
+            val motionBlurX by animateFloatAsState(
+                targetValue = if (isMoving) 6f else 0f,
+                animationSpec = if (isMoving) snap() else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+                label = "segMotionBlur",
+            )
             Box(
                 Modifier
                     .offset(x = indicatorX)
                     .width(segWidth)
                     .fillMaxHeight()
+                    .then(if (motionBlurX > 0.5f) Modifier.blur(motionBlurX.dp, androidx.compose.ui.unit.Dp.Zero) else Modifier)
                     .background(indicatorColor, RoundedCornerShape(14.dp)),
             )
             Row(
@@ -221,16 +233,14 @@ fun MorphSegmented(
                                     painter = rememberVectorPainter(icon),
                                     contentDescription = null,
                                     colorFilter = ColorFilter.tint(fg),
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(if (selected) 16.dp else 14.dp),
                                 )
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(Modifier.width(if (selected) 6.dp else 4.dp))
                             }
                             BasicText(
                                 opt.label,
-                                style = textStyle.copy(
-                                    color = fg,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                ),
+                                style = if (selected) textStyle
+                                        else textStyle.copy(fontSize = textStyle.fontSize * 0.88f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

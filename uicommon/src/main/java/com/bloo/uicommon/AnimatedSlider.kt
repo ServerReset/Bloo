@@ -3,6 +3,7 @@ package com.bloo.uicommon
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -129,10 +131,16 @@ fun AnimatedSlider(
         }
     }
 
+    val settleBlur by animateFloatAsState(
+        targetValue = if (settling) 4f else 0f,
+        animationSpec = if (settling) snap() else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+        label = "settleBlur",
+    )
     Box(
         Modifier
             .fillMaxWidth()
             .height(thumbH)
+            .then(if (settleBlur > 0.5f) Modifier.blur(settleBlur.dp, androidx.compose.ui.unit.Dp.Zero) else Modifier)
             .onSizeChanged { widthPx = it.width.toFloat() }
             .pointerInput(valueRange, steps) {
                 awaitEachGesture {
