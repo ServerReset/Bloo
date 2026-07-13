@@ -567,6 +567,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (shouldLock) _state.update { it.copy(locked = true) }
         }
+        // Prompt to refresh if data is stale after returning from background.
+        if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > 10 * 60 * 1000L) {
+            val anyStale = _state.value.lastFetched.values.any { System.currentTimeMillis() - it > 10 * 60 * 1000L }
+            if (anyStale) reportInfo("Data may be stale — pull down to refresh")
+        }
     }
 
     fun canUseBiometrics(): Boolean =
