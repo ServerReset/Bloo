@@ -54,6 +54,7 @@ import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.vehicleStateLabel
 import com.bloo.bluelink.ui.resolveWidgetAccent
 import kotlinx.coroutines.flow.first
@@ -97,6 +98,7 @@ class BlooWidget : GlanceAppWidget() {
         val photo: Bitmap?,
         val address: String?,
         val layoutMode: String,  // "info" shows data, "controls" shows buttons
+        val metric: Boolean = false,
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -184,7 +186,8 @@ class BlooWidget : GlanceAppWidget() {
                     if (snap == null) {
                         SetupTile(base, configIntent(context, widgetId))
                     } else {
-                        val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address, layoutMode)
+                        val metric = appearance.unitSystem == "metric"
+                        val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address, layoutMode, metric)
                         when {
                             w < 70.dp || (w < 80.dp && h < 80.dp) ->
                                 if (layoutMode == "controls") ControlsTile(c, base) else InfoTile(c, base)
@@ -273,7 +276,7 @@ class BlooWidget : GlanceAppWidget() {
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(c.snap.name.take(12), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 9.sp))
                 Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 20.sp))
-                c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
+                c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
             }
             if (c.actions.isNotEmpty()) {
                 Spacer(GlanceModifier.width(8.dp))
@@ -307,7 +310,7 @@ class BlooWidget : GlanceAppWidget() {
                 Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 26.sp))
             }
             Spacer(GlanceModifier.height(2.dp))
-            c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = if (narrow) 9.sp else 11.sp)) }
+            c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = if (narrow) 9.sp else 11.sp)) }
             Spacer(GlanceModifier.height(8.dp))
             if (c.actions.isNotEmpty()) {
                 ButtonGrid(c, c.actions.take(4), cols = 1, showLabel = false, iconSize = 24.dp,
@@ -361,7 +364,7 @@ class BlooWidget : GlanceAppWidget() {
             if (secondLine.isNotEmpty()) Text(secondLine, maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp))
             Spacer(GlanceModifier.height(6.dp))
             Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 34.sp))
-            c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
+            c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
             Spacer(GlanceModifier.height(4.dp))
             StateChip(c)
             if (c.actions.isNotEmpty()) {
@@ -386,7 +389,7 @@ class BlooWidget : GlanceAppWidget() {
                         style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 30.sp))
                     Spacer(GlanceModifier.width(6.dp))
                     Column(modifier = GlanceModifier.padding(bottom = 4.dp)) {
-                        c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 12.sp)) }
+                        c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 12.sp)) }
                     }
                 }
             }
@@ -416,7 +419,7 @@ class BlooWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.height(6.dp))
                 Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 34.sp))
                 c.snap.rangeMi?.let {
-                    Text("$it mi ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
+                    Text("${formatDistance(it, c.metric)} ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
                 }
             }
             if (c.actions.isNotEmpty()) {
@@ -454,7 +457,7 @@ class BlooWidget : GlanceAppWidget() {
                         Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = pctSize))
                         Spacer(GlanceModifier.width(8.dp))
                         Column(modifier = GlanceModifier.padding(bottom = 6.dp)) {
-                            c.snap.rangeMi?.let { Text("$it mi", maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 14.sp, fontWeight = FontWeight.Medium)) }
+                            c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 14.sp, fontWeight = FontWeight.Medium)) }
                             Text(if (c.snap.isEv) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp))
                         }
                     }

@@ -282,6 +282,10 @@ import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.supportsConnectedStore
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.formatDistance
+import com.bloo.bluelink.data.formatSpeed
+import com.bloo.bluelink.data.formatTripDistance
+import com.bloo.bluelink.data.formatEfficiency
 import com.bloo.bluelink.data.targetForCurrentPlug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

@@ -997,6 +997,7 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 
 @Composable
 private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge", Icons.Filled.Bolt) {
+    val metric = ui.localSettings.unitSystem == "metric"
     MorphButton(
         label = if (car.charging == true) "Charging — stop" else "Start charge",
         icon = Icons.Filled.Bolt,
@@ -1007,7 +1008,7 @@ private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
     )
     Spacer(Modifier.height(4.dp))
     car.percent?.let { StatusRow("Battery", "$it%") }
-    car.rangeMi?.let { StatusRow("Range", "$it mi") }
+    car.rangeMi?.let { StatusRow("Range", formatDistance(it, metric)) }
     StatusRow("Plug", car.chargerLabel ?: (if (car.pluggedIn == true) "Plugged in" else "Unplugged"))
     car.timeToFullMin?.takeIf { it > 0 }?.let { StatusRow("Time to full", fmtMinutes(it)) }
 }
