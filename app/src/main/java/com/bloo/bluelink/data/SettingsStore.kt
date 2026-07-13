@@ -128,8 +128,8 @@ class SettingsStore(private val context: Context) {
         val weatherLat: Double? = null,
         val weatherLon: Double? = null,
         val weatherLabel: String? = null,
-        /** Show all temperatures across the app in Fahrenheit (defaults to true for US locale). */
-        val useFahrenheit: Boolean = true,
+        /** Derived: true for imperial (miles, °F), false for metric (km, °C). */
+        val useFahrenheit: Boolean get() = unitSystem != "metric",
         val biometricLock: Boolean = false,
         /** When the biometric lock re-engages after leaving the foreground. */
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
@@ -178,7 +178,6 @@ class SettingsStore(private val context: Context) {
             weatherLat = prefs[Keys.WEATHER_LAT]?.toDoubleOrNull(),
             weatherLon = prefs[Keys.WEATHER_LON]?.toDoubleOrNull(),
             weatherLabel = prefs[Keys.WEATHER_LABEL],
-            useFahrenheit = prefs[Keys.WEATHER_FAHRENHEIT]?.toBooleanStrictOrNull() ?: true,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
@@ -948,7 +947,8 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** Set the unit system from a Fahrenheit/Celsius toggle. Maps F → imperial, C → metric. */
     suspend fun setUseFahrenheit(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.WEATHER_FAHRENHEIT] = value.toString() }
+        setUnitSystem(if (value) "imperial" else "metric")
     }
 }

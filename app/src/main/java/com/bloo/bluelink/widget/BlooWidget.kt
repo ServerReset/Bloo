@@ -162,12 +162,13 @@ class BlooWidget : GlanceAppWidget() {
                             Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
                         }
                     }
-                    // Glass background: a tinted, edge-lit layer that simulates
-                    // frosted glass over the home screen wallpaper.
+                    // Frosted glass effect: a cool-tinted base with a subtle white
+                    // edge highlight that suggests glass refraction and depth.
                     if (!photoBgActive && bgAlphaLevel > 0) {
-                        val glassColor = Color(0.18f, 0.20f, 0.26f, bgAlpha * 0.85f)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(glassColor))) {}
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.08f)))) {}
+                        val glassBase = Color(0.14f, 0.16f, 0.22f, bgAlpha * 0.85f)
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(glassBase))) {}
+                        val edgeColor = Color(1f, 1f, 1f, bgAlpha * 0.10f)
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(edgeColor))) {}
                     }
                     val base = GlanceModifier.fillMaxSize()
                         .let { m ->
