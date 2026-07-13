@@ -282,6 +282,10 @@ import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.supportsConnectedStore
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.formatDistance
+import com.bloo.bluelink.data.formatSpeed
+import com.bloo.bluelink.data.formatTripDistance
+import com.bloo.bluelink.data.formatEfficiency
 import com.bloo.bluelink.data.targetForCurrentPlug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2553,7 +2557,8 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                 // balanced block instead of top-clustered with a big gap below.
                 Spacer(Modifier.weight(1f))
                 LastUpdatedLabel(v, state)
-                ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
+                ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v),
+                    metric = vm.appearance.collectAsState().value.unitSystem == "metric")
                 Spacer(Modifier.height(6.dp))
                 // Flush with the 14 dp tile padding already on this Column, unlike
                 // the dual-column/pebble callers' extra 26 dp start inset - cover
@@ -2683,6 +2688,7 @@ private fun HeroHeader(
     drivingLabel: String? = null,
     dragHandle: Modifier = Modifier,
     height: Dp = 150.dp,
+    metric: Boolean = false,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
     val corner by animateDpAsState(
@@ -2697,7 +2703,7 @@ private fun HeroHeader(
         Column(Modifier.padding(16.dp)) {
             HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(16.dp))
-            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel)
+            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
     }
 }
@@ -2737,9 +2743,7 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
 }
 
 @Composable
-private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean, drivingLabel: String? = null) {
-    // Primary metric: battery if the car has one, else fuel. Plug-in hybrids show
-    // both - battery as the headline and fuel as a secondary line.
+private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean, drivingLabel: String? = null, metric: Boolean = false) {
     val fuelPct = status?.fuelLevel
     val pct = status?.percentFor(hasBattery)
     val frac = ((pct ?: 0).coerceIn(0, 100)) / 100f
@@ -2782,7 +2786,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(
-                    text = range?.let { "$it mi" } ?: "--",
+                    text = range?.let { formatDistance(it, metric) } ?: "--",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -3576,7 +3580,8 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
 @Composable
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v))
+    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v),
+        metric = vm.appearance.collectAsState().value.unitSystem == "metric")
     // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
     // CompactMainTile) which always wrap it in a Surface that establishes a
     // readable contentColor. StateControl's status label falls back to
@@ -3658,10 +3663,11 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
     val status = state.statusFor(v)
     val seats = state.seatConfigFor(v)
     val enabled = !state.loading
+    val appMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
     when (section) {
         "summary" -> HeroHeader(
             v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
-            state.drivingLabel(v), dragHandle = dragHandle,
+            state.drivingLabel(v), dragHandle = dragHandle, metric = appMetric,
         )
         "controls" -> ControlsPebble(v, state, vm, dragHandle)
         "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
@@ -4785,26 +4791,27 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
             trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
             trips.isEmpty() -> Text("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                trips.take(8).forEach { TripRow(it) }
+                val tripMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
+                trips.take(8).forEach { TripRow(it, metric = tripMetric) }
             }
         }
     }
 }
 
 @Composable
-private fun TripRow(trip: EvTrip) {
+private fun TripRow(trip: EvTrip, metric: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(tripDate(trip.startdate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             trip.distance?.let {
-                Text("%.1f mi".format(it), style = MaterialTheme.typography.bodyMedium)
+                Text(formatTripDistance(it, metric), style = MaterialTheme.typography.bodyMedium)
             }
         }
-        val pace = remember(trip) { buildList {
+        val pace = remember(trip, metric) { buildList {
             trip.driveMinutes?.let { add("$it min") }
             trip.idleMinutes?.takeIf { it > 0 }?.let { add("$it min idle") }
-            trip.avgspeed?.value?.let { add("avg ${it.toInt()} mph") }
-            trip.maxspeed?.value?.let { add("max ${it.toInt()} mph") }
+            trip.avgspeed?.value?.let { add("avg ${formatSpeed(it.toDouble(), metric)}") }
+            trip.maxspeed?.value?.let { add("max ${formatSpeed(it.toDouble(), metric)}") }
         } }
         if (pace.isNotEmpty()) {
             Text(pace.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -4837,6 +4844,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val context = LocalContext.current
     val appearance by vm.appearance.collectAsState()
     val inApp = appearance.linksInApp
+    val metric = appearance.unitSystem == "metric"
     val location = state.locations[v.vin]
     val odo = v.odometer?.trim()?.takeIf { it.isNotBlank() }
     val odoInt = odo?.replace(",", "")?.toDoubleOrNull()?.toInt()
@@ -4871,7 +4879,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 status.percentFor(v.isEv)?.let {
                     StatusRow(if (v.isEv) "Charge" else "Fuel", "$it%")
                 }
-                status.rangeMiFor(v.isEv)?.let { StatusRow("Range", "$it mi") }
+                status.rangeMiFor(v.isEv)?.let { StatusRow("Range", formatDistance(it, metric)) }
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
                 // Comfort heaters (read-only; mirror/rear-window heat track defrost).
                 status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
@@ -4893,11 +4901,14 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         SectionLabel("Service & identity")
         SelectionContainer { StatusRow("VIN", v.vin) }
         if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
-        odo?.let { StatusRow("Odometer", "$it mi") }
-        lastSvc?.let { StatusRow("Last service at", "$it mi") }
+        odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
+        lastSvc?.let { StatusRow("Last service at", formatDistance(it, metric)) }
         nextDue?.let {
-            val note = remaining?.let { r -> if (r >= 0) " · $r mi to go" else " · overdue ${-r} mi" } ?: ""
-            StatusRow("Next service due", "$it mi$note")
+            val suffix = if (metric) "km" else "mi"
+            val note = remaining?.let { r ->
+                if (r >= 0) " · ${formatDistance(r, metric)} to go" else " · overdue ${formatDistance(-r, metric)}"
+            } ?: ""
+            StatusRow("Next service due", "${formatDistance(it, metric)}$note")
         }
         if (lastSvc == null || interval == null) {
             Text(
@@ -5027,8 +5038,10 @@ private data class DiagRow(val label: String, val value: String, val indent: Boo
 
 @Composable
 private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
-    val rows = remember(status, fahrenheit) { buildList {
+    val appearance = vm.appearance.collectAsState().value
+    val fahrenheit = appearance.useFahrenheit
+    val metric = appearance.unitSystem == "metric"
+    val rows = remember(status, fahrenheit, metric) { buildList {
         status?.tirePressureLamp?.let { tp ->
             val psiSuffix = status.tirePressure?.all?.takeIf { it > 0 }?.let { " · $it psi" } ?: ""
             add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning$psiSuffix" else "OK$psiSuffix"))
@@ -5043,7 +5056,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             }
         }
         status?.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
-        status?.rangeMiFor(v.isEv)?.let { add(DiagRow("Range", "$it mi")) }
+        status?.rangeMiFor(v.isEv)?.let { add(DiagRow("Range", formatDistance(it, metric))) }
         status?.airTemp?.value?.let { add(DiagRow("Climate setpoint", degLabel(it, fahrenheit))) }
         status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
         status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
@@ -5849,12 +5862,13 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
  */
 @Composable
 private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
     val fuelPct = status?.fuelLevel
     val range = status?.dte?.value?.toInt()
     val summary = when {
-        fuelPct != null && range != null -> "$fuelPct% · $range mi"
+        fuelPct != null && range != null -> "$fuelPct% · ${formatDistance(range, metric)}"
         fuelPct != null -> "$fuelPct%"
-        range != null -> "$range mi"
+        range != null -> "${formatDistance(range, metric)}"
         else -> "--"
     }
     Pebble(
@@ -5866,7 +5880,7 @@ private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
             status == null -> Text("No status yet.")
             else -> {
                 fuelPct?.let { StatusRow("Fuel level", "$it%") }
-                range?.let { StatusRow("Range (distance to empty)", "$it mi") }
+                range?.let { StatusRow("Range (distance to empty)", formatDistance(range, metric)) }
                 if (fuelPct == null && range == null) Text("No fuel data reported.")
             }
         }
@@ -6002,6 +6016,7 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
     val appearance by vm.appearance.collectAsState()
     val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
     val fahrenheit = appearance.useFahrenheit
+    val metric = appearance.unitSystem == "metric"
     val w = state.homeWeather
     var weatherSpinning by remember { mutableStateOf(false) }
     var spinStartedAt by remember { mutableLongStateOf(0L) }
@@ -6074,7 +6089,7 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
                 StatusRow("Feels like", w.feelsLikeLabel(fahrenheit))
                 w.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
                 w.humidity?.let { StatusRow("Humidity", "$it%") }
-                StatusRow("Wind", "${w.windKph.toInt()} km/h")
+                StatusRow("Wind", formatSpeed(w.windKph.toDouble(), metric))
             }
         }
     }
