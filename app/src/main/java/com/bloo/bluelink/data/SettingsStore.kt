@@ -128,8 +128,8 @@ class SettingsStore(private val context: Context) {
         val weatherLat: Double? = null,
         val weatherLon: Double? = null,
         val weatherLabel: String? = null,
-        /** Derived: true for imperial (miles, °F), false for metric (km, °C). */
-        val useFahrenheit: Boolean get() = unitSystem != "metric",
+        /** True for imperial (°F), false for metric (°C). Derived from [unitSystem]. */
+        val useFahrenheit: Boolean = true,
         val biometricLock: Boolean = false,
         /** When the biometric lock re-engages after leaving the foreground. */
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
@@ -191,6 +191,7 @@ class SettingsStore(private val context: Context) {
             auroraColorMode = prefs[Keys.AURORA_COLOR_MODE] ?: "complementary",
             auroraCustomColor = prefs[Keys.AURORA_CUSTOM_COLOR],
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
+            useFahrenheit = (prefs[Keys.UNIT_SYSTEM] ?: "imperial") != "metric",
         )
     }
 
