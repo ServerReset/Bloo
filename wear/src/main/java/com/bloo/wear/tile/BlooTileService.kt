@@ -106,7 +106,7 @@ abstract class BlooTileService : TileService() {
 
     private data class TileResult(
         val car: VehicleSnapshot?,
-        val roles: WearColorRoles?,
+        val roles: WearColorRoles,
         val actions: List<String>,
         val metric: Boolean,
     )
