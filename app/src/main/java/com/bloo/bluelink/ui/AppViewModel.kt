@@ -1370,7 +1370,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val result = runCatching { repoFor(v).trips(v) }.getOrElse { e ->
                 AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}")
                 emptyList()
-            }
+            }.filter { it.distance != null && it.distance!! > 0 }
             _state.update {
                 it.copy(trips = it.trips + (v.vin to result), pending = it.pending - "${v.vin}:trips")
             }

@@ -107,6 +107,7 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
+import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -688,18 +689,14 @@ private fun SectionCard(
     icon: ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // Card had no internal padding at all — title/icon/content sat flush against
-    // its edges, which the round bezel's curvature then clipped whenever the tile
-    // scrolled away from dead-center (the corners narrow fastest there). The
-    // outer ScalingLazyColumn already reserves a round-safe horizontal inset
-    // (22dp), so this only needs a small top-up — a big horizontal value here
-    // double-stacks with that and starves button labels of width, truncating
-    // text like "Heat to ~65°F" mid-number. Vertical is the one that actually
-    // matters for the curve, since it affects how a tile fits at any scroll
-    // position, not just at rest.
-    Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+    Card(
+        onClick = {},
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
         Column(
-            Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+            Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
         ) {
             if (title != null) {
                 Row(
@@ -710,7 +707,7 @@ private fun SectionCard(
                         Icon(
                             icon,
                             contentDescription = null,
-                            modifier = Modifier.size(15.dp),
+                            modifier = Modifier.size(14.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }

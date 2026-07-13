@@ -52,7 +52,7 @@ CI builds are available as zip artifacts from GitHub Actions. Each run produces 
 
 To install:
 
-1. Download the zip artifact for your platform from the latest [Actions run](../../actions)
+1. Download the zip artifact for your platform from the latest [Actions run](../../actions/workflows/android.yml)
 2. Unzip the file on your phone or computer
 3. Open the APK file on your Android phone
 4. Tap **"More details"** to expand the Play Protect warning, then tap **"Install without scanning"** and confirm with your biometrics or device password

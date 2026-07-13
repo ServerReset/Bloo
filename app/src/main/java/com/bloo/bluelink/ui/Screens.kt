@@ -6868,15 +6868,15 @@ private fun SettingsScreen(vm: AppViewModel) {
                     onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
-                // Global temperature unit, applied everywhere temperatures show.
+                // Unit system: controls temperature, distance, and speed display.
                 SettingsSegmentedRow(
-                    label = "Temperature unit",
+                    label = "Units",
                     options = listOf(
-                        SegmentOption("c", "Celsius", null),
-                        SegmentOption("f", "Fahrenheit", null),
+                        SegmentOption("imperial", "Imperial", null),
+                        SegmentOption("metric", "Metric", null),
                     ),
-                    selectedKey = if (appearance.useFahrenheit) "f" else "c",
-                    onSelect = { vm.setUseFahrenheit(it == "f") },
+                    selectedKey = appearance.unitSystem,
+                    onSelect = { vm.setUnitSystem(it) },
                 )
             }
 
@@ -7757,7 +7757,7 @@ fun MorphSegmented(
         containerColor = buttonContainer(),
         indicatorColor = scheme.primary,
         selectedTextColor = scheme.onPrimary,
-        unselectedTextColor = scheme.onSurfaceVariant,
+        unselectedTextColor = scheme.onSurface.copy(alpha = 0.65f),
         textStyle = MaterialTheme.typography.labelLarge,
         onTick = { haptics?.tick() },
         modifier = modifier,
