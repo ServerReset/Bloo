@@ -1961,7 +1961,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
                             rotationZ = effectiveOff * if (page >= exPager.currentPage) 2f else -2f
-                        }) {
+                        }.then(if (effectiveOff > 0.01f) Modifier.blur(
+                            (effectiveOff * 6).dp, (effectiveOff * 3).dp
+                        ) else Modifier)) {
                             val pv = vehicles[page]
                             CarThemeOverride(
                                 paletteId = appearance.carCustomPaletteIds[pv.vin],
@@ -2147,11 +2149,13 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                 abs(delta).coerceIn(0f, 1f)
             }
         }
-        Box(Modifier.fillMaxSize().graphicsLayer {
-            alpha = 1f - pageOff * 0.2f
-            scaleX = 1f - pageOff * 0.06f
-            scaleY = 1f - pageOff * 0.06f
-        }) {
+                        Box(Modifier.fillMaxSize().graphicsLayer {
+                            alpha = 1f - pageOff * 0.2f
+                            scaleX = 1f - pageOff * 0.06f
+                            scaleY = 1f - pageOff * 0.06f
+                        }.then(if (pageOff > 0.01f) Modifier.blur(
+                            (pageOff * 8).dp, (pageOff * 4).dp
+                        ) else Modifier)) {
             CarThemeOverride(
                 paletteId = appearance.carCustomPaletteIds[v.vin],
                 customPalettes = appearance.customPalettes,
