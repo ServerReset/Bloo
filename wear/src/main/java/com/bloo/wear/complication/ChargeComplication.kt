@@ -12,6 +12,7 @@ import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.formatDistance
 import com.bloo.wear.MainActivity
 import com.bloo.wear.R
 
@@ -29,7 +30,8 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         val snap = resolveComplicationCar(applicationContext, "ChargeComplication", request.complicationInstanceId)
             ?: return null
-        return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.isEv, snap.charging == true, snap.vin)
+        val metric = runCatching { com.bloo.wear.WearLocalStore(this).flow.first().unitSystem == "metric" }.getOrDefault(false)
+        return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.isEv, snap.charging == true, snap.vin, metric)
     }
 
     override fun onComplicationDeactivated(complicationInstanceId: Int) {
@@ -43,6 +45,7 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         isEv: Boolean,
         charging: Boolean,
         vin: String? = null,
+        metric: Boolean = false,
     ): ComplicationData? {
         val label = if (isEv) "Battery" else "Fuel"
         val text = pct?.let { "$it%" } ?: "—%"
@@ -53,7 +56,7 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         }
         val desc = PlainComplicationText.Builder(descText).build()
         val plainText = PlainComplicationText.Builder(text).build()
-        val rangeTitle = rangeMi?.let { PlainComplicationText.Builder("$it mi").build() }
+        val rangeTitle = rangeMi?.let { PlainComplicationText.Builder(formatDistance(it, metric)).build() }
         val tap = openAppIntent(vin)
         val bolt = if (charging) {
             MonochromaticImage.Builder(Icon.createWithResource(this, R.drawable.ic_widget_bolt)).build()

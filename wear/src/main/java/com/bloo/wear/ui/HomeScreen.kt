@@ -512,7 +512,7 @@ private fun TileContent(
         WearTiles.LIMITS -> LimitsCard(vm, ui, car)
         WearTiles.LOCATION -> LocationCard(vm, ui, car)
         WearTiles.WEATHER -> WeatherCard(ui, car)
-        WearTiles.INFO -> InfoCard(car)
+        WearTiles.INFO -> InfoCard(car, ui)
         WearTiles.DIAGNOSTICS -> DiagnosticsCard(car)
         WearTiles.ASSIST -> AssistCard(car)
         WearTiles.MORE -> MoreCard(vm, ui, car, onSettings, onTrips, onReorder)
@@ -1134,9 +1134,10 @@ private fun WeatherCard(ui: WearUi, car: CarView) = SectionCard("Weather") {
 }
 
 @Composable
-private fun InfoCard(car: CarView) = SectionCard("Info", Icons.Filled.DirectionsCar) {
+private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Filled.DirectionsCar) {
+    val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
     StatusRow("Engine", if (car.engineOn) "On" else "Off")
-    car.tempSetting?.let { StatusRow("Set temp", "$it°") }
+    car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
     StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
     StatusRow("Defrost", if (car.defrostOn) "On" else "Off")
     StatusRow("Accessory", if (car.accessoryOn) "On" else "Off")

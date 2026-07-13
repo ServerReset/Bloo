@@ -32,6 +32,7 @@ import com.bloo.bluelink.data.vehicleStateLabel
 import com.bloo.wear.R
 import com.bloo.wear.TILE_CHIP_ACTIONS
 import com.bloo.wear.WearComms
+import com.bloo.bluelink.data.formatDistance
 import com.bloo.wear.WearLocalStore
 import com.bloo.wear.WearSettingsStore
 import com.google.common.util.concurrent.Futures
@@ -225,7 +226,8 @@ abstract class BlooTileService : TileService() {
         val climate  = snap.climateOn == true
         val pct      = snap.percent ?: 0
         val pctText  = "${snap.percent ?: "—"}%"
-        val rngText  = snap.rangeMi?.let { "$it mi" } ?: ""
+            val metric = local?.unitSystem == "metric"
+            val rngText  = snap.rangeMi?.let { formatDistance(it, metric) } ?: ""
         // Clarify what the big % means for this car (and double as the brand footer).
         val secondaryLabel = if (snap.isEv) "Battery" else "Fuel"
 
