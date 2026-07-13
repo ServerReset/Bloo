@@ -1,6 +1,7 @@
 package com.bloo.wear
 
 import android.content.Context
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearCommand
