@@ -8346,14 +8346,14 @@ private fun CommandButton(
 /** A staggered fade-in + slide-up entrance for onboarding sections. */
 @Composable
 private fun StaggerFadeIn(delay: Int, offset: Int = 16, content: @Composable () -> Unit) {
-    val alpha = remember { Animatable(0f) }
-    val y = remember { Animatable(offset.toFloat()) }
+    val animAlpha = remember { Animatable(0f) }
+    val animY = remember { Animatable(offset.toFloat()) }
     LaunchedEffect(Unit) {
         if (delay > 0) delay(delay.toLong())
-        launch { alpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
-        launch { y.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
+        launch { animAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
+        launch { animY.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
-    Box(Modifier.graphicsLayer { alpha = alpha.value; translationY = y.value }) {
+    Box(Modifier.graphicsLayer { alpha = animAlpha.value; translationY = animY.value }) {
         content()
     }
 }
