@@ -542,18 +542,22 @@ private fun OnboardingScreen(vm: AppViewModel) {
 
             // --- Welcome header ---
             Spacer(Modifier.height(4.dp))
-            Text(
-                "Welcome to Bloo",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Black,
-                color = scheme.onSurface,
-            )
+            StaggerFadeIn(delay = 0, offset = 20) {
+                Text(
+                    "Welcome to Bloo",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    color = scheme.onSurface,
+                )
+            }
             Spacer(Modifier.height(6.dp))
-            Text(
-                "Control your Hyundai, Genesis, or Kia from this app. Set up your car details below.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = scheme.onSurface,
-            )
+            StaggerFadeIn(delay = 120, offset = 16) {
+                Text(
+                    "Control your Hyundai, Genesis, or Kia from this app. Set up your car details below.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = scheme.onSurface,
+                )
+            }
 
             Spacer(Modifier.height(28.dp))
 
@@ -2133,8 +2137,31 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         state = pager,
         modifier = Modifier.fillMaxSize(),
         userScrollEnabled = !scrubbing.value,
+        beyondViewportPageCount = 1,
     ) { page ->
-        val v = vehicles[page]
+        val pageOff by remember(page) {
+            derivedStateOf {
+                val delta = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction)
+                abs(delta).coerceIn(0f, 1f)
+            }
+        }
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            alpha = 1f - pageOff * 0.2f
+            scaleX = 1f - pageOff * 0.06f
+            scaleY = 1f - pageOff * 0.06f
+        }) {
+            CarThemeOverride(
+                paletteId = appearance.carCustomPaletteIds[v.vin],
+                customPalettes = appearance.customPalettes,
+                themeMode = appearance.themeMode,
+                vibrancy = appearance.vibrancy,
+            ) {
+                CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
+                    CompactCar(v, state, vm)
+                }
+            }
+        }
+    }
         CarThemeOverride(
             paletteId = appearance.carCustomPaletteIds[v.vin],
             customPalettes = appearance.customPalettes,
@@ -2699,6 +2726,12 @@ private fun HeroHeader(
     metric: Boolean = false,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
+    val heroAlpha = remember { Animatable(0f) }
+    val heroOffset = remember { Animatable(16f) }
+    LaunchedEffect(Unit) {
+        launch { heroAlpha.animateTo(1f, tween(400)) }
+        launch { heroOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
+    }
     val corner by animateDpAsState(
         targetValue = if (charging) 40.dp else 24.dp,
         animationSpec = spring(
@@ -2707,7 +2740,10 @@ private fun HeroHeader(
         ),
         label = "heroCorner",
     )
-    Card(modifier = Modifier.fillMaxWidth().then(dragHandle), shape = RoundedCornerShape(corner)) {
+    Card(modifier = Modifier.fillMaxWidth().then(dragHandle).graphicsLayer {
+        alpha = heroAlpha.value
+        translationY = heroOffset.value
+    }, shape = RoundedCornerShape(corner)) {
         Column(Modifier.padding(16.dp)) {
             HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(16.dp))
@@ -7357,7 +7393,11 @@ private fun CarSettingsCard(
                     MorphExpandButton(expanded = expanded, onToggle = onToggle)
                 }
             }
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(220)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+                exit = fadeOut(tween(160)) + shrinkVertically(tween(180)),
+            ) {
                 Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SettingsGroup("Powertrain") {
                         PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
@@ -8029,10 +8069,15 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                 }
             }
 
-            if (expanded) {
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Spacer(Modifier.height(10.dp))
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), expandFrom = Alignment.Top),
+                exit = fadeOut(tween(150)) + shrinkVertically(tween(180), shrinkTowards = Alignment.Top),
+            ) {
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(Modifier.height(10.dp))
                 Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 // TileActions is a fixed 4-option list (unlike "Runs" below, whose
@@ -8324,5 +8369,20 @@ private fun CommandButton(
         Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(8.dp))
         Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** A staggered fade-in + slide-up entrance for onboarding sections. */
+@Composable
+private fun StaggerFadeIn(delay: Int, offset: Int = 16, content: @Composable () -> Unit) {
+    val alpha = remember { Animatable(0f) }
+    val y = remember { Animatable(offset.toFloat()) }
+    LaunchedEffect(Unit) {
+        if (delay > 0) delay(delay.toLong())
+        launch { alpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
+        launch { y.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
+    }
+    Box(Modifier.graphicsLayer { alpha = alpha.value; translationY = y.value }) {
+        content()
     }
 }
