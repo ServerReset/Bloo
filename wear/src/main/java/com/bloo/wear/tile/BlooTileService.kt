@@ -158,7 +158,8 @@ abstract class BlooTileService : TileService() {
         // Per-render nonce baked into chip clickable ids so a handled tap's id can
         // never equal a fresh render's id (see the dedupe above).
         val nonce = System.currentTimeMillis().toString(36)
-        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles, actions, nonce)
+        val metric = local?.unitSystem == "metric"
+        val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles, actions, nonce, metric)
 
         // Refresh faster while charging (percent moves quickly) than when idle.
         val freshness = if (snapshot?.charging == true) FRESHNESS_CHARGING_MS else FRESHNESS_MS
@@ -216,6 +217,7 @@ abstract class BlooTileService : TileService() {
         roles: WearColorRoles,
         actions: List<String>,
         nonce: String,
+        metric: Boolean = false,
     ): LayoutElementBuilders.LayoutElement {
         val screenDp = device.screenWidthDp
         val isSmall  = screenDp < 193
@@ -226,8 +228,7 @@ abstract class BlooTileService : TileService() {
         val climate  = snap.climateOn == true
         val pct      = snap.percent ?: 0
         val pctText  = "${snap.percent ?: "—"}%"
-            val metric = local?.unitSystem == "metric"
-            val rngText  = snap.rangeMi?.let { formatDistance(it, metric) } ?: ""
+        val rngText  = snap.rangeMi?.let { formatDistance(it, metric) } ?: ""
         // Clarify what the big % means for this car (and double as the brand footer).
         val secondaryLabel = if (snap.isEv) "Battery" else "Fuel"
 

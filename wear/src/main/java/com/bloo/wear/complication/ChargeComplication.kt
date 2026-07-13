@@ -15,6 +15,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.wear.MainActivity
 import com.bloo.wear.R
+import kotlinx.coroutines.flow.first
 
 /**
  * Watch-face complication for the selected car's charge/fuel level. Supports
