@@ -1527,7 +1527,10 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
         title = { Text("Update available") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Build #${info.run.runNumber} is ready on GitHub Actions.")
+                Text("Build #${info.run.runNumber} is ready.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                info.run.displayTitle?.let { title ->
+                    Text(title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                }
                 Text(
                     "Open the run page to download the phone and watch APKs. " +
                         "Android will warn that the app is from an unknown source — " +
@@ -6426,6 +6429,21 @@ private fun SettingsScreen(vm: AppViewModel) {
           if (query.isNotBlank()) {
             SettingsSearchResults(query, vm, state, appearance, notif)
           } else {
+            // Simple / Advanced mode toggle
+            val advanced = state.settingsMode == "advanced"
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Settings mode", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("simple", "Simple", null),
+                        SegmentOption("advanced", "Advanced", null),
+                    ),
+                    selectedKey = state.settingsMode,
+                    onSelect = { vm.setSettingsMode(it) },
+                    modifier = Modifier.width(200.dp),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
                 if (state.accounts.isEmpty()) {
@@ -6485,7 +6503,7 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // On-device AI - only when the device supports Gemini Nano.
             if (state.aiSupported) {
-                SettingsCard("AI") {
+                if (advanced) SettingsCard("AI") {
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
@@ -6511,7 +6529,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // App-icon shortcuts (long-press the launcher icon)
-            SettingsCard("App shortcuts") {
+            if (advanced) SettingsCard("App shortcuts") {
                 Text(
                     "Pick which long-press app-icon shortcuts appear. Launchers usually show " +
                         "only the first 4–5.",
@@ -6541,7 +6559,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
-                SettingsCard(if (single) "Car" else "Cars") {
+                if (advanced) SettingsCard(if (single) "Car" else "Cars") {
                     if (single) {
                         val v = state.vehicles[0]
                         CarSettingsCard(
@@ -6673,7 +6691,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Color
-            SettingsCard("Color") {
+            if (advanced) SettingsCard("Color") {
                 // editingPalette: null = no dialog; non-null id but missing in list = new
                 var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
                 var showEditor by remember { mutableStateOf(false) }
@@ -6885,7 +6903,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Font
-            SettingsCard("Font") {
+            if (advanced) SettingsCard("Font") {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
@@ -6899,7 +6917,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Links
-            SettingsCard("Links") {
+            if (advanced) SettingsCard("Links") {
                 SettingsSegmentedRow(
                     label = "Open links",
                     options = listOf(
@@ -6912,7 +6930,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Logs
-            SettingsCard("Logs") {
+            if (advanced) SettingsCard("Logs") {
                 var logsExpanded by remember { mutableStateOf(false) }
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -6970,7 +6988,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Notifications
-            SettingsCard("Notifications") {
+            if (advanced) SettingsCard("Notifications") {
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
                 if (notif.doorOpen) {
@@ -7121,7 +7139,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Security
-            SettingsCard("Security") {
+            if (advanced) SettingsCard("Security") {
                 if (canBio) {
                     SettingsSegmentedRow(
                         label = "Require fingerprint to open",
@@ -7165,7 +7183,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Sounds & vibration
-            SettingsCard("Sounds & vibration") {
+            if (advanced) SettingsCard("Sounds & vibration") {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
             }
 
@@ -8391,7 +8409,14 @@ private fun StaggerFadeIn(delay: Int, offset: Int = 16, content: @Composable () 
         launch { animAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
         launch { animY.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
-    Box(Modifier.graphicsLayer { alpha = animAlpha.value; translationY = animY.value }) {
+    val staggerBlur by animateFloatAsState(
+        targetValue = if (animAlpha.value < 0.5f) 4f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+        label = "staggerBlur",
+    )
+    Box(Modifier.graphicsLayer { alpha = animAlpha.value; translationY = animY.value }.then(
+        if (staggerBlur > 0.5f) Modifier.blur(staggerBlur.dp, 0.dp) else Modifier
+    )) {
         content()
     }
 }

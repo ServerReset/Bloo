@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 
 /** A completed GitHub Actions build of the app, normalised to what the
  *  update flow needs. */
-data class WorkflowRun(val runNumber: Int, val htmlUrl: String)
+data class WorkflowRun(val runNumber: Int, val htmlUrl: String, val displayTitle: String? = null)
 
 /**
  * Checks GitHub Actions for the latest successful build. Bloo isn't on the
@@ -50,6 +50,7 @@ object UpdateApi {
     private data class WorkflowRunResponse(
         @SerialName("run_number") val runNumber: Int = 0,
         @SerialName("html_url") val htmlUrl: String = "",
+        @SerialName("display_title") val displayTitle: String? = null,
     )
 
     /** The latest successful build (from an ordinary push, not a PR) on
@@ -76,7 +77,7 @@ object UpdateApi {
                 val parsed = json.decodeFromString(WorkflowRunsResponse.serializer(), body)
                 val run = parsed.workflowRuns.firstOrNull() ?: return@use null
                 if (run.runNumber <= 0 || run.htmlUrl.isBlank()) return@use null
-                WorkflowRun(runNumber = run.runNumber, htmlUrl = run.htmlUrl)
+                WorkflowRun(runNumber = run.runNumber, htmlUrl = run.htmlUrl, displayTitle = run.displayTitle)
             }
         }.getOrNull()
     }

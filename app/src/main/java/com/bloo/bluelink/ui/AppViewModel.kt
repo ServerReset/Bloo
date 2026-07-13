@@ -153,6 +153,8 @@ data class UiState(
     val updateChecking: Boolean = false,
     /** Non-null when the last update check failed (network/API error). */
     val updateCheckFailed: String? = null,
+    /** Settings mode: "simple" (essential settings) or "advanced" (all settings). */
+    val settingsMode: String = "simple",
     /** Drive URI (content://...) for auto-backup; null when not configured. */
     val syncUri: String? = null,
     /** Last time settings were synced with Drive (ms), for merge decisions. */
@@ -1868,6 +1870,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun reportInfo(msg: String) {
         _state.update { it.copy(message = msg, messageType = "info") }
     }
+
+    /** Switch between simple and advanced settings view. */
+    fun setSettingsMode(mode: String) = _state.update { it.copy(settingsMode = mode) }
 
     private fun launchBusy(block: suspend () -> Unit) {
         viewModelScope.launch {
