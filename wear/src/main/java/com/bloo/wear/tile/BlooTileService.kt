@@ -104,6 +104,13 @@ abstract class BlooTileService : TileService() {
             )
             .build()
 
+    private data class TileResult(
+        val car: VehicleSnapshot?,
+        val roles: WearColorRoles?,
+        val actions: List<String>,
+        val metric: Boolean,
+    )
+
     private fun buildTile(params: RequestBuilders.TileRequest): TileBuilders.Tile {
         val ctx = applicationContext
         val device = params.deviceConfiguration
@@ -149,16 +156,15 @@ abstract class BlooTileService : TileService() {
                 data = store.current()
                 car = pick(data)
             }
-            Triple(car, resolveRoles(ctx, car?.vin), actions)
+            val metric = local?.unitSystem == "metric"
+            TileResult(car, resolveRoles(ctx, car?.vin), actions, metric)
         }
-        val snapshot = result.first
-        val roles = result.second
-        val actions = result.third
+        val snapshot = result.car
+        val roles = result.roles
+        val actions = result.actions
+        val metric = result.metric
 
-        // Per-render nonce baked into chip clickable ids so a handled tap's id can
-        // never equal a fresh render's id (see the dedupe above).
         val nonce = System.currentTimeMillis().toString(36)
-        val metric = local?.unitSystem == "metric"
         val layout = if (snapshot == null) emptyLayout(ctx, device) else carLayout(ctx, device, snapshot, roles, actions, nonce, metric)
 
         // Refresh faster while charging (percent moves quickly) than when idle.
