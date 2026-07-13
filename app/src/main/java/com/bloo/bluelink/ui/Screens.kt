@@ -1879,7 +1879,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val widthDp = cfg.screenWidthDp
     val heightDp = cfg.screenHeightDp
     val large = widthDp >= 600
-    val compact = !large && heightDp < 520
+    val compact = !large && heightDp < 570
     // Only show cover-screen hints once per session.
     var coverHintShown by rememberSaveable { mutableStateOf(false) }
     // Detect a device that likely has a cover screen: look for a camera cutout
