@@ -251,6 +251,13 @@ object WearBridge {
             val uri = store.syncUri() ?: return@runCatching
             val app = context.applicationContext
             val parsed = android.net.Uri.parse(uri)
+            // Respect Wi-Fi only setting
+            if (store.syncWifiOnly()) {
+                val cm = app.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
+                    ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+                if (!wifi) return@runCatching
+            }
             val fileModifiedMs = runCatching {
                 if (android.provider.DocumentsContract.isDocumentUri(app, parsed)) {
                     val cursor = app.contentResolver.query(
