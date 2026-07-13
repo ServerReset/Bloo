@@ -2139,6 +2139,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         userScrollEnabled = !scrubbing.value,
         beyondViewportPageCount = 1,
     ) { page ->
+        val v = vehicles[page]
         val pageOff by remember(page) {
             derivedStateOf {
                 val delta = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction)
@@ -2159,17 +2160,6 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                 CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
                     CompactCar(v, state, vm)
                 }
-            }
-        }
-    }
-        CarThemeOverride(
-            paletteId = appearance.carCustomPaletteIds[v.vin],
-            customPalettes = appearance.customPalettes,
-            themeMode = appearance.themeMode,
-            vibrancy = appearance.vibrancy,
-        ) {
-            CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
-                CompactCar(v, state, vm)
             }
         }
     }
@@ -8154,9 +8144,7 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                     Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Remove tile", fontWeight = FontWeight.SemiBold)
-                }
             }
-        }
     }
 }
 
