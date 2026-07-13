@@ -247,15 +247,13 @@ object WearBridge {
      *  to the watch. Called when the watch requests a Drive sync. */
     suspend fun driveSync(context: Context) {
         runCatching {
-            val store = com.bloo.bluelink.data.SettingsStore(context)
+            val store = SettingsStore(context)
             val uri = store.syncUri() ?: return@runCatching
             val app = context.applicationContext
             val parsed = android.net.Uri.parse(uri)
-            // Download the settings file from Drive
             val remoteContent = app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText() ?: return@runCatching
             val remoteJson = remoteContent.substringAfter('\n', "")
             store.importSettingsJson(remoteJson)
-            // Re-publish the newly imported settings to the watch
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)
             updateAllSurfaces(context)

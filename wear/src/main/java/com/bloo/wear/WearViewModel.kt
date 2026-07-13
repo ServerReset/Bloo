@@ -29,6 +29,7 @@ import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.repositoryFor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
