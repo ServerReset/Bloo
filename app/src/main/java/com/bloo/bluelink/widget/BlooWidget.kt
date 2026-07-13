@@ -162,14 +162,17 @@ class BlooWidget : GlanceAppWidget() {
                             Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
                         }
                     }
-                    // Background layer: at level 0 (opaque) use the solid theme color;
-                    // at higher levels the widget becomes transparent so the home
-                    // screen wallpaper shows through (glass effect).
+                    // Glass background: a tinted, edge-lit layer that simulates
+                    // frosted glass over the home screen wallpaper.
+                    if (!photoBgActive && bgAlphaLevel > 0) {
+                        val glassColor = Color(0.18f, 0.20f, 0.26f, bgAlpha * 0.85f)
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(glassColor))) {}
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.08f)))) {}
+                    }
                     val base = GlanceModifier.fillMaxSize()
                         .let { m ->
-                            if (photoBgActive) m
-                            else if (bgAlphaLevel == 0) m.background(themeBg)
-                            else m.background(ColorProvider(Color(0.10f, 0.10f, 0.12f, bgAlpha)))
+                            if (photoBgActive || bgAlphaLevel > 0) m
+                            else m.background(themeBg)
                         }
                         .cornerRadius(corner)
                         .padding(pillPad)
