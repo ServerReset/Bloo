@@ -1575,13 +1575,13 @@ private fun AuroraBackground(
             val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    val alpha = 0.08f
-                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.12f) * alpha
-                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.12f) * alpha
+                    val alpha = 0.03f
+                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.025f) * alpha
+                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.025f) * alpha
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
-            mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
+            mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
             onDispose { mgr.unregisterListener(listener) }
         }
     }
@@ -1620,20 +1620,21 @@ private fun AuroraBackground(
     }
 
     val t = rememberInfiniteTransition(label = "aurora")
-    val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
-    val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
-    val p3 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(11000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
+    val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
+    val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(13000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
+    val p3 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(10000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
     fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
     Box(
         modifier
-            .blur(90.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            .fillMaxSize()
+            .blur(120.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
                     drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
-                blob(basePrimary.copy(alpha = 0.55f), mix(0.15f, 0.7f, p1) + tiltX, mix(0.2f, 0.45f, p2) + tiltY, 0.6f)
-                blob(baseTertiary.copy(alpha = 0.5f), mix(0.85f, 0.35f, p2) - tiltX, mix(0.75f, 0.5f, p3) - tiltY, 0.55f)
-                blob(baseSecondary.copy(alpha = 0.5f), mix(0.5f, 0.4f, p3) + tiltX * 0.6f, mix(0.35f, 0.95f, p1) + tiltY * 0.6f, 0.55f)
+                blob(basePrimary.copy(alpha = 0.30f), mix(0.38f, 0.62f, p1) + tiltX, mix(0.40f, 0.55f, p2) + tiltY, 0.45f)
+                blob(baseTertiary.copy(alpha = 0.25f), mix(0.42f, 0.58f, p2) - tiltX, mix(0.45f, 0.60f, p3) - tiltY, 0.40f)
+                blob(baseSecondary.copy(alpha = 0.20f), mix(0.35f, 0.50f, p3) + tiltX, mix(0.38f, 0.52f, p1) + tiltY, 0.38f)
             },
     )
 }
