@@ -29,9 +29,10 @@ object WearTiles {
     const val MORE = "more"
 
     const val SMART_CLIMATE = "smart_climate"
+    const val AI = "ai"
 
     val DEFAULT_ORDER = listOf(
-        SUMMARY, LOCK, CLIMATE, SMART_CLIMATE, COMFORT, PRESETS, CHARGE, LIMITS,
+        SUMMARY, LOCK, CHARGE, LIMITS, AI, CLIMATE, SMART_CLIMATE, COMFORT, PRESETS,
         LOCATION, WEATHER, INFO, DIAGNOSTICS, ASSIST, MORE,
     )
 
@@ -44,6 +45,7 @@ object WearTiles {
         PRESETS to "Presets",
         CHARGE to "Charge",
         LIMITS to "Charge Limits",
+        AI to "AI Summary",
         LOCATION to "Location",
         WEATHER to "Weather",
         INFO to "Info",
@@ -72,7 +74,7 @@ object WearPebbles {
         "summary" to listOf(WearTiles.SUMMARY),
         "controls" to listOf(WearTiles.LOCK),
         "charge" to listOf(WearTiles.CHARGE, WearTiles.LIMITS),
-        "ai" to emptyList(),
+        "ai" to listOf(WearTiles.AI),
         "climate" to listOf(WearTiles.CLIMATE, WearTiles.SMART_CLIMATE, WearTiles.COMFORT, WearTiles.PRESETS),
         "info" to listOf(WearTiles.INFO),
         "location" to listOf(WearTiles.LOCATION),

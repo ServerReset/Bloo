@@ -96,6 +96,21 @@ object WearComms {
         }
     }
 
+    /** Relay a phone-only request (e.g. AI summary) to a connected phone — no
+     *  optimistic flip, no standalone fallback, since the watch can't fulfil it
+     *  itself. Returns whether the phone received it. */
+    suspend fun relayToPhone(context: Context, command: WearCommand): Boolean =
+        withContext(Dispatchers.IO) {
+            val node = phoneNodeId(context) ?: return@withContext false
+            runCatching {
+                Tasks.await(
+                    Wearable.getMessageClient(context).sendMessage(
+                        node, WearSync.PATH_COMMAND, WearSync.encodeCommand(command).toByteArray(),
+                    ), 10, TimeUnit.SECONDS,
+                )
+            }.isSuccess
+        }
+
     /** Ask for fresh data: relay a refresh to the phone, or refresh standalone. */
     suspend fun requestSync(context: Context, vin: String, refresh: Boolean) {
         withContext(Dispatchers.IO) {

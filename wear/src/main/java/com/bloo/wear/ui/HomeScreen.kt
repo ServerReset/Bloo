@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AirlineSeatReclineNormal
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Call
@@ -515,6 +516,7 @@ private fun TileContent(
         WearTiles.WEATHER -> WeatherCard(ui, car)
         WearTiles.INFO -> InfoCard(car, ui)
         WearTiles.DIAGNOSTICS -> DiagnosticsCard(car)
+        WearTiles.AI -> AiCard(vm, ui, car)
         WearTiles.ASSIST -> AssistCard(car)
         WearTiles.MORE -> MoreCard(vm, ui, car, onSettings, onTrips, onReorder)
     }
@@ -1190,6 +1192,35 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
     seatLabel(car.seatRr)?.let { StatusRow("Seat RR", it) }
     car.timeToFullMin?.takeIf { it > 0 }?.let { StatusRow("Time to full", fmtMinutes(it)) }
     if (car.chargerLabel != null) StatusRow("Charger", car.chargerLabel)
+}
+
+@Composable
+private fun AiCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("AI Summary", Icons.Filled.AutoAwesome) {
+    val summary = ui.extras.ai[car.vin]
+    val busy = ui.aiBusy == car.vin
+    if (summary != null) {
+        Text(
+            summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(8.dp))
+    } else if (!busy) {
+        Text(
+            "A quick plain-English rundown of your car, written on your phone.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+    MorphButton(
+        label = if (busy) "Summarizing…" else if (summary != null) "Refresh" else "Summarize",
+        icon = Icons.Filled.AutoAwesome,
+        active = false,
+        activeColor = MaterialTheme.colorScheme.primary,
+        pending = busy,
+        onClick = { vm.requestAiSummary(car.vin) },
+    )
 }
 
 @Composable

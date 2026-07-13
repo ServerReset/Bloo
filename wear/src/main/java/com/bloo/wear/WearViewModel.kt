@@ -129,6 +129,8 @@ data class WearUi(
     val message: String? = null,
     val presets: Map<String, List<ClimatePreset>> = emptyMap(),
     val extras: com.bloo.bluelink.data.WearExtras = com.bloo.bluelink.data.WearExtras(),
+    /** VIN currently waiting on an AI summary from the phone, for a spinner. */
+    val aiBusy: String? = null,
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     /** Per-car climate draft (sliders/toggles), so each car remembers its own. */
@@ -245,7 +247,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             WearPresetsStore(ctx).flow.collect { p -> _ui.update { it.copy(presets = p.byVin) } }
         }
         viewModelScope.launch {
-            WearExtrasStore(ctx).flow.collect { e -> _ui.update { it.copy(extras = e) } }
+            WearExtrasStore(ctx).flow.collect { e -> _ui.update { it.copy(extras = e, aiBusy = null) } }
         }
         viewModelScope.launch {
             localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
@@ -480,6 +482,20 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---- Commands ---------------------------------------------------------
+
+    /** Ask the phone to generate an AI status summary for [vin]. The phone can't
+     *  be reached from the watch's own connection for this, so it's a phone-only
+     *  relay; the summary arrives asynchronously via the extras push and lands in
+     *  ui.extras.ai[vin]. */
+    fun requestAiSummary(vin: String) {
+        viewModelScope.launch {
+            _ui.update { it.copy(aiBusy = vin, message = null) }
+            val ok = runCatching {
+                WearComms.relayToPhone(ctx, com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.AI_SUMMARY))
+            }.getOrDefault(false)
+            if (!ok) _ui.update { it.copy(aiBusy = null, message = "Bring your phone nearby to summarize") }
+        }
+    }
 
     fun toggleLock(vin: String) = command(vin, "doors") { v, repo, st ->
         if (st?.doorLock == true) { repo.unlock(v); flip(vin) { it.copy(doorLock = false) } }
