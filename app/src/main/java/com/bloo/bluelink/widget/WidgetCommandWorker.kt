@@ -61,8 +61,7 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 if (wearAction != null) {
                     val result = WearCommandRunner.execute(ctx, WearCommand(vin, wearAction))
                     if (!result.ok) {
-                        // The car never got the command: undo the optimistic flip so the
-                        // widget doesn't keep asserting a state that isn't true.
+                        AppLog.log("⚠ Widget command failed: ${wearAction} → ${result.message}")
                         runCatching {
                             val store = SnapshotStore(ctx)
                             store.current().vehicles.firstOrNull { it.vin == vin }?.let {
@@ -71,13 +70,17 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                         }
                         return
                     }
+                    AppLog.log("Widget: ${wearAction} → ok")
                 }
-                // Brief pause for the car to process the command, then fetch actual state.
                 kotlinx.coroutines.delay(4000)
                 WearCommandRunner.refresh(ctx, vin)
+                AppLog.log("Widget: refreshed after command")
             }
 
-            WidgetAction.Kind.REFRESH -> WearCommandRunner.refresh(ctx, vin)
+            WidgetAction.Kind.REFRESH -> {
+                WearCommandRunner.refresh(ctx, vin)
+                AppLog.log("Widget refresh")
+            }
 
             WidgetAction.Kind.LOCATION -> {
                 runCatching { WearCommandRunner.refresh(ctx, vin) }

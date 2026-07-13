@@ -6,6 +6,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.WearCommandRunner
 
@@ -23,11 +24,13 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val cmd = inputData.getString(KEY_CMD) ?: return Result.failure()
         if (cmd == CMD_REFRESH) {
-            // Just re-fetch this car's status into the snapshot, then redraw tiles.
-            runCatching { WearCommandRunner.refresh(applicationContext, vin) }
+            runCatching {
+                WearCommandRunner.refresh(applicationContext, vin)
+                AppLog.log("Tile refresh for $vin")
+            }.onFailure { AppLog.log("⚠ Tile refresh failed: ${it.message}") }
         } else {
             val target = inputData.getString(KEY_TARGET) ?: "default"
-            runCatching { TileCommandRunner.run(applicationContext, vin, cmd, target) }
+            TileCommandRunner.run(applicationContext, vin, cmd, target)
         }
         runCatching { BlooTileService.requestUpdates(applicationContext) }
         return Result.success()

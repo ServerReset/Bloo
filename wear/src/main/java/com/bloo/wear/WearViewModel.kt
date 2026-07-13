@@ -915,6 +915,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             val wearCommand = explicit ?: toWearCommand(vin, action)
             val relayed = runCatching { WearComms.send(ctx, wearCommand) }.isSuccess
             if (relayed) {
+                AppLog.log("Watch: $action relayed to phone")
                 val currentSnap = snapshots[vin]
                 if (currentSnap != null) {
                     val newSnap = com.bloo.bluelink.data.WearCommandRunner.optimistic(currentSnap, wearCommand.action)
@@ -945,14 +946,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching {
                     BlueLinkGate.statusMutex.withLock { block(v, repoFor(v.brand), statuses[vin]) }
                 }.onSuccess {
+                    AppLog.log("Watch: $action ok")
                     publish()
                     if (successMessage != null) _ui.update { it.copy(message = successMessage) }
                     sessionFetched.remove(vin)
                     refreshStatus(vin, surface = false)
                     requestWidgetUpdates()
                 }.onFailure { e ->
+                    AppLog.log("⚠ Watch command $action failed: ${e.message}")
                     _ui.update { it.copy(message = e.message ?: "Command failed") }
-                    AppLog.log("Watch command $action failed: ${e.message}")
                 }
             }
         }

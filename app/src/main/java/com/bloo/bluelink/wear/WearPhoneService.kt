@@ -58,7 +58,8 @@ class WearPhoneService : WearableListenerService() {
                 }
                 scope.launch {
                     val result = WearBridge.execute(applicationContext, command)
-                    // Tell the watch how it went, then fan out to all surfaces.
+                    if (result.ok) AppLog.log("Phone relay: ${command.action} → ok")
+                    else AppLog.log("⚠ Phone relay: ${command.action} → ${result.message}")
                     runCatching {
                         Tasks.await(
                             Wearable.getMessageClient(applicationContext).sendMessage(

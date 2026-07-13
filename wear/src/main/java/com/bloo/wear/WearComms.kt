@@ -77,8 +77,7 @@ object WearComms {
     private suspend fun runStandalone(context: Context, command: WearCommand) {
         val result = WearCommandRunner.execute(context, command)
         if (!result.ok) {
-            // The car never got the command: undo send()'s optimistic flip so the
-            // tile/app don't keep asserting a state that isn't true.
+            AppLog.log("⚠ Watch standalone command failed: ${command.action} → ${result.message}")
             runCatching {
                 val store = SnapshotStore(context)
                 store.current().vehicles.firstOrNull { it.vin == command.vin }?.let {
@@ -91,6 +90,8 @@ object WearComms {
                 "Command failed",
                 result.message ?: "Couldn't reach your car. Try again when your phone is nearby.",
             )
+        } else {
+            AppLog.log("Watch standalone: ${command.action} → ok")
         }
     }
 

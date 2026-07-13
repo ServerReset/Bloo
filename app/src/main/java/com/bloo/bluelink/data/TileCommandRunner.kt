@@ -34,10 +34,15 @@ object TileCommandRunner {
             }
         }.fold(
             onSuccess = { msg ->
+                AppLog.log(msg)
                 runCatching { SnapshotStore(ctx).updateVehicle(optimistic(snap, cmd)) }
                 Result(true, msg)
             },
-            onFailure = { e -> Result(false, e.message ?: "Command failed") },
+            onFailure = { e ->
+                val err = e.message ?: "Command failed"
+                AppLog.log("⚠ $err (${cmd} → ${v.name})")
+                Result(false, err)
+            },
         )
     }
 
