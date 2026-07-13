@@ -39,7 +39,9 @@ object UpdateChecker {
         val store = UpdateStore(context)
         if (!force && !store.checksEnabled.first()) return UpdateCheckResult.UpToDate
         val now = System.currentTimeMillis()
-        if (!force && now - store.lastCheckedAt() < CHECK_INTERVAL_MS) return UpdateCheckResult.UpToDate
+        // Skip rapid re-checks (1 minute debounce), but always check on cold start.
+        if (!force && now - store.lastCheckedAt() < 60_000L) return UpdateCheckResult.UpToDate
+        // Respect snooze ("Remind me in 3 days").
         if (!force && now < store.snoozeUntil()) return UpdateCheckResult.UpToDate
 
         val branch = BuildConfig.BUILD_BRANCH.ifBlank { UpdateApi.DEFAULT_BRANCH }

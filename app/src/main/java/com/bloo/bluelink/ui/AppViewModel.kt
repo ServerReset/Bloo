@@ -828,20 +828,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         val app = getApplication<android.app.Application>()
                         val parsed = android.net.Uri.parse(uri)
+                        // Check the file's actual last-modified time from Drive
+                        val fileModifiedMs = runCatching {
+                            if (android.provider.DocumentsContract.isDocumentUri(app, parsed)) {
+                                val cursor = app.contentResolver.query(
+                                    parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                                    null, null, null,
+                                )
+                                cursor?.use {
+                                    if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
+                                    else null
+                                }
+                            } else null
+                        }.getOrNull()
                         // Download: read the existing file from Drive
                         val remoteContent = runCatching {
                             app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
                         }.getOrNull()
-                        // First line = timestamp, rest = settings JSON
-                        val remoteTs = remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L
                         val remoteJson = remoteContent?.substringAfter('\n', "")
-                        if (remoteTs > _state.value.lastSyncMs) {
-                            settingsStore.importSettingsJson(remoteJson.orEmpty())
+                        val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
+                        if (remoteTs > _state.value.lastSyncMs && remoteJson != null) {
+                            settingsStore.importSettingsJson(remoteJson)
                             _state.update { it.copy(syncUri = uri) }
                         }
                         // Upload our current settings with current timestamp
                         val now = System.currentTimeMillis()
-                        // Simple format: first line = timestamp, rest = settings JSON
                         val body = "$now\n${settingsStore.exportSettingsJson()}"
                         runCatching {
                             app.contentResolver.openOutputStream(parsed, "wt")?.use {

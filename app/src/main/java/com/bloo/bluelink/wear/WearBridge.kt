@@ -251,9 +251,29 @@ object WearBridge {
             val uri = store.syncUri() ?: return@runCatching
             val app = context.applicationContext
             val parsed = android.net.Uri.parse(uri)
+            val fileModifiedMs = runCatching {
+                if (android.provider.DocumentsContract.isDocumentUri(app, parsed)) {
+                    val cursor = app.contentResolver.query(
+                        parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                        null, null, null,
+                    )
+                    cursor?.use {
+                        if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
+                        else null
+                    }
+                } else null
+            }.getOrNull()
             val remoteContent = app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText() ?: return@runCatching
             val remoteJson = remoteContent.substringAfter('\n', "")
-            store.importSettingsJson(remoteJson)
+            val remoteTs = fileModifiedMs ?: (remoteContent.substringBefore('\n').toLongOrNull() ?: 0L)
+            val lastSync = store.lastSyncMs()
+            if (remoteTs > lastSync) {
+                store.importSettingsJson(remoteJson)
+            }
+            val now = System.currentTimeMillis()
+            val body = "$now\n${store.exportSettingsJson()}"
+            runCatching { app.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) } }
+            store.setLastSyncMs(now)
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)
             updateAllSurfaces(context)
