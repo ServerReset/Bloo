@@ -1518,40 +1518,48 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 @Composable
 private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: AppViewModel) {
     val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
     AlertDialog(
         onDismissRequest = vm::dismissUpdate,
-        title = { Text("Update available") },
+        title = { Text("Update available", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Build #${info.run.runNumber} is ready on GitHub Actions.")
-                Text(
-                    "Open the run page to download the phone and watch APKs. " +
-                        "Android will warn that the app is from an unknown source — " +
-                        "tap \"More details\", then \"Install without scanning\".",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                MorphTextButton(
-                    "Remind me in 3 days",
-                    onClick = vm::snoozeUpdate,
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Build info with pill badge
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(shape = RoundedCornerShape(8.dp), color = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer) {
+                        Text("Build #${info.run.runNumber}", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text("is ready", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                }
+                // Step-by-step install guide
+                Surface(shape = RoundedCornerShape(12.dp), color = scheme.surfaceVariant.copy(alpha = 0.5f), tonalElevation = 1.dp) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("To install:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurfaceVariant)
+                        Text("1. Open the Actions run and download the zip artifact", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        Text("2. Unzip the file — it contains the phone and watch APKs", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        Text("3. Open the APK on your device", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        Text("4. Tap \"More details\", then \"Install without scanning\"", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    }
+                }
+                MorphTextButton("Remind me in 3 days", onClick = vm::snoozeUpdate, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             MorphButton(
                 onClick = {
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
-                    }
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
                     vm.dismissUpdate()
                 },
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
             ) {
+                Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
                 Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
-            MorphTextButton("Not now", vm::dismissUpdate)
+            MorphTextButton("Not now", vm::dismissUpdate, modifier = Modifier.fillMaxWidth())
         },
     )
 }

@@ -162,13 +162,16 @@ class BlooWidget : GlanceAppWidget() {
                             Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
                         }
                     }
-                    // Frosted glass effect: a cool-tinted base with a subtle white
-                    // edge highlight that suggests glass refraction and depth.
+                    // Frosted glass effect: layered tints that simulate depth,
+                    // refraction and a subtle edge glow — no real-time blur
+                    // available in Glance, so we build it from overlapping tints.
                     if (!photoBgActive && bgAlphaLevel > 0) {
-                        val glassBase = Color(0.14f, 0.16f, 0.22f, bgAlpha * 0.85f)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(glassBase))) {}
-                        val edgeColor = Color(1f, 1f, 1f, bgAlpha * 0.10f)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(edgeColor))) {}
+                        // Deep base tint (cool blue-gray)
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.12f, 0.14f, 0.20f, bgAlpha * 0.90f)))) {}
+                        // Mid layer: lighter interior (simulates light penetrating glass)
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.18f, 0.20f, 0.26f, bgAlpha * 0.40f)))) {}
+                        // Edge highlight: thin white glow at the rim (glass refraction)
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.12f)))) {}
                     }
                     val base = GlanceModifier.fillMaxSize()
                         .let { m ->

@@ -42,8 +42,7 @@ Multiple brands can be signed in at the same time. Credentials are stored encryp
 ./gradlew assembleDebug
 ```
 
-Phone APK: `app/build/outputs/apk/debug/Bloo-0.1-debug.apk`
-Watch APK: `wear/build/outputs/apk/debug/Bloo-Wear.apk`
+APKs are output to `app/build/outputs/apk/` and `wear/build/outputs/apk/`.
 
 Requires Android Studio Meerkat or newer (AGP 9.1, Kotlin 2.2.20).
 
@@ -55,9 +54,8 @@ To install:
 
 1. Download the zip artifact for your platform from the latest [Actions run](../../actions)
 2. Unzip the file on your phone or computer
-3. Open the APK file (Bloo-0.1-debug.apk) on your Android phone
-4. Android will warn that the app is from an unknown source. Tap the settings gear or expand the Play Protect box.
-5. Tap "Install anyway" and confirm with your biometrics or device password
+3. Open the APK file on your Android phone
+4. Tap **"More details"** to expand the Play Protect warning, then tap **"Install without scanning"** and confirm with your biometrics or device password
 
 The warning appears because Bloo is not signed with Google Play Store keys. I cannot publish on the Play Store because it costs money I do not have, and Hyundai would not approve an unofficial app on their platform. The app is safe, open source, and does not collect any data. All credentials are stored encrypted on-device.
 
