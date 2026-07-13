@@ -1944,10 +1944,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
                             }
                         }
+                        // Spring-bouncy page transition: off-screen pages fade, shrink,
+                        // and tilt slightly — snapping back with a subtle overshoot.
+                        val snapBounce by animateFloatAsState(
+                            targetValue = if (pageOff < 0.01f) 0f else 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "pageBounce",
+                        )
+                        val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         Box(Modifier.fillMaxSize().graphicsLayer {
-                            alpha = 1f - pageOff * 0.15f
-                            scaleX = 1f - pageOff * 0.04f
-                            scaleY = 1f - pageOff * 0.04f
+                            alpha = 1f - effectiveOff * 0.2f
+                            scaleX = 1f - effectiveOff * 0.06f
+                            scaleY = 1f - effectiveOff * 0.06f
+                            rotationZ = effectiveOff * if (page >= exPager.currentPage) 2f else -2f
                         }) {
                             val pv = vehicles[page]
                             CarThemeOverride(
@@ -2265,8 +2274,9 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 Box(
                     Modifier
                         .fillMaxSize()
+                        .navigationBarsPadding()
                         .padding(
-                            start = 10.dp, top = tileTopPadding, bottom = 10.dp,
+                            start = 10.dp, top = tileTopPadding, bottom = 24.dp,
                             end = if (tiles.size > 1) 22.dp else 10.dp,
                         ),
                 ) {
@@ -7283,6 +7293,12 @@ private fun SettingsScreen(vm: AppViewModel) {
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
+            val coachAlpha = remember { Animatable(0f) }
+            val coachOffset = remember { Animatable(-20f) }
+            LaunchedEffect(Unit) {
+                launch { coachAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
+                launch { coachOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
+            }
             Surface(
                 onClick = { vm.dismissSettingsCoach() },
                 shape = RoundedCornerShape(16.dp),
@@ -7292,7 +7308,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
-                    .padding(start = 12.dp, top = 60.dp, end = 12.dp),
+                    .padding(start = 12.dp, top = 60.dp, end = 12.dp)
+                    .graphicsLayer {
+                        alpha = coachAlpha.value
+                        translationY = coachOffset.value
+                    },
             ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
