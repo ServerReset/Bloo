@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Slider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -190,12 +190,19 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Opaque", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Slider(
+            val scheme = MaterialTheme.colorScheme
+            com.bloo.uicommon.AnimatedSlider(
                 value = backgroundAlpha.toFloat(),
                 onValueChange = { backgroundAlpha = it.roundToInt() },
                 valueRange = 0f..9f,
                 steps = 8,
-                modifier = Modifier.weight(1f),
+                accent = scheme.primary,
+                inactiveColor = scheme.surfaceContainerHighest,
+                dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
+                dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
+                reduceMotion = false,
+                onStepTick = { },
+                onSettle = { },
             )
             Text("Glass", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
