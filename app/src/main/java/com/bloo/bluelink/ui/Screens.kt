@@ -8144,7 +8144,9 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
                     Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Remove tile", fontWeight = FontWeight.SemiBold)
+                }
             }
+        }
     }
 }
 
