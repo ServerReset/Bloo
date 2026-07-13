@@ -1736,7 +1736,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Set Wi-Fi only vs any network for auto-sync. */
     fun setSyncWifiOnly(wifiOnly: Boolean) = viewModelScope.launch {
         AppLog.log("Drive sync: ${if (wifiOnly) "Wi-Fi only" else "any network"}")
-    }
         settingsStore.setSyncWifiOnly(wifiOnly)
         _state.update { it.copy(syncWifiOnly = wifiOnly) }
     }
