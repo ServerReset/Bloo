@@ -77,10 +77,16 @@ class WearPhoneService : WearableListenerService() {
                 val command = WearSync.decodeCommand(String(event.data ?: ByteArray(0)))
                 scope.launch {
                     val ctx = applicationContext
-                    if (command?.action == WearAction.REFRESH) {
-                        WearBridge.refresh(ctx, command.vin)
+                    when (command?.action) {
+                        WearAction.REFRESH -> {
+                            WearBridge.refresh(ctx, command.vin)
+                            WearBridge.refreshAllSurfaces(ctx)
+                        }
+                        WearAction.DRIVE_SYNC -> {
+                            WearBridge.driveSync(ctx)
+                        }
+                        else -> WearBridge.refreshAllSurfaces(ctx)
                     }
-                    WearBridge.refreshAllSurfaces(ctx)
                 }
             }
         }

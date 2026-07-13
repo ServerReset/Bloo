@@ -430,10 +430,31 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-pull snapshots, sessions and settings the phone has published. */
     fun resync() {
         viewModelScope.launch {
+            runCatching { WearComms.requestSync(ctx, "", refresh = false) }
             runCatching { WearComms.pullLatest(ctx) }
             snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
             refreshConnection()
             if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
+        }
+    }
+
+    /** Ask the phone to pull the latest settings from Google Drive and re-publish them. */
+    fun syncDrive() {
+        viewModelScope.launch {
+            runCatching {
+                val node = com.bloo.wear.WearComms.phoneNodeId(ctx)
+                if (node != null) {
+                    val cmd = com.bloo.bluelink.data.WearCommand(vin = "", action = com.bloo.bluelink.data.WearAction.DRIVE_SYNC)
+                    com.google.android.gms.tasks.Tasks.await(
+                        com.google.android.gms.wearable.Wearable.getMessageClient(ctx).sendMessage(
+                            node, com.bloo.bluelink.data.WearSync.PATH_SYNC_REQUEST,
+                            com.bloo.bluelink.data.WearSync.encodeCommand(cmd).toByteArray(),
+                        ), 10, java.util.concurrent.TimeUnit.SECONDS,
+                    )
+                }
+            }
+            delay(3000)
+            runCatching { com.bloo.wear.WearComms.pullLatest(ctx) }
         }
     }
 

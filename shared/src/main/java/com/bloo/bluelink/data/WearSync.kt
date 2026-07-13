@@ -194,6 +194,10 @@ object WearAction {
 
     /** Request the phone to generate and push an AI summary for a car. */
     const val AI_SUMMARY = "ai_summary"
+
+    /** Request the phone to import the latest settings from Google Drive and
+     *  re-publish them to the watch. */
+    const val DRIVE_SYNC = "drive_sync"
 }
 
 /** A command the watch wants run for one car. */

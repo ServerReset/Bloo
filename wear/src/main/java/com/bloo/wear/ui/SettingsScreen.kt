@@ -268,6 +268,15 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     pending = false,
                     onClick = { vm.resync() },
                 )
+                Spacer(Modifier.height(4.dp))
+                MorphButton(
+                    label = "Import from Drive",
+                    icon = Icons.Filled.Bolt,
+                    active = false,
+                    activeColor = MaterialTheme.colorScheme.tertiary,
+                    pending = false,
+                    onClick = { vm.syncDrive() },
+                )
             }
         }
 
