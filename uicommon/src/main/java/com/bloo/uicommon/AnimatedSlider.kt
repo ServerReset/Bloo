@@ -123,10 +123,10 @@ fun AnimatedSlider(
             if (reduceMotion) {
                 anim.snapTo(target)
             } else {
-                anim.animateTo(
-                    target,
-                    animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
-                )
+            anim.animateTo(
+                target,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+            )
             }
             settling = false
         }

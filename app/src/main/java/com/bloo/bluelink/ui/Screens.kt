@@ -6884,9 +6884,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                 StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
                 AnimatedSlider(
                     value = uiScaleDraft,
-                    onValueChange = { uiScaleDraft = (it * 100).roundToInt() / 100f },
-                    valueRange = 0.85f..1.3f,
-                    steps = 44,
+                    onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+                    valueRange = 0.8f..1.3f,
+                    steps = 4,
                     onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
@@ -7596,8 +7596,8 @@ private fun SettingsSearchResults(
         StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
         AnimatedSlider(
             value = uiScaleDraft,
-            onValueChange = { uiScaleDraft = (it * 100).roundToInt() / 100f },
-            valueRange = 0.85f..1.3f,
+            onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+            valueRange = 0.8f..1.3f,
             steps = 8,
             onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
         )
