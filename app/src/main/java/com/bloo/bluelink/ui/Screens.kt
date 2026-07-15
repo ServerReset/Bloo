@@ -7069,7 +7069,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Notifications
-            if (advanced) SettingsCard("Notifications") {
+            SettingsCard("Notifications") {
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
                 if (notif.doorOpen) {
@@ -7264,7 +7264,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Sounds & vibration
-            if (advanced) SettingsCard("Sounds & vibration") {
+            SettingsCard("Sounds & vibration") {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
             }
 
