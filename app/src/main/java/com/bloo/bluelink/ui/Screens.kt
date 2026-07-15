@@ -5291,37 +5291,37 @@ private fun ClimatePebble(
     val startClimate = { vm.startClimate(v, currentReq) }
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val simpleMode = state.settingsMode != "advanced"
-        Pebble(
-            v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
-            summary = when {
-                climateOn && driving -> "On · driving"
-                climateOn -> "On"
-                else -> "Off"
+
+    Pebble(
+        v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
+        summary = when {
+            climateOn && driving -> "On · driving"
+            climateOn -> "On"
+            else -> "Off"
+        },
+        headerAction = PebbleHeaderAction(
+            label = when {
+                climateOn && driving -> "On"
+                climateOn -> "Stop"
+                else -> "Start"
             },
-            headerAction = PebbleHeaderAction(
-                label = when {
-                    climateOn && driving -> "On"
-                    climateOn -> "Stop"
-                    else -> "Start"
-                },
-                icon = Icons.Filled.AcUnit,
-                onClick = {
-                    if (climateOn) { vm.stopClimate(v); activePresetId = null }
-                    else if (simpleMode && weather != null) {
-                        // Simple mode: auto-smart climate
-                        val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
-                        val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
-                                          else (ambientF + 10).coerceIn(60, 85)
-                        tempF = smartTarget; defrost = false; activePresetId = null
-                        vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                    } else startClimate()
-                },
-                enabled = !driving,
-                pending = pending,
-                active = climateOn,
-                spinning = climateOn,
-            ),
-        ) {
+            icon = Icons.Filled.AcUnit,
+            onClick = {
+                if (climateOn) { vm.stopClimate(v); activePresetId = null }
+                else if (simpleMode && weather != null) {
+                    val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+                    val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
+                                      else (ambientF + 10).coerceIn(60, 85)
+                    tempF = smartTarget; defrost = false; activePresetId = null
+                    vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                } else startClimate()
+            },
+            enabled = !driving,
+            pending = pending,
+            active = climateOn,
+            spinning = climateOn,
+        ),
+    ) {
         if (driving) {
             if (climateOn) {
                 Text(
@@ -6523,7 +6523,7 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // On-device AI - only when the device supports Gemini Nano.
             if (state.aiSupported) {
-                AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard("AI") {
+                if (advanced) SettingsCard("AI") {
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
@@ -6549,7 +6549,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard("App shortcuts") {
+            if (advanced) SettingsCard("App shortcuts") {
                 Text(
                     "Pick which long-press app-icon shortcuts appear. Launchers usually show " +
                         "only the first 4–5.",
@@ -6579,7 +6579,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
-                AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard(if (single) "Car" else "Cars") {
+                if (advanced) SettingsCard(if (single) "Car" else "Cars") {
                     if (single) {
                         val v = state.vehicles[0]
                         CarSettingsCard(
@@ -6923,7 +6923,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Font
-            AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard("Font") {
+            if (advanced) SettingsCard("Font") {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
@@ -6937,7 +6937,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Links
-            AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard("Links") {
+            if (advanced) SettingsCard("Links") {
                 SettingsSegmentedRow(
                     label = "Open links",
                     options = listOf(
@@ -6950,7 +6950,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Logs
-            AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard("Logs") {
+            if (advanced) SettingsCard("Logs") {
                 var logsExpanded by remember { mutableStateOf(false) }
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -7008,7 +7008,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Notifications
-            AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard("Notifications") {
+            if (advanced) SettingsCard("Notifications") {
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
                 if (notif.doorOpen) {
@@ -7203,7 +7203,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Sounds & vibration
-            AnimatedVisibility(visible = advanced, enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)), exit = fadeOut(tween(200)) + shrinkVertically(tween(200))) { SettingsCard("Sounds & vibration") {
+            if (advanced) SettingsCard("Sounds & vibration") {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
             }
 
