@@ -761,14 +761,18 @@ private fun OnboardingScreen(vm: AppViewModel) {
                                     "Save to Drive: pick a folder in Google Drive to store your settings. " +
                                     "Changes sync automatically.\n\n" +
                                     "Open from Drive: pick the settings file from Google Drive on another device.")
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    MorphTextButton("Save to Drive", onClick = {
+                                // Stacked, not a Row: three buttons ("Save to
+                                // Drive"/"Open from Drive"/"Cancel") side by side
+                                // could overflow the dialog's width on a narrow
+                                // phone with no wrap/scroll to fall back on.
+                                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    MorphTextButton("Save to Drive", modifier = Modifier.fillMaxWidth(), onClick = {
                                         showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json")
                                     })
-                                    MorphTextButton("Open from Drive", onClick = {
+                                    MorphTextButton("Open from Drive", modifier = Modifier.fillMaxWidth(), onClick = {
                                         showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json"))
                                     })
-                                    MorphTextButton("Cancel", onClick = { showDriveDialog = false })
+                                    MorphTextButton("Cancel", modifier = Modifier.fillMaxWidth(), onClick = { showDriveDialog = false })
                                 }
                             },
                             confirmButton = {},
@@ -2034,6 +2038,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                                 carNameVisible = hidden
                                                 scrollToTopFn = scrollFn
                                             } else null,
+                                            // Only hide the per-car pull indicator in the
+                                            // multi-car grid (perPage > 1) -- a prior fix
+                                            // meant for the grid only ended up applying here
+                                            // unconditionally, silently killing the single-
+                                            // car view's refresh feedback too.
+                                            hideIndicator = perPage > 1,
                                         )
                                     }
                                 }
@@ -2116,7 +2126,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.ArrowBack,
                 description = "Back to all cars",
                 onClick = { vm.collapse() },
-                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().offset(y = refreshShift),
             )
         }
         if (expandedIdx != null) {
@@ -2124,14 +2134,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.SwapHoriz,
                 description = "Flip columns",
                 onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp),
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp).offset(y = refreshShift),
             )
         }
         FloatingIcon(
             icon = Icons.Filled.Settings,
             description = "Settings",
             onClick = { vm.openSettings() },
-            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().offset(y = refreshShift),
         )
     }
     }
@@ -3304,6 +3314,7 @@ private fun VehicleDetailContent(
     onExpand: (() -> Unit)? = null,
     reserveHeaderEnd: Boolean = false,
     onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
+    hideIndicator: Boolean = false,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -3320,7 +3331,7 @@ private fun VehicleDetailContent(
             onNameHiddenChanged(nameHidden) { scroll.animateScrollTo(0) }
         }
     }
-    Refreshable(v, state, vm, hideIndicator = true) {
+    Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -6734,7 +6745,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                             })
                         },
                         dismissButton = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Stacked, not a Row alongside confirmButton's own
+                            // "Save to Drive" -- three action labels sharing one
+                            // line risks overflow on a narrow phone.
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 MorphTextButton("Open from Drive", onClick = {
                                     showDriveDialog = false
                                     driveOpenLauncher.launch(arrayOf("application/json"))
@@ -6794,8 +6808,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                 }
             }
-
-            // Color
 
             // Display scale
             SettingsCard("Display") {
@@ -7186,6 +7198,47 @@ private fun SettingsScreen(vm: AppViewModel) {
                                     )
                                 }
                             }
+                            // Custom palettes: the create/edit dialog and per-palette
+                            // selection existed (SettingsStore + AppViewModel) but had
+                            // no entry point anywhere in the UI after the old Color
+                            // card was merged into this Theme card -- restore it here.
+                            Spacer(Modifier.height(10.dp))
+                            Text("Custom palettes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(6.dp))
+                            var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
+                            var showPaletteEditor by remember { mutableStateOf(false) }
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                appearance.customPalettes.forEach { palette ->
+                                    CustomPaletteSwatch(
+                                        palette = palette,
+                                        selected = appearance.activeCustomPaletteId == palette.id,
+                                        onClick = { vm.setActiveCustomPaletteId(palette.id) },
+                                        onEdit = { editingPalette = palette; showPaletteEditor = true },
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                            .clickable { editingPalette = null; showPaletteEditor = true },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(Icons.Filled.Add, contentDescription = "New custom palette")
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("New", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            if (showPaletteEditor) {
+                                PaletteEditorDialog(
+                                    editing = editingPalette,
+                                    onSave = { vm.saveCustomPalette(it); vm.setActiveCustomPaletteId(it.id); showPaletteEditor = false },
+                                    onDelete = { vm.deleteCustomPalette(it); showPaletteEditor = false },
+                                    onDismiss = { showPaletteEditor = false },
+                                )
+                            }
                         }
                     }
                     Spacer(Modifier.height(10.dp))
@@ -7247,47 +7300,51 @@ onValueChange = { vibrancyDraft = it },
                     }
                 }
             }
-            // Morphing search: pill expands into text field on tap
-            AnimatedContent(
-                targetState = searchFocused || query.isNotEmpty(),
-                transitionSpec = { fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) togetherWith fadeOut(tween(150)) + shrinkVertically(tween(150)) },
-                label = "searchMorph",
-            ) { isSearching ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    if (isSearching) {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            placeholder = { Text("Search settings & car data") },
-                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                            trailingIcon = {
-                                if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
-                                else IconButton(onClick = { searchFocused = false }) { Icon(Icons.Filled.Close, "Close") }
-                            },
-                            singleLine = true,
-                            shape = RoundedCornerShape(50),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    } else {
-                        Surface(
-                            onClick = { searchFocused = true },
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            tonalElevation = 6.dp,
-                            shadowElevation = 8.dp,
-                        ) {
-                            Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(bottomInset + 16.dp))
           }
         }
+          // Morphing search: pill expands into text field on tap. Rendered
+          // OUTSIDE the if/else on query (not inside the no-query branch) --
+          // it used to live only in the "else" branch, so the text field was
+          // unmounted the instant the user typed a character and query became
+          // non-blank, leaving no way to see/edit/clear the search mid-search.
+          AnimatedContent(
+              targetState = searchFocused || query.isNotEmpty(),
+              transitionSpec = { fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) togetherWith fadeOut(tween(150)) + shrinkVertically(tween(150)) },
+              label = "searchMorph",
+          ) { isSearching ->
+              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                  if (isSearching) {
+                      OutlinedTextField(
+                          value = query,
+                          onValueChange = { query = it },
+                          placeholder = { Text("Search settings & car data") },
+                          leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                          trailingIcon = {
+                              if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
+                              else IconButton(onClick = { searchFocused = false }) { Icon(Icons.Filled.Close, "Close") }
+                          },
+                          singleLine = true,
+                          shape = RoundedCornerShape(50),
+                          modifier = Modifier.fillMaxWidth(),
+                      )
+                  } else {
+                      Surface(
+                          onClick = { searchFocused = true },
+                          shape = RoundedCornerShape(50),
+                          color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                          contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                          tonalElevation = 6.dp,
+                          shadowElevation = 8.dp,
+                      ) {
+                          Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                              Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                              Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
+                          }
+                      }
+                  }
+              }
+          }
+          Spacer(Modifier.height(bottomInset + 16.dp))
         }
         } // Box (wide-screen centering)
         // Floating back-arrow + "Settings" label + simple/advanced button.
@@ -7398,7 +7455,11 @@ private fun CarSettingsCard(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = cardBg),
     ) {
-        Column(Modifier.padding(12.dp).animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))) {
+        // Same bouncy spec as the enclosing SettingsCard/settings-screen columns
+        // (both animate the same expand/collapse height delta) -- a softer,
+        // faster spec here made this card visibly settle before the outer
+        // containers finished bouncing, reading as a double-animation/jump.
+        Column(Modifier.padding(12.dp).animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))) {
             Row(
                 Modifier.fillMaxWidth()
                     .then(if (collapsible) Modifier.clickable { onToggle() } else Modifier)
@@ -7468,6 +7529,32 @@ private fun CarSettingsCard(
                                 onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
                             )
                         }
+
+                    // Per-car palette override: existed in SettingsStore/AppViewModel
+                    // (setCarPaletteId) with no UI entry point anywhere -- only shown
+                    // once there's at least one custom palette to actually choose.
+                    val appearance by vm.appearance.collectAsState()
+                    if (state.settingsMode == "advanced" && appearance.customPalettes.isNotEmpty()) {
+                        SettingsGroup("Palette override") {
+                            Text(
+                                "Give this car its own colour palette instead of the app-wide theme.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                appearance.customPalettes.forEach { palette ->
+                                    val selected = appearance.carCustomPaletteIds[v.vin] == palette.id
+                                    CustomPaletteSwatch(
+                                        palette = palette,
+                                        selected = selected,
+                                        onClick = { vm.setCarPaletteId(v.vin, if (selected) null else palette.id) },
+                                        onEdit = {},
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     SettingsGroup("Photo") {
                         val storedImage = state.imageUrls[v.vin]
@@ -8452,7 +8539,13 @@ private fun BlooDialog(
             }
         } },
         text = { Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.padding(16.dp, 8.dp, 16.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Scrollable: variable-length content (e.g. the climate-choice
+            // dialog's preset list) can otherwise exceed the dialog's height
+            // with no way to reach entries past the bottom edge.
+            Column(
+                Modifier.padding(16.dp, 8.dp, 16.dp, 12.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 text()
             }
         } },

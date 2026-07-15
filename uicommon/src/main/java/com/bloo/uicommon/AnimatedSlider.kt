@@ -116,9 +116,15 @@ fun AnimatedSlider(
     }
     fun settleTo(target: Float) {
         prevStep = target
-        onSettle()
         settling = true
+        // onValueChange BEFORE onSettle: callers commonly track "the last value
+        // we saw" in their own onValueChange closure and read it back inside
+        // onSettle (see Screens.kt's AnimatedSlider wrapper). A plain tap never
+        // calls onValueChange before settleTo (only a drag does, via trackTo),
+        // so firing onSettle first meant those callers read a stale value from
+        // before this interaction — this order guarantees it's already current.
         onValueChange(target)
+        onSettle()
         settleJob?.cancel()
         settleJob = scope.launch {
             if (reduceMotion) {
