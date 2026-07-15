@@ -111,8 +111,8 @@ fun AnimatedSlider(
             onStepTick()
             prevStep = s
         }
-        // Use the snapped step value during drag for discrete stop feedback.
-        onValueChange(s)
+        // Free-flow during drag; the snapped step is applied on settle.
+        onValueChange(clamped)
     }
     fun settleTo(target: Float) {
         prevStep = target
