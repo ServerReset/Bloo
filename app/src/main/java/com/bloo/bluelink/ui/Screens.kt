@@ -753,33 +753,25 @@ private fun OnboardingScreen(vm: AppViewModel) {
                         ActivityResultContracts.OpenDocument(),
                     ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
                     if (showDriveDialog) {
-                        AlertDialog(
+                        BlooDialog(
                             onDismissRequest = { showDriveDialog = false },
-                            title = { Text("Google Drive sync") },
+                            title = { Text("Google Drive sync", fontWeight = FontWeight.Bold) },
                             text = {
-                                Text(
-                                    "Sync your settings across devices using Google Drive.\n\n" +
-                                        "Save to Drive: pick a folder in Google Drive to " +
-                                        "store your settings. Changes sync automatically.\n\n" +
-                                        "Open from Drive: pick the settings file from " +
-                                        "Google Drive on another device.",
-                                )
-                            },
-                            confirmButton = {
-                                MorphTextButton("Save to Drive", onClick = {
-                                    showDriveDialog = false
-                                    driveSaveLauncher.launch("bloo_settings.json")
-                                })
-                            },
-                            dismissButton = {
+                                Text("Sync your settings across devices using Google Drive.\n\n" +
+                                    "Save to Drive: pick a folder in Google Drive to store your settings. " +
+                                    "Changes sync automatically.\n\n" +
+                                    "Open from Drive: pick the settings file from Google Drive on another device.")
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    MorphTextButton("Save to Drive", onClick = {
+                                        showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json")
+                                    })
                                     MorphTextButton("Open from Drive", onClick = {
-                                        showDriveDialog = false
-                                        driveOpenLauncher.launch(arrayOf("application/json"))
+                                        showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json"))
                                     })
                                     MorphTextButton("Cancel", onClick = { showDriveDialog = false })
                                 }
                             },
+                            confirmButton = {},
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -5455,37 +5447,29 @@ private fun ClimatePebble(
 
         // Climate start choice dialog (advanced mode)
         if (showClimateChoice) {
-            AlertDialog(
+            BlooDialog(
                 onDismissRequest = { showClimateChoice = false },
-                title = { Text("Start climate") },
+                title = { Text("Start climate", fontWeight = FontWeight.Bold) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (weather != null) {
-                            val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
-                            val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
-                                              else (ambientF + 10).coerceIn(60, 85)
-                            MorphButton(
-                                onClick = {
-                                    tempF = smartTarget; defrost = false; activePresetId = null
-                                    vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                                    showClimateChoice = false
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text("Smart climate", fontWeight = FontWeight.SemiBold)
-                            }
+                    if (weather != null) {
+                        val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+                        val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
+                                          else (ambientF + 10).coerceIn(60, 85)
+                        MorphButton(onClick = {
+                            tempF = smartTarget; defrost = false; activePresetId = null
+                            vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                            showClimateChoice = false
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Smart climate", fontWeight = FontWeight.SemiBold)
                         }
-                        presets.forEach { preset ->
-                            MorphButton(
-                                onClick = {
-                                    applyPreset(preset.request)
-                                    vm.startClimate(v, preset.request)
-                                    activePresetId = preset.id
-                                    showClimateChoice = false
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text(preset.name, fontWeight = FontWeight.SemiBold) }
-                        }
+                    }
+                    presets.forEach { preset ->
+                        MorphButton(onClick = {
+                            applyPreset(preset.request)
+                            vm.startClimate(v, preset.request)
+                            activePresetId = preset.id
+                            showClimateChoice = false
+                        }, modifier = Modifier.fillMaxWidth()) { Text(preset.name, fontWeight = FontWeight.SemiBold) }
                     }
                 },
                 confirmButton = { MorphTextButton("Cancel", onClick = { showClimateChoice = false }) },
@@ -8567,4 +8551,33 @@ private fun StaggerFadeIn(delay: Int, offset: Int = 16, content: @Composable () 
     )) {
         content()
     }
+}
+
+/** App-wide dialog style: themed Surface, consistent shape and button layout. */
+@Composable
+private fun BlooDialog(
+    onDismissRequest: () -> Unit,
+    title: @Composable () -> Unit,
+    text: @Composable ColumnScope.() -> Unit,
+    confirmButton: @Composable RowScope.() -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
+            Row(Modifier.padding(16.dp, 12.dp, 16.dp, 0.dp), verticalAlignment = Alignment.CenterVertically) {
+                title()
+            }
+        } },
+        text = { Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.padding(16.dp, 8.dp, 16.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                text()
+            }
+        } },
+        confirmButton = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                confirmButton()
+            }
+        },
+        containerColor = Color.Transparent,
+    )
 }
