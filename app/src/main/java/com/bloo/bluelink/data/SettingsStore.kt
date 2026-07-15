@@ -994,7 +994,7 @@ class SettingsStore(private val context: Context) {
      *  change stops being purely additive (a renamed/restructured key an older
      *  client would misinterpret rather than just skip), so old clients can
      *  detect and refuse it instead of silently importing something wrong. */
-    private const val BACKUP_VERSION = 1
+    private val BACKUP_VERSION = 1
 
     /** Preference keys that describe THIS device's own Drive-sync wiring (a
      *  content:// URI this app instance was granted permission for, local
