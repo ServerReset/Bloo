@@ -7261,8 +7261,9 @@ onValueChange = { vibrancyDraft = it },
         }
         } // Box (wide-screen centering)
         // Floating back-arrow + "Settings" label + simple/advanced button.
+        Box(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),
+            Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
