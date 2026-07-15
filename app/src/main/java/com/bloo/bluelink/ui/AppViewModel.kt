@@ -996,7 +996,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else it.licensePlates + (vin to plate.trim()),
             )
         }
-        viewModelScope.launch { settingsStore.setLicensePlate(vin, plate) }
+        // Also republish the snapshot immediately so the watch's Info tile picks
+        // up the new plate right away instead of waiting on the next status
+        // refresh to happen to rebuild it.
+        viewModelScope.launch { settingsStore.setLicensePlate(vin, plate); persistSnapshots() }
     }
 
     fun setLastServiceMiles(vin: String, miles: Int?) {
@@ -1006,7 +1009,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else it.lastServiceMiles + (vin to miles),
             )
         }
-        viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles) }
+        // Republish immediately so the watch's Info tile reflects it right away.
+        viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles); persistSnapshots() }
     }
 
     fun setServiceIntervalMiles(vin: String, miles: Int?) {
@@ -1016,7 +1020,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else it.serviceIntervalMiles + (vin to miles),
             )
         }
-        viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles) }
+        // Republish immediately so the watch's Info tile reflects it right away.
+        viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles); persistSnapshots() }
     }
 
     fun setSeatFlag(v: Vehicle, field: String, value: Boolean) {
@@ -1055,7 +1060,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update {
             it.copy(hiddenPebbles = if (hidden) it.hiddenPebbles + key else it.hiddenPebbles - key)
         }
-        viewModelScope.launch { settingsStore.setSectionHidden(v.vin, section, hidden) }
+        viewModelScope.launch {
+            settingsStore.setSectionHidden(v.vin, section, hidden)
+            // hiddenSections isn't part of Appearance, so it isn't covered by the
+            // appearance.collect mirror below -- republish explicitly so the
+            // watch's matching tile hides/shows immediately.
+            com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value)
+        }
     }
 
     /** Finish first-run onboarding (wizard complete) and land in the app. */
@@ -1084,7 +1095,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
-        viewModelScope.launch { settingsStore.setPowertrain(v.vin, value) }
+        // Republish immediately: the watch's Charge/Fuel tile derives hasBattery
+        // from the synced snapshot, so a correction here needs to reach it right
+        // away rather than waiting on the next status refresh.
+        viewModelScope.launch { settingsStore.setPowertrain(v.vin, value); persistSnapshots() }
     }
 
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
@@ -1750,10 +1764,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val json = withContext(Dispatchers.IO) {
             runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
         }
-        if (json != null) {
-            settingsStore.importSettingsJson(json)
-            AppLog.log("Settings imported from Drive")
-        }
+        // importSettingsJson returns null on success, or an error message on a
+        // rejected/corrupt backup (wrong format, newer version) -- surface that
+        // instead of reporting "imported" for a file that was actually rejected.
+        val importError = json?.let { settingsStore.importSettingsJson(it) }
+        if (json != null && importError == null) AppLog.log("Settings imported from Drive")
+        else if (importError != null) AppLog.log("⚠ Settings import from Drive: $importError")
         runCatching {
             getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
                 uri,
@@ -1761,7 +1777,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         settingsStore.setSyncUri(uri.toString())
-        _state.update { it.copy(syncUri = uri.toString(), message = if (json != null) "Settings imported and auto-sync enabled" else "Auto-sync enabled") }
+        val message = when {
+            json == null -> "Auto-sync enabled"
+            importError != null -> "Auto-sync enabled, but couldn't import: $importError"
+            else -> "Settings imported and auto-sync enabled"
+        }
+        _state.update { it.copy(syncUri = uri.toString(), message = message) }
     }
 
     /** Set Wi-Fi only vs any network for auto-sync. */

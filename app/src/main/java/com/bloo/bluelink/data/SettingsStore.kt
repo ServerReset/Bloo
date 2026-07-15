@@ -14,6 +14,8 @@ import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -34,6 +36,13 @@ private val Context.settingsDataStore by preferencesDataStore(
     name = "bloo_settings",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
+
+// Process-wide serialization for performDriveSync(): the periodic worker, the
+// auto-sync-on-refresh collector, and a watch-requested sync can all fire at
+// nearly the same moment, and SettingsStore is instantiated fresh at each call
+// site (not a singleton) — a per-instance lock wouldn't serialize anything, so
+// this lives at module scope instead, same pattern as BlueLinkGate.statusMutex.
+private val driveSyncMutex = Mutex()
 
 /**
  * Which seat heat/cool functions a specific car actually has (user-configured).
@@ -737,15 +746,19 @@ class SettingsStore(private val context: Context) {
      * "Sync now" request, which is exactly how a bug (this device's own Drive URI
      * leaking into the portable export) existed in two copies at once.
      */
-    suspend fun performDriveSync(): DriveSyncOutcome {
-        val uri = syncUri() ?: return DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
+    suspend fun performDriveSync(): DriveSyncOutcome = driveSyncMutex.withLock {
+        // The periodic worker, the auto-sync-on-refresh collector, and a
+        // watch-requested sync can all fire within moments of each other with
+        // no coordination otherwise -- this mutex makes them run one at a time
+        // instead of racing to read/merge/upload the same Drive file.
+        val uri = syncUri() ?: return@withLock DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
         if (syncWifiOnly()) {
             val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
             val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
                 ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
             if (!wifi) {
                 AppLog.log("⚠ Drive sync: skipped (Wi-Fi only, on cellular)")
-                return DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
+                return@withLock DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
             }
         }
         val parsed = android.net.Uri.parse(uri)
@@ -789,12 +802,22 @@ class SettingsStore(private val context: Context) {
             uploadError = it.message ?: "Couldn't write the Drive file"
             AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
         }.getOrElse { false }
-        setLastSyncMs(now)
-        // We've now published everything we had pending, so nothing is "dirty"
-        // relative to Drive anymore — but only once the upload actually landed.
-        if (uploaded) clearDirtyKeys()
+        // Only claim "last synced at <now>" when the upload actually landed --
+        // bumping it on a total failure (download AND upload both threw) made
+        // the UI show "Last synced just now" right next to "Sync failed" on
+        // every single attempt, with no way to tell sync had never succeeded.
+        if (uploaded) {
+            setLastSyncMs(now)
+            // We've now published everything we had pending, so nothing is
+            // "dirty" relative to Drive anymore — but only once it landed.
+            clearDirtyKeys()
+        }
         return DriveSyncOutcome(
-            ran = true, imported = imported, uploaded = uploaded, syncedAtMs = now,
+            // Match what was actually persisted above: report the OLD synced
+            // time on total failure, not "now", so a caller that copies this
+            // straight into UI state (AppViewModel does) can't show "synced
+            // just now" next to a sync-failed error.
+            ran = true, imported = imported, uploaded = uploaded, syncedAtMs = if (uploaded) now else lastSyncMs(),
             error = uploadError ?: downloadError?.takeIf { remoteContent == null },
         )
     }
