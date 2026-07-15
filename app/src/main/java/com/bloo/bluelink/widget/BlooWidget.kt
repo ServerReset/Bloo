@@ -164,16 +164,18 @@ class BlooWidget : GlanceAppWidget() {
                             Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
                         }
                     }
-                    // Frosted glass effect: layered tints that simulate depth,
-                    // refraction and a subtle edge glow — no real-time blur
-                    // available in Glance, so we build it from overlapping tints.
+                    // Realistic frosted glass effect: layered tints simulating
+                    // depth, refraction, and a subtle edge glow — no real-time blur
+                    // available in Glance, so built from overlapping tints.
                     if (!photoBgActive && bgAlphaLevel > 0) {
                         // Deep base tint (cool blue-gray)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.12f, 0.14f, 0.20f, bgAlpha * 0.90f)))) {}
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.10f, 0.12f, 0.18f, bgAlpha * 0.92f)))) {}
                         // Mid layer: lighter interior (simulates light penetrating glass)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.18f, 0.20f, 0.26f, bgAlpha * 0.40f)))) {}
-                        // Edge highlight: thin white glow at the rim (glass refraction)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.12f)))) {}
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.20f, 0.22f, 0.28f, bgAlpha * 0.35f)))) {}
+                        // Top sheen: a lighter overlay suggesting ambient light from above
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.06f)))) {}
+                        // Edge highlight: thin bright rim (glass refraction at the border)
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.15f)))) {}
                     }
                     val base = GlanceModifier.fillMaxSize()
                         .let { m ->

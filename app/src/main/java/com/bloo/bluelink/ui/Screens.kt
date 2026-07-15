@@ -162,7 +162,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Slider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -6948,17 +6947,14 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Display scale
             SettingsCard("Display") {
-                // Scale slider: updates the percentage preview live during drag,
-                // but only commits the actual scale change when the user lets go.
                 var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
                 StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
-                Slider(
+                AnimatedSlider(
                     value = uiScaleDraft,
-                    onValueChange = { uiScaleDraft = it },
+                    onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
                     valueRange = 0.8f..1.3f,
                     steps = 4,
-                    onValueChangeFinished = { vm.setUiScaleSoon(uiScaleDraft) },
-                    modifier = Modifier.fillMaxWidth(),
+                    onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
                 // Unit system: controls temperature, distance, and speed display.
@@ -7677,13 +7673,12 @@ private fun SettingsSearchResults(
     add("Text & layout scale", "display size zoom bigger") {
         var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
         StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
-        Slider(
+        AnimatedSlider(
             value = uiScaleDraft,
-            onValueChange = { uiScaleDraft = it },
+            onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
             valueRange = 0.8f..1.3f,
             steps = 4,
-            onValueChangeFinished = { vm.setUiScaleSoon(uiScaleDraft) },
-            modifier = Modifier.fillMaxWidth(),
+            onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
