@@ -244,54 +244,20 @@ object WearBridge {
         WearCommandRunner.refresh(context, vin)
 
     /** Trigger a Drive sync: download settings from Drive, import them, and re-publish
-     *  to the watch. Called when the watch requests a Drive sync. */
+     *  to the watch. Called when the watch requests a Drive sync.
+     *
+     *  The download/compare/import/upload sequence itself lives in
+     *  [SettingsStore.performDriveSync] — shared with the phone's own
+     *  auto-sync-on-refresh collector, so there's exactly one implementation. */
     suspend fun driveSync(context: Context) {
         runCatching {
             val store = SettingsStore(context)
-            val uri = store.syncUri()
-            if (uri == null) {
+            if (store.syncUri() == null) {
                 com.bloo.bluelink.data.AppLog.log("⚠ Drive sync: not configured")
                 return@runCatching
             }
-            val app = context.applicationContext
-            val parsed = android.net.Uri.parse(uri)
-            if (store.syncWifiOnly()) {
-                val cm = app.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-                val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
-                    ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
-                if (!wifi) {
-                    com.bloo.bluelink.data.AppLog.log("⚠ Drive sync: skipped (Wi-Fi only, on cellular)")
-                    return@runCatching
-                }
-            }
             com.bloo.bluelink.data.AppLog.log("Drive sync: starting")
-            val fileModifiedMs = runCatching {
-                if (android.provider.DocumentsContract.isDocumentUri(app, parsed)) {
-                    val cursor = app.contentResolver.query(
-                        parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
-                        null, null, null,
-                    )
-                    cursor?.use {
-                        if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
-                        else null
-                    }
-                } else null
-            }.getOrNull()
-            val remoteContent = app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText() ?: return@runCatching
-            val remoteJson = remoteContent.substringAfter('\n', "")
-            val remoteTs = fileModifiedMs ?: (remoteContent.substringBefore('\n').toLongOrNull() ?: 0L)
-            val lastSync = store.lastSyncMs()
-            if (remoteTs > lastSync) {
-                com.bloo.bluelink.data.AppLog.log("Drive sync: importing newer settings")
-                store.importSettingsJson(remoteJson)
-            }
-            val now = System.currentTimeMillis()
-            val body = "$now\n${store.exportSettingsJson()}"
-            runCatching {
-                app.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
-                com.bloo.bluelink.data.AppLog.log("Drive sync: complete")
-            }.onFailure { com.bloo.bluelink.data.AppLog.log("⚠ Drive sync: upload failed: ${it.message}") }
-            store.setLastSyncMs(now)
+            store.performDriveSync()
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)
             updateAllSurfaces(context)

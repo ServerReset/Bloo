@@ -710,6 +710,81 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[stringPreferencesKey("sync_wifi")] = value.toString() }
     }
 
+    /** Outcome of one [performDriveSync] pass. */
+    data class DriveSyncOutcome(
+        /** False when sync isn't configured, or was skipped (Wi-Fi-only, not on Wi-Fi). */
+        val ran: Boolean,
+        /** True if a newer remote file was found and imported into this device. */
+        val imported: Boolean,
+        /** True if this device's settings were successfully uploaded. */
+        val uploaded: Boolean,
+        /** The timestamp this pass recorded as the last-sync time (unchanged if !ran). */
+        val syncedAtMs: Long,
+    )
+
+    /**
+     * One full bidirectional Drive-sync pass: download the file at [syncUri] (if
+     * configured), import it when it's newer than our last sync (by the file's
+     * real last-modified time, falling back to a timestamp embedded in the file
+     * for providers that don't expose one), then upload our current settings with
+     * a fresh timestamp.
+     *
+     * This is the ONE place this logic lives — it used to be duplicated between
+     * the phone's auto-sync-on-refresh collector and the watch's on-demand
+     * "Sync now" request, which is exactly how a bug (this device's own Drive URI
+     * leaking into the portable export) existed in two copies at once.
+     */
+    suspend fun performDriveSync(): DriveSyncOutcome {
+        val uri = syncUri() ?: return DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
+        if (syncWifiOnly()) {
+            val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
+                ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+            if (!wifi) {
+                AppLog.log("⚠ Drive sync: skipped (Wi-Fi only, on cellular)")
+                return DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
+            }
+        }
+        val parsed = android.net.Uri.parse(uri)
+        // Check the file's actual last-modified time from Drive.
+        val fileModifiedMs = runCatching {
+            if (android.provider.DocumentsContract.isDocumentUri(context, parsed)) {
+                val cursor = context.contentResolver.query(
+                    parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                    null, null, null,
+                )
+                cursor?.use {
+                    if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
+                    else null
+                }
+            } else null
+        }.getOrNull()
+        // Download: read the existing file from Drive.
+        val remoteContent = runCatching {
+            context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+        }.getOrNull()
+        val remoteJson = remoteContent?.substringAfter('\n', "")
+        val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
+        var imported = false
+        if (remoteTs > lastSyncMs() && remoteJson != null) {
+            AppLog.log("Drive sync: imported newer settings")
+            importSettingsJson(remoteJson)
+            imported = true
+        }
+        val now = System.currentTimeMillis()
+        val body = "$now\n${exportSettingsJson()}"
+        val uploaded = runCatching {
+            context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
+            AppLog.log("Drive sync: uploaded settings")
+            true
+        }.getOrElse {
+            AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
+            false
+        }
+        setLastSyncMs(now)
+        return DriveSyncOutcome(ran = true, imported = imported, uploaded = uploaded, syncedAtMs = now)
+    }
+
     // The car's last known address + coordinates, refreshed by the Location action
     // and rendered in the widget's location box.
     suspend fun widgetLocationAddress(widgetId: Int): String? =
@@ -899,6 +974,12 @@ class SettingsStore(private val context: Context) {
 
     private val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
+    /** Preference keys that describe THIS device's own Drive-sync wiring (a
+     *  content:// URI this app instance was granted permission for, and the local
+     *  bookkeeping of when it last synced) — never portable, so never included in
+     *  or restored from a settings backup. */
+    private val DEVICE_LOCAL_KEYS = setOf("sync_uri", "sync_last_ms")
+
     /**
      * Export every app preference (theme, colours and custom palettes, weather,
      * notifications, tiles, per-car config…) as one portable JSON backup. Values
@@ -909,6 +990,13 @@ class SettingsStore(private val context: Context) {
         val prefs = context.settingsDataStore.data.first()
         val entries = buildJsonObject {
             prefs.asMap().forEach { (key, value) ->
+                // sync_uri/sync_last_ms are this DEVICE's own Drive permission grant
+                // and sync bookkeeping, not a portable app preference — including
+                // them would make every import overwrite the receiving device's
+                // working Drive URI with one it has no permission to use, silently
+                // breaking its own sync (or corrupting a plain settings-restore that
+                // has nothing to do with Drive at all).
+                if (key.name in DEVICE_LOCAL_KEYS) return@forEach
                 when (value) {
                     is Boolean -> put(key.name, JsonPrimitive(value))
                     is String -> put(key.name, JsonPrimitive(value))
@@ -937,6 +1025,10 @@ class SettingsStore(private val context: Context) {
         val prefs = root["prefs"]?.jsonObject ?: return "Settings file has no data"
         context.settingsDataStore.edit { mut ->
             prefs.forEach { (name, element) ->
+                // Never accept this device's own Drive URI/bookkeeping from a backup —
+                // exportSettingsJson no longer writes these, but reject them here too
+                // in case an older export (or a hand-edited file) still has them.
+                if (name in DEVICE_LOCAL_KEYS) return@forEach
                 val prim = (element as? JsonPrimitive) ?: return@forEach
                 when {
                     // A real JSON string (e.g. "DARK", "true") → keep as a string pref.
