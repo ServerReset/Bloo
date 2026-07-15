@@ -183,6 +183,9 @@ class WearPhoneService : WearableListenerService() {
         if (!SettingsStore(ctx).aiEnabled()) {
             return WearAiResult(vin, ok = false, message = "AI summaries are turned off in Settings")
         }
+        if (!Ai(ctx).isSupported()) {
+            return WearAiResult(vin, ok = false, message = "AI summaries aren't supported on this phone")
+        }
         val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
             ?: return WearAiResult(vin, ok = false, message = "Car not found")
         val summary = runCatching {

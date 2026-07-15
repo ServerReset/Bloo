@@ -254,7 +254,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             WearPresetsStore(ctx).flow.collect { p -> _ui.update { it.copy(presets = p.byVin) } }
         }
         viewModelScope.launch {
-            WearExtrasStore(ctx).flow.collect { e -> _ui.update { it.copy(extras = e, aiBusy = null) } }
+            WearExtrasStore(ctx).flow.collect { e ->
+                _ui.update { u ->
+                    // extras also carries weather/photo updates on the same push,
+                    // so only clear aiBusy when a NEW summary actually landed for
+                    // the car we're waiting on -- otherwise an unrelated weather
+                    // refresh silently kills the spinner and the real AI result
+                    // (or failure) that arrives later gets dropped by WearAiEvents'
+                    // own "still waiting on this vin" guard.
+                    val busyVin = u.aiBusy
+                    val gotNewSummary = busyVin != null && e.ai[busyVin] != null && e.ai[busyVin] != u.extras.ai[busyVin]
+                    u.copy(extras = e, aiBusy = if (gotNewSummary) null else u.aiBusy)
+                }
+            }
         }
         viewModelScope.launch {
             localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
