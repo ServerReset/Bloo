@@ -6513,6 +6513,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 label = "settingsMode",
             ) { isAdvanced ->
                 Column {
+            Spacer(Modifier.height(8.dp))
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
                 if (state.accounts.isEmpty()) {
@@ -6598,21 +6599,36 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // App-icon shortcuts (long-press the launcher icon)
-            if (advanced) SettingsCard("App shortcuts") {
-                Text(
-                    "Pick which long-press app-icon shortcuts appear. Launchers usually show " +
-                        "only the first 4–5.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                state.vehicles.forEach { v ->
-                    Spacer(Modifier.height(4.dp))
-                    Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
-                        ToggleRow(
-                            com.bloo.bluelink.Shortcuts.actionLabel(cmd),
-                            state.isShortcutEnabled(v.vin, cmd),
-                        ) { vm.setShortcutEnabled(v.vin, cmd, it) }
+            if (advanced) {
+                var shortcutsExpanded by remember { mutableStateOf(false) }
+                SettingsCard("App shortcuts") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Quick-access shortcuts from the launcher icon",
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        MorphExpandButton(expanded = shortcutsExpanded, onToggle = { shortcutsExpanded = !shortcutsExpanded })
+                    }
+                    AnimatedVisibility(
+                        visible = shortcutsExpanded,
+                        enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+                        exit = fadeOut(tween(150)) + shrinkVertically(tween(160)),
+                    ) {
+                        Column {
+                            Spacer(Modifier.height(8.dp))
+                            state.vehicles.forEach { v ->
+                                Spacer(Modifier.height(4.dp))
+                                Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
+                                    ToggleRow(
+                                        com.bloo.bluelink.Shortcuts.actionLabel(cmd),
+                                        state.isShortcutEnabled(v.vin, cmd),
+                                    ) { vm.setShortcutEnabled(v.vin, cmd, it) }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -6949,7 +6965,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
                 AnimatedSlider(
                     value = uiScaleDraft,
-                    onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+                    onValueChange = { uiScaleDraft = it },
                     valueRange = 0.8f..1.3f,
                     steps = 4,
                     onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
@@ -7316,9 +7332,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                     StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
                     AnimatedSlider(
                         value = vibrancyDraft,
-                        onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
+                        onValueChange = { vibrancyDraft = it },
                         valueRange = 0f..2f,
-                        steps = 19,
+                        steps = 9,
                         onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
                     )
                 }
@@ -7369,17 +7385,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Text("My location", fontWeight = FontWeight.SemiBold)
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Text("Units", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(6.dp))
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("imperial", "Imperial", null),
-                        SegmentOption("metric", "Metric", null),
-                    ),
-                    selectedKey = appearance.unitSystem,
-                    onSelect = { vm.setUnitSystem(it) },
-                )
                 }  // Column (AnimatedContent content)
             }  // AnimatedContent
             }
@@ -7416,7 +7421,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             ) {
                 Text(
                     if (state.settingsMode == "advanced") "Simple" else "Advanced",
-                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -7721,9 +7726,9 @@ private fun SettingsSearchResults(
         StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
         AnimatedSlider(
             value = vibrancyDraft,
-            onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
+            onValueChange = { vibrancyDraft = it },
             valueRange = 0f..2f,
-            steps = 19,
+            steps = 9,
             onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
         )
     }
