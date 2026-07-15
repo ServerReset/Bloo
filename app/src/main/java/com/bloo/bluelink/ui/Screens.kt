@@ -6512,7 +6512,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 },
                 label = "settingsMode",
             ) { isAdvanced ->
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Spacer(Modifier.height(8.dp))
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
@@ -6935,10 +6935,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                 StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
                 AnimatedSlider(
                     value = vibrancyDraft,
-                    onValueChange = { vibrancyDraft = it },
+                    onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
                     valueRange = 0f..2f,
-                    steps = 0,
-                    onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
+                    steps = 19,
+                    onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
                 )
 
                 if (showEditor) {
@@ -6960,10 +6960,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                 StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
                 AnimatedSlider(
                     value = uiScaleDraft,
-                    onValueChange = { uiScaleDraft = it },
+                    onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
                     valueRange = 0.8f..1.3f,
-                    steps = 0,
-                    onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
+                    steps = 4,
+                    onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
                 // Unit system: controls temperature, distance, and speed display.
@@ -7320,17 +7320,40 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                 }
                 if (advanced) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(14.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
+                    ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
+                    Text(
+                        "Uses your wallpaper palette on Android 12+. Turn off to choose a built-in palette below.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    AnimatedVisibility(visible = !appearance.dynamicColor) {
+                        Column {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Built-in palettes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(6.dp))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ColorPalette.entries.forEach { palette ->
+                                    PaletteSwatch(
+                                        palette = palette,
+                                        selected = appearance.activeCustomPaletteId == null && appearance.colorPalette == palette,
+                                        onClick = { vm.setColorPalette(palette); vm.setActiveCustomPaletteId(null) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
                     var vibrancyDraft by remember(appearance.vibrancy) { mutableFloatStateOf(appearance.vibrancy) }
                     StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
                     AnimatedSlider(
                         value = vibrancyDraft,
-                        onValueChange = { vibrancyDraft = it },
+                        onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
                         valueRange = 0f..2f,
-                        steps = 0,
-                        onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
+                        steps = 19,
+                        onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
                     )
                 }
             }
@@ -7709,10 +7732,10 @@ private fun SettingsSearchResults(
         StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
         AnimatedSlider(
             value = uiScaleDraft,
-            onValueChange = { uiScaleDraft = it },
+            onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
             valueRange = 0.8f..1.3f,
-            steps = 0,
-            onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
+            steps = 4,
+            onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
@@ -7721,10 +7744,10 @@ private fun SettingsSearchResults(
         StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
         AnimatedSlider(
             value = vibrancyDraft,
-            onValueChange = { vibrancyDraft = it },
+            onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
             valueRange = 0f..2f,
-            steps = 0,
-            onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
+            steps = 19,
+            onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
         )
     }
     add("Open links in app", "browser tab links") {

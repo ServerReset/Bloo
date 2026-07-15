@@ -111,7 +111,9 @@ fun AnimatedSlider(
             onStepTick()
             prevStep = s
         }
-        onValueChange(s)
+        // Use the continuous raw value during drag so the preview updates live;
+        // the snapped step is used on settle for the final commit.
+        onValueChange(clamped)
     }
     fun settleTo(target: Float) {
         prevStep = target
