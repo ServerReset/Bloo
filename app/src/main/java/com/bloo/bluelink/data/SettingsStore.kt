@@ -198,19 +198,19 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setHapticsEnabled(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.HAPTICS] = value.toString() }
+        editTracked { it[Keys.HAPTICS] = value.toString() }
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {
-        context.settingsDataStore.edit { it[Keys.BIOMETRIC] = enabled.toString() }
+        editTracked { it[Keys.BIOMETRIC] = enabled.toString() }
     }
 
     suspend fun setLockTiming(value: LockTiming) {
-        context.settingsDataStore.edit { it[Keys.LOCK_TIMING] = value.name }
+        editTracked { it[Keys.LOCK_TIMING] = value.name }
     }
 
     suspend fun setColumnsFlipped(flipped: Boolean) {
-        context.settingsDataStore.edit { it[Keys.FLIPPED] = flipped.toString() }
+        editTracked { it[Keys.FLIPPED] = flipped.toString() }
     }
 
     // --- Notifications --------------------------------------------------
@@ -245,26 +245,26 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setNotifyService(v: Boolean) =
-        context.settingsDataStore.edit { it[booleanPreferencesKey("notify_service")] = v }.let {}
+        editTracked { it[booleanPreferencesKey("notify_service")] = v }.let {}
 
     suspend fun setNotifyDoor(v: Boolean) =
-        context.settingsDataStore.edit { it[booleanPreferencesKey("notify_door")] = v }.let {}
+        editTracked { it[booleanPreferencesKey("notify_door")] = v }.let {}
 
     suspend fun setDoorOpenMinutes(v: Int) =
-        context.settingsDataStore.edit { it[stringPreferencesKey("notify_door_min")] = v.toString() }.let {}
+        editTracked { it[stringPreferencesKey("notify_door_min")] = v.toString() }.let {}
 
     suspend fun setNotifyRunning(v: Boolean) =
-        context.settingsDataStore.edit { it[booleanPreferencesKey("notify_running")] = v }.let {}
+        editTracked { it[booleanPreferencesKey("notify_running")] = v }.let {}
 
     suspend fun setRunningMinutes(v: Int) =
-        context.settingsDataStore.edit { it[stringPreferencesKey("notify_running_min")] = v.toString() }.let {}
+        editTracked { it[stringPreferencesKey("notify_running_min")] = v.toString() }.let {}
 
     // Transient alert bookkeeping (per car), used to fire each alert only once.
     suspend fun doorOpenSince(vin: String): Long? =
         context.settingsDataStore.data.first()[stringPreferencesKey("door_since_$vin")]?.toLongOrNull()
 
     suspend fun setDoorOpenSince(vin: String, value: Long?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val k = stringPreferencesKey("door_since_$vin")
             if (value == null) it.remove(k) else it[k] = value.toString()
         }
@@ -274,7 +274,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("engine_since_$vin")]?.toLongOrNull()
 
     suspend fun setEngineOnSince(vin: String, value: Long?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val k = stringPreferencesKey("engine_since_$vin")
             if (value == null) it.remove(k) else it[k] = value.toString()
         }
@@ -284,42 +284,42 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("alert_$key")] ?: false
 
     suspend fun setAlertFired(key: String, value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("alert_$key")] = value }
+        editTracked { it[booleanPreferencesKey("alert_$key")] = value }
     }
 
     suspend fun setUiScale(value: Float) {
-        context.settingsDataStore.edit { it[Keys.UI_SCALE] = value.toString() }
+        editTracked { it[Keys.UI_SCALE] = value.toString() }
     }
 
     suspend fun setVibrancy(value: Float) {
-        context.settingsDataStore.edit { it[Keys.VIBRANCY] = value.toString() }
+        editTracked { it[Keys.VIBRANCY] = value.toString() }
     }
 
     suspend fun setLinksInApp(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.LINKS_IN_APP] = value.toString() }
+        editTracked { it[Keys.LINKS_IN_APP] = value.toString() }
     }
 
     suspend fun setAuroraBackground(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.AURORA] = value.toString() }
+        editTracked { it[Keys.AURORA] = value.toString() }
     }
 
     suspend fun setAuroraMotion(value: String) {
-        context.settingsDataStore.edit { it[Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
+        editTracked { it[Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
     }
 
     suspend fun setAuroraColorMode(value: String) {
-        context.settingsDataStore.edit { it[Keys.AURORA_COLOR_MODE] = value.takeIf { it in setOf("complementary", "material", "custom") } ?: "complementary" }
+        editTracked { it[Keys.AURORA_COLOR_MODE] = value.takeIf { it in setOf("complementary", "material", "custom") } ?: "complementary" }
     }
 
     suspend fun setAuroraCustomColor(value: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = Keys.AURORA_CUSTOM_COLOR
             if (value.isNullOrBlank()) it.remove(key) else it[key] = value
         }
     }
 
     suspend fun setUnitSystem(value: String) {
-        context.settingsDataStore.edit { it[Keys.UNIT_SYSTEM] = value.takeIf { it in setOf("imperial", "metric") } ?: "imperial" }
+        editTracked { it[Keys.UNIT_SYSTEM] = value.takeIf { it in setOf("imperial", "metric") } ?: "imperial" }
     }
 
     /** Settings view mode: "simple" or "advanced". */
@@ -327,7 +327,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[Keys.SETTINGS_MODE] ?: "simple"
 
     suspend fun setSettingsMode(value: String) {
-        context.settingsDataStore.edit { it[Keys.SETTINGS_MODE] = value }
+        editTracked { it[Keys.SETTINGS_MODE] = value }
     }
 
     /** Per-VIN default climate preset ID for the one-tap Start button. */
@@ -335,7 +335,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET_PREFIX + vin)]?.takeIf { it.isNotBlank() }
 
     suspend fun setDefaultClimatePreset(vin: String, id: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET_PREFIX + vin)
             if (id.isNullOrBlank()) it.remove(key) else it[key] = id
         }
@@ -347,7 +347,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("plate_$vin")] ?: ""
 
     suspend fun setLicensePlate(vin: String, value: String) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("plate_$vin")
             if (value.isBlank()) it.remove(key) else it[key] = value.trim()
         }
@@ -357,7 +357,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
 
     suspend fun setLastServiceMiles(vin: String, value: Int?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("svc_last_$vin")
             if (value == null) it.remove(key) else it[key] = value.toString()
         }
@@ -367,7 +367,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
 
     suspend fun setServiceIntervalMiles(vin: String, value: Int?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("svc_interval_$vin")
             if (value == null) it.remove(key) else it[key] = value.toString()
         }
@@ -377,7 +377,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[Keys.LAST_VIN]
 
     suspend fun setLastVehicleVin(vin: String) {
-        context.settingsDataStore.edit { it[Keys.LAST_VIN] = vin }
+        editTracked { it[Keys.LAST_VIN] = vin }
     }
 
     /** User-defined display order of vehicles (by VIN). */
@@ -386,7 +386,7 @@ class SettingsStore(private val context: Context) {
             ?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
 
     suspend fun setVehicleOrder(order: List<String>) {
-        context.settingsDataStore.edit { it[Keys.ORDER] = order.joinToString("\n") }
+        editTracked { it[Keys.ORDER] = order.joinToString("\n") }
     }
 
     /** Optional user-set photo URL per vehicle (empty = use the default gradient). */
@@ -394,7 +394,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("img_$vin")]?.takeIf { it.isNotBlank() }
 
     suspend fun setImageUrl(vin: String, url: String) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("img_$vin")
             if (url.isBlank()) it.remove(key) else it[key] = url.trim()
         }
@@ -425,7 +425,7 @@ class SettingsStore(private val context: Context) {
 
     /** [field] is one of dh/dc/ph/pc/rlh/rlc/rrh/rrc. */
     suspend fun setSeatFlag(vin: String, field: String, value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
+        editTracked { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
     }
 
     // --- First-run onboarding -------------------------------------------
@@ -434,7 +434,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("onboarding_seen")] ?: false
 
     suspend fun setOnboardingSeen() {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("onboarding_seen")] = true }
+        editTracked { it[booleanPreferencesKey("onboarding_seen")] = true }
     }
 
     /** True once a car has been through the feature-setup wizard. */
@@ -442,7 +442,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("car_configured_$vin")] ?: false
 
     suspend fun setCarConfigured(vin: String) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("car_configured_$vin")] = true }
+        editTracked { it[booleanPreferencesKey("car_configured_$vin")] = true }
     }
 
     // --- Per-car section order -------------------------------------------
@@ -470,7 +470,7 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setSectionOrder(vin: String, order: List<String>) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("sections_$vin")] = order.joinToString(",") }
+        editTracked { it[stringPreferencesKey("sections_$vin")] = order.joinToString(",") }
     }
 
     private fun csv(p: androidx.datastore.preferences.core.Preferences, key: String): Set<String> =
@@ -480,7 +480,7 @@ class SettingsStore(private val context: Context) {
         csv(context.settingsDataStore.data.first(), "collapsed_$vin")
 
     suspend fun setSectionCollapsed(vin: String, section: String, collapsed: Boolean) {
-        context.settingsDataStore.edit {
+        editTracked {
             val set = csv(it, "collapsed_$vin").toMutableSet()
             if (collapsed) set.add(section) else set.remove(section)
             it[stringPreferencesKey("collapsed_$vin")] = set.joinToString(",")
@@ -491,7 +491,7 @@ class SettingsStore(private val context: Context) {
         csv(context.settingsDataStore.data.first(), "hidden_$vin")
 
     suspend fun setSectionHidden(vin: String, section: String, hidden: Boolean) {
-        context.settingsDataStore.edit {
+        editTracked {
             val set = csv(it, "hidden_$vin").toMutableSet()
             if (hidden) set.add(section) else set.remove(section)
             it[stringPreferencesKey("hidden_$vin")] = set.joinToString(",")
@@ -504,7 +504,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("ai_enabled")] ?: false
 
     suspend fun setAiEnabled(value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("ai_enabled")] = value }
+        editTracked { it[booleanPreferencesKey("ai_enabled")] = value }
     }
 
     /** When on, AI summaries run automatically on open/refresh/command (vs only on tap). */
@@ -512,7 +512,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("ai_auto")] ?: false
 
     suspend fun setAiAuto(value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("ai_auto")] = value }
+        editTracked { it[booleanPreferencesKey("ai_auto")] = value }
     }
 
     // --- App-icon shortcut selection -------------------------------------
@@ -524,7 +524,7 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setEnabledShortcuts(ids: Set<String>) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("enabled_shortcuts")] = ids.joinToString(",") }
+        editTracked { it[stringPreferencesKey("enabled_shortcuts")] = ids.joinToString(",") }
     }
 
     // --- Quick Settings tiles --------------------------------------------
@@ -538,7 +538,7 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setTileConfig(index: Int, vin: String?, cmd: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val vk = stringPreferencesKey("tile_${index}_vin")
             val ck = stringPreferencesKey("tile_${index}_cmd")
             if (vin.isNullOrBlank() || cmd.isNullOrBlank()) { it.remove(vk); it.remove(ck) }
@@ -551,7 +551,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("tile_${index}_label")]?.takeIf { it.isNotBlank() }
 
     suspend fun setTileLabel(index: Int, label: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val k = stringPreferencesKey("tile_${index}_label")
             if (label.isNullOrBlank()) it.remove(k) else it[k] = label.trim()
         }
@@ -563,7 +563,7 @@ class SettingsStore(private val context: Context) {
             ?.takeIf { it.isNotBlank() } ?: "default"
 
     suspend fun setTileClimateTarget(index: Int, target: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val k = stringPreferencesKey("tile_${index}_climate")
             if (target.isNullOrBlank()) it.remove(k) else it[k] = target
         }
@@ -574,7 +574,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("tile_background")] ?: false
 
     suspend fun setTileBackground(value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("tile_background")] = value }
+        editTracked { it[booleanPreferencesKey("tile_background")] = value }
     }
 
     /** When true, a tile kicks a throttled status refresh when it becomes visible,
@@ -583,7 +583,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("tile_live_refresh")] ?: false
 
     suspend fun setTileLiveRefresh(value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("tile_live_refresh")] = value }
+        editTracked { it[booleanPreferencesKey("tile_live_refresh")] = value }
     }
 
     /** Last time a tile-driven refresh ran for [vin] (epoch ms), for throttling. */
@@ -591,7 +591,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("tile_refreshed_$vin")]?.toLongOrNull() ?: 0L
 
     suspend fun setTileRefreshedAt(vin: String, value: Long) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("tile_refreshed_$vin")] = value.toString() }
+        editTracked { it[stringPreferencesKey("tile_refreshed_$vin")] = value.toString() }
     }
 
     // --- Home-screen widgets -------------------------------------------------
@@ -606,14 +606,14 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setWidgetConfig(widgetId: Int, vin: String, actions: List<String>) {
-        context.settingsDataStore.edit {
+        editTracked {
             it[stringPreferencesKey("widget_${widgetId}_vin")] = vin
             it[stringPreferencesKey("widget_${widgetId}_actions")] = actions.joinToString(",")
         }
     }
 
     suspend fun clearWidgetConfig(widgetId: Int) {
-        context.settingsDataStore.edit {
+        editTracked {
             // Remove every per-widget key so a re-used widget id starts clean.
             listOf("vin", "actions", "pending", "auth", "photobg", "loc", "addr", "lat", "lon").forEach { suffix ->
                 it.remove(stringPreferencesKey("widget_${widgetId}_$suffix"))
@@ -626,7 +626,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_pending")]?.takeIf { it.isNotBlank() }
 
     suspend fun setWidgetPendingAction(widgetId: Int, action: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("widget_${widgetId}_pending")
             if (action.isNullOrBlank()) it.remove(key) else it[key] = action
         }
@@ -636,7 +636,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_auth")] ?: true
 
     suspend fun setWidgetRequireAuth(widgetId: Int, value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_auth")] = value }
+        editTracked { it[booleanPreferencesKey("widget_${widgetId}_auth")] = value }
     }
 
     /** Use the car's set photo as a full-bleed widget background (default off). */
@@ -644,7 +644,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_photobg")] ?: false
 
     suspend fun setWidgetPhotoBackground(widgetId: Int, value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_photobg")] = value }
+        editTracked { it[booleanPreferencesKey("widget_${widgetId}_photobg")] = value }
     }
 
     /** Widget background transparency level (0 = opaque, 9 = very transparent). */
@@ -653,7 +653,7 @@ class SettingsStore(private val context: Context) {
             ?.toIntOrNull() ?: 0
 
     suspend fun setWidgetBackgroundAlpha(widgetId: Int, value: Int) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_alpha")] = value.coerceIn(0, 9).toString() }
+        editTracked { it[stringPreferencesKey("widget_${widgetId}_alpha")] = value.coerceIn(0, 9).toString() }
     }
 
     /** Show a map/location box on large widgets (default off). */
@@ -661,7 +661,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_loc")] ?: false
 
     suspend fun setWidgetShowLocation(widgetId: Int, value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_loc")] = value }
+        editTracked { it[booleanPreferencesKey("widget_${widgetId}_loc")] = value }
     }
 
     /** Much more rounded corners (pill-like) for small widgets (default false). */
@@ -669,7 +669,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_pill")] ?: false
 
     suspend fun setWidgetPillShape(widgetId: Int, value: Boolean) {
-        context.settingsDataStore.edit { it[booleanPreferencesKey("widget_${widgetId}_pill")] = value }
+        editTracked { it[booleanPreferencesKey("widget_${widgetId}_pill")] = value }
     }
 
     /** Layout preference: "info" (show percent/range) or "controls" (show buttons). */
@@ -678,7 +678,7 @@ class SettingsStore(private val context: Context) {
             ?: "info"
 
     suspend fun setWidgetLayoutMode(widgetId: Int, value: String) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("widget_${widgetId}_layout")] = value.takeIf { it in setOf("info", "controls") } ?: "info" }
+        editTracked { it[stringPreferencesKey("widget_${widgetId}_layout")] = value.takeIf { it in setOf("info", "controls") } ?: "info" }
     }
 
     /** Drive URI for auto-backup; null when not configured. */
@@ -686,7 +686,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("sync_uri")]?.takeIf { it.isNotBlank() }
 
     suspend fun setSyncUri(uri: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("sync_uri")
             if (uri.isNullOrBlank()) it.remove(key) else it[key] = uri
         }
@@ -698,7 +698,7 @@ class SettingsStore(private val context: Context) {
             ?.toLongOrNull() ?: 0L
 
     suspend fun setLastSyncMs(ms: Long) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("sync_last_ms")] = ms.toString() }
+        editTracked { it[stringPreferencesKey("sync_last_ms")] = ms.toString() }
     }
 
     /** Wi-Fi only sync (true) or any network (false). */
@@ -707,7 +707,7 @@ class SettingsStore(private val context: Context) {
             ?.toBooleanStrictOrNull() ?: true
 
     suspend fun setSyncWifiOnly(value: Boolean) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("sync_wifi")] = value.toString() }
+        editTracked { it[stringPreferencesKey("sync_wifi")] = value.toString() }
     }
 
     /** Outcome of one [performDriveSync] pass. */
@@ -720,6 +720,9 @@ class SettingsStore(private val context: Context) {
         val uploaded: Boolean,
         /** The timestamp this pass recorded as the last-sync time (unchanged if !ran). */
         val syncedAtMs: Long,
+        /** A user-facing reason the pass didn't fully succeed, or null if it did
+         *  (or wasn't configured — that's not a failure). */
+        val error: String? = null,
     )
 
     /**
@@ -760,29 +763,41 @@ class SettingsStore(private val context: Context) {
             } else null
         }.getOrNull()
         // Download: read the existing file from Drive.
+        var downloadError: String? = null
         val remoteContent = runCatching {
             context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
-        }.getOrNull()
+        }.onFailure { downloadError = it.message ?: "Couldn't read the Drive file" }.getOrNull()
         val remoteJson = remoteContent?.substringAfter('\n', "")
         val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
         var imported = false
         if (remoteTs > lastSyncMs() && remoteJson != null) {
+            // Protect anything WE'VE changed locally but haven't uploaded yet —
+            // read the dirty set before this pass touches anything, so a merge
+            // import can't accidentally protect keys it's about to import itself.
+            val protectedKeys = dirtyKeys()
             AppLog.log("Drive sync: imported newer settings")
-            importSettingsJson(remoteJson)
+            mergeSettingsJson(remoteJson, protect = protectedKeys)
             imported = true
         }
         val now = System.currentTimeMillis()
         val body = "$now\n${exportSettingsJson()}"
+        var uploadError: String? = null
         val uploaded = runCatching {
             context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
             AppLog.log("Drive sync: uploaded settings")
             true
-        }.getOrElse {
+        }.onFailure {
+            uploadError = it.message ?: "Couldn't write the Drive file"
             AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
-            false
-        }
+        }.getOrElse { false }
         setLastSyncMs(now)
-        return DriveSyncOutcome(ran = true, imported = imported, uploaded = uploaded, syncedAtMs = now)
+        // We've now published everything we had pending, so nothing is "dirty"
+        // relative to Drive anymore — but only once the upload actually landed.
+        if (uploaded) clearDirtyKeys()
+        return DriveSyncOutcome(
+            ran = true, imported = imported, uploaded = uploaded, syncedAtMs = now,
+            error = uploadError ?: downloadError?.takeIf { remoteContent == null },
+        )
     }
 
     // The car's last known address + coordinates, refreshed by the Location action
@@ -791,7 +806,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_addr")]?.takeIf { it.isNotBlank() }
 
     suspend fun setWidgetLocationAddress(widgetId: Int, address: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("widget_${widgetId}_addr")
             if (address.isNullOrBlank()) it.remove(key) else it[key] = address
         }
@@ -805,7 +820,7 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setWidgetLocationLatLon(widgetId: Int, lat: Double?, lon: Double?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val latKey = stringPreferencesKey("widget_${widgetId}_lat")
             val lonKey = stringPreferencesKey("widget_${widgetId}_lon")
             if (lat != null) it[latKey] = lat.toString() else it.remove(latKey)
@@ -819,7 +834,7 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("hotspot_$vin")]?.takeIf { it.isNotBlank() }
 
     suspend fun setHotspot(vin: String, section: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             val key = stringPreferencesKey("hotspot_$vin")
             if (section.isNullOrBlank()) it.remove(key) else it[key] = section
         }
@@ -832,23 +847,23 @@ class SettingsStore(private val context: Context) {
             ?.let { runCatching { Powertrain.valueOf(it) }.getOrNull() }
 
     suspend fun setPowertrain(vin: String, value: Powertrain) {
-        context.settingsDataStore.edit { it[stringPreferencesKey("ptrain_$vin")] = value.name }
+        editTracked { it[stringPreferencesKey("ptrain_$vin")] = value.name }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
-        context.settingsDataStore.edit { it[Keys.THEME] = mode.name }
+        editTracked { it[Keys.THEME] = mode.name }
     }
 
     suspend fun setFontChoice(choice: FontChoice) {
-        context.settingsDataStore.edit { it[Keys.FONT] = choice.name }
+        editTracked { it[Keys.FONT] = choice.name }
     }
 
     suspend fun setDynamicColor(enabled: Boolean) {
-        context.settingsDataStore.edit { it[Keys.DYNAMIC] = enabled.toString() }
+        editTracked { it[Keys.DYNAMIC] = enabled.toString() }
     }
 
     suspend fun setColorPalette(palette: ColorPalette) {
-        context.settingsDataStore.edit { it[Keys.PALETTE] = palette.name }
+        editTracked { it[Keys.PALETTE] = palette.name }
     }
 
     // --- Per-car climate settings + presets ------------------------------
@@ -863,7 +878,7 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun saveClimate(vin: String, req: ClimateRequest) {
-        context.settingsDataStore.edit {
+        editTracked {
             it[stringPreferencesKey("climate_$vin")] = climateJson.encodeToString(ClimateRequest.serializer(), req)
         }
     }
@@ -878,21 +893,21 @@ class SettingsStore(private val context: Context) {
         val existing = climatePresets(vin).toMutableList()
         val idx = existing.indexOfFirst { it.id == preset.id }
         if (idx >= 0) existing[idx] = preset else existing.add(preset)
-        context.settingsDataStore.edit {
+        editTracked {
             it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, existing)
         }
     }
 
     suspend fun deleteClimatePreset(vin: String, id: String) {
         val updated = climatePresets(vin).filter { it.id != id }
-        context.settingsDataStore.edit {
+        editTracked {
             it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, updated)
         }
     }
 
     /** Persist a full, reordered preset list for a car. */
     suspend fun setClimatePresets(vin: String, presets: List<ClimatePreset>) {
-        context.settingsDataStore.edit {
+        editTracked {
             it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, presets)
         }
     }
@@ -910,7 +925,7 @@ class SettingsStore(private val context: Context) {
     /** Insert or replace a custom palette by id. */
     suspend fun saveCustomPalette(palette: CustomPaletteData) {
         val updated = readCustomPalettes().filter { it.id != palette.id } + palette
-        context.settingsDataStore.edit {
+        editTracked {
             it[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, updated)
         }
     }
@@ -918,7 +933,7 @@ class SettingsStore(private val context: Context) {
     /** Remove a custom palette; clears the active id if it matches. */
     suspend fun deleteCustomPalette(id: String) {
         val updated = readCustomPalettes().filter { it.id != id }
-        context.settingsDataStore.edit { prefs ->
+        editTracked { prefs ->
             prefs[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, updated)
             if (prefs[Keys.ACTIVE_CUSTOM_PALETTE_ID] == id) prefs.remove(Keys.ACTIVE_CUSTOM_PALETTE_ID)
         }
@@ -926,7 +941,7 @@ class SettingsStore(private val context: Context) {
 
     /** Set which custom palette is active (null = use a built-in palette). */
     suspend fun setActiveCustomPaletteId(id: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             if (id == null) it.remove(Keys.ACTIVE_CUSTOM_PALETTE_ID)
             else it[Keys.ACTIVE_CUSTOM_PALETTE_ID] = id
         }
@@ -940,7 +955,7 @@ class SettingsStore(private val context: Context) {
             runCatching { paletteJson.decodeFromString(carPaletteSerializer, json) }.getOrElse { emptyMap() }
         } ?: emptyMap()
         val updated = if (paletteId == null) current - vin else current + (vin to paletteId)
-        context.settingsDataStore.edit {
+        editTracked {
             if (updated.isEmpty()) it.remove(Keys.CAR_PALETTE_IDS)
             else it[Keys.CAR_PALETTE_IDS] = paletteJson.encodeToString(carPaletteSerializer, updated)
         }
@@ -948,7 +963,7 @@ class SettingsStore(private val context: Context) {
 
     /** Clear all per-car palette overrides at once (e.g. when reverting to dynamic color). */
     suspend fun clearAllCarPaletteIds() {
-        context.settingsDataStore.edit { it.remove(Keys.CAR_PALETTE_IDS) }
+        editTracked { it.remove(Keys.CAR_PALETTE_IDS) }
     }
 
     /** Serialise all custom palettes to a JSON string for export/share. */
@@ -964,7 +979,7 @@ class SettingsStore(private val context: Context) {
             .getOrElse { return "Invalid palette file" }
         val existing = readCustomPalettes()
         val merged = existing + parsed.filter { new -> existing.none { it.id == new.id } }
-        context.settingsDataStore.edit {
+        editTracked {
             it[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, merged)
         }
         return null
@@ -975,10 +990,50 @@ class SettingsStore(private val context: Context) {
     private val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     /** Preference keys that describe THIS device's own Drive-sync wiring (a
-     *  content:// URI this app instance was granted permission for, and the local
-     *  bookkeeping of when it last synced) — never portable, so never included in
-     *  or restored from a settings backup. */
-    private val DEVICE_LOCAL_KEYS = setOf("sync_uri", "sync_last_ms")
+     *  content:// URI this app instance was granted permission for, local
+     *  bookkeeping of when it last synced, its own Wi-Fi-only preference, and
+     *  which keys it's changed locally since its last sync) — never portable, so
+     *  never included in or restored from a settings backup. A tablet that's
+     *  Wi-Fi-only and a phone with unlimited data may reasonably want different
+     *  choices here, same as the Drive URI itself. */
+    private val DEVICE_LOCAL_KEYS = setOf("sync_uri", "sync_last_ms", "sync_wifi", "sync_dirty_keys")
+
+    /**
+     * Wraps a settings mutation to record which preference keys it actually
+     * changed into the "dirty" set — the keys this device has touched locally
+     * since its own last successful Drive sync. [performDriveSync] protects
+     * these from being overwritten by an incoming remote file, so a local edit
+     * that hasn't been uploaded yet is never silently lost (field-level merge
+     * instead of one whole-file last-write-wins).
+     *
+     * NOT used by [mergeSettingsJson] — accepting a value FROM the remote file
+     * must not re-mark that same key as a pending local change, or it would
+     * never propagate back out to a third device.
+     */
+    private suspend fun editTracked(mutate: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
+        context.settingsDataStore.edit { prefs ->
+            val before = HashMap(prefs.asMap())
+            mutate(prefs)
+            val after = prefs.asMap()
+            val touched = mutableSetOf<String>()
+            after.forEach { (k, v) -> if (before[k] != v) touched += k.name }
+            before.keys.forEach { k -> if (k.name !in after.keys.map { it.name }) touched += k.name }
+            touched.removeAll(DEVICE_LOCAL_KEYS)
+            if (touched.isNotEmpty()) {
+                val dirtyKey = stringPreferencesKey("sync_dirty_keys")
+                val existing = prefs[dirtyKey]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                prefs[dirtyKey] = (existing + touched).joinToString(",")
+            }
+        }
+    }
+
+    private suspend fun dirtyKeys(): Set<String> =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_dirty_keys")]
+            ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
+    private suspend fun clearDirtyKeys() {
+        context.settingsDataStore.edit { it.remove(stringPreferencesKey("sync_dirty_keys")) }
+    }
 
     /**
      * Export every app preference (theme, colours and custom palettes, weather,
@@ -1015,6 +1070,9 @@ class SettingsStore(private val context: Context) {
     /**
      * Restore settings from a backup produced by [exportSettingsJson], overwriting
      * any matching keys. Returns an error message on failure, or null on success.
+     * Uses [editTracked] — a manual restore is a deliberate local change, so if
+     * this device also has Drive auto-sync configured, the restored values are
+     * the ones the next sync should push out, not silently discard.
      */
     suspend fun importSettingsJson(json: String): String? {
         val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }
@@ -1023,7 +1081,7 @@ class SettingsStore(private val context: Context) {
             return "Not a Bloo settings backup"
         }
         val prefs = root["prefs"]?.jsonObject ?: return "Settings file has no data"
-        context.settingsDataStore.edit { mut ->
+        editTracked { mut ->
             prefs.forEach { (name, element) ->
                 // Never accept this device's own Drive URI/bookkeeping from a backup —
                 // exportSettingsJson no longer writes these, but reject them here too
@@ -1044,11 +1102,36 @@ class SettingsStore(private val context: Context) {
         return null
     }
 
+    /**
+     * Merge a Drive-downloaded settings file into local prefs for the AUTOMATIC
+     * bidirectional sync: every key in [protect] (changed locally since our own
+     * last successful sync, and not yet uploaded) keeps its current local value;
+     * every other key is taken from remote. Unlike [importSettingsJson] this does
+     * NOT go through [editTracked] — accepting a remote value must not re-mark
+     * that key as a pending local change, or it would never finish converging.
+     */
+    private suspend fun mergeSettingsJson(json: String, protect: Set<String>) {
+        val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return
+        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") return
+        val prefs = root["prefs"]?.jsonObject ?: return
+        context.settingsDataStore.edit { mut ->
+            prefs.forEach { (name, element) ->
+                if (name in DEVICE_LOCAL_KEYS || name in protect) return@forEach
+                val prim = (element as? JsonPrimitive) ?: return@forEach
+                when {
+                    prim.isString -> mut[stringPreferencesKey(name)] = prim.content
+                    prim.booleanOrNull != null -> mut[booleanPreferencesKey(name)] = prim.booleanOrNull!!
+                    else -> mut[stringPreferencesKey(name)] = prim.content
+                }
+            }
+        }
+    }
+
     // --- Weather ---------------------------------------------------------
 
     /** Set or clear the weather location. Passing null lat/lon clears it. */
     suspend fun setWeatherLocation(lat: Double?, lon: Double?, label: String?) {
-        context.settingsDataStore.edit {
+        editTracked {
             if (lat == null || lon == null) {
                 it.remove(Keys.WEATHER_LAT)
                 it.remove(Keys.WEATHER_LON)
