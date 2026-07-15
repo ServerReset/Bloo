@@ -6745,11 +6745,28 @@ private fun SettingsScreen(vm: AppViewModel) {
                 if (state.syncUri != null) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Settings auto-sync to Drive on every refresh. Changes made on " +
-                            "another device are merged automatically.",
+                        "Settings auto-sync to Drive in the background and on every " +
+                            "refresh. Changes made on another device are merged automatically.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
+                    val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
+                    if (lastSyncLabel.isNotBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Last synced $lastSyncLabel",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (state.syncError != null) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Sync failed: ${state.syncError}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     Spacer(Modifier.height(4.dp))
                     MorphSegmented(
                         options = listOf(

@@ -62,17 +62,33 @@ class WearListenerService : WearableListenerService() {
     }
 
     override fun onMessageReceived(event: MessageEvent) {
-        if (event.path != WearSync.PATH_COMMAND_RESULT) return
         val raw = String(event.data ?: ByteArray(0))
-        serviceScope.launch {
-            runCatching {
-                val result = WearSync.decodeResult(raw) ?: return@launch
-                WearNotifications.post(
-                    applicationContext,
-                    ("result" + result.vin + result.action).hashCode(),
-                    if (result.ok) "Command succeeded" else "Command failed",
-                    result.message ?: "Done",
-                )
+        when (event.path) {
+            WearSync.PATH_COMMAND_RESULT -> serviceScope.launch {
+                runCatching {
+                    val result = WearSync.decodeResult(raw) ?: return@launch
+                    WearNotifications.post(
+                        applicationContext,
+                        ("result" + result.vin + result.action).hashCode(),
+                        if (result.ok) "Command succeeded" else "Command failed",
+                        result.message ?: "Done",
+                    )
+                }
+            }
+            WearSync.PATH_SYNC_RESULT -> serviceScope.launch {
+                runCatching {
+                    val result = WearSync.decodeSyncResult(raw) ?: return@launch
+                    // A live WearViewModel (Settings screen, where "Sync now" lives)
+                    // clears its busy spinner off this immediately; the notification
+                    // is a backstop in case the app was closed mid-request.
+                    WearSyncEvents.emit(result)
+                    WearNotifications.post(
+                        applicationContext,
+                        "drivesync".hashCode(),
+                        if (result.ok) "Drive sync complete" else "Drive sync failed",
+                        result.message ?: if (result.ok) "Settings synced" else "Couldn't sync settings",
+                    )
+                }
             }
         }
     }

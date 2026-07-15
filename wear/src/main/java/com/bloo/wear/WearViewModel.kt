@@ -131,6 +131,8 @@ data class WearUi(
     val extras: com.bloo.bluelink.data.WearExtras = com.bloo.bluelink.data.WearExtras(),
     /** VIN currently waiting on an AI summary from the phone, for a spinner. */
     val aiBusy: String? = null,
+    /** True while a "Sync now" (Drive) request is waiting on the phone's reply. */
+    val driveSyncBusy: Boolean = false,
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     /** Per-car climate draft (sliders/toggles), so each car remembers its own. */
@@ -251,6 +253,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
+        }
+        viewModelScope.launch {
+            WearSyncEvents.results.collect { r ->
+                _ui.update { it.copy(driveSyncBusy = false, message = r.message ?: if (r.ok) "Settings synced" else "Sync failed") }
+            }
         }
         viewModelScope.launch {
             WearClimateStore(ctx).flow.collect { remote -> mergeRemoteClimate(remote) }
@@ -441,10 +448,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Ask the phone to pull the latest settings from Google Drive and re-publish them. */
+    /** Ask the phone to run a Drive sync and re-publish settings. Shows a busy
+     *  spinner until the phone's [com.bloo.bluelink.data.WearSyncResult] reply
+     *  arrives (via [WearSyncEvents]), or times out. */
     fun syncDrive() {
         viewModelScope.launch {
-            runCatching {
+            _ui.update { it.copy(driveSyncBusy = true, message = null) }
+            val sent = runCatching {
                 val node = com.bloo.wear.WearComms.phoneNodeId(ctx)
                 if (node != null) {
                     val cmd = com.bloo.bluelink.data.WearCommand(vin = "", action = com.bloo.bluelink.data.WearAction.DRIVE_SYNC)
@@ -454,9 +464,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                             com.bloo.bluelink.data.WearSync.encodeCommand(cmd).toByteArray(),
                         ), 10, java.util.concurrent.TimeUnit.SECONDS,
                     )
-                }
+                    true
+                } else false
+            }.getOrDefault(false)
+            if (!sent) {
+                _ui.update { it.copy(driveSyncBusy = false, message = "Bring your phone nearby to sync") }
+                return@launch
             }
-            delay(3000)
+            // Safety net: if the phone never replies (dropped connection mid-
+            // request), don't leave the busy spinner stuck forever. If the reply
+            // already arrived, the WearSyncEvents collector already cleared
+            // driveSyncBusy, so this no-ops.
+            delay(15_000)
+            _ui.update { if (it.driveSyncBusy) it.copy(driveSyncBusy = false, message = "Sync timed out") else it }
             runCatching { com.bloo.wear.WearComms.pullLatest(ctx) }
         }
     }

@@ -65,6 +65,10 @@ object WearSync {
     /** Message path: phone → watch, "I just executed a command, here's the result". */
     const val PATH_COMMAND_RESULT = "/bloo/command_result"
 
+    /** Message path: phone → watch, "I just attempted the Drive sync you asked
+     *  for, here's how it went". */
+    const val PATH_SYNC_RESULT = "/bloo/sync_result"
+
     /** DataItem path: watch → phone, local display preferences (font/UI scale)
      *  so a change made on the watch syncs back to the phone immediately. */
     const val PATH_LOCAL = "/bloo/local"
@@ -163,6 +167,12 @@ object WearSync {
 
     fun decodeResult(raw: String?): WearCommandResult? =
         raw?.let { runCatching { json.decodeFromString(WearCommandResult.serializer(), it) }.getOrNull() }
+
+    fun encodeSyncResult(result: WearSyncResult): String =
+        json.encodeToString(WearSyncResult.serializer(), result)
+
+    fun decodeSyncResult(raw: String?): WearSyncResult? =
+        raw?.let { runCatching { json.decodeFromString(WearSyncResult.serializer(), it) }.getOrNull() }
 }
 
 /** The full car list mirrored to the watch, plus which one is selected. */
@@ -225,6 +235,13 @@ data class WearCommand(
 data class WearCommandResult(
     val vin: String,
     val action: String,
+    val ok: Boolean,
+    val message: String? = null,
+)
+
+/** The phone's reply after attempting a watch-requested Drive sync. */
+@Serializable
+data class WearSyncResult(
     val ok: Boolean,
     val message: String? = null,
 )

@@ -163,6 +163,9 @@ data class UiState(
     val lastSyncMs: Long = 0L,
     /** Wi-Fi only sync (true) or any network (false). */
     val syncWifiOnly: Boolean = true,
+    /** Reason the last Drive sync attempt didn't fully succeed, or null if it did
+     *  (or hasn't run yet). Cleared by the next attempt that succeeds. */
+    val syncError: String? = null,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 
@@ -727,7 +730,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (!wasRefreshing) {
                     val outcome = withContext(Dispatchers.IO) { settingsStore.performDriveSync() }
                     if (outcome.ran) {
-                        _state.update { it.copy(lastSyncMs = outcome.syncedAtMs) }
+                        _state.update { it.copy(lastSyncMs = outcome.syncedAtMs, syncError = outcome.error) }
                     }
                 }
             }

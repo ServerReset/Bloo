@@ -8,6 +8,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearExtras
 import com.bloo.bluelink.data.WearSync
+import com.bloo.bluelink.data.WearSyncResult
 import androidx.glance.appwidget.updateAll
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataEvent
@@ -84,7 +85,21 @@ class WearPhoneService : WearableListenerService() {
                             WearBridge.refreshAllSurfaces(ctx)
                         }
                         WearAction.DRIVE_SYNC -> {
-                            WearBridge.driveSync(ctx)
+                            val outcome = WearBridge.driveSync(ctx)
+                            val result = if (outcome == null) {
+                                WearSyncResult(ok = false, message = "Drive sync isn't set up on this phone")
+                            } else {
+                                WearSyncResult(ok = outcome.uploaded, message = outcome.error)
+                            }
+                            runCatching {
+                                Tasks.await(
+                                    Wearable.getMessageClient(ctx).sendMessage(
+                                        event.sourceNodeId,
+                                        WearSync.PATH_SYNC_RESULT,
+                                        WearSync.encodeSyncResult(result).toByteArray(),
+                                    )
+                                )
+                            }
                         }
                         else -> WearBridge.refreshAllSurfaces(ctx)
                     }

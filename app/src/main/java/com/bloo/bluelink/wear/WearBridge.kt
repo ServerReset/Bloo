@@ -244,23 +244,28 @@ object WearBridge {
         WearCommandRunner.refresh(context, vin)
 
     /** Trigger a Drive sync: download settings from Drive, import them, and re-publish
-     *  to the watch. Called when the watch requests a Drive sync.
+     *  to the watch. Called when the watch requests a Drive sync. Returns the
+     *  outcome so the caller can report back to the watch what happened; null
+     *  means sync isn't configured on this phone at all.
      *
      *  The download/compare/import/upload sequence itself lives in
      *  [SettingsStore.performDriveSync] — shared with the phone's own
      *  auto-sync-on-refresh collector, so there's exactly one implementation. */
-    suspend fun driveSync(context: Context) {
-        runCatching {
+    suspend fun driveSync(context: Context): SettingsStore.DriveSyncOutcome? {
+        return runCatching {
             val store = SettingsStore(context)
             if (store.syncUri() == null) {
                 com.bloo.bluelink.data.AppLog.log("⚠ Drive sync: not configured")
-                return@runCatching
+                return@runCatching null
             }
             com.bloo.bluelink.data.AppLog.log("Drive sync: starting")
-            store.performDriveSync()
+            val outcome = store.performDriveSync()
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)
             updateAllSurfaces(context)
+            outcome
+        }.getOrElse { e ->
+            SettingsStore.DriveSyncOutcome(ran = true, imported = false, uploaded = false, syncedAtMs = 0L, error = e.message ?: "Sync failed")
         }
     }
 

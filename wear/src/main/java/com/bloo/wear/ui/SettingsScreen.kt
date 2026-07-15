@@ -270,11 +270,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 MorphButton(
-                    label = "Import from Drive",
+                    label = if (ui.driveSyncBusy) "Syncing…" else "Import from Drive",
                     icon = Icons.Filled.Bolt,
                     active = false,
                     activeColor = MaterialTheme.colorScheme.tertiary,
-                    pending = false,
+                    pending = ui.driveSyncBusy,
                     onClick = { vm.syncDrive() },
                 )
             }
