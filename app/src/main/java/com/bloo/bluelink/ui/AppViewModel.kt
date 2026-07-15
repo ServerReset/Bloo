@@ -1842,9 +1842,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // In viewModelScope, not a screen-tied scope, so closing Settings inside
     // that beat can't drop the change.
     fun setUiScaleSoon(value: Float) =
-        viewModelScope.launch { kotlinx.coroutines.delay(150); settingsStore.setUiScale(value) }
+        viewModelScope.launch { settingsStore.setUiScale(value) }
     fun setVibrancySoon(value: Float) =
-        viewModelScope.launch { kotlinx.coroutines.delay(150); settingsStore.setVibrancy(value) }
+        viewModelScope.launch { settingsStore.setVibrancy(value) }
     fun setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
     fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }

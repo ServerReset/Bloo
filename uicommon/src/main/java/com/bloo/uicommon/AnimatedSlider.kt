@@ -125,7 +125,7 @@ fun AnimatedSlider(
             } else {
             anim.animateTo(
                 target,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
             )
             }
             settling = false
