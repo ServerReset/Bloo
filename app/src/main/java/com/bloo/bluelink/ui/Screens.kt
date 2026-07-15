@@ -6464,6 +6464,15 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
             Spacer(Modifier.height(8.dp))
+            AnimatedContent(
+                targetState = advanced,
+                transitionSpec = {
+                    (fadeIn(tween(300)) + slideInVertically { it / 8 }) togetherWith
+                        (fadeOut(tween(200)) + slideOutVertically { -it / 8 })
+                },
+                label = "settingsMode",
+            ) { isAdvanced ->
+                Column {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
                 if (state.accounts.isEmpty()) {
@@ -7321,6 +7330,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                     selectedKey = appearance.unitSystem,
                     onSelect = { vm.setUnitSystem(it) },
                 )
+                }  // Column (AnimatedContent content)
+            }  // AnimatedContent
             }
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
