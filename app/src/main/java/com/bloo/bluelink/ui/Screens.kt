@@ -461,7 +461,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Garage -> {
                     val appearance by vm.appearance.collectAsState()
                     Box(Modifier.fillMaxSize()) {
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance)
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = state.refreshing)
                         GarageScreen(state, vm)
                     }
                 }
@@ -1583,6 +1583,7 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
 private fun AuroraBackground(
     modifier: Modifier = Modifier,
     appearance: SettingsStore.Appearance? = null,
+    refreshing: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     val motionMode = appearance?.auroraMotion ?: "static"
@@ -1642,6 +1643,14 @@ private fun AuroraBackground(
         else -> scheme.secondary
     }
 
+    val explosion by animateFloatAsState(
+        targetValue = if (refreshing) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
+        label = "auroraExplode",
+    )
+    val explodeAlpha = 1f + explosion * 2.5f
+    val explodeSize = 1f + explosion * 0.8f
+    val explodeSpread = 1f + explosion * 0.3f
     val t = rememberInfiniteTransition(label = "aurora")
     val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
     val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(13000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
@@ -1650,14 +1659,14 @@ private fun AuroraBackground(
     Box(
         modifier
             .fillMaxSize()
-            .blur(120.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            .blur((120.dp * (1f + explosion * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
                     drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
-                blob(basePrimary.copy(alpha = 0.30f), mix(0.38f, 0.62f, p1) + tiltX, mix(0.40f, 0.55f, p2) + tiltY, 0.45f)
-                blob(baseTertiary.copy(alpha = 0.25f), mix(0.42f, 0.58f, p2) - tiltX, mix(0.45f, 0.60f, p3) - tiltY, 0.40f)
-                blob(baseSecondary.copy(alpha = 0.20f), mix(0.35f, 0.50f, p3) + tiltX, mix(0.38f, 0.52f, p1) + tiltY, 0.38f)
+                blob(basePrimary.copy(alpha = (0.30f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.38f, 0.62f, p1) + tiltX) * explodeSpread, (mix(0.40f, 0.55f, p2) + tiltY) * explodeSpread, 0.45f * explodeSize)
+                blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.42f, 0.58f, p2) - tiltX) * explodeSpread, (mix(0.45f, 0.60f, p3) - tiltY) * explodeSpread, 0.40f * explodeSize)
+                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.35f, 0.50f, p3) + tiltX) * explodeSpread, (mix(0.38f, 0.52f, p1) + tiltY) * explodeSpread, 0.38f * explodeSize)
             },
     )
 }
