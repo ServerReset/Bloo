@@ -6508,6 +6508,13 @@ private fun SettingsScreen(vm: AppViewModel) {
             SettingsSearchResults(query, vm, state, appearance, notif)
           } else {
             val advanced = state.settingsMode == "advanced"
+            // Shared transition for every advanced-only card/section below, so
+            // switching Simple/Advanced reveals or tucks them away smoothly
+            // instead of an abrupt appear/disappear (the outer Column's own
+            // animateContentSize only smooths the resulting height change
+            // around them, not their own appearance).
+            val advancedEnter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
+            val advancedExit = fadeOut(tween(150)) + shrinkVertically(tween(160))
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)),
@@ -6571,33 +6578,35 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // On-device AI - only when the device supports Gemini Nano.
             if (state.aiSupported) {
-                if (advanced) SettingsCard("AI") {
-                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
-                    Text(
-                        "Adds an AI summary pebble to each car and lets you ask the search " +
-                            "box plain questions like \"what's the odometer\". Everything runs " +
-                            "privately on your device.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (state.aiEnabled) {
-                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
+                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                    SettingsCard("AI") {
+                        ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                         Text(
-                            if (state.aiAuto) {
-                                "Summaries refresh on their own when you open a car, refresh its " +
-                                    "status, or send a command. You can still tap Summarize anytime."
-                            } else {
-                                "Summaries only run when you tap Summarize on a car."
-                            },
+                            "Adds an AI summary pebble to each car and lets you ask the search " +
+                                "box plain questions like \"what's the odometer\". Everything runs " +
+                                "privately on your device.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (state.aiEnabled) {
+                            ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
+                            Text(
+                                if (state.aiAuto) {
+                                    "Summaries refresh on their own when you open a car, refresh its " +
+                                        "status, or send a command. You can still tap Summarize anytime."
+                                } else {
+                                    "Summaries only run when you tap Summarize on a car."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
 
             // App-icon shortcuts (long-press the launcher icon)
-            if (advanced) {
+            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                 var shortcutsExpanded by remember { mutableStateOf(false) }
                 SettingsCard("App shortcuts") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -6642,7 +6651,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
-                if (advanced) SettingsCard(if (single) "Car" else "Cars") {
+                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                SettingsCard(if (single) "Car" else "Cars") {
                     if (single) {
                         val v = state.vehicles[0]
                         CarSettingsCard(
@@ -6666,6 +6676,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                             )
                         }
                     }
+                }
                 }
             }
 
@@ -6834,7 +6845,8 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Font
-            if (advanced) SettingsCard("Font") {
+            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            SettingsCard("Font") {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
@@ -6846,9 +6858,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                 }
             }
+            }
 
             // Links
-            if (advanced) SettingsCard("Links") {
+            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            SettingsCard("Links") {
                 SettingsSegmentedRow(
                     label = "Open links",
                     options = listOf(
@@ -6859,9 +6873,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                     onSelect = { vm.setLinksInApp(it == "app") },
                 )
             }
+            }
 
             // Logs
-            if (advanced) SettingsCard("Logs") {
+            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            SettingsCard("Logs") {
                 var logsExpanded by remember { mutableStateOf(false) }
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -6916,6 +6932,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         }
                     }
                 }
+            }
             }
 
             // Notifications
@@ -7174,7 +7191,12 @@ private fun SettingsScreen(vm: AppViewModel) {
                         )
                     }
                 }
-                if (advanced) {
+                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                  // AnimatedVisibility lays out a single child, not an implicit
+                  // Column of its content lambda's composables -- without this
+                  // wrapper the Spacer/Divider/Toggle/Slider siblings below would
+                  // all stack on top of each other instead of flowing vertically.
+                  Column {
                     Spacer(Modifier.height(14.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     Spacer(Modifier.height(10.dp))
@@ -7251,6 +7273,7 @@ onValueChange = { vibrancyDraft = it },
                     steps = 19,
                     onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
                     )
+                  }
                 }
             }
 
