@@ -6492,23 +6492,29 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Content scrolls behind the status bar; clear the floating pills.
             Spacer(Modifier.height(topInset + 56.dp))
             var query by remember { mutableStateOf("") }
+            var showSearch by remember { mutableStateOf(false) }
+            if (showSearch || query.isNotBlank()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search settings & car data") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
+                        else IconButton(onClick = { showSearch = false }) { Icon(Icons.Filled.Close, "Close") }
+                    },
+                    singleLine = true,
+                    shape = FieldShape,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+            }
           // Drop any stale AI answer once the search box is cleared.
           LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
           if (query.isNotBlank()) {
             SettingsSearchResults(query, vm, state, appearance, notif)
           } else {
             val advanced = state.settingsMode == "advanced"
-            Spacer(Modifier.height(8.dp))
-            MorphSegmented(
-                options = listOf(
-                    SegmentOption("simple", "Simple", null),
-                    SegmentOption("advanced", "Advanced", null),
-                ),
-                selectedKey = state.settingsMode,
-                onSelect = { vm.setSettingsMode(it) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)),
@@ -7230,9 +7236,7 @@ onValueChange = { vibrancyDraft = it },
             var searchQuery by remember { mutableStateOf("") }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Surface(
-                    onClick = {
-                        // Assign the search query to the outer scope's query
-                    },
+                    onClick = { showSearch = true },
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -7250,7 +7254,7 @@ onValueChange = { vibrancyDraft = it },
         }
         }
         } // Box (wide-screen centering)
-        // Floating back-arrow + "Settings" label + simple/advanced pills over the content.
+        // Floating back-arrow + "Settings" label + simple/advanced button.
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),
             verticalAlignment = Alignment.CenterVertically,
@@ -7269,6 +7273,21 @@ onValueChange = { vibrancyDraft = it },
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+            Spacer(Modifier.weight(1f))
+            Surface(
+                onClick = { vm.setSettingsMode(if (state.settingsMode == "advanced") "simple" else "advanced") },
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Text(
+                    if (state.settingsMode == "advanced") "Simple" else "Advanced",
+                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
