@@ -6935,15 +6935,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                 StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
                 AnimatedSlider(
                     value = vibrancyDraft,
-                    onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
+                    onValueChange = { vibrancyDraft = it },
                     valueRange = 0f..2f,
-                    steps = 19,
-                    // A beat after release, not synchronously in onSettle: firing the
-                    // app-wide recompose in the same instant the settle-bounce spring
-                    // starts made that recompose compete with the bounce for frame
-                    // budget, which is what read as the bounce stalling/cutting short
-                    // even with the commit already limited to once-per-release.
-                    onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
+                    steps = 0,
+                    onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
                 )
 
                 if (showEditor) {
@@ -6967,8 +6962,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                     value = uiScaleDraft,
                     onValueChange = { uiScaleDraft = it },
                     valueRange = 0.8f..1.3f,
-                    steps = 4,
-                    onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
+                    steps = 0,
+                    onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
                 // Unit system: controls temperature, distance, and speed display.
@@ -7334,8 +7329,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                         value = vibrancyDraft,
                         onValueChange = { vibrancyDraft = it },
                         valueRange = 0f..2f,
-                        steps = 9,
-                        onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
+                        steps = 0,
+                        onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
                     )
                 }
             }
@@ -7714,10 +7709,10 @@ private fun SettingsSearchResults(
         StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
         AnimatedSlider(
             value = uiScaleDraft,
-            onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+            onValueChange = { uiScaleDraft = it },
             valueRange = 0.8f..1.3f,
-            steps = 4,
-            onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
+            steps = 0,
+            onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
@@ -7728,8 +7723,8 @@ private fun SettingsSearchResults(
             value = vibrancyDraft,
             onValueChange = { vibrancyDraft = it },
             valueRange = 0f..2f,
-            steps = 9,
-            onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
+            steps = 0,
+            onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
         )
     }
     add("Open links in app", "browser tab links") {
