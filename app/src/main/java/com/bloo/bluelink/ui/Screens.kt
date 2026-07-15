@@ -5394,6 +5394,18 @@ private fun ClimatePebble(
 
         SectionLabel("Controls")
 
+        // Show the set temperature when climate is running, with an animated entrance.
+        AnimatedVisibility(
+            visible = climateOn,
+            enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), expandFrom = Alignment.Top),
+            exit = fadeOut(tween(200)) + shrinkVertically(tween(200), shrinkTowards = Alignment.Top),
+        ) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Set temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                com.bloo.uicommon.AnimatedValue(degLabel(tempF.toString(), fahrenheit), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+            }
+        }
+
         // Color shifts from blue (cold) through neutral to orange-red (hot),
         // normalised to the slider range so it adapts if the range ever changes.
         val tempRange = 62f..82f
