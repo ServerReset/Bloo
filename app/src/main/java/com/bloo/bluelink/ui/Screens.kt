@@ -7412,6 +7412,7 @@ onValueChange = { vibrancyDraft = it },
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
         }
+        }
         } // Box (wide-screen centering)
         // Floating back-arrow + "Settings" label + simple/advanced pills over the content.
         Row(
