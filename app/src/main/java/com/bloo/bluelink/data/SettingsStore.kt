@@ -107,9 +107,11 @@ class SettingsStore(private val context: Context) {
         val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
         val AURORA_CUSTOM_COLOR = stringPreferencesKey("aurora_custom_color")
         val UNIT_SYSTEM = stringPreferencesKey("unit_system")
+        val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
+        val ORDER = stringPreferencesKey("vehicle_order")
         val SETTINGS_MODE = stringPreferencesKey("settings_mode")
         /** Per-VIN default climate preset ID for the one-tap Start button in advanced mode. */
-        val DEFAULT_CLIMATE_PRESET = stringPreferencesKey("default_climate_preset_")
+        const val DEFAULT_CLIMATE_PRESET_PREFIX = "default_climate_preset_"
     }
 
     data class Appearance(
@@ -330,11 +332,11 @@ class SettingsStore(private val context: Context) {
 
     /** Per-VIN default climate preset ID for the one-tap Start button. */
     suspend fun defaultClimatePreset(vin: String): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET.name + vin)]?.takeIf { it.isNotBlank() }
+        context.settingsDataStore.data.first()[stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET_PREFIX + vin)]?.takeIf { it.isNotBlank() }
 
     suspend fun setDefaultClimatePreset(vin: String, id: String?) {
         context.settingsDataStore.edit {
-            val key = stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET.name + vin)
+            val key = stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET_PREFIX + vin)
             if (id.isNullOrBlank()) it.remove(key) else it[key] = id
         }
     }
