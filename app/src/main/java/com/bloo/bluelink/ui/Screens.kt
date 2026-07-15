@@ -3389,7 +3389,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         derivedStateOf { controlsScroll.value > with(density) { (topInset + 52.dp + 40.dp).toPx() } }
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
-    Refreshable(v, state, vm) {
+    Refreshable(v, state, vm, hideIndicator = true) {
         Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped.
         AnimatedContent(
@@ -3564,6 +3564,7 @@ private fun Refreshable(
     v: Vehicle,
     state: UiState,
     vm: AppViewModel,
+    hideIndicator: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val ptrState = rememberPullToRefreshState()
@@ -3593,13 +3594,15 @@ private fun Refreshable(
         val offScreenPx = with(density) { -(topInset + 56.dp).roundToPx() }
         val onScreenPx = with(density) { (topInset + 28.dp).roundToPx() }
         val indicatorY = offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt()
-        PullToRefreshDefaults.LoadingIndicator(
-            state = ptrState,
-            isRefreshing = state.refreshing,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset { IntOffset(0, indicatorY) },
-        )
+        if (!hideIndicator) {
+            PullToRefreshDefaults.LoadingIndicator(
+                state = ptrState,
+                isRefreshing = state.refreshing,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset { IntOffset(0, indicatorY) },
+            )
+        }
     }
 }
 
