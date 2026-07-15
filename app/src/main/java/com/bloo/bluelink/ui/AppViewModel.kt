@@ -711,13 +711,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val uri = settingsStore.syncUri()
             val lastSync = settingsStore.lastSyncMs()
+            // Restores a failure the background periodic worker hit while the
+            // app was closed, so it's visible in Settings on next launch instead
+            // of only ever surfacing if a foreground sync happens to fail too.
+            val lastError = settingsStore.lastSyncError()
             val wifiOnly = settingsStore.syncWifiOnly()
             val settingsMode = settingsStore.settingsMode()
             val vehicles = _state.value.vehicles
             val defaultPresets = vehicles.associate { v ->
                 v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
             }
-            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncWifiOnly = wifiOnly, settingsMode = settingsMode, defaultClimatePresets = defaultPresets) }
+            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly, settingsMode = settingsMode, defaultClimatePresets = defaultPresets) }
         }
         // Bidirectional auto-sync on refresh: download newer settings from Drive,
         // then upload our current settings (merge loop for cross-device sync).
@@ -1741,13 +1745,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */
     fun setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
-        runCatching {
+        val granted = runCatching {
             getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
                 uri,
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
             )
-            AppLog.log("Drive auto-sync enabled")
-        }.onFailure { AppLog.log("⚠ Drive sync: could not take URI permission") }
+        }.isSuccess
+        if (!granted) {
+            // Without a PERSISTED grant, this session's temporary read/write
+            // access from the picker intent works until the process dies, then
+            // every sync attempt fails with a SecurityException forever with no
+            // obvious fix in sight -- refuse to enable sync at all instead of
+            // silently setting up something that's guaranteed to break later.
+            AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
+            _state.update { it.copy(message = "Couldn't get lasting access to that file — try picking it again") }
+            return@launch
+        }
+        AppLog.log("Drive auto-sync enabled")
         settingsStore.setSyncUri(uri.toString())
         _state.update { it.copy(syncUri = uri.toString()) }
     }
@@ -1755,7 +1769,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Disable auto-sync. */
     fun clearSyncUri() = viewModelScope.launch {
         settingsStore.setSyncUri(null)
-        _state.update { it.copy(syncUri = null) }
+        // Also drop any stale error (in-memory AND persisted) so re-enabling
+        // sync later doesn't briefly show an error from the previous, now-
+        // disabled setup before the first new sync attempt completes.
+        settingsStore.setLastSyncError(null)
+        _state.update { it.copy(syncUri = null, syncError = null) }
         AppLog.log("Drive auto-sync disabled")
     }
 
@@ -1770,11 +1788,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val importError = json?.let { settingsStore.importSettingsJson(it) }
         if (json != null && importError == null) AppLog.log("Settings imported from Drive")
         else if (importError != null) AppLog.log("⚠ Settings import from Drive: $importError")
-        runCatching {
+        val granted = runCatching {
             getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
                 uri,
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
             )
+        }.isSuccess
+        if (!granted) {
+            // Same reasoning as setSyncUri: without a persisted grant, sync is
+            // guaranteed to start failing the moment this process dies, so
+            // don't claim auto-sync is enabled -- but the import itself (if it
+            // succeeded) already landed, so still report that part honestly.
+            AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
+            _state.update {
+                it.copy(message = when {
+                    json == null -> "Couldn't get lasting access to that file — try picking it again"
+                    importError != null -> "Couldn't import ($importError), and couldn't get lasting access to that file"
+                    else -> "Settings imported, but couldn't set up auto-sync — try picking the file again"
+                })
+            }
+            return@launch
         }
         settingsStore.setSyncUri(uri.toString())
         val message = when {

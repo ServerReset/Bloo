@@ -710,6 +710,17 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("sync_last_ms")] = ms.toString() }
     }
 
+    /** Persisted so a failure from the background periodic worker (no live
+     *  ViewModel to update UiState.syncError) still shows up in Settings the
+     *  next time the app is opened, instead of only being visible if a
+     *  foreground sync happens to fail while the app is open. */
+    suspend fun lastSyncError(): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_last_error")]
+
+    suspend fun setLastSyncError(error: String?) {
+        editTracked { if (error == null) it.remove(stringPreferencesKey("sync_last_error")) else it[stringPreferencesKey("sync_last_error")] = error }
+    }
+
     /** Wi-Fi only sync (true) or any network (false). */
     suspend fun syncWifiOnly(): Boolean =
         context.settingsDataStore.data.first()[stringPreferencesKey("sync_wifi")]
@@ -812,13 +823,19 @@ class SettingsStore(private val context: Context) {
             // "dirty" relative to Drive anymore — but only once it landed.
             clearDirtyKeys()
         }
+        val error = uploadError ?: downloadError?.takeIf { remoteContent == null }
+        // Persisted (not just returned) so a failure from the background
+        // periodic worker -- which has no live ViewModel/UiState to update --
+        // still shows up in Settings next time the app is opened, instead of
+        // silently only ever reaching AppLog.
+        setLastSyncError(error)
         return DriveSyncOutcome(
             // Match what was actually persisted above: report the OLD synced
             // time on total failure, not "now", so a caller that copies this
             // straight into UI state (AppViewModel does) can't show "synced
             // just now" next to a sync-failed error.
             ran = true, imported = imported, uploaded = uploaded, syncedAtMs = if (uploaded) now else lastSyncMs(),
-            error = uploadError ?: downloadError?.takeIf { remoteContent == null },
+            error = error,
         )
     }
 
@@ -1026,7 +1043,7 @@ class SettingsStore(private val context: Context) {
      *  never included in or restored from a settings backup. A tablet that's
      *  Wi-Fi-only and a phone with unlimited data may reasonably want different
      *  choices here, same as the Drive URI itself. */
-    private val DEVICE_LOCAL_KEYS = setOf("sync_uri", "sync_last_ms", "sync_wifi", "sync_dirty_keys")
+    private val DEVICE_LOCAL_KEYS = setOf("sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys")
 
     /**
      * Wraps a settings mutation to record which preference keys it actually
