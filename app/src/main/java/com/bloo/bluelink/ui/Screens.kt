@@ -6504,16 +6504,21 @@ private fun SettingsScreen(vm: AppViewModel) {
             SettingsSearchResults(query, vm, state, appearance, notif)
           } else {
             val advanced = state.settingsMode == "advanced"
-            AnimatedContent(
-                targetState = advanced,
-                transitionSpec = {
-                    (fadeIn(tween(300)) + slideInVertically { it / 8 }) togetherWith
-                        (fadeOut(tween(200)) + slideOutVertically { -it / 8 })
-                },
-                label = "settingsMode",
-            ) { isAdvanced ->
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Spacer(Modifier.height(8.dp))
+            MorphSegmented(
+                options = listOf(
+                    SegmentOption("simple", "Simple", null),
+                    SegmentOption("advanced", "Advanced", null),
+                ),
+                selectedKey = state.settingsMode,
+                onSelect = { vm.setSettingsMode(it) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+            ) {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
                 if (state.accounts.isEmpty()) {
@@ -6935,10 +6940,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                 StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
                 AnimatedSlider(
                     value = vibrancyDraft,
-                    onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
+                    onValueChange = { vibrancyDraft = it },
                     valueRange = 0f..2f,
                     steps = 19,
-                    onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
+                    onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
                 )
 
                 if (showEditor) {
@@ -6960,10 +6965,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                 StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
                 AnimatedSlider(
                     value = uiScaleDraft,
-                    onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+                    onValueChange = { uiScaleDraft = it },
                     valueRange = 0.8f..1.3f,
                     steps = 4,
-                    onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
+                    onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
                 )
                 Spacer(Modifier.height(12.dp))
                 // Unit system: controls temperature, distance, and speed display.
@@ -7350,10 +7355,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                     StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
                     AnimatedSlider(
                         value = vibrancyDraft,
-                        onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
-                        valueRange = 0f..2f,
-                        steps = 19,
-                        onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
+onValueChange = { vibrancyDraft = it },
+                    valueRange = 0f..2f,
+                    steps = 19,
+                    onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
                     )
                 }
             }
@@ -7403,8 +7408,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Text("My location", fontWeight = FontWeight.SemiBold)
                     }
                 }
-                }  // Column (AnimatedContent content)
-            }  // AnimatedContent
             }
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
@@ -7429,22 +7432,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            Spacer(Modifier.weight(1f))
-            // Simple / Advanced toggle as a floating pill
-            Surface(
-                onClick = { vm.setSettingsMode(if (state.settingsMode == "advanced") "simple" else "advanced") },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ) {
-                Text(
-                    if (state.settingsMode == "advanced") "Simple" else "Advanced",
-                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
