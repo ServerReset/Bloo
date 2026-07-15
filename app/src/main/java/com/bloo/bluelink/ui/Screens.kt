@@ -7139,7 +7139,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Security
-            if (advanced) SettingsCard("Security") {
+            SettingsCard("Security") {
                 if (canBio) {
                     SettingsSegmentedRow(
                         label = "Require fingerprint to open",
