@@ -69,6 +69,11 @@ object WearSync {
      *  for, here's how it went". */
     const val PATH_SYNC_RESULT = "/bloo/sync_result"
 
+    /** Message path: phone → watch, "I just attempted the AI summary you asked
+     *  for, here's how it went" (sent on both success and failure, so the
+     *  watch's busy spinner always resolves). */
+    const val PATH_AI_RESULT = "/bloo/ai_result"
+
     /** DataItem path: watch → phone, local display preferences (font/UI scale)
      *  so a change made on the watch syncs back to the phone immediately. */
     const val PATH_LOCAL = "/bloo/local"
@@ -173,6 +178,12 @@ object WearSync {
 
     fun decodeSyncResult(raw: String?): WearSyncResult? =
         raw?.let { runCatching { json.decodeFromString(WearSyncResult.serializer(), it) }.getOrNull() }
+
+    fun encodeAiResult(result: WearAiResult): String =
+        json.encodeToString(WearAiResult.serializer(), result)
+
+    fun decodeAiResult(raw: String?): WearAiResult? =
+        raw?.let { runCatching { json.decodeFromString(WearAiResult.serializer(), it) }.getOrNull() }
 }
 
 /** The full car list mirrored to the watch, plus which one is selected. */
@@ -242,6 +253,14 @@ data class WearCommandResult(
 /** The phone's reply after attempting a watch-requested Drive sync. */
 @Serializable
 data class WearSyncResult(
+    val ok: Boolean,
+    val message: String? = null,
+)
+
+/** The phone's reply after attempting a watch-requested AI summary. */
+@Serializable
+data class WearAiResult(
+    val vin: String,
     val ok: Boolean,
     val message: String? = null,
 )

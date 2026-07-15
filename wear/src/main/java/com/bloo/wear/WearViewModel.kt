@@ -260,6 +260,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            WearAiEvents.results.collect { r ->
+                // Only touch state if we're still waiting on this exact car -- a
+                // stale/duplicate reply (e.g. after a timeout already cleared it)
+                // shouldn't clobber unrelated busy state or messages.
+                _ui.update { if (it.aiBusy == r.vin) it.copy(aiBusy = null, message = r.message) else it }
+            }
+        }
+        viewModelScope.launch {
             WearClimateStore(ctx).flow.collect { remote -> mergeRemoteClimate(remote) }
         }
         viewModelScope.launch {
@@ -513,7 +521,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             val ok = runCatching {
                 WearComms.relayToPhone(ctx, com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.AI_SUMMARY))
             }.getOrDefault(false)
-            if (!ok) _ui.update { it.copy(aiBusy = null, message = "Bring your phone nearby to summarize") }
+            if (!ok) {
+                _ui.update { it.copy(aiBusy = null, message = "Bring your phone nearby to summarize") }
+                return@launch
+            }
+            // Safety net: the relay reached the phone, but if the phone never
+            // replies (killed mid-request, message lost) the spinner would
+            // otherwise spin forever.
+            kotlinx.coroutines.delay(15_000)
+            _ui.update { if (it.aiBusy == vin) it.copy(aiBusy = null, message = "Summary timed out") else it }
         }
     }
 

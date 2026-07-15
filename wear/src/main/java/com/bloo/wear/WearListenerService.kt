@@ -90,6 +90,24 @@ class WearListenerService : WearableListenerService() {
                     )
                 }
             }
+            WearSync.PATH_AI_RESULT -> serviceScope.launch {
+                runCatching {
+                    val result = WearSync.decodeAiResult(raw) ?: return@launch
+                    // A live WearViewModel clears its aiBusy spinner off this
+                    // immediately; only notify on failure -- a success is already
+                    // visible the moment the extras push lands on the AI card, so
+                    // a success notification here would just be noise.
+                    WearAiEvents.emit(result)
+                    if (!result.ok) {
+                        WearNotifications.post(
+                            applicationContext,
+                            ("ai" + result.vin).hashCode(),
+                            "Summary failed",
+                            result.message ?: "Couldn't generate a summary",
+                        )
+                    }
+                }
+            }
         }
     }
 }

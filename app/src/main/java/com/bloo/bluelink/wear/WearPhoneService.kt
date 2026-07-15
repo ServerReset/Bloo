@@ -6,6 +6,7 @@ import com.bloo.bluelink.data.ClimateSyncStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
+import com.bloo.bluelink.data.WearAiResult
 import com.bloo.bluelink.data.WearExtras
 import com.bloo.bluelink.data.WearSync
 import com.bloo.bluelink.data.WearSyncResult
@@ -40,19 +41,15 @@ class WearPhoneService : WearableListenerService() {
                 if (command.action == WearAction.AI_SUMMARY) {
                     scope.launch {
                         val ctx = applicationContext
-                        val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == command.vin }
-                        if (snap != null) {
-                            val summary = runCatching { Ai(ctx).summarize("${snap.name} vehicle status: The doors are ${if (snap.locked == true) "locked" else "unlocked"}. Climate is ${if (snap.climateOn == true) "on" else "off"}.${snap.percent?.let { " Battery is at $it%." } ?: ""}${snap.rangeMi?.let { " Range is $it miles." } ?: ""}") }.getOrNull()
-                            if (summary != null) {
-                                // Read the current extras item from the Data Layer, patch the ai map, republish.
-                                val dataClient = Wearable.getDataClient(ctx)
-                                val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
-                                val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
-                                items?.release()
-                                val updated = existing.copy(ai = existing.ai + (command.vin to summary))
-                                WearBridge.publishExtras(ctx, updated)
-                                AppLog.log("AI summary generated for ${snap.name}")
-                            }
+                        val result = runAiSummary(ctx, command.vin)
+                        runCatching {
+                            Tasks.await(
+                                Wearable.getMessageClient(ctx).sendMessage(
+                                    event.sourceNodeId,
+                                    WearSync.PATH_AI_RESULT,
+                                    WearSync.encodeAiResult(result).toByteArray(),
+                                )
+                            )
                         }
                     }
                     return
@@ -164,5 +161,34 @@ class WearPhoneService : WearableListenerService() {
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
+    }
+
+    /** Generate an AI summary for the watch's [WearAction.AI_SUMMARY] request,
+     *  always returning a result so the watch's busy spinner resolves either
+     *  way -- unlike the extras push (only sent on success), this is the
+     *  watch's only feedback for a disabled, unsupported, or failed request. */
+    private suspend fun runAiSummary(ctx: android.content.Context, vin: String): WearAiResult {
+        if (!SettingsStore(ctx).aiEnabled()) {
+            return WearAiResult(vin, ok = false, message = "AI summaries are turned off in Settings")
+        }
+        val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
+            ?: return WearAiResult(vin, ok = false, message = "Car not found")
+        val summary = runCatching {
+            Ai(ctx).summarize(
+                "${snap.name} vehicle status: The doors are ${if (snap.locked == true) "locked" else "unlocked"}. " +
+                    "Climate is ${if (snap.climateOn == true) "on" else "off"}." +
+                    "${snap.percent?.let { " Battery is at $it%." } ?: ""}${snap.rangeMi?.let { " Range is $it miles." } ?: ""}",
+            )
+        }.getOrNull() ?: return WearAiResult(vin, ok = false, message = "Couldn't generate a summary")
+
+        // Read the current extras item from the Data Layer, patch the ai map, republish.
+        val dataClient = Wearable.getDataClient(ctx)
+        val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
+        val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
+        items?.release()
+        val updated = existing.copy(ai = existing.ai + (vin to summary))
+        WearBridge.publishExtras(ctx, updated)
+        AppLog.log("AI summary generated for ${snap.name}")
+        return WearAiResult(vin, ok = true)
     }
 }
