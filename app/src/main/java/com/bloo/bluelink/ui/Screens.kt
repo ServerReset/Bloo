@@ -3322,7 +3322,7 @@ private fun VehicleDetailContent(
             onNameHiddenChanged(nameHidden) { scroll.animateScrollTo(0) }
         }
     }
-    Refreshable(v, state, vm) {
+    Refreshable(v, state, vm, hideIndicator = true) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -6492,20 +6492,6 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Content scrolls behind the status bar; clear the floating pills.
             Spacer(Modifier.height(topInset + 56.dp))
             var query by remember { mutableStateOf("") }
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("Search settings & car data") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
-                    }
-                },
-                singleLine = true,
-                shape = FieldShape,
-                modifier = Modifier.fillMaxWidth(),
-            )
           // Drop any stale AI answer once the search box is cleared.
           LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
           if (query.isNotBlank()) {
@@ -6789,183 +6775,6 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Color
-            if (advanced) SettingsCard("Color") {
-                // editingPalette: null = no dialog; non-null id but missing in list = new
-                var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
-                var showEditor by remember { mutableStateOf(false) }
-                val haptics = LocalHaptics.current
-                val paletteImportLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.GetContent(),
-                ) { uri -> uri?.let { vm.importPalettes(context, it) } }
-
-                ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
-                Text(
-                    "Uses your wallpaper palette on Android 12+. Turn off to choose or design your own palette.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                AnimatedVisibility(visible = !appearance.dynamicColor) {
-                    Column {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Built-in palettes",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            ColorPalette.entries.forEach { palette ->
-                                PaletteSwatch(
-                                    palette = palette,
-                                    selected = appearance.activeCustomPaletteId == null &&
-                                        appearance.colorPalette == palette,
-                                    onClick = {
-                                        vm.setColorPalette(palette)
-                                        vm.setActiveCustomPaletteId(null)
-                                    },
-                                )
-                            }
-                        }
-                        if (appearance.customPalettes.isNotEmpty()) {
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                "Custom palettes",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                appearance.customPalettes.forEach { custom ->
-                                    CustomPaletteSwatch(
-                                        palette = custom,
-                                        selected = appearance.activeCustomPaletteId == custom.id,
-                                        onClick = { vm.setActiveCustomPaletteId(custom.id) },
-                                        onEdit = { editingPalette = custom; showEditor = true },
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        MorphTextButton(
-                            "Add custom palette",
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { editingPalette = null; showEditor = true },
-                        )
-                        // Export / import the user's custom palettes.
-                        Spacer(Modifier.height(4.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MorphTextButton(
-                                "Export",
-                                modifier = Modifier.weight(1f),
-                                enabled = appearance.customPalettes.isNotEmpty(),
-                                onClick = { vm.exportPalettes(context) },
-                            )
-                            MorphTextButton(
-                                "Import",
-                                modifier = Modifier.weight(1f),
-                                onClick = { paletteImportLauncher.launch("application/json") },
-                            )
-                        }
-                        // Per-car theme overrides: each car can run its own custom palette.
-                        if (appearance.customPalettes.isNotEmpty() && state.vehicles.isNotEmpty()) {
-                            Spacer(Modifier.height(14.dp))
-                            Text(
-                                "Per-car theme",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                "Override the global palette for individual cars.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            state.vehicles.forEach { car ->
-                                val carPaletteId = appearance.carCustomPaletteIds[car.vin]
-                                Row(
-                                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    Text(
-                                        car.name,
-                                        Modifier.weight(1f),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    MorphChip(
-                                        selected = carPaletteId == null,
-                                        onClick = { haptics?.tick(); vm.setCarPaletteId(car.vin, null) },
-                                        label = "Global",
-                                    )
-                                    appearance.customPalettes.forEach { pal ->
-                                        val selected = carPaletteId == pal.id
-                                        val swatchColor = Color(pal.primaryArgb.toLong() and 0xFFFFFFFFL)
-                                        val palScale by animateFloatAsState(
-                                            if (selected) 1.18f else 1f,
-                                            spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                                            label = "carPalScale",
-                                        )
-                                        // Outer box gives room for 1.18x scale so the circle never clips.
-                                        Box(
-                                            modifier = Modifier
-                                                .size(38.dp)
-                                                .clickable { haptics?.tick(); vm.setCarPaletteId(car.vin, pal.id) },
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Box(
-                                                Modifier
-                                                    .size(30.dp)
-                                                    .graphicsLayer(scaleX = palScale, scaleY = palScale)
-                                                    .clip(CircleShape)
-                                                    .background(if (selected) MaterialTheme.colorScheme.outline else Color.Transparent)
-                                                    .padding(if (selected) 2.dp else 0.dp)
-                                                    .clip(CircleShape)
-                                                    .background(swatchColor),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                if (selected) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                // Vibrancy feeds BlooTheme's colorScheme, which wraps ~the whole app --
-                // committing on every drag tick (vm.setVibrancy -> DataStore -> Flow ->
-                // recompose everything under MaterialTheme) made every tick an app-wide
-                // recompose, dropping frames badly enough that the settle bounce looked
-                // like it cut short. Draft locally while dragging; only commit on release.
-                var vibrancyDraft by remember(appearance.vibrancy) { mutableFloatStateOf(appearance.vibrancy) }
-                StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
-                AnimatedSlider(
-                    value = vibrancyDraft,
-                    onValueChange = { vibrancyDraft = it },
-                    valueRange = 0f..2f,
-                    steps = 19,
-                    onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
-                )
-
-                if (showEditor) {
-                    PaletteEditorDialog(
-                        editing = editingPalette,
-                        onSave = { palette ->
-                            vm.saveCustomPalette(palette)
-                            vm.setActiveCustomPaletteId(palette.id)
-                        },
-                        onDelete = { id -> vm.deleteCustomPalette(id) },
-                        onDismiss = { showEditor = false; editingPalette = null },
-                    )
-                }
-            }
 
             // Display scale
             SettingsCard("Display") {
@@ -7417,6 +7226,25 @@ onValueChange = { vibrancyDraft = it },
                     }
                 }
             }
+            // Floating search pill at bottom center
+            var searchQuery by remember { mutableStateOf("") }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                Surface(
+                    onClick = {
+                        // Assign the search query to the outer scope's query
+                    },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                ) {
+                    Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
             Spacer(Modifier.height(bottomInset + 16.dp))
           }
         }
@@ -7728,10 +7556,10 @@ private fun SettingsSearchResults(
         StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
         AnimatedSlider(
             value = uiScaleDraft,
-            onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+            onValueChange = { uiScaleDraft = it },
             valueRange = 0.8f..1.3f,
             steps = 4,
-            onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
+            onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
@@ -7740,10 +7568,10 @@ private fun SettingsSearchResults(
         StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
         AnimatedSlider(
             value = vibrancyDraft,
-            onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
+            onValueChange = { vibrancyDraft = it },
             valueRange = 0f..2f,
             steps = 19,
-            onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
+            onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
         )
     }
     add("Open links in app", "browser tab links") {
