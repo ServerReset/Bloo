@@ -239,8 +239,16 @@ fun MorphSegmented(
                             }
                             BasicText(
                                 opt.label,
-                                style = if (selected) textStyle
-                                        else textStyle.copy(fontSize = textStyle.fontSize * 0.88f),
+                                // BasicText doesn't consult LocalContentColor like Text()
+                                // does, so the animated selected/unselected color has to be
+                                // baked into the style here — it was computed as `fg` above
+                                // but never actually reached the label, silently rendering
+                                // at TextStyle's default (unspecified → black) regardless of
+                                // selection or theme. Also lighter than the caller's style:
+                                // Medium when selected reads as the active choice; Normal
+                                // for the rest keeps the whole control visually quiet.
+                                style = if (selected) textStyle.copy(color = fg, fontWeight = FontWeight.Medium)
+                                        else textStyle.copy(color = fg, fontWeight = FontWeight.Normal, fontSize = textStyle.fontSize * 0.88f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
