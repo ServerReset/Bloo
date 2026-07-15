@@ -141,10 +141,12 @@ object WearBridge {
             vin to rolesOf(carScheme)
         }.toMap()
 
-        // Each car's pebble order so the watch lays its tiles out to match.
+        // Each car's pebble order (and which pebbles the user hid) so the watch
+        // lays its tiles out to match and drops what the phone hides.
         val store = SettingsStore(context)
-        val pebbleOrders = SnapshotStore(context).current().vehicles
-            .associate { it.vin to store.sectionOrder(it.vin) }
+        val vins = SnapshotStore(context).current().vehicles.map { it.vin }
+        val pebbleOrders = vins.associateWith { store.sectionOrder(it) }
+        val hiddenSections = vins.associateWith { store.hiddenSections(it) }
 
         val payload = WearSettingsPayload(
             dark = dark,
@@ -154,6 +156,7 @@ object WearBridge {
             colors = rolesOf(s),
             carColors = carColors,
             pebbleOrders = pebbleOrders,
+            hiddenSections = hiddenSections,
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))

@@ -246,8 +246,10 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
     val out = ArrayList<String>()
     if (hasAlerts) out.add(TILE_ALERTS)
     // Tile order is derived from this car's pebble order, kept in sync with the
-    // phone (one pebble can expand into several tiles).
-    for (key in WearPebbles.tilesFor(ui.pebbleOrderFor(car.vin))) {
+    // phone (one pebble can expand into several tiles); pebbles the user hid on
+    // the phone are dropped so a hidden section doesn't still show up here.
+    val hidden = ui.settings?.hiddenSections?.get(car.vin).orEmpty()
+    for (key in WearPebbles.tilesFor(ui.pebbleOrderFor(car.vin), hidden)) {
         val show = when (key) {
             // Always shown so you can save the first preset from the watch.
             WearTiles.PRESETS -> true

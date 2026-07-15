@@ -924,6 +924,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             name = v.name,
             model = v.model,
             isEv = v.isEv,
+            hasBattery = hasBattery,
             regId = v.regId,
             generation = v.generation,
             brandIndicator = v.brandIndicator,

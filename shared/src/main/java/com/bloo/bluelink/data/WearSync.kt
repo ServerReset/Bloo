@@ -310,6 +310,9 @@ data class WearSettingsPayload(
     /** Per-VIN pebble (detail-section) order, so the watch lays its tiles out in
      *  the same order as each car on the phone. */
     val pebbleOrders: Map<String, List<String>> = emptyMap(),
+    /** Per-VIN pebble keys the user hid on the phone, so the watch drops the
+     *  matching tiles instead of still showing something the phone hides. */
+    val hiddenSections: Map<String, Set<String>> = emptyMap(),
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */

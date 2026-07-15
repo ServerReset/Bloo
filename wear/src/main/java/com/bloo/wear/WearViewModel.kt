@@ -1056,7 +1056,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private fun buildCarView(v: Vehicle): CarView {
         val s = statuses[v.vin]
         val snap = snapshots[v.vin]
-        val hasBattery = v.isEv
+        // Prefer the phone's manually-corrected powertrain (a PHEV the API
+        // misreports as gas still needs the Charge tile) over the raw isEv
+        // flag; only standalone mode with no synced snapshot yet falls back.
+        val hasBattery = snap?.hasBattery ?: v.isEv
         val ev = s?.evStatus
         val coord = s?.vehicleLocation?.coord
         val lamp = s?.tirePressureLamp

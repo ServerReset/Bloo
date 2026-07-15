@@ -23,6 +23,12 @@ data class VehicleSnapshot(
     val name: String,
     val model: String,
     val isEv: Boolean,
+    /** Whether this car has a chargeable battery, per the user's manual
+     *  powertrain override on the phone (a PHEV the API misreports as gas
+     *  still needs the Charge tile). Defaults to [isEv] so snapshots built
+     *  without an override (e.g. the watch's own standalone vehicle fetch)
+     *  behave exactly as before. */
+    val hasBattery: Boolean = isEv,
     val regId: String = "",
     val generation: String = "2",
     val brandIndicator: String = "H",

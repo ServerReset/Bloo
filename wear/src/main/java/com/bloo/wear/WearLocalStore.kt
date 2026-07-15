@@ -120,11 +120,18 @@ object WearPebbles {
         return merged.distinct()
     }
 
-    /** Expand a pebble order into the flat watch-tile order. */
-    fun tilesFor(pebbleOrder: List<String>): List<String> {
+    /** Expand a pebble order into the flat watch-tile order, dropping any pebble
+     *  in [hiddenPebbles] (synced from the phone's per-car hidden-section
+     *  setting). Filtering happens after [normalize] so a pebble the user hid
+     *  is still excluded here without being mistaken by normalize() for a new,
+     *  unknown pebble that must be appended back in. */
+    fun tilesFor(pebbleOrder: List<String>, hiddenPebbles: Set<String> = emptySet()): List<String> {
         val src = normalize(pebbleOrder)
         val tiles = ArrayList<String>()
-        for (p in src) tiles += TO_TILES[p].orEmpty()
+        for (p in src) {
+            if (p in hiddenPebbles) continue
+            tiles += TO_TILES[p].orEmpty()
+        }
         tiles += TAIL
         return tiles.distinct()
     }
