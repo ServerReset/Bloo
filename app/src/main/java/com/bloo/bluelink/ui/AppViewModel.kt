@@ -155,6 +155,8 @@ data class UiState(
     val updateCheckFailed: String? = null,
     /** Settings mode: "simple" (essential settings) or "advanced" (all settings). */
     val settingsMode: String = "simple",
+    /** Per-VIN default preset ID for the one-tap climate Start button. */
+    val defaultClimatePresets: Map<String, String> = emptyMap(),
     /** Drive URI (content://...) for auto-backup; null when not configured. */
     val syncUri: String? = null,
     /** Last time settings were synced with Drive (ms), for merge decisions. */
@@ -814,7 +816,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val uri = settingsStore.syncUri()
             val lastSync = settingsStore.lastSyncMs()
             val wifiOnly = settingsStore.syncWifiOnly()
-            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncWifiOnly = wifiOnly) }
+            val settingsMode = settingsStore.settingsMode()
+            val vehicles = _state.value.vehicles
+            val defaultPresets = vehicles.associate { v ->
+                v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
+            }
+            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncWifiOnly = wifiOnly, settingsMode = settingsMode, defaultClimatePresets = defaultPresets) }
         }
         // Bidirectional auto-sync on refresh: download newer settings from Drive,
         // then upload our current settings (merge loop for cross-device sync).
@@ -1872,7 +1879,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Switch between simple and advanced settings view. */
-    fun setSettingsMode(mode: String) = _state.update { it.copy(settingsMode = mode) }
+    fun setSettingsMode(mode: String) {
+        _state.update { it.copy(settingsMode = mode) }
+        viewModelScope.launch { settingsStore.setSettingsMode(mode) }
+    }
+
+    /** Get or set the default climate preset for a car (used by the one-tap Start button). */
+    fun defaultClimatePreset(vin: String): String? = runBlocking { settingsStore.defaultClimatePreset(vin) }
+
+    fun setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
+        settingsStore.setDefaultClimatePreset(vin, id)
+    }
 
     private fun launchBusy(block: suspend () -> Unit) {
         viewModelScope.launch {

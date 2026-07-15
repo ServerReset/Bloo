@@ -5315,9 +5315,21 @@ private fun ClimatePebble(
                                       else (ambientF + 10).coerceIn(60, 85)
                     tempF = smartTarget; defrost = false; activePresetId = null
                     vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                } else if (weather != null || presets.isNotEmpty()) {
-                    showClimateChoice = true
-                } else startClimate()
+                } else {
+                    val defaultId = state.defaultClimatePresets[v.vin]
+                    val matchingPreset = defaultId?.let { id -> presets.firstOrNull { it.id == id } }
+                    if (matchingPreset != null) {
+                        applyPreset(matchingPreset.request)
+                        vm.startClimate(v, matchingPreset.request)
+                        activePresetId = matchingPreset.id
+                    } else if (weather != null) {
+                        val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+                        val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
+                                          else (ambientF + 10).coerceIn(60, 85)
+                        tempF = smartTarget; defrost = false; activePresetId = null
+                        vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                    } else startClimate()
+                }
             },
             enabled = !driving,
             pending = pending,
@@ -6491,21 +6503,7 @@ private fun SettingsScreen(vm: AppViewModel) {
           if (query.isNotBlank()) {
             SettingsSearchResults(query, vm, state, appearance, notif)
           } else {
-            // Simple / Advanced mode toggle
             val advanced = state.settingsMode == "advanced"
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Settings mode", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("simple", "Simple", null),
-                        SegmentOption("advanced", "Advanced", null),
-                    ),
-                    selectedKey = state.settingsMode,
-                    onSelect = { vm.setSettingsMode(it) },
-                    modifier = Modifier.width(200.dp),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
             AnimatedContent(
                 targetState = advanced,
                 transitionSpec = {
@@ -7389,9 +7387,9 @@ private fun SettingsScreen(vm: AppViewModel) {
           }
         }
         } // Box (wide-screen centering)
-        // Floating back-arrow + "Settings" label pills over the content.
+        // Floating back-arrow + "Settings" label + simple/advanced pills over the content.
         Row(
-            Modifier.align(Alignment.TopStart).statusBarsPadding(),
+            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
@@ -7408,6 +7406,22 @@ private fun SettingsScreen(vm: AppViewModel) {
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+            Spacer(Modifier.weight(1f))
+            // Simple / Advanced toggle as a floating pill
+            Surface(
+                onClick = { vm.setSettingsMode(if (state.settingsMode == "advanced") "simple" else "advanced") },
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Text(
+                    if (state.settingsMode == "advanced") "Simple" else "Advanced",
+                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
@@ -7531,6 +7545,28 @@ private fun CarSettingsCard(
                                 { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
                         }
                         ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
+                    }
+
+                    if (advanced) {
+                        SettingsGroup("Default climate start") {
+                            val carPresets = state.climatePresets[v.vin].orEmpty()
+                            val currentDefault = state.defaultClimatePresets[v.vin] ?: "smart"
+                            Text(
+                                "When the climate Start button is tapped (collapsed view), " +
+                                    "the app runs your chosen preset or smart climate.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            MorphSegmented(
+                                options = buildList {
+                                    add(SegmentOption("smart", "Smart", null))
+                                    carPresets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
+                                },
+                                selectedKey = currentDefault,
+                                onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
+                            )
+                        }
                     }
 
                     SettingsGroup("Photo") {

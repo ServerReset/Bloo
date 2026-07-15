@@ -95,11 +95,8 @@ class SettingsStore(private val context: Context) {
         val WEATHER_LAT = stringPreferencesKey("weather_lat")
         val WEATHER_LON = stringPreferencesKey("weather_lon")
         val WEATHER_LABEL = stringPreferencesKey("weather_label")
-        val WEATHER_FAHRENHEIT = stringPreferencesKey("weather_fahrenheit")
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LOCK_TIMING = stringPreferencesKey("lock_timing")
-        val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
-        val ORDER = stringPreferencesKey("vehicle_order")
         val FLIPPED = stringPreferencesKey("columns_flipped")
         val LINKS_IN_APP = stringPreferencesKey("links_in_app")
         val UI_SCALE = stringPreferencesKey("ui_scale")
@@ -110,6 +107,9 @@ class SettingsStore(private val context: Context) {
         val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
         val AURORA_CUSTOM_COLOR = stringPreferencesKey("aurora_custom_color")
         val UNIT_SYSTEM = stringPreferencesKey("unit_system")
+        val SETTINGS_MODE = stringPreferencesKey("settings_mode")
+        /** Per-VIN default climate preset ID for the one-tap Start button in advanced mode. */
+        val DEFAULT_CLIMATE_PRESET = stringPreferencesKey("default_climate_preset_")
     }
 
     data class Appearance(
@@ -318,6 +318,25 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setUnitSystem(value: String) {
         context.settingsDataStore.edit { it[Keys.UNIT_SYSTEM] = value.takeIf { it in setOf("imperial", "metric") } ?: "imperial" }
+    }
+
+    /** Settings view mode: "simple" or "advanced". */
+    suspend fun settingsMode(): String =
+        context.settingsDataStore.data.first()[Keys.SETTINGS_MODE] ?: "simple"
+
+    suspend fun setSettingsMode(value: String) {
+        context.settingsDataStore.edit { it[Keys.SETTINGS_MODE] = value }
+    }
+
+    /** Per-VIN default climate preset ID for the one-tap Start button. */
+    suspend fun defaultClimatePreset(vin: String): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET.name + vin)]?.takeIf { it.isNotBlank() }
+
+    suspend fun setDefaultClimatePreset(vin: String, id: String?) {
+        context.settingsDataStore.edit {
+            val key = stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET.name + vin)
+            if (id.isNullOrBlank()) it.remove(key) else it[key] = id
+        }
     }
 
     // --- Per-car identity + service (the API has no service-history fields) ---
