@@ -7296,6 +7296,7 @@ onValueChange = { vibrancyDraft = it },
             }
             Spacer(Modifier.width(8.dp))
         }
+        }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
             val coachAlpha = remember { Animatable(0f) }
