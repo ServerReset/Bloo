@@ -162,6 +162,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Slider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -5291,6 +5292,7 @@ private fun ClimatePebble(
     val startClimate = { vm.startClimate(v, currentReq) }
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val simpleMode = state.settingsMode != "advanced"
+    var showClimateChoice by remember { mutableStateOf(false) }
 
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
@@ -5314,6 +5316,8 @@ private fun ClimatePebble(
                                       else (ambientF + 10).coerceIn(60, 85)
                     tempF = smartTarget; defrost = false; activePresetId = null
                     vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                } else if (weather != null || presets.isNotEmpty()) {
+                    showClimateChoice = true
                 } else startClimate()
             },
             enabled = !driving,
@@ -5412,6 +5416,45 @@ private fun ClimatePebble(
                 Text("Set temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 com.bloo.uicommon.AnimatedValue(degLabel(tempF.toString(), fahrenheit), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
             }
+        }
+
+        // Climate start choice dialog (advanced mode)
+        if (showClimateChoice) {
+            AlertDialog(
+                onDismissRequest = { showClimateChoice = false },
+                title = { Text("Start climate") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (weather != null) {
+                            val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+                            val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
+                                              else (ambientF + 10).coerceIn(60, 85)
+                            MorphButton(
+                                onClick = {
+                                    tempF = smartTarget; defrost = false; activePresetId = null
+                                    vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                                    showClimateChoice = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Smart climate", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        presets.forEach { preset ->
+                            MorphButton(
+                                onClick = {
+                                    applyPreset(preset.request)
+                                    vm.startClimate(v, preset.request)
+                                    activePresetId = preset.id
+                                    showClimateChoice = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(preset.name, fontWeight = FontWeight.SemiBold) }
+                        }
+                    }
+                },
+                confirmButton = { MorphTextButton("Cancel", onClick = { showClimateChoice = false }) },
+            )
         }
 
         // Color shifts from blue (cold) through neutral to orange-red (hot),
@@ -6905,18 +6948,17 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Display scale
             SettingsCard("Display") {
-                // Same deferred-commit pattern as Vibrancy above: uiScale feeds
-                // BlooTheme's LocalDensity override for ~the whole app, so committing
-                // every drag tick recomposed everything and dropped frames badly
-                // enough to look like the settle bounce cut short.
+                // Scale slider: updates the percentage preview live during drag,
+                // but only commits the actual scale change when the user lets go.
                 var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
                 StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
-                AnimatedSlider(
+                Slider(
                     value = uiScaleDraft,
-                    onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+                    onValueChange = { uiScaleDraft = it },
                     valueRange = 0.8f..1.3f,
                     steps = 4,
-                    onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
+                    onValueChangeFinished = { vm.setUiScaleSoon(uiScaleDraft) },
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
                 // Unit system: controls temperature, distance, and speed display.
@@ -7633,18 +7675,15 @@ private fun SettingsSearchResults(
         ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
     }
     add("Text & layout scale", "display size zoom bigger") {
-        // Deferred-commit, same as the main Display card's slider: uiScale feeds
-        // BlooTheme's LocalDensity for ~the whole app, so committing every drag
-        // tick recomposed everything and dropped frames badly enough to look
-        // like the settle bounce cut short.
         var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
         StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
-        AnimatedSlider(
+        Slider(
             value = uiScaleDraft,
-            onValueChange = { uiScaleDraft = (it * 10).roundToInt() / 10f },
+            onValueChange = { uiScaleDraft = it },
             valueRange = 0.8f..1.3f,
-            steps = 8,
-            onValueSettled = { vm.setUiScaleSoon(uiScaleDraft) },
+            steps = 4,
+            onValueChangeFinished = { vm.setUiScaleSoon(uiScaleDraft) },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
     add("Colour vibrancy", "color saturation vivid material you") {
