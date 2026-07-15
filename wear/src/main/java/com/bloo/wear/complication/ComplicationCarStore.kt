@@ -1,7 +1,9 @@
 package com.bloo.wear.complication
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bloo.bluelink.data.SnapshotStore
@@ -12,7 +14,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private val Context.complicationCarStore by preferencesDataStore(name = "bloo_complication_cars")
+// A corruption handler so a file damaged by an interrupted write/power loss
+// resets to empty prefs instead of rethrowing an uncaught exception out of
+// every read — this is read on every complication render ("must not throw").
+private val Context.complicationCarStore by preferencesDataStore(
+    name = "bloo_complication_cars",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /**
  * Maps a watch-face complication INSTANCE (a specific slot on a specific watch

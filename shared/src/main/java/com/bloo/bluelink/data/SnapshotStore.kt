@@ -1,7 +1,9 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -76,7 +78,14 @@ private data class SnapshotPayload(
     val selectedVin: String? = null,
 )
 
-private val Context.snapshotDataStore by preferencesDataStore(name = "bloo_snapshots")
+// A corruption handler so a file damaged by an interrupted write/power loss
+// resets to empty prefs instead of rethrowing an uncaught exception out of
+// every read — this store is read from the widget, tiles, and complications,
+// every one of which would otherwise crash on a corrupt file.
+private val Context.snapshotDataStore by preferencesDataStore(
+    name = "bloo_snapshots",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 class SnapshotStore(private val context: Context) {
 

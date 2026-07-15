@@ -1,8 +1,10 @@
 package com.bloo.wear
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -11,7 +13,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-private val Context.wearLocalStore by preferencesDataStore(name = "bloo_wear_local")
+// A corruption handler so a file damaged by an interrupted write/power loss
+// resets to empty prefs instead of rethrowing an uncaught exception out of
+// every read — this backs live tiles/complications, which must not throw.
+private val Context.wearLocalStore by preferencesDataStore(
+    name = "bloo_wear_local",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 object WearTiles {
     const val SUMMARY = "summary"

@@ -1,13 +1,21 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-private val Context.climateSyncStore by preferencesDataStore(name = "bloo_climate_sync")
+// A corruption handler so a file damaged by an interrupted write/power loss
+// resets to empty prefs instead of rethrowing an uncaught exception out of
+// every read (AppViewModel collects this store's flow at init).
+private val Context.climateSyncStore by preferencesDataStore(
+    name = "bloo_climate_sync",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /**
  * The phone's copy of the live climate draft the watch publishes (two-way

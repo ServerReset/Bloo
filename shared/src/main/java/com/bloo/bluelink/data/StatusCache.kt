@@ -1,14 +1,22 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-private val Context.statusCacheStore by preferencesDataStore(name = "bloo_status_cache")
+// A corruption handler so a file damaged by an interrupted write/power loss
+// resets to empty prefs instead of rethrowing an uncaught exception out of
+// every read (this cache is read at cold start, before any network call returns).
+private val Context.statusCacheStore by preferencesDataStore(
+    name = "bloo_status_cache",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 @Serializable
 private data class CachePayload(

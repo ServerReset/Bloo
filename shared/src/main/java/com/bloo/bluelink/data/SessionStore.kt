@@ -1,12 +1,22 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 
-private val Context.dataStore by preferencesDataStore(name = "bloo_session")
+// A corruption handler so a file damaged by an interrupted write/power loss
+// resets to empty prefs (signed out) instead of rethrowing an uncaught
+// exception out of every read — every surface (app, widget, tiles, watch
+// bridge) reads this at some point, and a crash loop is worse than a forced
+// re-login.
+private val Context.dataStore by preferencesDataStore(
+    name = "bloo_session",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /**
  * Persists Blue Link sessions — one per brand, so a Hyundai and a Genesis

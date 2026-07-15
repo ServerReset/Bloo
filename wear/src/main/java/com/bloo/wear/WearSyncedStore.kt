@@ -2,8 +2,10 @@ package com.bloo.wear
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bloo.bluelink.data.WearClimateState
@@ -18,10 +20,16 @@ import kotlinx.coroutines.flow.map
 // delegates must live at top level. Holding them inside WearSyncedStore instances
 // crashes with "There are multiple DataStores active for the same file" as soon as
 // a ViewModel collector and a listener-service writer coexist.
-private val Context.wearSettingsStore by preferencesDataStore(name = "bloo_wear_settings")
-private val Context.wearClimateStore by preferencesDataStore(name = "bloo_wear_climate")
-private val Context.wearPresetsStore by preferencesDataStore(name = "bloo_wear_presets")
-private val Context.wearExtrasStore by preferencesDataStore(name = "bloo_wear_extras")
+//
+// Each also gets a corruption handler so a file damaged by an interrupted
+// write/power loss resets to empty prefs instead of rethrowing an uncaught
+// exception out of every read (these back live tiles/complications, which must
+// not throw).
+private val corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
+private val Context.wearSettingsStore by preferencesDataStore(name = "bloo_wear_settings", corruptionHandler = corruptionHandler)
+private val Context.wearClimateStore by preferencesDataStore(name = "bloo_wear_climate", corruptionHandler = corruptionHandler)
+private val Context.wearPresetsStore by preferencesDataStore(name = "bloo_wear_presets", corruptionHandler = corruptionHandler)
+private val Context.wearExtrasStore by preferencesDataStore(name = "bloo_wear_extras", corruptionHandler = corruptionHandler)
 
 /**
  * Generic single-key DataStore wrapper that replaces the structurally identical
