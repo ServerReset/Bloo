@@ -940,6 +940,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // A non-null status is freshly-fetched data; null means we're building a
             // placeholder snapshot with no live status yet (leave fetchedAt unknown).
             fetchedAt = if (status != null) System.currentTimeMillis() else 0L,
+            odometer = v.odometer,
+            licensePlate = _state.value.licensePlates[v.vin],
+            lastServiceMiles = _state.value.lastServiceMiles[v.vin],
+            serviceIntervalMiles = _state.value.serviceIntervalMiles[v.vin],
         )
     }
 

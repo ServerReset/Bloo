@@ -45,6 +45,13 @@ data class VehicleSnapshot(
      *  unknown. Lets glanceable surfaces flag stale data instead of showing an
      *  hours-old lock/charge state as if it were live. */
     val fetchedAt: Long = 0L,
+    val odometer: String? = null,
+    /** User-entered license plate and service-due tracking (phone Settings),
+     *  mirrored so surfaces other than the phone's own Info pebble -- the
+     *  watch's Info tile in particular -- can show the same maintenance info. */
+    val licensePlate: String? = null,
+    val lastServiceMiles: Int? = null,
+    val serviceIntervalMiles: Int? = null,
 ) {
     /** Rebuild the command-capable Vehicle (used by widgets/tiles). */
     fun toVehicle(): Vehicle = Vehicle(
@@ -55,6 +62,7 @@ data class VehicleSnapshot(
         generation = generation,
         brandIndicator = brandIndicator,
         isEv = isEv,
+        odometer = odometer,
     )
 }
 

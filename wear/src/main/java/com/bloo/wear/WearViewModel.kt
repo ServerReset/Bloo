@@ -99,6 +99,11 @@ data class CarView(
     val battery12vHealth: String?,
     val fuelLevel: Int?,
     val hasLiveStatus: Boolean,
+    /** User-entered license plate and service-due tracking, synced from phone
+     *  Settings (never entered directly on the watch). */
+    val licensePlate: String?,
+    val lastServiceMiles: Int?,
+    val serviceIntervalMiles: Int?,
 )
 
 /** The editable climate settings for one car (seats are 0–3 heat steps). */
@@ -1141,6 +1146,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             battery12vHealth = s?.battery?.health,
             fuelLevel = s?.fuelLevel,
             hasLiveStatus = s != null,
+            licensePlate = snap?.licensePlate,
+            lastServiceMiles = snap?.lastServiceMiles,
+            serviceIntervalMiles = snap?.serviceIntervalMiles,
         )
     }
 }

@@ -1182,7 +1182,21 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     if (car.trunkOpen) StatusRow("Trunk", "Open", valueColor = MaterialTheme.colorScheme.error)
     if (car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
     StatusRow("VIN", car.vin.takeLast(6))
+    val metric = ui.localSettings.unitSystem == "metric"
+    val odoInt = car.odometer?.replace(",", "")?.toDoubleOrNull()?.toInt()
     car.odometer?.let { StatusRow("Odometer", it) }
+    car.licensePlate?.takeIf { it.isNotBlank() }?.let { StatusRow("Plate", it) }
+    val lastSvc = car.lastServiceMiles
+    val interval = car.serviceIntervalMiles
+    if (lastSvc != null && interval != null) {
+        val nextDue = lastSvc + interval
+        val remaining = odoInt?.let { nextDue - it }
+        StatusRow(
+            "Service due",
+            remaining?.let { "in ${formatDistance(it.coerceAtLeast(0), metric)}" } ?: "at ${formatDistance(nextDue, metric)}",
+            valueColor = if (remaining != null && remaining <= 0) MaterialTheme.colorScheme.error else null,
+        )
+    }
 }
 
 @Composable
