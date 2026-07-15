@@ -7547,8 +7547,7 @@ private fun CarSettingsCard(
                         ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
                     }
 
-                    if (advanced) {
-                        SettingsGroup("Default climate start") {
+                    if (state.settingsMode == "advanced") SettingsGroup("Default climate start") {
                             val carPresets = state.climatePresets[v.vin].orEmpty()
                             val currentDefault = state.defaultClimatePresets[v.vin] ?: "smart"
                             Text(
@@ -7567,7 +7566,6 @@ private fun CarSettingsCard(
                                 onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
                             )
                         }
-                    }
 
                     SettingsGroup("Photo") {
                         val storedImage = state.imageUrls[v.vin]

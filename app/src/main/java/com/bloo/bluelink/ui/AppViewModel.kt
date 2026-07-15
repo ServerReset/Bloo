@@ -1885,7 +1885,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Get or set the default climate preset for a car (used by the one-tap Start button). */
-    fun defaultClimatePreset(vin: String): String? = runBlocking { settingsStore.defaultClimatePreset(vin) }
+    fun defaultClimatePreset(vin: String): String? = null // loaded asynchronously on init
 
     fun setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
         settingsStore.setDefaultClimatePreset(vin, id)
