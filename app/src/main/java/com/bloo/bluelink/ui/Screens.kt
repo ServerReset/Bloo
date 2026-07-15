@@ -6517,7 +6517,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             Spacer(Modifier.height(10.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+                modifier = Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)),
             ) {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
@@ -8334,7 +8334,7 @@ private fun SettingsCard(title: String, content: @Composable () -> Unit) {
         Column(
             Modifier
                 .padding(16.dp)
-                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+                .animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
