@@ -1558,10 +1558,8 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
                     Spacer(Modifier.width(8.dp))
                     Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphTextButton("Remind me in 3 days", onClick = vm::snoozeUpdate, modifier = Modifier.weight(1f))
-                    MorphTextButton("Not now", onClick = vm::dismissUpdate, modifier = Modifier.weight(1f))
-                }
+                MorphTextButton("Remind me", onClick = vm::snoozeUpdate, modifier = Modifier.fillMaxWidth())
+                MorphTextButton("Not now", onClick = vm::dismissUpdate, modifier = Modifier.fillMaxWidth())
             }
         },
     )
@@ -6496,8 +6494,11 @@ private fun SettingsScreen(vm: AppViewModel) {
           // Drop any stale AI answer once the search box is cleared.
           LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
           if (query.isNotBlank()) {
+            // Search results appear above the search bar; AI summary tile sits
+            // between the results and the bar so the flow is: keyboard → search
+            // bar → AI summary → match results.
             SettingsSearchResults(query, vm, state, appearance, notif)
-          } else {
+          }
             val advanced = state.settingsMode == "advanced"
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -7340,7 +7341,6 @@ onValueChange = { vibrancyDraft = it },
             }
         }
   }
-}
 
 /** One reorderable car entry in Settings; tap to expand its setup + photo. */
 @Composable
