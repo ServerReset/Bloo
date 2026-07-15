@@ -1522,43 +1522,55 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 @Composable
 private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: AppViewModel) {
     val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
     AlertDialog(
         onDismissRequest = vm::dismissUpdate,
-        title = { Text("Update available") },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.Info, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+                Text("Update available", fontWeight = FontWeight.Bold)
+            }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Build #${info.run.runNumber} is ready.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                info.run.displayTitle?.let { title ->
-                    Text(title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(shape = RoundedCornerShape(8.dp), color = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer) {
+                        Text("Build #${info.run.runNumber}", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                    info.run.displayTitle?.let { title ->
+                        Text(title, style = MaterialTheme.typography.bodySmall, color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
-                Text(
-                    "Open the run page to download the phone and watch APKs. " +
-                        "Android will warn that the app is from an unknown source — " +
-                        "tap \"More details\", then \"Install without scanning\".",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                MorphTextButton(
-                    "Remind me in 3 days",
-                    onClick = vm::snoozeUpdate,
-                )
+                Surface(shape = RoundedCornerShape(12.dp), color = scheme.surfaceVariant.copy(alpha = 0.5f)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
+                        Text("1. Open the Actions run page", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        Text("2. Download the zip artifact for your device", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        Text("3. Unzip the file and open the APK", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        Text("4. Tap \"More details\" → \"Install without scanning\"", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    }
+                }
             }
         },
         confirmButton = {
-            MorphButton(
-                onClick = {
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
-                    }
-                    vm.dismissUpdate()
-                },
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-            ) {
-                Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                MorphButton(
+                    onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                        vm.dismissUpdate()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                ) {
+                    Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton("Remind me in 3 days", onClick = vm::snoozeUpdate, modifier = Modifier.weight(1f))
+                    MorphTextButton("Not now", onClick = vm::dismissUpdate, modifier = Modifier.weight(1f))
+                }
             }
-        },
-        dismissButton = {
-            MorphTextButton("Not now", vm::dismissUpdate)
         },
     )
 }
