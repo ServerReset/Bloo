@@ -287,6 +287,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** VINs fetched from the network this session (cache restore doesn't count). */
     private val sessionFetched = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
+    /** Guards [bootstrapDriveSync] so it starts its collector exactly once per
+     *  ViewModel, no matter how many times the garage (re)loads. */
+    private val driveSyncBootstrapped = java.util.concurrent.atomic.AtomicBoolean(false)
+
     /** Copy-pasteable activity log shown in Settings. */
     val logs: StateFlow<List<String>> = AppLog.lines
 
@@ -668,6 +672,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 screen = screen,
             )
         }
+        // One-time: now that vehicles (and their default climate presets) are
+        // known, start the Drive auto-sync bootstrap + collector.
+        bootstrapDriveSync()
         // Keep the app-icon long-press shortcuts in sync with the current cars.
         com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet)
         // Run any shortcut that was tapped before the garage finished loading.
@@ -677,6 +684,95 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         ensureStatus(vehicles[index])
         viewModelScope.launch {
             vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
+        }
+    }
+
+    /**
+     * One-time Drive-sync bootstrap: restore the saved sync URI / settings-mode /
+     * last-sync-time / per-car default climate presets, then start the
+     * bidirectional auto-sync collector (download-then-upload whenever a refresh
+     * settles). Guarded by [driveSyncBootstrapped] so calling this more than once
+     * (the garage can reload after a re-login) never starts a second collector.
+     *
+     * This used to be spliced into the middle of [loadStatus] — which runs on
+     * every single vehicle status fetch — so every manual refresh started a
+     * brand-new, permanent `_state.refreshing` collector that itself did a full
+     * Drive download + merge + upload. None of those collectors ever completed,
+     * so a long session accumulated an unbounded pile of them, and each later
+     * refresh fired ALL of them at once: redundant network calls and concurrent
+     * writes to the same Drive file racing each other.
+     */
+    private fun bootstrapDriveSync() {
+        if (!driveSyncBootstrapped.compareAndSet(false, true)) return
+        // Restore auto-sync Drive URI and last sync timestamp from preferences.
+        viewModelScope.launch {
+            val uri = settingsStore.syncUri()
+            val lastSync = settingsStore.lastSyncMs()
+            val wifiOnly = settingsStore.syncWifiOnly()
+            val settingsMode = settingsStore.settingsMode()
+            val vehicles = _state.value.vehicles
+            val defaultPresets = vehicles.associate { v ->
+                v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
+            }
+            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncWifiOnly = wifiOnly, settingsMode = settingsMode, defaultClimatePresets = defaultPresets) }
+        }
+        // Bidirectional auto-sync on refresh: download newer settings from Drive,
+        // then upload our current settings (merge loop for cross-device sync).
+        viewModelScope.launch {
+            _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
+                if (!wasRefreshing) {
+                    withContext(Dispatchers.IO) {
+                        val uri = settingsStore.syncUri()
+                        if (uri == null) return@withContext
+                        // Check network: skip if Wi-Fi only and not on Wi-Fi
+                        val wifiOnly = _state.value.syncWifiOnly
+                        if (wifiOnly) {
+                            val cm = getApplication<android.app.Application>()
+                                .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
+                                as android.net.ConnectivityManager
+                            val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
+                                ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+                            if (!wifi) return@withContext
+                        }
+                        val app = getApplication<android.app.Application>()
+                        val parsed = android.net.Uri.parse(uri)
+                        // Check the file's actual last-modified time from Drive
+                        val fileModifiedMs = runCatching {
+                            if (android.provider.DocumentsContract.isDocumentUri(app, parsed)) {
+                                val cursor = app.contentResolver.query(
+                                    parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                                    null, null, null,
+                                )
+                                cursor?.use {
+                                    if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
+                                    else null
+                                }
+                            } else null
+                        }.getOrNull()
+                        // Download: read the existing file from Drive
+                        val remoteContent = runCatching {
+                            app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                        }.getOrNull()
+                        val remoteJson = remoteContent?.substringAfter('\n', "")
+                        val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
+                        if (remoteTs > _state.value.lastSyncMs && remoteJson != null) {
+                            AppLog.log("Drive sync: imported newer settings")
+                            settingsStore.importSettingsJson(remoteJson)
+                            _state.update { it.copy(syncUri = uri) }
+                        }
+                        val now = System.currentTimeMillis()
+                        val body = "$now\n${settingsStore.exportSettingsJson()}"
+                        runCatching {
+                            app.contentResolver.openOutputStream(parsed, "wt")?.use {
+                                it.write(body.toByteArray())
+                            }
+                            AppLog.log("Drive sync: uploaded settings")
+                        }.onFailure { AppLog.log("⚠ Drive sync: upload failed: ${it.message}") }
+                        settingsStore.setLastSyncMs(now)
+                        _state.update { it.copy(lastSyncMs = now) }
+                    }
+                }
+            }
         }
     }
 
@@ -809,79 +905,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         statusLoc?.let { loc ->
                             reverseGeocode(loc)?.let { place ->
                                 _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
-            }
-        }
-        // Restore auto-sync Drive URI and last sync timestamp from preferences
-        viewModelScope.launch {
-            val uri = settingsStore.syncUri()
-            val lastSync = settingsStore.lastSyncMs()
-            val wifiOnly = settingsStore.syncWifiOnly()
-            val settingsMode = settingsStore.settingsMode()
-            val vehicles = _state.value.vehicles
-            val defaultPresets = vehicles.associate { v ->
-                v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
-            }
-            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncWifiOnly = wifiOnly, settingsMode = settingsMode, defaultClimatePresets = defaultPresets) }
-        }
-        // Bidirectional auto-sync on refresh: download newer settings from Drive,
-        // then upload our current settings (merge loop for cross-device sync).
-        viewModelScope.launch {
-            _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
-                if (!wasRefreshing) {
-                    withContext(Dispatchers.IO) {
-                        val uri = settingsStore.syncUri()
-                        if (uri == null) return@withContext
-                        // Check network: skip if Wi-Fi only and not on Wi-Fi
-                        val wifiOnly = _state.value.syncWifiOnly
-                        if (wifiOnly) {
-                            val cm = getApplication<android.app.Application>()
-                                .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
-                                as android.net.ConnectivityManager
-                            val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
-                                ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
-                            if (!wifi) return@withContext
-                        }
-                        val app = getApplication<android.app.Application>()
-                        val parsed = android.net.Uri.parse(uri)
-                        // Check the file's actual last-modified time from Drive
-                        val fileModifiedMs = runCatching {
-                            if (android.provider.DocumentsContract.isDocumentUri(app, parsed)) {
-                                val cursor = app.contentResolver.query(
-                                    parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
-                                    null, null, null,
-                                )
-                                cursor?.use {
-                                    if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
-                                    else null
-                                }
-                            } else null
-                        }.getOrNull()
-                        // Download: read the existing file from Drive
-                        val remoteContent = runCatching {
-                            app.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
-                        }.getOrNull()
-                        val remoteJson = remoteContent?.substringAfter('\n', "")
-                        val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
-                        if (remoteTs > _state.value.lastSyncMs && remoteJson != null) {
-                            AppLog.log("Drive sync: imported newer settings")
-                            settingsStore.importSettingsJson(remoteJson)
-                            _state.update { it.copy(syncUri = uri) }
-                        }
-                        val now = System.currentTimeMillis()
-                        val body = "$now\n${settingsStore.exportSettingsJson()}"
-                        runCatching {
-                            app.contentResolver.openOutputStream(parsed, "wt")?.use {
-                                it.write(body.toByteArray())
                             }
-                            AppLog.log("Drive sync: uploaded settings")
-                        }.onFailure { AppLog.log("⚠ Drive sync: upload failed: ${it.message}") }
-                        settingsStore.setLastSyncMs(now)
-                        _state.update { it.copy(lastSyncMs = now) }
+                        }
                     }
-                }
-            }
-        }
-    }
                 }
                 sessionFetched.add(v.vin)
                 logSuccess?.let { AppLog.log(it) }
