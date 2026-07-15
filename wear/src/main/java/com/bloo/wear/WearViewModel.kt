@@ -859,6 +859,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Turn AI summaries on/off. Optimistically flips the synced flag so the
+     *  toggle and AI tile react instantly; the phone's echo (or a future
+     *  settings push) settles it for real. */
+    fun setAiEnabled(enabled: Boolean) {
+        _ui.update { u -> u.copy(settings = u.settings?.copy(aiEnabled = enabled)) }
+        viewModelScope.launch { WearComms.publishAiToggle(ctx, enabled) }
+    }
+
     /** Choose which action chips the glanceable Tile shows, then redraw it. */
     fun setTileActions(actions: List<String>) {
         viewModelScope.launch {

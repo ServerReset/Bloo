@@ -157,6 +157,7 @@ object WearBridge {
             carColors = carColors,
             pebbleOrders = pebbleOrders,
             hiddenSections = hiddenSections,
+            aiEnabled = store.aiEnabled(),
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))

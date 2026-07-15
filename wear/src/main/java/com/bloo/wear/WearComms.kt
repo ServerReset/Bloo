@@ -187,6 +187,20 @@ object WearComms {
         }
     }
 
+    /** Push a "turn AI summaries on/off" toggle back to the phone. Its own path
+     *  (not [PATH_LOCAL]) so it can never race with that path's uiScale echo. */
+    suspend fun publishAiToggle(context: Context, enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_AI_TOGGLE).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeAiToggle(com.bloo.bluelink.data.WearAiTogglePayload(enabled)))
+                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
+            }
+        }
+    }
+
     /** On launch, pull whatever the phone already published so the UI isn't empty
      *  while waiting for the next DataChanged callback. */
     suspend fun pullLatest(context: Context) {

@@ -257,7 +257,8 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
             WearTiles.LOCATION -> car.lat != null && car.lon != null
             WearTiles.WEATHER, WearTiles.SMART_CLIMATE -> ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null
             WearTiles.DIAGNOSTICS -> car.hasLiveStatus
-            else -> true // summary, lock, climate, comfort, info, ai, assist, more
+            WearTiles.AI -> ui.settings?.aiEnabled == true
+            else -> true // summary, lock, climate, comfort, info, assist, more
         }
         if (show) out.add(key)
     }

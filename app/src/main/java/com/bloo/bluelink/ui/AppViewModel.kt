@@ -1130,7 +1130,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAiEnabled(value: Boolean) {
         _state.update { it.copy(aiEnabled = value) }
-        viewModelScope.launch { settingsStore.setAiEnabled(value) }
+        viewModelScope.launch {
+            settingsStore.setAiEnabled(value)
+            // aiEnabled isn't part of Appearance, so it isn't covered by the
+            // appearance.collect mirror below -- republish explicitly so the
+            // watch's own AI toggle/tile visibility updates immediately.
+            com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value)
+        }
     }
 
     fun setAiAuto(value: Boolean) {

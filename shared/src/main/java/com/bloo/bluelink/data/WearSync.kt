@@ -78,6 +78,11 @@ object WearSync {
      *  so a change made on the watch syncs back to the phone immediately. */
     const val PATH_LOCAL = "/bloo/local"
 
+    /** DataItem path: watch → phone, "turn AI summaries on/off" -- kept separate
+     *  from [PATH_LOCAL] so toggling it can never race with (or get overwritten
+     *  by) that path's own uiScale echo. */
+    const val PATH_AI_TOGGLE = "/bloo/ai_toggle"
+
     /** DataMap / message key holding the JSON body. */
     const val KEY_PAYLOAD = "payload"
 
@@ -184,6 +189,12 @@ object WearSync {
 
     fun decodeAiResult(raw: String?): WearAiResult? =
         raw?.let { runCatching { json.decodeFromString(WearAiResult.serializer(), it) }.getOrNull() }
+
+    fun encodeAiToggle(payload: WearAiTogglePayload): String =
+        json.encodeToString(WearAiTogglePayload.serializer(), payload)
+
+    fun decodeAiToggle(raw: String?): WearAiTogglePayload? =
+        raw?.let { runCatching { json.decodeFromString(WearAiTogglePayload.serializer(), it) }.getOrNull() }
 }
 
 /** The full car list mirrored to the watch, plus which one is selected. */
@@ -332,6 +343,9 @@ data class WearSettingsPayload(
     /** Per-VIN pebble keys the user hid on the phone, so the watch drops the
      *  matching tiles instead of still showing something the phone hides. */
     val hiddenSections: Map<String, Set<String>> = emptyMap(),
+    /** Whether on-device AI summaries are turned on, mirrored so the watch can
+     *  show the same toggle state and hide the AI tile when it's off. */
+    val aiEnabled: Boolean = false,
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */
@@ -339,6 +353,12 @@ data class WearSettingsPayload(
 data class WearLocalPayload(
     val uiScale: Float = 1f,
     val unitSystem: String? = null,
+)
+
+/** Watch → phone: "turn AI summaries on/off". */
+@Serializable
+data class WearAiTogglePayload(
+    val enabled: Boolean = false,
 )
 
 /** A single car's reordered pebble order, sent watch → phone. */

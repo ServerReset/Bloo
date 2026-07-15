@@ -133,6 +133,26 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
+            SettingSection("AI Summaries") {
+                val enabled = ui.settings?.aiEnabled == true
+                Text(
+                    "On-device summaries of a car's status, generated on your phone.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                MorphButton(
+                    label = if (enabled) "On" else "Off",
+                    icon = Icons.Filled.Bolt,
+                    active = enabled,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = false,
+                    onClick = { vm.setAiEnabled(!enabled) },
+                )
+            }
+        }
+
+        item {
             SettingSection("Watch text size") {
                 Text(
                     "${"%.1f".format(ui.localSettings.fontScale)}×",
