@@ -6492,23 +6492,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Content scrolls behind the status bar; clear the floating pills.
             Spacer(Modifier.height(topInset + 56.dp))
             var query by remember { mutableStateOf("") }
-            var showSearch by remember { mutableStateOf(false) }
-            if (showSearch || query.isNotBlank()) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Search settings & car data") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
-                        else IconButton(onClick = { showSearch = false }) { Icon(Icons.Filled.Close, "Close") }
-                    },
-                    singleLine = true,
-                    shape = FieldShape,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-            }
+            var searchFocused by remember { mutableStateOf(false) }
           // Drop any stale AI answer once the search box is cleared.
           LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
           if (query.isNotBlank()) {
@@ -7232,20 +7216,41 @@ onValueChange = { vibrancyDraft = it },
                     }
                 }
             }
-            // Floating search pill at bottom center
-            var searchQuery by remember { mutableStateOf("") }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                Surface(
-                    onClick = { showSearch = true },
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    tonalElevation = 6.dp,
-                    shadowElevation = 8.dp,
-                ) {
-                    Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
+            // Morphing search: pill expands into text field on tap
+            AnimatedContent(
+                targetState = searchFocused || query.isNotEmpty(),
+                transitionSpec = { fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) togetherWith fadeOut(tween(150)) + shrinkVertically(tween(150)) },
+                label = "searchMorph",
+            ) { isSearching ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    if (isSearching) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            placeholder = { Text("Search settings & car data") },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
+                                else IconButton(onClick = { searchFocused = false }) { Icon(Icons.Filled.Close, "Close") }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        Surface(
+                            onClick = { searchFocused = true },
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tonalElevation = 6.dp,
+                            shadowElevation = 8.dp,
+                        ) {
+                            Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
                     }
                 }
             }
