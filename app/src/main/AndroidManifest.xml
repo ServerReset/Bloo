@@ -53,6 +53,20 @@
             </intent-filter>
         </activity>
 
+        <!-- Grants a share-sheet target (Drive, Files, email, etc.) temporary read
+             access to an exported settings-backup file. Without this, "Export"
+             could only share the backup as EXTRA_TEXT, which most file-saving
+             targets don't accept as a share destination at all. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Wear OS Data Layer: receives the watch's remote commands and sync
              requests. Bound on-demand by Play Services when a /bloo message
              arrives, so it works even with the phone app closed. -->

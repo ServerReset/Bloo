@@ -1662,14 +1662,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(message = error ?: "Palettes imported", messageType = if (error == null) "success" else "error") }
     }
 
-    /** Share a full settings backup (includes colours and palettes) via the share sheet. */
+    /**
+     * Share a full settings backup (includes colours and palettes) via the share
+     * sheet, as a real file — not raw EXTRA_TEXT, which most file-saving targets
+     * (Drive, Files, email attachments) don't accept as a share destination at
+     * all, silently limiting "Export" to text-only apps and defeating the whole
+     * point of producing something "Restore" can later read back in.
+     */
     fun exportSettings(context: android.content.Context) = viewModelScope.launch {
         val json = settingsStore.exportSettingsJson()
+        val uri = withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+                val file = java.io.File(dir, "bloo_settings_backup.json")
+                file.writeText(json)
+                androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            }.getOrNull()
+        }
+        if (uri == null) {
+            _state.update { it.copy(message = "Couldn't prepare the backup file") }
+            return@launch
+        }
         runCatching {
             val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                 type = "application/json"
-                putExtra(android.content.Intent.EXTRA_TEXT, json)
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
                 putExtra(android.content.Intent.EXTRA_SUBJECT, "Bloo settings backup")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(

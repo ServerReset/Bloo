@@ -775,9 +775,8 @@ class SettingsStore(private val context: Context) {
             // read the dirty set before this pass touches anything, so a merge
             // import can't accidentally protect keys it's about to import itself.
             val protectedKeys = dirtyKeys()
-            AppLog.log("Drive sync: imported newer settings")
-            mergeSettingsJson(remoteJson, protect = protectedKeys)
-            imported = true
+            imported = mergeSettingsJson(remoteJson, protect = protectedKeys)
+            if (imported) AppLog.log("Drive sync: imported newer settings")
         }
         val now = System.currentTimeMillis()
         val body = "$now\n${exportSettingsJson()}"
@@ -989,6 +988,14 @@ class SettingsStore(private val context: Context) {
 
     private val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
+    /** The settings-backup format version. The format is a flat key-value bag,
+     *  so an older client reading a newer backup is normally fine (unrecognized
+     *  keys are simply ignored — ignoreUnknownKeys); bump this only if a future
+     *  change stops being purely additive (a renamed/restructured key an older
+     *  client would misinterpret rather than just skip), so old clients can
+     *  detect and refuse it instead of silently importing something wrong. */
+    private const val BACKUP_VERSION = 1
+
     /** Preference keys that describe THIS device's own Drive-sync wiring (a
      *  content:// URI this app instance was granted permission for, local
      *  bookkeeping of when it last synced, its own Wi-Fi-only preference, and
@@ -1061,7 +1068,7 @@ class SettingsStore(private val context: Context) {
         }
         val root = buildJsonObject {
             put("_format", JsonPrimitive("bloo-settings"))
-            put("_version", JsonPrimitive(1))
+            put("_version", JsonPrimitive(BACKUP_VERSION))
             put("prefs", entries)
         }
         return backupJson.encodeToString(JsonObject.serializer(), root)
@@ -1079,6 +1086,10 @@ class SettingsStore(private val context: Context) {
             .getOrElse { return "Invalid settings file" }
         if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") {
             return "Not a Bloo settings backup"
+        }
+        val version = root["_version"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1
+        if (version > BACKUP_VERSION) {
+            return "This backup was made with a newer version of Bloo — update the app first"
         }
         val prefs = root["prefs"]?.jsonObject ?: return "Settings file has no data"
         editTracked { mut ->
@@ -1109,11 +1120,20 @@ class SettingsStore(private val context: Context) {
      * every other key is taken from remote. Unlike [importSettingsJson] this does
      * NOT go through [editTracked] — accepting a remote value must not re-mark
      * that key as a pending local change, or it would never finish converging.
+     * Returns whether anything was actually applied.
      */
-    private suspend fun mergeSettingsJson(json: String, protect: Set<String>) {
-        val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return
-        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") return
-        val prefs = root["prefs"]?.jsonObject ?: return
+    private suspend fun mergeSettingsJson(json: String, protect: Set<String>): Boolean {
+        val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return false
+        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") return false
+        val version = root["_version"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1
+        if (version > BACKUP_VERSION) {
+            // A newer device wrote this — rather than misapply a format we don't
+            // recognize, skip the import half this round (the upload half still
+            // runs normally) and wait for this device to be updated.
+            AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping import")
+            return false
+        }
+        val prefs = root["prefs"]?.jsonObject ?: return false
         context.settingsDataStore.edit { mut ->
             prefs.forEach { (name, element) ->
                 if (name in DEVICE_LOCAL_KEYS || name in protect) return@forEach
@@ -1125,6 +1145,7 @@ class SettingsStore(private val context: Context) {
                 }
             }
         }
+        return true
     }
 
     // --- Weather ---------------------------------------------------------

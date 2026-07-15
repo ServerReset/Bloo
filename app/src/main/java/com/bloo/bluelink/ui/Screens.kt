@@ -6670,10 +6670,18 @@ private fun SettingsScreen(vm: AppViewModel) {
                 val driveOpenLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenDocument(),
                 ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
+
                 Text(
-                    "Export your settings to a file. Save it to Google Drive to " +
-                        "keep your theme, palettes, tile order and preferences " +
-                        "synced across devices. Sign-in credentials are never included.",
+                    "Manual backup",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "A one-time snapshot of your theme, palettes, tile order and " +
+                        "preferences as a file — share it anywhere, or restore it later. " +
+                        "Sign-in credentials are never included.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -6690,7 +6698,22 @@ private fun SettingsScreen(vm: AppViewModel) {
                         onClick = { settingsImportLauncher.launch("application/json") },
                     )
                 }
-                Spacer(Modifier.height(8.dp))
+
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Automatic Drive sync",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Keeps a Google Drive file continuously up to date, so every " +
+                        "signed-in device converges on the same settings automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
                 if (showDriveDialog) {
                     AlertDialog(
                         onDismissRequest = { showDriveDialog = false },
@@ -6723,16 +6746,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MorphTextButton(
-                        if (state.syncUri != null) "Auto-sync: on" else "Set up auto-sync",
+                        if (state.syncUri != null) "Change Drive file" else "Set up auto-sync",
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            if (state.syncUri != null) {
-                                // Already set up; show dialog to re-pick or open from another device
-                                showDriveDialog = true
-                            } else {
-                                showDriveDialog = true
-                            }
-                        },
+                        onClick = { showDriveDialog = true },
                     )
                     if (state.syncUri != null) {
                         MorphTextButton(
