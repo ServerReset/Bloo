@@ -7272,6 +7272,20 @@ private fun SettingsScreen(vm: AppViewModel) {
                         )
                     }
                 }
+                if (advanced) {
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    Spacer(Modifier.height(8.dp))
+                    var vibrancyDraft by remember(appearance.vibrancy) { mutableFloatStateOf(appearance.vibrancy) }
+                    StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
+                    AnimatedSlider(
+                        value = vibrancyDraft,
+                        onValueChange = { vibrancyDraft = (it * 10).roundToInt() / 10f },
+                        valueRange = 0f..2f,
+                        steps = 19,
+                        onValueSettled = { vm.setVibrancySoon(vibrancyDraft) },
+                    )
+                }
             }
 
             // Weather
