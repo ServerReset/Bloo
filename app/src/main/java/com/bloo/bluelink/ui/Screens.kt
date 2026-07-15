@@ -6494,11 +6494,8 @@ private fun SettingsScreen(vm: AppViewModel) {
           // Drop any stale AI answer once the search box is cleared.
           LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
           if (query.isNotBlank()) {
-            // Search results appear above the search bar; AI summary tile sits
-            // between the results and the bar so the flow is: keyboard → search
-            // bar → AI summary → match results.
             SettingsSearchResults(query, vm, state, appearance, notif)
-          }
+          } else {
             val advanced = state.settingsMode == "advanced"
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -7261,9 +7258,8 @@ onValueChange = { vibrancyDraft = it },
         }
         } // Box (wide-screen centering)
         // Floating back-arrow + "Settings" label + simple/advanced button.
-        Box(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
@@ -7295,7 +7291,6 @@ onValueChange = { vibrancyDraft = it },
                 )
             }
             Spacer(Modifier.width(8.dp))
-        }
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
@@ -7343,6 +7338,7 @@ onValueChange = { vibrancyDraft = it },
             }
         }
   }
+}
 
 /** One reorderable car entry in Settings; tap to expand its setup + photo. */
 @Composable
