@@ -188,7 +188,6 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         Text("Background transparency", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Opaque", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val scheme = MaterialTheme.colorScheme
             com.bloo.uicommon.AnimatedSlider(
                 value = backgroundAlpha.toFloat(),
@@ -203,7 +202,6 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 onStepTick = { },
                 onSettle = { },
             )
-            Text("Glass", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
             when (backgroundAlpha) {

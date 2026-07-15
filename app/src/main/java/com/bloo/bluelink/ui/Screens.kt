@@ -7779,7 +7779,7 @@ fun MorphSegmented(
         containerColor = buttonContainer(),
         indicatorColor = scheme.primary,
         selectedTextColor = scheme.onPrimary,
-        unselectedTextColor = scheme.onSurface.copy(alpha = 0.65f),
+        unselectedTextColor = scheme.onSurfaceVariant,
         textStyle = MaterialTheme.typography.labelLarge,
         onTick = { haptics?.tick() },
         modifier = modifier,
