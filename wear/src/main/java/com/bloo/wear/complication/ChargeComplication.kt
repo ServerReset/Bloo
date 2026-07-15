@@ -32,7 +32,7 @@ class ChargeComplication : SuspendingComplicationDataSourceService() {
         val snap = resolveComplicationCar(applicationContext, "ChargeComplication", request.complicationInstanceId)
             ?: return null
         val metric = runCatching { com.bloo.wear.WearLocalStore(this).flow.first().unitSystem == "metric" }.getOrDefault(false)
-        return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.isEv, snap.charging == true, snap.vin, metric)
+        return buildData(request.complicationType, snap.percent, snap.rangeMi, snap.hasBattery, snap.charging == true, snap.vin, metric)
     }
 
     override fun onComplicationDeactivated(complicationInstanceId: Int) {

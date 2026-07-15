@@ -421,7 +421,7 @@ class BlooWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.height(6.dp))
                 Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 34.sp))
                 c.snap.rangeMi?.let {
-                    Text("${formatDistance(it, c.metric)} ${if (c.snap.isEv) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
+                    Text("${formatDistance(it, c.metric)} ${if (c.snap.hasBattery) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
                 }
             }
             if (c.actions.isNotEmpty()) {
@@ -460,7 +460,7 @@ class BlooWidget : GlanceAppWidget() {
                         Spacer(GlanceModifier.width(8.dp))
                         Column(modifier = GlanceModifier.padding(bottom = 6.dp)) {
                             c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 14.sp, fontWeight = FontWeight.Medium)) }
-                            Text(if (c.snap.isEv) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp))
+                            Text(if (c.snap.hasBattery) "Battery" else "Fuel", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp))
                         }
                     }
                     val addr = c.address

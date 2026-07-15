@@ -4933,10 +4933,10 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
                 if (status.defrost == true) StatusRow("Defrost", "On")
                 status.airTemp?.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit)) }
-                status.percentFor(v.isEv)?.let {
-                    StatusRow(if (v.isEv) "Charge" else "Fuel", "$it%")
+                status.percentFor(state.hasBattery(v))?.let {
+                    StatusRow(if (state.hasBattery(v)) "Charge" else "Fuel", "$it%")
                 }
-                status.rangeMiFor(v.isEv)?.let { StatusRow("Range", formatDistance(it, metric)) }
+                status.rangeMiFor(state.hasBattery(v))?.let { StatusRow("Range", formatDistance(it, metric)) }
                 status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
                 // Comfort heaters (read-only; mirror/rear-window heat track defrost).
                 status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
@@ -5112,7 +5112,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             }
         }
         status?.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
-        status?.rangeMiFor(v.isEv)?.let { add(DiagRow("Range", formatDistance(it, metric))) }
+        status?.rangeMiFor(state.hasBattery(v))?.let { add(DiagRow("Range", formatDistance(it, metric))) }
         status?.airTemp?.value?.let { add(DiagRow("Climate setpoint", degLabel(it, fahrenheit))) }
         status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
         status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }

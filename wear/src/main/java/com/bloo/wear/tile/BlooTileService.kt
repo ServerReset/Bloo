@@ -236,7 +236,9 @@ abstract class BlooTileService : TileService() {
         val pctText  = "${snap.percent ?: "—"}%"
         val rngText  = snap.rangeMi?.let { formatDistance(it, metric) } ?: ""
         // Clarify what the big % means for this car (and double as the brand footer).
-        val secondaryLabel = if (snap.isEv) "Battery" else "Fuel"
+        // hasBattery (not the raw isEv) so a manually-corrected PHEV on the phone
+        // (misreported as gas by the API) still reads "Battery" here too.
+        val secondaryLabel = if (snap.hasBattery) "Battery" else "Fuel"
 
         val hasPct = snap.percent != null
 
@@ -307,7 +309,11 @@ abstract class BlooTileService : TileService() {
 
         // The user's chosen actions (1–2 of lock/climate/charge) as circular icon
         // buttons. Icon-only, so they can never truncate like text chips did.
-        val chosen = actions.filter { it in TILE_CHIP_ACTIONS }.distinct().take(2)
+        // Drop "charge" for a car with no chargeable battery -- otherwise a
+        // gas-only car with charge configured as a chip shows a button that can
+        // only ever fail.
+        val chosen = actions.filter { it in TILE_CHIP_ACTIONS && (it != "charge" || snap.hasBattery) }
+            .distinct().take(2)
             .ifEmpty { listOf("lock", "climate") }
         val btnSize = when {
             chosen.size == 1 -> ButtonDefaults.LARGE_SIZE
