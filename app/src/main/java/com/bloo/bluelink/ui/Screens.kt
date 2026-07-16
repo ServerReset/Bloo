@@ -29,7 +29,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -6568,8 +6570,12 @@ private fun SettingsScreen(vm: AppViewModel) {
             // instead of an abrupt appear/disappear (the outer Column's own
             // animateContentSize only smooths the resulting height change
             // around them, not their own appearance).
-            val advancedEnter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
-            val advancedExit = fadeOut(tween(150)) + shrinkVertically(tween(160))
+            // Bouncier than a plain settle (SoftDamping is a near-critical 0.82,
+            // barely any overshoot) to match the outer column's own bouncy
+            // animateContentSize below -- the two used different feels, which
+            // read as the whole switch being stiffer than intended.
+            val advancedEnter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
+            val advancedExit = fadeOut(tween(150)) + shrinkVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)),
@@ -6631,31 +6637,31 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
-            // On-device AI - only when the device supports Gemini Nano.
+            // On-device AI - only when the device supports Gemini Nano. Always
+            // shown (not advanced-only): it's a headline feature, not a power-
+            // user knob, and hiding it behind Advanced made it easy to miss.
             if (state.aiSupported) {
-                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
-                    SettingsCard("AI") {
-                        ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
+                SettingsCard("AI") {
+                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
+                    Text(
+                        "Adds an AI summary pebble to each car and lets you ask the search " +
+                            "box plain questions like \"what's the odometer\". Everything runs " +
+                            "privately on your device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (state.aiEnabled) {
+                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
                         Text(
-                            "Adds an AI summary pebble to each car and lets you ask the search " +
-                                "box plain questions like \"what's the odometer\". Everything runs " +
-                                "privately on your device.",
+                            if (state.aiAuto) {
+                                "Summaries refresh on their own when you open a car, refresh its " +
+                                    "status, or send a command. You can still tap Summarize anytime."
+                            } else {
+                                "Summaries only run when you tap Summarize on a car."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (state.aiEnabled) {
-                            ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
-                            Text(
-                                if (state.aiAuto) {
-                                    "Summaries refresh on their own when you open a car, refresh its " +
-                                        "status, or send a command. You can still tap Summarize anytime."
-                                } else {
-                                    "Summaries only run when you tap Summarize on a car."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
                     }
                 }
             }
@@ -7364,6 +7370,16 @@ onValueChange = { vibrancyDraft = it },
         // (tap, or once there's a query) raises the keyboard and reveals,
         // bottom-to-top: the search bar, an AI answer tile, then the
         // scrollable list of matching settings -- closest to the bar first.
+        //
+        // Sits with extra clearance above the keyboard right after tapping
+        // (so it doesn't feel jammed against the IME the instant it's up),
+        // then settles down flush with the keyboard the moment typing
+        // actually starts.
+        val restingLift by animateDpAsState(
+            targetValue = if (searchFocused && query.isEmpty()) 96.dp else 0.dp,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+            label = "searchRestingLift",
+        )
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
@@ -7371,7 +7387,7 @@ onValueChange = { vibrancyDraft = it },
                 .fillMaxWidth()
                 .imePadding()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = bottomInset + 12.dp),
+                .padding(bottom = bottomInset + 12.dp + restingLift),
         ) {
             AnimatedVisibility(
                 visible = searchFocused || query.isNotEmpty(),
@@ -7421,6 +7437,12 @@ onValueChange = { vibrancyDraft = it },
                 selectedKey = state.settingsMode,
                 onSelect = { vm.setSettingsMode(it) },
                 modifier = Modifier.width(172.dp),
+                // Match the "Settings" title pill right next to it exactly
+                // (same container tint and height) instead of the ordinary
+                // button-track color/size every other MorphSegmented uses --
+                // they're both floating chrome in the same row.
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                trackHeight = 44.dp,
             )
             Spacer(Modifier.width(8.dp))
         }
@@ -7711,10 +7733,8 @@ private val SearchStopwords = setOf(
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
 /**
- * The Settings search bar: fixed to the bottom of the screen (a floating
- * pill when idle, morphing into a text field on tap), with a soft pulsing
- * glow behind it -- brighter and quicker while focused -- instead of a flat
- * Surface with no visual invitation to tap.
+ * The Settings search bar: a compact ~40%-width pill when idle, morphing into
+ * a full-width text field on tap, with a soft pulsing glow behind it.
  */
 @Composable
 private fun GlowySearchBar(
@@ -7732,60 +7752,87 @@ private fun GlowySearchBar(
         animationSpec = infiniteRepeatable(tween(if (focused) 1100 else 2200, easing = LinearEasing), RepeatMode.Reverse),
         label = "glowPulse",
     )
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        // The glow itself: a blurred, oversized primary-colour pill sitting
-        // just behind the real bar so its edges bleed softly outward.
+    // A real soft halo: fill+clip to the pill shape FIRST, blur LAST with an
+    // unbounded edge treatment so it fades outward past the shape's own
+    // bounds. The previous order (blur, THEN clip) clipped the blur flat at
+    // the rounded-rect edge, which is exactly what made it look like a
+    // square cutout instead of a glow.
+    @Composable
+    fun Glow(modifier: Modifier) {
         Box(
-            Modifier
-                .matchParentSize()
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-                .blur(26.dp)
+            modifier
                 .clip(RoundedCornerShape(50))
-                .background(scheme.primary.copy(alpha = (if (focused) 0.5f else 0.22f) * glowPulse)),
+                .background(scheme.primary.copy(alpha = (if (focused) 0.55f else 0.26f) * glowPulse))
+                .blur(22.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
         )
+    }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         AnimatedContent(
             targetState = focused || query.isNotEmpty(),
             transitionSpec = {
-                (fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))) togetherWith
-                (fadeOut(tween(150)) + shrinkVertically(tween(150)))
+                val enter = fadeIn(tween(220)) +
+                    expandHorizontally(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow), Alignment.CenterHorizontally) +
+                    expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow), Alignment.CenterVertically)
+                val exit = fadeOut(tween(150)) +
+                    shrinkHorizontally(tween(180), Alignment.CenterHorizontally) +
+                    shrinkVertically(tween(150), Alignment.CenterVertically)
+                enter togetherWith exit
             },
             label = "searchMorph",
         ) { isSearching ->
             if (isSearching) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    placeholder = { Text("Search settings & car data") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Filled.Close, "Clear") }
-                        else IconButton(onClick = { onFocusChange(false) }) { Icon(Icons.Filled.Close, "Close") }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                        .shadow(if (focused) 16.dp else 6.dp, RoundedCornerShape(50), ambientColor = scheme.primary, spotColor = scheme.primary),
-                )
+                Box(Modifier.fillMaxWidth()) {
+                    Glow(Modifier.matchParentSize().padding(horizontal = 6.dp, vertical = 2.dp))
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        placeholder = { Text("Search settings & car data") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Filled.Close, "Clear") }
+                            else IconButton(onClick = { onFocusChange(false) }) { Icon(Icons.Filled.Close, "Close") }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(50),
+                        // OutlinedTextField's container is transparent by
+                        // default, so it inherited whatever busy content was
+                        // scrolling underneath -- often unreadable. A solid
+                        // high-contrast container fixes that regardless of
+                        // what's behind it.
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = scheme.surfaceContainerHighest,
+                            unfocusedContainerColor = scheme.surfaceContainerHighest,
+                            focusedTextColor = scheme.onSurface,
+                            unfocusedTextColor = scheme.onSurface,
+                            focusedBorderColor = scheme.primary,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .shadow(if (focused) 16.dp else 6.dp, RoundedCornerShape(50), ambientColor = scheme.primary, spotColor = scheme.primary),
+                    )
+                }
             } else {
-                Surface(
-                    onClick = { onFocusChange(true) },
-                    shape = RoundedCornerShape(50),
-                    color = scheme.primaryContainer.copy(alpha = 0.9f),
-                    contentColor = scheme.onPrimaryContainer,
-                    tonalElevation = 6.dp,
-                    shadowElevation = 10.dp,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
+                Box(Modifier.fillMaxWidth(0.4f)) {
+                    Glow(Modifier.matchParentSize().padding(horizontal = 4.dp, vertical = 2.dp))
+                    Surface(
+                        onClick = { onFocusChange(true) },
+                        shape = RoundedCornerShape(50),
+                        color = scheme.primaryContainer.copy(alpha = 0.95f),
+                        contentColor = scheme.onPrimaryContainer,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 10.dp,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Search", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -7919,8 +7966,13 @@ private fun SettingsSearchResults(
     // resulting stack top-to-bottom is [suggested results] [AI tile]
     // [search bar], matching the requested reading order bottom-up.
     val results = if (tokens.isEmpty()) entries else entries.filter { e -> tokens.all { it in e.haystack } }
+    // Floating above busy/aurora content needs real separation -- a plain
+    // default Card blends into whatever's behind it. Elevated container +
+    // actual shadow (not just tonal elevation) so results clearly pop.
+    val resultCardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    val resultCardElevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     if (results.isEmpty()) {
-        Card(Modifier.fillMaxWidth()) {
+        Card(Modifier.fillMaxWidth(), colors = resultCardColors, elevation = resultCardElevation) {
             Text(
                 "No matches for “$query”",
                 Modifier.padding(16.dp),
@@ -7929,7 +7981,7 @@ private fun SettingsSearchResults(
         }
     } else {
         results.forEach { e ->
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(), colors = resultCardColors, elevation = resultCardElevation) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     e.content()
@@ -8001,6 +8053,8 @@ fun MorphSegmented(
     selectedKey: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    containerColor: Color? = null,
+    trackHeight: Dp? = null,
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
@@ -8008,13 +8062,14 @@ fun MorphSegmented(
         options = options,
         selectedKey = selectedKey,
         onSelect = onSelect,
-        containerColor = buttonContainer(),
+        containerColor = containerColor ?: buttonContainer(),
         indicatorColor = scheme.primary,
         selectedTextColor = scheme.onPrimary,
         unselectedTextColor = scheme.onSurfaceVariant,
         textStyle = MaterialTheme.typography.labelLarge,
         onTick = { haptics?.tick() },
         modifier = modifier,
+        trackHeight = trackHeight ?: (if (options.any { it.icon != null }) 48.dp else 44.dp),
     )
 }
 
