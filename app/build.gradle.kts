@@ -131,6 +131,14 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Real hardware-accelerated blur/glass ("liquid glass" / frosted) for
+    // floating UI (search bar, floating buttons) — Glance widgets can't use
+    // this (RemoteViews has no blur primitive), see BlooWidget's simulated tint.
+    // (haze-glass exists upstream but isn't published to Maven Central yet --
+    // "Liquid glass" style below is a distinct blurEffect tuning, not that module.)
+    implementation("dev.chrisbanes.haze:haze:1.7.2")
+    implementation("dev.chrisbanes.haze:haze-blur:1.7.2")
+
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.
     implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")

@@ -134,6 +134,7 @@ class BlooWidget : GlanceAppWidget() {
         val pillShape = settings.widgetPillShape(widgetId)
         val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
         val bgAlphaLevel = settings.widgetBackgroundAlpha(widgetId) // 0 (opaque) - 9 (transparent)
+        val liquidGlass = appearance.glassStyle == com.bloo.bluelink.data.GlassStyle.LIQUID
 
         provideContent {
             GlanceTheme {
@@ -164,34 +165,34 @@ class BlooWidget : GlanceAppWidget() {
                             Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
                         }
                     }
-                    // Realistic frosted glass effect: layered tints simulating
-                    // depth, a directional light source, and edge refraction —
-                    // Glance has no blur or gradient primitives, so this is all
-                    // built from stacked flat tints. The previous version used
-                    // four uniform full-size washes, which just reads as a
-                    // slightly-lighter flat color rather than glass; a real
-                    // pane of glass has an uneven, directional highlight and a
-                    // top-to-bottom falloff, not a uniform tint on every layer.
+                    // Frosted-glass tint. Glance/RemoteViews has no blur or
+                    // gradient primitive, AND a hard limit on how many nested
+                    // views a single widget can contain -- the previous version
+                    // stacked 6 extra full-size Boxes (a Column of 3 weighted
+                    // bands plus base/glint/rim) on top of the widget's own
+                    // tile content, which could silently exceed that budget on
+                    // a small (1x1/2x2) widget and render broken/blank instead
+                    // of erroring visibly. Down to 3 total layers: base tint,
+                    // one corner glint, one top rim -- still reads as glass,
+                    // well inside the view budget.
                     if (!photoBgActive && bgAlphaLevel > 0) {
-                        // Deep base tint (cool blue-gray).
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.09f, 0.11f, 0.17f, bgAlpha * 0.88f)))) {}
-                        // Pseudo-gradient: three stacked weighted bands standing in
-                        // for a real top-to-bottom gradient, lighter near the top
-                        // (as if lit from above) fading to a slightly darker base.
-                        Column(GlanceModifier.fillMaxSize().cornerRadius(corner)) {
-                            Box(GlanceModifier.fillMaxWidth().defaultWeight().background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.16f)))) {}
-                            Box(GlanceModifier.fillMaxWidth().defaultWeight().background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.06f)))) {}
-                            Box(GlanceModifier.fillMaxWidth().defaultWeight().background(ColorProvider(Color(0f, 0f, 0f, bgAlpha * 0.10f)))) {}
-                        }
+                        // "Liquid glass" reads brighter/cooler with a stronger
+                        // glint (closer to refractive glass); "Frosted" is a
+                        // flatter, greyer, more opaque-looking tint -- the
+                        // same 3-layer budget either way (see comment above).
+                        val baseTint = if (liquidGlass) Color(0.10f, 0.13f, 0.22f, bgAlpha * 0.80f) else Color(0.16f, 0.16f, 0.17f, bgAlpha * 0.92f)
+                        val glintAlpha = if (liquidGlass) bgAlpha * 0.30f else bgAlpha * 0.14f
+                        val rimAlpha = if (liquidGlass) bgAlpha * 0.34f else bgAlpha * 0.18f
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(baseTint))) {}
                         // A directional glint in one corner (not a uniform sheen)
                         // reads as an actual light source catching the glass.
                         Box(
                             GlanceModifier.size(64.dp).padding(start = 6.dp, top = 6.dp)
                                 .cornerRadius(32.dp)
-                                .background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.20f))),
+                                .background(ColorProvider(Color(1f, 1f, 1f, glintAlpha))),
                         ) {}
                         // Thin bright rim along the top edge (glass-edge refraction).
-                        Box(GlanceModifier.fillMaxWidth().height(2.dp).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.24f)))) {}
+                        Box(GlanceModifier.fillMaxWidth().height(2.dp).background(ColorProvider(Color(1f, 1f, 1f, rimAlpha)))) {}
                     }
                     val base = GlanceModifier.fillMaxSize()
                         .let { m ->

@@ -1933,6 +1933,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAuroraCustomColor(value: String?) = viewModelScope.launch { settingsStore.setAuroraCustomColor(value) }
 
+    fun setGlassStyle(value: com.bloo.bluelink.data.GlassStyle) = viewModelScope.launch { settingsStore.setGlassStyle(value) }
+
     fun setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }
 
     fun clearLogs() = AppLog.clear()

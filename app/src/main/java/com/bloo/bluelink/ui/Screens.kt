@@ -276,6 +276,7 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.GlassStyle
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
@@ -309,6 +310,8 @@ import kotlin.math.roundToInt
 import kotlin.math.tan
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 @Composable
 fun BlooApp(vm: AppViewModel) {
@@ -348,7 +351,17 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    CompositionLocalProvider(LocalHaptics provides haptics) {
+    // One Haze source for the whole app: the root background (below) is what
+    // every floating icon/search bar blurs, regardless of which screen is on
+    // top -- Haze tracks source/effect nodes by shared state, not literal
+    // parent-child nesting, so this works across the AnimatedContent screen
+    // swap below.
+    val hazeState = rememberHazeState()
+    CompositionLocalProvider(
+        LocalHaptics provides haptics,
+        LocalHazeState provides hazeState,
+        LocalGlassStyle provides appearance.glassStyle,
+    ) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
     // status/navigation bars; screen content draws on top of it.
     val scheme = MaterialTheme.colorScheme
@@ -377,7 +390,8 @@ fun BlooApp(vm: AppViewModel) {
                         scheme.surfaceContainerLow,
                     ),
                 ),
-            ),
+            )
+            .hazeSource(state = hazeState),
     ) {
     Scaffold(
         containerColor = Color.Transparent,
@@ -2649,15 +2663,21 @@ private fun FloatingIcon(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "floatIconScale",
     )
+    // A real blurred glass backdrop when Haze is available (see GlassChrome.kt),
+    // with the Surface's own tint kept as a lighter fallback/legibility floor
+    // underneath it -- so this still looks right on the rare composable that
+    // isn't inside BlooApp's LocalHazeState (e.g. a preview).
+    val hasHaze = LocalHazeState.current != null
     Surface(
         onClick = { haptics?.click(); onClick() },
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = if (hasHaze) 0.38f else 0.82f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         interactionSource = interaction,
         modifier = modifier.padding(outerPadding).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
     ) {
         Box(contentAlignment = Alignment.Center) {
+            GlassBackdropCircle(Modifier.matchParentSize())
             Icon(icon, contentDescription = description)
         }
     }
@@ -7226,6 +7246,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                         )
                     }
                 }
+                Spacer(Modifier.height(10.dp))
+                Text("Floating UI glass", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(6.dp))
+                MorphSegmented(
+                    options = GlassStyle.entries.map { SegmentOption(it.name, it.label, null) },
+                    selectedKey = appearance.glassStyle.name,
+                    onSelect = { runCatching { vm.setGlassStyle(GlassStyle.valueOf(it)) } },
+                )
+                Text(
+                    "Applies to floating buttons, the settings search bar, and the home-screen widget.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                   // AnimatedVisibility lays out a single child, not an implicit
                   // Column of its content lambda's composables -- without this
@@ -7414,15 +7447,18 @@ onValueChange = { vibrancyDraft = it },
             Surface(
                 onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = if (LocalHazeState.current != null) 0.38f else 0.82f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
-                Text(
-                    "Settings",
-                    Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Box {
+                    GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
+                    Text(
+                        "Settings",
+                        Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
             Spacer(Modifier.weight(1f))
             // A real segmented control (not a single button that only ever
@@ -7818,20 +7854,23 @@ private fun GlowySearchBar(
                     Surface(
                         onClick = { onFocusChange(true) },
                         shape = RoundedCornerShape(50),
-                        color = scheme.primaryContainer.copy(alpha = 0.95f),
+                        color = scheme.primaryContainer.copy(alpha = if (LocalHazeState.current != null) 0.55f else 0.95f),
                         contentColor = scheme.onPrimaryContainer,
                         tonalElevation = 6.dp,
                         shadowElevation = 10.dp,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Search", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Box {
+                            GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Search", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                 }
