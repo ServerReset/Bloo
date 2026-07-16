@@ -165,17 +165,33 @@ class BlooWidget : GlanceAppWidget() {
                         }
                     }
                     // Realistic frosted glass effect: layered tints simulating
-                    // depth, refraction, and a subtle edge glow — no real-time blur
-                    // available in Glance, so built from overlapping tints.
+                    // depth, a directional light source, and edge refraction —
+                    // Glance has no blur or gradient primitives, so this is all
+                    // built from stacked flat tints. The previous version used
+                    // four uniform full-size washes, which just reads as a
+                    // slightly-lighter flat color rather than glass; a real
+                    // pane of glass has an uneven, directional highlight and a
+                    // top-to-bottom falloff, not a uniform tint on every layer.
                     if (!photoBgActive && bgAlphaLevel > 0) {
-                        // Deep base tint (cool blue-gray)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.10f, 0.12f, 0.18f, bgAlpha * 0.92f)))) {}
-                        // Mid layer: lighter interior (simulates light penetrating glass)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.20f, 0.22f, 0.28f, bgAlpha * 0.35f)))) {}
-                        // Top sheen: a lighter overlay suggesting ambient light from above
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.06f)))) {}
-                        // Edge highlight: thin bright rim (glass refraction at the border)
-                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.15f)))) {}
+                        // Deep base tint (cool blue-gray).
+                        Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0.09f, 0.11f, 0.17f, bgAlpha * 0.88f)))) {}
+                        // Pseudo-gradient: three stacked weighted bands standing in
+                        // for a real top-to-bottom gradient, lighter near the top
+                        // (as if lit from above) fading to a slightly darker base.
+                        Column(GlanceModifier.fillMaxSize().cornerRadius(corner)) {
+                            Box(GlanceModifier.fillMaxWidth().defaultWeight().background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.16f)))) {}
+                            Box(GlanceModifier.fillMaxWidth().defaultWeight().background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.06f)))) {}
+                            Box(GlanceModifier.fillMaxWidth().defaultWeight().background(ColorProvider(Color(0f, 0f, 0f, bgAlpha * 0.10f)))) {}
+                        }
+                        // A directional glint in one corner (not a uniform sheen)
+                        // reads as an actual light source catching the glass.
+                        Box(
+                            GlanceModifier.size(64.dp).padding(start = 6.dp, top = 6.dp)
+                                .cornerRadius(32.dp)
+                                .background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.20f))),
+                        ) {}
+                        // Thin bright rim along the top edge (glass-edge refraction).
+                        Box(GlanceModifier.fillMaxWidth().height(2.dp).background(ColorProvider(Color(1f, 1f, 1f, bgAlpha * 0.24f)))) {}
                     }
                     val base = GlanceModifier.fillMaxSize()
                         .let { m ->

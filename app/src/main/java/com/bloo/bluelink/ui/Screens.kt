@@ -129,6 +129,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -753,29 +756,10 @@ private fun OnboardingScreen(vm: AppViewModel) {
                         ActivityResultContracts.OpenDocument(),
                     ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
                     if (showDriveDialog) {
-                        BlooDialog(
+                        DriveSyncSetupDialog(
                             onDismissRequest = { showDriveDialog = false },
-                            title = { Text("Google Drive sync", fontWeight = FontWeight.Bold) },
-                            text = {
-                                Text("Sync your settings across devices using Google Drive.\n\n" +
-                                    "Save to Drive: pick a folder in Google Drive to store your settings. " +
-                                    "Changes sync automatically.\n\n" +
-                                    "Open from Drive: pick the settings file from Google Drive on another device.")
-                                // Stacked, not a Row: three buttons ("Save to
-                                // Drive"/"Open from Drive"/"Cancel") side by side
-                                // could overflow the dialog's width on a narrow
-                                // phone with no wrap/scroll to fall back on.
-                                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    MorphTextButton("Save to Drive", modifier = Modifier.fillMaxWidth(), onClick = {
-                                        showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json")
-                                    })
-                                    MorphTextButton("Open from Drive", modifier = Modifier.fillMaxWidth(), onClick = {
-                                        showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json"))
-                                    })
-                                    MorphTextButton("Cancel", modifier = Modifier.fillMaxWidth(), onClick = { showDriveDialog = false })
-                                }
-                            },
-                            confirmButton = {},
+                            onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
+                            onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -6765,36 +6749,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
                 Spacer(Modifier.height(10.dp))
                 if (showDriveDialog) {
-                    AlertDialog(
+                    DriveSyncSetupDialog(
                         onDismissRequest = { showDriveDialog = false },
-                        title = { Text("Google Drive sync") },
-                        text = {
-                            Text(
-                                "Sync your settings across devices using Google Drive.\n\n" +
-                                    "Save to Drive: pick a folder in Google Drive to " +
-                                    "store your settings. Changes sync automatically.\n\n" +
-                                    "Open from Drive: pick the settings file from " +
-                                    "Google Drive on another device.",
-                            )
-                        },
-                        confirmButton = {
-                            MorphTextButton("Save to Drive", onClick = {
-                                showDriveDialog = false
-                                driveSaveLauncher.launch("bloo_settings.json")
-                            })
-                        },
-                        dismissButton = {
-                            // Stacked, not a Row alongside confirmButton's own
-                            // "Save to Drive" -- three action labels sharing one
-                            // line risks overflow on a narrow phone.
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                MorphTextButton("Open from Drive", onClick = {
-                                    showDriveDialog = false
-                                    driveOpenLauncher.launch(arrayOf("application/json"))
-                                })
-                                MorphTextButton("Cancel", onClick = { showDriveDialog = false })
-                            }
-                        },
+                        onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
+                        onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
                     )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -8571,6 +8529,72 @@ private fun StaggerFadeIn(delay: Int, offset: Int = 16, content: @Composable () 
         if (staggerBlur > 0.5f) Modifier.blur(staggerBlur.dp, 0.dp) else Modifier
     )) {
         content()
+    }
+}
+
+/**
+ * The Google Drive sync setup dialog, shared between onboarding and the
+ * Settings "Backup & sync" card so both look and behave identically (they
+ * used to be two separately hand-rolled dialogs -- one BlooDialog, one plain
+ * AlertDialog with an awkward confirmButton/dismissButton split -- that had
+ * drifted out of sync with each other). Two tappable choice cards instead of
+ * three same-weight text buttons, so "start fresh" vs. "join an existing
+ * sync" reads as an actual decision rather than an arbitrary button order.
+ */
+@Composable
+private fun DriveSyncSetupDialog(
+    onDismissRequest: () -> Unit,
+    onSaveToDrive: () -> Unit,
+    onOpenFromDrive: () -> Unit,
+) {
+    BlooDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Icon(Icons.Filled.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(10.dp))
+            Text("Google Drive sync", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Text(
+                "Keep your settings in sync across devices with one file in Google Drive.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            DriveSyncChoiceRow(
+                icon = Icons.Filled.CreateNewFolder,
+                title = "Save to Drive",
+                subtitle = "Start fresh — create a new file with this device's settings.",
+                onClick = onSaveToDrive,
+            )
+            Spacer(Modifier.height(8.dp))
+            DriveSyncChoiceRow(
+                icon = Icons.Filled.FileOpen,
+                title = "Open from Drive",
+                subtitle = "Join an existing sync file set up on another device.",
+                onClick = onOpenFromDrive,
+            )
+        },
+        confirmButton = { MorphTextButton("Cancel", onClick = onDismissRequest) },
+    )
+}
+
+@Composable
+private fun DriveSyncChoiceRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 
