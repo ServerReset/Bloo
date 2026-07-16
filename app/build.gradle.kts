@@ -131,15 +131,13 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Real hardware-accelerated blur/glass ("liquid glass" / frosted) for
-    // floating UI (search bar, floating buttons) — Glance widgets can't use
-    // this (RemoteViews has no blur primitive), see BlooWidget's simulated tint.
-    // (haze-glass exists upstream but isn't published to Maven Central yet --
-    // "Liquid glass" style below is a distinct blurEffect tuning, not that module.)
-    // 2.0.0-alphaNN is the only published line with the hazeEffect/blurEffect
-    // v2 API this code uses (the 1.x line predates that split/rewrite).
-    implementation("dev.chrisbanes.haze:haze:2.0.0-alpha03")
-    implementation("dev.chrisbanes.haze:haze-blur:2.0.0-alpha03")
+    // Real Liquid Glass refraction/blur/vibrancy ("io.github.kyant0:backdrop",
+    // aka "AndroidLiquidGlass") for floating UI (search bar, floating
+    // buttons) — Glance widgets can't use this (RemoteViews has no shader
+    // primitive), see BlooWidget's simulated tint. Its shader effects
+    // (RenderEffect/RuntimeShader) no-op gracefully below roughly API 31/33,
+    // so it's safe against this app's minSdk 26 without a separate fallback path.
+    implementation("io.github.kyant0:backdrop:2.0.0")
 
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.
