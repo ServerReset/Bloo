@@ -217,6 +217,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -6537,6 +6540,13 @@ private fun SettingsScreen(vm: AppViewModel) {
 
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+  // Hoisted above the scrolling column: the search bar now floats fixed to
+  // the bottom of the SCREEN (a sibling of the scrolling content, not part of
+  // its scrolled flow), so both it and the column need this state.
+  var query by remember { mutableStateOf("") }
+  var searchFocused by remember { mutableStateOf(false) }
+  // Drop any stale AI answer once the search box is cleared.
+  LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
   BackdropHost {
         // On wide screens (tablets, landscape), cap width and centre so lines
         // don't stretch wall-to-wall.
@@ -6551,14 +6561,8 @@ private fun SettingsScreen(vm: AppViewModel) {
         ) {
             // Content scrolls behind the status bar; clear the floating pills.
             Spacer(Modifier.height(topInset + 56.dp))
-            var query by remember { mutableStateOf("") }
-            var searchFocused by remember { mutableStateOf(false) }
-          // Drop any stale AI answer once the search box is cleared.
-          LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
-          if (query.isNotBlank()) {
-            SettingsSearchResults(query, vm, state, appearance, notif)
-          } else {
-            val advanced = state.settingsMode == "advanced"
+            run {
+                val advanced = state.settingsMode == "advanced"
             // Shared transition for every advanced-only card/section below, so
             // switching Simple/Advanced reveals or tucks them away smoothly
             // instead of an abrupt appear/disappear (the outer Column's own
@@ -7350,49 +7354,39 @@ onValueChange = { vibrancyDraft = it },
             }
           }
         }
-          // Morphing search: pill expands into text field on tap. Rendered
-          // OUTSIDE the if/else on query (not inside the no-query branch) --
-          // it used to live only in the "else" branch, so the text field was
-          // unmounted the instant the user typed a character and query became
-          // non-blank, leaving no way to see/edit/clear the search mid-search.
-          AnimatedContent(
-              targetState = searchFocused || query.isNotEmpty(),
-              transitionSpec = { fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) togetherWith fadeOut(tween(150)) + shrinkVertically(tween(150)) },
-              label = "searchMorph",
-          ) { isSearching ->
-              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                  if (isSearching) {
-                      OutlinedTextField(
-                          value = query,
-                          onValueChange = { query = it },
-                          placeholder = { Text("Search settings & car data") },
-                          leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                          trailingIcon = {
-                              if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
-                              else IconButton(onClick = { searchFocused = false }) { Icon(Icons.Filled.Close, "Close") }
-                          },
-                          singleLine = true,
-                          shape = RoundedCornerShape(50),
-                          modifier = Modifier.fillMaxWidth(),
-                      )
-                  } else {
-                      Surface(
-                          onClick = { searchFocused = true },
-                          shape = RoundedCornerShape(50),
-                          color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
-                          contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                          tonalElevation = 6.dp,
-                          shadowElevation = 8.dp,
-                      ) {
-                          Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                              Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                              Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
-                          }
-                      }
-                  }
-              }
-          }
-          Spacer(Modifier.height(bottomInset + 16.dp))
+          // The search bar itself now floats fixed to the screen's bottom
+          // edge (see below, outside this scrolling column) -- reserve space
+          // here so scrolled content never sits behind it.
+          Spacer(Modifier.height(bottomInset + 132.dp))
+        }
+        // Bottom-anchored search: a fixed overlay, not part of the scrolling
+        // list, so it's always reachable without scrolling. Expanding it
+        // (tap, or once there's a query) raises the keyboard and reveals,
+        // bottom-to-top: the search bar, an AI answer tile, then the
+        // scrollable list of matching settings -- closest to the bar first.
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .widthIn(max = 640.dp)
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = bottomInset + 12.dp),
+        ) {
+            AnimatedVisibility(
+                visible = searchFocused || query.isNotEmpty(),
+                enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+                exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (query.isNotBlank()) SettingsSearchResults(query, vm, state, appearance, notif)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            GlowySearchBar(query, searchFocused, onQueryChange = { query = it }, onFocusChange = { searchFocused = it })
         }
         } // Box (wide-screen centering)
         // Floating back-arrow + "Settings" label + simple/advanced button.
@@ -7717,6 +7711,89 @@ private val SearchStopwords = setOf(
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
 /**
+ * The Settings search bar: fixed to the bottom of the screen (a floating
+ * pill when idle, morphing into a text field on tap), with a soft pulsing
+ * glow behind it -- brighter and quicker while focused -- instead of a flat
+ * Surface with no visual invitation to tap.
+ */
+@Composable
+private fun GlowySearchBar(
+    query: String,
+    focused: Boolean,
+    onQueryChange: (String) -> Unit,
+    onFocusChange: (Boolean) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(focused) { if (focused) runCatching { focusRequester.requestFocus() } }
+    val glowPulse by rememberInfiniteTransition(label = "searchGlow").animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(if (focused) 1100 else 2200, easing = LinearEasing), RepeatMode.Reverse),
+        label = "glowPulse",
+    )
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        // The glow itself: a blurred, oversized primary-colour pill sitting
+        // just behind the real bar so its edges bleed softly outward.
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .blur(26.dp)
+                .clip(RoundedCornerShape(50))
+                .background(scheme.primary.copy(alpha = (if (focused) 0.5f else 0.22f) * glowPulse)),
+        )
+        AnimatedContent(
+            targetState = focused || query.isNotEmpty(),
+            transitionSpec = {
+                (fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))) togetherWith
+                (fadeOut(tween(150)) + shrinkVertically(tween(150)))
+            },
+            label = "searchMorph",
+        ) { isSearching ->
+            if (isSearching) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    placeholder = { Text("Search settings & car data") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Filled.Close, "Clear") }
+                        else IconButton(onClick = { onFocusChange(false) }) { Icon(Icons.Filled.Close, "Close") }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                        .shadow(if (focused) 16.dp else 6.dp, RoundedCornerShape(50), ambientColor = scheme.primary, spotColor = scheme.primary),
+                )
+            } else {
+                Surface(
+                    onClick = { onFocusChange(true) },
+                    shape = RoundedCornerShape(50),
+                    color = scheme.primaryContainer.copy(alpha = 0.9f),
+                    contentColor = scheme.onPrimaryContainer,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 10.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Search settings...", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * Live search over both app settings and per-car data/fields. Tokenises the
  * query (dropping filler words like "for"/"the"), so "odometer for xyz" finds
  * the odometer of the car named xyz, and "plate" lists every car's plate.
@@ -7837,8 +7914,33 @@ private fun SettingsSearchResults(
         }
     }
 
-    // On-device AI reply (when enabled): answer the question in natural language,
-    // while the structured data below still surfaces the exact values.
+    // Matches render FIRST (top of this composable's output), the AI answer
+    // LAST -- this composable is placed above the floating search bar, so the
+    // resulting stack top-to-bottom is [suggested results] [AI tile]
+    // [search bar], matching the requested reading order bottom-up.
+    val results = if (tokens.isEmpty()) entries else entries.filter { e -> tokens.all { it in e.haystack } }
+    if (results.isEmpty()) {
+        Card(Modifier.fillMaxWidth()) {
+            Text(
+                "No matches for “$query”",
+                Modifier.padding(16.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else {
+        results.forEach { e ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    e.content()
+                }
+            }
+        }
+    }
+
+    // On-device AI reply (when enabled): answer the question in natural
+    // language -- a fallback/complement for questions with no structured
+    // match above, or a plain-language gloss when there is one.
     if (state.aiEnabled) {
         LaunchedEffect(query) {
             if (query.isNotBlank()) {
@@ -7867,26 +7969,6 @@ private fun SettingsSearchResults(
                         Text("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-        }
-    }
-
-    val results = if (tokens.isEmpty()) entries else entries.filter { e -> tokens.all { it in e.haystack } }
-    if (results.isEmpty()) {
-        Card(Modifier.fillMaxWidth()) {
-            Text(
-                "No matches for “$query”",
-                Modifier.padding(16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        return
-    }
-    results.forEach { e ->
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                e.content()
             }
         }
     }
