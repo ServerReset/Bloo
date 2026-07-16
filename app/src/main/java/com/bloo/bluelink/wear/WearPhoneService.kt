@@ -124,7 +124,7 @@ class WearPhoneService : WearableListenerService() {
             val path = item.uri.path
             if (path != WearSync.PATH_CLIMATE && path != WearSync.PATH_PRESETS &&
                 path != WearSync.PATH_PEBBLE_ORDER && path != WearSync.PATH_LOCAL &&
-                path != WearSync.PATH_AI_TOGGLE
+                path != WearSync.PATH_AI_TOGGLE && path != WearSync.PATH_AURORA_TOGGLE
             ) return@mapNotNull null
             val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
                 ?: return@mapNotNull null
@@ -166,6 +166,16 @@ class WearPhoneService : WearableListenerService() {
                         store.setAiEnabled(payload.enabled)
                         // Mirror straight back so the watch's optimistic toggle
                         // settles on the confirmed value, same as pebble order.
+                        runCatching {
+                            val appearance = store.appearance.first()
+                            WearBridge.publishSettingsNow(applicationContext, appearance)
+                        }
+                    }
+                    WearSync.PATH_AURORA_TOGGLE -> {
+                        val payload = WearSync.decodeAuroraToggle(raw) ?: return@forEach
+                        val store = SettingsStore(applicationContext)
+                        store.setAuroraBackground(payload.enabled)
+                        // Same settle-back pattern as the AI toggle above.
                         runCatching {
                             val appearance = store.appearance.first()
                             WearBridge.publishSettingsNow(applicationContext, appearance)

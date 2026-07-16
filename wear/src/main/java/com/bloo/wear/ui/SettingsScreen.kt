@@ -169,6 +169,26 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
+            SettingSection("Aurora background") {
+                val enabled = ui.settings?.auroraEnabled == true
+                Text(
+                    "A soft gradient behind the watch app instead of a solid surface.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                MorphButton(
+                    label = if (enabled) "On" else "Off",
+                    icon = Icons.Filled.Bolt,
+                    active = enabled,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = false,
+                    onClick = { vm.setAuroraEnabled(!enabled) },
+                )
+            }
+        }
+
+        item {
             SettingSection("Watch text size") {
                 Text(
                     "${"%.1f".format(ui.localSettings.fontScale)}×",

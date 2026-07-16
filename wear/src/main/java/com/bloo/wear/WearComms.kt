@@ -201,6 +201,20 @@ object WearComms {
         }
     }
 
+    /** Push a "turn the aurora background on/off" toggle back to the phone,
+     *  same own-path pattern as [publishAiToggle]. */
+    suspend fun publishAuroraToggle(context: Context, enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val request = PutDataMapRequest.create(WearSync.PATH_AURORA_TOGGLE).apply {
+                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeAuroraToggle(com.bloo.bluelink.data.WearAuroraTogglePayload(enabled)))
+                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
+            }
+        }
+    }
+
     /** On launch, pull whatever the phone already published so the UI isn't empty
      *  while waiting for the next DataChanged callback. */
     suspend fun pullLatest(context: Context) {

@@ -899,6 +899,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { WearComms.publishAiToggle(ctx, enabled) }
     }
 
+    /** Turn the watch's own aurora background on/off. Same optimistic-update +
+     *  phone-echo pattern as [setAiEnabled]. */
+    fun setAuroraEnabled(enabled: Boolean) {
+        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraEnabled = enabled)) }
+        viewModelScope.launch { WearComms.publishAuroraToggle(ctx, enabled) }
+    }
+
     /** Choose which action chips the glanceable Tile shows, then redraw it. */
     fun setTileActions(actions: List<String>) {
         viewModelScope.launch {

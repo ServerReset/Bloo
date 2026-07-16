@@ -83,6 +83,10 @@ object WearSync {
      *  by) that path's own uiScale echo. */
     const val PATH_AI_TOGGLE = "/bloo/ai_toggle"
 
+    /** DataItem path: watch → phone, "turn the aurora background on/off" --
+     *  its own path for the same reason as [PATH_AI_TOGGLE]. */
+    const val PATH_AURORA_TOGGLE = "/bloo/aurora_toggle"
+
     /** DataMap / message key holding the JSON body. */
     const val KEY_PAYLOAD = "payload"
 
@@ -195,6 +199,12 @@ object WearSync {
 
     fun decodeAiToggle(raw: String?): WearAiTogglePayload? =
         raw?.let { runCatching { json.decodeFromString(WearAiTogglePayload.serializer(), it) }.getOrNull() }
+
+    fun encodeAuroraToggle(payload: WearAuroraTogglePayload): String =
+        json.encodeToString(WearAuroraTogglePayload.serializer(), payload)
+
+    fun decodeAuroraToggle(raw: String?): WearAuroraTogglePayload? =
+        raw?.let { runCatching { json.decodeFromString(WearAuroraTogglePayload.serializer(), it) }.getOrNull() }
 }
 
 /** The full car list mirrored to the watch, plus which one is selected. */
@@ -352,6 +362,9 @@ data class WearSettingsPayload(
     /** Whether on-device AI summaries are turned on, mirrored so the watch can
      *  show the same toggle state and hide the AI tile when it's off. */
     val aiEnabled: Boolean = false,
+    /** Whether the phone's aurora background is on -- the watch's own default
+     *  before any local override (see [WearAuroraTogglePayload]). */
+    val auroraEnabled: Boolean = false,
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */
@@ -364,6 +377,12 @@ data class WearLocalPayload(
 /** Watch → phone: "turn AI summaries on/off". */
 @Serializable
 data class WearAiTogglePayload(
+    val enabled: Boolean = false,
+)
+
+/** Watch → phone: "turn the aurora background on/off". */
+@Serializable
+data class WearAuroraTogglePayload(
     val enabled: Boolean = false,
 )
 

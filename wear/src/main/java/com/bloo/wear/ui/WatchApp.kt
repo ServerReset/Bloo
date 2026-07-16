@@ -1,5 +1,12 @@
 package com.bloo.wear.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppScaffold
@@ -25,13 +35,56 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.wear.WearScreen
 import com.bloo.wear.WearViewModel
+
+/**
+ * A simplified, watch-scaled counterpart to the phone's aurora background: a
+ * diagonal primary→tertiary gradient over the base surface, its blend slowly
+ * breathing between the two, instead of the phone's full multi-blob
+ * simulation -- cheap enough for the watch's smaller GPU budget while still
+ * reading as a living gradient rather than a flat fill.
+ */
+@Composable
+private fun WearAuroraBackground(colors: WearColorRoles?, modifier: Modifier = Modifier) {
+    val primary = colors?.primary?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
+    val tertiary = colors?.tertiary?.let { Color(it) } ?: MaterialTheme.colorScheme.tertiary
+    val base = colors?.background?.let { Color(it) } ?: MaterialTheme.colorScheme.background
+    val breathe by rememberInfiniteTransition(label = "wearAurora").animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(4500, easing = LinearEasing), RepeatMode.Reverse),
+        label = "wearAuroraBreathe",
+    )
+    Box(
+        modifier
+            .background(base)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        primary.copy(alpha = 0.32f * breathe),
+                        Color.Transparent,
+                        tertiary.copy(alpha = 0.26f * breathe),
+                    ),
+                    start = Offset.Zero,
+                    end = Offset.Infinite,
+                ),
+            ),
+    )
+}
 
 @Composable
 fun WatchApp(vm: WearViewModel) {
     val ui by vm.ui.collectAsState()
-    AppScaffold {
+    val auroraOn = ui.settings?.auroraEnabled == true
+    Box(Modifier.fillMaxSize()) {
+    if (auroraOn) {
+        WearAuroraBackground(ui.settings?.colors, Modifier.fillMaxSize())
+    }
+    // Transparent container so the aurora Box behind shows through instead of
+    // AppScaffold's own opaque background fill covering it.
+    AppScaffold(containerColor = if (auroraOn) Color.Transparent else MaterialTheme.colorScheme.background) {
         when (ui.screen) {
             WearScreen.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
@@ -95,5 +148,6 @@ fun WatchApp(vm: WearViewModel) {
                 }
             }
         }
+    }
     }
 }

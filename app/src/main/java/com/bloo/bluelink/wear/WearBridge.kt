@@ -158,6 +158,7 @@ object WearBridge {
             pebbleOrders = pebbleOrders,
             hiddenSections = hiddenSections,
             aiEnabled = store.aiEnabled(),
+            auroraEnabled = appearance.auroraBackground,
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))
