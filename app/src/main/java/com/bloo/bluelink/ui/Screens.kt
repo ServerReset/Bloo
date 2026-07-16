@@ -313,6 +313,8 @@ import kotlin.math.roundToInt
 import kotlin.math.tan
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 /** Which [ReorderColumn.introKey]s have already played their cold-start
  *  intro (see `staggerInOnColdStart`), so it plays once per key per process
@@ -359,8 +361,22 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
+    // One Haze source for the whole app: the root background (below) is what
+    // every floating icon/search bar blurs, regardless of which screen is on
+    // top. Haze tracks source/effect nodes by shared state, not literal
+    // parent-child nesting, so this works across the AnimatedContent screen
+    // swap below -- but unlike the reverted refraction-library attempt, this
+    // is Haze's own lightweight per-node blur (no shared GraphicsLayer that
+    // multiple simultaneous consumers all fight over), which this app
+    // already ran crash-free before. The source Box is also deliberately
+    // NOT the same node the biometric lock's `.blur(lockBlur)` animates on
+    // (see below) -- keeping haze's own capture off a node whose blur
+    // radius is separately animating avoids stacking two different kinds of
+    // "resample this every frame" work on the exact same layer.
+    val hazeState = rememberHazeState()
     CompositionLocalProvider(
         LocalHaptics provides haptics,
+        LocalHazeState provides hazeState,
         LocalGlassStyle provides appearance.glassStyle,
     ) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
@@ -379,10 +395,10 @@ fun BlooApp(vm: AppViewModel) {
         label = "lockAlpha",
     )
     Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().blur(lockBlur)) {
     Box(
         Modifier
             .fillMaxSize()
-            .blur(lockBlur)
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -391,7 +407,8 @@ fun BlooApp(vm: AppViewModel) {
                         scheme.surfaceContainerLow,
                     ),
                 ),
-            ),
+            )
+            .hazeSource(state = hazeState),
     ) {
     Scaffold(
         containerColor = Color.Transparent,
@@ -493,6 +510,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Settings -> SettingsScreen(vm)
             }
         }
+    }
     }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
@@ -2691,6 +2709,7 @@ private fun FloatingIcon(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         contentColor = MaterialTheme.colorScheme.onSurface,
+        shadowElevation = 6.dp,
         interactionSource = interaction,
         modifier = modifier.padding(outerPadding).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
     ) {
@@ -3466,6 +3485,7 @@ private fun VehicleDetailContent(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
                     contentColor = MaterialTheme.colorScheme.onSurface,
+                    shadowElevation = 6.dp,
                 ) {
                     Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                         Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -3557,6 +3577,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
+                shadowElevation = 6.dp,
             ) {
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -7496,6 +7517,7 @@ onValueChange = { vibrancyDraft = it },
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
+                shadowElevation = 6.dp,
             ) {
                 Box {
                     GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
@@ -7512,7 +7534,11 @@ onValueChange = { vibrancyDraft = it },
             // names the OTHER mode) so the CURRENT mode is always obvious at a
             // glance -- the old single-label button was easy to misread as "the
             // mode you're already in" and tap the wrong way.
-            Box(Modifier.width(172.dp)) {
+            Box(
+                Modifier
+                    .width(172.dp)
+                    .shadow(6.dp, RoundedCornerShape(20.dp), clip = false),
+            ) {
                 // Match the "Settings" title pill right next to it (same glass
                 // treatment, same track height) instead of the ordinary
                 // button-track color/size every other MorphSegmented uses --
@@ -7889,10 +7915,18 @@ private fun GlowySearchBar(
                                     singleLine = true,
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
                                     cursorBrush = SolidColor(scheme.primary),
+                                    // No auto-collapse-on-blur here: onFocusChanged
+                                    // fires immediately with isFocused = false the
+                                    // instant this field first composes (before the
+                                    // LaunchedEffect-driven requestFocus() below has
+                                    // actually landed) -- with an empty query that
+                                    // false-positive blur collapsed the bar back down
+                                    // in the same beat it opened, which looked like
+                                    // tapping it did nothing at all. Closing is the
+                                    // explicit trailing Close button's job now.
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .focusRequester(focusRequester)
-                                        .onFocusChanged { if (!it.isFocused && query.isBlank()) onFocusChange(false) },
+                                        .focusRequester(focusRequester),
                                     decorationBox = { inner ->
                                         if (query.isEmpty()) {
                                             Text(
