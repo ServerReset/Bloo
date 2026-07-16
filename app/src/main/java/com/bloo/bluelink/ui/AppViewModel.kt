@@ -149,6 +149,12 @@ data class UiState(
     /** A newer CI build than what's installed, if the update checker found one
      *  and it hasn't been dismissed this session or snoozed. */
     val updateInfo: com.bloo.bluelink.update.UpdateInfo? = null,
+    /** Same "a newer build exists" fact as [updateInfo], but NOT cleared by
+     *  dismissing/snoozing the popup -- only by a later check finding the app
+     *  is current, or the user turning update checks off. Drives the hero
+     *  pebble's persistent "update available" banner, so dismissing the
+     *  one-time popup doesn't also lose every other way back to it. */
+    val updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
     /** True while a manual "Check now" request is in flight. */
     val updateChecking: Boolean = false,
     /** Non-null when the last update check failed (network/API error). */
@@ -395,10 +401,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             when (val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication())) {
                 is com.bloo.bluelink.update.UpdateCheckResult.Available ->
-                    _state.update { it.copy(updateInfo = result.info) }
+                    _state.update { it.copy(updateInfo = result.info, updateAvailable = result.info) }
                 is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
                     _state.update { it.copy(updateCheckFailed = result.error) }
-                is com.bloo.bluelink.update.UpdateCheckResult.UpToDate -> { /* nothing */ }
+                is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
+                    _state.update { it.copy(updateAvailable = null) }
             }
         }
         // Restore the last-known status/location from disk so the UI shows
@@ -1124,7 +1131,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** "Not now": the checker only ever runs once per cold start anyway (its
      *  own debounce), so just clearing the in-memory prompt is enough - no
-     *  persisted state needed. */
+     *  persisted state needed. updateAvailable is left alone so the hero
+     *  pebble's banner still offers a way back to the update. */
     fun dismissUpdate() = _state.update { it.copy(updateInfo = null, updateCheckFailed = null) }
 
     /** "Remind me in a few days": persists a snooze that outlasts the checker's
@@ -1134,9 +1142,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { com.bloo.bluelink.update.UpdateChecker.snooze(getApplication()) }
     }
 
+    /** Re-opens the update popup from the hero pebble's persistent banner. */
+    fun reopenUpdatePrompt() = _state.update { it.copy(updateInfo = it.updateAvailable) }
+
     fun setUpdateChecksEnabled(enabled: Boolean) {
         viewModelScope.launch { updateStore.setChecksEnabled(enabled) }
-        if (!enabled) _state.update { it.copy(updateInfo = null, updateCheckFailed = null) }
+        if (!enabled) _state.update { it.copy(updateInfo = null, updateCheckFailed = null, updateAvailable = null) }
     }
 
     /** Manual "Check now": ignores the debounce/snooze/enabled gates (force), and
@@ -1150,9 +1161,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update {
                 when (result) {
                     is com.bloo.bluelink.update.UpdateCheckResult.Available ->
-                        it.copy(updateChecking = false, updateInfo = result.info, updateCheckFailed = null)
+                        it.copy(updateChecking = false, updateInfo = result.info, updateAvailable = result.info, updateCheckFailed = null)
                     is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
-                        it.copy(updateChecking = false, message = "You're on the latest build.", messageType = "success")
+                        it.copy(updateChecking = false, updateAvailable = null, message = "You're on the latest build.", messageType = "success")
                     is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
                         it.copy(updateChecking = false, updateCheckFailed = result.error)
                 }

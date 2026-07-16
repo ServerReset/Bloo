@@ -132,6 +132,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -2742,6 +2743,8 @@ private fun HeroHeader(
     dragHandle: Modifier = Modifier,
     height: Dp = 150.dp,
     metric: Boolean = false,
+    updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
+    onOpenUpdate: (() -> Unit)? = null,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
     val heroAlpha = remember { Animatable(0f) }
@@ -2762,10 +2765,42 @@ private fun HeroHeader(
         alpha = heroAlpha.value
         translationY = heroOffset.value
     }, shape = RoundedCornerShape(corner)) {
-        Column(Modifier.padding(16.dp)) {
+        Column(
+            Modifier
+                .padding(16.dp)
+                // So the update banner below expands/collapses the whole card
+                // smoothly instead of the card just snapping to its new height.
+                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+        ) {
             HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(16.dp))
             ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
+            if (updateAvailable != null && onOpenUpdate != null) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.SystemUpdate,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Update available", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            updateAvailable.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${updateAvailable.run.runNumber}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    MorphTextButton("Update", onClick = onOpenUpdate)
+                }
+            }
         }
     }
 }
@@ -3655,7 +3690,10 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val hMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
-    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric = hMetric)
+    HeroHeader(
+        v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric = hMetric,
+        updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
+    )
     // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
     // CompactMainTile) which always wrap it in a Surface that establishes a
     // readable contentColor. StateControl's status label falls back to
@@ -3742,6 +3780,7 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
         "summary" -> HeroHeader(
             v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
             state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
+            updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
         )
         "controls" -> ControlsPebble(v, state, vm, dragHandle)
         "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
