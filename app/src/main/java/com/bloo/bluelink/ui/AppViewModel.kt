@@ -714,7 +714,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Restores a failure the background periodic worker hit while the
             // app was closed, so it's visible in Settings on next launch instead
             // of only ever surfacing if a foreground sync happens to fail too.
-            val lastError = settingsStore.lastSyncError()
+            var lastError = settingsStore.lastSyncError()
+            // Proactive check: don't wait for the next sync attempt to discover
+            // the persisted grant is gone (revoked in system Settings, or the
+            // picked Drive file/folder was deleted) -- surface it the moment
+            // the app opens instead.
+            if (uri != null) {
+                val stillGranted = runCatching {
+                    getApplication<android.app.Application>().contentResolver.persistedUriPermissions.any {
+                        it.uri.toString() == uri && it.isReadPermission && it.isWritePermission
+                    }
+                }.getOrDefault(true) // Assume fine if the check itself fails; performDriveSync will report the real error.
+                if (!stillGranted) {
+                    lastError = "Lost access to the Drive file — set up sync again"
+                    settingsStore.setLastSyncError(lastError)
+                }
+            }
             val wifiOnly = settingsStore.syncWifiOnly()
             val settingsMode = settingsStore.settingsMode()
             val vehicles = _state.value.vehicles

@@ -1645,22 +1645,35 @@ private fun AuroraBackground(
     val explodeAlpha = 1f + explosion * 2.5f
     val explodeSize = 1f + explosion * 0.8f
     val explodeSpread = 1f + explosion * 0.3f
+    // "Static" must mean static: this infinite drift used to run unconditionally
+    // regardless of auroraMotion, so picking "Static" still animated (just
+    // without the tilt reactivity) -- gate it on "motion" and hold fixed
+    // midpoints otherwise. Also widened the drift range and shortened the
+    // cycle so "Motion" reads as clearly alive instead of a multi-second creep
+    // that a heavy blur mostly erased anyway.
+    val motionActive = motionMode == "motion"
     val t = rememberInfiniteTransition(label = "aurora")
-    val p1 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
-    val p2 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(13000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
-    val p3 by t.animateFloat(0f, 1f, infiniteRepeatable(tween(10000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
+    val p1 by if (motionActive) t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
+              else remember { mutableFloatStateOf(0.5f) }
+    val p2 by if (motionActive) t.animateFloat(0f, 1f, infiniteRepeatable(tween(6500, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
+              else remember { mutableFloatStateOf(0.5f) }
+    val p3 by if (motionActive) t.animateFloat(0f, 1f, infiniteRepeatable(tween(5000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
+              else remember { mutableFloatStateOf(0.5f) }
     fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
     Box(
         modifier
             .fillMaxSize()
-            .blur((120.dp * (1f + explosion * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            // Lighter than before (was 120dp): that much blur smoothed three
+            // drifting blobs into a wash that barely changed frame to frame,
+            // reading as "not animating" even though the drift was running.
+            .blur((90.dp * (1f + explosion * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
                     drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
-                blob(basePrimary.copy(alpha = (0.30f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.38f, 0.62f, p1) + tiltX) * explodeSpread, (mix(0.40f, 0.55f, p2) + tiltY) * explodeSpread, 0.45f * explodeSize)
-                blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.42f, 0.58f, p2) - tiltX) * explodeSpread, (mix(0.45f, 0.60f, p3) - tiltY) * explodeSpread, 0.40f * explodeSize)
-                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.35f, 0.50f, p3) + tiltX) * explodeSpread, (mix(0.38f, 0.52f, p1) + tiltY) * explodeSpread, 0.38f * explodeSize)
+                blob(basePrimary.copy(alpha = (0.30f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread, (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread, 0.45f * explodeSize)
+                blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread, (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread, 0.40f * explodeSize)
+                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.22f, 0.58f, p3) + tiltX) * explodeSpread, (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread, 0.38f * explodeSize)
             },
     )
 }
@@ -2119,8 +2132,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
             }
         }
-        // Floating overlay controls. They ride the same refresh shift as the page
-        // content so everything slides down together during a pull-to-refresh.
+        // Back/flip ride the refresh shift with the page content during a pull-
+        // to-refresh; Settings stays put -- it's a persistent nav target, not
+        // page-local chrome, so it shouldn't wander while pulling to refresh.
         if (expandedByUser != null) {
             FloatingIcon(
                 icon = Icons.Filled.ArrowBack,
@@ -2141,7 +2155,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             icon = Icons.Filled.Settings,
             description = "Settings",
             onClick = { vm.openSettings() },
-            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().offset(y = refreshShift),
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
         )
     }
     }
@@ -3578,7 +3592,6 @@ private fun Refreshable(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val ptrState = rememberPullToRefreshState()
-    val density = LocalDensity.current
     val haptics = LocalHaptics.current
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -3599,18 +3612,27 @@ private fun Refreshable(
     ) {
         // Content stays full-size and edge-to-edge; never shifted down.
         content()
-        // Indicator floats above content as a z-elevated overlay.
-        val indicatorProgress = if (state.refreshing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
-        val offScreenPx = with(density) { -(topInset + 56.dp).roundToPx() }
-        val onScreenPx = with(density) { (topInset + 28.dp).roundToPx() }
-        val indicatorY = offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt()
+        // Indicator floats above content as a z-elevated overlay. The whole
+        // indicatorProgress/indicatorY calc used to live directly in this
+        // composable's body, reading ptrState.distanceFraction on every frame
+        // of the drag -- that's a *composition*-phase read, so it recomposed
+        // this entire Box (and everything content() renders, the whole car
+        // card) on every pixel of the pull gesture, not just re-laid-out the
+        // small indicator. Moved into the offset{} lambda, which only runs in
+        // the layout phase, so a live drag now costs one indicator relayout
+        // per frame instead of a full recomposition of the car's content.
         if (!hideIndicator) {
             PullToRefreshDefaults.LoadingIndicator(
                 state = ptrState,
                 isRefreshing = state.refreshing,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset { IntOffset(0, indicatorY) },
+                    .offset {
+                        val indicatorProgress = if (state.refreshing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
+                        val offScreenPx = -(topInset + 56.dp).roundToPx()
+                        val onScreenPx = (topInset + 28.dp).roundToPx()
+                        IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt())
+                    },
             )
         }
     }
@@ -4428,6 +4450,12 @@ private fun StateControl(
                                 (fadeIn(tween(200)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200))) togetherWith
                                 (fadeOut(tween(150)) + scaleOut(targetScale = 1.1f, animationSpec = tween(150)))
                             },
+                            // Default is TopStart: "Locked"/"Unlocked" render at
+                            // slightly different intrinsic heights, so without
+                            // this the old and new icon+label rows didn't align
+                            // to the same vertical center during the crossfade,
+                            // reading as the whole control nudging on toggle.
+                            contentAlignment = Alignment.CenterStart,
                             label = "lockStateAnim",
                         ) { (ic, label) ->
                             Row(
@@ -7390,19 +7418,19 @@ onValueChange = { vibrancyDraft = it },
                 )
             }
             Spacer(Modifier.weight(1f))
-            Surface(
-                onClick = { vm.setSettingsMode(if (state.settingsMode == "advanced") "simple" else "advanced") },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ) {
-                Text(
-                    if (state.settingsMode == "advanced") "Simple" else "Advanced",
-                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            // A real segmented control (not a single button that only ever
+            // names the OTHER mode) so the CURRENT mode is always obvious at a
+            // glance -- the old single-label button was easy to misread as "the
+            // mode you're already in" and tap the wrong way.
+            MorphSegmented(
+                options = listOf(
+                    SegmentOption("simple", "Simple", null),
+                    SegmentOption("advanced", "Advanced", null),
+                ),
+                selectedKey = state.settingsMode,
+                onSelect = { vm.setSettingsMode(it) },
+                modifier = Modifier.width(172.dp),
+            )
             Spacer(Modifier.width(8.dp))
         }
         // First-run coach mark pointing at the back arrow.
