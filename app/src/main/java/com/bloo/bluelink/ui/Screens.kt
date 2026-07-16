@@ -313,10 +313,12 @@ import androidx.compose.ui.graphics.toArgb
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
-/** True until the first pebble list reads it (see [ReorderColumn]'s
- *  `staggerInOnColdStart`), so the fade-in-lockstep intro plays once per
- *  process, not every time the garage screen recomposes or reappears. */
-private var coldStartIntroPending = true
+/** Which [ReorderColumn.introKey]s have already played their cold-start
+ *  intro (see `staggerInOnColdStart`), so it plays once per key per process
+ *  -- keyed per-vehicle (not a single global flag) so a prefetched/off-screen
+ *  neighbour in the expanded car pager can't "use up" the intro before the
+ *  page the user actually sees composes. */
+private val coldStartIntroPlayed = mutableSetOf<Any>()
 
 @Composable
 fun BlooApp(vm: AppViewModel) {
@@ -3158,9 +3160,13 @@ private fun <T> ReorderColumn(
     onDragRelease: ((key: Any) -> Boolean)? = null,
     // When true, each item fades/slides in top-to-bottom in quick lockstep the
     // first time this column appears after a fresh process start (see
-    // [coldStartIntroPending]) -- e.g. the garage's pebble list, so opening the
+    // [coldStartIntroPlayed]) -- e.g. the garage's pebble list, so opening the
     // app feels alive instead of the whole screen just popping in at once.
     staggerInOnColdStart: Boolean = false,
+    // Identity for the "already played" check above -- distinct per logical
+    // column (e.g. each car's VIN), so one column consuming the intro can't
+    // rob another (possibly still off-screen/prefetched) column of its own.
+    introKey: Any = Unit,
     content: @Composable (item: T, dragHandle: Modifier, isDragging: Boolean) -> Unit,
 ) {
     var order by remember { mutableStateOf(items) }
@@ -3168,10 +3174,10 @@ private fun <T> ReorderColumn(
     var offsetY by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
     var dropRipple by remember { mutableStateOf(0L) }
-    // Consumed (flips false) the instant the first such column reads it, so
-    // navigating back to the garage later in the same process never replays it.
-    val playIntro = remember {
-        staggerInOnColdStart && coldStartIntroPending.also { coldStartIntroPending = false }
+    // Consumed the instant this key is first read, so navigating back to the
+    // garage (or a second car's column composing) later never replays it.
+    val playIntro = remember(introKey) {
+        staggerInOnColdStart && coldStartIntroPlayed.add(introKey)
     }
 
     // Sync with upstream changes only while not actively dragging.
@@ -3813,6 +3819,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
             }
         },
         staggerInOnColdStart = true,
+        introKey = v.vin,
     ) { section, dragHandle, _ ->
         SinglePebble(section, v, state, vm, dragHandle)
     }
@@ -7489,21 +7496,26 @@ onValueChange = { vibrancyDraft = it },
             // names the OTHER mode) so the CURRENT mode is always obvious at a
             // glance -- the old single-label button was easy to misread as "the
             // mode you're already in" and tap the wrong way.
-            MorphSegmented(
-                options = listOf(
-                    SegmentOption("simple", "Simple", null),
-                    SegmentOption("advanced", "Advanced", null),
-                ),
-                selectedKey = state.settingsMode,
-                onSelect = { vm.setSettingsMode(it) },
-                modifier = Modifier.width(172.dp),
-                // Match the "Settings" title pill right next to it exactly
-                // (same container tint and height) instead of the ordinary
+            Box(Modifier.width(172.dp)) {
+                // Match the "Settings" title pill right next to it (same glass
+                // treatment, same track height) instead of the ordinary
                 // button-track color/size every other MorphSegmented uses --
-                // they're both floating chrome in the same row.
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
-                trackHeight = 44.dp,
-            )
+                // they're both floating chrome in the same row. MorphSegmented
+                // has no backdrop slot of its own, so the blur is drawn here,
+                // behind it, at the same corner radius it clips its own
+                // background to (20.dp).
+                GlassBackdrop(RoundedCornerShape(20.dp), Modifier.matchParentSize())
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("simple", "Simple", null),
+                        SegmentOption("advanced", "Advanced", null),
+                    ),
+                    selectedKey = state.settingsMode,
+                    onSelect = { vm.setSettingsMode(it) },
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                    trackHeight = 44.dp,
+                )
+            }
             Spacer(Modifier.width(8.dp))
         }
         // First-run coach mark pointing at the back arrow.

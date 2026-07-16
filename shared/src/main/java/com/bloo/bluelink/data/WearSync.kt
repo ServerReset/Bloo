@@ -362,8 +362,10 @@ data class WearSettingsPayload(
     /** Whether on-device AI summaries are turned on, mirrored so the watch can
      *  show the same toggle state and hide the AI tile when it's off. */
     val aiEnabled: Boolean = false,
-    /** Whether the phone's aurora background is on -- the watch's own default
-     *  before any local override (see [WearAuroraTogglePayload]). */
+    /** Whether the aurora background is on. One shared flag, same as
+     *  [aiEnabled] above -- flipping it on either device (see
+     *  [WearAuroraTogglePayload] for the watch's own toggle) changes both,
+     *  by design, so the two stay in lockstep rather than silently diverging. */
     val auroraEnabled: Boolean = false,
 )
 
