@@ -935,10 +935,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
     }
 
-    private fun com.bloo.bluelink.data.Weather.toWear() = com.bloo.bluelink.data.WearWeather(
-        tempC = tempC, feelsLikeC = feelsLikeC, highC = highC, lowC = lowC,
-        windKph = windKph, humidity = humidity, isDay = isDay, code = code,
-    )
 
     private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {
         // Use the effective powertrain (a PHEV reads battery %, not fuel %).
@@ -1881,33 +1877,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Use the device's last-known location as the weather location (needs permission). */
     fun useDeviceLocationForWeather() = viewModelScope.launch {
-        val loc = withContext(Dispatchers.IO) {
-            runCatching {
-                val lm = getApplication<Application>()
-                    .getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
-                val providers = listOf(
-                    android.location.LocationManager.GPS_PROVIDER,
-                    android.location.LocationManager.NETWORK_PROVIDER,
-                    android.location.LocationManager.PASSIVE_PROVIDER,
-                )
-                providers.firstNotNullOfOrNull { p ->
-                    runCatching { lm.getLastKnownLocation(p) }.getOrNull()
-                }
-            }.getOrNull()
-        }
-        if (loc == null) {
+        val ok = withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation() }
+        if (!ok) {
             _state.update { it.copy(message = "No device location available — try setting a place instead") }
             return@launch
         }
-        val label = withContext(Dispatchers.IO) {
-            runCatching {
-                Geocoder(getApplication(), Locale.getDefault())
-                    .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->
-                        listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct().joinToString(", ")
-                    }
-            }.getOrNull()
-        } ?: "My location"
-        settingsStore.setWeatherLocation(loc.latitude, loc.longitude, label)
         loadHomeWeather(force = true)
     }
 

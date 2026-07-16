@@ -26,6 +26,11 @@ data class Weather(
     /** When this reading was fetched (wall-clock millis). */
     val fetchedAt: Long = System.currentTimeMillis(),
 ) {
+    /** Same shape as [WearWeather], for mirroring a fetched reading to the watch. */
+    fun toWear() = WearWeather(
+        tempC = tempC, feelsLikeC = feelsLikeC, highC = highC, lowC = lowC,
+        windKph = windKph, humidity = humidity, isDay = isDay, code = code,
+    )
     fun tempF(): Double = tempC * 9 / 5 + 32
     fun feelsLikeF(): Double = feelsLikeC * 9 / 5 + 32
     fun highF(): Double? = highC?.let { it * 9 / 5 + 32 }

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
@@ -129,6 +130,21 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     Spacer(Modifier.height(4.dp))
                     Text("Text scale: ${"%.2f".format(it)}×", style = MaterialTheme.typography.bodySmall)
                 }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Weather location is set on your phone. Use its current spot:",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                MorphButton(
+                    label = "Use phone's location",
+                    icon = Icons.Filled.MyLocation,
+                    active = false,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = false,
+                    onClick = { vm.setWeatherFromDeviceLocation() },
+                )
             }
         }
 

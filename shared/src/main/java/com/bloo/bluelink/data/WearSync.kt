@@ -230,6 +230,12 @@ object WearAction {
     /** Request the phone to import the latest settings from Google Drive and
      *  re-publish them to the watch. */
     const val DRIVE_SYNC = "drive_sync"
+
+    /** Request the phone set its home weather location from its own device
+     *  GPS (mirrors the phone Settings screen's "My location" action) — the
+     *  watch has no independent weather fetch of its own, it only ever
+     *  displays whatever the phone last published. */
+    const val WEATHER_DEVICE_LOCATION = "weather_device_location"
 }
 
 /** A command the watch wants run for one car. */

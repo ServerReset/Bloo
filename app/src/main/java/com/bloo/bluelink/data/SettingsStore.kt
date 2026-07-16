@@ -1205,6 +1205,31 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** Set the home weather location from this device's own last-known GPS
+     *  fix, reverse-geocoded to a place label. Shared by the phone Settings
+     *  screen's "My location" action and the watch's equivalent (relayed
+     *  through WearPhoneService, since the watch has no weather fetch of its
+     *  own). Returns false when no location is available (e.g. permission
+     *  never granted on this device) so the caller can report that clearly. */
+    suspend fun setWeatherFromDeviceLocation(): Boolean {
+        val loc = runCatching {
+            val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+            listOf(
+                android.location.LocationManager.GPS_PROVIDER,
+                android.location.LocationManager.NETWORK_PROVIDER,
+                android.location.LocationManager.PASSIVE_PROVIDER,
+            ).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+        }.getOrNull() ?: return false
+        val label = runCatching {
+            android.location.Geocoder(context, java.util.Locale.getDefault())
+                .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->
+                    listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct().joinToString(", ")
+                }
+        }.getOrNull() ?: "My location"
+        setWeatherLocation(loc.latitude, loc.longitude, label)
+        return true
+    }
+
     /** Set the unit system from a Fahrenheit/Celsius toggle. Maps F → imperial, C → metric. */
     suspend fun setUseFahrenheit(value: Boolean) {
         setUnitSystem(if (value) "imperial" else "metric")

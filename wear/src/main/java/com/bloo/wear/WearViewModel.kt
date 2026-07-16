@@ -550,6 +550,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Ask the phone to set its home weather location from its own device
+     *  GPS (mirrors the phone Settings screen's "My location" action) and
+     *  push fresh weather back -- the watch has no location/weather fetch of
+     *  its own, it only ever displays what the phone last published. */
+    fun setWeatherFromDeviceLocation() {
+        viewModelScope.launch {
+            val sent = runCatching {
+                WearComms.relayToPhone(ctx, com.bloo.bluelink.data.WearCommand(vin = "", action = com.bloo.bluelink.data.WearAction.WEATHER_DEVICE_LOCATION))
+            }.getOrDefault(false)
+            _ui.update {
+                it.copy(message = if (sent) "Asked your phone to update the weather location" else "Bring your phone nearby to set this")
+            }
+        }
+    }
+
     fun toggleLock(vin: String) = command(vin, "doors") { v, repo, st ->
         if (st?.doorLock == true) { repo.unlock(v); flip(vin) { it.copy(doorLock = false) } }
         else { repo.lock(v); flip(vin) { it.copy(doorLock = true) } }

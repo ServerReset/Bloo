@@ -54,6 +54,13 @@ class WearPhoneService : WearableListenerService() {
                     }
                     return
                 }
+                if (command.action == WearAction.WEATHER_DEVICE_LOCATION) {
+                    // Fire-and-forget, like resync: the watch's own extras
+                    // collector already reacts the moment the fresh weather
+                    // publishes below, no dedicated result message needed.
+                    scope.launch { runCatching { setWeatherFromDeviceLocation(applicationContext) } }
+                    return
+                }
                 scope.launch {
                     val result = WearBridge.execute(applicationContext, command)
                     if (result.ok) AppLog.log("Phone relay: ${command.action} → ok")
@@ -205,5 +212,29 @@ class WearPhoneService : WearableListenerService() {
         WearBridge.publishExtras(ctx, updated)
         AppLog.log("AI summary generated for ${snap.name}")
         return WearAiResult(vin, ok = true)
+    }
+
+    /** Handle the watch's [WearAction.WEATHER_DEVICE_LOCATION] request: the
+     *  watch has no weather fetch of its own, so this sets the phone's home
+     *  weather location from the phone's OWN GPS (mirrors the phone Settings
+     *  screen's "My location" action) and republishes fresh weather to the
+     *  watch immediately rather than waiting for the next natural refresh. */
+    private suspend fun setWeatherFromDeviceLocation(ctx: android.content.Context) {
+        val store = SettingsStore(ctx)
+        if (!store.setWeatherFromDeviceLocation()) {
+            AppLog.log("⚠ Watch weather-location request: no device location available")
+            return
+        }
+        val appearance = store.appearance.first()
+        val lat = appearance.weatherLat
+        val lon = appearance.weatherLon
+        if (lat == null || lon == null) return
+        val weather = runCatching { com.bloo.bluelink.data.WeatherApi.fetch(lat, lon) }.getOrNull() ?: return
+        val dataClient = Wearable.getDataClient(ctx)
+        val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
+        val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
+        items?.release()
+        WearBridge.publishExtras(ctx, existing.copy(homeWeather = weather.toWear()))
+        AppLog.log("Weather location set from watch request")
     }
 }
