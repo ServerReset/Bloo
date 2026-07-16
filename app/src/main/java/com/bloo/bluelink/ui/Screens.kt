@@ -285,6 +285,7 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
@@ -7861,6 +7862,31 @@ private val SearchStopwords = setOf(
 
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
+/** A vehicle command recognised in a free-form search query. [cmd]/[climateTarget]
+ *  map directly onto [com.bloo.bluelink.data.TileCommandRunner]'s own command
+ *  vocabulary, so search runs commands through the exact same path the Quick
+ *  Settings tiles use. */
+private class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
+
+/** Recognises a small, deliberately-conservative set of command phrasings --
+ *  lock/unlock, start/stop/smart climate, start/stop charging -- rather than
+ *  attempting general natural-language command parsing. Order matters:
+ *  "unlock" is checked before the bare "lock" pattern so "unlock" doesn't
+ *  also match as "lock". */
+private fun parseVehicleCommand(query: String): ParsedVehicleCommand? {
+    val q = query.lowercase()
+    return when {
+        Regex("\\bunlock\\b").containsMatchIn(q) -> ParsedVehicleCommand("unlock", label = "Unlocking")
+        Regex("\\block\\b").containsMatchIn(q) -> ParsedVehicleCommand("lock", label = "Locking")
+        Regex("smart climate|smart (ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate", "smart", "Starting smart climate for")
+        Regex("stop (the )?(climate|ac|a/c|heat)|turn off (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate", label = "Stopping climate for")
+        Regex("(start|turn on|run) (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate", "default", "Starting climate for")
+        Regex("stop (the )?charg").containsMatchIn(q) -> ParsedVehicleCommand("charge", label = "Stopping charge for")
+        Regex("(start|begin) (the )?charg|charge (it|the car) now").containsMatchIn(q) -> ParsedVehicleCommand("charge", label = "Starting charge for")
+        else -> null
+    }
+}
+
 /**
  * The Settings search bar: ONE persistent pill-shaped element the whole time
  * -- a real button that morphs into the full search field, not two separate
@@ -8141,6 +8167,55 @@ private fun SettingsSearchResults(
                     Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     e.content()
                 }
+            }
+        }
+    }
+
+    // A recognised command ("lock my Ioniq", "start smart climate", "stop
+    // charging") actually runs -- reuses TileCommandRunner, the same
+    // execution path the Quick Settings tiles use, so this isn't a separate,
+    // untested way of sending vehicle commands. If the query doesn't name a
+    // specific car, this falls back to a single car (unambiguous) or asks
+    // the user to be more specific (multiple cars, none named).
+    val command = remember(query) { parseVehicleCommand(query) }
+    if (command != null) {
+        val ctx = LocalContext.current
+        val namedVehicle = state.vehicles.firstOrNull { v -> v.name.isNotBlank() && v.name.lowercase() in query.lowercase() }
+        val targetVehicle = namedVehicle ?: state.vehicles.singleOrNull()
+        var actionResult by remember(query) { mutableStateOf<String?>(null) }
+        var actionRunning by remember(query) { mutableStateOf(false) }
+        LaunchedEffect(query) {
+            if (targetVehicle != null) {
+                delay(500)
+                actionRunning = true
+                val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, command.cmd, command.climateTarget) }.getOrNull()
+                actionResult = result?.message ?: "Command failed"
+                actionRunning = false
+                vm.refreshStatus(targetVehicle)
+            }
+        }
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Action", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    when {
+                        targetVehicle == null -> {
+                            val example = state.vehicles.firstOrNull()?.name ?: "car"
+                            "Which car? Mention its name, e.g. “${command.label} my $example”."
+                        }
+                        actionRunning -> "${command.label} ${targetVehicle.name}…"
+                        actionResult != null -> actionResult!!
+                        else -> "${command.label} ${targetVehicle.name}"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }
@@ -8897,35 +8972,46 @@ private fun DriveSyncSetupDialog(
     onSaveToDrive: () -> Unit,
     onOpenFromDrive: () -> Unit,
 ) {
-    BlooDialog(
+    val scheme = MaterialTheme.colorScheme
+    // Same plain AlertDialog structure as UpdatePromptDialog (icon+bold title
+    // Row, informative Surface content, stacked full-width buttons) instead
+    // of the separate BlooDialog wrapper this used before, so the app's two
+    // most common pop-ups -- "an update is ready" and "set up Drive sync" --
+    // read as the same family of dialog rather than two different styles.
+    AlertDialog(
         onDismissRequest = onDismissRequest,
         title = {
-            Icon(Icons.Filled.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(10.dp))
-            Text("Google Drive sync", fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.Cloud, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+                Text("Google Drive sync", fontWeight = FontWeight.Bold)
+            }
         },
         text = {
-            Text(
-                "Keep your settings in sync across devices with one file in Google Drive.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            DriveSyncChoiceRow(
-                icon = Icons.Filled.CreateNewFolder,
-                title = "Save to Drive",
-                subtitle = "Start fresh — create a new file with this device's settings.",
-                onClick = onSaveToDrive,
-            )
-            Spacer(Modifier.height(8.dp))
-            DriveSyncChoiceRow(
-                icon = Icons.Filled.FileOpen,
-                title = "Open from Drive",
-                subtitle = "Join an existing sync file set up on another device.",
-                onClick = onOpenFromDrive,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Keep your settings in sync across devices with one file in Google Drive.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                )
+                DriveSyncChoiceRow(
+                    icon = Icons.Filled.CreateNewFolder,
+                    title = "Save to Drive",
+                    subtitle = "Start fresh — create a new file with this device's settings.",
+                    onClick = onSaveToDrive,
+                )
+                DriveSyncChoiceRow(
+                    icon = Icons.Filled.FileOpen,
+                    title = "Open from Drive",
+                    subtitle = "Join an existing sync file set up on another device.",
+                    onClick = onOpenFromDrive,
+                )
+            }
         },
-        confirmButton = { MorphTextButton("Cancel", onClick = onDismissRequest) },
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                MorphTextButton("Cancel", onClick = onDismissRequest, modifier = Modifier.fillMaxWidth())
+            }
+        },
     )
 }
 
