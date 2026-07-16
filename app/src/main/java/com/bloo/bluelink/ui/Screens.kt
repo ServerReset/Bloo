@@ -313,8 +313,6 @@ import kotlin.math.roundToInt
 import kotlin.math.tan
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 /** Which [ReorderColumn.introKey]s have already played their cold-start
  *  intro (see `staggerInOnColdStart`), so it plays once per key per process
@@ -361,15 +359,8 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // One Liquid Glass backdrop for the whole app: the root background
-    // (below) is what every floating icon/search bar refracts, regardless of
-    // which screen is on top -- the effect Modifiers reference this same
-    // LayerBackdrop instance rather than needing literal parent-child
-    // nesting, so this works across the AnimatedContent screen swap below.
-    val liquidBackdrop = rememberLayerBackdrop()
     CompositionLocalProvider(
         LocalHaptics provides haptics,
-        LocalLiquidBackdrop provides liquidBackdrop,
         LocalGlassStyle provides appearance.glassStyle,
     ) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
@@ -400,8 +391,7 @@ fun BlooApp(vm: AppViewModel) {
                         scheme.surfaceContainerLow,
                     ),
                 ),
-            )
-            .layerBackdrop(liquidBackdrop),
+            ),
     ) {
     Scaffold(
         containerColor = Color.Transparent,

@@ -131,14 +131,6 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Real Liquid Glass refraction/blur/vibrancy ("io.github.kyant0:backdrop",
-    // aka "AndroidLiquidGlass") for floating UI (search bar, floating
-    // buttons) — Glance widgets can't use this (RemoteViews has no shader
-    // primitive), see BlooWidget's simulated tint. Its shader effects
-    // (RenderEffect/RuntimeShader) no-op gracefully below roughly API 31/33,
-    // so it's safe against this app's minSdk 26 without a separate fallback path.
-    implementation("io.github.kyant0:backdrop:2.0.0")
-
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.
     implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")
