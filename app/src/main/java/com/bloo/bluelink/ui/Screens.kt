@@ -8257,7 +8257,7 @@ private fun CarTilesHeader(name: String, img: String?, assignedCount: Int, total
             // A slim capacity bar reads the per-car tile budget at a glance,
             // instead of just a count with no sense of how much room is left.
             Spacer(Modifier.height(6.dp))
-            val fill by androidx.compose.animation.animateFloatAsState(
+            val fill by animateFloatAsState(
                 targetValue = if (totalTiles > 0) assignedCount / totalTiles.toFloat() else 0f,
                 animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                 label = "tileCapacityFill",
