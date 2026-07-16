@@ -1608,31 +1608,41 @@ private fun AuroraBackground(
     val colorMode = appearance?.auroraColorMode ?: "complementary"
     val customHex = appearance?.auroraCustomColor
 
-    // A slow, heavily-smoothed device-tilt parallax on the blob positions --
-    // independent of auroraMotion ("static" only turns off the auto-drift
-    // below, not tilt-tracking; a still aurora that never reacts to the
-    // phone at all doesn't read as glass/depth). A low exponential-smoothing
-    // alpha is what keeps this from jittering on every tiny hand tremor: each
-    // sample only nudges the running average a little, so the blobs drift
-    // toward wherever you've tilted to over roughly a second, not instantly.
+    // "Motion" follows the phone's tilt (like a lock-screen wallpaper
+    // parallax); "Static" ignores tilt entirely and instead gets its own
+    // slow, small ambient drift (see p1/p2/p3 below) so it still reads as
+    // alive when the phone is sitting still, rather than a literally frozen
+    // frame. A low exponential-smoothing alpha is what keeps the tilt from
+    // jittering on every tiny hand tremor: each sample only nudges the
+    // running average a little, so the blobs drift toward wherever you've
+    // tilted to over roughly a second, not instantly. The multiplier is
+    // deliberately large enough to be unmistakable -- it previously read as
+    // "not doing anything" because it was blended in alongside a much
+    // bigger automatic drift that swamped it; Motion mode no longer runs
+    // that automatic drift at all, so tilt is the only thing moving it.
     var tiltX by remember { mutableFloatStateOf(0f) }
     var tiltY by remember { mutableFloatStateOf(0f) }
-    run {
+    val motionActive = motionMode == "motion"
+    if (motionActive) {
         val ctx = LocalContext.current
         DisposableEffect(ctx) {
             val mgr = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    val alpha = 0.012f
-                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.02f) * alpha
-                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.02f) * alpha
+                    val alpha = 0.02f
+                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.06f) * alpha
+                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.06f) * alpha
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
             if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
             onDispose { mgr.unregisterListener(listener) }
         }
+    } else {
+        // Not tracking tilt in Static mode -- reset so a mode switch away
+        // from Motion doesn't leave the blobs stuck at a stale offset.
+        LaunchedEffect(motionActive) { tiltX = 0f; tiltY = 0f }
     }
 
     val basePrimary = when (colorMode) {
@@ -1688,20 +1698,19 @@ private fun AuroraBackground(
     val explodeAlpha = 1f + explosionValue * 2.5f
     val explodeSize = 1f + explosionValue * 0.8f
     val explodeSpread = 1f + explosionValue * 0.3f
-    // "Static" must mean static: this infinite drift used to run unconditionally
-    // regardless of auroraMotion, so picking "Static" still animated (just
-    // without the tilt reactivity) -- gate it on "motion" and hold fixed
-    // midpoints otherwise. Also widened the drift range and shortened the
-    // cycle so "Motion" reads as clearly alive instead of a multi-second creep
-    // that a heavy blur mostly erased anyway.
-    val motionActive = motionMode == "motion"
+    // Motion mode: blobs held at a fixed midpoint -- the tilt tracking above
+    // supplies all the movement, unmixed with anything else, so it's
+    // unambiguously "the phone's tilt is moving this." Static mode: a small,
+    // slow ambient drift of its own (a narrow 0.42-0.58 amplitude, not the
+    // full 0-1 span Motion used to use) so it still reads as alive when the
+    // phone is sitting still, instead of a literally frozen frame.
     val t = rememberInfiniteTransition(label = "aurora")
-    val p1 by if (motionActive) t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
-              else remember { mutableFloatStateOf(0.5f) }
-    val p2 by if (motionActive) t.animateFloat(0f, 1f, infiniteRepeatable(tween(6500, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
-              else remember { mutableFloatStateOf(0.5f) }
-    val p3 by if (motionActive) t.animateFloat(0f, 1f, infiniteRepeatable(tween(5000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
-              else remember { mutableFloatStateOf(0.5f) }
+    val p1 by if (motionActive) remember { mutableFloatStateOf(0.5f) }
+              else t.animateFloat(0.42f, 0.58f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
+    val p2 by if (motionActive) remember { mutableFloatStateOf(0.5f) }
+              else t.animateFloat(0.58f, 0.42f, infiniteRepeatable(tween(11000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
+    val p3 by if (motionActive) remember { mutableFloatStateOf(0.5f) }
+              else t.animateFloat(0.45f, 0.55f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
     fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
     Box(
         modifier
