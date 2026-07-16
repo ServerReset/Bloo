@@ -2718,9 +2718,12 @@ private fun FloatingIcon(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 6.dp,
         interactionSource = interaction,
-        modifier = modifier.padding(outerPadding).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
+        modifier = modifier
+            .padding(outerPadding)
+            .size(44.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .dropShadow(CircleShape),
     ) {
         Box(contentAlignment = Alignment.Center) {
             GlassBackdropCircle(Modifier.matchParentSize())
@@ -3494,7 +3497,7 @@ private fun VehicleDetailContent(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
                     contentColor = MaterialTheme.colorScheme.onSurface,
-                    shadowElevation = 6.dp,
+                    modifier = Modifier.dropShadow(RoundedCornerShape(50)),
                 ) {
                     Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                         Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -3586,7 +3589,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                shadowElevation = 6.dp,
+                modifier = Modifier.dropShadow(RoundedCornerShape(50)),
             ) {
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -7486,10 +7489,13 @@ onValueChange = { vibrancyDraft = it },
         // (tap, or once there's a query) raises the keyboard and reveals,
         // bottom-to-top: the search bar, an AI answer tile, then the
         // scrollable list of matching settings -- closest to the bar first.
-        // Sits flush right above the keyboard the instant it's up -- a
-        // previous "extra clearance, then settle down" hover was meant to
-        // feel less jammed against the IME, but read as the bar just sitting
-        // stranded well above the keyboard instead.
+        // Sits flush right above the keyboard the instant it's up. The extra
+        // `bottomInset` clearance is only added when the keyboard is closed
+        // (to clear the nav bar) -- adding it unconditionally on top of
+        // .imePadding() double-counted that inset once the keyboard was
+        // showing (imePadding's own height already clears the nav bar on
+        // essentially every device), which is why the bar sat stranded way
+        // too high above the keyboard instead of flush against it.
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
@@ -7497,7 +7503,7 @@ onValueChange = { vibrancyDraft = it },
                 .fillMaxWidth()
                 .imePadding()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = bottomInset + 12.dp),
+                .padding(bottom = if (searchFocused || query.isNotEmpty()) 12.dp else bottomInset + 12.dp),
         ) {
             AnimatedVisibility(
                 visible = searchFocused || query.isNotEmpty(),
@@ -7526,7 +7532,7 @@ onValueChange = { vibrancyDraft = it },
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                shadowElevation = 6.dp,
+                modifier = Modifier.dropShadow(RoundedCornerShape(50)),
             ) {
                 Box {
                     GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
@@ -7546,7 +7552,7 @@ onValueChange = { vibrancyDraft = it },
             Box(
                 Modifier
                     .width(172.dp)
-                    .shadow(6.dp, RoundedCornerShape(20.dp), clip = false),
+                    .dropShadow(RoundedCornerShape(20.dp)),
             ) {
                 // Match the "Settings" title pill right next to it (same glass
                 // treatment, same track height) instead of the ordinary
@@ -7582,7 +7588,6 @@ onValueChange = { vibrancyDraft = it },
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shadowElevation = 6.dp,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
@@ -7590,7 +7595,8 @@ onValueChange = { vibrancyDraft = it },
                     .graphicsLayer {
                         alpha = coachAlpha.value
                         translationY = coachOffset.value
-                    },
+                    }
+                    .dropShadow(RoundedCornerShape(16.dp)),
             ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -7905,19 +7911,25 @@ private fun GlowySearchBar(
                 color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(liquid = 0.45f, frosted = 0.80f)),
                 contentColor = scheme.onSurface,
                 tonalElevation = 6.dp,
-                shadowElevation = if (expanded) 16.dp else 10.dp,
-                modifier = Modifier.fillMaxWidth(),
+                // A real drop shadow (offset + soft blur), not just Surface's
+                // own tonal shadowElevation, which reads as barely-there on
+                // most backgrounds -- this is a plain Box behind the Surface
+                // with its own background+blur, exactly like GlowySearchBar's
+                // halo above, just darker and offset downward.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .dropShadow(RoundedCornerShape(50)),
             ) {
                 Box {
                     GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Box(Modifier.weight(1f)) {
-                            if (expanded) {
+                    if (expanded) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Box(Modifier.weight(1f)) {
                                 BasicTextField(
                                     value = query,
                                     onValueChange = onQueryChange,
@@ -7949,22 +7961,32 @@ private fun GlowySearchBar(
                                         inner()
                                     },
                                 )
-                            } else {
-                                Text(
-                                    "Search",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
                             }
-                        }
-                        if (expanded) {
                             IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
                                 Icon(
                                     Icons.Filled.Close,
                                     contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
                                 )
                             }
+                        }
+                    } else {
+                        // Collapsed: a centered icon+label cluster, not a
+                        // fill-weighted text box with nothing balancing the
+                        // other side -- that left everything reading as
+                        // left-aligned instead of centered in the pill.
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "Search",
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
