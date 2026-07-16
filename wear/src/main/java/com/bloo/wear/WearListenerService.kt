@@ -39,25 +39,29 @@ class WearListenerService : WearableListenerService() {
         if (updates.isEmpty()) return
 
         serviceScope.launch {
-          runCatching {
             var tileNeedsRefresh = false
+            // Each item wrapped individually -- one malformed/failing payload
+            // (e.g. a corrupt PATH_STATE write) must not skip processing the
+            // rest of the same batch (PATH_SETTINGS, PATH_EXTRAS, etc. changing
+            // together is common on a single phone-side publish burst).
             updates.forEach { (path, raw) ->
-                when (path) {
-                    WearSync.PATH_STATE -> {
-                        WearStateWriter.persistState(applicationContext, raw)
-                        tileNeedsRefresh = true
+                runCatching {
+                    when (path) {
+                        WearSync.PATH_STATE -> {
+                            WearStateWriter.persistState(applicationContext, raw)
+                            tileNeedsRefresh = true
+                        }
+                        WearSync.PATH_AUTH -> WearStateWriter.persistAuth(applicationContext, raw)
+                        WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(applicationContext, raw)
+                        WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(applicationContext, raw)
+                        WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(applicationContext, raw)
+                        WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(applicationContext, raw)
                     }
-                    WearSync.PATH_AUTH -> WearStateWriter.persistAuth(applicationContext, raw)
-                    WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(applicationContext, raw)
-                    WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(applicationContext, raw)
-                    WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(applicationContext, raw)
-                    WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(applicationContext, raw)
                 }
             }
             // Push a tile + complication refresh so the glanceable surfaces update
             // immediately when the phone publishes new vehicle state.
-            if (tileNeedsRefresh) refreshWearGlanceables(applicationContext)
-          }
+            if (tileNeedsRefresh) runCatching { refreshWearGlanceables(applicationContext) }
         }
     }
 

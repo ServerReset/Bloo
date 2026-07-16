@@ -269,7 +269,13 @@ object WearBridge {
             updateAllSurfaces(context)
             outcome
         }.getOrElse { e ->
-            SettingsStore.DriveSyncOutcome(ran = true, imported = false, uploaded = false, syncedAtMs = 0L, error = e.message ?: "Sync failed")
+            // Fall back to the real last-known sync time (not 0L/"never") on a
+            // genuinely unexpected exception -- performDriveSync already
+            // catches everything it reasonably can internally, so reaching
+            // here is rare, but a stray uncaught exception here shouldn't
+            // regress "Last synced" to blank when a real prior sync exists.
+            val lastKnown = runCatching { SettingsStore(context).lastSyncMs() }.getOrDefault(0L)
+            SettingsStore.DriveSyncOutcome(ran = true, imported = false, uploaded = false, syncedAtMs = lastKnown, error = e.message ?: "Sync failed")
         }
     }
 

@@ -41,7 +41,18 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             runCatching { WearBridge.publishSettingsNow(ctx, store.appearance.first()) }
             runCatching { BlooWidget().updateAll(ctx) }
         }
-        if (outcome?.error != null) AppLog.log("⚠ Background Drive sync: ${outcome.error}")
+        if (outcome?.error != null) {
+            AppLog.log("⚠ Background Drive sync: ${outcome.error}")
+            // Retry with WorkManager's own backoff (set below) instead of just
+            // waiting up to 2h for the next periodic tick -- most failures here
+            // are transient (a momentary network hiccup, Drive briefly
+            // unreachable), so recovering within minutes instead of hours is a
+            // real reliability difference for a "seamless" sync experience. A
+            // permanently-broken cause (revoked permission) just retries a
+            // few times with growing delays and gives up until the next
+            // periodic tick, which is still bounded and cheap.
+            return Result.retry()
+        }
         return Result.success()
     }
 
@@ -56,6 +67,10 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
+                // Explicit (rather than relying on the platform default) so a
+                // transient failure is retried within a minute, not the
+                // default's much longer first backoff step.
+                .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,

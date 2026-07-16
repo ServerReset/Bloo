@@ -807,6 +807,16 @@ class SettingsStore(private val context: Context) {
         var uploadError: String? = null
         val uploaded = runCatching {
             context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
+                ?: error("Couldn't open the Drive file for writing")
+            // Verify the write actually landed instead of trusting that
+            // close() completing without throwing means the bytes are really
+            // there -- some document providers can silently truncate or drop
+            // a buffered write under low storage or an interrupted upload,
+            // which previously would have reported success, advanced
+            // lastSyncMs, and cleared the dirty set for data that was never
+            // actually saved.
+            val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+            if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
             AppLog.log("Drive sync: uploaded settings")
             true
         }.onFailure {
