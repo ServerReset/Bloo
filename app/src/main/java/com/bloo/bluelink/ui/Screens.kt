@@ -2668,15 +2668,14 @@ private fun FloatingIcon(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "floatIconScale",
     )
-    // A real blurred glass backdrop when Haze is available (see GlassChrome.kt),
-    // with the Surface's own tint kept as a lighter fallback/legibility floor
-    // underneath it -- so this still looks right on the rare composable that
-    // isn't inside BlooApp's LocalHazeState (e.g. a preview).
-    val hasHaze = LocalHazeState.current != null
+    // Liquid glass gets a real blurred backdrop (see GlassChrome.kt) with just
+    // a light tint underneath; Frosted is the plain semi-transparent fill
+    // this looked like before Haze was added, just more transparent than the
+    // old flat version per feedback that it read as too opaque.
     Surface(
         onClick = { haptics?.click(); onClick() },
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = if (hasHaze) 0.38f else 0.82f),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         contentColor = MaterialTheme.colorScheme.onSurface,
         interactionSource = interaction,
         modifier = modifier.padding(outerPadding).size(44.dp).graphicsLayer(scaleX = scale, scaleY = scale),
@@ -7472,7 +7471,7 @@ onValueChange = { vibrancyDraft = it },
             Surface(
                 onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = if (LocalHazeState.current != null) 0.38f else 0.82f),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 Box {
@@ -7879,7 +7878,7 @@ private fun GlowySearchBar(
                     Surface(
                         onClick = { onFocusChange(true) },
                         shape = RoundedCornerShape(50),
-                        color = scheme.primaryContainer.copy(alpha = if (LocalHazeState.current != null) 0.55f else 0.95f),
+                        color = scheme.primaryContainer.copy(alpha = glassContainerAlpha(liquid = 0.45f, frosted = 0.80f)),
                         contentColor = scheme.onPrimaryContainer,
                         tonalElevation = 6.dp,
                         shadowElevation = 10.dp,
