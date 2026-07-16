@@ -136,8 +136,10 @@ dependencies {
     // this (RemoteViews has no blur primitive), see BlooWidget's simulated tint.
     // (haze-glass exists upstream but isn't published to Maven Central yet --
     // "Liquid glass" style below is a distinct blurEffect tuning, not that module.)
-    implementation("dev.chrisbanes.haze:haze:1.7.2")
-    implementation("dev.chrisbanes.haze:haze-blur:1.7.2")
+    // 2.0.0-alphaNN is the only published line with the hazeEffect/blurEffect
+    // v2 API this code uses (the 1.x line predates that split/rewrite).
+    implementation("dev.chrisbanes.haze:haze:2.0.0-alpha03")
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.0-alpha03")
 
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.

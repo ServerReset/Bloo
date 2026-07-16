@@ -313,6 +313,11 @@ import androidx.compose.ui.graphics.toArgb
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
+/** True until the first pebble list reads it (see [ReorderColumn]'s
+ *  `staggerInOnColdStart`), so the fade-in-lockstep intro plays once per
+ *  process, not every time the garage screen recomposes or reappears. */
+private var coldStartIntroPending = true
+
 @Composable
 fun BlooApp(vm: AppViewModel) {
     val state by vm.state.collectAsState()
@@ -3152,6 +3157,11 @@ private fun <T> ReorderColumn(
     // to the hot spot) so the normal reorder is skipped.
     onDragMove: ((key: Any, windowPointer: Offset) -> Unit)? = null,
     onDragRelease: ((key: Any) -> Boolean)? = null,
+    // When true, each item fades/slides in top-to-bottom in quick lockstep the
+    // first time this column appears after a fresh process start (see
+    // [coldStartIntroPending]) -- e.g. the garage's pebble list, so opening the
+    // app feels alive instead of the whole screen just popping in at once.
+    staggerInOnColdStart: Boolean = false,
     content: @Composable (item: T, dragHandle: Modifier, isDragging: Boolean) -> Unit,
 ) {
     var order by remember { mutableStateOf(items) }
@@ -3159,6 +3169,11 @@ private fun <T> ReorderColumn(
     var offsetY by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
     var dropRipple by remember { mutableStateOf(0L) }
+    // Consumed (flips false) the instant the first such column reads it, so
+    // navigating back to the garage later in the same process never replays it.
+    val playIntro = remember {
+        staggerInOnColdStart && coldStartIntroPending.also { coldStartIntroPending = false }
+    }
 
     // Sync with upstream changes only while not actively dragging.
     LaunchedEffect(items) { if (draggingKey == null) order = items }
@@ -3173,7 +3188,7 @@ private fun <T> ReorderColumn(
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
-        order.forEach { item ->
+        order.forEachIndexed { index, item ->
             val k = keyOf(item)
             // Identity key so Compose moves the existing node when the order
             // changes (instead of reusing nodes by slot, which looks janky).
@@ -3186,6 +3201,14 @@ private fun <T> ReorderColumn(
                                    else spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMediumLow),
                     label = "lift"
                 )
+                // Quick top-to-bottom lockstep reveal, once, on a fresh launch.
+                val intro = remember { Animatable(if (playIntro) 0f else 1f) }
+                LaunchedEffect(Unit) {
+                    if (playIntro) {
+                        delay(index * 45L)
+                        intro.animateTo(1f, tween(260, easing = FastOutSlowInEasing))
+                    }
+                }
                 Box(
                     Modifier
                         .zIndex(if (dragging) 1f else 0f)
@@ -3193,9 +3216,10 @@ private fun <T> ReorderColumn(
                         // one is positioned manually via graphicsLayer below.
                         .then(if (dragging) Modifier else Modifier.animatePlacement())
                         .graphicsLayer {
-                            translationY = if (dragging) offsetY else 0f
+                            translationY = if (dragging) offsetY else (1f - intro.value) * 28.dp.toPx()
                             scaleX = lift
                             scaleY = lift
+                            alpha = intro.value
                         }
                         .onSizeChanged { heights[k] = it.height },
                 ) {
@@ -3789,6 +3813,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
                 if (pin) { vm.setHotspot(v, key as String); true } else false
             }
         },
+        staggerInOnColdStart = true,
     ) { section, dragHandle, _ ->
         SinglePebble(section, v, state, vm, dragHandle)
     }
