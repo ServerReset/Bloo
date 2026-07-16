@@ -108,6 +108,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -222,6 +223,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -243,6 +245,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -7463,16 +7466,10 @@ onValueChange = { vibrancyDraft = it },
         // (tap, or once there's a query) raises the keyboard and reveals,
         // bottom-to-top: the search bar, an AI answer tile, then the
         // scrollable list of matching settings -- closest to the bar first.
-        //
-        // Sits with extra clearance above the keyboard right after tapping
-        // (so it doesn't feel jammed against the IME the instant it's up),
-        // then settles down flush with the keyboard the moment typing
-        // actually starts.
-        val restingLift by animateDpAsState(
-            targetValue = if (searchFocused && query.isEmpty()) 96.dp else 0.dp,
-            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
-            label = "searchRestingLift",
-        )
+        // Sits flush right above the keyboard the instant it's up -- a
+        // previous "extra clearance, then settle down" hover was meant to
+        // feel less jammed against the IME, but read as the bar just sitting
+        // stranded well above the keyboard instead.
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
@@ -7480,7 +7477,7 @@ onValueChange = { vibrancyDraft = it },
                 .fillMaxWidth()
                 .imePadding()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = bottomInset + 12.dp + restingLift),
+                .padding(bottom = bottomInset + 12.dp),
         ) {
             AnimatedVisibility(
                 visible = searchFocused || query.isNotEmpty(),
@@ -7834,8 +7831,11 @@ private val SearchStopwords = setOf(
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
 /**
- * The Settings search bar: a compact ~40%-width pill when idle, morphing into
- * a full-width text field on tap, with a soft pulsing glow behind it.
+ * The Settings search bar: ONE persistent pill-shaped element the whole time
+ * -- a real button that morphs into the full search field, not two separate
+ * composables cross-fading in and out. Only its width fraction (~40% ->
+ * 100%) and inner content (a "Search" label -> a real text field) animate;
+ * the Surface/glow/shape underneath never changes identity.
  */
 @Composable
 private fun GlowySearchBar(
@@ -7846,95 +7846,91 @@ private fun GlowySearchBar(
 ) {
     val scheme = MaterialTheme.colorScheme
     val focusRequester = remember { FocusRequester() }
+    val expanded = focused || query.isNotEmpty()
     LaunchedEffect(focused) { if (focused) runCatching { focusRequester.requestFocus() } }
     val glowPulse by rememberInfiniteTransition(label = "searchGlow").animateFloat(
         initialValue = 0.55f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(if (focused) 1100 else 2200, easing = LinearEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(tween(if (expanded) 1100 else 2200, easing = LinearEasing), RepeatMode.Reverse),
         label = "glowPulse",
     )
-    // A real soft halo: fill+clip to the pill shape FIRST, blur LAST with an
-    // unbounded edge treatment so it fades outward past the shape's own
-    // bounds. The previous order (blur, THEN clip) clipped the blur flat at
-    // the rounded-rect edge, which is exactly what made it look like a
-    // square cutout instead of a glow.
-    @Composable
-    fun Glow(modifier: Modifier) {
-        Box(
-            modifier
-                .clip(RoundedCornerShape(50))
-                .background(scheme.primary.copy(alpha = (if (focused) 0.55f else 0.26f) * glowPulse))
-                .blur(22.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
-        )
-    }
+    val widthFraction by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0.4f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "searchWidth",
+    )
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        AnimatedContent(
-            targetState = focused || query.isNotEmpty(),
-            transitionSpec = {
-                val enter = fadeIn(tween(220)) +
-                    expandHorizontally(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow), Alignment.CenterHorizontally) +
-                    expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow), Alignment.CenterVertically)
-                val exit = fadeOut(tween(150)) +
-                    shrinkHorizontally(tween(180), Alignment.CenterHorizontally) +
-                    shrinkVertically(tween(150), Alignment.CenterVertically)
-                enter togetherWith exit
-            },
-            label = "searchMorph",
-        ) { isSearching ->
-            if (isSearching) {
-                Box(Modifier.fillMaxWidth()) {
-                    Glow(Modifier.matchParentSize().padding(horizontal = 6.dp, vertical = 2.dp))
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = onQueryChange,
-                        placeholder = { Text("Search settings & car data") },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (query.isNotEmpty()) IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Filled.Close, "Clear") }
-                            else IconButton(onClick = { onFocusChange(false) }) { Icon(Icons.Filled.Close, "Close") }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(50),
-                        // OutlinedTextField's container is transparent by
-                        // default, so it inherited whatever busy content was
-                        // scrolling underneath -- often unreadable. A solid
-                        // high-contrast container fixes that regardless of
-                        // what's behind it.
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = scheme.surfaceContainerHighest,
-                            unfocusedContainerColor = scheme.surfaceContainerHighest,
-                            focusedTextColor = scheme.onSurface,
-                            unfocusedTextColor = scheme.onSurface,
-                            focusedBorderColor = scheme.primary,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                            .shadow(if (focused) 16.dp else 6.dp, RoundedCornerShape(50), ambientColor = scheme.primary, spotColor = scheme.primary),
-                    )
-                }
-            } else {
-                Box(Modifier.fillMaxWidth(0.4f)) {
-                    Glow(Modifier.matchParentSize().padding(horizontal = 4.dp, vertical = 2.dp))
-                    Surface(
-                        onClick = { onFocusChange(true) },
-                        shape = RoundedCornerShape(50),
-                        color = scheme.primaryContainer.copy(alpha = glassContainerAlpha(liquid = 0.45f, frosted = 0.80f)),
-                        contentColor = scheme.onPrimaryContainer,
-                        tonalElevation = 6.dp,
-                        shadowElevation = 10.dp,
-                        modifier = Modifier.fillMaxWidth(),
+        Box(Modifier.fillMaxWidth(widthFraction.coerceIn(0.05f, 1f))) {
+            // A real soft halo, sized to this element's own current bounds --
+            // fill+clip to the pill shape FIRST, blur LAST with an unbounded
+            // edge treatment so it fades outward past the shape's own bounds
+            // instead of clipping flat at the edge (which looked like a
+            // square cutout instead of a glow).
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(scheme.primary.copy(alpha = (if (expanded) 0.5f else 0.26f) * glowPulse))
+                    .blur(22.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+            )
+            Surface(
+                onClick = { if (!expanded) onFocusChange(true) },
+                shape = RoundedCornerShape(50),
+                color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(liquid = 0.45f, frosted = 0.80f)),
+                contentColor = scheme.onSurface,
+                tonalElevation = 6.dp,
+                shadowElevation = if (expanded) 16.dp else 10.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Box {
+                    GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box {
-                            GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Search", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Box(Modifier.weight(1f)) {
+                            if (expanded) {
+                                BasicTextField(
+                                    value = query,
+                                    onValueChange = onQueryChange,
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
+                                    cursorBrush = SolidColor(scheme.primary),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .focusRequester(focusRequester)
+                                        .onFocusChanged { if (!it.isFocused && query.isBlank()) onFocusChange(false) },
+                                    decorationBox = { inner ->
+                                        if (query.isEmpty()) {
+                                            Text(
+                                                "Search settings & car data",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = scheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        inner()
+                                    },
+                                )
+                            } else {
+                                Text(
+                                    "Search",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        if (expanded) {
+                            IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
+                                )
                             }
                         }
                     }
