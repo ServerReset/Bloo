@@ -482,7 +482,9 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Onboarding -> OnboardingScreen(vm)
                 is Screen.CarSetup -> CarSetupWizardScreen(vm, screen.vins)
                 Screen.Garage -> {
-                    val appearance by vm.appearance.collectAsState()
+                    // Reuses the outer `appearance` (already collected once above
+                    // for the CompositionLocalProvider) instead of re-subscribing
+                    // to the same StateFlow a second time here.
                     Box(Modifier.fillMaxSize()) {
                         if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = state.refreshing)
                         GarageScreen(state, vm)
@@ -2682,10 +2684,8 @@ private fun FloatingIcon(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "floatIconScale",
     )
-    // Liquid glass gets a real blurred backdrop (see GlassChrome.kt) with just
-    // a light tint underneath; Frosted is the plain semi-transparent fill
-    // this looked like before Haze was added, just more transparent than the
-    // old flat version per feedback that it read as too opaque.
+    // Plain semi-transparent fill (see GlassChrome.kt) -- more transparent
+    // than the original flat version per feedback that it read as too opaque.
     Surface(
         onClick = { haptics?.click(); onClick() },
         shape = CircleShape,
