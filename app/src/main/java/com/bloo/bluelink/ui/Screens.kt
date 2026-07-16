@@ -1595,22 +1595,29 @@ private fun AuroraBackground(
     val colorMode = appearance?.auroraColorMode ?: "complementary"
     val customHex = appearance?.auroraCustomColor
 
+    // A slow, heavily-smoothed device-tilt parallax on the blob positions --
+    // independent of auroraMotion ("static" only turns off the auto-drift
+    // below, not tilt-tracking; a still aurora that never reacts to the
+    // phone at all doesn't read as glass/depth). A low exponential-smoothing
+    // alpha is what keeps this from jittering on every tiny hand tremor: each
+    // sample only nudges the running average a little, so the blobs drift
+    // toward wherever you've tilted to over roughly a second, not instantly.
     var tiltX by remember { mutableFloatStateOf(0f) }
     var tiltY by remember { mutableFloatStateOf(0f) }
-    if (motionMode == "motion") {
+    run {
         val ctx = LocalContext.current
         DisposableEffect(ctx) {
             val mgr = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    val alpha = 0.03f
-                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.025f) * alpha
-                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.025f) * alpha
+                    val alpha = 0.012f
+                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.02f) * alpha
+                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.02f) * alpha
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
-            mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+            if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
             onDispose { mgr.unregisterListener(listener) }
         }
     }
@@ -1648,14 +1655,26 @@ private fun AuroraBackground(
         else -> scheme.secondary
     }
 
-    val explosion by animateFloatAsState(
-        targetValue = if (refreshing) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
-        label = "auroraExplode",
-    )
-    val explodeAlpha = 1f + explosion * 2.5f
-    val explodeSize = 1f + explosion * 0.8f
-    val explodeSpread = 1f + explosion * 0.3f
+    // A guaranteed grow-then-shrink pulse rather than a value that just
+    // chases the raw refreshing boolean: a quick refresh (cache hit, or a
+    // refresh that resolves in well under a second) flipped refreshing back
+    // to false before the spring had visibly moved, which read as the
+    // background just snapping to its resting size instead of animating.
+    // Holding briefly at the peak guarantees the "grow" half is actually
+    // visible before the "shrink" half starts, regardless of how fast the
+    // underlying refresh itself completes.
+    val explosion = remember { Animatable(0f) }
+    LaunchedEffect(refreshing) {
+        if (refreshing) {
+            explosion.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium))
+            delay(220)
+        }
+        explosion.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow))
+    }
+    val explosionValue = explosion.value
+    val explodeAlpha = 1f + explosionValue * 2.5f
+    val explodeSize = 1f + explosionValue * 0.8f
+    val explodeSpread = 1f + explosionValue * 0.3f
     // "Static" must mean static: this infinite drift used to run unconditionally
     // regardless of auroraMotion, so picking "Static" still animated (just
     // without the tilt reactivity) -- gate it on "motion" and hold fixed
@@ -1677,7 +1696,7 @@ private fun AuroraBackground(
             // Lighter than before (was 120dp): that much blur smoothed three
             // drifting blobs into a wash that barely changed frame to frame,
             // reading as "not animating" even though the drift was running.
-            .blur((90.dp * (1f + explosion * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            .blur((90.dp * (1f + explosionValue * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
@@ -3000,6 +3019,14 @@ private val ChargeGreen = Color(0xFF2EBD59)
 private val ChargeGreenDark = Color(0xFF1B8A41)
 
 private val SoftDamping get() = com.bloo.uicommon.SoftDamping
+
+/** Shared spring stiffness for the Simple/Advanced mode switch's card
+ *  expand/collapse (the outer settings column, each card's own
+ *  animateContentSize, and the advanced-only cards' enter/exit) -- slower
+ *  than [Spring.StiffnessLow] for a slightly longer, calmer settle, paired
+ *  with [SoftDamping] for minimal bounce. All of these must share one spec
+ *  or the pieces visibly settle at different times/feels. */
+private const val AdvancedModeStiffness = 130f
 
 /**
  * When true (cover-screen tiles), pebbles render permanently open with no
@@ -6621,15 +6648,17 @@ private fun SettingsScreen(vm: AppViewModel) {
             // instead of an abrupt appear/disappear (the outer Column's own
             // animateContentSize only smooths the resulting height change
             // around them, not their own appearance).
-            // Bouncier than a plain settle (SoftDamping is a near-critical 0.82,
-            // barely any overshoot) to match the outer column's own bouncy
-            // animateContentSize below -- the two used different feels, which
-            // read as the whole switch being stiffer than intended.
-            val advancedEnter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
-            val advancedExit = fadeOut(tween(150)) + shrinkVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+            // A slower, near-critical settle (SoftDamping = 0.82, barely any
+            // overshoot) instead of the previous MediumBouncy (0.2, very
+            // bouncy) -- the mode switch read as too springy/fast; this reads
+            // as a calmer, slightly longer settle instead. Shared with
+            // CarSettingsCard/SettingsCard's own animateContentSize below so
+            // all three settle at the same feel instead of visibly disagreeing.
+            val advancedEnter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
+            val advancedExit = fadeOut(tween(150)) + shrinkVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)),
+                modifier = Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
             ) {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts") {
@@ -7591,11 +7620,11 @@ private fun CarSettingsCard(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = cardBg),
     ) {
-        // Same bouncy spec as the enclosing SettingsCard/settings-screen columns
-        // (both animate the same expand/collapse height delta) -- a softer,
-        // faster spec here made this card visibly settle before the outer
-        // containers finished bouncing, reading as a double-animation/jump.
-        Column(Modifier.padding(12.dp).animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))) {
+        // Same spec as the enclosing SettingsCard/settings-screen columns
+        // (both animate the same expand/collapse height delta) -- a different
+        // spec here made this card visibly settle before the outer
+        // containers finished, reading as a double-animation/jump.
+        Column(Modifier.padding(12.dp).animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))) {
             Row(
                 Modifier.fillMaxWidth()
                     .then(if (collapsible) Modifier.clickable { onToggle() } else Modifier)
@@ -8572,7 +8601,7 @@ private fun SettingsCard(title: String, content: @Composable () -> Unit) {
         Column(
             Modifier
                 .padding(16.dp)
-                .animateContentSize(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)),
+                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
