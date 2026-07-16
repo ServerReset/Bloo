@@ -44,13 +44,17 @@ fun GlassBackdrop(shape: Shape, modifier: Modifier = Modifier) {
     if (LocalGlassStyle.current != GlassStyle.LIQUID) return
     val density = LocalDensity.current
     Box(
-        modifier.drawBackdrop(backdrop = backdrop, shape = { shape }) {
-            vibrancy()
-            with(density) {
-                blur(8.dp.toPx())
-                lens(12.dp.toPx(), 22.dp.toPx(), depthEffect = true)
-            }
-        },
+        modifier.drawBackdrop(
+            backdrop = backdrop,
+            shape = { shape },
+            effects = {
+                vibrancy()
+                with(density) {
+                    blur(8.dp.toPx())
+                    lens(12.dp.toPx(), 22.dp.toPx(), depthEffect = true)
+                }
+            },
+        ),
     )
 }
 
