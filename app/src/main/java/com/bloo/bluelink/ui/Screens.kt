@@ -8250,14 +8250,33 @@ private fun CarTilesHeader(name: String, img: String?, assignedCount: Int, total
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                when (assignedCount) {
-                    0 -> "No tiles yet"
-                    1 -> "1 quick tile"
-                    else -> "$assignedCount quick tiles"
-                },
+                if (assignedCount == 0) "No tiles yet" else "$assignedCount of $totalTiles tiles used",
                 style = MaterialTheme.typography.labelMedium,
                 color = scheme.onSurfaceVariant,
             )
+            // A slim capacity bar reads the per-car tile budget at a glance,
+            // instead of just a count with no sense of how much room is left.
+            Spacer(Modifier.height(6.dp))
+            val fill by androidx.compose.animation.animateFloatAsState(
+                targetValue = if (totalTiles > 0) assignedCount / totalTiles.toFloat() else 0f,
+                animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                label = "tileCapacityFill",
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(scheme.surfaceContainerHighest),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fill.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(50))
+                        .background(scheme.primary),
+                )
+            }
         }
     }
 }
