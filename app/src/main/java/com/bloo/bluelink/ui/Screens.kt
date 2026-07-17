@@ -290,6 +290,7 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherCode

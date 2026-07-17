@@ -1,66 +1,84 @@
 package com.bloo.bluelink.ui
 
-import android.graphics.BlurMaskFilter
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
+import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.onSizeChanged
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GlassStyle
+import com.bloo.uicommon.dropShadow
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.blurEffect
 import dev.chrisbanes.haze.hazeEffect
 
 /**
- * A real drop shadow -- an offset, blurred, dark silhouette of [shape] drawn
- * behind the composable -- rather than Material3 Surface's own tonal
- * `shadowElevation`, which reads as barely-there against most of this app's
- * backgrounds. Every piece of floating chrome (icons, pills, the search bar)
- * uses this so it visibly separates from whatever's behind it.
+ * A gentle radial lens/refraction distortion, applied as a self-contained
+ * *foreground* effect on each glass element's own already-rendered content
+ * (never a shared capture object multiple consumers read from -- that
+ * architecture is what crashed the app when this used
+ * io.github.kyant0:backdrop, see the doc comment below). Bows light toward
+ * the edges like a real curved-glass surface catches it, on top of Haze's
+ * blur. AGSL requires API 33+; both shader construction and the per-frame
+ * RenderEffect build are wrapped in [runCatching] so any shader compile/
+ * runtime failure just silently skips the lens effect (blur-only, previous
+ * appearance) rather than crashing.
  */
-fun Modifier.dropShadow(
-    shape: Shape,
-    color: Color = Color.Black.copy(alpha = 0.38f),
-    blurRadius: Dp = 14.dp,
-    offsetY: Dp = 5.dp,
-    offsetX: Dp = 0.dp,
-): Modifier = this.drawBehind {
-    val paint = Paint().asFrameworkPaint().apply {
-        this.color = color.toArgb()
-        isAntiAlias = true
-        if (blurRadius > 0.dp) {
-            maskFilter = BlurMaskFilter(blurRadius.toPx(), BlurMaskFilter.Blur.NORMAL)
+private const val RefractionShaderSrc = """
+    uniform shader content;
+    uniform float2 size;
+    half4 main(float2 coord) {
+        float2 uv = coord / max(size, float2(1.0));
+        float2 centered = uv - 0.5;
+        float dist = length(centered);
+        float bulge = smoothstep(0.0, 0.72, dist) * 0.035;
+        float2 distorted = uv - centered * bulge;
+        float2 sampleCoord = clamp(distorted, 0.0, 1.0) * size;
+        half4 c = content.eval(sampleCoord);
+        float edgeGlint = smoothstep(0.55, 1.0, dist) * 0.06;
+        return half4(c.rgb + edgeGlint, c.a);
+    }
+"""
+
+/** Remembers one shader instance per call site; null below API 33 or on any construction failure. */
+@Composable
+private fun rememberRefractionShader(): RuntimeShader? {
+    if (Build.VERSION.SDK_INT < 33) return null
+    return remember { runCatching { RuntimeShader(RefractionShaderSrc) }.getOrNull() }
+}
+
+/**
+ * Applies the AGSL refraction lens to this element, sized to its own layout
+ * bounds. No-op if [shader] is null (unsupported API level or construction
+ * failed) or if building the per-frame [RenderEffect] ever throws.
+ */
+private fun Modifier.refractionLens(shader: RuntimeShader?): Modifier {
+    if (shader == null) return this
+    return this
+        .onSizeChanged { sz ->
+            runCatching { shader.setFloatUniform("size", sz.width.toFloat(), sz.height.toFloat()) }
         }
-    }
-    val outline = shape.createOutline(size, layoutDirection, this)
-    val path = when (outline) {
-        is Outline.Rectangle -> androidx.compose.ui.graphics.Path().apply { addRect(outline.rect) }
-        is Outline.Rounded -> androidx.compose.ui.graphics.Path().apply { addRoundRect(outline.roundRect) }
-        is Outline.Generic -> outline.path
-    }
-    drawIntoCanvas { canvas ->
-        canvas.save()
-        canvas.translate(offsetX.toPx(), offsetY.toPx())
-        canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
-        canvas.restore()
-    }
+        .graphicsLayer {
+            val effect = runCatching {
+                RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
+            }.getOrNull() ?: return@graphicsLayer
+            renderEffect = effect
+            clip = true
+        }
 }
 
 /**
@@ -100,9 +118,11 @@ val LocalGlassStyle = staticCompositionLocalOf { GlassStyle.LIQUID }
 fun GlassBackdrop(shape: Shape, modifier: Modifier = Modifier) {
     val hazeState = LocalHazeState.current ?: return
     if (LocalGlassStyle.current != GlassStyle.LIQUID) return
+    val refractionShader = rememberRefractionShader()
     Box(
         modifier
             .clip(shape)
+            .refractionLens(refractionShader)
             .hazeEffect(state = hazeState) {
                 blurEffect {
                     // Strong and clearly-visible per feedback that the

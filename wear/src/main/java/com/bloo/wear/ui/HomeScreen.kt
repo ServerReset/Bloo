@@ -127,6 +127,7 @@ import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import com.bloo.wear.seatStepLabels
+import com.bloo.uicommon.dropShadow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -594,7 +595,10 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
     ) {
         Box(
             Modifier
-                .shadow(4.dp, RoundedCornerShape(50), clip = false)
+                // Same real drop-shadow technique as the phone's floating
+                // chrome (an offset, blurred silhouette) instead of Wear
+                // Compose's own tonal shadow, which read as barely-there.
+                .dropShadow(RoundedCornerShape(50))
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .pointerInput(Unit) {
