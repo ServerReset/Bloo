@@ -13,6 +13,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -716,48 +718,10 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
 }
 
 // ---- Section cards -------------------------------------------------------
-
-@Composable
-private fun SectionCard(
-    title: String?,
-    icon: ImageVector? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Card(
-        onClick = {},
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Column(
-            Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
-        ) {
-            if (title != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (icon != null) {
-                        Icon(
-                            icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    Text(
-                        title.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-            }
-            content()
-        }
-    }
-}
+// SectionCard itself now lives in Components.kt (same package) so every
+// screen -- not just Home -- shares one "card with an uppercase, bold,
+// primary-tinted header" visual language instead of each screen rolling its
+// own card styling.
 
 /** Alert card — shown only when there are open doors/windows/warnings.
  *  Fades in with a subtle vertical slide when alerts appear. */
@@ -1008,12 +972,27 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             Spacer(Modifier.width(4.dp))
             val delBg = if (confirming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
             val delFg = if (confirming) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer
+            // A real confirm/delete action with zero press feedback previously --
+            // the same spring scale-punch every MorphButton gets, kept as a
+            // circle here since MorphButton's pill/label shape doesn't fit an
+            // icon-only two-state control like this one.
+            val delInteraction = remember { MutableInteractionSource() }
+            val delPressed by delInteraction.collectIsPressedAsState()
+            val delScale by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (delPressed) 0.88f else 1f,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessHigh,
+                ),
+                label = "presetDeleteScale",
+            )
             Box(
                 modifier = Modifier
                     .size(36.dp)
+                    .graphicsLayer { scaleX = delScale; scaleY = delScale }
                     .clip(CircleShape)
                     .background(delBg)
-                    .clickable {
+                    .clickable(interactionSource = delInteraction, indication = null) {
                         if (confirming) {
                             vm.deletePreset(car.vin, preset.id)
                             confirmDeleteId = null

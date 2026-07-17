@@ -98,10 +98,7 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
             for (index in trips.indices) {
                 val t = trips[index]
                 item(key = index) {
-                    Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                        t.startdate?.take(16)?.replace('T', ' ')?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                    SectionCard(t.startdate?.take(16)?.replace('T', ' ')) {
                         val metric = ui.localSettings.unitSystem == "metric"
                         t.distance?.let { StatusRow("Distance", formatTripDistance(it, metric)) }
                         t.driveMinutes?.let { StatusRow("Drive", fmtMinutes(it)) }

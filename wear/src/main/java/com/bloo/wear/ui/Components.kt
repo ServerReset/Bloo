@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,6 +63,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.Card
+import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -75,6 +78,53 @@ import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.math.tan
+
+/**
+ * A card with a consistent uppercase, bold, primary-tinted header (optional
+ * icon), then content -- the one card language every screen (Home's tiles,
+ * Settings' sections) should share instead of each rolling its own styling.
+ */
+@Composable
+fun SectionCard(
+    title: String?,
+    icon: ImageVector? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        onClick = {},
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Column(
+            Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+        ) {
+            if (title != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (icon != null) {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Text(
+                        title.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+            content()
+        }
+    }
+}
 
 /**
  * The Wear text-entry pattern: tapping launches the system input overlay

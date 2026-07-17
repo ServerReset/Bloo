@@ -415,7 +415,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
-            Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+            SectionCard(null) {
                 StatusRow(
                     label = "Phone",
                     value = if (ui.phoneConnected) "Connected" else "Standalone",
@@ -480,12 +480,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     }
 }
 
-/** A settings section: a card with a consistent bold title header, then content.
- *  One place for the header styling every settings group repeated inline. */
+/** A settings section -- now a thin wrapper over the shared [SectionCard] so
+ *  Settings uses the exact same card language (rounded corners, uppercase
+ *  bold primary-tinted header) as Home's tiles, instead of a plain default
+ *  Card with a different corner radius/container tone/title style. */
 @Composable
 private fun SettingSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        content()
-    }
+    SectionCard(title, content = content)
 }
