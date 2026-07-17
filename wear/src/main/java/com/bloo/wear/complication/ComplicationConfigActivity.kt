@@ -70,10 +70,18 @@ class ComplicationConfigActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     item { ListHeader { Text("Show which car?", textAlign = TextAlign.Center) } }
-                    if (loaded && cars.isEmpty()) {
+                    if (!loaded) {
+                        item {
+                            androidx.wear.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    } else if (cars.isEmpty()) {
                         item {
                             Text(
                                 "No cars yet -- sign in on your phone first, then it syncs here.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                         }
