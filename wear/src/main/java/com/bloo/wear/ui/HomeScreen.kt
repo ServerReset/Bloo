@@ -1509,8 +1509,14 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                     }
                     .onSizeChanged { heights[key] = it.height }
             ) {
+                    val cardTint by animateColorAsState(
+                        targetValue = if (dragging) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow,
+                        label = "reorderRowTint",
+                    )
                     Card(
                         onClick = {},
+                        colors = CardDefaults.cardColors(containerColor = cardTint),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .pointerInput(key) {
