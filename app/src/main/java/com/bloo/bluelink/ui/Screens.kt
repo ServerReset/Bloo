@@ -7515,7 +7515,15 @@ onValueChange = { vibrancyDraft = it },
                     Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (query.isNotBlank()) SettingsSearchResults(query, vm, state, appearance, notif)
+                    if (query.isNotBlank()) {
+                        SettingsSearchResults(query, vm, state, appearance, notif)
+                    } else {
+                        // Focused but empty: nothing to search yet, so surface a
+                        // few example queries -- otherwise there's no way to
+                        // discover that search can answer data questions and
+                        // run commands, not just find settings by name.
+                        SearchSuggestions(state) { query = it }
+                    }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -8016,6 +8024,45 @@ private fun GlowySearchBar(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Example queries shown while the search bar is focused but empty --
+ * without these there's no way to discover that search answers data
+ * questions ("what's my odometer") and runs commands ("lock my car"), not
+ * just finds settings by name.
+ */
+@Composable
+private fun SearchSuggestions(state: UiState, onPick: (String) -> Unit) {
+    val carName = state.vehicles.firstOrNull()?.name
+    val examples = buildList {
+        add("odometer" + (carName?.let { " for $it" } ?: ""))
+        add("battery level")
+        add("lock" + (carName?.let { " my $it" } ?: " my car"))
+        add("haptic feedback")
+        if (state.vehicles.any { state.hasBattery(it) }) add("start smart climate")
+    }
+    Text(
+        "Try asking",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        examples.forEach { example ->
+            Surface(
+                onClick = { onPick(example) },
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Text(
+                    example,
+                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                )
             }
         }
     }

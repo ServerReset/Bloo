@@ -176,11 +176,15 @@ class BlooWidget : GlanceAppWidget() {
                     // widget -- an artifact, not a highlight -- so it's gone.
                     if (!photoBgActive && bgAlphaLevel > 0) {
                         // "Liquid glass" reads brighter/cooler; "Frosted" is a
-                        // flatter, greyer, more opaque-looking tint.
+                        // flatter, greyer, more opaque-looking tint. Kept at 2
+                        // total layers (base tint + top rim) -- a 3rd
+                        // bottom-rim layer needed an extra alignment wrapper
+                        // Box to position it, which pushes closer to the
+                        // RemoteViews view-count budget that broke this exact
+                        // effect once already (see comment above).
                         val baseTint = if (liquidGlass) Color(0.10f, 0.13f, 0.22f, bgAlpha * 0.80f) else Color(0.16f, 0.16f, 0.17f, bgAlpha * 0.92f)
                         val rimAlpha = if (liquidGlass) bgAlpha * 0.34f else bgAlpha * 0.18f
                         Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(baseTint))) {}
-                        // Thin bright rim along the top edge (glass-edge refraction).
                         Box(GlanceModifier.fillMaxWidth().height(2.dp).background(ColorProvider(Color(1f, 1f, 1f, rimAlpha)))) {}
                     }
                     val base = GlanceModifier.fillMaxSize()

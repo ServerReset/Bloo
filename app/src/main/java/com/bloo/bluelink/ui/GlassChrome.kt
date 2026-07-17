@@ -1,9 +1,9 @@
 package com.bloo.bluelink.ui
 
 import android.graphics.BlurMaskFilter
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Paint
@@ -99,34 +100,40 @@ val LocalGlassStyle = staticCompositionLocalOf { GlassStyle.LIQUID }
 fun GlassBackdrop(shape: Shape, modifier: Modifier = Modifier) {
     val hazeState = LocalHazeState.current ?: return
     if (LocalGlassStyle.current != GlassStyle.LIQUID) return
-    Box(modifier.clip(shape)) {
-        Box(
-            Modifier
-                .matchParentSize()
-                .hazeEffect(state = hazeState) {
-                    blurEffect {
-                        // Strong and clearly-visible per feedback that the
-                        // previous tuning "didn't look like it was doing
-                        // anything" -- a deeper blur radius, a brighter
-                        // frosted highlight tint, and real noise texture
-                        // read as glass at a glance instead of a barely-
-                        // there wash.
-                        blurRadius = 34.dp
-                        noiseFactor = 0.12f
-                        colorEffects = listOf(HazeColorEffect.tint(Color.White.copy(alpha = 0.20f)))
-                    }
-                },
-        )
-        // A thin bright rim along the top edge -- the same "catches the
-        // light" cue real glass/acrylic panels show -- on top of the blur so
-        // it reads as an actual material, not just a blurred pane.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.5.dp)
-                .drawBehind { drawRect(Color.White.copy(alpha = 0.35f)) },
-        )
-    }
+    Box(
+        modifier
+            .clip(shape)
+            .hazeEffect(state = hazeState) {
+                blurEffect {
+                    // Strong and clearly-visible per feedback that the
+                    // previous tuning "didn't look like it was doing
+                    // anything" -- a deeper blur radius, a brighter
+                    // frosted highlight tint, and real noise texture
+                    // read as glass at a glance instead of a barely-
+                    // there wash.
+                    blurRadius = 34.dp
+                    noiseFactor = 0.12f
+                    colorEffects = listOf(HazeColorEffect.tint(Color.White.copy(alpha = 0.20f)))
+                }
+            }
+            // A full-perimeter edge, brighter along the top and fading down
+            // the sides -- real glass/acrylic catches the light all around
+            // its rim, not just a single flat line across the top, which
+            // read as a sticker/decal rather than an actual material edge.
+            .border(
+                BorderStroke(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.55f),
+                            Color.White.copy(alpha = 0.12f),
+                            Color.White.copy(alpha = 0.22f),
+                        ),
+                    ),
+                ),
+                shape,
+            ),
+    )
 }
 
 /** Convenience overload for the common circular floating-icon case. */
