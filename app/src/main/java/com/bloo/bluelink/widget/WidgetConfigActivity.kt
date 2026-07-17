@@ -54,6 +54,7 @@ import com.bloo.bluelink.ui.MorphButton
 import com.bloo.bluelink.ui.MorphButtonLabel
 import com.bloo.bluelink.ui.MorphChip
 import com.bloo.bluelink.ui.MorphTextButton
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -101,6 +102,11 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var pillShape by remember { mutableStateOf(false) }
     var layoutMode by remember { mutableStateOf("info") }
     var backgroundAlpha by remember { mutableStateOf(0) }
+    // Frosted/Liquid glass is an app-wide setting (same one Settings' "Floating
+    // UI glass" control uses), not a per-widget preference -- shown and
+    // editable here too since there was previously no way to tell from the
+    // widget config screen that it was even respected.
+    var glassStyle by remember { mutableStateOf(com.bloo.bluelink.data.GlassStyle.LIQUID) }
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
 
     LaunchedEffect(Unit) {
@@ -112,6 +118,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         pillShape = store.widgetPillShape(widgetId)
         layoutMode = store.widgetLayoutMode(widgetId)
         backgroundAlpha = store.widgetBackgroundAlpha(widgetId)
+        glassStyle = store.appearance.first().glassStyle
         val existing = store.widgetConfig(widgetId)
         if (existing != null) {
             selectedVin = existing.first.takeIf { vin -> cars.any { it.vin == vin } } ?: cars.firstOrNull()?.vin
@@ -209,6 +216,26 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 9 -> "Nearly transparent"
                 else -> "Level ${backgroundAlpha}/9"
             },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text("Glass style", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(4.dp))
+        com.bloo.bluelink.ui.MorphSegmented(
+            options = com.bloo.bluelink.data.GlassStyle.entries.map { com.bloo.bluelink.ui.SegmentOption(it.name, it.label, null) },
+            selectedKey = glassStyle.name,
+            onSelect = { key ->
+                val value = runCatching { com.bloo.bluelink.data.GlassStyle.valueOf(key) }.getOrNull() ?: return@MorphSegmented
+                glassStyle = value
+                scope.launch {
+                    SettingsStore(context).setGlassStyle(value)
+                    runCatching { BlooWidget().updateAll(context) }
+                }
+            },
+        )
+        Text(
+            "Applies everywhere, not just this widget -- same setting as Settings' \"Floating UI glass\".",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
