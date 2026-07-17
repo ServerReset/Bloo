@@ -72,10 +72,16 @@ data class SeatConfig(
 /** User-confirmed powertrain (the US API only exposes EV vs gas). */
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
-/** Frosted (flat blurred tint) vs Liquid glass (brighter, more refractive) floating-UI style. */
+/**
+ * Frosted (flat blurred tint) vs Liquid glass (brighter, more refractive)
+ * floating-UI style. Ultra glass is Liquid glass everywhere Liquid applies,
+ * plus it extends the same real blur/refraction to the pebble section
+ * backgrounds too, not just floating chrome (icons, search bar, pills).
+ */
 enum class GlassStyle(val label: String) {
     FROSTED("Frosted"),
     LIQUID("Liquid glass"),
+    ULTRA("Ultra glass"),
 }
 
 /** When the biometric app-lock re-engages after the app leaves the foreground. */

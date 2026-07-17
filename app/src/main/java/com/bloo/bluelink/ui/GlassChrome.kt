@@ -105,6 +105,10 @@ val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 /** User's chosen floating-chrome material; read by [GlassBackdrop]. */
 val LocalGlassStyle = staticCompositionLocalOf { GlassStyle.LIQUID }
 
+/** True for both glass styles that render real blur (Liquid and Ultra); false for Frosted's flat tint. */
+private val GlassStyle.rendersBlur: Boolean
+    get() = this == GlassStyle.LIQUID || this == GlassStyle.ULTRA
+
 /**
  * Draws the blurred backdrop for one piece of floating chrome (a sibling
  * drawn behind the caller's own icon/text content) -- only for the
@@ -117,7 +121,7 @@ val LocalGlassStyle = staticCompositionLocalOf { GlassStyle.LIQUID }
 @Composable
 fun GlassBackdrop(shape: Shape, modifier: Modifier = Modifier) {
     val hazeState = LocalHazeState.current ?: return
-    if (LocalGlassStyle.current != GlassStyle.LIQUID) return
+    if (!LocalGlassStyle.current.rendersBlur) return
     val refractionShader = rememberRefractionShader()
     Box(
         modifier
@@ -168,6 +172,14 @@ fun GlassBackdropCircle(modifier: Modifier = Modifier) = GlassBackdrop(CircleSha
  */
 @Composable
 fun glassContainerAlpha(liquid: Float = 0.30f, frosted: Float = 0.62f): Float {
-    val isLiquidGlass = LocalHazeState.current != null && LocalGlassStyle.current == GlassStyle.LIQUID
+    val isLiquidGlass = LocalHazeState.current != null && LocalGlassStyle.current.rendersBlur
     return if (isLiquidGlass) liquid else frosted
 }
+
+/**
+ * True only for [GlassStyle.ULTRA] (with a registered [LocalHazeState]) --
+ * gates the pebble section backgrounds' own real-glass treatment, which is
+ * one step further than Liquid glass applies (floating chrome only).
+ */
+@Composable
+fun isUltraGlass(): Boolean = LocalHazeState.current != null && LocalGlassStyle.current == GlassStyle.ULTRA

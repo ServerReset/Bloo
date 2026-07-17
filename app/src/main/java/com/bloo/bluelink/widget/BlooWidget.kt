@@ -134,7 +134,8 @@ class BlooWidget : GlanceAppWidget() {
         val pillShape = settings.widgetPillShape(widgetId)
         val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
         val bgAlphaLevel = settings.widgetBackgroundAlpha(widgetId) // 0 (opaque) - 9 (transparent)
-        val liquidGlass = appearance.glassStyle == com.bloo.bluelink.data.GlassStyle.LIQUID
+        val liquidGlass = appearance.glassStyle == com.bloo.bluelink.data.GlassStyle.LIQUID ||
+            appearance.glassStyle == com.bloo.bluelink.data.GlassStyle.ULTRA
 
         provideContent {
             GlanceTheme {

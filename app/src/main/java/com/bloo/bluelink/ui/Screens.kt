@@ -4686,110 +4686,122 @@ private fun Pebble(
         label = "pebbleCorner",
     )
     val fillHeight = LocalPebbleFillHeight.current
-    Card(
-        Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier),
-        shape = RoundedCornerShape(corner),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-    ) {
-        // animateContentSize gives a smooth, correctly-measured collapse (no
-        // post-animation size jump). Cover-screen tiles fill instead.
-        Column(
-            if (fillHeight) {
-                Modifier.fillMaxHeight()
-            } else {
-                Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
-            },
+    val ultraGlass = isUltraGlass()
+    val pebbleShape = RoundedCornerShape(corner)
+    Box(Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)) {
+        // Ultra glass extends the same real blur/refraction floating chrome
+        // uses to the pebble backgrounds themselves, not just icons/search --
+        // the Card below goes translucent so this shows through it.
+        if (ultraGlass) {
+            GlassBackdrop(pebbleShape, Modifier.matchParentSize())
+        }
+        Card(
+            Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier),
+            shape = pebbleShape,
+            colors = CardDefaults.cardColors(
+                containerColor = if (ultraGlass) containerColor.copy(alpha = 0.28f) else containerColor,
+            ),
         ) {
-            // Header: tap anywhere to toggle, long-press to drag-reorder. The
-            // action button and chevron handle their own clicks. Fixed min height
-            // so every collapsed pebble lines up.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (forceExpanded) Modifier
-                        else Modifier.clickable {
-                            if (expanded) haptics?.tick() else haptics?.click()
-                            vm.togglePebble(v, section)
-                        },
-                    )
-                    .then(dragHandle)
-                    .heightIn(min = PebbleHeaderHeight)
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            // animateContentSize gives a smooth, correctly-measured collapse (no
+            // post-animation size jump). Cover-screen tiles fill instead.
+            Column(
+                if (fillHeight) {
+                    Modifier.fillMaxHeight()
+                } else {
+                    Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
+                },
             ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    if (summary != null) {
-                        AnimatedContent(
-                            targetState = summary,
-                            transitionSpec = {
-                                (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                                (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                // Header: tap anywhere to toggle, long-press to drag-reorder. The
+                // action button and chevron handle their own clicks. Fixed min height
+                // so every collapsed pebble lines up.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (forceExpanded) Modifier
+                            else Modifier.clickable {
+                                if (expanded) haptics?.tick() else haptics?.click()
+                                vm.togglePebble(v, section)
                             },
-                            label = "pebbleSummary",
-                        ) { s ->
-                            Text(
-                                s,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                                maxLines = 1,
+                        )
+                        .then(dragHandle)
+                        .heightIn(min = PebbleHeaderHeight)
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        if (summary != null) {
+                            AnimatedContent(
+                                targetState = summary,
+                                transitionSpec = {
+                                    (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                                    (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                                },
+                                label = "pebbleSummary",
+                            ) { s ->
+                                Text(
+                                    s,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                    if (!forceExpanded) {
+                        if (headerAction != null) {
+                            SplitExpandButton(
+                                action = headerAction,
+                                expanded = expanded,
+                                onToggle = { vm.togglePebble(v, section) },
+                            )
+                        } else {
+                            MorphExpandButton(
+                                expanded = expanded,
+                                onToggle = { vm.togglePebble(v, section) },
                             )
                         }
                     }
                 }
-                if (!forceExpanded) {
-                    if (headerAction != null) {
-                        SplitExpandButton(
-                            action = headerAction,
-                            expanded = expanded,
-                            onToggle = { vm.togglePebble(v, section) },
-                        )
-                    } else {
-                        MorphExpandButton(
-                            expanded = expanded,
-                            onToggle = { vm.togglePebble(v, section) },
+                if (fillHeight) {
+                    // Cover-screen tiles are always force-expanded and must fill the
+                    // remaining height, so the body is a direct weighted child of the
+                    // Column (no AnimatedVisibility, which would break weight()).
+                    if (expanded) {
+                        val bodyScroll = LocalCoverScrollState.current ?: rememberScrollState()
+                        Column(
+                            Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
+                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            content = content,
                         )
                     }
-                }
-            }
-            if (fillHeight) {
-                // Cover-screen tiles are always force-expanded and must fill the
-                // remaining height, so the body is a direct weighted child of the
-                // Column (no AnimatedVisibility, which would break weight()).
-                if (expanded) {
-                    val bodyScroll = LocalCoverScrollState.current ?: rememberScrollState()
-                    Column(
-                        Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
-                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        content = content,
-                    )
-                }
-            } else {
-                // Normal pebbles: animate the body fading + sliding open/closed.
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = fadeIn(tween(180)) + expandVertically(
-                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                        expandFrom = Alignment.Top,
-                    ),
-                    exit = fadeOut(tween(130)) + shrinkVertically(
-                        tween(160),
-                        shrinkTowards = Alignment.Top,
-                    ),
-                ) {
-                    Column(
-                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        content = content,
-                    )
+                } else {
+                    // Normal pebbles: animate the body fading + sliding open/closed.
+                    AnimatedVisibility(
+                        visible = expanded,
+                        enter = fadeIn(tween(180)) + expandVertically(
+                            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                            expandFrom = Alignment.Top,
+                        ),
+                        exit = fadeOut(tween(130)) + shrinkVertically(
+                            tween(160),
+                            shrinkTowards = Alignment.Top,
+                        ),
+                    ) {
+                        Column(
+                            Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            content = content,
+                        )
+                    }
                 }
             }
         }
