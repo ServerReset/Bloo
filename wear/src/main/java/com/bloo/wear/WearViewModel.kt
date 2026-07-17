@@ -294,7 +294,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // manual resync), so a relayed Refresh spun briefly and the screen then
             // kept showing the old data until an app restart.
             snapshotStore.payload.collect { data ->
-                if (data.vehicles.isEmpty()) return@collect
+                if (data.vehicles.isEmpty()) {
+                    // A genuine push asserting zero vehicles (all cars removed
+                    // on the phone, or a sign-out that didn't route through
+                    // this watch's own signOutAll()) -- reconcile local state
+                    // instead of silently keeping stale cars around forever.
+                    // Only acts when there's actually something stale to
+                    // clear, so repeated empty pushes are cheap no-ops.
+                    if (snapshots.isNotEmpty() || vehicles.isNotEmpty()) {
+                        snapshots = emptyMap()
+                        vehicles = emptyList()
+                        statuses = emptyMap()
+                        trips = emptyMap()
+                        publish()
+                    }
+                    return@collect
+                }
                 snapshots = data.vehicles.associateBy { it.vin }
                 // buildCarView prefers a cached in-memory status over the snapshot,
                 // so fold the snapshot's core fields into any status we hold -
