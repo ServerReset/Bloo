@@ -1,6 +1,7 @@
 package com.bloo.wear.complication
 
 import android.content.ComponentName
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -44,17 +45,23 @@ class ComplicationConfigActivity : ComponentActivity() {
         setResult(RESULT_CANCELED)
 
         val complicationId = intent.getIntExtra(EXTRA_COMPLICATION_ID, -1)
-        @Suppress("DEPRECATION")
-        val component: ComponentName? = intent.getParcelableExtra(EXTRA_PROVIDER_COMPONENT)
+        val component: ComponentName? = if (Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableExtra(EXTRA_PROVIDER_COMPONENT, ComponentName::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(EXTRA_PROVIDER_COMPONENT)
+        }
         if (complicationId == -1 || component == null) { finish(); return }
         val dataSource = component.shortClassName.substringAfterLast('.')
 
         setContent {
             var cars by remember { mutableStateOf<List<VehicleSnapshot>>(emptyList()) }
+            var loaded by remember { mutableStateOf(false) }
             var settings by remember { mutableStateOf<com.bloo.bluelink.data.WearSettingsPayload?>(null) }
             LaunchedEffect(Unit) {
                 cars = runCatching { SnapshotStore(applicationContext).current().vehicles }.getOrDefault(emptyList())
                 settings = runCatching { WearSettingsStore(applicationContext).flow.first() }.getOrNull()
+                loaded = true
             }
             BlooWearTheme(settings) {
                 ScalingLazyColumn(
@@ -63,6 +70,14 @@ class ComplicationConfigActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     item { ListHeader { Text("Show which car?", textAlign = TextAlign.Center) } }
+                    if (loaded && cars.isEmpty()) {
+                        item {
+                            Text(
+                                "No cars yet -- sign in on your phone first, then it syncs here.",
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
                     items(cars, key = { it.vin }) { car ->
                         MorphButton(
                             label = car.name,

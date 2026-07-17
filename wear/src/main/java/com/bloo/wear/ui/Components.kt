@@ -148,7 +148,13 @@ fun ChargeRing(
  *  with tap-to-retry. */
 @Composable
 fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
-    val tile = remember(lat, lon) {
+    // Round to ~11m precision before keying: GPS jitter between status
+    // refreshes shouldn't force a tile URL recompute (and, since the URL is
+    // the Coil cache/request key, a live car sitting still shouldn't look
+    // like it's re-fetching the same map tile on every poll).
+    val latKey = (lat * 10000).toInt()
+    val lonKey = (lon * 10000).toInt()
+    val tile = remember(latKey, lonKey) {
         val z = 15
         val n = (1 shl z).toDouble()
         val latRad = Math.toRadians(lat)

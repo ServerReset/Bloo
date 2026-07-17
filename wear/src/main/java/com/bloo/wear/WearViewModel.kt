@@ -371,7 +371,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ui.update { it.copy(busy = true, message = null) }
             runCatching {
-                (repoFor(brand) as BlueLinkRepository).login(email.trim(), password, pin.trim())
+                val repo = repoFor(brand) as? BlueLinkRepository
+                    ?: error("Sign-in isn't supported for ${brand.label} yet")
+                repo.login(email.trim(), password, pin.trim())
                 credentialStore.save(Credentials(email.trim(), password, pin.trim(), brand))
             }.onSuccess {
                 AppLog.log("Watch sign-in: ${email.trim()} (${brand.label})")

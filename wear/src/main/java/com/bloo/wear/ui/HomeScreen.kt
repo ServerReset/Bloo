@@ -288,10 +288,35 @@ private fun CarColumn(
     val focusRequester = remember { FocusRequester() }
     val round = LocalConfiguration.current.isScreenRound
 
-    val tiles = remember(ui.pebbleOverride, ui.settings, ui.presets, ui.extras, car) { visibleTiles(ui, car) }
+    // Narrowly keyed on just what visibleTiles() actually reads -- keying on
+    // the whole ui.settings/ui.extras objects meant any unrelated push (e.g.
+    // another car's weather, an unrelated setting) recomputed this for every
+    // on-screen car page.
+    val hiddenForCar = ui.settings?.hiddenSections?.get(car.vin)
+    val pebbleOrder = ui.pebbleOrderFor(car.vin)
+    val hasCarWeather = ui.extras.carWeather[car.vin] != null
+    val hasHomeWeather = ui.extras.homeWeather != null
+    val aiEnabled = ui.settings?.aiEnabled
+    val tiles = remember(
+        car.vin,
+        car.alertCount,
+        hiddenForCar,
+        pebbleOrder,
+        car.hasBattery,
+        car.lat,
+        car.lon,
+        hasCarWeather,
+        hasHomeWeather,
+        car.hasLiveStatus,
+        aiEnabled,
+    ) { visibleTiles(ui, car) }
     val tileCount = tiles.size
     val infinite = tileCount > 1
-    val cycles = if (infinite) 200 else 1
+    // The wrap-around teleport guard below only ever lets the user drift
+    // tileCount * 2 items from center before recentring, so a much smaller
+    // buffer than 200 cycles covers the same usable range with far less
+    // incidental list allocation.
+    val cycles = if (infinite) 24 else 1
     val total = tileCount * cycles
     val summaryIdx = tiles.indexOf(WearTiles.SUMMARY).coerceAtLeast(0)
     val initialIndex = if (infinite) (cycles / 2) * tileCount + summaryIdx else summaryIdx
@@ -910,10 +935,13 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
         pending = "${car.vin}:climate" in ui.pending || weather == null,
         onClick = { if (weather != null) vm.smartClimate(car.vin) },
     )
-    if (ambientF != null) {
+    // Guard on `weather` itself, not just the derived `ambientF`, so a future
+    // change decoupling the two can't turn this into a real NPE.
+    val currentWeather = weather
+    if (ambientF != null && currentWeather != null) {
         Spacer(Modifier.height(4.dp))
         Text(
-            "Ambient: ${weatherTemp(weather!!.tempC, fahrenheit)} · adjusts ±10°${if (fahrenheit) "F" else "C"}",
+            "Ambient: ${weatherTemp(currentWeather.tempC, fahrenheit)} · adjusts ±10°${if (fahrenheit) "F" else "C"}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
@@ -1073,8 +1101,12 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
 
 @Composable
 private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Location", Icons.Filled.LocationOn) {
-    val lat = car.lat ?: 0.0
-    val lon = car.lon ?: 0.0
+    // visibleTiles() only shows this card when both are non-null; guarded
+    // explicitly here too so a future reordering can't silently render
+    // "0.0, 0.0" instead of failing loudly.
+    val lat = car.lat
+    val lon = car.lon
+    if (lat == null || lon == null) return@SectionCard
     val context = LocalContext.current
     // Resolve a human-readable place name the first time we have coordinates.
     LaunchedEffect(car.vin, car.lat, car.lon) {
