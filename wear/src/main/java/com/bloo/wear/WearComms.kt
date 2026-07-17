@@ -38,23 +38,43 @@ object WearComms {
     /** Run a command: optimistic local flip, then relay to the phone (or execute
      *  it standalone). */
     suspend fun send(context: Context, command: WearCommand) {
-        withContext(Dispatchers.IO) {
-            // Resolve TOGGLE_* to an explicit LOCK/UNLOCK etc. from the PRE-flip
-            // snapshot. The standalone fallback's executor decides toggle direction
-            // by re-reading the same store the optimistic write below lands in, so
-            // relaying the raw toggle after flipping made every standalone toggle
-            // execute the OPPOSITE action (tap Unlock -> car re-locks). Resolving
-            // here also means the phone relay carries the direction the user
-            // actually saw on the watch.
-            var resolved = command
-            runCatching {
-                val store = SnapshotStore(context)
-                store.current().vehicles.firstOrNull { it.vin == command.vin }?.let { snap ->
-                    resolved = command.copy(action = WearCommandRunner.resolveToggle(snap, command.action))
-                    // Optimistic update so the tile reacts the instant it's tapped.
-                    store.updateVehicle(WearCommandRunner.optimistic(snap, resolved.action))
-                }
+        val resolved = applyOptimistic(context, command)
+        relayCommand(context, resolved)
+    }
+
+    /**
+     * Just the "resolve TOGGLE_* to an explicit LOCK/UNLOCK etc. and flip the
+     * local snapshot" half of [send], split out so a caller that needs the
+     * optimistic update to have landed before it does something else (e.g.
+     * BlooTileService re-reading the store to render immediately) can await
+     * just this part synchronously, then fire the slower network half in the
+     * background via [relayCommand] instead of double-applying the update.
+     *
+     * Resolve TOGGLE_* to an explicit LOCK/UNLOCK etc. from the PRE-flip
+     * snapshot. The standalone fallback's executor decides toggle direction
+     * by re-reading the same store the optimistic write below lands in, so
+     * relaying the raw toggle after flipping made every standalone toggle
+     * execute the OPPOSITE action (tap Unlock -> car re-locks). Resolving
+     * here also means the phone relay carries the direction the user
+     * actually saw on the watch.
+     */
+    suspend fun applyOptimistic(context: Context, command: WearCommand): WearCommand = withContext(Dispatchers.IO) {
+        var resolved = command
+        runCatching {
+            val store = SnapshotStore(context)
+            store.current().vehicles.firstOrNull { it.vin == command.vin }?.let { snap ->
+                resolved = command.copy(action = WearCommandRunner.resolveToggle(snap, command.action))
+                // Optimistic update so the tile reacts the instant it's tapped.
+                store.updateVehicle(WearCommandRunner.optimistic(snap, resolved.action))
             }
+        }
+        resolved
+    }
+
+    /** The network half of [send] -- relay an already-[applyOptimistic]-resolved
+     *  command to the phone, or run it standalone if unreachable. */
+    suspend fun relayCommand(context: Context, resolved: WearCommand) {
+        withContext(Dispatchers.IO) {
             val node = phoneNodeId(context)
             if (node != null) {
                 runCatching {

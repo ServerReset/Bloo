@@ -122,7 +122,8 @@ abstract class BlooTileService : TileService() {
         // rendered car reflects it, then resolve theme roles for that same car.
         val result = runBlocking {
             val store = SnapshotStore(ctx)
-            val local = runCatching { WearLocalStore(ctx).flow.first() }.getOrNull()
+            val localStore = WearLocalStore(ctx)
+            val local = runCatching { localStore.flow.first() }.getOrNull()
             val actions = local?.tileActions ?: listOf("lock", "climate")
             val tileVin = local?.tileCarVins?.getOrNull(poolIndex)
 
@@ -139,20 +140,22 @@ abstract class BlooTileService : TileService() {
             // not just taps. Without dedupe, one tap on Unlock kept re-sending the
             // unlock command to the car on every background render. Ids carry a
             // per-render nonce (see cmd()), so "same id as last handled" means this
-            // exact tap was already executed.
-            if (clickId?.startsWith(CMD_PREFIX) == true && clickId != WearLocalStore(ctx).tileLastClick()) {
-                WearLocalStore(ctx).setTileLastClick(clickId)
+            // exact tap was already executed. Keyed by this tile's own poolIndex --
+            // each pool tile has its own independently-persisted lastClickableId.
+            if (clickId?.startsWith(CMD_PREFIX) == true && clickId != localStore.tileLastClick(poolIndex)) {
+                localStore.setTileLastClick(poolIndex, clickId)
                 val action = clickId.removePrefix(CMD_PREFIX).substringBefore(':')
                 val c = car
                 if (c != null) {
-                    // Dispatch in background so the tile renders immediately — the
-                    // optimistic snapshot update in WearComms.send will be picked up
-                    // on the next tile render pass.
+                    // Apply the optimistic snapshot flip synchronously so the
+                    // re-read just below actually reflects it, then relay the
+                    // slower network half in the background so the tile still
+                    // renders immediately.
+                    val resolved = WearComms.applyOptimistic(ctx, WearCommand(c.vin, action))
                     tileScope.launch {
-                        runCatching { WearComms.send(ctx, WearCommand(c.vin, action)) }
+                        runCatching { WearComms.relayCommand(ctx, resolved) }
                     }
                 }
-                // Re-read immediately so any in-line optimistic update is reflected.
                 data = store.current()
                 car = pick(data)
             }

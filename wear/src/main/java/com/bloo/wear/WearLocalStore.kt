@@ -248,19 +248,24 @@ class WearLocalStore(private val context: Context) {
         context.wearLocalStore.edit { it[keyUpdateSnoozeUntil] = millis }
     }
 
-    // The last tile chip clickable id that was actually executed. Tile State
-    // (including lastClickableId) is persisted by the system and re-delivered on
-    // every subsequent onTileRequest - including freshness/push refreshes - so
-    // BlooTileService must dedupe or a single tap's command re-fires on every
-    // later background render. Ids carry a per-render nonce, so equality here
-    // means "this exact tap was already handled".
-    private val keyTileLastClick = stringPreferencesKey("tile_last_click")
+    // The last tile chip clickable id that was actually executed, PER POOL
+    // SLOT (BlooTile1..4 each have their own independently-persisted Wear
+    // Tile State/lastClickableId) -- a single shared key meant a background
+    // render of one pinned tile could be mistaken for a fresh tap just
+    // because a DIFFERENT tile was tapped more recently, re-firing a stale
+    // command. Tile State (including lastClickableId) is persisted by the
+    // system and re-delivered on every subsequent onTileRequest - including
+    // freshness/push refreshes - so BlooTileService must dedupe or a single
+    // tap's command re-fires on every later background render. Ids carry a
+    // per-render nonce, so equality here means "this exact tap was already
+    // handled".
+    private fun keyTileLastClick(poolIndex: Int) = stringPreferencesKey("tile_last_click_$poolIndex")
 
-    suspend fun tileLastClick(): String? =
-        context.wearLocalStore.data.first()[keyTileLastClick]
+    suspend fun tileLastClick(poolIndex: Int): String? =
+        context.wearLocalStore.data.first()[keyTileLastClick(poolIndex)]
 
-    suspend fun setTileLastClick(id: String) {
-        context.wearLocalStore.edit { it[keyTileLastClick] = id }
+    suspend fun setTileLastClick(poolIndex: Int, id: String) {
+        context.wearLocalStore.edit { it[keyTileLastClick(poolIndex)] = id }
     }
 
     suspend fun setTileOrder(order: List<String>) {

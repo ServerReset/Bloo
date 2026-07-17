@@ -136,16 +136,21 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
             item { FieldRow("PIN", if (pin.isBlank()) "" else "••••", Icons.Filled.Pin, pinInput) }
         }
 
-        // Sign-in button
-        item {
-            MorphButton(
-                label = "Sign in",
-                icon = Icons.Filled.Login,
-                active = false,
-                activeColor = MaterialTheme.colorScheme.primary,
-                pending = false,
-                onClick = { vm.login(brand, email, password, pin) },
-            )
+        // Sign-in button -- Kia has no fields to fill in above (see the
+        // InfoCallout), so there's nothing this button could meaningfully do
+        // for that brand; showing it invited a tap that always fails with
+        // blank credentials, contradicting the "sign in on your phone" message.
+        if (brand != Brand.KIA) {
+            item {
+                MorphButton(
+                    label = "Sign in",
+                    icon = Icons.Filled.Login,
+                    active = false,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    pending = false,
+                    onClick = { vm.login(brand, email, password, pin) },
+                )
+            }
         }
 
         // Error message
