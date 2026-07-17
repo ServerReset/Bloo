@@ -271,6 +271,9 @@ fun SliderRow(
     max: Int,
     step: Int,
     accent: Color? = null,
+    /** See [AnimatedSlider]'s onSettle -- pass this for a caller whose commit
+     *  (a DataStore write, a phone push) shouldn't fire on every drag tick. */
+    onSettle: (() -> Unit)? = null,
     onValue: (Int) -> Unit,
 ) {
     val fill = accent ?: MaterialTheme.colorScheme.primary
@@ -289,6 +292,7 @@ fun SliderRow(
             valueRange = min.toFloat()..max.toFloat(),
             steps = steps,
             accent = fill,
+            onSettle = onSettle,
         )
     }
 }
@@ -315,6 +319,10 @@ fun AnimatedSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
     accent: Color = MaterialTheme.colorScheme.primary,
+    /** Fires once when the drag ends, after [onValueChange] has already landed
+     *  the final value -- the hook for callers whose commit is expensive
+     *  (a DataStore write, a phone push) and shouldn't fire on every tick. */
+    onSettle: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val scheme = MaterialTheme.colorScheme
@@ -329,7 +337,7 @@ fun AnimatedSlider(
         dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
         reduceMotion = LocalReduceMotion.current,
         onStepTick = { haptics.tick() },
-        onSettle = { haptics.click() },
+        onSettle = { haptics.click(); onSettle?.invoke() },
     )
 }
 

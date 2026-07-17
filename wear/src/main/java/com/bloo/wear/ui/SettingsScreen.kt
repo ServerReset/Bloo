@@ -262,19 +262,26 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             SettingSection("Watch text size") {
+                // A local draft during the drag -- setFontScale does a DataStore
+                // write AND a Wearable Data Layer push to the phone, so it
+                // should commit once on release, not on every drag tick (which
+                // fired dozens of near-simultaneous writes/IPC sends per drag,
+                // racing each other with no ordering guarantee).
+                var draft by remember(ui.localSettings.fontScale) { mutableStateOf(ui.localSettings.fontScale) }
                 Text(
-                    "${"%.1f".format(ui.localSettings.fontScale)}×",
+                    "${"%.1f".format(draft)}×",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(4.dp))
                 SliderRow(
                     label = "Scale",
-                    valueLabel = "${"%.1f".format(ui.localSettings.fontScale)}×",
-                    value = ((ui.localSettings.fontScale - 0.8f) / 0.05f).roundToInt(),
+                    valueLabel = "${"%.1f".format(draft)}×",
+                    value = ((draft - 0.8f) / 0.05f).roundToInt(),
                     min = 0,
                     max = 12,
                     step = 1,
-                ) { step -> vm.setFontScale(0.8f + step * 0.05f) }
+                    onSettle = { vm.setFontScale(draft) },
+                ) { step -> draft = 0.8f + step * 0.05f }
             }
         }
 
