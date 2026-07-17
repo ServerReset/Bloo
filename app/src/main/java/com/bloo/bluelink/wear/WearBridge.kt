@@ -159,6 +159,8 @@ object WearBridge {
             hiddenSections = hiddenSections,
             aiEnabled = store.aiEnabled(),
             auroraEnabled = appearance.auroraBackground,
+            auroraColorMode = appearance.auroraColorMode,
+            auroraCustomColor = appearance.auroraCustomColor,
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))

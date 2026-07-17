@@ -367,6 +367,13 @@ data class WearSettingsPayload(
      *  [WearAuroraTogglePayload] for the watch's own toggle) changes both,
      *  by design, so the two stay in lockstep rather than silently diverging. */
     val auroraEnabled: Boolean = false,
+    /** Aurora colour source: "complementary", "material", or "custom" -- same
+     *  three modes as the phone's aurora background, mirrored so the watch's
+     *  own simplified gradient (see WearAuroraBackground) picks matching
+     *  colours instead of always looking like "material" mode. */
+    val auroraColorMode: String = "complementary",
+    /** Custom colour hex for aurora (only used when [auroraColorMode] is "custom"). */
+    val auroraCustomColor: String? = null,
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */

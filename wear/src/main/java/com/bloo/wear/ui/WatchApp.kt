@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppScaffold
@@ -39,18 +40,45 @@ import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.wear.WearScreen
 import com.bloo.wear.WearViewModel
 
+/** Rotates a hex/ARGB colour's hue by the given degrees; falls back to the colour itself on parse failure. */
+private fun Color.hueShifted(degrees: Float): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(this.toArgb(), hsv)
+    hsv[0] = (hsv[0] + degrees) % 360f
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
 /**
  * A simplified, watch-scaled counterpart to the phone's aurora background: a
  * diagonal primary→tertiary gradient over the base surface, its blend slowly
  * breathing between the two, instead of the phone's full multi-blob
  * simulation -- cheap enough for the watch's smaller GPU budget while still
  * reading as a living gradient rather than a flat fill.
+ *
+ * [colorMode] and [customHex] mirror the phone's three aurora colour sources
+ * (complementary / material / custom) so the watch doesn't always look like
+ * "material" mode regardless of what's chosen on the phone.
  */
 @Composable
-private fun WearAuroraBackground(colors: WearColorRoles?, modifier: Modifier = Modifier) {
-    val primary = colors?.primary?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
-    val tertiary = colors?.tertiary?.let { Color(it) } ?: MaterialTheme.colorScheme.tertiary
+private fun WearAuroraBackground(
+    colors: WearColorRoles?,
+    colorMode: String,
+    customHex: String?,
+    modifier: Modifier = Modifier,
+) {
+    val themePrimary = colors?.primary?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
+    val themeTertiary = colors?.tertiary?.let { Color(it) } ?: MaterialTheme.colorScheme.tertiary
     val base = colors?.background?.let { Color(it) } ?: MaterialTheme.colorScheme.background
+    val customColor = customHex?.let { hx -> runCatching { Color(android.graphics.Color.parseColor(hx)) }.getOrNull() }
+    val primary = when (colorMode) {
+        "custom" -> customColor ?: themePrimary
+        "complementary" -> base.hueShifted(180f)
+        else -> themePrimary // "material"
+    }
+    val tertiary = when (colorMode) {
+        "custom" -> customColor?.hueShifted(180f) ?: themeTertiary
+        else -> themeTertiary // complementary only recolours the primary blob, same as the phone
+    }
     val breathe by rememberInfiniteTransition(label = "wearAurora").animateFloat(
         initialValue = 0.55f,
         targetValue = 1f,
@@ -80,7 +108,12 @@ fun WatchApp(vm: WearViewModel) {
     val auroraOn = ui.settings?.auroraEnabled == true
     Box(Modifier.fillMaxSize()) {
     if (auroraOn) {
-        WearAuroraBackground(ui.settings?.colors, Modifier.fillMaxSize())
+        WearAuroraBackground(
+            ui.settings?.colors,
+            ui.settings?.auroraColorMode ?: "complementary",
+            ui.settings?.auroraCustomColor,
+            Modifier.fillMaxSize(),
+        )
     }
     // Transparent container so the aurora Box behind shows through instead of
     // AppScaffold's own opaque background fill covering it.
