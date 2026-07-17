@@ -18,15 +18,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppScaffold
@@ -38,6 +43,7 @@ import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.wear.WearScreen
+import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 
 /** Rotates a hex/ARGB colour's hue by the given degrees; falls back to the colour itself on parse failure. */
@@ -102,13 +108,32 @@ private fun WearAuroraBackground(
     )
 }
 
+/** A [HapticFeedback] that drops every call -- used to honor the phone's
+ *  haptics-off setting without touching the dozens of existing
+ *  `LocalHapticFeedback.current` call sites across the watch app. */
+private object NoOpHapticFeedback : HapticFeedback {
+    override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {}
+}
+
 @Composable
 fun WatchApp(vm: WearViewModel) {
     val ui by vm.ui.collectAsState()
-    if (ui.pinLocked) {
-        PinLockScreen(vm)
-        return
+    val hapticsEnabled = ui.settings?.hapticsEnabled ?: true
+    val baseHaptics = LocalHapticFeedback.current
+    val effectiveHaptics = remember(hapticsEnabled, baseHaptics) {
+        if (hapticsEnabled) baseHaptics else NoOpHapticFeedback
     }
+    CompositionLocalProvider(LocalHapticFeedback provides effectiveHaptics) {
+        if (ui.pinLocked) {
+            PinLockScreen(vm)
+        } else {
+            WatchAppContent(vm, ui)
+        }
+    }
+}
+
+@Composable
+private fun WatchAppContent(vm: WearViewModel, ui: WearUi) {
     val auroraOn = ui.settings?.auroraEnabled == true
     Box(Modifier.fillMaxSize()) {
     if (auroraOn) {

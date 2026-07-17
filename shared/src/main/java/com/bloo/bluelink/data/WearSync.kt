@@ -374,6 +374,11 @@ data class WearSettingsPayload(
     val auroraColorMode: String = "complementary",
     /** Custom colour hex for aurora (only used when [auroraColorMode] is "custom"). */
     val auroraCustomColor: String? = null,
+    /** Whether haptic feedback is on app-wide. Mirrored so a user who disabled
+     *  it on the phone (e.g. finds the buzzing annoying) doesn't keep getting
+     *  it on every watch tap/slider-tick/PIN-digit -- see WatchApp's root
+     *  LocalHapticFeedback override. */
+    val hapticsEnabled: Boolean = true,
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */

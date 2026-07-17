@@ -171,23 +171,22 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         Spacer(Modifier.height(8.dp))
                         Text("Lock after", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(4.dp))
-                        listOf(
-                            "off" to "Off",
-                            "immediate" to "Immediately",
-                            "1min" to "1 min",
-                            "5min" to "5 min",
-                            "10min" to "10 min",
-                        ).forEach { (key, label) ->
-                            MorphButton(
-                                label = label,
-                                icon = Icons.Filled.Lock,
-                                active = ls.pinLockTiming == key,
-                                activeColor = MaterialTheme.colorScheme.primary,
-                                pending = false,
-                                onClick = { vm.setPinLockTiming(key) },
-                            )
-                            Spacer(Modifier.height(4.dp))
-                        }
+                        // A single segmented row (matching the app's established
+                        // "pick exactly one of a short list" control, e.g. the
+                        // brand picker on LoginScreen) instead of five stacked
+                        // full-width buttons -- much less vertical space on a
+                        // round face and one visual language instead of two.
+                        MorphSegmented(
+                            options = listOf(
+                                WearSegmentOption("off", "Off"),
+                                WearSegmentOption("immediate", "Now"),
+                                WearSegmentOption("1min", "1m"),
+                                WearSegmentOption("5min", "5m"),
+                                WearSegmentOption("10min", "10m"),
+                            ),
+                            selectedKey = ls.pinLockTiming,
+                            onSelect = { key -> vm.setPinLockTiming(key) },
+                        )
                     }
                     Spacer(Modifier.height(4.dp))
                     MorphButton(

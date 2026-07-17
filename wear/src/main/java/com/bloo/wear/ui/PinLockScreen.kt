@@ -1,7 +1,16 @@
 package com.bloo.wear.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -30,35 +41,58 @@ import com.bloo.wear.WearViewModel
 
 private const val PIN_LENGTH = 4
 
-/** Small filled/empty dots showing how many of [PIN_LENGTH] digits are entered. */
+/** Small dots showing how many of [PIN_LENGTH] digits are entered, filling
+ *  with a size+colour spring (same "fill" feel as ChargeRing's progress
+ *  animation) instead of teleporting, and briefly tinting error on a wrong PIN. */
 @Composable
-private fun PinDots(filled: Int) {
+private fun PinDots(filled: Int, showError: Boolean) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         repeat(PIN_LENGTH) { i ->
-            Box(
-                Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (i < filled) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ),
+            val isFilled = i < filled
+            val color by animateColorAsState(
+                targetValue = when {
+                    showError -> MaterialTheme.colorScheme.error
+                    isFilled -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                animationSpec = tween(150),
+                label = "pinDotColor",
             )
+            val size by animateDpAsState(
+                targetValue = if (isFilled) 11.dp else 9.dp,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                label = "pinDotSize",
+            )
+            Box(Modifier.size(size).clip(CircleShape).background(color))
         }
     }
 }
 
 @Composable
 private fun PinKey(label: String, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label = "pinKeyScale",
+    )
+    val bg by animateColorAsState(
+        targetValue = if (pressed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = tween(120),
+        label = "pinKeyBg",
+    )
+    val content = if (pressed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     Box(
         Modifier
-            .size(38.dp)
+            .size(40.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(onClick = onClick),
+            .background(bg)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = MaterialTheme.typography.titleSmall)
+        Text(label, style = MaterialTheme.typography.titleSmall, color = content)
     }
 }
 
@@ -75,7 +109,7 @@ private fun PinKeypad(onDigit: (String) -> Unit, onBackspace: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEach { key ->
                     if (key.isEmpty()) {
-                        Spacer(Modifier.size(38.dp))
+                        Spacer(Modifier.size(40.dp))
                     } else {
                         PinKey(key, onClick = { if (key == "⌫") onBackspace() else onDigit(key) })
                     }
@@ -88,8 +122,9 @@ private fun PinKeypad(onDigit: (String) -> Unit, onBackspace: () -> Unit) {
 /**
  * A self-contained 4-digit PIN entry pad: collects exactly [PIN_LENGTH]
  * digits, then calls [onSubmit] and clears itself. [error], when non-null, is
- * shown above the dots and triggers a reject haptic + clears any partial entry
- * (used for "wrong PIN" after a failed [onSubmit]).
+ * shown above the dots and triggers a reject haptic + a brief error tint/shake
+ * on the dots + clears any partial entry (used for "wrong PIN" after a failed
+ * [onSubmit]).
  */
 @Composable
 fun PinEntryScreen(
@@ -102,15 +137,28 @@ fun PinEntryScreen(
 ) {
     var buffer by remember { mutableStateOf("") }
     val haptics = LocalHapticFeedback.current
+    var showErrorTint by remember { mutableStateOf(false) }
+    val shakeX = remember { Animatable(0f) }
     LaunchedEffect(error) {
         if (error != null) {
             haptics.reject()
             buffer = ""
+            showErrorTint = true
+            // A quick left-right-left shake reads as "rejected" the same way
+            // MessageSnackbar's errorContainer tint reads as "bad state"
+            // elsewhere in the app -- the red text alone was easy to miss.
+            listOf(-8f, 8f, -5f, 5f, 0f).forEach { x ->
+                shakeX.animateTo(x, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh))
+            }
+            showErrorTint = false
         }
     }
+    val entranceAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { entranceAlpha.animateTo(1f, tween(220)) }
     Column(
         modifier
             .fillMaxSize()
+            .graphicsLayer { alpha = entranceAlpha.value }
             .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -135,7 +183,9 @@ fun PinEntryScreen(
             )
         }
         Spacer(Modifier.height(8.dp))
-        PinDots(buffer.length)
+        Box(Modifier.offset(x = shakeX.value.dp)) {
+            PinDots(buffer.length, showErrorTint)
+        }
         Spacer(Modifier.height(8.dp))
         PinKeypad(
             onDigit = { d ->
@@ -205,41 +255,48 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        when (step) {
-            PinFlowStep.CONFIRM_CURRENT -> PinEntryScreen(
-                title = "Enter current PIN",
-                error = error,
-                onCancel = onDone,
-                onSubmit = { pin ->
-                    vm.verifyPinForManagement(pin) { ok ->
-                        if (ok) {
-                            error = null
-                            step = if (mode == PinFlowMode.REMOVE) PinFlowStep.REMOVING else PinFlowStep.ENTER_NEW
-                        } else {
-                            error = "Wrong PIN"
+        // Keyed on `step` so each step gets its own PinEntryScreen instance --
+        // its internal entrance-fade LaunchedEffect(Unit) then replays on every
+        // step change instead of only once for the whole overlay, giving the
+        // CONFIRM_CURRENT -> ENTER_NEW -> CONFIRM_NEW sequence a soft crossfade
+        // between steps instead of a hard pop.
+        androidx.compose.runtime.key(step) {
+            when (step) {
+                PinFlowStep.CONFIRM_CURRENT -> PinEntryScreen(
+                    title = "Enter current PIN",
+                    error = error,
+                    onCancel = onDone,
+                    onSubmit = { pin ->
+                        vm.verifyPinForManagement(pin) { ok ->
+                            if (ok) {
+                                error = null
+                                step = if (mode == PinFlowMode.REMOVE) PinFlowStep.REMOVING else PinFlowStep.ENTER_NEW
+                            } else {
+                                error = "Wrong PIN"
+                            }
                         }
-                    }
-                },
-            )
-            PinFlowStep.ENTER_NEW -> PinEntryScreen(
-                title = "Set a new PIN",
-                error = error,
-                onCancel = onDone,
-                onSubmit = { pin -> error = null; firstEntry = pin; step = PinFlowStep.CONFIRM_NEW },
-            )
-            PinFlowStep.CONFIRM_NEW -> PinEntryScreen(
-                title = "Confirm PIN",
-                onCancel = onDone,
-                onSubmit = { pin ->
-                    if (pin == firstEntry) {
-                        vm.setPin(pin) { onDone() }
-                    } else {
-                        error = "Didn't match -- try again"
-                        step = PinFlowStep.ENTER_NEW
-                    }
-                },
-            )
-            PinFlowStep.REMOVING -> LaunchedEffect(Unit) { vm.clearPin(); onDone() }
+                    },
+                )
+                PinFlowStep.ENTER_NEW -> PinEntryScreen(
+                    title = "Set a new PIN",
+                    error = error,
+                    onCancel = onDone,
+                    onSubmit = { pin -> error = null; firstEntry = pin; step = PinFlowStep.CONFIRM_NEW },
+                )
+                PinFlowStep.CONFIRM_NEW -> PinEntryScreen(
+                    title = "Confirm PIN",
+                    onCancel = onDone,
+                    onSubmit = { pin ->
+                        if (pin == firstEntry) {
+                            vm.setPin(pin) { onDone() }
+                        } else {
+                            error = "Didn't match -- try again"
+                            step = PinFlowStep.ENTER_NEW
+                        }
+                    },
+                )
+                PinFlowStep.REMOVING -> LaunchedEffect(Unit) { vm.clearPin(); onDone() }
+            }
         }
     }
 }
