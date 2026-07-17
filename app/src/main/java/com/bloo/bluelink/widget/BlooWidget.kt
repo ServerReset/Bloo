@@ -290,7 +290,7 @@ class BlooWidget : GlanceAppWidget() {
                 Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 20.sp))
                 c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
             }
-            if (c.actions.isNotEmpty()) {
+            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
                 Spacer(GlanceModifier.width(8.dp))
                 val take = c.actions.take(4)
                 // Horizontal row on short widgets — one row only
@@ -324,7 +324,12 @@ class BlooWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.height(2.dp))
             c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = if (narrow) 9.sp else 11.sp)) }
             Spacer(GlanceModifier.height(8.dp))
-            if (c.actions.isNotEmpty()) {
+            // "Info" mode hides the action buttons everywhere, not just on
+            // the smallest tiers -- previously most tiers ignored layoutMode
+            // entirely and always showed both info and buttons together, so
+            // switching the setting had no visible effect on anything but
+            // the tiniest widget sizes.
+            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
                 ButtonGrid(c, c.actions.take(4), cols = 1, showLabel = false, iconSize = 24.dp,
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight())
             }
@@ -379,7 +384,7 @@ class BlooWidget : GlanceAppWidget() {
             c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
             Spacer(GlanceModifier.height(4.dp))
             StateChip(c)
-            if (c.actions.isNotEmpty()) {
+            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
                 Spacer(GlanceModifier.height(8.dp))
                 val take = c.actions.take(4)
                 val cols = if (take.size >= 3) 2 else take.size.coerceAtLeast(1)
@@ -407,7 +412,7 @@ class BlooWidget : GlanceAppWidget() {
             }
             Spacer(GlanceModifier.height(2.dp))
             StateChip(c)
-            if (c.actions.isNotEmpty()) {
+            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
                 Spacer(GlanceModifier.height(8.dp))
                 val take = c.actions.take(4)
                 val cols = if (take.size >= 3) 2 else take.size.coerceAtLeast(1)
@@ -434,7 +439,7 @@ class BlooWidget : GlanceAppWidget() {
                     Text("${formatDistance(it, c.metric)} ${if (c.snap.hasBattery) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
                 }
             }
-            if (c.actions.isNotEmpty()) {
+            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
                 Spacer(GlanceModifier.width(12.dp))
                 val take = c.actions.take(4)
                 val cols = if (take.size >= 3 && h >= 150.dp) 2 else 1
@@ -498,7 +503,7 @@ class BlooWidget : GlanceAppWidget() {
                     }
                 }
             }
-            if (take.isNotEmpty()) {
+            if (take.isNotEmpty() && c.layoutMode == "controls") {
                 Spacer(GlanceModifier.height(14.dp))
                 ButtonGrid(c, take, cols = footerCols, showLabel = h >= 290.dp, iconSize = 24.dp,
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight())

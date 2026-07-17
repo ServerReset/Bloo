@@ -87,6 +87,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -3496,12 +3499,15 @@ private fun VehicleDetailContent(
                 Surface(
                     onClick = { scope.launch { scroll.animateScrollTo(0) } },
                     shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.dropShadow(RoundedCornerShape(50)),
                 ) {
-                    Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                        Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    Box {
+                        GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
+                        Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                            Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
@@ -3588,13 +3594,16 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             Surface(
                 onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.dropShadow(RoundedCornerShape(50)),
             ) {
+              Box {
+                GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 }
+              }
             }
         }
         }
@@ -7490,21 +7499,23 @@ onValueChange = { vibrancyDraft = it },
         // (tap, or once there's a query) raises the keyboard and reveals,
         // bottom-to-top: the search bar, an AI answer tile, then the
         // scrollable list of matching settings -- closest to the bar first.
-        // Sits flush right above the keyboard the instant it's up. The extra
-        // `bottomInset` clearance is only added when the keyboard is closed
-        // (to clear the nav bar) -- adding it unconditionally on top of
-        // .imePadding() double-counted that inset once the keyboard was
-        // showing (imePadding's own height already clears the nav bar on
-        // essentially every device), which is why the bar sat stranded way
-        // too high above the keyboard instead of flush against it.
+        // Sits flush above whichever is taller, the keyboard or the nav bar
+        // -- windowInsetsPadding with the UNION of the two insets tracks the
+        // real system-reported IME height directly (smoothly animated by the
+        // system as the keyboard slides up/down), instead of manually adding
+        // a fixed nav-bar clearance on top of .imePadding() gated on our own
+        // "is it focused" boolean. That manual version could only ever be
+        // approximately right: it flipped the moment the app *requested*
+        // focus, not when the keyboard had actually finished animating in,
+        // which is what read as "jumps up too high, then snaps down."
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .widthIn(max = 640.dp)
                 .fillMaxWidth()
-                .imePadding()
+                .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
                 .padding(horizontal = 16.dp)
-                .padding(bottom = if (searchFocused || query.isNotEmpty()) 12.dp else bottomInset + 12.dp),
+                .padding(bottom = 12.dp),
         ) {
             AnimatedVisibility(
                 visible = searchFocused || query.isNotEmpty(),
@@ -8048,21 +8059,31 @@ private fun SearchSuggestions(state: UiState, onPick: (String) -> Unit) {
     Text(
         "Try asking",
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = FontWeight.Bold,
+        // Floating directly over the aurora/scrolling content behind it with
+        // nothing opaque underneath -- onSurfaceVariant (a deliberately muted
+        // secondary-text tone) read as low-contrast there. Full-strength
+        // onSurface instead.
+        color = MaterialTheme.colorScheme.onSurface,
     )
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         examples.forEach { example ->
             Surface(
                 onClick = { onPick(example) },
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
             ) {
-                Text(
-                    example,
-                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                )
+                Box {
+                    GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
+                    Text(
+                        example,
+                        Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
     }
@@ -9064,19 +9085,19 @@ private fun DriveSyncSetupDialog(
 
 @Composable
 private fun DriveSyncChoiceRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    Surface(
+    // The app's standard button component (MorphButton), not a bespoke
+    // Surface row -- so this dialog's actions look and feel like every other
+    // button in the app instead of a one-off.
+    MorphButton(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(14.dp),
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        Icon(icon, contentDescription = null)
+        Spacer(Modifier.width(12.dp))
+        Column(horizontalAlignment = Alignment.Start) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

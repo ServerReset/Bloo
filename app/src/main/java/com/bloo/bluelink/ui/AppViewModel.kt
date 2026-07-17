@@ -1670,7 +1670,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settingsStore.setThemeMode(mode) }
+    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
+        settingsStore.setThemeMode(mode)
+        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
+    }
     fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch {
         settingsStore.setDynamicColor(enabled)
@@ -1933,7 +1936,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAuroraCustomColor(value: String?) = viewModelScope.launch { settingsStore.setAuroraCustomColor(value) }
 
-    fun setGlassStyle(value: com.bloo.bluelink.data.GlassStyle) = viewModelScope.launch { settingsStore.setGlassStyle(value) }
+    fun setGlassStyle(value: com.bloo.bluelink.data.GlassStyle) = viewModelScope.launch {
+        settingsStore.setGlassStyle(value)
+        // The widget reads this on its own schedule (Glance's provideGlance
+        // only re-runs on an explicit update, not reactively on DataStore
+        // changes), so without this the new style silently didn't show up
+        // until the next unrelated refresh.
+        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
+    }
 
     fun setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }
 
