@@ -1,6 +1,7 @@
 package com.bloo.wear
 
 import android.content.Context
+import android.util.Base64
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -9,6 +10,8 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import java.security.MessageDigest
+import java.security.SecureRandom
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -143,6 +146,9 @@ object WearTilePool {
     const val SIZE = 4
 }
 
+/** Valid [WearLocalSettings.pinLockTiming] values, same vocabulary as the phone's LockTiming. */
+val PIN_LOCK_TIMINGS = setOf("off", "immediate", "1min", "5min", "10min")
+
 data class WearLocalSettings(
     val fontScale: Float = 1f,
     val unitSystem: String = "imperial",
@@ -156,6 +162,15 @@ data class WearLocalSettings(
     val updateChecksEnabled: Boolean = true,
     val updateLastCheckedAt: Long = 0L,
     val updateSnoozeUntil: Long = 0L,
+    /** Whether the watch's own PIN lock is armed. Only meaningful when [hasPin]
+     *  is also true -- turning this on with no PIN set yet is a no-op gate. */
+    val pinLockEnabled: Boolean = false,
+    /** "off"/"immediate"/"1min"/"5min"/"10min" -- see [PIN_LOCK_TIMINGS]. */
+    val pinLockTiming: String = "immediate",
+    /** Whether a PIN has actually been set. Deliberately just a boolean here --
+     *  the salted hash itself is never exposed through this reactive flow, only
+     *  through the dedicated suspend verify/set/clear functions below. */
+    val hasPin: Boolean = false,
 )
 
 /** The actions a Tile chip can perform, in canonical order. */
@@ -171,6 +186,10 @@ class WearLocalStore(private val context: Context) {
     private val keyUpdateChecksEnabled = booleanPreferencesKey("update_checks_enabled")
     private val keyUpdateLastCheckedAt = longPreferencesKey("update_last_checked_at")
     private val keyUpdateSnoozeUntil = longPreferencesKey("update_snooze_until")
+    private val keyPinLockEnabled = booleanPreferencesKey("pin_lock_enabled")
+    private val keyPinLockTiming = stringPreferencesKey("pin_lock_timing")
+    private val keyPinSalt = stringPreferencesKey("pin_salt")
+    private val keyPinHash = stringPreferencesKey("pin_hash")
 
     // Pre-pool single-tile setting; migrated into slot 0 the first time that slot
     // is touched, and read as a fallback for slot 0 until then.
@@ -203,6 +222,9 @@ class WearLocalStore(private val context: Context) {
             updateChecksEnabled = prefs[keyUpdateChecksEnabled] ?: true,
             updateLastCheckedAt = prefs[keyUpdateLastCheckedAt] ?: 0L,
             updateSnoozeUntil = prefs[keyUpdateSnoozeUntil] ?: 0L,
+            pinLockEnabled = prefs[keyPinLockEnabled] ?: false,
+            pinLockTiming = prefs[keyPinLockTiming]?.takeIf { it in PIN_LOCK_TIMINGS } ?: "immediate",
+            hasPin = prefs[keyPinHash] != null,
         )
     }
 
@@ -256,5 +278,54 @@ class WearLocalStore(private val context: Context) {
             if (vin.isNullOrBlank()) prefs.remove(keyTileCarVin(index)) else prefs[keyTileCarVin(index)] = vin
             if (index == 0) prefs.remove(keyTileCarVinLegacy)
         }
+    }
+
+    // --- PIN lock -----------------------------------------------------------
+    // The PIN is never stored in plaintext and never leaves the watch: only a
+    // salted SHA-256 hash lives in DataStore, and only [verifyPin] ever reads
+    // it back (to compare, not to reveal). WearComms/WearLocalPayload mirror
+    // just the enabled flag + timing to the phone for its settings backup --
+    // see that payload's doc comment for why the hash itself is excluded.
+
+    suspend fun setPinLockEnabled(enabled: Boolean) {
+        context.wearLocalStore.edit { it[keyPinLockEnabled] = enabled }
+    }
+
+    suspend fun setPinLockTiming(value: String) {
+        context.wearLocalStore.edit { it[keyPinLockTiming] = value.takeIf { v -> v in PIN_LOCK_TIMINGS } ?: "immediate" }
+    }
+
+    /** Salt+hash [rawPin] and store it, arming the lock. Caller validates format first. */
+    suspend fun setPin(rawPin: String) {
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        context.wearLocalStore.edit {
+            it[keyPinSalt] = Base64.encodeToString(salt, Base64.NO_WRAP)
+            it[keyPinHash] = hashPin(rawPin, salt)
+            it[keyPinLockEnabled] = true
+        }
+    }
+
+    /** Remove the PIN entirely and disarm the lock. */
+    suspend fun clearPin() {
+        context.wearLocalStore.edit {
+            it.remove(keyPinSalt)
+            it.remove(keyPinHash)
+            it[keyPinLockEnabled] = false
+        }
+    }
+
+    suspend fun verifyPin(rawPin: String): Boolean {
+        val prefs = context.wearLocalStore.data.first()
+        val saltB64 = prefs[keyPinSalt] ?: return false
+        val expected = prefs[keyPinHash] ?: return false
+        val salt = runCatching { Base64.decode(saltB64, Base64.NO_WRAP) }.getOrNull() ?: return false
+        return hashPin(rawPin, salt) == expected
+    }
+
+    private fun hashPin(pin: String, salt: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").apply {
+            update(salt)
+        }.digest(pin.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
     }
 }

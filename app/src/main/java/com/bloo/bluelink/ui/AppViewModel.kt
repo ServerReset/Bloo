@@ -1766,6 +1766,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val error = settingsStore.importSettingsJson(json)
         AppLog.log(if (error == null) "Settings imported from backup" else "⚠ Settings import: $error")
         _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) "success" else "error") }
+        // Push the restored appearance/preferences down to the watch too --
+        // otherwise a manual restore only takes effect on the phone until
+        // some unrelated event (a pebble reorder, the next Drive sync) later
+        // happens to trigger a watch push.
+        if (error == null) {
+            com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), settingsStore.appearance.first())
+        }
     }
 
     /** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */

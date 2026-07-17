@@ -159,6 +159,10 @@ class WearPhoneService : WearableListenerService() {
                         val store = SettingsStore(applicationContext)
                         store.setUiScale(payload.uiScale.coerceIn(0.8f, 1.4f))
                         payload.unitSystem?.let { store.setUnitSystem(it) }
+                        // Backup record only -- see WearLocalPayload's doc comment
+                        // for why this is one-directional (watch -> phone) and
+                        // never pushed back down to reconfigure the watch.
+                        store.setWatchPinLock(payload.watchPinLockEnabled, payload.watchPinLockTiming)
                     }
                     WearSync.PATH_AI_TOGGLE -> {
                         val payload = WearSync.decodeAiToggle(raw) ?: return@forEach

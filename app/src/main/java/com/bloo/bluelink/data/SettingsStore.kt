@@ -132,6 +132,11 @@ class SettingsStore(private val context: Context) {
         val ORDER = stringPreferencesKey("vehicle_order")
         val SETTINGS_MODE = stringPreferencesKey("settings_mode")
         val GLASS_STYLE = stringPreferencesKey("glass_style")
+        /** Watch's own PIN lock enabled/timing, mirrored here purely as a backup
+         *  record (see WearLocalPayload's doc comment) -- the phone never reads
+         *  or acts on these, and never pushes them back down to the watch. */
+        val WATCH_PIN_ENABLED = stringPreferencesKey("watch_pin_lock_enabled")
+        val WATCH_PIN_TIMING = stringPreferencesKey("watch_pin_lock_timing")
         /** Per-VIN default climate preset ID for the one-tap Start button in advanced mode. */
         const val DEFAULT_CLIMATE_PRESET_PREFIX = "default_climate_preset_"
     }
@@ -179,6 +184,10 @@ class SettingsStore(private val context: Context) {
         val hapticsEnabled: Boolean = true,
         /** Frosted vs liquid-glass style for floating UI (search bar, floating buttons, widget). */
         val glassStyle: GlassStyle = GlassStyle.LIQUID,
+        /** Watch's own PIN lock enabled/timing -- a backup record only, mirrored
+         *  from the watch. See [SettingsStore.Keys.WATCH_PIN_ENABLED]'s comment. */
+        val watchPinLockEnabled: Boolean = false,
+        val watchPinLockTiming: String = "immediate",
     )
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
@@ -220,6 +229,8 @@ class SettingsStore(private val context: Context) {
             useFahrenheit = (prefs[Keys.UNIT_SYSTEM] ?: "imperial") != "metric",
             glassStyle = prefs[Keys.GLASS_STYLE]?.let { runCatching { GlassStyle.valueOf(it) }.getOrNull() }
                 ?: GlassStyle.LIQUID,
+            watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
+            watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
         )
     }
 
@@ -237,6 +248,16 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setLockTiming(value: LockTiming) {
         editTracked { it[Keys.LOCK_TIMING] = value.name }
+    }
+
+    /** Mirrors the watch's own PIN lock enabled/timing for backup purposes only
+     *  -- called from WearPhoneService when the watch pushes a change, never
+     *  from phone UI (the phone has no control over the watch's PIN lock). */
+    suspend fun setWatchPinLock(enabled: Boolean, timing: String) {
+        editTracked {
+            it[Keys.WATCH_PIN_ENABLED] = enabled.toString()
+            it[Keys.WATCH_PIN_TIMING] = timing
+        }
     }
 
     suspend fun setColumnsFlipped(flipped: Boolean) {

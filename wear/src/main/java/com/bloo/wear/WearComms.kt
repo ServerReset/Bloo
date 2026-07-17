@@ -173,13 +173,31 @@ object WearComms {
             }.isSuccess
         }
 
-    /** Push the watch's local display scale back to the phone so the phone's
-     *  Settings → Text scale slider stays in sync when changed on the watch. */
-    suspend fun publishLocalSettings(context: Context, uiScale: Float, unitSystem: String? = null) {
+    /** Push the watch's local display scale (and PIN-lock enabled/timing, for
+     *  the phone's settings backup record -- see [WearLocalPayload]) back to
+     *  the phone so the phone's Settings → Text scale slider stays in sync
+     *  when changed on the watch. */
+    suspend fun publishLocalSettings(
+        context: Context,
+        uiScale: Float,
+        unitSystem: String? = null,
+        pinLockEnabled: Boolean = false,
+        pinLockTiming: String = "immediate",
+    ) {
         withContext(Dispatchers.IO) {
             runCatching {
                 val request = PutDataMapRequest.create(WearSync.PATH_LOCAL).apply {
-                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeLocal(WearLocalPayload(uiScale = uiScale, unitSystem = unitSystem)))
+                    dataMap.putString(
+                        WearSync.KEY_PAYLOAD,
+                        WearSync.encodeLocal(
+                            WearLocalPayload(
+                                uiScale = uiScale,
+                                unitSystem = unitSystem,
+                                watchPinLockEnabled = pinLockEnabled,
+                                watchPinLockTiming = pinLockTiming,
+                            ),
+                        ),
+                    )
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)

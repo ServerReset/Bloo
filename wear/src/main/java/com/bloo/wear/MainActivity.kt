@@ -24,6 +24,14 @@ class MainActivity : ComponentActivity() {
     private val notifPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* best-effort */ }
 
+    // PIN-lock relock timing, mirroring the phone's MainActivity: record when
+    // the app left the foreground, then on return ask the ViewModel whether
+    // enough time passed to re-lock. `firstStart` skips the very first
+    // onStart after cold-create, since cold-start locking is already decided
+    // by the ViewModel's own init (see WearViewModel's localStore.flow collect).
+    private var backgroundedAt = 0L
+    private var firstStart = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Ask once for notification permission so the watch can surface command
@@ -55,5 +63,19 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Re-check phone reachability whenever the watch face returns to Bloo.
         viewModel.refreshConnection()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        backgroundedAt = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (firstStart) {
+            firstStart = false
+        } else {
+            viewModel.maybeRelock(backgroundedAt)
+        }
     }
 }

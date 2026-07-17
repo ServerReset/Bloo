@@ -381,6 +381,19 @@ data class WearSettingsPayload(
 data class WearLocalPayload(
     val uiScale: Float = 1f,
     val unitSystem: String? = null,
+    /** Whether the watch's own PIN lock is on, mirrored to the phone purely so
+     *  it shows up in the phone's Drive/manual settings backup (a record of
+     *  the setting, for portability) -- the PIN code itself never leaves the
+     *  watch, and the phone never pushes this back down to reconfigure the
+     *  watch (see WearViewModel/WearPhoneService for why: the phone's synced
+     *  copy can be briefly stale relative to a change the watch just made,
+     *  and silently clobbering a security-lock setting from a stale echo is
+     *  worse than a one-time manual re-enable after restoring a backup onto
+     *  a new watch). */
+    val watchPinLockEnabled: Boolean = false,
+    /** "off"/"immediate"/"1min"/"5min"/"10min" -- same meaning as the phone's
+     *  own LockTiming, mirrored for the same backup-record reason above. */
+    val watchPinLockTiming: String = "immediate",
 )
 
 /** Watch → phone: "turn AI summaries on/off". */

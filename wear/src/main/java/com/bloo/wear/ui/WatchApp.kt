@@ -105,6 +105,10 @@ private fun WearAuroraBackground(
 @Composable
 fun WatchApp(vm: WearViewModel) {
     val ui by vm.ui.collectAsState()
+    if (ui.pinLocked) {
+        PinLockScreen(vm)
+        return
+    }
     val auroraOn = ui.settings?.auroraEnabled == true
     Box(Modifier.fillMaxSize()) {
     if (auroraOn) {

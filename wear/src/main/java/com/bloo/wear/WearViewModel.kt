@@ -157,6 +157,8 @@ data class WearUi(
     val updateRun: com.bloo.bluelink.data.WorkflowRun? = null,
     /** True while a manual "Check now" is in flight. */
     val updateChecking: Boolean = false,
+    /** True when the PIN lock gate (see PinLockScreen) is covering the app. */
+    val pinLocked: Boolean = false,
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
     fun chargeDraftFor(vin: String): ChargeLimitDraft = chargeLimitDrafts[vin] ?: ChargeLimitDraft()
@@ -269,7 +271,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
+            var pinColdStartChecked = false
+            localStore.flow.collect { s ->
+                _ui.update { it.copy(localSettings = s) }
+                // Cold-start lock, mirroring the phone's "lock immediately on
+                // launch if enabled" behaviour -- only once, so later settings
+                // emissions (e.g. toggling something unrelated) don't re-lock
+                // an already-unlocked session.
+                if (!pinColdStartChecked) {
+                    pinColdStartChecked = true
+                    if (s.pinLockEnabled && s.hasPin) _ui.update { it.copy(pinLocked = true) }
+                }
+            }
         }
         viewModelScope.launch {
             WearSyncEvents.results.collect { r ->
@@ -896,7 +909,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val clamped = scale.coerceIn(0.8f, 1.4f)
             localStore.setFontScale(clamped)
-            WearComms.publishLocalSettings(ctx, clamped)
+            val ls = localStore.flow.first()
+            WearComms.publishLocalSettings(ctx, clamped, ls.unitSystem, ls.pinLockEnabled, ls.pinLockTiming)
         }
     }
 
@@ -904,8 +918,84 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setUnitSystem(value: String) {
         viewModelScope.launch {
             localStore.setUnitSystem(value)
-            WearComms.publishLocalSettings(ctx, localStore.flow.first().fontScale, value)
+            val ls = localStore.flow.first()
+            WearComms.publishLocalSettings(ctx, ls.fontScale, value, ls.pinLockEnabled, ls.pinLockTiming)
         }
+    }
+
+    // --- PIN lock ------------------------------------------------------------
+
+    /** Called from MainActivity's onStart with the timestamp the app was
+     *  backgrounded at (0 if it was never backgrounded this process), mirroring
+     *  the phone's AppViewModel.maybeRelock. */
+    fun maybeRelock(backgroundedAtMs: Long) {
+        val ls = _ui.value.localSettings
+        if (_ui.value.pinLocked || !ls.pinLockEnabled || !ls.hasPin || backgroundedAtMs == 0L) return
+        val elapsed = System.currentTimeMillis() - backgroundedAtMs
+        val shouldLock = when (ls.pinLockTiming) {
+            "off" -> false
+            "immediate" -> true
+            "1min" -> elapsed >= 60_000L
+            "5min" -> elapsed >= 5 * 60_000L
+            "10min" -> elapsed >= 10 * 60_000L
+            else -> true
+        }
+        if (shouldLock) _ui.update { it.copy(pinLocked = true) }
+    }
+
+    /** Attempt to unlock with an entered PIN. Reports success/failure via [onResult]. */
+    fun submitPin(pin: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val ok = localStore.verifyPin(pin)
+            if (ok) _ui.update { it.copy(pinLocked = false) }
+            onResult(ok)
+        }
+    }
+
+    /** Verify an entered PIN without unlocking -- used by the settings screen's
+     *  "confirm your current PIN before changing/removing it" step. */
+    fun verifyPinForManagement(pin: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch { onResult(localStore.verifyPin(pin)) }
+    }
+
+    fun setPinLockEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            localStore.setPinLockEnabled(enabled)
+            pushLocalPinSettings()
+        }
+    }
+
+    fun setPinLockTiming(value: String) {
+        viewModelScope.launch {
+            localStore.setPinLockTiming(value)
+            pushLocalPinSettings()
+        }
+    }
+
+    /** Set (or replace) the PIN and arm the lock. [onDone] reports whether the
+     *  format was valid (exactly 4 digits) -- caller is responsible for asking
+     *  twice and comparing before calling this. */
+    fun setPin(pin: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val valid = pin.length == 4 && pin.all { it.isDigit() }
+            if (valid) {
+                localStore.setPin(pin)
+                pushLocalPinSettings()
+            }
+            onDone(valid)
+        }
+    }
+
+    fun clearPin() {
+        viewModelScope.launch {
+            localStore.clearPin()
+            pushLocalPinSettings()
+        }
+    }
+
+    private suspend fun pushLocalPinSettings() {
+        val ls = localStore.flow.first()
+        WearComms.publishLocalSettings(ctx, ls.fontScale, ls.unitSystem, ls.pinLockEnabled, ls.pinLockTiming)
     }
 
     /** Turn AI summaries on/off. Optimistically flips the synced flag so the

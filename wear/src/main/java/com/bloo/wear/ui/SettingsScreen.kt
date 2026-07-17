@@ -59,6 +59,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    var pinFlow by remember { mutableStateOf<PinFlowMode?>(null) }
     var confirmSignOut by remember { mutableStateOf(false) }
     // Auto-reset the destructive confirm so a stale "tap again" can't sign you out later.
     LaunchedEffect(confirmSignOut) {
@@ -145,6 +146,77 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     pending = false,
                     onClick = { vm.setWeatherFromDeviceLocation() },
                 )
+            }
+        }
+
+        item {
+            SettingSection("PIN lock") {
+                val ls = ui.localSettings
+                Text(
+                    if (ls.hasPin) "Locks the watch app after it's put away." else "Set a 4-digit PIN to lock the watch app when you're not wearing it.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                if (ls.hasPin) {
+                    MorphButton(
+                        label = if (ls.pinLockEnabled) "Lock: On" else "Lock: Off",
+                        icon = Icons.Filled.Lock,
+                        active = ls.pinLockEnabled,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        pending = false,
+                        onClick = { vm.setPinLockEnabled(!ls.pinLockEnabled) },
+                    )
+                    if (ls.pinLockEnabled) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Lock after", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(4.dp))
+                        listOf(
+                            "off" to "Off",
+                            "immediate" to "Immediately",
+                            "1min" to "1 min",
+                            "5min" to "5 min",
+                            "10min" to "10 min",
+                        ).forEach { (key, label) ->
+                            MorphButton(
+                                label = label,
+                                icon = Icons.Filled.Lock,
+                                active = ls.pinLockTiming == key,
+                                activeColor = MaterialTheme.colorScheme.primary,
+                                pending = false,
+                                onClick = { vm.setPinLockTiming(key) },
+                            )
+                            Spacer(Modifier.height(4.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    MorphButton(
+                        label = "Change PIN",
+                        icon = Icons.Filled.Lock,
+                        active = false,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        pending = false,
+                        onClick = { pinFlow = PinFlowMode.CHANGE },
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    MorphButton(
+                        label = "Remove PIN",
+                        icon = Icons.Filled.Lock,
+                        active = false,
+                        activeColor = MaterialTheme.colorScheme.error,
+                        pending = false,
+                        onClick = { pinFlow = PinFlowMode.REMOVE },
+                    )
+                } else {
+                    MorphButton(
+                        label = "Set PIN",
+                        icon = Icons.Filled.Lock,
+                        active = false,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        pending = false,
+                        onClick = { pinFlow = PinFlowMode.SET },
+                    )
+                }
             }
         }
 
@@ -398,6 +470,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         // Surfaces "Check now" results (and any other message) while in Settings -
         // the home snackbar isn't on screen here.
         MessageSnackbar(ui.message) { vm.dismissMessage() }
+        pinFlow?.let { mode -> PinManagementOverlay(vm, mode, onDone = { pinFlow = null }) }
     }
 }
 
