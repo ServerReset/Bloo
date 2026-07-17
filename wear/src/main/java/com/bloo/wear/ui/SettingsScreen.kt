@@ -1,11 +1,18 @@
 package com.bloo.wear.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -389,6 +396,46 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     pending = false,
                     onClick = { vm.setUpdateChecksEnabled(!ui.localSettings.updateChecksEnabled) },
                 )
+                // "Check now" finishing used to just silently revert its own
+                // label, with no confirmation an update was (or wasn't) found
+                // beyond a transient snackbar -- fade in real result content
+                // instead, the same way AiCard swaps in its summary.
+                AnimatedVisibility(
+                    visible = !ui.updateChecking && ui.updateRun != null,
+                    enter = fadeIn(tween(200)) + expandVertically(tween(200)),
+                    exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+                ) {
+                    Column {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Update available: build #${ui.updateRun?.runNumber ?: ""}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        MorphButton(
+                            label = "Open on phone",
+                            icon = Icons.Filled.Sync,
+                            active = false,
+                            activeColor = MaterialTheme.colorScheme.tertiary,
+                            pending = false,
+                            onClick = { vm.openUpdateOnPhone() },
+                        )
+                    }
+                }
+                AnimatedVisibility(
+                    visible = !ui.updateChecking && ui.updateRun == null && ui.localSettings.updateLastCheckedAt > 0,
+                    enter = fadeIn(tween(200)) + expandVertically(tween(200)),
+                    exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+                ) {
+                    Text(
+                        "You're up to date",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
             }
         }
 

@@ -2,7 +2,10 @@ package com.bloo.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
@@ -61,14 +64,19 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
 
     if (ui.busy) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator()
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "Signing in…",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(tween(200)),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Signing in…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         return
@@ -153,11 +161,17 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
             }
         }
 
-        // Error message
-        ui.message?.let { msg ->
-            item {
+        // Error message -- item is always present so it fades/expands in and
+        // shrinks/fades out instead of popping the whole list below it up or
+        // down when it appears/disappears.
+        item {
+            AnimatedVisibility(
+                visible = ui.message != null,
+                enter = fadeIn(tween(200)) + expandVertically(tween(200)),
+                exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+            ) {
                 Text(
-                    msg,
+                    ui.message ?: "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
