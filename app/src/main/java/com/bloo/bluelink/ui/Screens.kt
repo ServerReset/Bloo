@@ -8042,8 +8042,19 @@ private fun GlowySearchBar(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "searchWidth",
     )
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label = "searchPress",
+    )
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Box(Modifier.fillMaxWidth(widthFraction.coerceIn(0.05f, 1f))) {
+        Box(
+            Modifier
+                .fillMaxWidth(widthFraction.coerceIn(0.05f, 1f))
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale },
+        ) {
             // A real soft halo, sized to this element's own current bounds --
             // fill+clip to the pill shape FIRST, blur LAST with an unbounded
             // edge treatment so it fades outward past the shape's own bounds
@@ -8057,12 +8068,24 @@ private fun GlowySearchBar(
                     .background(scheme.primary.copy(alpha = (if (expanded) 0.5f else 0.26f) * glowPulse))
                     .blur(22.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
             )
+            // A second, tighter, brighter "hot core" layer right at the pill's
+            // own edge -- one wide soft halo alone read as a flat wash; this
+            // gives the glow actual depth (a bright core fading into the wider
+            // bloom) the same way a real light source does.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(50))
+                    .background(scheme.primary.copy(alpha = (if (expanded) 0.34f else 0.18f) * glowPulse))
+                    .blur(8.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+            )
             Surface(
                 onClick = { if (!expanded) onFocusChange(true) },
                 shape = RoundedCornerShape(50),
                 color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(liquid = 0.45f, frosted = 0.80f)),
                 contentColor = scheme.onSurface,
                 tonalElevation = 6.dp,
+                interactionSource = interaction,
                 // A real drop shadow (offset + soft blur), not just Surface's
                 // own tonal shadowElevation, which reads as barely-there on
                 // most backgrounds -- this is a plain Box behind the Surface
@@ -8074,71 +8097,86 @@ private fun GlowySearchBar(
             ) {
                 Box {
                     GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
-                    if (expanded) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Box(Modifier.weight(1f)) {
-                                BasicTextField(
-                                    value = query,
-                                    onValueChange = onQueryChange,
-                                    singleLine = true,
-                                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
-                                    cursorBrush = SolidColor(scheme.primary),
-                                    // No auto-collapse-on-blur here: onFocusChanged
-                                    // fires immediately with isFocused = false the
-                                    // instant this field first composes (before the
-                                    // LaunchedEffect-driven requestFocus() below has
-                                    // actually landed) -- with an empty query that
-                                    // false-positive blur collapsed the bar back down
-                                    // in the same beat it opened, which looked like
-                                    // tapping it did nothing at all. Closing is the
-                                    // explicit trailing Close button's job now.
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .focusRequester(focusRequester),
-                                    decorationBox = { inner ->
-                                        if (query.isEmpty()) {
-                                            Text(
-                                                "Search settings & car data",
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = scheme.onSurfaceVariant,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                        inner()
-                                    },
+                    // Cross-fades + scales between the collapsed and expanded
+                    // content instead of an instant swap -- the pill's WIDTH
+                    // already animates smoothly, but the content inside used to
+                    // pop in/out the moment its branch flipped, landing well
+                    // before the width settled and reading as a jarring cut
+                    // partway through an otherwise fluid morph.
+                    AnimatedContent(
+                        targetState = expanded,
+                        transitionSpec = {
+                            (fadeIn(tween(220, delayMillis = 60)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 60))) togetherWith
+                            (fadeOut(tween(120)) + scaleOut(targetScale = 0.92f, animationSpec = tween(120)))
+                        },
+                        label = "searchContentMorph",
+                    ) { isExpanded ->
+                        if (isExpanded) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Box(Modifier.weight(1f)) {
+                                    BasicTextField(
+                                        value = query,
+                                        onValueChange = onQueryChange,
+                                        singleLine = true,
+                                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
+                                        cursorBrush = SolidColor(scheme.primary),
+                                        // No auto-collapse-on-blur here: onFocusChanged
+                                        // fires immediately with isFocused = false the
+                                        // instant this field first composes (before the
+                                        // LaunchedEffect-driven requestFocus() below has
+                                        // actually landed) -- with an empty query that
+                                        // false-positive blur collapsed the bar back down
+                                        // in the same beat it opened, which looked like
+                                        // tapping it did nothing at all. Closing is the
+                                        // explicit trailing Close button's job now.
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .focusRequester(focusRequester),
+                                        decorationBox = { inner ->
+                                            if (query.isEmpty()) {
+                                                Text(
+                                                    "Search settings & car data",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = scheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                            inner()
+                                        },
+                                    )
+                                }
+                                IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
+                                    )
+                                }
+                            }
+                        } else {
+                            // Collapsed: a centered icon+label cluster, not a
+                            // fill-weighted text box with nothing balancing the
+                            // other side -- that left everything reading as
+                            // left-aligned instead of centered in the pill.
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "Search",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
-                                Icon(
-                                    Icons.Filled.Close,
-                                    contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
-                                )
-                            }
-                        }
-                    } else {
-                        // Collapsed: a centered icon+label cluster, not a
-                        // fill-weighted text box with nothing balancing the
-                        // other side -- that left everything reading as
-                        // left-aligned instead of centered in the pill.
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                "Search",
-                                style = MaterialTheme.typography.bodyLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
                         }
                     }
                 }

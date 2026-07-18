@@ -27,16 +27,24 @@ import dev.chrisbanes.haze.blur.blurEffect
 import dev.chrisbanes.haze.hazeEffect
 
 /**
- * A gentle radial lens/refraction distortion, applied as a self-contained
+ * A radial lens/refraction distortion, applied as a self-contained
  * *foreground* effect on each glass element's own already-rendered content
  * (never a shared capture object multiple consumers read from -- that
  * architecture is what crashed the app when this used
  * io.github.kyant0:backdrop, see the doc comment below). Bows light toward
  * the edges like a real curved-glass surface catches it, on top of Haze's
- * blur. AGSL requires API 33+; both shader construction and the per-frame
- * RenderEffect build are wrapped in [runCatching] so any shader compile/
- * runtime failure just silently skips the lens effect (blur-only, previous
- * appearance) rather than crashing.
+ * blur, with a touch of chromatic aberration (R/G/B sampled at slightly
+ * different bulge strengths) at the rim -- the same prism-fringe cue real
+ * curved glass/acrylic edges show, and what makes a refraction effect read
+ * as "glass" rather than just "warped." Deliberately a static per-layout
+ * distortion, not a continuously-animated time-based sweep: this class of
+ * effect has a real crash history in this app (see below), so the shader
+ * stays as simple as it can while still looking convincing, rather than
+ * adding a per-frame animation loop for a subtler win. AGSL requires API
+ * 33+; both shader construction and the per-frame RenderEffect build are
+ * wrapped in [runCatching] so any shader compile/runtime failure just
+ * silently skips the lens effect (blur-only, previous appearance) rather
+ * than crashing.
  */
 private const val RefractionShaderSrc = """
     uniform shader content;
@@ -45,12 +53,18 @@ private const val RefractionShaderSrc = """
         float2 uv = coord / max(size, float2(1.0));
         float2 centered = uv - 0.5;
         float dist = length(centered);
-        float bulge = smoothstep(0.0, 0.72, dist) * 0.035;
-        float2 distorted = uv - centered * bulge;
-        float2 sampleCoord = clamp(distorted, 0.0, 1.0) * size;
-        half4 c = content.eval(sampleCoord);
-        float edgeGlint = smoothstep(0.55, 1.0, dist) * 0.06;
-        return half4(c.rgb + edgeGlint, c.a);
+        float bulgeBase = smoothstep(0.0, 0.68, dist) * 0.07;
+        // Chromatic aberration: each channel bulges by a slightly different
+        // amount, so the rim shows a faint red/blue fringe like light
+        // splitting through a real curved edge.
+        float2 rBulge = uv - centered * (bulgeBase * 1.18);
+        float2 gBulge = uv - centered * bulgeBase;
+        float2 bBulge = uv - centered * (bulgeBase * 0.82);
+        half r = content.eval(clamp(rBulge, 0.0, 1.0) * size).r;
+        half g = content.eval(clamp(gBulge, 0.0, 1.0) * size).g;
+        half4 bSample = content.eval(clamp(bBulge, 0.0, 1.0) * size);
+        float edgeGlint = smoothstep(0.5, 1.0, dist) * 0.09;
+        return half4(r + edgeGlint, g + edgeGlint, bSample.b + edgeGlint, bSample.a);
     }
 """
 
