@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
@@ -40,7 +41,11 @@ fun WiggleText(
 ) {
     val isSixSeven = text.filter { it.isDigit() }.toIntOrNull() == 67
     if (!isSixSeven || reduceMotion) {
-        BasicText(text, style = style, maxLines = maxLines)
+        // BasicText defaults to TextOverflow.Clip -- a value long enough to
+        // exceed maxLines (a long status string routed through AnimatedValue,
+        // not just short numeric readouts) hard-clipped instead of trailing
+        // off with "...", unlike nearly every other truncating Text in the app.
+        BasicText(text, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
         return
     }
     val transition = rememberInfiniteTransition(label = "wiggle67")
