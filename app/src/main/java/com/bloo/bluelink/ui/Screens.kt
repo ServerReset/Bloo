@@ -67,6 +67,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -167,6 +168,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Card
@@ -435,6 +444,14 @@ fun BlooApp(vm: AppViewModel) {
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .padding(16.dp)
+                        // This is a hand-rolled Surface, not M3's own Snackbar()
+                        // composable (which sets live-region semantics
+                        // internally) -- without this, a command result / sync
+                        // completion / error appears visually but TalkBack
+                        // never proactively announces it; a screen-reader user
+                        // has to blindly swipe around after every action to
+                        // discover whether it worked.
+                        .semantics { liveRegion = LiveRegionMode.Polite }
                         .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                         .graphicsLayer {
                             alpha = (1f - abs(offsetX.value) / (dismissPx * 2.2f)).coerceIn(0f, 1f)
@@ -1191,7 +1208,10 @@ private fun WizardFeatureToggle(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onChecked(!checked) }
+            // Same fix as ToggleRow: toggleable + Role.Switch on the row, with
+            // the inner Switch's own semantics node cleared, so TalkBack sees
+            // one correctly-announced toggle instead of two focus stops.
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChecked)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1200,7 +1220,7 @@ private fun WizardFeatureToggle(
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onChecked)
+        Switch(checked = checked, onCheckedChange = onChecked, modifier = Modifier.clearAndSetSemantics {})
     }
 }
 
@@ -4362,9 +4382,18 @@ fun MorphButton(
     val resolvedContent = if (active) activeContentColor else contentColor
     Button(
         onClick = { haptics?.click(); onClick() },
-        modifier = modifier.animateContentSize(
-            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        ),
+        modifier = modifier
+            .animateContentSize(
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            )
+            // `active` is otherwise a colour-only change -- most call sites also
+            // swap their label text (Lock/Unlock, Start/Stop), which is why this
+            // mostly "worked" for TalkBack by accident, but that's caller
+            // discipline, not something the shared button guarantees. Setting
+            // `selected` here makes every MorphButton correct by construction:
+            // the app's one button framework, so this is the single highest-
+            // leverage place to fix it.
+            .semantics { selected = active },
         enabled = enabled,
         shape = RoundedCornerShape(percent = pct.roundToInt()),
         interactionSource = interactionSource,
@@ -4486,13 +4515,20 @@ fun MorphChip(
         label = "chipBg",
     )
     val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val chipSelected = selected
     Surface(
         onClick = { haptics?.tick(); onClick() },
         shape = RoundedCornerShape(corner),
         color = container,
         contentColor = content,
         interactionSource = interaction,
-        modifier = modifier,
+        // Same gap MorphSegmented had: a selectable pill with no `selected`
+        // semantics reaching TalkBack, which announced every chip identically
+        // regardless of which one was actually active. Captured into a
+        // differently-named local first -- inside semantics{}, `selected` on
+        // its own resolves to the SemanticsPropertyReceiver's own property,
+        // not this composable's `selected` parameter of the same name.
+        modifier = modifier.semantics { this.selected = chipSelected },
     ) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -8829,7 +8865,16 @@ private fun SettingsCard(title: String, content: @Composable () -> Unit) {
                 .padding(16.dp)
                 .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            // Role.Heading lets TalkBack's "headings" navigation control jump
+            // section-to-section across Settings' ~15 SettingsCards instead of
+            // linearly swiping through every row of every card to get anywhere
+            // -- there was no heading structure anywhere in the phone app.
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
             Spacer(Modifier.height(8.dp))
             content()
         }
@@ -8957,9 +9002,17 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
             // layout bounds; without this trailing reserve it got clipped by the
             // screen/card edge.
             .padding(end = 3.dp)
-            .clickable(
+            // toggleable (not clickable) gives this its own Role.Switch + checked
+            // semantics node -- the inner Switch below clears its own (identical)
+            // node so TalkBack sees ONE correctly-announced toggle for the row
+            // instead of two adjacent focus stops (a generic "double tap to
+            // activate" for the row, then the real on/off announcement for the
+            // Switch a swipe later).
+            .toggleable(
+                value = checked,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
+                role = Role.Switch,
             ) {
                 val next = !checked
                 if (next) haptics?.toggleOn() else haptics?.toggleOff()
@@ -8971,7 +9024,7 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
         Switch(
             checked = checked,
             onCheckedChange = { if (it) haptics?.toggleOn() else haptics?.toggleOff(); onChange(it) },
-            modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale),
+            modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale).clearAndSetSemantics {},
         )
     }
 }

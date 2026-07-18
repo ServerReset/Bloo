@@ -94,6 +94,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -499,7 +503,17 @@ internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
             Modifier
                 .clip(RoundedCornerShape(16.dp))
                 .background(if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer)
-                .clickable { onDismiss() }
+                // liveRegion: this appears asynchronously (a command result, a
+                // sync completion, an error) with no other cue, so without it
+                // TalkBack never proactively announces the message at all.
+                // contentDescription on the dismiss action: was an unlabelled
+                // clickable region -- TalkBack announced the message text but
+                // gave no indication tapping it dismisses the alert.
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = "${message.orEmpty()}. Double tap to dismiss."
+                }
+                .clickable(onClickLabel = "Dismiss") { onDismiss() }
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Text(
