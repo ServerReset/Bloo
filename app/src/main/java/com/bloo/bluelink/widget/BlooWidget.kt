@@ -134,8 +134,6 @@ class BlooWidget : GlanceAppWidget() {
         val pillShape = settings.widgetPillShape(widgetId)
         val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
         val bgAlphaLevel = settings.widgetBackgroundAlpha(widgetId) // 0 (opaque) - 9 (transparent)
-        val liquidGlass = appearance.glassStyle == com.bloo.bluelink.data.GlassStyle.LIQUID ||
-            appearance.glassStyle == com.bloo.bluelink.data.GlassStyle.ULTRA
 
         provideContent {
             GlanceTheme {
@@ -153,38 +151,36 @@ class BlooWidget : GlanceAppWidget() {
                 val themeBg = if (appearance.themeMode.name == "AMOLED") ColorProvider(Color(0xFF000000))
                               else GlanceTheme.colors.widgetBackground
                 Box(GlanceModifier.fillMaxSize().cornerRadius(corner)) {
-                    // Photo background (optional): the car image full-bleed, with a
-                    // scrim so the white text/buttons stay legible.
+                    // Photo background (optional): the car image full-bleed and
+                    // genuinely blurred (not just a sharp photo behind a dark
+                    // scrim) -- Glance/RemoteViews has no live blur primitive,
+                    // but a real blur can still be baked into the bitmap itself
+                    // once, off the render path (see blurredCached()), the same
+                    // way this file already caches its decoded/downsampled
+                    // bitmaps. A soft, blurred backdrop plus a lighter scrim
+                    // reads as "glass over a photo" far better than a sharp
+                    // photo ever could within what this platform can actually do.
                     if (photoBgActive) {
                         Image(
-                            provider = ImageProvider(photo!!), contentDescription = null,
+                            provider = ImageProvider(blurredCached(photo!!, photoPath!!)), contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = GlanceModifier.fillMaxSize().cornerRadius(corner),
                         )
-                        val scrimAlpha = 0.42f * bgAlpha
+                        val scrimAlpha = 0.30f * bgAlpha
                         if (scrimAlpha > 0.01f) {
                             Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
                         }
                     }
-                    // Frosted-glass tint. Glance/RemoteViews has no blur or
-                    // gradient primitive, AND a hard limit on how many nested
-                    // views a single widget can contain, so this stays a flat
-                    // tint + a thin top rim -- 2 total layers, well inside the
-                    // view budget. A previous version also drew a small
-                    // rounded-corner "glint" box in the top-left as a stand-in
-                    // for a directional highlight; with no gradient to fade it,
-                    // it just rendered as a plain solid circle sitting on the
-                    // widget -- an artifact, not a highlight -- so it's gone.
+                    // Plain tint, no glass-style distinction -- Glance has no
+                    // blur/gradient primitive and a hard limit on how many
+                    // nested views one widget can contain, so trying to fake
+                    // distinct "Liquid"/"Frosted" looks here was never going to
+                    // read as actual glass, just two slightly different flat
+                    // tints. One consistent, honest tint instead: a base fill
+                    // plus a thin top rim (2 layers, well inside the view budget).
                     if (!photoBgActive && bgAlphaLevel > 0) {
-                        // "Liquid glass" reads brighter/cooler; "Frosted" is a
-                        // flatter, greyer, more opaque-looking tint. Kept at 2
-                        // total layers (base tint + top rim) -- a 3rd
-                        // bottom-rim layer needed an extra alignment wrapper
-                        // Box to position it, which pushes closer to the
-                        // RemoteViews view-count budget that broke this exact
-                        // effect once already (see comment above).
-                        val baseTint = if (liquidGlass) Color(0.10f, 0.13f, 0.22f, bgAlpha * 0.80f) else Color(0.16f, 0.16f, 0.17f, bgAlpha * 0.92f)
-                        val rimAlpha = if (liquidGlass) bgAlpha * 0.34f else bgAlpha * 0.18f
+                        val baseTint = Color(0.12f, 0.13f, 0.16f, bgAlpha * 0.85f)
+                        val rimAlpha = bgAlpha * 0.22f
                         Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(baseTint))) {}
                         Box(GlanceModifier.fillMaxWidth().height(2.dp).background(ColorProvider(Color(1f, 1f, 1f, rimAlpha)))) {}
                     }
@@ -673,6 +669,26 @@ class BlooWidget : GlanceAppWidget() {
             while (longest > 0 && longest / sample > maxPx) sample *= 2
             BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
         }.getOrNull()?.also { bitmapCache.put(key, it) }
+    }
+
+    /** A soft, real blur of [source] (the already-downsampled photo bitmap),
+     *  memoised by [path]'s identity so it's computed once per photo, not on
+     *  every widget refresh tick. No RenderScript/RenderEffect available in
+     *  this context (Glance content is built off the main render pipeline,
+     *  and RenderEffect needs a live View/RenderNode) -- downscaling hard and
+     *  upscaling back with bilinear filtering is a well-known cheap
+     *  approximation of a strong Gaussian blur, using only two allocation-
+     *  free bitmap scales, no per-pixel loop. */
+    private fun blurredCached(source: Bitmap, path: String): Bitmap {
+        val file = java.io.File(path)
+        val key = "blur:$path:${file.lastModified()}"
+        bitmapCache.get(key)?.let { return it }
+        return runCatching {
+            val downW = (source.width / 12).coerceAtLeast(6)
+            val downH = (source.height / 12).coerceAtLeast(6)
+            val small = Bitmap.createScaledBitmap(source, downW, downH, true)
+            Bitmap.createScaledBitmap(small, source.width, source.height, true)
+        }.getOrDefault(source).also { bitmapCache.put(key, it) }
     }
 
     companion object {
