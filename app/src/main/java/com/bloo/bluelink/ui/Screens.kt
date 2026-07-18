@@ -1573,52 +1573,104 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: AppViewModel) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = vm::dismissUpdate,
-        title = {
+        icon = Icons.Filled.Info,
+        title = "Update available",
+        text = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Filled.Info, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
-                Text("Update available", fontWeight = FontWeight.Bold)
+                Surface(shape = RoundedCornerShape(8.dp), color = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer) {
+                    Text("Build #${info.run.runNumber}", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                }
+                info.run.displayTitle?.let { title ->
+                    Text(title, style = MaterialTheme.typography.bodySmall, color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Surface(shape = RoundedCornerShape(12.dp), color = scheme.surfaceVariant.copy(alpha = 0.5f)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
+                    Text("1. Open the Actions run page", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text("2. Download the zip artifact for your device", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text("3. Unzip the file and open the APK", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text("4. Tap \"More details\" → \"Install without scanning\"", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+            }
+        },
+        buttons = {
+            MorphButton(
+                onClick = {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                    vm.dismissUpdate()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            ) {
+                Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
+            }
+            MorphTextButton("Remind me", onClick = vm::snoozeUpdate, modifier = Modifier.fillMaxWidth())
+            MorphTextButton("Not now", onClick = vm::dismissUpdate, modifier = Modifier.fillMaxWidth())
+        },
+    )
+}
+
+/**
+ * The app's shared "important pop-up" dialog shell. Update-available and
+ * Drive-sync-setup both route through this now instead of two separately
+ * hand-rolled AlertDialogs that merely happened to look similar -- one real
+ * shared composable, and both get actual Liquid Glass (GlassBackdrop's real
+ * blur, not just a flat tint) the same way the rest of the app's floating
+ * chrome does, which the plain default AlertDialog surface never had.
+ */
+@Composable
+private fun GlassAlertDialog(
+    onDismissRequest: () -> Unit,
+    icon: ImageVector,
+    title: String,
+    text: @Composable ColumnScope.() -> Unit,
+    buttons: @Composable ColumnScope.() -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val blockShape = RoundedCornerShape(16.dp)
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        containerColor = Color.Transparent,
+        title = {
+            Box {
+                GlassBackdrop(blockShape, Modifier.matchParentSize())
+                Surface(
+                    shape = blockShape,
+                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(liquid = 0.55f, frosted = 0.92f)),
+                ) {
+                    Row(
+                        Modifier.padding(16.dp, 14.dp, 16.dp, 0.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+                        Text(title, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(shape = RoundedCornerShape(8.dp), color = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer) {
-                        Text("Build #${info.run.runNumber}", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                    }
-                    info.run.displayTitle?.let { title ->
-                        Text(title, style = MaterialTheme.typography.bodySmall, color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                Surface(shape = RoundedCornerShape(12.dp), color = scheme.surfaceVariant.copy(alpha = 0.5f)) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
-                        Text("1. Open the Actions run page", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                        Text("2. Download the zip artifact for your device", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                        Text("3. Unzip the file and open the APK", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                        Text("4. Tap \"More details\" → \"Install without scanning\"", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    }
+            Box {
+                GlassBackdrop(blockShape, Modifier.matchParentSize())
+                Surface(
+                    shape = blockShape,
+                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(liquid = 0.55f, frosted = 0.92f)),
+                ) {
+                    Column(
+                        Modifier.padding(16.dp, 12.dp, 16.dp, 12.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        content = text,
+                    )
                 }
             }
         },
         confirmButton = {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                MorphButton(
-                    onClick = {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                        vm.dismissUpdate()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                ) {
-                    Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
-                }
-                MorphTextButton("Remind me", onClick = vm::snoozeUpdate, modifier = Modifier.fillMaxWidth())
-                MorphTextButton("Not now", onClick = vm::dismissUpdate, modifier = Modifier.fillMaxWidth())
-            }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp), content = buttons)
         },
     )
 }
@@ -9464,44 +9516,36 @@ private fun DriveSyncSetupDialog(
     onOpenFromDrive: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // Same plain AlertDialog structure as UpdatePromptDialog (icon+bold title
-    // Row, informative Surface content, stacked full-width buttons) instead
-    // of the separate BlooDialog wrapper this used before, so the app's two
-    // most common pop-ups -- "an update is ready" and "set up Drive sync" --
-    // read as the same family of dialog rather than two different styles.
-    AlertDialog(
+    // Routed through the same GlassAlertDialog shell as UpdatePromptDialog
+    // (icon+bold title, informative content, stacked full-width buttons) --
+    // one real shared composable instead of two separately hand-rolled
+    // AlertDialogs that merely happened to look similar, and both now get
+    // real Liquid Glass instead of a flat surface fill.
+    GlassAlertDialog(
         onDismissRequest = onDismissRequest,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Filled.Cloud, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
-                Text("Google Drive sync", fontWeight = FontWeight.Bold)
-            }
-        },
+        icon = Icons.Filled.Cloud,
+        title = "Google Drive sync",
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Keep your settings in sync across devices with one file in Google Drive.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant,
-                )
-                DriveSyncChoiceRow(
-                    icon = Icons.Filled.CreateNewFolder,
-                    title = "Save to Drive",
-                    subtitle = "Start fresh — create a new file with this device's settings.",
-                    onClick = onSaveToDrive,
-                )
-                DriveSyncChoiceRow(
-                    icon = Icons.Filled.FileOpen,
-                    title = "Open from Drive",
-                    subtitle = "Join an existing sync file set up on another device.",
-                    onClick = onOpenFromDrive,
-                )
-            }
+            Text(
+                "Keep your settings in sync across devices with one file in Google Drive.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant,
+            )
+            DriveSyncChoiceRow(
+                icon = Icons.Filled.CreateNewFolder,
+                title = "Save to Drive",
+                subtitle = "Start fresh — create a new file with this device's settings.",
+                onClick = onSaveToDrive,
+            )
+            DriveSyncChoiceRow(
+                icon = Icons.Filled.FileOpen,
+                title = "Open from Drive",
+                subtitle = "Join an existing sync file set up on another device.",
+                onClick = onOpenFromDrive,
+            )
         },
-        confirmButton = {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                MorphTextButton("Cancel", onClick = onDismissRequest, modifier = Modifier.fillMaxWidth())
-            }
+        buttons = {
+            MorphTextButton("Cancel", onClick = onDismissRequest, modifier = Modifier.fillMaxWidth())
         },
     )
 }
