@@ -174,8 +174,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Card
@@ -2795,16 +2797,36 @@ private fun PagerDots(
             )
         }
         Surface(
-            modifier = Modifier.pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    down.consume()
-                    haptics?.tick()
-                    holding = true
-                    try { waitForUpOrCancellation() }
-                    finally { holding = false }
+            modifier = Modifier
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        haptics?.tick()
+                        holding = true
+                        try { waitForUpOrCancellation() }
+                        finally { holding = false }
+                    }
                 }
-            },
+                // This whole control is a raw pointerInput gesture (long-press
+                // to refresh) with zero semantics -- with TalkBack's touch
+                // exploration intercepting single-finger gestures, it was both
+                // unreachable as its own focus stop and the long-press gesture
+                // itself couldn't be triggered. contentDescription announces
+                // which car is showing (the dots' only visual information);
+                // onLongClick exposes the refresh gesture as a real
+                // accessibility action instead of a gesture no assistive
+                // technology can perform.
+                .then(
+                    if (onRefresh != null) {
+                        Modifier.semantics {
+                            contentDescription = "Car ${current + 1} of $count"
+                            onLongClick("Refresh") { onRefresh(); true }
+                        }
+                    } else {
+                        Modifier.semantics { contentDescription = "Car ${current + 1} of $count" }
+                    },
+                ),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
             shadowElevation = 2.dp,
@@ -4641,7 +4663,13 @@ private fun StateControl(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                Icon(ic, contentDescription = label, tint = stateColor, modifier = Modifier.size(22.dp))
+                                // null, not `label`: the Text right after already
+                                // carries the same words, so a non-null
+                                // description here was a redundant swipe stop
+                                // ("Locked" from the icon, then "Locked" again
+                                // from the text) -- purely decorative now that
+                                // the label is announced once.
+                                Icon(ic, contentDescription = null, tint = stateColor, modifier = Modifier.size(22.dp))
                                 Text(
                                     label,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -4995,7 +5023,12 @@ private fun SplitExpandButton(
             color = buttonContainer(),
             contentColor = MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
-            modifier = Modifier.fillMaxHeight(),
+            // The icon's own contentDescription below is the NEXT action
+            // ("Expand"/"Collapse"); this is the CURRENT state -- without it
+            // TalkBack only ever hears what tapping will do, never whether the
+            // pebble is presently open, so distinguishing the two took a
+            // double-tap-and-listen-again instead of being announced on focus.
+            modifier = Modifier.fillMaxHeight().semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
             Box(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 12.dp),
@@ -5037,7 +5070,10 @@ private fun MorphExpandButton(
         shape = RoundedCornerShape(corner),
         color = buttonContainer(),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.size(50.dp),
+        // Same as SplitExpandButton's chevron: the icon's contentDescription is
+        // the next action, this is the current state -- both together instead
+        // of only announcing what tapping does.
+        modifier = Modifier.size(50.dp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(

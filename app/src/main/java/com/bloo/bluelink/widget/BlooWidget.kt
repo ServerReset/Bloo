@@ -574,7 +574,10 @@ class BlooWidget : GlanceAppWidget() {
         ) {
             if (showLabel) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
-                    Image(provider = ImageProvider(vis.iconRes), contentDescription = action.label, colorFilter = ColorFilter.tint(vis.fg), modifier = GlanceModifier.size(iconSize))
+                    // null, not action.label: the Text right below already
+                    // carries the same words -- a non-null description here
+                    // was a redundant announcement.
+                    Image(provider = ImageProvider(vis.iconRes), contentDescription = null, colorFilter = ColorFilter.tint(vis.fg), modifier = GlanceModifier.size(iconSize))
                     Spacer(GlanceModifier.height(4.dp))
                     Text(vis.label, maxLines = 1, style = TextStyle(color = vis.fg, fontSize = 11.sp, fontWeight = FontWeight.Bold))
                 }
