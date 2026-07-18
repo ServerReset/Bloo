@@ -2175,6 +2175,26 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             onRefresh = { vm.refreshStatus(vehicles[state.currentIndex]) },
                         )
                     }
+                    // Grid mode (perPage > 1, wide/large screens) hides each
+                    // card's own pull-to-refresh indicator above -- state.refreshing
+                    // is one app-wide flag, not per-car, so leaving them unhidden
+                    // would light up every visible card's spinner for a refresh
+                    // that only touched one of them. But that left a real gap:
+                    // pageCount == 1 (every car already fits on one page, common
+                    // on tablets) meant PagerDots above never renders either, so
+                    // pulling to refresh in the grid had *zero* visual feedback of
+                    // any kind. One shared, real M3 Expressive indicator here
+                    // covers every grid case, page dots or not.
+                    if (perPage > 1) {
+                        AnimatedVisibility(
+                            visible = state.refreshing,
+                            enter = fadeIn(tween(150)),
+                            exit = fadeOut(tween(200)),
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp),
+                        ) {
+                            LoadingIndicator()
+                        }
+                    }
                     // Hoisted car-name pill — centered at top, slides in/out vertically.
                     if (perPage == 1) {
                         AnimatedVisibility(
