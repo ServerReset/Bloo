@@ -30,6 +30,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -193,7 +195,20 @@ fun AnimatedSlider(
             // just to keep semantics fresh (the Canvas below reads anim.value in
             // its own draw scope, which redraws without recomposing). The stepped
             // value is also what assistive tech should announce.
-            .progressSemantics(value, valueRange, steps),
+            .progressSemantics(value, valueRange, steps)
+            // progressSemantics alone only publishes the value for announcement
+            // (read-only, meant for plain progress indicators) -- this control
+            // is adjustable, so without setProgress a screen-reader user could
+            // hear the current value but had no supported way to change it
+            // (touch-exploration intercepts the raw drag gesture the pointerInput
+            // above depends on). TalkBack's adjust gesture computes its own step
+            // size from progressSemantics' steps and calls this directly.
+            .semantics {
+                setProgress { target ->
+                    settleTo(snapToStep(target, valueRange, steps))
+                    true
+                }
+            },
     ) {
         Canvas(Modifier.fillMaxWidth().height(thumbH)) {
             val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)

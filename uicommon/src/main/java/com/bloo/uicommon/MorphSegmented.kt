@@ -42,6 +42,12 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -214,9 +220,9 @@ fun MorphSegmented(
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
                 options.forEachIndexed { i, opt ->
-                    val selected = i == visualIndex
+                    val isSelected = i == visualIndex
                     val fg by animateColorAsState(
-                        if (selected) selectedTextColor else unselectedTextColor,
+                        if (isSelected) selectedTextColor else unselectedTextColor,
                         spring(stiffness = Spring.StiffnessMediumLow),
                         label = "segFg",
                     )
@@ -224,7 +230,30 @@ fun MorphSegmented(
                         modifier = Modifier
                             .width(segWidth)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(14.dp)),
+                            .clip(RoundedCornerShape(14.dp))
+                            // The whole control's touch/drag handling lives in
+                            // the parent Row's single pointerInput above (a
+                            // real clickable/selectable here would register its
+                            // own gesture detector and fight that custom drag
+                            // logic), so this is a semantics-only, additive
+                            // accessibility action -- TalkBack invokes it via
+                            // the AccessibilityNodeInfo click action, which
+                            // doesn't go through the normal touch dispatch
+                            // pipeline the drag gesture depends on. Previously
+                            // this control had NO accessibility semantics at
+                            // all: unlabelled, unfocusable, state unannounced.
+                            .semantics {
+                                contentDescription = opt.label
+                                role = Role.Tab
+                                selected = isSelected
+                                onClick(label = "Select ${opt.label}") {
+                                    if (opt.key != currentSelectedKey) {
+                                        currentOnTick()
+                                        currentOnSelect(opt.key)
+                                    }
+                                    true
+                                }
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
                         Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -233,9 +262,9 @@ fun MorphSegmented(
                                     painter = rememberVectorPainter(icon),
                                     contentDescription = null,
                                     colorFilter = ColorFilter.tint(fg),
-                                    modifier = Modifier.size(if (selected) 16.dp else 14.dp),
+                                    modifier = Modifier.size(if (isSelected) 16.dp else 14.dp),
                                 )
-                                Spacer(Modifier.width(if (selected) 6.dp else 4.dp))
+                                Spacer(Modifier.width(if (isSelected) 6.dp else 4.dp))
                             }
                             BasicText(
                                 opt.label,
@@ -247,7 +276,7 @@ fun MorphSegmented(
                                 // selection or theme. Also lighter than the caller's style:
                                 // Medium when selected reads as the active choice; Normal
                                 // for the rest keeps the whole control visually quiet.
-                                style = if (selected) textStyle.copy(color = fg, fontWeight = FontWeight.Medium)
+                                style = if (isSelected) textStyle.copy(color = fg, fontWeight = FontWeight.Medium)
                                         else textStyle.copy(color = fg, fontWeight = FontWeight.Normal, fontSize = textStyle.fontSize * 0.88f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
