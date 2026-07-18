@@ -109,6 +109,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -6799,8 +6800,14 @@ private fun SettingsScreen(vm: AppViewModel) {
   // its scrolled flow), so both it and the column need this state.
   var query by remember { mutableStateOf("") }
   var searchFocused by remember { mutableStateOf(false) }
+  // Separate from `query`, which updates on every keystroke purely to
+  // live-filter the matching-settings list below (no side effects). Running
+  // a vehicle command or an AI query is a real action -- it must only fire
+  // once the user has actually submitted (Enter/search key, or tapping a
+  // suggestion chip), never mid-typing off a debounce timer.
+  var submittedQuery by remember { mutableStateOf("") }
   // Drop any stale AI answer once the search box is cleared.
-  LaunchedEffect(query.isBlank()) { if (query.isBlank()) vm.clearAiReply() }
+  LaunchedEffect(query.isBlank()) { if (query.isBlank()) { vm.clearAiReply(); submittedQuery = "" } }
   BackdropHost {
         // On wide screens (tablets, landscape), cap width and centre so lines
         // don't stretch wall-to-wall.
@@ -7660,23 +7667,55 @@ onValueChange = { vibrancyDraft = it },
                 enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
                 exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
             ) {
-                Column(
-                    Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                // This panel floats directly over the scrolling settings list
+                // behind it -- without its own opaque backdrop, "Try asking"
+                // and the gaps between suggestion pills had nothing painted
+                // under them at all, so whatever settings row happened to be
+                // scrolled to that same spot showed straight through and
+                // collided with the panel's own text. A real Surface (solid
+                // fill, glass border, shadow) the same way the search bar
+                // itself and its individual result cards already work.
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(liquid = 0.92f, frosted = 0.98f)),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().dropShadow(RoundedCornerShape(28.dp), blurRadius = 16.dp, offsetY = 6.dp),
                 ) {
-                    if (query.isNotBlank()) {
-                        SettingsSearchResults(query, vm, state, appearance, notif)
-                    } else {
-                        // Focused but empty: nothing to search yet, so surface a
-                        // few example queries -- otherwise there's no way to
-                        // discover that search can answer data questions and
-                        // run commands, not just find settings by name.
-                        SearchSuggestions(state) { query = it }
+                    Box {
+                        GlassBackdrop(RoundedCornerShape(28.dp), Modifier.matchParentSize())
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 360.dp)
+                                .verticalScroll(rememberScrollState())
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            if (query.isNotBlank()) {
+                                SettingsSearchResults(query, submittedQuery, vm, state, appearance, notif)
+                            } else {
+                                // Focused but empty: nothing to search yet, so surface a
+                                // few example queries -- otherwise there's no way to
+                                // discover that search can answer data questions and
+                                // run commands, not just find settings by name.
+                                // Tapping one is itself the deliberate "go" action, so
+                                // it submits immediately rather than just filling the
+                                // box and waiting for a second Enter/tap.
+                                SearchSuggestions(state) { picked -> query = picked; submittedQuery = picked }
+                            }
+                        }
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            GlowySearchBar(query, searchFocused, onQueryChange = { query = it }, onFocusChange = { searchFocused = it })
+            GlowySearchBar(
+                query,
+                searchFocused,
+                onQueryChange = { query = it },
+                onFocusChange = { searchFocused = it },
+                onSubmit = { submittedQuery = query },
+            )
         }
         } // Box (wide-screen centering)
         // Floating back-arrow + "Settings" label + simple/advanced button.
@@ -8057,6 +8096,7 @@ private fun GlowySearchBar(
     focused: Boolean,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
+    onSubmit: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val focusRequester = remember { FocusRequester() }
@@ -8174,6 +8214,8 @@ private fun GlowySearchBar(
                                         singleLine = true,
                                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
                                         cursorBrush = SolidColor(scheme.primary),
+                                        keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                                        keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                                         // No auto-collapse-on-blur here: onFocusChanged
                                         // fires immediately with isFocused = false the
                                         // instant this field first composes (before the
@@ -8291,6 +8333,7 @@ private fun SearchSuggestions(state: UiState, onPick: (String) -> Unit) {
 @Composable
 private fun SettingsSearchResults(
     query: String,
+    submittedQuery: String,
     vm: AppViewModel,
     state: UiState,
     appearance: SettingsStore.Appearance,
@@ -8439,16 +8482,21 @@ private fun SettingsSearchResults(
     // untested way of sending vehicle commands. If the query doesn't name a
     // specific car, this falls back to a single car (unambiguous) or asks
     // the user to be more specific (multiple cars, none named).
-    val command = remember(query) { parseVehicleCommand(query) }
+    //
+    // Gated on submittedQuery, NOT the live query -- this actually sends a
+    // command to the car, so it must only run once the user has deliberately
+    // submitted (Enter/search key, or a suggestion tap), never mid-typing off
+    // a debounce timer. Typing "lock my car" used to run the lock the moment
+    // the debounce elapsed, whether or not that's what the user meant to do.
+    val command = remember(submittedQuery) { if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery) }
     if (command != null) {
         val ctx = LocalContext.current
-        val namedVehicle = state.vehicles.firstOrNull { v -> v.name.isNotBlank() && v.name.lowercase() in query.lowercase() }
+        val namedVehicle = state.vehicles.firstOrNull { v -> v.name.isNotBlank() && v.name.lowercase() in submittedQuery.lowercase() }
         val targetVehicle = namedVehicle ?: state.vehicles.singleOrNull()
-        var actionResult by remember(query) { mutableStateOf<String?>(null) }
-        var actionRunning by remember(query) { mutableStateOf(false) }
-        LaunchedEffect(query) {
+        var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
+        var actionRunning by remember(submittedQuery) { mutableStateOf(false) }
+        LaunchedEffect(submittedQuery) {
             if (targetVehicle != null) {
-                delay(500)
                 actionRunning = true
                 val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, command.cmd, command.climateTarget) }.getOrNull()
                 actionResult = result?.message ?: "Command failed"
@@ -8485,11 +8533,15 @@ private fun SettingsSearchResults(
     // On-device AI reply (when enabled): answer the question in natural
     // language -- a fallback/complement for questions with no structured
     // match above, or a plain-language gloss when there is one.
+    //
+    // Gated on submittedQuery, not the live query -- this fires a real AI
+    // request (network/compute cost, and it used to visibly show "Thinking…"
+    // while the user was still mid-word), so it must wait for a deliberate
+    // submit rather than firing on every keystroke's debounce.
     if (state.aiEnabled) {
-        LaunchedEffect(query) {
-            if (query.isNotBlank()) {
-                delay(450)
-                vm.askAi(query)
+        LaunchedEffect(submittedQuery) {
+            if (submittedQuery.isNotBlank()) {
+                vm.askAi(submittedQuery)
             } else {
                 vm.clearAiReply()
             }
