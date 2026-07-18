@@ -2416,6 +2416,11 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 vm.refreshStatus(v)
             }
             edgeTraceHolding = false
+        } else if (edgeTraceProgress.value > 0f) {
+            // Released (or cancelled into a swipe) before completing the hold --
+            // ease the partial ring back to nothing instead of leaving it frozen
+            // at whatever progress it had reached.
+            edgeTraceProgress.animateTo(0f, androidx.compose.animation.core.tween(200))
         }
     }
 
@@ -2488,6 +2493,16 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
         }
         // Edge-trace overlay: when holding, a line traces the screen edge clockwise
         // from the top-left. Full circuit = refresh. Drawn on top of everything.
+        //
+        // This sits on top of (a sibling of, drawn after) the full-screen
+        // VerticalPager above, so an unconditional down.consume() here claimed
+        // every touch before the pager's own drag detector ever saw it --
+        // silently breaking vertical swipe-to-page-tiles on the cover screen
+        // entirely, since literally every touch on screen started here first.
+        // Never consuming anything fixes that: this handler only *watches* the
+        // stream to detect a stationary hold, ceding the moment real movement
+        // (a swipe) appears, so the pager underneath is always free to claim
+        // its own drag the instant it exceeds slop.
         Box(
             Modifier
                 .fillMaxSize()
@@ -2495,9 +2510,17 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         edgeTraceHolding = true
-                        down.consume()
-                        try { waitForUpOrCancellation() }
-                        finally { if (edgeTraceHolding) edgeTraceHolding = false }
+                        val slop = viewConfiguration.touchSlop
+                        try {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) break
+                                val dx = abs(change.position.x - down.position.x)
+                                val dy = abs(change.position.y - down.position.y)
+                                if (dx > slop || dy > slop) break
+                            }
+                        } finally { if (edgeTraceHolding) edgeTraceHolding = false }
                     }
                 },
         ) {
