@@ -1734,12 +1734,10 @@ private fun AuroraBackground(
     val explodeAlpha = 1f + explosionValue * 2.5f
     val explodeSize = 1f + explosionValue * 0.8f
     val explodeSpread = 1f + explosionValue * 0.3f
-    // Motion mode: blobs held at a fixed midpoint -- the tilt tracking above
-    // supplies all the movement, unmixed with anything else, so it's
-    // unambiguously "the phone's tilt is moving this." Static mode: a small,
-    // slow ambient drift of its own (a narrow 0.42-0.58 amplitude, not the
-    // full 0-1 span Motion used to use) so it still reads as alive when the
-    // phone is sitting still, instead of a literally frozen frame.
+    // Both modes now run the same ambient drift below; Motion mode adds tilt
+    // on top of it instead of replacing it entirely, so a phone that isn't
+    // being actively tilted (sitting on a desk, in a stand, or just being
+    // looked at) still reads as alive instead of a dead, frozen frame.
     // Hand-ticked at ~12fps instead of riding Compose's animation clock
     // (which recomposes on every display frame, up to 120x/sec). For a slow
     // multi-second drift sitting under a heavy 90dp blur, that clock was
@@ -1750,17 +1748,22 @@ private fun AuroraBackground(
     var p1 by remember { mutableFloatStateOf(0.5f) }
     var p2 by remember { mutableFloatStateOf(0.5f) }
     var p3 by remember { mutableFloatStateOf(0.5f) }
-    LaunchedEffect(motionActive) {
-        if (motionActive) {
-            p1 = 0.5f; p2 = 0.5f; p3 = 0.5f
-            return@LaunchedEffect
-        }
+    // Runs in BOTH modes now -- Motion previously froze this drift entirely
+    // and relied only on tilt, so a phone sitting still (the common case:
+    // on a desk, in a stand, or just being looked at without being moved)
+    // showed a completely dead background. This is now a smaller ambient
+    // drift added underneath tilt in Motion mode, and the sole driver in
+    // Static mode -- widened and sped up from the previous ±0.08/9-14s
+    // (correct in principle, but under a heavy 90dp blur it read as "not
+    // animating" -- too subtle to actually perceive) to something
+    // unambiguously visible at a glance.
+    LaunchedEffect(Unit) {
         val start = System.currentTimeMillis()
         while (true) {
             val elapsed = System.currentTimeMillis() - start
-            p1 = 0.42f + (0.58f - 0.42f) * triangleWave(elapsed, 14_000L)
-            p2 = 0.58f + (0.42f - 0.58f) * triangleWave(elapsed, 11_000L)
-            p3 = 0.45f + (0.55f - 0.45f) * triangleWave(elapsed, 9_000L)
+            p1 = 0.32f + (0.68f - 0.32f) * triangleWave(elapsed, 9_000L)
+            p2 = 0.68f + (0.32f - 0.68f) * triangleWave(elapsed, 7_000L)
+            p3 = 0.35f + (0.65f - 0.35f) * triangleWave(elapsed, 6_000L)
             delay(80)
         }
     }
@@ -6928,8 +6931,6 @@ private fun SettingsScreen(vm: AppViewModel) {
     val settingsScope = rememberCoroutineScope()
 
     // System back returns to the garage, not out of the app.
-    BackHandler { vm.closeSettings() }
-
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
     // System photo picker (crash-free), then our own Compose crop step.
@@ -6946,6 +6947,18 @@ private fun SettingsScreen(vm: AppViewModel) {
   // its scrolled flow), so both it and the column need this state.
   var query by remember { mutableStateOf("") }
   var searchFocused by remember { mutableStateOf(false) }
+  // System back returns to the garage, not out of the app -- but while the
+  // search pill is expanded, back should collapse it back to the small
+  // button first (matching every other "expanded surface" in the app),
+  // not skip straight past it to the previous screen.
+  BackHandler {
+      if (searchFocused || query.isNotEmpty()) {
+          searchFocused = false
+          query = ""
+      } else {
+          vm.closeSettings()
+      }
+  }
   // Separate from `query`, which updates on every keystroke purely to
   // live-filter the matching-settings list below (no side effects). Running
   // a vehicle command or an AI query is a real action -- it must only fire
