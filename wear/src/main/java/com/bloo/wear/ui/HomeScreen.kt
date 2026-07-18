@@ -69,17 +69,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.keyframes
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -114,10 +109,8 @@ import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
-import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WearWeather
@@ -474,7 +467,6 @@ private fun CarColumn(
             name = car.name,
             visible = centerTile.isNotEmpty() && centerTile != WearTiles.SUMMARY,
             phoneConnected = ui.phoneConnected,
-            onRefresh = { vm.refreshStatus(car.vin) },
         )
     }
 }
@@ -600,38 +592,17 @@ private fun CurvedDotIndicator(total: Int, activeIndex: Int) {
 
 /** A small pill naming the car you're currently looking at. Sits below the
  *  system clock (Wear's TimeText owns the very top center) so the two don't
- *  overlap. Long-press to trigger a status refresh with an expanding animation. */
+ *  overlap.
+ *
+ *  This used to also be a long-press-to-refresh control (an escalating-
+ *  haptic hold gesture with its own expanding progress-ring animation), but
+ *  that duplicated the plain "Refresh" button already in the More tile --
+ *  same action, and this path had no accessible alternative for TalkBack/
+ *  switch-access users (a raw pointerInput gesture with no semantics),
+ *  unlike the button. Removed rather than fixed, since the button already
+ *  covers the same need with far less code. */
 @Composable
-private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnected: Boolean = true, onRefresh: () -> Unit = {}) {
-    val scope = rememberCoroutineScope()
-    val hapticFeedback = LocalHapticFeedback.current
-    // 0f = pill only, 1f = full screen filled
-    val expandProgress = remember { Animatable(0f) }
-    // Hoisted out of the gesture so a COMPLETED hold's fade-out tail (delay +
-    // animateTo(0f)) can be cancelled by the next hold. Left gesture-local, that
-    // tail outlived its gesture, and when its animateTo(0f) fired mid-way through
-    // a quick second hold it stole the Animatable's mutator - collapsing the new
-    // progress ring, killing that hold before onRefresh(), and leaving the
-    // escalating haptics buzzing until finger-up.
-    var holdJob by remember { mutableStateOf<Job?>(null) }
-
-    // Circular progress ring that fills clockwise as the user holds.
-    // Only composed while the hold is active (saves a layer at rest).
-    if (expandProgress.value > 0.001f) {
-        val progressColor = MaterialTheme.colorScheme.primary
-        CircularProgressIndicator(
-            progress = { expandProgress.value.coerceIn(0f, 1f) },
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = (expandProgress.value * 3f).coerceIn(0f, 1f) },
-            strokeWidth = 4.dp,
-            colors = ProgressIndicatorDefaults.colors(
-                indicatorColor = progressColor,
-                trackColor = progressColor.copy(alpha = 0.15f),
-            ),
-        )
-    }
-
+private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnected: Boolean = true) {
     AnimatedVisibility(
         visible = visible,
         modifier = Modifier.align(Alignment.TopCenter).padding(top = 26.dp),
@@ -646,69 +617,6 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
                 .dropShadow(RoundedCornerShape(50))
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        down.consume()
-                        // Kill any previous hold's lingering fade-out tail before
-                        // starting this one (see holdJob's declaration).
-                        holdJob?.cancel()
-                        var completed = false
-                        var hapticJob: Job? = null
-                        hapticJob = scope.launch {
-                            var delayMs = 250L
-                            var count = 0
-                            while (isActive) {
-                                // Escalate: start gentle, go strong
-                                val type = when {
-                                    count < 3  -> HapticFeedbackType.TextHandleMove
-                                    count < 7  -> HapticFeedbackType.LongPress
-                                    else       -> HapticFeedbackType.LongPress
-                                }
-                                hapticFeedback.performHapticFeedback(type)
-                                if (count >= 3) {
-                                    // Double-pulse for stronger feel
-                                    delay(40L)
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                }
-                                count++
-                                delay(delayMs)
-                                delayMs = (delayMs * 0.65f).toLong().coerceAtLeast(25L)
-                            }
-                        }
-                        holdJob = scope.launch {
-                            expandProgress.animateTo(
-                                1f,
-                                keyframes {
-                                    durationMillis = 1000
-                                    0f at 0
-                                    1.06f at 800 using FastOutSlowInEasing
-                                    1f at 1000
-                                }
-                            )
-                            hapticJob?.cancel()
-                            completed = true
-                            onRefresh()
-                            delay(600)
-                            expandProgress.animateTo(0f, tween(400))
-                        }
-                        // Wait for finger up or cancellation
-                        try {
-                            waitForUpOrCancellation()
-                        } finally {
-                            hapticJob?.cancel()
-                            if (!completed) {
-                                holdJob?.cancel()
-                                scope.launch {
-                                    expandProgress.animateTo(
-                                        0f,
-                                        tween(300)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
                 .padding(horizontal = 14.dp, vertical = 5.dp),
         ) {
             Row(
@@ -1464,9 +1372,10 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     // Persist (summary first) to the car's pebble order, synced to the phone.
     fun commit() {
         vm.savePebbleOrder(vin, listOf("summary") + order)
-        // Also persist the expanded watch-tile order locally so it takes effect
-        // immediately without waiting for the phone to echo back via settings.
-        vm.setTileOrder(WearPebbles.tilesFor(listOf("summary") + order))
+        // Redraw the glanceable Tile now so the new order takes effect
+        // immediately, instead of waiting for the phone to echo the order
+        // back or the Tile's own next freshness-interval poll.
+        vm.refreshTileWidgets()
     }
 
     ScalingLazyColumn(

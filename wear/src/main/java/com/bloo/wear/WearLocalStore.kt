@@ -46,24 +46,6 @@ object WearTiles {
         SUMMARY, LOCK, CHARGE, LIMITS, AI, CLIMATE, SMART_CLIMATE, COMFORT, PRESETS,
         LOCATION, WEATHER, INFO, DIAGNOSTICS, ASSIST, MORE,
     )
-
-    val LABELS = mapOf(
-        SUMMARY to "Summary",
-        LOCK to "Lock / Unlock",
-        CLIMATE to "Climate",
-        SMART_CLIMATE to "Smart Climate",
-        COMFORT to "Comfort",
-        PRESETS to "Presets",
-        CHARGE to "Charge",
-        LIMITS to "Charge Limits",
-        AI to "AI Summary",
-        LOCATION to "Location",
-        WEATHER to "Weather",
-        INFO to "Info",
-        DIAGNOSTICS to "Diagnostics",
-        ASSIST to "Assist",
-        MORE to "More",
-    )
 }
 
 /**
@@ -152,7 +134,6 @@ val PIN_LOCK_TIMINGS = setOf("off", "immediate", "1min", "5min", "10min")
 data class WearLocalSettings(
     val fontScale: Float = 1f,
     val unitSystem: String = "imperial",
-    val tileOrder: List<String> = WearTiles.DEFAULT_ORDER,
     /** Which action chips the glanceable Tile shows (subset of [TILE_CHIP_ACTIONS]). */
     val tileActions: List<String> = listOf("lock", "climate"),
     /** Per pool-slot pinned car VIN; null = unconfigured (follows the selected car).
@@ -179,7 +160,6 @@ val TILE_CHIP_ACTIONS = listOf("lock", "climate", "charge")
 class WearLocalStore(private val context: Context) {
 
     private val keyFontScale = floatPreferencesKey("font_scale")
-    private val keyTileOrder = stringPreferencesKey("tile_order")
     private val keyTileActions = stringPreferencesKey("tile_actions")
     private fun keyTileCarVin(index: Int) = stringPreferencesKey("tile_car_vin_$index")
     private val keyUnitSystem = stringPreferencesKey("unit_system")
@@ -197,13 +177,6 @@ class WearLocalStore(private val context: Context) {
 
     val flow: Flow<WearLocalSettings> = context.wearLocalStore.data.map { prefs ->
         val fontScale = (prefs[keyFontScale] ?: 1f).coerceIn(0.8f, 1.4f)
-        val savedOrder = prefs[keyTileOrder]
-            ?.split(",")
-            ?.filter { it.isNotBlank() }
-            ?: WearTiles.DEFAULT_ORDER
-        // Merge: keep saved order, append any new keys not yet in the saved list.
-        val merged = savedOrder.filter { it in WearTiles.DEFAULT_ORDER } +
-            WearTiles.DEFAULT_ORDER.filter { it !in savedOrder }
         val actions = prefs[keyTileActions]
             ?.split(",")
             ?.filter { it in TILE_CHIP_ACTIONS }
@@ -216,7 +189,6 @@ class WearLocalStore(private val context: Context) {
         WearLocalSettings(
             fontScale = fontScale,
             unitSystem = prefs[keyUnitSystem] ?: "imperial",
-            tileOrder = merged,
             tileActions = actions,
             tileCarVins = tileCarVins,
             updateChecksEnabled = prefs[keyUpdateChecksEnabled] ?: true,
@@ -266,10 +238,6 @@ class WearLocalStore(private val context: Context) {
 
     suspend fun setTileLastClick(poolIndex: Int, id: String) {
         context.wearLocalStore.edit { it[keyTileLastClick(poolIndex)] = id }
-    }
-
-    suspend fun setTileOrder(order: List<String>) {
-        context.wearLocalStore.edit { it[keyTileOrder] = order.joinToString(",") }
     }
 
     suspend fun setTileActions(actions: List<String>) {

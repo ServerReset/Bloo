@@ -874,10 +874,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
 
-    /** "Not now": the checker only runs once per cold start anyway (its own
-     *  debounce), so clearing the in-memory banner is enough. */
-    fun dismissUpdate() = _ui.update { it.copy(updateRun = null) }
-
     /** "Remind me in a few days": persists a snooze that outlasts the checker's
      *  normal debounce window too. */
     fun snoozeUpdate() {
@@ -1069,14 +1065,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Persist the watch-side tile display order. Called after a pebble reorder
-     *  so the tile order takes effect locally without waiting for phone echo. */
-    fun setTileOrder(order: List<String>) {
-        viewModelScope.launch {
-            localStore.setTileOrder(order)
-            requestWidgetUpdates()
-        }
-    }
+    /** Redraw the glanceable Tile/complications now, without waiting for a
+     *  phone echo -- e.g. right after a pebble reorder, so the new tile order
+     *  takes effect immediately instead of on the next freshness-interval
+     *  poll. */
+    fun refreshTileWidgets() = requestWidgetUpdates()
 
     /** Pin pool slot [index]'s Tile to a car (null = follow selected), then redraw it. */
     fun setTileCarVin(index: Int, vin: String?) {
