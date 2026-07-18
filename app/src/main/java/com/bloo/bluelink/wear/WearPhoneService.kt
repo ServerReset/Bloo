@@ -190,6 +190,9 @@ class WearPhoneService : WearableListenerService() {
                         val payload = WearSync.decodeAuroraToggle(raw) ?: return@forEach
                         val store = SettingsStore(applicationContext)
                         store.setAuroraBackground(payload.enabled)
+                        // null means this push only touched `enabled` -- leave
+                        // the phone's current colour mode alone.
+                        payload.colorMode?.let { store.setAuroraColorMode(it) }
                         // Same settle-back pattern as the AI toggle above.
                         runCatching {
                             val appearance = store.appearance.first()

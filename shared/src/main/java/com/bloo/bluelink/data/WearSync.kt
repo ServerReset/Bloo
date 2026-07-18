@@ -407,10 +407,15 @@ data class WearAiTogglePayload(
     val enabled: Boolean = false,
 )
 
-/** Watch → phone: "turn the aurora background on/off". */
+/** Watch → phone: "turn the aurora background on/off", and optionally set its
+ *  colour mode from the watch too. [colorMode] is null when this push is only
+ *  changing [enabled] -- the phone leaves its current colour mode alone in
+ *  that case, so toggling the background off and back on from the watch
+ *  never resets an unrelated setting. */
 @Serializable
 data class WearAuroraTogglePayload(
     val enabled: Boolean = false,
+    val colorMode: String? = null,
 )
 
 /** A single car's reordered pebble order, sent watch → phone. */

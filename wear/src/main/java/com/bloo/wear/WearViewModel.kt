@@ -1050,6 +1050,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { WearComms.publishAuroraToggle(ctx, enabled) }
     }
 
+    /** Set the aurora colour mode ("complementary"/"material"/"custom") from
+     *  the watch -- same optimistic-update + phone-echo pattern as
+     *  [setAiEnabled], carried on the same push as the enabled flag (whatever
+     *  it currently is) so this never accidentally turns the background on
+     *  or off as a side effect of just changing its colour. */
+    fun setAuroraColorMode(mode: String) {
+        val enabled = _ui.value.settings?.auroraEnabled ?: return
+        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraColorMode = mode)) }
+        viewModelScope.launch { WearComms.publishAuroraToggle(ctx, enabled, colorMode = mode) }
+    }
+
     /** Choose which action chips the glanceable Tile shows, then redraw it. */
     fun setTileActions(actions: List<String>) {
         viewModelScope.launch {

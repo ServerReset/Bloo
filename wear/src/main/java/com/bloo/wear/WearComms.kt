@@ -240,12 +240,16 @@ object WearComms {
     }
 
     /** Push a "turn the aurora background on/off" toggle back to the phone,
-     *  same own-path pattern as [publishAiToggle]. */
-    suspend fun publishAuroraToggle(context: Context, enabled: Boolean) {
+     *  same own-path pattern as [publishAiToggle]. [colorMode] additionally
+     *  sets the phone's aurora colour mode from the watch when non-null. */
+    suspend fun publishAuroraToggle(context: Context, enabled: Boolean, colorMode: String? = null) {
         withContext(Dispatchers.IO) {
             runCatching {
                 val request = PutDataMapRequest.create(WearSync.PATH_AURORA_TOGGLE).apply {
-                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeAuroraToggle(com.bloo.bluelink.data.WearAuroraTogglePayload(enabled)))
+                    dataMap.putString(
+                        WearSync.KEY_PAYLOAD,
+                        WearSync.encodeAuroraToggle(com.bloo.bluelink.data.WearAuroraTogglePayload(enabled, colorMode)),
+                    )
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)

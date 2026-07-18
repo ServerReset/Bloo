@@ -275,6 +275,28 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     pending = false,
                     onClick = { vm.setAuroraEnabled(!enabled) },
                 )
+                // The watch could previously only mirror whatever colour mode
+                // the phone had chosen -- this is the only "background/
+                // appearance" setting on the watch with real watch-side
+                // control, syncing back the same way the AI/Aurora on-off
+                // toggles already do. Watch has no colour-picker keyboard for
+                // "Custom" hex entry, so that mode isn't offered here; it's
+                // still honoured (using whatever hex the phone published) if
+                // the phone itself set it.
+                AnimatedVisibility(visible = enabled, enter = fadeIn(tween(150)), exit = fadeOut(tween(120))) {
+                    Column {
+                        Spacer(Modifier.height(6.dp))
+                        MorphSegmented(
+                            options = listOf(
+                                WearSegmentOption("complementary", "Complementary"),
+                                WearSegmentOption("material", "Material You"),
+                            ),
+                            selectedKey = (ui.settings?.auroraColorMode ?: "complementary")
+                                .let { if (it == "custom") "complementary" else it },
+                            onSelect = { vm.setAuroraColorMode(it) },
+                        )
+                    }
+                }
             }
         }
 
