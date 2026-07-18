@@ -484,6 +484,14 @@ fun BlooApp(vm: AppViewModel) {
                         IconButton(onClick = { clipboard.setText(AnnotatedString(data.visuals.message)) }) {
                             Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
                         }
+                        // Swipe-to-dismiss is a raw drag gesture with no
+                        // TalkBack equivalent (a single-finger swipe here is
+                        // captured by TalkBack's own navigation instead), so a
+                        // screen-reader user previously had no way to dismiss
+                        // early and had to wait out the auto-hide timeout.
+                        IconButton(onClick = { data.dismiss() }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Dismiss")
+                        }
                     }
                 }
             }
@@ -3409,6 +3417,28 @@ private fun <T> ReorderColumn(
                     val handleCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
                     val handle = Modifier
                         .onGloballyPositioned { handleCoords.value = it }
+                        // The drag gesture below has no TalkBack equivalent at
+                        // all -- reordering pebbles/presets/cars was completely
+                        // unreachable for screen-reader users. Additive
+                        // semantics-only "Move up"/"Move down" actions alongside
+                        // the existing gesture (same pattern already used for
+                        // MorphSegmented's drag track), reusing the same reorder
+                        // + commit logic the drag path uses.
+                        .semantics {
+                            val cur = order.indexOfFirst { keyOf(it) == k }
+                            customActions = listOfNotNull(
+                                if (cur > 0) CustomAccessibilityAction("Move up") {
+                                    order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
+                                    onReorder(order)
+                                    true
+                                } else null,
+                                if (cur in 0 until order.lastIndex) CustomAccessibilityAction("Move down") {
+                                    order = order.toMutableList().also { it.add(cur + 1, it.removeAt(cur)) }
+                                    onReorder(order)
+                                    true
+                                } else null,
+                            )
+                        }
                         .pointerInput(k) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { draggingKey = k; offsetY = 0f },
@@ -4131,6 +4161,17 @@ private fun PaletteSwatch(
                 .padding(ring)
                 .clip(CircleShape)
                 .background(palette.swatch)
+                // The colour name was only ever rendered as a sibling Text
+                // below, outside this clickable's own semantics -- TalkBack
+                // announced an unlabelled "double tap to activate" with no
+                // colour name and no sense of which swatch is selected (the
+                // ring/check are purely visual). RadioButton matches the
+                // "pick exactly one" behaviour of this swatch row.
+                .semantics {
+                    contentDescription = palette.label
+                    role = Role.RadioButton
+                    this.selected = selected
+                }
                 .clickable { haptics?.click(); onClick() },
             contentAlignment = Alignment.Center,
         ) {
@@ -4178,6 +4219,11 @@ private fun CustomPaletteSwatch(
         Box(
             modifier = Modifier
                 .size(58.dp)
+                .semantics {
+                    contentDescription = palette.name
+                    role = Role.RadioButton
+                    this.selected = selected
+                }
                 .clickable { haptics?.click(); onClick() },
             contentAlignment = Alignment.Center,
         ) {
@@ -4893,10 +4939,15 @@ private fun Pebble(
                     Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
+                        // Same heading fix as SettingsCard: with 8+ pebbles per
+                        // car and no heading structure, TalkBack users could
+                        // only reach a given section (Climate, Charge, ...) by
+                        // swiping through every row of every pebble above it.
                         Text(
                             title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
+                            modifier = Modifier.semantics { heading() },
                         )
                         if (summary != null) {
                             AnimatedContent(
@@ -4992,6 +5043,11 @@ private class PebbleHeaderAction(
     val activeContainer: Color? = null,
     val activeContent: Color? = null,
     val isWarning: Boolean = false,
+    /** Explicit TalkBack label for icon-only actions (empty [label]) -- without
+     *  it, an empty-label button inside a Surface (which doesn't merge
+     *  descendant semantics) announces only "Button" with no indication of
+     *  what it does. Only needed when [label] is blank. */
+    val contentDescription: String? = null,
 )
 
 /**
@@ -5087,7 +5143,11 @@ private fun SplitExpandButton(
             color = leftBg,
             contentColor = leftFg,
             shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
-            modifier = Modifier.fillMaxHeight(),
+            modifier = Modifier.fillMaxHeight().then(
+                if (action.label.isEmpty() && action.contentDescription != null) {
+                    Modifier.semantics { contentDescription = action.contentDescription!! }
+                } else Modifier,
+            ),
         ) {
             Row(
                 modifier = Modifier
@@ -5518,6 +5578,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             icon = Icons.Filled.Warning,
             onClick = { vm.togglePebble(v, "diagnostics") },
             isWarning = true,
+            contentDescription = "Diagnostics warning",
         ) else null,
     ) {
         if (rows.isEmpty()) {
@@ -8086,6 +8147,7 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.semantics { heading() },
         )
         content()
     }
