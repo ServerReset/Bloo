@@ -49,13 +49,25 @@ abstract class ToggleStateComplication : SuspendingComplicationDataSourceService
     }
 
     private fun build(type: ComplicationType, on: Boolean?, vin: String?): ComplicationData? {
+        // `on == null` means the state hasn't synced yet, not that it's
+        // confirmed off -- collapsing both into `isOn = false` rendered an
+        // unsynced lock complication as a definite "Unlocked", which a user
+        // glancing at their watch face could mistake for a real reading of
+        // the car. Render an explicit neutral state instead, matching how
+        // ChargeComplication already renders "—%" for an unknown percentage.
+        val known = on != null
         val isOn = on == true
-        val image = MonochromaticImage.Builder(Icon.createWithResource(this, iconRes(isOn))).build()
-        val desc = PlainComplicationText.Builder(description(isOn)).build()
+        val image = MonochromaticImage.Builder(
+            Icon.createWithResource(this, if (known) iconRes(isOn) else iconRes(false)),
+        ).build()
+        val desc = PlainComplicationText.Builder(if (known) description(isOn) else "State unknown").build()
         val tap = vin?.let { ComplicationTapReceiver.pendingIntent(this, it, action) }
         return when (type) {
             ComplicationType.SHORT_TEXT ->
-                ShortTextComplicationData.Builder(PlainComplicationText.Builder(text(isOn)).build(), desc)
+                ShortTextComplicationData.Builder(
+                    PlainComplicationText.Builder(if (known) text(isOn) else "—").build(),
+                    desc,
+                )
                     .setTitle(PlainComplicationText.Builder(title).build())
                     .setMonochromaticImage(image)
                     .apply { tap?.let { setTapAction(it) } }

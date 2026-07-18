@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Lock
@@ -248,7 +249,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 MorphButton(
                     label = if (enabled) "On" else "Off",
-                    icon = Icons.Filled.Bolt,
+                    icon = Icons.Filled.AutoAwesome,
                     active = enabled,
                     activeColor = MaterialTheme.colorScheme.primary,
                     pending = false,
@@ -487,17 +488,6 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     )
                 }
             }
-        }
-
-        item {
-            MorphButton(
-                label = if (ui.resyncBusy) "Syncing…" else "Re-sync from phone",
-                icon = Icons.Filled.Sync,
-                active = false,
-                activeColor = MaterialTheme.colorScheme.primary,
-                pending = ui.resyncBusy,
-                onClick = { vm.resync() },
-            )
         }
 
         item {

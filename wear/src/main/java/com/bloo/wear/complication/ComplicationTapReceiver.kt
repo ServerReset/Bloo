@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Handles a tap on the Lock / Climate complication: relays the toggle command to
@@ -30,7 +31,20 @@ class ComplicationTapReceiver : BroadcastReceiver() {
         val pending = goAsync()
         scope.launch {
             try {
-                runCatching { WearComms.send(ctx, WearCommand(vin, action)) }
+                // goAsync()'s extended process lifetime is roughly 10s and not
+                // guaranteed beyond that. WearComms.send can itself chain up to
+                // 10s on a phone-relay attempt and then, on failure, an
+                // unbounded standalone network call to the car API -- easily
+                // exceeding that budget on a slow/degraded connection, which
+                // used to risk the process being reclaimed before finish() ever
+                // ran (no complication refresh, tap silently appears to do
+                // nothing). Capping the whole attempt keeps this receiver
+                // predictable: finish() always runs within budget, and the
+                // complications still get a best-effort refresh request even
+                // if the underlying command didn't finish in time.
+                withTimeoutOrNull(9_000) {
+                    runCatching { WearComms.send(ctx, WearCommand(vin, action)) }
+                }
                 ComplicationLink.requestUpdate(ctx)
             } finally {
                 pending.finish()
