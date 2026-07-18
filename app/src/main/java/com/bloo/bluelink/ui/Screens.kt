@@ -2726,7 +2726,7 @@ private fun FloatingIcon(
         interactionSource = interaction,
         modifier = modifier
             .padding(outerPadding)
-            .size(44.dp)
+            .size(48.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .dropShadow(CircleShape),
     ) {

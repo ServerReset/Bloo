@@ -24,6 +24,7 @@ import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.WearClimateState
 import com.bloo.bluelink.data.WindowOpen
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.maskEmail
 import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
@@ -404,7 +405,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 repo.login(email.trim(), password, pin.trim())
                 credentialStore.save(Credentials(email.trim(), password, pin.trim(), brand))
             }.onSuccess {
-                AppLog.log("Watch sign-in: ${email.trim()} (${brand.label})")
+                AppLog.log("Watch sign-in: ${maskEmail(email.trim())} (${brand.label})")
                 _ui.update {
                     it.copy(busy = false, screen = WearScreen.Ready, accounts = credentialStore.loadAll().map { c -> c.email })
                 }

@@ -5,6 +5,15 @@ import java.util.TimeZone
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
+/** Mask an email for diagnostics (AppLog is in-memory/copyable in the app's
+ *  own log viewer, not a place account addresses should appear in full) --
+ *  "j***@gmail.com" instead of "jane.doe@gmail.com". */
+fun maskEmail(email: String): String {
+    val at = email.indexOf('@')
+    if (at <= 0) return "***"
+    return "${email.first()}***${email.substring(at)}"
+}
+
 /** Current GMT offset in whole hours (e.g. -5 EST, -4 EDT) -- both brand API
  *  clients send this as an auth header; kept in one place so a future fix
  *  (e.g. rounding for negative sub-hour offsets) can't apply to one and not

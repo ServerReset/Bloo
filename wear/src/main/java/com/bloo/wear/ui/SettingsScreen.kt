@@ -173,7 +173,17 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         active = ls.pinLockEnabled,
                         activeColor = MaterialTheme.colorScheme.primary,
                         pending = false,
-                        onClick = { vm.setPinLockEnabled(!ls.pinLockEnabled) },
+                        // Arming the lock needs no proof; turning it off is
+                        // functionally the same as removing the PIN (the watch
+                        // will never lock again), so it goes through the same
+                        // "confirm your current PIN first" flow REMOVE already
+                        // uses -- otherwise anyone holding the watch during the
+                        // exact window the lock protects could disable it with
+                        // no PIN at all.
+                        onClick = {
+                            if (ls.pinLockEnabled) pinFlow = PinFlowMode.DISABLE
+                            else vm.setPinLockEnabled(true)
+                        },
                     )
                     if (ls.pinLockEnabled) {
                         Spacer(Modifier.height(8.dp))

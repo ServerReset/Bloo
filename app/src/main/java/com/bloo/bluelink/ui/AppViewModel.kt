@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.KiaRepository
 import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.LockTiming
+import com.bloo.bluelink.data.maskEmail
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
@@ -451,7 +452,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         launchBusy {
             (repoFor(brand) as BlueLinkRepository).login(username.trim(), password, pin.trim())
             credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
-            AppLog.log("Signed in as ${username.trim()} (${brand.label})")
+            AppLog.log("Signed in as ${maskEmail(username.trim())} (${brand.label})")
             _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
             loadGarageInternal()
         }
@@ -511,7 +512,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun finishKiaLogin(creds: Credentials) {
         credentialStore.save(creds)
-        AppLog.log("Signed in as ${creds.email} (Kia)")
+        AppLog.log("Signed in as ${maskEmail(creds.email)} (Kia)")
         _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
         loadGarageInternal()
     }

@@ -85,7 +85,7 @@ private fun PinKey(label: String, onClick: () -> Unit) {
     val content = if (pressed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     Box(
         Modifier
-            .size(40.dp)
+            .size(48.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
             .background(bg)
@@ -109,7 +109,7 @@ private fun PinKeypad(onDigit: (String) -> Unit, onBackspace: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEach { key ->
                     if (key.isEmpty()) {
-                        Spacer(Modifier.size(40.dp))
+                        Spacer(Modifier.size(48.dp))
                     } else {
                         PinKey(key, onClick = { if (key == "⌫") onBackspace() else onDigit(key) })
                     }
@@ -233,9 +233,9 @@ fun PinLockScreen(vm: WearViewModel) {
 }
 
 /** Which PIN-management flow [PinManagementOverlay] is running. */
-enum class PinFlowMode { SET, CHANGE, REMOVE }
+enum class PinFlowMode { SET, CHANGE, REMOVE, DISABLE }
 
-private enum class PinFlowStep { CONFIRM_CURRENT, ENTER_NEW, CONFIRM_NEW, REMOVING }
+private enum class PinFlowStep { CONFIRM_CURRENT, ENTER_NEW, CONFIRM_NEW, REMOVING, DISABLING }
 
 /**
  * A full-screen overlay driving the settings screen's "Set/Change/Remove PIN"
@@ -270,7 +270,11 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                         vm.verifyPinForManagement(pin) { ok ->
                             if (ok) {
                                 error = null
-                                step = if (mode == PinFlowMode.REMOVE) PinFlowStep.REMOVING else PinFlowStep.ENTER_NEW
+                                step = when (mode) {
+                                    PinFlowMode.REMOVE -> PinFlowStep.REMOVING
+                                    PinFlowMode.DISABLE -> PinFlowStep.DISABLING
+                                    else -> PinFlowStep.ENTER_NEW
+                                }
                             } else {
                                 error = "Wrong PIN"
                             }
@@ -296,6 +300,14 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                     },
                 )
                 PinFlowStep.REMOVING -> LaunchedEffect(Unit) { vm.clearPin(); onDone() }
+                // Turning "Lock: On" off is functionally identical to removing
+                // the PIN entirely (the watch will never lock again) but used
+                // to require no PIN at all -- anyone who picked up the watch
+                // during the exact window the lock is meant to protect could
+                // permanently disable it in two taps. Requiring the same
+                // CONFIRM_CURRENT step as REMOVE closes that gap without
+                // clearing the stored PIN, so re-enabling doesn't need a reset.
+                PinFlowStep.DISABLING -> LaunchedEffect(Unit) { vm.setPinLockEnabled(false); onDone() }
             }
         }
     }
