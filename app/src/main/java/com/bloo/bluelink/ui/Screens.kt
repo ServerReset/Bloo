@@ -3631,7 +3631,13 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         derivedStateOf { controlsScroll.value > with(density) { (topInset + 52.dp + 40.dp).toPx() } }
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
-    Refreshable(v, state, vm, hideIndicator = true) {
+    // Was hardcoded hideIndicator = true -- the same "grid-only" flag that
+    // hid the pull-to-refresh spinner in the single-car view (fixed in
+    // a944a91) also hid it here, in the expanded/wide dual-column detail
+    // view, unconditionally. This is a single car's own detail screen, not
+    // the multi-car grid the flag was meant for, so the real M3 Expressive
+    // indicator should show here too.
+    Refreshable(v, state, vm) {
         Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped.
         AnimatedContent(
