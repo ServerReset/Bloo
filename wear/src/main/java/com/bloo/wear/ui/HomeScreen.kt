@@ -340,7 +340,11 @@ private fun CarColumn(
     // on-screen car back to its Summary tile.
     LaunchedEffect(tiles) {
         if (initialised) {
-            state.scrollToItem((cycles / 2) * tileCount + summaryIdx)
+            // Animated, not an instant snap -- everything else on this screen
+            // (page transitions, dots, button morphs, card resizing) is
+            // spring/tween animated, so a hard teleport here read as a glitch
+            // by comparison against the rest of the screen's motion language.
+            state.animateScrollToItem((cycles / 2) * tileCount + summaryIdx)
         }
         initialised = true
     }
@@ -521,6 +525,7 @@ internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -715,6 +720,7 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 if (!phoneConnected) {
@@ -1112,6 +1118,7 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
         fontWeight = FontWeight.Medium,
         textAlign = TextAlign.Center,
         maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
     )
     if (car.engineOn) {
         Spacer(Modifier.height(2.dp))
