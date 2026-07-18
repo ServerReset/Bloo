@@ -1,7 +1,18 @@
 package com.bloo.bluelink.data
 
+import java.util.TimeZone
+
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
+
+/** Current GMT offset in whole hours (e.g. -5 EST, -4 EDT) -- both brand API
+ *  clients send this as an auth header; kept in one place so a future fix
+ *  (e.g. rounding for negative sub-hour offsets) can't apply to one and not
+ *  the other. */
+fun gmtOffsetHours(): String {
+    val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
+    return (offsetMs / 3_600_000).toString()
+}
 
 /** "just now" / "x min ago" / "x hr ago" for a wall-clock timestamp in ms. */
 fun relativeLabel(ms: Long?): String {

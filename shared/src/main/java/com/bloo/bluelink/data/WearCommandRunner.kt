@@ -124,13 +124,19 @@ object WearCommandRunner {
             if (vin.isBlank()) all else all.filter { it.vin == vin }
         }
         BlueLinkGate.statusMutex.withLock {
+            // One repo instance per brand, reused across that brand's vehicles
+            // in this loop -- a fresh KiaRepository per vehicle threw away its
+            // account-wide vehicle-list cache each time, so "refresh all" on N
+            // Kia cars fired N redundant full-account list calls (each already
+            // covering all N cars) instead of one.
+            val reposByBrand = mutableMapOf<Brand, VehicleRepository>()
             targets.forEach { snap ->
                 runCatching {
                     val v = snap.toVehicle()
-                    val repo = repositoryFor(
-                        Brand.fromIndicator(v.brandIndicator),
-                        SessionStore(context), CredentialStore(context),
-                    )
+                    val brand = Brand.fromIndicator(v.brandIndicator)
+                    val repo = reposByBrand.getOrPut(brand) {
+                        repositoryFor(brand, SessionStore(context), CredentialStore(context))
+                    }
                     repo.status(v, refresh = force)?.let { store.updateVehicle(snap.merged(it)) }
                 }
             }

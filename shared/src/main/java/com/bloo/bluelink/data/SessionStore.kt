@@ -91,14 +91,22 @@ class SessionStore(private val context: Context) {
 
     /** Migrate the old single-session keys into the per-brand layout (one-shot). */
     private suspend fun migrateLegacy() {
-        val p = context.dataStore.data.first()
-        val legacyAccess = p[stringPreferencesKey("access_token")] ?: return
-        val brand = Brand.fromName(p[stringPreferencesKey("brand")])
+        // Quick short-circuit so a call with nothing to migrate skips opening a
+        // transaction at all. The actual migration re-reads everything from
+        // the transaction's own state (`e`), not this outer snapshot -- it
+        // used to copy the remaining legacy fields from this stale `p` read
+        // even inside edit{}, so a second migrateLegacy() racing a concurrent
+        // updateAccessToken() (SessionStore is constructed fresh in several
+        // places that can run at once) could re-write a stale legacy-derived
+        // token over one that was just updated.
+        if (context.dataStore.data.first()[stringPreferencesKey("access_token")] == null) return
         context.dataStore.edit { e ->
+            val legacyAccess = e[stringPreferencesKey("access_token")] ?: return@edit
+            val brand = Brand.fromName(e[stringPreferencesKey("brand")])
             e[key(brand, "access")] = legacyAccess
-            p[stringPreferencesKey("refresh_token")]?.let { e[key(brand, "refresh")] = it }
-            p[stringPreferencesKey("username")]?.let { e[key(brand, "username")] = it }
-            p[stringPreferencesKey("pin")]?.let { e[key(brand, "pin")] = it }
+            e[stringPreferencesKey("refresh_token")]?.let { e[key(brand, "refresh")] = it }
+            e[stringPreferencesKey("username")]?.let { e[key(brand, "username")] = it }
+            e[stringPreferencesKey("pin")]?.let { e[key(brand, "pin")] = it }
             e[brandsKey] = brand.name
             listOf("access_token", "refresh_token", "username", "pin", "brand").forEach {
                 e.remove(stringPreferencesKey(it))

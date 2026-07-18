@@ -96,11 +96,6 @@ class KiaUsaApi {
 
     // --- Headers ---------------------------------------------------------
 
-    private fun gmtOffsetHours(): String {
-        val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
-        return (offsetMs / 3_600_000).toString()
-    }
-
     private fun rfc1123Date(): String =
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("GMT") }
@@ -151,7 +146,15 @@ class KiaUsaApi {
             val text = resp.body?.string().orEmpty()
             val sid = resp.header("sid")
             if (sid != null) {
-                return@withContext KiaAuth.LoggedIn(KiaSession(sid, rmtoken, deviceId, pin))
+                // Prefer a freshly-issued rmtoken if the server sent one on this
+                // silent re-auth -- verifyOtpAndComplete's own response already
+                // does this (reads resp.header("rmtoken")); this branch used to
+                // just echo back the caller-supplied token unconditionally, so a
+                // server-side rotation would never get persisted, eventually
+                // failing with an already-invalidated rmtoken and forcing a full
+                // OTP re-login that a valid replacement would have avoided.
+                val freshRmtoken = resp.header("rmtoken") ?: rmtoken
+                return@withContext KiaAuth.LoggedIn(KiaSession(sid, freshRmtoken, deviceId, pin))
             }
             val payload = parseJson(text, resp.code).obj()?.get("payload")?.obj()
             val otpKey = payload?.get("otpKey")?.str()

@@ -16,8 +16,13 @@ class KiaRepository(
     private val credentialStore: CredentialStore,
 ) : VehicleRepository {
 
-    /** Session-specific vinkeys + EV flags, keyed by vehicle id (our [Vehicle.vin]). */
-    private val summaries = mutableMapOf<String, KiaVehicleSummary>()
+    /** Session-specific vinkeys + EV flags, keyed by vehicle id (our [Vehicle.vin]).
+     *  This one repository instance is cached and reused across the app's
+     *  lifetime (see AppViewModel/WearViewModel's `repos` map), and not every
+     *  call path that reads/mutates it runs under the same lock (e.g. a
+     *  background garage load can race a user-triggered command) -- a plain
+     *  HashMap risked a ConcurrentModificationException under that race. */
+    private val summaries = java.util.concurrent.ConcurrentHashMap<String, KiaVehicleSummary>()
 
     /** Device id carried between the password step and the OTP steps. */
     private var pendingDeviceId: String? = null

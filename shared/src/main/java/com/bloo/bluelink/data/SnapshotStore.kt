@@ -68,9 +68,14 @@ data class VehicleSnapshot(
 
 /** Fold a freshly fetched status into an existing snapshot. */
 fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
-    val pct = if (isEv) status.evStatus?.batteryStatus else status.fuelLevel
-    val range = (status.evStatus?.drvDistance?.firstOrNull()
-        ?.rangeByFuel?.totalAvailableRange?.value ?: status.dte?.value)?.toInt()
+    // Use hasBattery (the user's manual powertrain override), not the raw
+    // isEv flag -- this reimplemented percentFor/rangeMiFor's own logic with
+    // the wrong flag, so a PHEV the API misreports as gas would have every
+    // refresh through this path (WearCommandRunner.refresh, used by the
+    // watch's standalone/command-triggered refreshes) clobber percent/rangeMi
+    // with fuel data instead of battery data.
+    val pct = status.percentFor(hasBattery)
+    val range = status.rangeMiFor(hasBattery)
     return copy(
         percent = pct ?: percent,
         rangeMi = range ?: rangeMi,

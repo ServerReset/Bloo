@@ -8,7 +8,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
-import java.util.TimeZone
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
@@ -51,12 +50,6 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
     private val jsonMedia = "application/json".toMediaType()
     private val formMedia = "application/x-www-form-urlencoded".toMediaType()
-
-    /** Current GMT offset in whole hours (e.g. -5 EST, -4 EDT). */
-    private fun gmtOffsetHours(): String {
-        val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
-        return (offsetMs / 3_600_000).toString()
-    }
 
     // --- Auth ------------------------------------------------------------
 
