@@ -453,11 +453,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         item {
             SettingSection("Sync") {
                 MorphButton(
-                    label = "Sync from phone",
+                    label = if (ui.resyncBusy) "Syncing…" else "Sync from phone",
                     icon = Icons.Filled.Sync,
                     active = false,
                     activeColor = MaterialTheme.colorScheme.primary,
-                    pending = false,
+                    pending = ui.resyncBusy,
                     onClick = { vm.resync() },
                 )
                 Spacer(Modifier.height(4.dp))
@@ -491,11 +491,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             MorphButton(
-                label = "Re-sync from phone",
+                label = if (ui.resyncBusy) "Syncing…" else "Re-sync from phone",
                 icon = Icons.Filled.Sync,
                 active = false,
                 activeColor = MaterialTheme.colorScheme.primary,
-                pending = false,
+                pending = ui.resyncBusy,
                 onClick = { vm.resync() },
             )
         }

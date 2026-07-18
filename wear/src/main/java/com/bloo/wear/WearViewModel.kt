@@ -160,6 +160,12 @@ data class WearUi(
     val updateChecking: Boolean = false,
     /** True when the PIN lock gate (see PinLockScreen) is covering the app. */
     val pinLocked: Boolean = false,
+    /** True while a manual "Sync from phone" (resync) is in flight -- every
+     *  other network-triggered button in this screen (lock, refresh, Drive
+     *  sync, AI summary, charge limits) shows a busy/disabled state; this one
+     *  didn't, so it could be tapped repeatedly with no feedback that
+     *  anything was happening. */
+    val resyncBusy: Boolean = false,
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
     fun chargeDraftFor(vin: String): ChargeLimitDraft = chargeLimitDrafts[vin] ?: ChargeLimitDraft()
@@ -272,18 +278,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            var pinColdStartChecked = false
-            localStore.flow.collect { s ->
-                _ui.update { it.copy(localSettings = s) }
-                // Cold-start lock, mirroring the phone's "lock immediately on
-                // launch if enabled" behaviour -- only once, so later settings
-                // emissions (e.g. toggling something unrelated) don't re-lock
-                // an already-unlocked session.
-                if (!pinColdStartChecked) {
-                    pinColdStartChecked = true
-                    if (s.pinLockEnabled && s.hasPin) _ui.update { it.copy(pinLocked = true) }
-                }
-            }
+            localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
         }
         viewModelScope.launch {
             WearSyncEvents.results.collect { r ->
@@ -353,6 +348,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun bootstrap() {
         viewModelScope.launch {
+            // Resolve the PIN-lock setting BEFORE anything below can reach the
+            // Ready screen with real car data. This used to run in a separate,
+            // independently-scheduled coroutine racing this one -- if
+            // bootstrap's phone-IPC calls (pullLatest, node lookup) happened to
+            // resolve before that other coroutine's first DataStore emission,
+            // the Ready screen could render, briefly showing real vehicle data,
+            // before pinLocked ever flipped true.
+            val settings = runCatching { localStore.flow.first() }.getOrNull()
+            if (settings?.pinLockEnabled == true && settings.hasPin) {
+                _ui.update { it.copy(pinLocked = true) }
+            }
             runCatching { WearComms.pullLatest(ctx) }
             refreshConnection()
             snapshots = runCatching { snapshotStore.current().vehicles.associateBy { it.vin } }.getOrElse { snapshots }
@@ -495,12 +501,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Re-pull snapshots, sessions and settings the phone has published. */
     fun resync() {
+        if (_ui.value.resyncBusy) return
         viewModelScope.launch {
-            runCatching { WearComms.requestSync(ctx, "", refresh = false) }
-            runCatching { WearComms.pullLatest(ctx) }
-            snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
-            refreshConnection()
-            if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
+            _ui.update { it.copy(resyncBusy = true) }
+            try {
+                runCatching { WearComms.requestSync(ctx, "", refresh = false) }
+                runCatching { WearComms.pullLatest(ctx) }
+                snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
+                refreshConnection()
+                if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
+            } finally {
+                _ui.update { it.copy(resyncBusy = false) }
+            }
         }
     }
 
@@ -622,6 +634,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  seeds the sliders so the controls reflect what's running. */
     fun applyPreset(vin: String, preset: ClimatePreset) {
         val r = preset.request
+        // Captured so a standalone (no-phone) failure can restore exactly what
+        // was showing before this preset was optimistically applied, instead
+        // of leaving the sliders/active-highlight showing a preset that the
+        // car never actually received.
+        val previousDraft = _ui.value.draftFor(vin)
         // Seed the sliders + active highlight up front: the relay path never runs
         // the block below, so seeding inside it never happened with a phone
         // connected - the preset started but the UI never showed it as active.
@@ -656,6 +673,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 seatRearLeft = r.seatRearLeft.apiValue,
                 seatRearRight = r.seatRearRight.apiValue,
             ),
+            onFailure = { updateDraft(vin) { previousDraft } },
         ) { v, repo, _ ->
             repo.startClimate(v, preset.request)
             flip(vin) { it.copy(airCtrlOn = true) }
@@ -673,14 +691,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (!Geocoder.isPresent()) return
         geocoded.add(vin)
         viewModelScope.launch {
-            runCatching {
-                val name = reverseGeocode(lat, lon)
-                if (!name.isNullOrBlank()) {
-                    placeNames = placeNames + (vin to name)
-                    publish()
-                } else {
-                    geocoded.remove(vin)
-                }
+            // Release the guard on ANY non-success outcome, not just a clean
+            // null result -- a thrown exception (geocoder service hiccup) used
+            // to leave `vin` stuck in `geocoded` forever, since remove() only
+            // ran inside the try block's else branch. That permanently
+            // disabled reverse-geocoding for that car for the rest of the
+            // app session, with the Location card silently falling back to
+            // raw lat/lon and never retrying.
+            val name = runCatching { reverseGeocode(lat, lon) }.getOrNull()
+            if (!name.isNullOrBlank()) {
+                placeNames = placeNames + (vin to name)
+                publish()
+            } else {
+                geocoded.remove(vin)
             }
         }
     }
@@ -725,6 +748,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val ac = draft.ac ?: car?.acLimit ?: 80
         val dc = draft.dc ?: car?.dcLimit ?: 90
         // Applied - drop this car's draft so the sliders track the car's fresh state.
+        // Kept so a standalone (no-phone) failure can restore it: dropping the
+        // draft synchronously here, before the command even runs, meant a
+        // failure silently reverted the sliders to the car's OLD limit with
+        // only a transient snackbar as evidence -- no "unsaved changes" state
+        // left to retry from.
+        val previousDraft = u.chargeLimitDrafts[vin]
         _ui.update { it.copy(chargeLimitDrafts = it.chargeLimitDrafts - vin) }
         command(
             vin, "chargeLimit",
@@ -739,6 +768,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 acLimit = ac,
                 dcLimit = dc,
             ),
+            onFailure = {
+                if (previousDraft != null) {
+                    _ui.update { it.copy(chargeLimitDrafts = it.chargeLimitDrafts + (vin to previousDraft)) }
+                }
+            },
         ) { v, repo, _ ->
             repo.setChargeTargets(v, ac, dc)
         }
@@ -1079,11 +1113,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // generic toggle at the stale draft temp (or just turned climate off).
         val isOn = statuses[vin]?.airCtrlOn ?: snapshots[vin]?.climateOn ?: false
         val d = _ui.value.draftFor(vin)
+        // Same rollback rationale as applyPreset: restore exactly what the
+        // draft showed before this optimistic change if the standalone
+        // command actually fails.
+        val previousDraft = d
         if (isOn) {
             updateDraft(vin) { it.copy(activePresetId = null) }
             command(
                 vin, "climate",
                 explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.CLIMATE_OFF),
+                onFailure = { updateDraft(vin) { previousDraft } },
             ) { v, repo, _ ->
                 repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
             }
@@ -1103,6 +1142,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,
                     seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
                 ),
+                onFailure = { updateDraft(vin) { previousDraft } },
             ) { v, repo, _ ->
                 repo.startClimate(v, d.toRequest(tempF = targetF, defrost = false))
                 flip(vin) { it.copy(airCtrlOn = true) }
@@ -1115,6 +1155,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         action: String,
         explicit: com.bloo.bluelink.data.WearCommand? = null,
         successMessage: String? = null,
+        // Only fires on the STANDALONE (non-relayed) failure path -- once a
+        // command is relayed to the phone, the watch has no ack channel back
+        // for whether the phone's own execution actually succeeded, so an
+        // optimistic draft change made for a relayed command can't be
+        // reverted here regardless.
+        onFailure: (() -> Unit)? = null,
         block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit,
     ) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
@@ -1162,6 +1208,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 }.onFailure { e ->
                     AppLog.log("⚠ Watch command $action failed: ${e.message}")
                     _ui.update { it.copy(message = e.message ?: "Command failed") }
+                    onFailure?.invoke()
                 }
             }
         }
