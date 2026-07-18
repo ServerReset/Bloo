@@ -11,7 +11,7 @@ fun relativeLabel(ms: Long?): String {
         d < 60_000 -> "just now"
         d < 3_600_000 -> "${d / 60_000} min ago"
         d < 86_400_000 -> "${d / 3_600_000} hr ago"
-        else -> "${d / 86_400_000} d ago"
+        else -> "${d / 86_400_000} day ago"
     }
 }
 

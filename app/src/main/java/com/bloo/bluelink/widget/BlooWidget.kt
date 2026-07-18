@@ -535,7 +535,7 @@ class BlooWidget : GlanceAppWidget() {
                     Image(provider = ImageProvider(R.drawable.ic_widget_location), contentDescription = null,
                         colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant), modifier = GlanceModifier.size(26.dp))
                     Spacer(GlanceModifier.height(4.dp))
-                    Text("Tap Location", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp))
+                    Text("Tap to locate", maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 10.sp))
                 }
             }
         }

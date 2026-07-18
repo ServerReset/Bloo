@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +49,7 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Close
@@ -88,7 +88,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onSizeChanged
@@ -1372,7 +1371,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         Spacer(Modifier.height(10.dp))
         MorphButton(
             label = "Update available",
-            icon = Icons.Filled.Refresh,
+            icon = Icons.Filled.SystemUpdate,
             active = true,
             activeColor = accent,
             pending = false,
@@ -1380,7 +1379,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         )
         Spacer(Modifier.height(4.dp))
         MorphButton(
-            label = "Remind me later",
+            label = "Remind me",
             icon = Icons.Filled.Close,
             active = false,
             activeColor = accent,
@@ -1466,7 +1465,7 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-                ListHeader { Text("Reorder Tiles", textAlign = TextAlign.Center) }
+                ListHeader { Text("Reorder tiles", textAlign = TextAlign.Center) }
                 Text(
                     "Long-press a row then drag to reorder",
                     style = MaterialTheme.typography.labelSmall,

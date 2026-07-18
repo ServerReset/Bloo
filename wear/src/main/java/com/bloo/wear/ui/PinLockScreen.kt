@@ -290,7 +290,7 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                         if (pin == firstEntry) {
                             vm.setPin(pin) { onDone() }
                         } else {
-                            error = "Didn't match -- try again"
+                            error = "Didn't match — try again"
                             step = PinFlowStep.ENTER_NEW
                         }
                     },
