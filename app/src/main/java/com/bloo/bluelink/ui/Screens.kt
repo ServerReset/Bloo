@@ -45,14 +45,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -8066,12 +8062,21 @@ private fun GlowySearchBar(
     val focusRequester = remember { FocusRequester() }
     val expanded = focused || query.isNotEmpty()
     LaunchedEffect(focused) { if (focused) runCatching { focusRequester.requestFocus() } }
-    val glowPulse by rememberInfiniteTransition(label = "searchGlow").animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(if (expanded) 1100 else 2200, easing = LinearEasing), RepeatMode.Reverse),
-        label = "glowPulse",
-    )
+    // Hand-ticked at ~12fps rather than Compose's animation clock -- this
+    // bar is a persistent fixture of the Settings screen, so an unthrottled
+    // 60fps+ blur-halo redraw for as long as that screen is open was one
+    // more sustained, always-there GPU cost worth trimming along with the
+    // Aurora backgrounds above.
+    var glowPulse by remember { mutableFloatStateOf(0.55f) }
+    LaunchedEffect(expanded) {
+        val periodMs = if (expanded) 1100L else 2200L
+        val start = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - start
+            glowPulse = 0.55f + (1f - 0.55f) * triangleWave(elapsed, periodMs)
+            delay(80)
+        }
+    }
     val widthFraction by animateFloatAsState(
         targetValue = if (expanded) 1f else 0.4f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
