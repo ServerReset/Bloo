@@ -918,7 +918,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Persist a new car display order (drag-and-drop in Settings). */
     fun reorderVehicles(order: List<Vehicle>) {
-        _state.update { it.copy(vehicles = order) }
+        _state.update { s ->
+            // Keep the same CAR selected across a reorder, not the same
+            // position -- selectIndex/expand always update currentIndex
+            // together with vehicles, but this was the one place that moved
+            // vehicles without it, so dragging a car above the currently
+            // selected one silently swapped which car the detail view showed.
+            val selectedVin = s.vehicles.getOrNull(s.currentIndex)?.vin
+            val newIndex = order.indexOfFirst { it.vin == selectedVin }
+            s.copy(vehicles = order, currentIndex = if (newIndex >= 0) newIndex else s.currentIndex)
+        }
         viewModelScope.launch {
             settingsStore.setVehicleOrder(order.map { it.vin })
             persistSnapshots(order)
@@ -997,9 +1006,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val app = getApplication<Application>()
                     val dir = java.io.File(app.filesDir, "cars").apply { mkdirs() }
                     val out = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.jpg")
-                    app.contentResolver.openInputStream(source)!!.use { input ->
-                        out.outputStream().use { input.copyTo(it) }
-                    }
+                    val input = app.contentResolver.openInputStream(source) ?: return@runCatching null
+                    input.use { i -> out.outputStream().use { o -> i.copyTo(o) } }
                     out.absolutePath
                 }.getOrNull()
             }
@@ -1414,12 +1422,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (v.vin in _state.value.trips || _state.value.isPending(v.vin, "trips")) return
         viewModelScope.launch {
             _state.update { it.copy(pending = it.pending + "${v.vin}:trips") }
-            val result = runCatching { repoFor(v).trips(v) }.getOrElse { e ->
-                AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}")
-                emptyList()
-            }.filter { it.distance != null && it.distance!! > 0 }
+            // Only cache the result on a successful fetch -- caching emptyList()
+            // on a transient failure looked identical to "genuinely no trips",
+            // and since the vin's presence in the map is what gates a re-fetch
+            // above, one bad network blip permanently stuck this car at "no
+            // trips" for the rest of the session with no way to retry.
+            val fetched = runCatching { repoFor(v).trips(v) }
+                .onFailure { e -> AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}") }
+                .getOrNull()
+                ?.filter { it.distance != null && it.distance!! > 0 }
             _state.update {
-                it.copy(trips = it.trips + (v.vin to result), pending = it.pending - "${v.vin}:trips")
+                it.copy(
+                    trips = if (fetched != null) it.trips + (v.vin to fetched) else it.trips,
+                    pending = it.pending - "${v.vin}:trips",
+                )
             }
         }
     }

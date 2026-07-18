@@ -31,32 +31,39 @@ object WearCommandRunner {
             seatRearLeft = SeatLevel.fromApi(command.seatRearLeft),
             seatRearRight = SeatLevel.fromApi(command.seatRearRight),
         )
-        return runCatching {
-            val updated = when (command.action) {
-                WearAction.TOGGLE_LOCK ->
-                    if (snap.locked == true) { repo.unlock(v); snap.copy(locked = false) }
-                    else { repo.lock(v); snap.copy(locked = true) }
-                WearAction.LOCK -> { repo.lock(v); snap.copy(locked = true) }
-                WearAction.UNLOCK -> { repo.unlock(v); snap.copy(locked = false) }
-                WearAction.TOGGLE_CLIMATE ->
-                    if (snap.climateOn == true) { repo.stopClimate(v); snap.copy(climateOn = false) }
-                    else { repo.startClimate(v, climate); snap.copy(climateOn = true) }
-                WearAction.CLIMATE_ON -> { repo.startClimate(v, climate); snap.copy(climateOn = true) }
-                WearAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = false) }
-                WearAction.TOGGLE_CHARGE ->
-                    if (snap.charging == true) { repo.stopCharge(v); snap.copy(charging = false) }
-                    else { repo.startCharge(v); snap.copy(charging = true) }
-                WearAction.CHARGE_ON -> { repo.startCharge(v); snap.copy(charging = true) }
-                WearAction.CHARGE_OFF -> { repo.stopCharge(v); snap.copy(charging = false) }
-                WearAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
-                else -> return WearCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
+        // Same lock refresh() and the phone UI's own command path already use --
+        // BlueLink 502s on overlapping requests for the same account, and this
+        // was the one command-executing path that skipped it, so a resent watch
+        // command (e.g. after a slow BLE ack) could fire the same command twice
+        // concurrently, or race a phone-UI-driven command, with no protection.
+        return BlueLinkGate.statusMutex.withLock {
+            runCatching {
+                val updated = when (command.action) {
+                    WearAction.TOGGLE_LOCK ->
+                        if (snap.locked == true) { repo.unlock(v); snap.copy(locked = false) }
+                        else { repo.lock(v); snap.copy(locked = true) }
+                    WearAction.LOCK -> { repo.lock(v); snap.copy(locked = true) }
+                    WearAction.UNLOCK -> { repo.unlock(v); snap.copy(locked = false) }
+                    WearAction.TOGGLE_CLIMATE ->
+                        if (snap.climateOn == true) { repo.stopClimate(v); snap.copy(climateOn = false) }
+                        else { repo.startClimate(v, climate); snap.copy(climateOn = true) }
+                    WearAction.CLIMATE_ON -> { repo.startClimate(v, climate); snap.copy(climateOn = true) }
+                    WearAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = false) }
+                    WearAction.TOGGLE_CHARGE ->
+                        if (snap.charging == true) { repo.stopCharge(v); snap.copy(charging = false) }
+                        else { repo.startCharge(v); snap.copy(charging = true) }
+                    WearAction.CHARGE_ON -> { repo.startCharge(v); snap.copy(charging = true) }
+                    WearAction.CHARGE_OFF -> { repo.stopCharge(v); snap.copy(charging = false) }
+                    WearAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
+                    else -> return@withLock WearCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
+                }
+                store.updateVehicle(updated)
+                AppLog.log("${command.action} → ${v.name}")
+                WearCommandResult(command.vin, command.action, ok = true)
+            }.getOrElse { e ->
+                AppLog.log("Command failed (${command.action}): ${e.message}")
+                WearCommandResult(command.vin, command.action, ok = false, message = e.message ?: "Command failed")
             }
-            store.updateVehicle(updated)
-            AppLog.log("${command.action} → ${v.name}")
-            WearCommandResult(command.vin, command.action, ok = true)
-        }.getOrElse { e ->
-            AppLog.log("Command failed (${command.action}): ${e.message}")
-            WearCommandResult(command.vin, command.action, ok = false, message = e.message ?: "Command failed")
         }
     }
 

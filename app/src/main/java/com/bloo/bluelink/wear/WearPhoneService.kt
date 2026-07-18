@@ -24,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Receives the watch's messages on the phone. Bound by the system whenever a
@@ -33,6 +34,16 @@ import kotlinx.coroutines.launch
 class WearPhoneService : WearableListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    companion object {
+        // Guards the PATH_EXTRAS read-modify-write in runAiSummary/
+        // setWeatherFromDeviceLocation -- both read the current extras item,
+        // patch one field, and republish the whole thing. Two requests landing
+        // close together (e.g. an AI summary for one car plus a weather-location
+        // request) could otherwise both read the same stale snapshot, and
+        // whichever publish lands second would silently drop the other's update.
+        private val extrasMutex = kotlinx.coroutines.sync.Mutex()
+    }
 
     override fun onMessageReceived(event: MessageEvent) {
         when (event.path) {
@@ -218,12 +229,14 @@ class WearPhoneService : WearableListenerService() {
         }.getOrNull() ?: return WearAiResult(vin, ok = false, message = "Couldn't generate a summary")
 
         // Read the current extras item from the Data Layer, patch the ai map, republish.
-        val dataClient = Wearable.getDataClient(ctx)
-        val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
-        val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
-        items?.release()
-        val updated = existing.copy(ai = existing.ai + (vin to summary))
-        WearBridge.publishExtras(ctx, updated)
+        extrasMutex.withLock {
+            val dataClient = Wearable.getDataClient(ctx)
+            val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
+            val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
+            items?.release()
+            val updated = existing.copy(ai = existing.ai + (vin to summary))
+            WearBridge.publishExtras(ctx, updated)
+        }
         AppLog.log("AI summary generated for ${snap.name}")
         return WearAiResult(vin, ok = true)
     }
@@ -244,11 +257,13 @@ class WearPhoneService : WearableListenerService() {
         val lon = appearance.weatherLon
         if (lat == null || lon == null) return
         val weather = runCatching { com.bloo.bluelink.data.WeatherApi.fetch(lat, lon) }.getOrNull() ?: return
-        val dataClient = Wearable.getDataClient(ctx)
-        val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
-        val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
-        items?.release()
-        WearBridge.publishExtras(ctx, existing.copy(homeWeather = weather.toWear()))
+        extrasMutex.withLock {
+            val dataClient = Wearable.getDataClient(ctx)
+            val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
+            val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
+            items?.release()
+            WearBridge.publishExtras(ctx, existing.copy(homeWeather = weather.toWear()))
+        }
         AppLog.log("Weather location set from watch request")
     }
 }

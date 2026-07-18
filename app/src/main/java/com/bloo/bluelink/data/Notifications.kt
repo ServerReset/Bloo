@@ -113,8 +113,13 @@ object CarAlerts {
             }
         }
 
-        if (prefs.doorOpen) {
-            val open = status?.doorOpen?.anyOpen == true || status?.trunkOpen == true || status?.hoodOpen == true
+        // A null status means this poll's fetch failed, not that doors/engine
+        // are actually closed/off -- treating it as "closed" reset the open/running
+        // timers on every transient failure, so a genuinely open door across a run
+        // of flaky polls could indefinitely delay the alert it was meant to fire.
+        // Skip evaluation entirely rather than guess.
+        if (prefs.doorOpen && status != null) {
+            val open = status.doorOpen?.anyOpen == true || status.trunkOpen == true || status.hoodOpen == true
             val key = "door_${v.vin}"
             val now = System.currentTimeMillis()
             if (open) {
@@ -136,9 +141,9 @@ object CarAlerts {
             }
         }
 
-        if (prefs.running) {
+        if (prefs.running && status != null) {
             // Remote start / climate (and on supported cars, the engine) report as "on".
-            val on = status?.engine == true || status?.airCtrlOn == true
+            val on = status.engine == true || status.airCtrlOn == true
             val key = "running_${v.vin}"
             val now = System.currentTimeMillis()
             if (on) {
