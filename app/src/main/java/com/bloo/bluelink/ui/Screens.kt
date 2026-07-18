@@ -4300,6 +4300,32 @@ private fun ColorPickerCanvas(
     val hueGradient = remember(Unit) {
         (0..12).map { i -> Color(android.graphics.Color.HSVToColor(floatArrayOf(i * 30f, 1f, 1f))) }
     }
+    fun hexOf(c: Color) = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and c.toArgb())
+    // A plain text field is the accessible alternative to the two drag-only
+    // Canvases below, which have no TalkBack path at all -- a screen-reader
+    // user can name and save a palette but never actually choose or perceive
+    // its colour otherwise. Only re-synced when the CANVAS changes the colour
+    // (picked), never on every keystroke, so it doesn't fight an in-progress
+    // edit -- typing itself only updates `picked` once, on a successful commit.
+    var hexInput by remember { mutableStateOf(hexOf(picked)) }
+    var hexError by remember { mutableStateOf(false) }
+    LaunchedEffect(picked) { if (hexInput != hexOf(picked)) { hexInput = hexOf(picked); hexError = false } }
+    fun commitHex() {
+        val parsed = runCatching {
+            android.graphics.Color.parseColor(if (hexInput.startsWith("#")) hexInput else "#$hexInput")
+        }.getOrNull()
+        if (parsed == null) {
+            hexError = true
+            return
+        }
+        hexError = false
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(parsed, hsv)
+        hue = hsv[0]
+        sat = hsv[1].coerceAtLeast(0.05f)
+        value = hsv[2].coerceAtLeast(0.3f)
+        update()
+    }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // Saturation × Value square
@@ -4308,6 +4334,9 @@ private fun ColorPickerCanvas(
                 .fillMaxWidth()
                 .height(180.dp)
                 .clip(RoundedCornerShape(12.dp))
+                .semantics {
+                    contentDescription = "Saturation and brightness picker. Use the hex colour field below for exact input."
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -4341,6 +4370,9 @@ private fun ColorPickerCanvas(
                 .fillMaxWidth()
                 .height(34.dp)
                 .clip(CircleShape)
+                .semantics {
+                    contentDescription = "Hue picker. Use the hex colour field below for exact input."
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -4371,6 +4403,18 @@ private fun ColorPickerCanvas(
                 .height(36.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(picked)
+        )
+
+        OutlinedTextField(
+            value = hexInput,
+            onValueChange = { hexInput = it; hexError = false },
+            label = { Text("Hex colour") },
+            singleLine = true,
+            isError = hexError,
+            supportingText = if (hexError) { { Text("Not a valid colour") } } else null,
+            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { commitHex() }),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitHex() },
         )
     }
 }
