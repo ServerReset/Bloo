@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,10 +31,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
@@ -116,17 +116,32 @@ fun MorphSegmented(
             // on release it snaps to a real selection and springs — "drag it and it
             // bounces to wherever you let go" — instead of only responding to a tap.
             var dragXPx by remember { mutableStateOf<Float?>(null) }
-            val restingX = (segWidth + gap) * selectedIndex
-            val indicatorX by animateDpAsState(
-                targetValue = dragXPx?.let { with(density) { it.toDp() } } ?: restingX,
-                // LowBouncy keeps a quick StiffnessMedium settle with just a light
-                // touch of overshoot (MediumBouncy wobbled too much on every change).
-                animationSpec = if (dragXPx != null) snap()
-                                else spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
-                label = "segIndicatorX",
-            )
-
             val segWidthPx = with(density) { segWidth.toPx() }
+            val gapPx = with(density) { gap.toPx() }
+            val restingXPx = (segWidthPx + gapPx) * selectedIndex
+            // A raw pixel Animatable driving graphicsLayer's translationX, not
+            // animateDpAsState + Modifier.offset(x = ...dp) -- offset() moves
+            // the layout position, so every single pixel of finger movement
+            // during a drag forced a full relayout pass of this control. At
+            // touch-sampling rates that read as visibly janky ("junky when
+            // you're dragging your finger around on it") rather than a smooth
+            // 1:1 follow. graphicsLayer's translation is a pure draw-phase
+            // transform -- same visual position, no relayout.
+            val indicatorXPx = remember { Animatable(restingXPx) }
+            val targetXPx = dragXPx ?: restingXPx
+            LaunchedEffect(targetXPx, dragXPx != null) {
+                if (dragXPx != null) {
+                    indicatorXPx.snapTo(targetXPx)
+                } else {
+                    // LowBouncy keeps a quick StiffnessMedium settle with just a
+                    // light touch of overshoot (MediumBouncy wobbled too much on
+                    // every change).
+                    indicatorXPx.animateTo(
+                        targetXPx,
+                        spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
+                    )
+                }
+            }
             // Raw touch/drag X is where the finger physically is; the indicator's
             // rendered position is its LEFT edge. Centre the indicator on the touch
             // point (subtract half a segment) so it doesn't jump half a segment off
@@ -157,9 +172,9 @@ fun MorphSegmented(
             )
             Box(
                 Modifier
-                    .offset(x = indicatorX)
                     .width(segWidth)
                     .fillMaxHeight()
+                    .graphicsLayer { translationX = indicatorXPx.value }
                     .then(if (motionBlurX > 0.5f) Modifier.blur(motionBlurX.dp, 0.dp) else Modifier)
                     .background(indicatorColor, RoundedCornerShape(14.dp)),
             )
