@@ -52,7 +52,17 @@ class WearListenerService : WearableListenerService() {
                             tileNeedsRefresh = true
                         }
                         WearSync.PATH_AUTH -> WearStateWriter.persistAuth(applicationContext, raw)
-                        WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(applicationContext, raw)
+                        WearSync.PATH_SETTINGS -> {
+                            // Settings carry the phone-synced theme colors the
+                            // Tile reads (resolveRoles() in BlooTileService),
+                            // so a theme change on the phone deserves the same
+                            // immediate refresh push as a vehicle-state change
+                            // -- without this, the Tile only picked it up on
+                            // its next freshness-interval poll (up to 10
+                            // minutes idle).
+                            WearStateWriter.persistSettings(applicationContext, raw)
+                            tileNeedsRefresh = true
+                        }
                         WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(applicationContext, raw)
                         WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(applicationContext, raw)
                         WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(applicationContext, raw)

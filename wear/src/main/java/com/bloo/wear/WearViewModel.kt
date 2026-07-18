@@ -993,10 +993,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { onResult(localStore.verifyPin(pin)) }
     }
 
-    fun setPinLockEnabled(enabled: Boolean) {
+    fun setPinLockEnabled(enabled: Boolean, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             localStore.setPinLockEnabled(enabled)
             pushLocalPinSettings()
+            onDone()
         }
     }
 
@@ -1021,10 +1022,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun clearPin() {
+    fun clearPin(onDone: () -> Unit = {}) {
         viewModelScope.launch {
             localStore.clearPin()
             pushLocalPinSettings()
+            onDone()
         }
     }
 

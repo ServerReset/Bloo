@@ -299,7 +299,14 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                         }
                     },
                 )
-                PinFlowStep.REMOVING -> LaunchedEffect(Unit) { vm.clearPin(); onDone() }
+                // clearPin()/setPinLockEnabled() are asynchronous DataStore
+                // writes -- calling onDone() right after firing them (rather
+                // than from their own completion callback) used to close this
+                // overlay and return to SettingsScreen before the write had
+                // actually landed, so the screen's toggle could very briefly
+                // flash its old "Lock: On" state until the settings flow
+                // caught up a moment later.
+                PinFlowStep.REMOVING -> LaunchedEffect(Unit) { vm.clearPin(onDone) }
                 // Turning "Lock: On" off is functionally identical to removing
                 // the PIN entirely (the watch will never lock again) but used
                 // to require no PIN at all -- anyone who picked up the watch
@@ -307,7 +314,7 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                 // permanently disable it in two taps. Requiring the same
                 // CONFIRM_CURRENT step as REMOVE closes that gap without
                 // clearing the stored PIN, so re-enabling doesn't need a reset.
-                PinFlowStep.DISABLING -> LaunchedEffect(Unit) { vm.setPinLockEnabled(false); onDone() }
+                PinFlowStep.DISABLING -> LaunchedEffect(Unit) { vm.setPinLockEnabled(false, onDone) }
             }
         }
     }
