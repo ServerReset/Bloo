@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -115,11 +116,17 @@ fun SectionCard(
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
+                    // Used for nearly every section on every watch screen
+                    // (Home, Settings, Trips) -- without heading(), TalkBack's
+                    // heading-navigation gesture found zero headings anywhere
+                    // in this app despite section titles being the natural
+                    // navigation landmarks.
                     Text(
                         title.uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.semantics { heading() },
                     )
                 }
                 Spacer(Modifier.height(4.dp))

@@ -45,6 +45,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -125,7 +129,18 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 val metric = ui.localSettings.unitSystem == "metric"
                 Row(
-                    Modifier.fillMaxWidth().clickable { vm.setUnitSystem(if (metric) "imperial" else "metric") },
+                    Modifier.fillMaxWidth()
+                        // A hand-rolled toggle row with no role/state -- TalkBack
+                        // announced "Units, Metric (km, °C), double tap to
+                        // activate" with no indication this is a binary switch
+                        // or what double-tapping does.
+                        .semantics(mergeDescendants = true) {
+                            role = Role.Switch
+                            stateDescription = if (metric) "Metric" else "Imperial"
+                        }
+                        .clickable(onClickLabel = if (metric) "Switch to Imperial" else "Switch to Metric") {
+                            vm.setUnitSystem(if (metric) "imperial" else "metric")
+                        },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

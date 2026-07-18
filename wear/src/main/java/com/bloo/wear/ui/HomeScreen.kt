@@ -89,8 +89,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -636,6 +638,12 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
                         Modifier
                             .size(6.dp)
                             .clip(CircleShape)
+                            // The only cue (while scrolled away from the
+                            // Summary tile, which has its own "Standalone"
+                            // text row) that the phone is disconnected --
+                            // purely colour/size otherwise, nothing for
+                            // TalkBack to announce.
+                            .semantics { contentDescription = "Phone disconnected, running standalone" }
                             .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)),
                     )
                 }
@@ -696,7 +704,15 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
                         .padding(top = 1.dp, end = 1.dp)
                         .size(15.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.error),
+                        .background(MaterialTheme.colorScheme.error)
+                        // ChargeRing (the sibling this badge overlays) has its
+                        // own contentDescription, but that doesn't cover this
+                        // separate node -- without its own label, TalkBack
+                        // read a lone digit or bare "!" with no indication it
+                        // means "N open alerts."
+                        .semantics {
+                            contentDescription = "$alertCount ${if (alertCount == 1) "alert" else "alerts"}"
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -1448,6 +1464,27 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
+                            // The drag gesture below has no TalkBack equivalent
+                            // at all -- this row was reachable but a double-tap
+                            // did nothing (onClick = {}), so reordering was
+                            // completely unusable for screen-reader users.
+                            // Additive "Move up"/"Move down" actions alongside
+                            // the drag, sharing the same reorder + commit logic.
+                            .semantics {
+                                val cur = order.indexOf(key)
+                                customActions = listOfNotNull(
+                                    if (cur > 0) CustomAccessibilityAction("Move up") {
+                                        order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
+                                        commit()
+                                        true
+                                    } else null,
+                                    if (cur in 0 until order.lastIndex) CustomAccessibilityAction("Move down") {
+                                        order = order.toMutableList().also { it.add(cur + 1, it.removeAt(cur)) }
+                                        commit()
+                                        true
+                                    } else null,
+                                )
+                            }
                             .pointerInput(key) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {

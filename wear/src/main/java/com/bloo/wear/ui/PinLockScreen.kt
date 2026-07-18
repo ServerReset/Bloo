@@ -33,6 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
@@ -89,6 +92,11 @@ private fun PinKey(label: String, onClick: () -> Unit) {
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
             .background(bg)
+            // The backspace key's visible/spoken content was the raw "⌫"
+            // glyph -- unlike the digit keys, TTS engines don't reliably
+            // pronounce it, so this was the one key most likely to be
+            // silent or wrong for a TalkBack user.
+            .then(if (label == "⌫") Modifier.semantics { contentDescription = "Backspace" } else Modifier)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -207,7 +215,7 @@ fun PinEntryScreen(
                 "Cancel",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable(onClick = onCancel),
+                modifier = Modifier.clickable(onClickLabel = "Cancel", role = Role.Button, onClick = onCancel),
             )
         }
     }
