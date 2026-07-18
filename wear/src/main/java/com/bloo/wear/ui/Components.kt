@@ -60,8 +60,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
-import androidx.wear.compose.material3.Card
-import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -87,11 +85,19 @@ fun SectionCard(
     icon: ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
-        onClick = {},
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    // A plain Box, not Wear Compose Material3's Card -- that component has no
+    // non-interactive overload (verified against the library source: every
+    // Card requires onClick), so `Card(onClick = {})` made every single
+    // section on every watch screen its own focusable "double tap does
+    // nothing" TalkBack stop before you ever reached its actual content. A
+    // Box with the same clip+background reproduces the identical flat-tonal
+    // look (this call only ever set containerColor, no border/elevation/
+    // interaction-dependent styling that a real Card would otherwise add).
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             Modifier.padding(horizontal = 6.dp, vertical = 8.dp),

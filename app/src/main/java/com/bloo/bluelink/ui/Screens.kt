@@ -168,9 +168,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -2528,6 +2530,7 @@ private fun VerticalPagerDots(
     var scrubStartPage by remember { mutableIntStateOf(0) }
     var scrubAccumY by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
+    val jumpScope = rememberCoroutineScope()
     // Shorter travel per page = a more sensitive scrub.
     val pxPerPage = with(density) { 14.dp.toPx() }
     // Shared flag so the parent HorizontalPager can lock car-switching swipes.
@@ -2583,6 +2586,25 @@ private fun VerticalPagerDots(
                         // parent never gets stuck with car-switching disabled.
                         scrubbing = false
                         coverScrubbing?.value = false
+                    }
+                }
+            }
+            // Entirely gesture-driven (long-press-then-drag-to-scrub) with no
+            // semantics at all -- with TalkBack's touch exploration
+            // intercepting single-finger gestures, this was both unreachable
+            // as its own focus stop and the scrub gesture itself couldn't be
+            // performed. contentDescription announces which tile is showing;
+            // customActions exposes a direct "go to this tile" action per
+            // tile (onPageJump is the same suspend jump function the scrub
+            // gesture already calls, so this is the exact same code path, not
+            // a parallel one that could drift out of sync).
+            .semantics {
+                contentDescription = "Showing ${tileName(tiles.getOrElse(current) { "" })} tile, ${current + 1} of $count"
+                customActions = tiles.mapIndexedNotNull { i, t ->
+                    if (i == current) return@mapIndexedNotNull null
+                    CustomAccessibilityAction("Go to ${tileName(t)}") {
+                        jumpScope.launch { onPageJump(i) }
+                        true
                     }
                 }
             },
