@@ -1,11 +1,5 @@
 package com.bloo.wear.ui
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,10 +13,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -85,12 +83,23 @@ private fun WearAuroraBackground(
         "custom" -> customColor?.hueShifted(180f) ?: themeTertiary
         else -> themeTertiary // complementary only recolours the primary blob, same as the phone
     }
-    val breathe by rememberInfiniteTransition(label = "wearAurora").animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4500, easing = LinearEasing), RepeatMode.Reverse),
-        label = "wearAuroraBreathe",
-    )
+    // Hand-ticked at ~12fps instead of Compose's animation clock (which
+    // redraws this full-screen gradient on every display frame, up to
+    // 120x/sec) -- this is the watch's near-always-visible home screen
+    // backdrop, so an unthrottled 60fps+ redraw loop for a slow multi-second
+    // breathing effect is a real, sustained battery/heat cost on hardware
+    // with a much smaller thermal and power budget than the phone's.
+    var breathe by remember { mutableFloatStateOf(0.55f) }
+    LaunchedEffect(Unit) {
+        val start = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - start
+            val phase = elapsed % 9000L
+            val frac = if (phase < 4500L) phase.toFloat() / 4500L else 2f - phase.toFloat() / 4500L
+            breathe = 0.55f + (1f - 0.55f) * frac
+            delay(80)
+        }
+    }
     Box(
         modifier
             .background(base)

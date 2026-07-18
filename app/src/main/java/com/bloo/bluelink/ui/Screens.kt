@@ -1627,6 +1627,12 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
  * A softly-blurred, slowly-drifting "aurora" of colour blobs - the animated login
  * backdrop. Three blobs ease back and forth on different periods.
  */
+/** Triangle wave in [0,1]: rises for [periodMs], falls for [periodMs], repeats. */
+private fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
+    val phase = elapsedMs % (2 * periodMs)
+    return if (phase < periodMs) phase.toFloat() / periodMs else 2f - phase.toFloat() / periodMs
+}
+
 @Composable
 private fun AuroraBackground(
     modifier: Modifier = Modifier,
@@ -1734,13 +1740,30 @@ private fun AuroraBackground(
     // slow ambient drift of its own (a narrow 0.42-0.58 amplitude, not the
     // full 0-1 span Motion used to use) so it still reads as alive when the
     // phone is sitting still, instead of a literally frozen frame.
-    val t = rememberInfiniteTransition(label = "aurora")
-    val p1 by if (motionActive) remember { mutableFloatStateOf(0.5f) }
-              else t.animateFloat(0.42f, 0.58f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "p1")
-    val p2 by if (motionActive) remember { mutableFloatStateOf(0.5f) }
-              else t.animateFloat(0.58f, 0.42f, infiniteRepeatable(tween(11000, easing = LinearEasing), RepeatMode.Reverse), label = "p2")
-    val p3 by if (motionActive) remember { mutableFloatStateOf(0.5f) }
-              else t.animateFloat(0.45f, 0.55f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "p3")
+    // Hand-ticked at ~12fps instead of riding Compose's animation clock
+    // (which recomposes on every display frame, up to 120x/sec). For a slow
+    // multi-second drift sitting under a heavy 90dp blur, that clock was
+    // forcing a full-screen blur redraw every single vsync for no visible
+    // gain over a much coarser update rate -- a real, sustained source of
+    // GPU load (and the phone heat it produced) any time this screen was on
+    // screen, which is most of the time this background is enabled at all.
+    var p1 by remember { mutableFloatStateOf(0.5f) }
+    var p2 by remember { mutableFloatStateOf(0.5f) }
+    var p3 by remember { mutableFloatStateOf(0.5f) }
+    LaunchedEffect(motionActive) {
+        if (motionActive) {
+            p1 = 0.5f; p2 = 0.5f; p3 = 0.5f
+            return@LaunchedEffect
+        }
+        val start = System.currentTimeMillis()
+        while (true) {
+            val elapsed = System.currentTimeMillis() - start
+            p1 = 0.42f + (0.58f - 0.42f) * triangleWave(elapsed, 14_000L)
+            p2 = 0.58f + (0.42f - 0.58f) * triangleWave(elapsed, 11_000L)
+            p3 = 0.45f + (0.55f - 0.45f) * triangleWave(elapsed, 9_000L)
+            delay(80)
+        }
+    }
     fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
     Box(
         modifier
