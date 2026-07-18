@@ -4,6 +4,7 @@ import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
@@ -53,17 +54,20 @@ private const val RefractionShaderSrc = """
         float2 uv = coord / max(size, float2(1.0));
         float2 centered = uv - 0.5;
         float dist = length(centered);
-        float bulgeBase = smoothstep(0.0, 0.68, dist) * 0.07;
+        // Pushed noticeably stronger than the first pass -- at the previous
+        // strength the bulge was too subtle to read as "glass" rather than a
+        // slightly-off blur on real hardware, which is what prompted this.
+        float bulgeBase = smoothstep(0.0, 0.62, dist) * 0.14;
         // Chromatic aberration: each channel bulges by a slightly different
         // amount, so the rim shows a faint red/blue fringe like light
         // splitting through a real curved edge.
-        float2 rBulge = uv - centered * (bulgeBase * 1.18);
+        float2 rBulge = uv - centered * (bulgeBase * 1.22);
         float2 gBulge = uv - centered * bulgeBase;
-        float2 bBulge = uv - centered * (bulgeBase * 0.82);
+        float2 bBulge = uv - centered * (bulgeBase * 0.78);
         half r = content.eval(clamp(rBulge, 0.0, 1.0) * size).r;
         half g = content.eval(clamp(gBulge, 0.0, 1.0) * size).g;
         half4 bSample = content.eval(clamp(bBulge, 0.0, 1.0) * size);
-        float edgeGlint = smoothstep(0.5, 1.0, dist) * 0.09;
+        float edgeGlint = smoothstep(0.42, 1.0, dist) * 0.16;
         return half4(r + edgeGlint, g + edgeGlint, bSample.b + edgeGlint, bSample.a);
     }
 """
@@ -81,7 +85,7 @@ private fun rememberRefractionShader(): RuntimeShader? {
  * failed) or if building the per-frame [RenderEffect] ever throws.
  */
 private fun Modifier.refractionLens(shader: RuntimeShader?): Modifier {
-    if (shader == null) return this
+    if (shader == null) return this.refractionFallback()
     return this
         .onSizeChanged { sz ->
             runCatching { shader.setFloatUniform("size", sz.width.toFloat(), sz.height.toFloat()) }
@@ -94,6 +98,25 @@ private fun Modifier.refractionLens(shader: RuntimeShader?): Modifier {
             clip = true
         }
 }
+
+/**
+ * Below API 33 (or if [RuntimeShader] construction ever fails) the AGSL lens
+ * is a total no-op, which used to mean the element silently lost its "glass"
+ * read with zero compensating treatment. This paints the same edge-catches-
+ * the-light cue as a plain radial gradient instead -- brighter dead centre,
+ * fading through the middle, a faint bright rim -- so every device shows
+ * *some* refraction-like highlight, not just devices new enough for AGSL.
+ */
+private fun Modifier.refractionFallback(): Modifier = this.background(
+    Brush.radialGradient(
+        colorStops = arrayOf(
+            0.0f to Color.White.copy(alpha = 0.10f),
+            0.55f to Color.White.copy(alpha = 0.02f),
+            0.85f to Color.White.copy(alpha = 0.0f),
+            1.0f to Color.White.copy(alpha = 0.12f),
+        ),
+    ),
+)
 
 /**
  * Real hardware-accelerated blur (Haze, dev.chrisbanes.haze) for floating

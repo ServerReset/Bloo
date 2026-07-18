@@ -185,6 +185,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -4785,7 +4786,18 @@ private fun Pebble(
             Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier),
             shape = pebbleShape,
             colors = CardDefaults.cardColors(
-                containerColor = if (ultraGlass) containerColor.copy(alpha = 0.28f) else containerColor,
+                // Ultra glass needs enough tint to stay legible over whatever's
+                // blurred behind it -- 0.28 read fine over a plain background
+                // but washed out text against a bright photo/wallpaper behind
+                // the blur. A firmer 0.46 keeps the glass read (still see-
+                // through, still blurred) while guaranteeing the tile's own
+                // tone -- not the backdrop's -- dominates contrast. contentColor
+                // is pinned to onSurface rather than left to derive from the
+                // now-translucent containerColor, which resolves to Unspecified
+                // (no scheme match) and would otherwise silently fall back to
+                // whatever ambient LocalContentColor happens to be in scope.
+                containerColor = if (ultraGlass) containerColor.copy(alpha = 0.46f) else containerColor,
+                contentColor = if (ultraGlass) MaterialTheme.colorScheme.onSurface else contentColorFor(containerColor),
             ),
         ) {
             // animateContentSize gives a smooth, correctly-measured collapse (no
@@ -8084,7 +8096,16 @@ private fun GlowySearchBar(
                 shape = RoundedCornerShape(50),
                 color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(liquid = 0.45f, frosted = 0.80f)),
                 contentColor = scheme.onSurface,
-                tonalElevation = 6.dp,
+                tonalElevation = if (expanded) 10.dp else 6.dp,
+                border = BorderStroke(
+                    if (expanded) 1.5.dp else 1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            scheme.primary.copy(alpha = (if (expanded) 0.65f else 0.35f) * glowPulse),
+                            scheme.primary.copy(alpha = 0.05f),
+                        ),
+                    ),
+                ),
                 interactionSource = interaction,
                 // A real drop shadow (offset + soft blur), not just Surface's
                 // own tonal shadowElevation, which reads as barely-there on
