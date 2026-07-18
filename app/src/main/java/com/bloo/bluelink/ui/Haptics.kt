@@ -97,15 +97,6 @@ class Haptics(context: Context) {
         } else waveform(longArrayOf(0, 14, 20, 10), intArrayOf(0, 150, 0, 70))
     }
 
-    /** Energy "flowing" feel when a charge starts — a slow rise with two pulses. */
-    fun chargeStart() {
-        if (composes) composed {
-            add(VibrationEffect.Composition.PRIMITIVE_SLOW_RISE, 0.8f, 0)
-            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.5f, 60)
-            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.6f, 90)
-        } else waveform(longArrayOf(0, 40, 40, 12, 40, 12), intArrayOf(0, 120, 0, 80, 0, 110))
-    }
-
     /**
      * Pull-to-refresh release: a tumbling "shake the dice" burst — irregular
      * ticks of varied weight that land on a final knock.
@@ -196,14 +187,6 @@ class Haptics(context: Context) {
                 intArrayOf(0, 240, 0, 150, 0, 110, 0, 160, 0, 90, 0, 120, 0, 80),
             )
         }
-    }
-
-    /** Error buzz — two firm knocks. */
-    fun error() {
-        if (composes) composed {
-            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 0)
-            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 120)
-        } else waveform(longArrayOf(0, 24, 110, 24), intArrayOf(0, 230, 0, 230))
     }
 
     // --- Composition helpers --------------------------------------------

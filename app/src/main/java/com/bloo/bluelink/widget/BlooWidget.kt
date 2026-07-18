@@ -265,21 +265,6 @@ class BlooWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun TinyTile(c: Ctx, base: GlanceModifier) {
-        val ctx = LocalContext.current
-        Box(
-            base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(6.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(c.snap.name.take(6), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 8.sp))
-                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 20.sp))
-                Box(GlanceModifier.size(5.dp).background(stateColor(c.snap, c.theme)).cornerRadius(3.dp)) {}
-            }
-        }
-    }
-
-    @Composable
     private fun ShortWideTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
         Row(
@@ -355,20 +340,6 @@ class BlooWidget : GlanceAppWidget() {
         val space = trimmed.indexOf(' ', 4).takeIf { it > 0 && it < trimmed.length - 2 }
         return if (space != null) trimmed.substring(0, space) to trimmed.substring(space + 1)
         else trimmed.substring(0, trimmed.length / 2) to trimmed.substring(trimmed.length / 2)
-    }
-
-    /** Strip of chunky buttons with no info (for the tiniest placements). */
-    @Composable
-    private fun ButtonStripTile(c: Ctx, base: GlanceModifier) {
-        val ctx = LocalContext.current
-        // Just buttons, no info text, fills the entire widget area
-        Row(base.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (c.actions.isNotEmpty()) {
-                val take = c.actions.take(4)
-                ButtonGrid(c, take, cols = take.size, showLabel = false, iconSize = 18.dp,
-                    modifier = GlanceModifier.fillMaxHeight().defaultWeight())
-            }
-        }
     }
 
     /** Tallish but moderately-wide widget: stacked name (2 lines), percent, 2×2 buttons. */
@@ -461,7 +432,6 @@ class BlooWidget : GlanceAppWidget() {
         val sideW = if (w >= 340.dp) w * 0.44f else w * 0.38f
         val tall = h >= 250.dp
         val pctSize = if (h >= 280.dp) 46.sp else if (h >= 220.dp) 40.sp else 34.sp
-        val showTiles = false
         val footerCols = if (tall && take.size >= 3) 2 else take.size.coerceAtLeast(1)
         Column(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -483,14 +453,6 @@ class BlooWidget : GlanceAppWidget() {
                     if (wantMap && addr != null) {
                         Spacer(GlanceModifier.height(8.dp))
                         Text(addr.take(40), maxLines = 2, style = TextStyle(color = onBgV(c), fontSize = 11.sp))
-                    }
-                    if (showTiles) {
-                        Spacer(GlanceModifier.height(12.dp))
-                        Row {
-                            DetailTile(c, "Lock", when (c.snap.locked) { true -> "Locked"; false -> "Unlocked"; else -> "—" })
-                            Spacer(GlanceModifier.width(8.dp))
-                            DetailTile(c, "Climate", if (c.snap.climateOn == true) "On" else "Off")
-                        }
                     }
                 }
                 if (wantMap) {
@@ -599,14 +561,6 @@ class BlooWidget : GlanceAppWidget() {
         val fg = if (bg == c.theme.accent) c.theme.onAccent else ColorProvider(Color.White)
         Box(GlanceModifier.background(bg).cornerRadius(9.dp).padding(horizontal = 8.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
             Text(label, maxLines = 1, style = TextStyle(color = fg, fontSize = 10.sp, fontWeight = FontWeight.Bold))
-        }
-    }
-
-    @Composable
-    private fun DetailTile(c: Ctx, label: String, value: String) {
-        Column(GlanceModifier.background(c.theme.tile).cornerRadius(12.dp).padding(horizontal = 12.dp, vertical = 7.dp)) {
-            Text(label.uppercase(), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 9.sp, fontWeight = FontWeight.Bold))
-            Text(value, maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 14.sp, fontWeight = FontWeight.Bold))
         }
     }
 

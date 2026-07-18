@@ -29,9 +29,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -49,7 +47,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -227,7 +224,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -253,7 +249,6 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -314,7 +309,6 @@ import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.formatTripDistance
-import com.bloo.bluelink.data.formatEfficiency
 import com.bloo.bluelink.data.targetForCurrentPlug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -5954,9 +5948,6 @@ private fun ClimatePebble(
         }
     }
 }
-
-private val SeatCool = Color(0xFF2E78FF)
-private val SeatHeat = Color(0xFFE5484D)
 
 @Composable
 private fun SeatControl(

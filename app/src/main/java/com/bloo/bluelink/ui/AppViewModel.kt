@@ -996,30 +996,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
     }
 
-    /**
-     * Copies a picked/cropped image into the app's own storage so it survives
-     * (cropper output lives in a temp cache and otherwise shows blank later).
-     */
-    fun importCarImage(vin: String, source: android.net.Uri) {
-        viewModelScope.launch {
-            val path = withContext(Dispatchers.IO) {
-                runCatching {
-                    val app = getApplication<Application>()
-                    val dir = java.io.File(app.filesDir, "cars").apply { mkdirs() }
-                    val out = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.jpg")
-                    val input = app.contentResolver.openInputStream(source) ?: return@runCatching null
-                    input.use { i -> out.outputStream().use { o -> i.copyTo(o) } }
-                    out.absolutePath
-                }.getOrNull()
-            }
-            if (path != null) {
-                setVehicleImage(vin, path)
-            } else {
-                _state.update { it.copy(message = "Couldn't save that photo") }
-            }
-        }
-    }
-
     fun setLicensePlate(vin: String, plate: String) {
         _state.update {
             it.copy(
@@ -1587,12 +1563,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repoFor(v).startClimate(v, req)
         }
 
-    /** Remote engine/climate start with defaults (the primary Climate action). */
-    fun engineStart(v: Vehicle) =
-        runCommand(v.vin, "climate", "Climate on", { it.copy(airCtrlOn = true) }) {
-            repoFor(v).startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
-        }
-
     fun startCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
             repoFor(v).startCharge(electric(v))
@@ -1701,37 +1671,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteCustomPalette(id: String) = viewModelScope.launch { settingsStore.deleteCustomPalette(id) }
     fun setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id) }
     fun setCarPaletteId(vin: String, paletteId: String?) = viewModelScope.launch { settingsStore.setCarPaletteId(vin, paletteId) }
-
-    /** Share all custom palettes as a JSON document via the system share sheet. */
-    fun exportPalettes(context: android.content.Context) = viewModelScope.launch {
-        val json = settingsStore.exportPalettesJson()
-        runCatching {
-            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                type = "application/json"
-                putExtra(android.content.Intent.EXTRA_TEXT, json)
-                putExtra(android.content.Intent.EXTRA_SUBJECT, "Bloo colour palettes")
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(
-                android.content.Intent.createChooser(intent, "Export palettes")
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        }.onFailure { _state.update { s -> s.copy(message = "Couldn't open the share sheet") } }
-    }
-
-    /** Import custom palettes from a user-picked JSON file. */
-    fun importPalettes(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
-        val json = withContext(Dispatchers.IO) {
-            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
-        }
-        if (json == null) {
-            _state.update { it.copy(message = "Couldn't read that file") }
-            return@launch
-        }
-        val error = settingsStore.importPalettesJson(json)
-        AppLog.log(if (error == null) "Palettes imported" else "⚠ Palette import: $error")
-        _state.update { it.copy(message = error ?: "Palettes imported", messageType = if (error == null) "success" else "error") }
-    }
 
     /**
      * Share a full settings backup (includes colours and palettes) via the share
@@ -1876,8 +1815,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Weather ---------------------------------------------------------
 
-    fun setUseFahrenheit(value: Boolean) = viewModelScope.launch { settingsStore.setUseFahrenheit(value) }
-
     fun clearWeatherLocation() = viewModelScope.launch {
         settingsStore.setWeatherLocation(null, null, null)
         _state.update { it.copy(homeWeather = null) }
@@ -1938,8 +1875,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
     fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
-    fun setUiScale(value: Float) = viewModelScope.launch { settingsStore.setUiScale(value) }
-    fun setVibrancy(value: Float) = viewModelScope.launch { settingsStore.setVibrancy(value) }
 
     // Deferred variants for the settings sliders: these two values recompose
     // ~the whole app (colorScheme / LocalDensity), so the commit waits a beat
@@ -1990,9 +1925,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(settingsMode = mode) }
         viewModelScope.launch { settingsStore.setSettingsMode(mode) }
     }
-
-    /** Get or set the default climate preset for a car (used by the one-tap Start button). */
-    fun defaultClimatePreset(vin: String): String? = null // loaded asynchronously on init
 
     fun setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
         settingsStore.setDefaultClimatePreset(vin, id)

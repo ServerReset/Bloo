@@ -100,7 +100,6 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                         }
                         if (!addr.isNullOrBlank()) runCatching { SettingsStore(ctx).setWidgetLocationAddress(widgetId, addr) }
                     }
-                    runCatching { SettingsStore(ctx).setWidgetLocationLatLon(widgetId, lat, lon) }
                     downloadAndCacheMapTile(ctx, widgetId, lat, lon)
                 }
             }
