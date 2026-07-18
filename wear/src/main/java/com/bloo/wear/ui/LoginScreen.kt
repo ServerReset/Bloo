@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -140,8 +142,8 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
         } else {
             // Each field button: tap to launch IME, shows current value
             item { FieldRow("Email", email, Icons.Filled.Email, emailInput) }
-            item { FieldRow("Password", if (password.isBlank()) "" else "••••••", Icons.Filled.Lock, passwordInput) }
-            item { FieldRow("PIN", if (pin.isBlank()) "" else "••••", Icons.Filled.Pin, pinInput) }
+            item { FieldRow("Password", if (password.isBlank()) "" else "••••••", Icons.Filled.Lock, passwordInput, masked = true) }
+            item { FieldRow("PIN", if (pin.isBlank()) "" else "••••", Icons.Filled.Pin, pinInput, masked = true) }
         }
 
         // Sign-in button -- Kia has no fields to fill in above (see the
@@ -193,23 +195,36 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
     }
 }
 
-/** A field row: icon + label above + value, taps open the keyboard. */
+/** A field row: icon + label above + value, taps open the keyboard.
+ *  [masked] is for password/PIN fields, whose visible value is a literal
+ *  bullet-character string ("••••••") -- MorphButton's label is just a Text
+ *  node, so without an override TalkBack reads that out glyph by glyph
+ *  ("bullet, bullet, bullet...") instead of announcing anything meaningful. */
 @Composable
 private fun FieldRow(
     label: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
+    masked: Boolean = false,
 ) {
-    MorphButton(
-        label = value.ifBlank { label },
-        secondaryLabel = if (value.isNotBlank()) label else null,
-        icon = icon,
-        active = false,
-        activeColor = MaterialTheme.colorScheme.primary,
-        pending = false,
-        onClick = onClick,
-    )
+    Box(
+        if (masked) {
+            Modifier.semantics(mergeDescendants = true) {
+                contentDescription = if (value.isBlank()) label else "$label, entered"
+            }
+        } else Modifier,
+    ) {
+        MorphButton(
+            label = value.ifBlank { label },
+            secondaryLabel = if (value.isNotBlank()) label else null,
+            icon = icon,
+            active = false,
+            activeColor = MaterialTheme.colorScheme.primary,
+            pending = false,
+            onClick = onClick,
+        )
+    }
 }
 
 /** A subtle, centered info callout — used for non-blocking instructions. */
