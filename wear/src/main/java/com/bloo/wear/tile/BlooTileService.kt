@@ -501,7 +501,10 @@ abstract class BlooTileService : TileService() {
             surfaceContainerHigh  = 0xFF262730.toInt(),
             outline               = 0xFF8E8E9A.toInt(),
             outlineVariant        = 0xFF44474F.toInt(),
-            error                 = 0xFFE5484D.toInt(),
+            // Matches BlooColors.heat -- missed in the earlier pass that
+            // pointed CLR_UNLOCKED (this same file, two lines up from here in
+            // the companion object) at the same constant.
+            error                 = com.bloo.bluelink.data.BlooColors.heat,
             onError               = 0xFF690005.toInt(),
             errorContainer        = 0xFF93000A.toInt(),
             onErrorContainer      = 0xFFFFDAD6.toInt(),

@@ -10,6 +10,7 @@ import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CarAlerts
+import com.bloo.bluelink.data.formatPlaceName
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Notifications
@@ -1546,12 +1547,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching {
             val results = Geocoder(getApplication(), Locale.getDefault())
                 .getFromLocation(loc.latitude, loc.longitude, 1)
-            results?.firstOrNull()?.let { a ->
-                listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea)
-                    .distinct()
-                    .joinToString(", ")
-                    .ifBlank { a.getAddressLine(0) }
-            }
+            results?.firstOrNull()?.let { a -> formatPlaceName(a) }
         }.getOrNull()
     }
 

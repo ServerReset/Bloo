@@ -2,6 +2,17 @@ package com.bloo.bluelink.data
 
 import java.util.TimeZone
 
+/** "Springfield, IL" (locality/subAdminArea + adminArea) from a reverse-
+ *  geocode result, falling back to the raw first address line. Was defined
+ *  separately on phone and watch; the watch's copy was missing the
+ *  `.distinct()` phone's had, so it could render "Springfield, Springfield"
+ *  when locality == adminArea. */
+fun formatPlaceName(a: android.location.Address): String? =
+    listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea)
+        .distinct()
+        .joinToString(", ")
+        .ifBlank { a.getAddressLine(0) }
+
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 

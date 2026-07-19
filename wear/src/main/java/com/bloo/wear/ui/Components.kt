@@ -345,15 +345,16 @@ fun StatusRow(label: String, value: String, valueColor: Color? = null) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            value,
-            modifier = Modifier.weight(1f, fill = false),
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
+        // Was a plain Text -- phone's StatusRow already animates its value
+        // cell via uicommon.AnimatedValue; this was the one platform where
+        // the same conceptual row (battery %, range, tire pressure, the
+        // diagnostics roll-up count, ...) still popped instead of crossfading.
+        AnimatedValue(
+            value = value,
+            style = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
             color = valueColor ?: MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.End,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }
@@ -606,6 +607,7 @@ fun AnimatedValue(
     color: Color = Color.Unspecified,
     fontWeight: FontWeight? = null,
     maxLines: Int = 1,
+    modifier: Modifier = Modifier,
 ) {
     val resolvedColor = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color
     val mergedStyle = style.copy(
@@ -617,5 +619,6 @@ fun AnimatedValue(
         style = mergedStyle,
         maxLines = maxLines,
         reduceMotion = LocalReduceMotion.current,
+        modifier = modifier,
     )
 }

@@ -78,9 +78,15 @@ fun AnimatedValue(
     style: TextStyle,
     maxLines: Int = 1,
     reduceMotion: Boolean = false,
+    // Needed for callers that must size this within a Row/Column layout (e.g.
+    // a label/value row using Modifier.weight on the value cell) -- without
+    // this, AnimatedContent's own layout node had no way to receive that
+    // modifier, since it's the top-level thing this function emits.
+    modifier: Modifier = Modifier,
 ) {
     AnimatedContent(
         targetState = value,
+        modifier = modifier,
         transitionSpec = {
             if (reduceMotion) fadeIn(tween(1)) togetherWith fadeOut(tween(1))
             else (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 3 }) togetherWith

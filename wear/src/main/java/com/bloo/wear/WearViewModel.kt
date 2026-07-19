@@ -805,15 +805,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun reverseGeocode(lat: Double, lon: Double): String? {
         val geocoder = Geocoder(ctx, Locale.getDefault())
-        fun format(a: android.location.Address): String? =
-            listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea)
-                .joinToString(", ").ifBlank { a.getAddressLine(0) }
+        // Was a local closure missing the phone's .distinct() -- could render
+        // "Springfield, Springfield" when locality == adminArea. Now shared.
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             withTimeoutOrNull(6000) {
                 suspendCancellableCoroutine { cont ->
                     geocoder.getFromLocation(lat, lon, 1, object : Geocoder.GeocodeListener {
                         override fun onGeocode(addresses: MutableList<android.location.Address>) {
-                            if (cont.isActive) cont.resume(addresses.firstOrNull()?.let(::format))
+                            if (cont.isActive) cont.resume(addresses.firstOrNull()?.let { com.bloo.bluelink.data.formatPlaceName(it) })
                         }
                         override fun onError(message: String?) {
                             if (cont.isActive) cont.resume(null)
@@ -825,7 +824,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) {
                 withTimeoutOrNull(6000) {
                     @Suppress("DEPRECATION")
-                    runCatching { geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()?.let(::format) }.getOrNull()
+                    runCatching { geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()?.let { com.bloo.bluelink.data.formatPlaceName(it) } }.getOrNull()
                 }
             }
         }
