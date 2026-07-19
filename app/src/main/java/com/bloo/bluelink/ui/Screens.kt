@@ -4344,12 +4344,20 @@ private fun CustomPaletteSwatch(
                 color = if (selected) MaterialTheme.colorScheme.onSurface
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Icon(
-                Icons.Filled.Settings,
-                contentDescription = "Edit",
-                modifier = Modifier.size(10.dp).clickable { haptics?.click(); onEdit() },
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // A bare 10dp clickable Icon (no IconButton) was well under the
+            // minimum touch target guideline and had no button semantics --
+            // TalkBack announced it with no "double tap to activate" cue and
+            // it was genuinely hard to hit with a finger. IconButton gives
+            // both a real (if still compact, given the tight swatch grid)
+            // touch target and the Button role for free.
+            IconButton(onClick = { haptics?.click(); onEdit() }, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = "Edit palette",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -6475,9 +6483,24 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     }
 
     // Separate AC (home / level-2) and DC (fast) charge-limit targets, each
-    // defaulting to 80% (a healthy daily ceiling) until the user picks one.
+    // defaulting to 80% (a healthy daily ceiling) until the car's real
+    // targets load in. Both pills' "Set" sends BOTH values together
+    // (setChargeLimits(v, acLimit, dcLimit)), so leaving one un-seeded at the
+    // 80% default meant tapping "Set" on just the AC pill silently reset a
+    // DC target that had never actually been 80% -- and vice versa.
     var acLimit by remember(v.vin) { mutableIntStateOf(80) }
     var dcLimit by remember(v.vin) { mutableIntStateOf(80) }
+    var limitsSeeded by remember(v.vin) { mutableStateOf(false) }
+    LaunchedEffect(v.vin, ev?.reservChargeInfos) {
+        if (limitsSeeded) return@LaunchedEffect
+        val realAc = ev?.reservChargeInfos?.level(1)
+        val realDc = ev?.reservChargeInfos?.level(0)
+        if (realAc != null || realDc != null) {
+            realAc?.let { acLimit = it }
+            realDc?.let { dcLimit = it }
+            limitsSeeded = true
+        }
+    }
 
     Pebble(
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
