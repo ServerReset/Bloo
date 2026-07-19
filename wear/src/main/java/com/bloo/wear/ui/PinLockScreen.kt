@@ -214,7 +214,17 @@ fun PinEntryScreen(
                     val next = buffer + d
                     buffer = next
                     if (next.length == PIN_LENGTH) {
-                        buffer = ""
+                        // Used to clear immediately, so a verification that
+                        // takes a moment (a cold DataStore read on first
+                        // unlock after reboot) briefly showed 4 empty dots
+                        // with zero PIN-related motion before either the
+                        // unlock happened or the error-shake fired -- a dead
+                        // beat with no "checking…" affordance at all. Leaving
+                        // the dots filled reads as "still verifying" instead;
+                        // a wrong PIN already clears + shakes via the `error`
+                        // effect above, and a correct one unmounts this
+                        // screen entirely, so there's no stale-filled state
+                        // to worry about either way.
                         onSubmit(next)
                     }
                 }
