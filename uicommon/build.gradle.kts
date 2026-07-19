@@ -28,6 +28,12 @@ kotlin {
 }
 
 dependencies {
+    // BlooColors (semantic ARGB Int constants) and other pure-Kotlin data --
+    // both :app and :wear already depend on :shared directly, so this adds
+    // nothing new to either APK's dependency graph, just lets uicommon
+    // composables reference the same canonical constants instead of each
+    // platform re-declaring (and silently drifting from) their own copies.
+    implementation(project(":shared"))
     // Foundation-only, pinned via the same Compose BOM the watch uses so the
     // versions resolve <= each consumer (the phone pins a newer foundation, the
     // watch this BOM) and Gradle upgrades, never downgrades. Deliberately NO

@@ -179,7 +179,11 @@ fun PinEntryScreen(
         modifier
             .fillMaxSize()
             .graphicsLayer { alpha = entranceAlpha.value }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            // The one screen this round-safe-padding sweep missed earlier
+            // this session -- arguably the first screen a round-watch user
+            // with the lock enabled ever sees, and its title/error text sat
+            // closer to the curved bezel than every other screen's.
+            .padding(horizontal = roundSafeHorizontalPadding(flat = 12.dp), vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -318,6 +322,13 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                     onSubmit = { pin -> error = null; firstEntry = pin; step = PinFlowStep.CONFIRM_NEW },
                 )
                 PinFlowStep.CONFIRM_NEW -> PinEntryScreen(
+                    // No `error` param here on purpose (unlike the other two
+                    // steps): a mismatch sets `error` and switches `step` to
+                    // ENTER_NEW in the same event, so Compose recomposes
+                    // straight to ENTER_NEW's screen -- this step's own
+                    // PinEntryScreen instance never gets a frame to show the
+                    // error on. The "Didn't match" message intentionally
+                    // surfaces on the screen the user bounces back to instead.
                     title = "Confirm PIN",
                     onCancel = onDone,
                     onSubmit = { pin ->

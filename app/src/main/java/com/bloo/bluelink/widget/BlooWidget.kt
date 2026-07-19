@@ -115,7 +115,7 @@ class BlooWidget : GlanceAppWidget() {
         val theme = Theme(
             accent = ColorProvider(accentColor),
             onAccent = ColorProvider(onAccent),
-            charge = ColorProvider(Color(0xFF2EBD59)),
+            charge = ColorProvider(Color(com.bloo.bluelink.data.BlooColors.chargeGreen)),
             unlocked = ColorProvider(Color(0xFFE0574B)),
             climate = ColorProvider(Color(0xFF16B8C6)),
             pending = ColorProvider(Color(0.55f, 0.55f, 0.60f, 0.55f)),

@@ -161,7 +161,7 @@ private fun WatchAppContent(vm: WearViewModel, ui: WearUi) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = roundSafeHorizontalPadding(flat = 24.dp, round = 32.dp)),
                 ) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(12.dp))

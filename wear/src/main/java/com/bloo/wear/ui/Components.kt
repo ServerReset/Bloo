@@ -394,15 +394,13 @@ fun SliderRow(
     }
 }
 
-/** Map a 62–82°F setpoint to the phone's blue→green→warm slider colour. */
+/** Map a 62-82°F setpoint to the blue->green->warm slider colour -- shared
+ *  with the phone (uicommon.tempColor) so both platforms use the same
+ *  canonical palette and the same spring animation instead of each having
+ *  drifted a stop away from BlooColors' cool/tempMid/tempHot and only the
+ *  phone side actually animating the transition. */
 @Composable
-fun tempColor(tempF: Int): Color {
-    val t = ((tempF - 62) / 20f).coerceIn(0f, 1f)
-    val cool = Color(0xFF2E78FF)
-    val mid = Color(0xFF2EBD59)
-    val warm = Color(0xFFE5484D)
-    return if (t < 0.5f) lerp(cool, mid, t * 2f) else lerp(mid, warm, (t - 0.5f) * 2f)
-}
+fun tempColor(tempF: Int): Color = com.bloo.uicommon.tempColor(tempF)
 
 /**
  * The app's fully custom slider — now a thin wrapper over the single shared

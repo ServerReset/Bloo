@@ -467,12 +467,16 @@ abstract class BlooTileService : TileService() {
 
         const val CLR_WHITE = 0xFFFFFFFF.toInt()
         const val CLR_DIM   = 0xFFAAAAAA.toInt()
-        const val CLR_CHARGE = 0xFF2EBD59.toInt()
-        const val CLR_WARN   = 0xFFF5A623.toInt()
+        // These re-declared the same hex values shared/BlooColors.kt already
+        // centralizes (stored there as raw Int for exactly this kind of
+        // non-Compose use) -- referencing it directly means they can't
+        // silently drift out of sync the way chargerLabel's text already had.
+        const val CLR_CHARGE = com.bloo.bluelink.data.BlooColors.chargeGreen
+        const val CLR_WARN   = com.bloo.bluelink.data.BlooColors.warn
         const val CLR_TRACK  = 0xFF3C3C3C.toInt()
         // Matches the phone widget's unlockedRed (BlooWidget.kt) so "unlocked" reads
         // as the same semantic red everywhere instead of drifting to a neutral gray.
-        const val CLR_UNLOCKED = 0xFFE5484D.toInt()
+        const val CLR_UNLOCKED = com.bloo.bluelink.data.BlooColors.heat
 
         /** Fallback roles when no phone sync has occurred yet. */
         val DEFAULT_ROLES = WearColorRoles(

@@ -6018,18 +6018,11 @@ private fun ClimatePebble(
             )
         }
 
-        // Color shifts from blue (cold) through neutral to orange-red (hot),
-        // normalised to the slider range so it adapts if the range ever changes.
+        // Was a hand-rolled version of the same blue->green->warm mapping
+        // uicommon.tempColor() now centralizes (shared with the watch, which
+        // had drifted to a different, unanimated palette).
         val tempRange = 62f..82f
-        val tempT = ((tempF - tempRange.start) / (tempRange.endInclusive - tempRange.start)).coerceIn(0f, 1f)
-        val tempColor by androidx.compose.animation.animateColorAsState(
-            targetValue = when {
-                tempT < 0.5f -> androidx.compose.ui.graphics.lerp(Color(0xFF2979FF), Color(0xFF66BB6A), tempT * 2f)
-                else -> androidx.compose.ui.graphics.lerp(Color(0xFF66BB6A), Color(0xFFFF5722), (tempT - 0.5f) * 2f)
-            },
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-            label = "tempColor",
-        )
+        val tempColor = com.bloo.uicommon.tempColor(tempF, tempRange.start, tempRange.endInclusive)
         if (fahrenheit) {
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
