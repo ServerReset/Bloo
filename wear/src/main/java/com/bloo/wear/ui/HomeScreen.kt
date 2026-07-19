@@ -871,6 +871,12 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
 @Composable
 private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort", Icons.Filled.AirlineSeatReclineNormal) {
     val d = ui.draftFor(car.vin)
+    // Moved from a trailing caption after the sliders (where it read as a
+    // bare, easy-to-miss afterthought -- the only card in the file ending on
+    // plain text rather than a control) to right under the header, matching
+    // where SmartClimateCard's own helper text lives.
+    Text("Applied when you start climate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(4.dp))
     MorphButton(
         label = if (d.steering) "Steering heat on" else "Steering heat",
         icon = Icons.Filled.Whatshot,
@@ -888,8 +894,6 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         SliderRow("Rear left", seatStepLabels[d.seatRearLeft], d.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(car.vin, it) }
         SliderRow("Rear right", seatStepLabels[d.seatRearRight], d.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(car.vin, it) }
     }
-    Spacer(Modifier.height(2.dp))
-    Text("Applied when you start climate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
@@ -1191,6 +1195,22 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
 private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Filled.Build) {
     val err = MaterialTheme.colorScheme.error
     val anyIndividualTire = car.tireFl || car.tireFr || car.tireRl || car.tireRr
+    // Unlike AlertsCard/SummaryCard, which lead with an at-a-glance badge,
+    // this could render up to a dozen rows with nothing summarizing "N items
+    // need attention" up top -- scanning for a problem meant reading the
+    // whole card. One roll-up row matches the "summarize, then detail"
+    // pattern the rest of the file already uses.
+    val issueCount = listOf(
+        anyIndividualTire, car.tireWarning,
+        car.battery12v != null && car.battery12v < 20,
+        car.lowFuel, car.washerLow, car.brakeLow, car.keyFobLow,
+    ).count { it }
+    StatusRow(
+        if (issueCount > 0) "Needs attention" else "Status",
+        if (issueCount > 0) "$issueCount to check" else "All normal",
+        valueColor = if (issueCount > 0) err else null,
+    )
+    Spacer(Modifier.height(2.dp))
     if (car.tireAll != null) {
         StatusRow("Tire avg", "${car.tireAll} psi")
     }

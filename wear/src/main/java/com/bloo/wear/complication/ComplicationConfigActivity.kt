@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
@@ -114,6 +115,23 @@ class ComplicationConfigActivity : ComponentActivity() {
                             )
                         }
                     }
+                    if (cars.isNotEmpty()) {
+                        item {
+                            // The Tile pool (Settings screen) has a "Follow
+                            // selected" option alongside concrete cars; this
+                            // screen only ever listed concrete cars, with no
+                            // way back to "just follow whatever I'm looking
+                            // at" once a car was explicitly pinned here.
+                            MorphButton(
+                                label = "Follow selected",
+                                icon = Icons.Filled.MyLocation,
+                                active = currentVin == null,
+                                activeColor = MaterialTheme.colorScheme.primary,
+                                pending = false,
+                                onClick = { followSelected(dataSource, complicationId, component) },
+                            )
+                        }
+                    }
                     items(cars, key = { it.vin }) { car ->
                         MorphButton(
                             label = car.name,
@@ -132,6 +150,19 @@ class ComplicationConfigActivity : ComponentActivity() {
     private fun choose(dataSource: String, complicationId: Int, component: ComponentName, vin: String) {
         lifecycleScope.launch {
             ComplicationCarStore(applicationContext).setVin(dataSource, complicationId, vin)
+            runCatching {
+                ComplicationDataSourceUpdateRequester
+                    .create(applicationContext, component)
+                    .requestUpdate(complicationId)
+            }
+            setResult(RESULT_OK)
+            finish()
+        }
+    }
+
+    private fun followSelected(dataSource: String, complicationId: Int, component: ComponentName) {
+        lifecycleScope.launch {
+            ComplicationCarStore(applicationContext).clear(dataSource, complicationId)
             runCatching {
                 ComplicationDataSourceUpdateRequester
                     .create(applicationContext, component)
