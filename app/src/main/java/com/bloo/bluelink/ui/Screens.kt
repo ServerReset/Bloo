@@ -157,6 +157,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -206,6 +207,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -1599,7 +1601,13 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
 /**
  * The app's shared "important pop-up" dialog shell. Update-available and
  * Drive-sync-setup both route through this now instead of two separately
- * hand-rolled AlertDialogs that merely happened to look similar.
+ * hand-rolled AlertDialogs that merely happened to look similar. A single
+ * elevated card -- icon in a tonal container, headline, supporting content,
+ * stacked actions -- per the Material 3 "basic dialog" layout, rather than
+ * routing through AlertDialog's own title/text slots: those render as two
+ * independently-clipped boxes with a gap between them, which read as a
+ * broken, disconnected stack of panels once each one lost the glass blur
+ * that used to visually tie them together.
  */
 @Composable
 private fun GlassAlertDialog(
@@ -1610,45 +1618,38 @@ private fun GlassAlertDialog(
     buttons: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val blockShape = RoundedCornerShape(16.dp)
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        containerColor = Color.Transparent,
-        title = {
-            Box {
-                Surface(
-                    shape = blockShape,
-                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.92f)),
+    val shape = RoundedCornerShape(28.dp)
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = shape,
+            color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.97f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .dropShadow(shape, blurRadius = 22.dp, offsetY = 8.dp)
+                .frostedRim(shape),
+        ) {
+            Column(Modifier.padding(24.dp)) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .background(scheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Row(
-                        Modifier.padding(16.dp, 14.dp, 16.dp, 0.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
-                        Text(title, fontWeight = FontWeight.Bold)
-                    }
+                    Icon(icon, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
                 }
+                Spacer(Modifier.height(16.dp))
+                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    content = text,
+                )
+                Spacer(Modifier.height(20.dp))
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp), content = buttons)
             }
-        },
-        text = {
-            Box {
-                Surface(
-                    shape = blockShape,
-                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.92f)),
-                ) {
-                    Column(
-                        Modifier.padding(16.dp, 12.dp, 16.dp, 12.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        content = text,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp), content = buttons)
-        },
-    )
+        }
+    }
 }
 
 /**
@@ -1926,6 +1927,29 @@ private fun EmptyScreen(vm: AppViewModel) {
                 }
             },
         )
+        // Three distinct causes used to collapse into the same "No vehicles
+        // found" / "Not signed in" copy -- including a real network/API
+        // failure, which then looked exactly like the app had silently
+        // signed the user out. Each now gets its own icon, headline, and
+        // primary action so the actual cause is always clear.
+        val loadFailed = state.accounts.isNotEmpty() && state.garageLoadError != null
+        val (icon, headline, body) = when {
+            state.accounts.isEmpty() -> Triple(
+                Icons.Filled.CloudOff,
+                "Not signed in",
+                "Sign in to your Hyundai, Kia, or Genesis account in Settings to get started.",
+            )
+            loadFailed -> Triple(
+                Icons.Filled.WifiOff,
+                "Couldn't load your vehicles",
+                "${state.garageLoadError}\n\nCheck your connection and try again.",
+            )
+            else -> Triple(
+                Icons.Filled.DirectionsCar,
+                "No vehicles found",
+                "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then tap Reload.",
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1935,45 +1959,57 @@ private fun EmptyScreen(vm: AppViewModel) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.widthIn(max = 360.dp),
             ) {
-                Icon(
-                    if (state.accounts.isEmpty()) Icons.Filled.CloudOff else Icons.Filled.DirectionsCar,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                )
+                val scheme = MaterialTheme.colorScheme
+                // A soft glow behind the icon instead of a bare, flat glyph
+                // floating on empty space -- the same halo technique the
+                // search bar uses for its own icon treatment.
+                Box(contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier
+                            .size(96.dp)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(scheme.primary.copy(alpha = 0.16f), Color.Transparent),
+                                ),
+                                CircleShape,
+                            ),
+                    )
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp),
+                        tint = if (loadFailed) scheme.error.copy(alpha = 0.85f) else scheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    )
+                }
                 Text(
-                    if (state.accounts.isEmpty()) "Not signed in" else "No vehicles found",
+                    headline,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    if (state.accounts.isEmpty())
-                        "Sign in to your Hyundai, Kia, or Genesis account in Settings to get started."
-                    else
-                        "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then tap Reload.",
+                    body,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(8.dp))
                 if (state.accounts.isEmpty()) {
-                    FilledTonalButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
+                    MorphButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Open Settings")
+                        Text("Open Settings", fontWeight = FontWeight.SemiBold)
                     }
                 } else {
-                    FilledTonalButton(onClick = { vm.loadGarage() }, modifier = Modifier.fillMaxWidth()) {
+                    MorphButton(onClick = { vm.loadGarage() }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Reload")
+                        Text(if (loadFailed) "Try again" else "Reload", fontWeight = FontWeight.SemiBold)
                     }
                 }
-                OutlinedButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Account Settings")
-                }
+                MorphTextButton("Account Settings", onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth())
             }
         }
     }

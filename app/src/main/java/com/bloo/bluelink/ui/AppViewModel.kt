@@ -173,6 +173,11 @@ data class UiState(
     /** Reason the last Drive sync attempt didn't fully succeed, or null if it did
      *  (or hasn't run yet). Cleared by the next attempt that succeeds. */
     val syncError: String? = null,
+    /** Set when the garage fetch came back empty because a request actually
+     *  failed (network/API error), not because the account genuinely has zero
+     *  vehicles. Distinguishes a real failure from "not signed in" / "no
+     *  vehicles" in [Screen.Empty]. Cleared by the next successful load. */
+    val garageLoadError: String? = null,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 
@@ -618,15 +623,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun loadGarageInner() {
         // Merge vehicles from every signed-in brand; one brand failing shouldn't
-        // hide the others.
+        // hide the others. Track failures separately from "this account
+        // genuinely has zero vehicles" -- collapsing both into the same empty
+        // list used to make a network/API failure display as "Not signed in"
+        // or "No vehicles found", which looked like the app had silently
+        // signed the user out rather than telling them what actually happened.
+        var lastError: String? = null
         val fetched = repos.values.flatMap { r ->
             runCatching { statusMutex.withLock { r.vehicles() } }.getOrElse { e ->
-                AppLog.log("⚠ ${e.message ?: "Couldn't load vehicles"}")
+                val msg = e.message ?: "Couldn't load vehicles"
+                AppLog.log("⚠ $msg")
+                lastError = msg
                 emptyList()
             }
         }
         if (fetched.isEmpty()) {
-            _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty) }
+            _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty, garageLoadError = lastError) }
             return
         }
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder())
@@ -681,6 +693,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 shortcutSet = shortcutSet,
                 currentIndex = index,
                 screen = screen,
+                garageLoadError = null,
             )
         }
         // One-time: now that vehicles (and their default climate presets) are
@@ -1084,7 +1097,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             vins.forEach { settingsStore.setCarConfigured(it) }
         }
         _state.update {
-            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage)
+            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage, garageLoadError = null)
         }
     }
 
@@ -1092,7 +1105,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun finishCarSetup(vins: List<String>) {
         viewModelScope.launch { vins.forEach { settingsStore.setCarConfigured(it) } }
         _state.update {
-            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage)
+            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage, garageLoadError = null)
         }
     }
 
