@@ -99,7 +99,7 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
             .focusRequester(focusRequester)
             .focusable(),
         state = state,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 28.dp),
+        contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // Title fades in from top

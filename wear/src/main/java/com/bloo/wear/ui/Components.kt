@@ -77,6 +77,18 @@ import kotlin.math.roundToInt
 import kotlin.math.tan
 
 /**
+ * Horizontal ScalingLazyColumn inset that actually widens on a round screen.
+ * Only HomeScreen accounted for `isScreenRound` before this; Settings, Login,
+ * Trips, and the tile-reorder screen all used a flat inset regardless of
+ * screen shape, so on a genuinely round watch their text/card edges sat
+ * noticeably closer to the curved bezel than Home's did -- worst on the
+ * reorder screen, which used only 8dp total.
+ */
+@Composable
+fun roundSafeHorizontalPadding(flat: Dp = 14.dp, round: Dp = 22.dp): Dp =
+    if (androidx.compose.ui.platform.LocalConfiguration.current.isScreenRound) round else flat
+
+/**
  * A card with a consistent uppercase, bold, primary-tinted header (optional
  * icon), then content -- the one card language every screen (Home's tiles,
  * Settings' sections) should share instead of each rolling its own styling.

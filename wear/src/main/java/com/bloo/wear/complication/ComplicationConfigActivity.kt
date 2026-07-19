@@ -79,7 +79,7 @@ class ComplicationConfigActivity : ComponentActivity() {
             BlooWearTheme(settings) {
                 ScalingLazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 30.dp),
+                    contentPadding = PaddingValues(horizontal = com.bloo.wear.ui.roundSafeHorizontalPadding(), vertical = 30.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     item { ListHeader { Text("Show which car?", textAlign = TextAlign.Center) } }

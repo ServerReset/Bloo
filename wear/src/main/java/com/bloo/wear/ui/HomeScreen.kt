@@ -1438,7 +1438,7 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
             .focusable(),
         state = state,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 32.dp),
+        contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(flat = 8.dp, round = 18.dp), vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         item {
