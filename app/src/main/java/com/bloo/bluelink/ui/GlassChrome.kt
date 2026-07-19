@@ -15,8 +15,15 @@ import androidx.compose.ui.unit.dp
  * bar, floating buttons, pebble backgrounds, dialogs, widget). Liquid/Ultra
  * glass (a real hardware-blurred, refractive material) was removed in favor
  * of this simpler, consistent look across every device and surface.
+ *
+ * Raised from 0.62 -- floating chrome (the settings/back/flip buttons, the
+ * name pill) sits directly over car photos of unpredictable brightness with
+ * no blur to separate it from what's behind, and at 0.62 a bright patch of
+ * photo showed through enough to read as barely-there. Every call site
+ * shares this one constant, so this single change also strengthens every
+ * other frosted surface (dialogs, search bar, widget) the same way.
  */
-fun glassContainerAlpha(frosted: Float = 0.62f): Float = frosted
+fun glassContainerAlpha(frosted: Float = 0.74f): Float = frosted
 
 /**
  * The hairline rim every piece of frosted chrome (floating pills, dialogs,
@@ -24,6 +31,11 @@ fun glassContainerAlpha(frosted: Float = 0.62f): Float = frosted
  * like a real card's edge catching ambient light. Without the old glass
  * blur behind these surfaces, this rim is what now reads as "this element
  * is a distinct, lifted piece of material" rather than a flat color patch.
+ *
+ * Strengthened alongside [glassContainerAlpha] for the same reason: over a
+ * busy or light car photo, a near-invisible 0.05-0.14 alpha border wasn't
+ * enough edge definition to keep floating buttons from blending into the
+ * image behind them.
  */
 @Composable
 fun Modifier.frostedRim(shape: Shape): Modifier {
@@ -33,9 +45,9 @@ fun Modifier.frostedRim(shape: Shape): Modifier {
             1.dp,
             Brush.verticalGradient(
                 listOf(
-                    onSurface.copy(alpha = 0.14f),
-                    onSurface.copy(alpha = 0.05f),
-                    onSurface.copy(alpha = 0.08f),
+                    onSurface.copy(alpha = 0.24f),
+                    onSurface.copy(alpha = 0.10f),
+                    onSurface.copy(alpha = 0.16f),
                 ),
             ),
         ),
