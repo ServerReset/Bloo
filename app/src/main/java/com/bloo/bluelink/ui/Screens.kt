@@ -4069,7 +4069,12 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-            PrimaryActions(v, state, vm)
+            // PrimaryActions' own default start padding (26.dp) plus this
+            // Box's 12.dp put the lock icon noticeably further right than
+            // every other pebble's header icon (Charge, Climate, ...), which
+            // only ever get Pebble's flat 16.dp row padding. 4.dp here lines
+            // the two icons up (4 + 12 = 16, matching Pebble's inset).
+            PrimaryActions(v, state, vm, contentPadding = PaddingValues(start = 4.dp, end = 8.dp))
         }
     }
 }
