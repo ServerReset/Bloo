@@ -44,6 +44,11 @@ private val Context.settingsDataStore by preferencesDataStore(
 // this lives at module scope instead, same pattern as BlueLinkGate.statusMutex.
 private val driveSyncMutex = Mutex()
 
+// A stalled SAF/DocumentsProvider call previously had no bound and could hold
+// driveSyncMutex indefinitely; each Drive I/O step in performDriveSync() is
+// capped at this long instead.
+private const val DRIVE_IO_TIMEOUT_MS = 20_000L
+
 /**
  * Which seat heat/cool functions a specific car actually has (user-configured).
  *
@@ -815,9 +820,18 @@ class SettingsStore(private val context: Context) {
         }.getOrNull()
         // Download: read the existing file from Drive.
         var downloadError: String? = null
+        // withTimeout, not just runCatching -- a stalled SAF/DocumentsProvider
+        // call (Drive app backgrounded, flaky network) previously had no
+        // bound at all and could hang this coroutine indefinitely while still
+        // holding driveSyncMutex, blocking every other sync path (the worker,
+        // the refresh collector, a watch-requested sync) until it resolved.
         val remoteContent = runCatching {
-            context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
-        }.onFailure { downloadError = it.message ?: "Couldn't read the Drive file" }.getOrNull()
+            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+            }
+        }.onFailure {
+            downloadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
+        }.getOrNull()
         val remoteJson = remoteContent?.substringAfter('\n', "")
         val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
         var imported = false
@@ -833,21 +847,23 @@ class SettingsStore(private val context: Context) {
         val body = "$now\n${exportSettingsJson()}"
         var uploadError: String? = null
         val uploaded = runCatching {
-            context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
-                ?: error("Couldn't open the Drive file for writing")
-            // Verify the write actually landed instead of trusting that
-            // close() completing without throwing means the bytes are really
-            // there -- some document providers can silently truncate or drop
-            // a buffered write under low storage or an interrupted upload,
-            // which previously would have reported success, advanced
-            // lastSyncMs, and cleared the dirty set for data that was never
-            // actually saved.
-            val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
-            if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
+            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
+                    ?: error("Couldn't open the Drive file for writing")
+                // Verify the write actually landed instead of trusting that
+                // close() completing without throwing means the bytes are really
+                // there -- some document providers can silently truncate or drop
+                // a buffered write under low storage or an interrupted upload,
+                // which previously would have reported success, advanced
+                // lastSyncMs, and cleared the dirty set for data that was never
+                // actually saved.
+                val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
+            }
             AppLog.log("Drive sync: uploaded settings")
             true
         }.onFailure {
-            uploadError = it.message ?: "Couldn't write the Drive file"
+            uploadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
             AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
         }.getOrElse { false }
         // Only claim "last synced at <now>" when the upload actually landed --

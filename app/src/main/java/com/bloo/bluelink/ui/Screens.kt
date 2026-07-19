@@ -7223,7 +7223,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (state.aiEnabled) {
+                    // Advanced-only: a power-user nuance on top of the basic
+                    // AI toggle above, not something a novice needs to see.
+                    if (state.aiEnabled && advanced) {
                         ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
                         Text(
                             if (state.aiAuto) {
@@ -7355,91 +7357,110 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                 }
 
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Automatic Drive sync",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Keeps a Google Drive file continuously up to date, so every " +
-                        "signed-in device converges on the same settings automatically.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(10.dp))
-                if (showDriveDialog) {
-                    DriveSyncSetupDialog(
-                        onDismissRequest = { showDriveDialog = false },
-                        onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
-                        onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphTextButton(
-                        if (state.syncUri != null) "Change Drive file" else "Set up auto-sync",
-                        modifier = Modifier.weight(1f),
-                        onClick = { showDriveDialog = true },
-                    )
-                    if (state.syncUri != null) {
-                        MorphTextButton(
-                            "Disable",
-                            modifier = Modifier.weight(1f),
-                            onClick = { vm.clearSyncUri() },
-                        )
-                    }
-                }
-                if (state.syncUri != null) {
-                    Spacer(Modifier.height(6.dp))
+                // Advanced-only: continuous background sync setup (Drive file
+                // picking, Wi-Fi-only toggle) is more involved than the basic
+                // one-shot Export/Restore above -- a novice user is more likely
+                // to want "save a backup file" than "wire up a live sync".
+                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                  Column {
+                    Spacer(Modifier.height(16.dp))
                     Text(
-                        "Settings auto-sync to Drive in the background and on every " +
-                            "refresh. Changes made on another device are merged automatically.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        "Automatic Drive sync",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
-                    if (lastSyncLabel.isNotBlank()) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "Last synced $lastSyncLabel",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (state.syncError != null) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "Sync failed: ${state.syncError}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
                     Spacer(Modifier.height(4.dp))
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("wifi", "Wi-Fi only", null),
-                            SegmentOption("any", "Any network", null),
-                        ),
-                        selectedKey = if (state.syncWifiOnly) "wifi" else "any",
-                        onSelect = { vm.setSyncWifiOnly(it == "wifi") },
+                    Text(
+                        "Keeps a Google Drive file continuously up to date, so every " +
+                            "signed-in device converges on the same settings automatically.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(10.dp))
+                    if (showDriveDialog) {
+                        DriveSyncSetupDialog(
+                            onDismissRequest = { showDriveDialog = false },
+                            onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
+                            onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MorphTextButton(
+                            if (state.syncUri != null) "Change Drive file" else "Set up auto-sync",
+                            modifier = Modifier.weight(1f),
+                            onClick = { showDriveDialog = true },
+                        )
+                        if (state.syncUri != null) {
+                            MorphTextButton(
+                                "Disable",
+                                modifier = Modifier.weight(1f),
+                                onClick = { vm.clearSyncUri() },
+                            )
+                        }
+                    }
+                    if (state.syncUri != null) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Settings auto-sync to Drive in the background and on every " +
+                                "refresh. Changes made on another device are merged automatically.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                        val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
+                        if (lastSyncLabel.isNotBlank()) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "Last synced $lastSyncLabel",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (state.syncError != null) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "Sync failed: ${state.syncError}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            // Was no way to retry short of pulling to refresh or
+                            // waiting for the next 2h background attempt.
+                            MorphTextButton(
+                                "Sync now",
+                                onClick = { vm.retryDriveSync() },
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        MorphSegmented(
+                            options = listOf(
+                                SegmentOption("wifi", "Wi-Fi only", null),
+                                SegmentOption("any", "Any network", null),
+                            ),
+                            selectedKey = if (state.syncWifiOnly) "wifi" else "any",
+                            onSelect = { vm.setSyncWifiOnly(it == "wifi") },
+                        )
+                    }
+                  }
                 }
             }
 
             // Display scale
             SettingsCard("Display") {
-                var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
-                StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
-                AnimatedSlider(
-                    value = uiScaleDraft,
-                    onValueChange = { uiScaleDraft = it },
-                    valueRange = 0.8f..1.3f,
-                    steps = 4,
-                    onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
-                )
-                Spacer(Modifier.height(12.dp))
+                // Advanced-only: a power-user knob, unlike the Units picker
+                // below it which every user needs regardless of mode.
+                if (advanced) {
+                    var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
+                    StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
+                    AnimatedSlider(
+                        value = uiScaleDraft,
+                        onValueChange = { uiScaleDraft = it },
+                        valueRange = 0.8f..1.3f,
+                        steps = 4,
+                        onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
                 // Unit system: controls temperature, distance, and speed display.
                 SettingsSegmentedRow(
                     label = "Units",
@@ -7634,7 +7655,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
-            // Quick Settings tiles
+            // Quick Settings tiles -- per-tile config is power-user territory,
+            // same tier as App shortcuts/Cars above.
+            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
             SettingsCard("Quick tiles") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -7692,6 +7715,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
                 Spacer(Modifier.height(12.dp))
                 QuickTilesManager(state, vm)
+            }
             }
 
             // Security
@@ -7757,47 +7781,55 @@ private fun SettingsScreen(vm: AppViewModel) {
                     selectedKey = appearance.themeMode.name,
                     onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
                 )
-                Spacer(Modifier.height(10.dp))
-                ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
-                Text(
-                    "Show a gradient aurora behind the content instead of a solid surface.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (appearance.auroraBackground) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(6.dp))
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("static", "Static", null),
-                            SegmentOption("motion", "Motion", null),
-                        ),
-                        selectedKey = appearance.auroraMotion,
-                        onSelect = { vm.setAuroraMotion(it) },
-                    )
+                // Advanced-only, same tier as the dynamic-color block below --
+                // Aurora's motion/colour-mode/custom-hex sub-options are
+                // power-user territory, not something a simple-mode user needs
+                // (the built-in solid-surface background covers everyone else).
+                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                  Column {
                     Spacer(Modifier.height(10.dp))
-                    Text("Colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(6.dp))
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("complementary", "Complementary", null),
-                            SegmentOption("material", "Material You", null),
-                            SegmentOption("custom", "Custom", null),
-                        ),
-                        selectedKey = appearance.auroraColorMode,
-                        onSelect = { vm.setAuroraColorMode(it) },
+                    ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
+                    Text(
+                        "Show a gradient aurora behind the content instead of a solid surface.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (appearance.auroraColorMode == "custom") {
+                    if (appearance.auroraBackground) {
                         Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = appearance.auroraCustomColor ?: "",
-                            onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
-                            label = { Text("Hex colour") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                        Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(6.dp))
+                        MorphSegmented(
+                            options = listOf(
+                                SegmentOption("static", "Static", null),
+                                SegmentOption("motion", "Motion", null),
+                            ),
+                            selectedKey = appearance.auroraMotion,
+                            onSelect = { vm.setAuroraMotion(it) },
                         )
+                        Spacer(Modifier.height(10.dp))
+                        Text("Colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(6.dp))
+                        MorphSegmented(
+                            options = listOf(
+                                SegmentOption("complementary", "Complementary", null),
+                                SegmentOption("material", "Material You", null),
+                                SegmentOption("custom", "Custom", null),
+                            ),
+                            selectedKey = appearance.auroraColorMode,
+                            onSelect = { vm.setAuroraColorMode(it) },
+                        )
+                        if (appearance.auroraColorMode == "custom") {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = appearance.auroraCustomColor ?: "",
+                                onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
+                                label = { Text("Hex colour") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
+                  }
                 }
                 AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                   // AnimatedVisibility lays out a single child, not an implicit

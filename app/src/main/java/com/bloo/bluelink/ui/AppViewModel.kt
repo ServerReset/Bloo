@@ -1940,6 +1940,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settingsStore.setDefaultClimatePreset(vin, id)
     }
 
+    /** Manual "Sync now" after a failed Drive sync -- previously the only way
+     *  to retry was pulling to refresh (which also triggers a sync) or waiting
+     *  for the next periodic worker tick, up to 2h away for a transient blip. */
+    fun retryDriveSync() {
+        viewModelScope.launch {
+            val outcome = withContext(Dispatchers.IO) { settingsStore.performDriveSync() }
+            if (outcome.ran) {
+                _state.update { it.copy(lastSyncMs = outcome.syncedAtMs, syncError = outcome.error) }
+            }
+        }
+    }
+
     private fun launchBusy(block: suspend () -> Unit) {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, message = null) }
