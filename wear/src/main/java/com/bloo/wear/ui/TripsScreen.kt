@@ -133,8 +133,10 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     )
                     Text(
+                        // titleMedium to match HomeScreen's "No cars yet" --
+                        // same conceptual role (a big centered empty state).
                         if (failed) "Couldn't load trips" else "No trips yet",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                     )

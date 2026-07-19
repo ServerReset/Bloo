@@ -166,8 +166,11 @@ private fun WatchAppContent(vm: WearViewModel, ui: WearUi) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(12.dp))
                     Text(
+                        // Matches the spinner-caption style Login/Trips use for
+                        // the same "busy" role (was bodySmall here, the one
+                        // mismatch in an otherwise-shared spec).
                         "Loading…",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
