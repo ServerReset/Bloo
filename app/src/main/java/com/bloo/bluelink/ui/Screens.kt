@@ -8815,6 +8815,10 @@ fun MorphSegmented(
         onTick = { haptics?.tick() },
         modifier = modifier,
         trackHeight = trackHeight ?: (if (options.any { it.icon != null }) 48.dp else 44.dp),
+        // Every other interactive surface (Pebble, floating pills, dialogs)
+        // got a hairline rim once real glass blur stopped giving flat
+        // surfaces a second depth cue; this control was the one left out.
+        borderColor = scheme.outline.copy(alpha = 0.18f),
     )
 }
 

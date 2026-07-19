@@ -498,10 +498,15 @@ internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
         enter = slideInVertically { it } + fadeIn(),
         exit = slideOutVertically { it } + fadeOut(),
     ) {
+        val snackbarShape = RoundedCornerShape(16.dp)
         Box(
             Modifier
-                .clip(RoundedCornerShape(16.dp))
+                .clip(snackbarShape)
                 .background(if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer)
+                // Real floating chrome (see CarNameOverlay above) gets a real
+                // drop shadow, not just a fill -- this was the one floating
+                // overlay in the file skipped.
+                .dropShadow(snackbarShape)
                 // liveRegion: this appears asynchronously (a command result, a
                 // sync completion, an error) with no other cue, so without it
                 // TalkBack never proactively announces the message at all.
