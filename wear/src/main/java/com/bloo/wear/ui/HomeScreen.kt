@@ -554,6 +554,7 @@ private fun TileContent(
             activeColor = MaterialTheme.colorScheme.primary,
             pending = "${car.vin}:doors" in ui.pending,
             onClick = { vm.toggleLock(car.vin) },
+            toggled = car.locked == true,
         )
         WearTiles.CLIMATE -> ClimateCard(vm, ui, car)
         WearTiles.SMART_CLIMATE -> SmartClimateCard(vm, ui, car)
@@ -786,6 +787,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             pending = "${car.vin}:doors" in ui.pending,
             onClick = { vm.toggleLock(car.vin) },
             modifier = Modifier.weight(1f),
+            toggled = locked,
         )
         MorphButton(
             label = "Climate",
@@ -795,6 +797,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             pending = "${car.vin}:climate" in ui.pending,
             onClick = { vm.toggleClimate(car.vin) },
             modifier = Modifier.weight(1f),
+            toggled = car.climateOn == true,
         )
     }
 }
@@ -809,6 +812,7 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         activeColor = MaterialTheme.colorScheme.tertiary,
         pending = "${car.vin}:climate" in ui.pending,
         onClick = { vm.toggleClimate(car.vin) },
+        toggled = car.climateOn == true,
     )
     Spacer(Modifier.height(6.dp))
     // 2°F steps, not 1° - the round screen only has room for so many dots before
@@ -1010,6 +1014,7 @@ private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
         activeColor = WearColors.chargeGreen,
         pending = "${car.vin}:charge" in ui.pending,
         onClick = { vm.toggleCharge(car.vin) },
+        toggled = car.charging == true,
     )
     Spacer(Modifier.height(4.dp))
     car.percent?.let { StatusRow("Battery", "$it%") }

@@ -186,6 +186,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                             if (ls.pinLockEnabled) pinFlow = PinFlowMode.DISABLE
                             else vm.setPinLockEnabled(true)
                         },
+                        toggled = ls.pinLockEnabled,
                     )
                     if (ls.pinLockEnabled) {
                         Spacer(Modifier.height(8.dp))
@@ -255,6 +256,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     activeColor = MaterialTheme.colorScheme.primary,
                     pending = false,
                     onClick = { vm.setAiEnabled(!enabled) },
+                    toggled = enabled,
                 )
             }
         }
@@ -275,6 +277,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     activeColor = MaterialTheme.colorScheme.primary,
                     pending = false,
                     onClick = { vm.setAuroraEnabled(!enabled) },
+                    toggled = enabled,
                 )
                 // The watch could previously only mirror whatever colour mode
                 // the phone had chosen -- this is the only "background/

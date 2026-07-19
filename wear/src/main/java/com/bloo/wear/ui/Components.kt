@@ -51,9 +51,13 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -453,6 +457,13 @@ fun MorphButton(
      *  spinning-icon "something is in flight" implication -- for states like
      *  "no data yet" that aren't actually a network request in progress. */
     enabled: Boolean = true,
+    /** Non-null exposes this as a real switch to TalkBack (Role.Switch +
+     *  the current on/off state), for genuine toggles (Lock, Climate,
+     *  Charge, AI enabled, PIN lock). MorphButton is also used for plain
+     *  action buttons ("Settings", "Refresh") and pickers, where announcing
+     *  a toggle role/state would be actively wrong -- null (the default)
+     *  leaves those exactly as before, relying on the label text alone. */
+    toggled: Boolean? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -494,6 +505,14 @@ fun MorphButton(
             .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .animateContentSize(
                 spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            )
+            .then(
+                if (toggled != null) {
+                    Modifier.semantics {
+                        role = Role.Switch
+                        this.toggleableState = ToggleableState(toggled)
+                    }
+                } else Modifier,
             ),
         shape = RoundedCornerShape(percent = pct.roundToInt()),
         colors = ButtonDefaults.buttonColors(
