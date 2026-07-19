@@ -639,6 +639,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         else { repo.lock(v); flip(vin) { it.copy(doorLock = true) } }
     }
 
+    // Hyundai/Genesis only -- see Vehicle.supportsHornLights. Passed as
+    // `explicit` (not inferred by toWearCommand from the action string) since
+    // command() always tries relaying to the phone FIRST -- without an
+    // explicit command here the relay path would've silently sent a REFRESH
+    // instead (toWearCommand's fallback for any action it doesn't recognize).
+    fun flashLights(vin: String) = command(
+        vin, "hornLights",
+        explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.FLASH_LIGHTS),
+    ) { v, repo, _ -> repo.flashLights(v) }
+
+    fun hornAndLights(vin: String) = command(
+        vin, "hornLights",
+        explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.HORN_AND_LIGHTS),
+    ) { v, repo, _ -> repo.hornAndLights(v) }
+
     fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
         if (st?.airCtrlOn == true) {
             repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }

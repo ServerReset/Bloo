@@ -55,6 +55,11 @@ object WearCommandRunner {
                     WearAction.CHARGE_ON -> { repo.startCharge(v); snap.copy(charging = true) }
                     WearAction.CHARGE_OFF -> { repo.stopCharge(v); snap.copy(charging = false) }
                     WearAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
+                    // Momentary, not stateful -- no snap field to flip, so
+                    // these fall through optimistic()/resolveToggle()/
+                    // inverse() below untouched (their `else` branches).
+                    WearAction.FLASH_LIGHTS -> { repo.flashLights(v); snap }
+                    WearAction.HORN_AND_LIGHTS -> { repo.hornAndLights(v); snap }
                     else -> return@withLock WearCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
                 }
                 store.updateVehicle(updated)

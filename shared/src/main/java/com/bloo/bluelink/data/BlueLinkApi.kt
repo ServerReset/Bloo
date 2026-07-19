@@ -152,6 +152,16 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
+    /** Flash the hazard lights only. Reference client: rcs/rhl/light, same
+     *  userName+vin JSON body and header set as lock/unlock. Hyundai/Genesis
+     *  only -- Kia's US API has no equivalent endpoint. */
+    suspend fun flashLights(token: String, username: String, pin: String, v: Vehicle) =
+        jsonCommand("/ac/v2/rcs/rhl/light", token, username, pin, v)
+
+    /** Flash the hazard lights and sound the horn. Reference client: rcs/rhl/hnl. */
+    suspend fun hornAndLights(token: String, username: String, pin: String, v: Vehicle) =
+        jsonCommand("/ac/v2/rcs/rhl/hnl", token, username, pin, v)
+
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
         // Pure EVs use evc/fatc/stop (no engine). ICE and PHEVs use rcs/rsc/stop
         // (remote engine start can be cancelled). The v.isEv flag comes from the
@@ -271,6 +281,24 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         val form = "userName=$username&vin=${v.vin}".toRequestBody(formMedia)
         val request = baseRequest(path, token, username, pin, v)
             .post(form)
+            .build()
+        call(request)
+    }
+
+    /** Same userName+vin payload as [formCommand], but JSON -- the horn/lights
+     *  endpoints reject the form-urlencoded body lock/unlock use. */
+    private suspend fun jsonCommand(
+        path: String, token: String, username: String, pin: String, v: Vehicle,
+    ): String = execute {
+        val body = json.encodeToString(
+            kotlinx.serialization.json.JsonObject.serializer(),
+            kotlinx.serialization.json.buildJsonObject {
+                put("userName", kotlinx.serialization.json.JsonPrimitive(username))
+                put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
+            },
+        ).toRequestBody(jsonMedia)
+        val request = baseRequest(path, token, username, pin, v)
+            .post(body)
             .build()
         call(request)
     }

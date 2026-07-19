@@ -21,6 +21,12 @@ interface VehicleRepository {
     suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int)
     suspend fun startCharge(v: Vehicle)
     suspend fun stopCharge(v: Vehicle)
+
+    /** True where the backend actually supports [flashLights]/[hornAndLights]
+     *  (Hyundai/Genesis US telematics only -- Kia's US API has no equivalent). */
+    val supportsHornLights: Boolean get() = false
+    suspend fun flashLights(v: Vehicle) {}
+    suspend fun hornAndLights(v: Vehicle) {}
 }
 
 /**
@@ -94,6 +100,16 @@ class BlueLinkRepository(
 
     override suspend fun startCharge(v: Vehicle) {
         withSession { s -> api.startCharge(s.accessToken, s.username, s.pin, v) }
+    }
+
+    override val supportsHornLights: Boolean get() = true
+
+    override suspend fun flashLights(v: Vehicle) {
+        withSession { s -> api.flashLights(s.accessToken, s.username, s.pin, v) }
+    }
+
+    override suspend fun hornAndLights(v: Vehicle) {
+        withSession { s -> api.hornAndLights(s.accessToken, s.username, s.pin, v) }
     }
 
     override suspend fun stopCharge(v: Vehicle) {

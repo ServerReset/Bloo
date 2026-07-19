@@ -40,7 +40,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -116,6 +118,7 @@ import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WearWeather
 import com.bloo.bluelink.data.degLabel
@@ -1347,6 +1350,32 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         pending = "${car.vin}:refresh" in ui.pending,
         onClick = { vm.refreshStatus(car.vin) },
     )
+    // Kia's US API has no equivalent endpoint (see Vehicle.supportsHornLights);
+    // matches what the official Hyundai/Genesis apps show.
+    if (car.brand != Brand.KIA) {
+        Spacer(Modifier.height(6.dp))
+        val hlPending = "${car.vin}:hornLights" in ui.pending
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            MorphButton(
+                label = "Flash lights",
+                icon = Icons.Filled.FlashOn,
+                active = false,
+                activeColor = accent,
+                pending = hlPending,
+                onClick = { vm.flashLights(car.vin) },
+                modifier = Modifier.weight(1f),
+            )
+            MorphButton(
+                label = "Horn",
+                icon = Icons.Filled.Campaign,
+                active = false,
+                activeColor = accent,
+                pending = hlPending,
+                onClick = { vm.hornAndLights(car.vin) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
     if (car.hasBattery && car.tripsSupported) {
         Spacer(Modifier.height(6.dp))
         MorphButton(

@@ -228,6 +228,11 @@ object WearAction {
     const val CHARGE_ON = "charge_on"
     const val CHARGE_OFF = "charge_off"
 
+    /** Flash the hazard lights, or flash + sound the horn. Hyundai/Genesis
+     *  only (see Vehicle.supportsHornLights) -- Kia's US API has neither. */
+    const val FLASH_LIGHTS = "flash_lights"
+    const val HORN_AND_LIGHTS = "horn_and_lights"
+
     /** Apply the AC/DC charge-limit targets in [WearCommand.acLimit]/[WearCommand.dcLimit]. */
     const val SET_CHARGE_LIMITS = "set_charge_limits"
 

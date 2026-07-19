@@ -142,3 +142,9 @@ val Brand.links: BrandLinks
  */
 val Vehicle.supportsConnectedStore: Boolean
     get() = brand == Brand.KIA || (generation.trim().toIntOrNull() ?: 0) >= 3
+
+/** Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the
+ *  Hyundai/Genesis US telematics API this app already uses for lock/unlock;
+ *  Kia's US API (Kia Connect) has no equivalent endpoint. */
+val Vehicle.supportsHornLights: Boolean
+    get() = brand != Brand.KIA

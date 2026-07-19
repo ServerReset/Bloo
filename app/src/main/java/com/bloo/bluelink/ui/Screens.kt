@@ -116,7 +116,9 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
@@ -304,6 +306,7 @@ import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.supportsConnectedStore
+import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.formatDistance
@@ -4199,6 +4202,19 @@ private fun PrimaryActions(
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
             highlightWhenOff = true,
             offTextColor = MaterialTheme.colorScheme.error,
+            // Kia's US API has no equivalent endpoint (see Vehicle.supportsHornLights),
+            // so these only appear for Hyundai/Genesis, matching what those apps show.
+            extraAction = if (v.supportsHornLights) {
+                {
+                    val hlPending = state.isPending(v.vin, "hornLights")
+                    IconButton(onClick = { vm.flashLights(v) }, enabled = !hlPending) {
+                        Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights")
+                    }
+                    IconButton(onClick = { vm.hornAndLights(v) }, enabled = !hlPending) {
+                        Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights")
+                    }
+                }
+            } else null,
         )
     }
 }
