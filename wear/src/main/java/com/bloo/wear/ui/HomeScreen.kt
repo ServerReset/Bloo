@@ -549,17 +549,6 @@ private fun TileContent(
     when (key) {
         TILE_ALERTS -> AlertsCard(car)
         WearTiles.SUMMARY -> SummaryCard(vm, ui, car)
-        WearTiles.LOCK -> MorphButton(
-            // The unlocked car is the noteworthy state, so it's the highlighted one
-            // (consistent with the phone tile and the watch Tile).
-            label = if (car.locked == true) "Locked" else "Unlocked",
-            icon = if (car.locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
-            active = car.locked == false,
-            activeColor = MaterialTheme.colorScheme.primary,
-            pending = "${car.vin}:doors" in ui.pending,
-            onClick = { vm.toggleLock(car.vin) },
-            toggled = car.locked == true,
-        )
         WearTiles.CLIMATE -> ClimateCard(vm, ui, car)
         WearTiles.SMART_CLIMATE -> SmartClimateCard(vm, ui, car)
         WearTiles.COMFORT -> ComfortCard(vm, ui, car)
@@ -786,11 +775,11 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         MorphButton(
             label = if (locked) "Locked" else "Unlocked",
             icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-            // Was `active = locked` -- highlighted the *opposite* state from
-            // the dedicated Lock tile one card below (WearTiles.LOCK, which
-            // highlights unlocked as the noteworthy state, matching the
-            // phone/complication). Two lock buttons a swipe apart teaching
-            // contradictory rules for what "highlighted" means.
+            // The unlocked car is the noteworthy state, so it's the
+            // highlighted one -- matches the phone tile/complication. (This
+            // used to also need to match a separate dedicated Lock tile a
+            // swipe below, which duplicated this exact button; that tile has
+            // since been removed as redundant.)
             active = !locked,
             activeColor = MaterialTheme.colorScheme.primary,
             pending = "${car.vin}:doors" in ui.pending,

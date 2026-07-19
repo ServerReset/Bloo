@@ -26,7 +26,6 @@ private val Context.wearLocalStore by preferencesDataStore(
 
 object WearTiles {
     const val SUMMARY = "summary"
-    const val LOCK = "lock"
     const val CLIMATE = "climate"
     const val COMFORT = "comfort"
     const val PRESETS = "presets"
@@ -43,7 +42,7 @@ object WearTiles {
     const val AI = "ai"
 
     val DEFAULT_ORDER = listOf(
-        SUMMARY, LOCK, CHARGE, LIMITS, AI, CLIMATE, SMART_CLIMATE, COMFORT, PRESETS,
+        SUMMARY, CHARGE, LIMITS, AI, CLIMATE, SMART_CLIMATE, COMFORT, PRESETS,
         LOCATION, WEATHER, INFO, DIAGNOSTICS, ASSIST, MORE,
     )
 }
@@ -65,7 +64,12 @@ object WearPebbles {
     /** Each pebble → the watch tiles it owns, in display order. */
     private val TO_TILES = mapOf(
         "summary" to listOf(WearTiles.SUMMARY),
-        "controls" to listOf(WearTiles.LOCK),
+        // The Lock tile was a bare lock/unlock button one swipe from the
+        // identical control already on SummaryCard's hero row -- dropped like
+        // "trips" below (a pebble that owns no tile of its own) rather than
+        // deleted outright, since pebble order is all that's persisted; no
+        // stored tile key exists anywhere to migrate or orphan.
+        "controls" to emptyList(),
         "charge" to listOf(WearTiles.CHARGE, WearTiles.LIMITS),
         "ai" to listOf(WearTiles.AI),
         "climate" to listOf(WearTiles.CLIMATE, WearTiles.SMART_CLIMATE, WearTiles.COMFORT, WearTiles.PRESETS),
