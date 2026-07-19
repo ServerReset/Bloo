@@ -52,6 +52,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -9491,27 +9492,39 @@ private fun StepRow(label: String, value: String, valueColor: Color = Color.Unsp
     }
 }
 
+/**
+ * The app's one toggle control for boolean settings. Ground-up redesign away
+ * from a plain label next to a stock Material [Switch] -- the whole row now
+ * washes toward the primary color and its own corners morph rounder when on
+ * (the same active-fill + pill-morph language [MorphButton] uses for every
+ * other control in the app), with a custom pill track+thumb standing in for
+ * the Switch so this shares that vocabulary too instead of being the one
+ * default-Material holdout in an otherwise fully custom UI.
+ */
 @Composable
 fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val haptics = LocalHaptics.current
-    val scale by animateFloatAsState(
-        if (checked) 1.04f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "toggleScale",
+    val rowPct by animateFloatAsState(
+        if (checked) 22f else 12f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "toggleRowShape",
+    )
+    val rowBg by androidx.compose.animation.animateColorAsState(
+        if (checked) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "toggleRowBg",
     )
     Row(
         Modifier
             .fillMaxWidth()
-            // The checked-state scale bump below draws outside the Switch's own
-            // layout bounds; without this trailing reserve it got clipped by the
-            // screen/card edge.
-            .padding(end = 3.dp)
+            .clip(RoundedCornerShape(percent = rowPct.roundToInt()))
+            .background(rowBg)
             // toggleable (not clickable) gives this its own Role.Switch + checked
-            // semantics node -- the inner Switch below clears its own (identical)
-            // node so TalkBack sees ONE correctly-announced toggle for the row
+            // semantics node -- the track below clears its own (identical) node
+            // so TalkBack sees ONE correctly-announced toggle for the row
             // instead of two adjacent focus stops (a generic "double tap to
             // activate" for the row, then the real on/off announcement for the
-            // Switch a swipe later).
+            // track a swipe later).
             .toggleable(
                 value = checked,
                 interactionSource = remember { MutableInteractionSource() },
@@ -9521,14 +9534,66 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
                 val next = !checked
                 if (next) haptics?.toggleOn() else haptics?.toggleOff()
                 onChange(next)
-            },
+            }
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Switch(
-            checked = checked,
-            onCheckedChange = { if (it) haptics?.toggleOn() else haptics?.toggleOff(); onChange(it) },
-            modifier = Modifier.graphicsLayer(scaleX = scale, scaleY = scale).clearAndSetSemantics {},
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal,
+        )
+        Spacer(Modifier.width(10.dp))
+        MorphToggleTrack(checked)
+    }
+}
+
+/**
+ * A pill track + circular thumb, spring-timed like [MorphButton] instead of
+ * the stock Material [Switch]. Purely visual -- [ToggleRow]'s own toggleable()
+ * modifier owns the real click target and semantics, so this clears its own.
+ */
+@Composable
+private fun MorphToggleTrack(checked: Boolean) {
+    val trackColor by androidx.compose.animation.animateColorAsState(
+        if (checked) MaterialTheme.colorScheme.primary else buttonContainer(),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "toggleTrackBg",
+    )
+    val thumbColor by androidx.compose.animation.animateColorAsState(
+        if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "toggleThumbFg",
+    )
+    val trackWidth = 44.dp
+    val trackHeight = 26.dp
+    val inset = 3.dp
+    val thumbSize by animateDpAsState(
+        if (checked) 20.dp else 16.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "toggleThumbSize",
+    )
+    val thumbOffset by animateDpAsState(
+        if (checked) trackWidth - thumbSize - inset else inset,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "toggleThumbOffset",
+    )
+    Box(
+        Modifier
+            .size(trackWidth, trackHeight)
+            .clip(RoundedCornerShape(50))
+            .background(trackColor)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), RoundedCornerShape(50))
+            .clearAndSetSemantics {},
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            Modifier
+                .padding(start = thumbOffset)
+                .size(thumbSize)
+                .clip(CircleShape)
+                .background(thumbColor),
         )
     }
 }
