@@ -1048,6 +1048,11 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
         activeColor = WearColors.chargeGreen,
         pending = "${car.vin}:chargeLimit" in ui.pending,
         onClick = { vm.applyChargeLimits(car.vin) },
+        // Both sliders fall back to 80/90 (or the car's last-known limits)
+        // before the user has ever touched them -- without this, a stray tap
+        // on "Apply limits" could push that guessed value to the car even
+        // though nothing was actually changed.
+        enabled = isDirty,
     )
 }
 
