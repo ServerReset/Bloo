@@ -909,10 +909,22 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         onClick = { vm.toggleSteering(car.vin) },
     )
     Spacer(Modifier.height(4.dp))
+    // Rear seats only when the live status shows they exist (non-null seatRl/Rr
+    // from a fetch). With rear seats present this card stacks 5 controls with
+    // no grouping cue -- a "Front"/"Rear" label pair reads it as two clusters
+    // instead of one long undifferentiated list, without splitting into a
+    // second independently-orderable tile (which would need its own
+    // TO_TILES/DEFAULT_ORDER migration for existing users).
+    val hasRearSeats = car.seatRl != null || car.seatRr != null
+    if (hasRearSeats) {
+        Text("Front", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(2.dp))
+    }
     SliderRow("Driver seat", seatStepLabels[d.seatDriver], d.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(car.vin, it) }
     SliderRow("Passenger", seatStepLabels[d.seatPassenger], d.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(car.vin, it) }
-    // Rear seats only when the live status shows they exist (non-null seatRl/Rr from a fetch).
-    if (car.seatRl != null || car.seatRr != null) {
+    if (hasRearSeats) {
+        Spacer(Modifier.height(6.dp))
+        Text("Rear", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(2.dp))
         SliderRow("Rear left", seatStepLabels[d.seatRearLeft], d.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(car.vin, it) }
         SliderRow("Rear right", seatStepLabels[d.seatRearRight], d.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(car.vin, it) }
@@ -923,6 +935,15 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets", Icons.Filled.Thermostat) {
     val list = ui.presets[car.vin].orEmpty()
     var confirmDeleteId by remember(car.vin) { mutableStateOf<String?>(null) }
+    // Matches Settings' "Sign out" confirm, the app's other destructive-action
+    // pattern -- that one auto-resets after 4s so a stale "tap again" can't
+    // fire later; this one previously stayed armed indefinitely once tapped.
+    LaunchedEffect(confirmDeleteId) {
+        if (confirmDeleteId != null) {
+            delay(4000)
+            confirmDeleteId = null
+        }
+    }
     if (list.isEmpty()) {
         Text(
             "Save the current climate settings as a preset.",
@@ -1049,14 +1070,16 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
     val dc = draft.dc ?: car.dcLimit ?: 90
     val isDirty = (draft.ac != null && draft.ac != car.acLimit) ||
                   (draft.dc != null && draft.dc != car.dcLimit)
-    if (isDirty) {
-        Text(
-            "Unsaved changes",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.tertiary,
-        )
-        Spacer(Modifier.height(2.dp))
-    }
+    // Every other slider card in this file (Climate/Comfort) commits each
+    // drag instantly with no separate save step, so this card's Apply-button
+    // model needs its own explanation up front -- not just a dirty flag that
+    // only appears after the fact.
+    Text(
+        if (isDirty) "Unsaved changes" else "Adjust, then tap Apply",
+        style = MaterialTheme.typography.labelSmall,
+        color = if (isDirty) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(2.dp))
     SliderRow("AC", "$ac%", ac, 50, 100, 10) { vm.setAcLimit(car.vin, it) }
     SliderRow("DC", "$dc%", dc, 50, 100, 10) { vm.setDcLimit(car.vin, it) }
     Spacer(Modifier.height(4.dp))
@@ -1183,6 +1206,18 @@ private fun WeatherCard(ui: WearUi, car: CarView) {
 @Composable
 private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Filled.DirectionsCar) {
     val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
+    val err = MaterialTheme.colorScheme.error
+    // This card is a flat list of ~10 rows with nothing summarizing "is
+    // everything closed up" at a glance -- DiagnosticsCard already solved the
+    // identical problem with a roll-up row, so this borrows that pattern.
+    val openCount = car.doorsOpen.size + car.windowsOpen.size +
+        (if (car.trunkOpen) 1 else 0) + (if (car.hoodOpen) 1 else 0)
+    StatusRow(
+        if (openCount > 0) "Open" else "Closed up",
+        if (openCount > 0) "$openCount item${if (openCount == 1) "" else "s"}" else "All secure",
+        valueColor = if (openCount > 0) err else null,
+    )
+    Spacer(Modifier.height(2.dp))
     StatusRow("Engine", if (car.engineOn) "On" else "Off")
     car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
     StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
