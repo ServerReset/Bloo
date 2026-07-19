@@ -96,6 +96,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1545,6 +1546,14 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                             // the drag, sharing the same reorder + commit logic.
                             .semantics {
                                 val cur = order.indexOf(key)
+                                // The move actions committed the reorder but
+                                // gave a TalkBack user no confirmation of
+                                // where the row landed -- they had to
+                                // re-navigate the whole list to find out,
+                                // unlike a sighted user watching the animated
+                                // slide. stateDescription re-reads after each
+                                // move since `order` is state.
+                                stateDescription = "Position ${cur + 1} of ${order.size}"
                                 customActions = listOfNotNull(
                                     if (cur > 0) CustomAccessibilityAction("Move up") {
                                         order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
