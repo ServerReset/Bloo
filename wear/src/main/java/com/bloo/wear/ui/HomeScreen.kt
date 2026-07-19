@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -913,8 +914,18 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
                 },
             )
             Spacer(Modifier.width(4.dp))
-            val delBg = if (confirming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
-            val delFg = if (confirming) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer
+            // Every sibling color change in this file (MorphButton's bg,
+            // PinKey's bg, ChargeRing) crossfades; this was the one hard cut.
+            val delBg by androidx.compose.animation.animateColorAsState(
+                targetValue = if (confirming) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                animationSpec = androidx.compose.animation.core.tween(120),
+                label = "presetDeleteBg",
+            )
+            val delFg by androidx.compose.animation.animateColorAsState(
+                targetValue = if (confirming) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
+                animationSpec = androidx.compose.animation.core.tween(120),
+                label = "presetDeleteFg",
+            )
             // A real confirm/delete action with zero press feedback previously --
             // the same spring scale-punch every MorphButton gets, kept as a
             // circle here since MorphButton's pill/label shape doesn't fit an
@@ -1085,8 +1096,15 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
 }
 
 @Composable
-private fun WeatherCard(ui: WearUi, car: CarView) = SectionCard("Weather") {
+private fun WeatherCard(ui: WearUi, car: CarView) {
+    // Every other multi-line card (Climate, Comfort, Charge, Location, Info,
+    // Diagnostics, AI, Assist, More) passes a header icon; Weather was the
+    // one bare-text header in the stack. Resolved up front (rather than
+    // inside SectionCard's content slot) so the header can use the same
+    // per-condition glyph the body already renders.
     val w = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
+    val headerIcon = w?.let { weatherIcon(it.code, it.isDay) } ?: Icons.Filled.WbSunny
+    SectionCard("Weather", headerIcon) {
     if (w == null) {
         Text(
             "No weather data available",
@@ -1116,6 +1134,7 @@ private fun WeatherCard(ui: WearUi, car: CarView) = SectionCard("Weather") {
     StatusRow("Feels", weatherTemp(w.feelsLikeC, f))
     w.humidity?.let { StatusRow("Humidity", "$it%") }
     if (w.windKph > 0) StatusRow("Wind", formatSpeed(w.windKph.toDouble(), ui.localSettings.unitSystem == "metric"))
+    }
 }
 
 @Composable
@@ -1359,10 +1378,13 @@ private fun CurvedIndicator(count: Int, current: Int, anchor: Float) {
         curvedRow {
             repeat(count) { i ->
                 curvedComposable {
+                    // Matches CurvedDotIndicator's 4dp/7dp scale (both are
+                    // "progress along the bezel" dots that can appear on the
+                    // same screen -- they used to disagree on unselected size).
                     Box(
                         Modifier
                             .padding(1.5.dp)
-                            .size(if (i == current) 7.dp else 5.dp)
+                            .size(if (i == current) 7.dp else 4.dp)
                             .clip(CircleShape)
                             .background(if (i == current) selected else unselected)
                     )

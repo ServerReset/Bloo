@@ -5,8 +5,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -85,6 +87,12 @@ fun MorphSegmented(
     onTick: () -> Unit,
     modifier: Modifier = Modifier,
     trackHeight: Dp = if (options.any { it.icon != null }) 48.dp else 44.dp,
+    /** Hairline rim colour, or null for the old borderless look. Every other
+     *  interactive surface (MorphButton, cards) got a rim once real glass
+     *  blur stopped giving flat surfaces a second depth cue; this control was
+     *  the one left out. Null-default keeps any caller that hasn't been
+     *  updated visually unchanged. */
+    borderColor: Color? = null,
 ) {
     val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
     val trackPad = 4.dp
@@ -101,8 +109,10 @@ fun MorphSegmented(
     val currentSelectedKey by rememberUpdatedState(selectedKey)
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentOnTick by rememberUpdatedState(onTick)
+    val trackShape = RoundedCornerShape(20.dp)
     Box(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(containerColor),
+        modifier = modifier.fillMaxWidth().clip(trackShape).background(containerColor)
+            .then(if (borderColor != null) Modifier.border(BorderStroke(1.dp, borderColor), trackShape) else Modifier),
     ) {
         BoxWithConstraints(Modifier.padding(trackPad).height(trackHeight)) {
             val n = options.size

@@ -7,7 +7,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -31,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -86,12 +89,21 @@ private fun PinKey(label: String, onClick: () -> Unit) {
         label = "pinKeyBg",
     )
     val content = if (pressed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val border by animateColorAsState(
+        targetValue = if (pressed) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+        animationSpec = tween(120),
+        label = "pinKeyBorder",
+    )
     Box(
         Modifier
             .size(48.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
             .background(bg)
+            // MorphButton (the app's other primary control) is bordered at
+            // rest; the PIN pad -- arguably the most-tapped control in the
+            // app -- was the one flat-surface-with-no-rim outlier.
+            .border(BorderStroke(1.dp, border), CircleShape)
             // The backspace key's visible/spoken content was the raw "⌫"
             // glyph -- unlike the digit keys, TTS engines don't reliably
             // pronounce it, so this was the one key most likely to be

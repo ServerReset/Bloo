@@ -106,7 +106,13 @@ fun SectionCard(
             // them read as flatter/less "material" than its own contents --
             // backwards from what should draw the eye. A faint rim gives
             // the card the same depth language.
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), cardShape),
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), cardShape)
+            // Without this, a card's row count changing (an "Unsaved changes"
+            // hint appearing, a preset row being deleted) snapped instantly
+            // while every button/dot/page transition elsewhere in the app is
+            // spring-animated -- the one un-animated size change left in an
+            // otherwise motion-consistent app.
+            .animateContentSize(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)),
     ) {
         Column(
             Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
@@ -247,11 +253,17 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val paintState = (asyncPainter as? AsyncImagePainter)?.state
     val isError = paintState is AsyncImagePainter.State.Error
     val isLoading = paintState is AsyncImagePainter.State.Loading
+    val thumbShape = RoundedCornerShape(18.dp)
     Box(
         modifier
             .size(116.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(thumbShape)
             .background(placeholder)
+            // Same flat surfaceContainerHigh tone as the SectionCard it sits
+            // inside -- without a border it visually merges with its parent
+            // card while loading/erroring, before the map image gives it any
+            // definition of its own.
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), thumbShape)
             .clickable(enabled = isError) { retryKey++ },
         contentAlignment = Alignment.Center,
     ) {
@@ -472,9 +484,19 @@ fun MorphButton(
             containerColor = bg,
             contentColor = resolvedContent,
             disabledContainerColor = bg,
-            disabledContentColor = resolvedContent.copy(alpha = 0.38f),
+            // A flat surfaceContainerHigh fill with 38%-alpha content and no
+            // border (the old `pending` case) had nothing left to read as
+            // "busy" rather than "broken" once Liquid/Ultra Glass stopped
+            // giving buttons a second depth cue -- keeping a dimmer rim and a
+            // less severe alpha dip keeps a pending button legibly "still
+            // there, just working" instead of washed-out.
+            disabledContentColor = resolvedContent.copy(alpha = 0.55f),
         ),
-        border = if (active || pending) null else BorderStroke(1.5.dp, scheme.outline.copy(alpha = 0.85f)),
+        border = when {
+            active -> null
+            pending -> BorderStroke(1.5.dp, scheme.outline.copy(alpha = 0.35f))
+            else -> BorderStroke(1.5.dp, scheme.outline.copy(alpha = 0.85f))
+        },
         label = {
             AnimatedContent(targetState = label, transitionSpec = {
                 (fadeIn(tween(150)) + slideInVertically(tween(150)) { -it / 3 }) togetherWith
@@ -527,6 +549,9 @@ fun MorphSegmented(
         onTick = { haptics.tick() },
         modifier = modifier,
         trackHeight = 48.dp,
+        // Every other interactive surface (MorphButton, SectionCard, PinKey)
+        // has a hairline rim; this was the one flat, borderless control left.
+        borderColor = scheme.outline.copy(alpha = 0.18f),
     )
 }
 
