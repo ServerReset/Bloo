@@ -44,28 +44,10 @@ import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import kotlinx.coroutines.launch
 
-/**
- * The phone renders this same EvTrip.startdate field through a proper
- * "EEE MMM d · h:mm a" formatter (see Screens.kt's tripDate()); the watch
- * was instead just clipping the raw feed string to 16 chars and swapping
- * 'T' for a space, showing a literal "2026-07-18 09:34" card title instead
- * of a readable date. Same parse approach, a slightly more compact pattern
- * (no weekday) to fit the watch's much narrower card.
- */
-private fun tripDate(raw: String?): String {
-    if (raw.isNullOrBlank()) return "Trip"
-    val trimmed = raw.substringBefore('.').trim()
-    val outFormat = java.text.SimpleDateFormat("MMM d · h:mm a", java.util.Locale.US)
-    // The feed has been observed with both a 'T' separator and a plain space --
-    // try each parse pattern in turn before giving up.
-    for (pattern in arrayOf("yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss")) {
-        val parsed = runCatching {
-            java.text.SimpleDateFormat(pattern, java.util.Locale.US).parse(trimmed)
-        }.getOrNull()
-        if (parsed != null) return outFormat.format(parsed)
-    }
-    return trimmed.take(16).replace('T', ' ')
-}
+// Was defined separately here and on the phone (Screens.kt's tripDate()) --
+// now shared/FormatUtils.kt's tripDate(), with includeWeekday = false for
+// the watch's narrower card (no weekday, matching the previous local format).
+private fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw, includeWeekday = false)
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

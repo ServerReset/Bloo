@@ -225,11 +225,12 @@ fun ChargeRing(
             modifier = Modifier.size(size),
             colors = ProgressIndicatorDefaults.colors(indicatorColor = animatedColor),
         )
-        AnimatedContent(
-            targetState = percent?.let { "$it%" } ?: "—",
-            transitionSpec = { (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it/3 }) togetherWith (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it/3 }) },
-            label = "pct",
-        ) { v -> Text(v, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+        // Was a hand-rolled AnimatedContent with the exact same transitionSpec
+        // uicommon's shared AnimatedValue already centralizes.
+        com.bloo.uicommon.AnimatedValue(
+            value = percent?.let { "$it%" } ?: "—",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+        )
     }
 }
 

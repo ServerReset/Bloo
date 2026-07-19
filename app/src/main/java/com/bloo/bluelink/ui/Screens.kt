@@ -3244,8 +3244,11 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
     }
 }
 
-private val ChargeGreen = Color(0xFF2EBD59)
-private val ChargeGreenDark = Color(0xFF1B8A41)
+// Was a phone-only re-declaration of the same hex values shared/BlooColors.kt
+// already centralizes (bit-identical today, one edit away from silently
+// diverging like chargerLabel's text had).
+private val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
+private val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
 
 private val SoftDamping get() = com.bloo.uicommon.SoftDamping
 
@@ -3335,6 +3338,10 @@ private fun RollingNumber(
 @Composable
 private fun rememberRelativeTime(millis: Long?): String? {
     if (millis == null) return null
+    // Re-derives the bucket thresholds shared/relativeLabel() already owns
+    // (and had already drifted from it -- "d ago" here vs "day ago" there).
+    // `now` exists purely to force a recompute on a timer; relativeLabel()
+    // reads the wall clock itself.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(millis) {
         while (true) {
@@ -3342,13 +3349,7 @@ private fun rememberRelativeTime(millis: Long?): String? {
             delay(30_000)
         }
     }
-    val diff = (now - millis).coerceAtLeast(0L)
-    return when {
-        diff < 60_000L -> "just now"
-        diff < 3_600_000L -> "${diff / 60_000L} min ago"
-        diff < 86_400_000L -> "${diff / 3_600_000L} hr ago"
-        else -> "${diff / 86_400_000L} d ago"
-    }
+    return if (now >= 0) com.bloo.bluelink.data.relativeLabel(millis) else null
 }
 
 /** Small "Updated x ago" caption shown prominently under the car name. */
@@ -5434,16 +5435,7 @@ private fun TripRow(trip: EvTrip, metric: Boolean = false) {
     }
 }
 
-/** "2026-06-01 18:22:31.0" -> "Mon Jun 1 · 6:22 PM" (falls back to the raw date). */
-private fun tripDate(raw: String?): String {
-    if (raw.isNullOrBlank()) return "Trip"
-    // Drop any fractional seconds - the feed's precision varies (".0" vs ".000000").
-    val trimmed = raw.substringBefore('.').trim()
-    return runCatching {
-        val parsed = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).parse(trimmed)
-        java.text.SimpleDateFormat("EEE MMM d · h:mm a", java.util.Locale.US).format(parsed!!)
-    }.getOrElse { trimmed.take(16) }
-}
+private fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw)
 
 // --- Car info (status + service + links combined) -------------------------
 
@@ -6584,11 +6576,7 @@ private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     }
 }
 
-private fun chargerLabel(plugin: Int?): String? = when (plugin) {
-    1 -> "DC fast"
-    2 -> "AC (level 2)"
-    else -> null
-}
+private fun chargerLabel(plugin: Int?): String? = com.bloo.bluelink.data.chargerLabel(plugin)
 
 private fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
 

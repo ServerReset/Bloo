@@ -5,6 +5,39 @@ import java.util.TimeZone
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
+/** Charger-plug type label for [EvStatus.batteryPlugin]. Was defined
+ *  separately on phone and watch and had already drifted ("AC (level 2)" vs
+ *  "AC") despite mapping the exact same wire value. */
+fun chargerLabel(plugin: Int?): String? = when (plugin) {
+    1 -> "DC fast"
+    2 -> "AC (level 2)"
+    else -> null
+}
+
+/** "2026-06-01 18:22:31.0" / "2026-06-01T18:22:31" -> "Mon Jun 1 · 6:22 PM"
+ *  (falls back to a trimmed raw string). Was defined separately on phone and
+ *  watch; the watch's version was fixed to try both a 'T' and a plain-space
+ *  separator (the feed has been observed with both) after the phone's
+ *  space-only version silently fell back to raw text on a 'T'-separated
+ *  timestamp -- consolidated on the more robust dual-pattern parse.
+ *  [includeWeekday] false drops the leading "EEE " for narrower displays. */
+fun tripDate(raw: String?, includeWeekday: Boolean = true): String {
+    if (raw.isNullOrBlank()) return "Trip"
+    // Drop any fractional seconds - the feed's precision varies (".0" vs ".000000").
+    val trimmed = raw.substringBefore('.').trim()
+    val outFormat = java.text.SimpleDateFormat(
+        if (includeWeekday) "EEE MMM d · h:mm a" else "MMM d · h:mm a",
+        java.util.Locale.US,
+    )
+    for (pattern in arrayOf("yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss")) {
+        val parsed = runCatching {
+            java.text.SimpleDateFormat(pattern, java.util.Locale.US).parse(trimmed)
+        }.getOrNull()
+        if (parsed != null) return outFormat.format(parsed)
+    }
+    return trimmed.take(16).replace('T', ' ')
+}
+
 /** Mask an email for diagnostics (AppLog is in-memory/copyable in the app's
  *  own log viewer, not a place account addresses should appear in full) --
  *  "j***@gmail.com" instead of "jane.doe@gmail.com". */

@@ -1404,7 +1404,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             climateOn = s?.airCtrlOn ?: snap?.climateOn,
             charging = ev?.batteryCharge ?: snap?.charging,
             pluggedIn = ev?.batteryPlugin?.let { it != 0 },
-            chargerLabel = when (ev?.batteryPlugin) { 1 -> "DC fast"; 2 -> "AC"; else -> null },
+            chargerLabel = com.bloo.bluelink.data.chargerLabel(ev?.batteryPlugin),
             timeToFullMin = ev?.remainTime2?.atc?.value?.toInt(),
             acLimit = ev?.reservChargeInfos?.level(1),
             dcLimit = ev?.reservChargeInfos?.level(0),
