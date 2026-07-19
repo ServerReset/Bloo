@@ -514,12 +514,16 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
 
         item {
+            // Every other network-triggered button on this screen (Sync from
+            // phone, Import from Drive, Check now) shows a busy state; this
+            // one never did despite kicking off a refresh per car.
+            val refreshingAny = ui.cars.any { "${it.vin}:refresh" in ui.pending }
             MorphButton(
                 label = "Refresh all cars",
                 icon = Icons.Filled.Refresh,
                 active = false,
                 activeColor = MaterialTheme.colorScheme.primary,
-                pending = false,
+                pending = refreshingAny,
                 onClick = { vm.refreshAll() },
             )
         }

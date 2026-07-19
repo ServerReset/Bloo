@@ -13,6 +13,7 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.DoorOpen
+import com.bloo.bluelink.data.EvStatus
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SessionStore
@@ -236,7 +237,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile
     private var placeNames: Map<String, String> = emptyMap()
     @Volatile
-    private var pending: Set<String> = emptySet()
+    // Ref-counted rather than a plain Set: two overlapping calls with the same
+    // key (e.g. a manual "Refresh" tap while onCarShown's own refresh for
+    // that car is still in flight) used to collapse to one Set entry, so the
+    // FIRST call's completion unconditionally cleared the key even though the
+    // SECOND call's block() was still running -- the pending spinner/disabled
+    // state vanished, and the button became tappable again, mid-request.
+    private var pendingCounts: Map<String, Int> = emptyMap()
+    private val pending: Set<String> get() = pendingCounts.keys
 
     // Cars whose status we've already fetched this session, so paging back and
     // forth doesn't re-hit the (rate-limited, battery-hungry) network each time.
@@ -499,8 +507,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshAll() {
+        // sessionFetched.clear() + only ever refreshing vehicles.firstOrNull()
+        // meant this silently refreshed just the first car in the garage --
+        // every other car quietly waited for its page to be scrolled to
+        // despite Settings' "Refresh all cars" button implying otherwise.
         sessionFetched.clear()
-        vehicles.firstOrNull()?.let { onCarShown(it.vin) }
+        sessionFetched.addAll(vehicles.map { it.vin })
+        vehicles.forEach { refreshStatus(it.vin, surface = false) }
         refreshConnection()
     }
 
@@ -640,7 +653,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggleCharge(vin: String) = command(vin, "charge") { v, repo, st ->
-        if (st?.evStatus?.batteryCharge == true) repo.stopCharge(v) else repo.startCharge(v)
+        val wasCharging = st?.evStatus?.batteryCharge == true
+        if (wasCharging) repo.stopCharge(v) else repo.startCharge(v)
+        // Unlike toggleLock/toggleClimate, this never flipped local state --
+        // on the standalone (no-phone) path the button stayed on its old
+        // state until the follow-up refreshStatus() network round-trip
+        // landed, a visible lag Lock/Climate don't have.
+        flip(vin) { it.copy(evStatus = (it.evStatus ?: EvStatus()).copy(batteryCharge = !wasCharging)) }
     }
 
     /** Apply a saved climate preset (start climate with its exact settings). Also
@@ -1269,11 +1288,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Plumbing ---------------------------------------------------------
 
     private fun mark(key: String, block: suspend () -> Unit) {
-        pending = pending + key
+        pendingCounts = pendingCounts + (key to (pendingCounts[key] ?: 0) + 1)
         publish()
         viewModelScope.launch {
             try { block() } finally {
-                pending = pending - key
+                val remaining = (pendingCounts[key] ?: 1) - 1
+                pendingCounts = if (remaining <= 0) pendingCounts - key else pendingCounts + (key to remaining)
                 publish()
             }
         }

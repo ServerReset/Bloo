@@ -449,6 +449,10 @@ fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     secondaryLabel: String? = null,
+    /** False disables the button (dimmed, unclickable) without pending's
+     *  spinning-icon "something is in flight" implication -- for states like
+     *  "no data yet" that aren't actually a network request in progress. */
+    enabled: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -484,7 +488,7 @@ fun MorphButton(
 
     Button(
         onClick = { haptics.click(); onClick() },
-        enabled = !pending,
+        enabled = enabled && !pending,
         interactionSource = interaction,
         modifier = modifier.fillMaxWidth()
             .graphicsLayer { scaleX = pressScale; scaleY = pressScale }

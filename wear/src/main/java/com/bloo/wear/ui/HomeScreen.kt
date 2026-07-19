@@ -845,7 +845,12 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
         icon = Icons.Filled.Thermostat,
         active = car.climateOn == true,
         activeColor = MaterialTheme.colorScheme.tertiary,
-        pending = "${car.vin}:climate" in ui.pending || weather == null,
+        // Weather only ever arrives passively from the phone -- "no weather
+        // yet" isn't an in-flight request, so it shouldn't show the same
+        // spinner a real command does (that read as "stuck loading forever"
+        // when the phone has no weather configured). Disabled, not pending.
+        pending = "${car.vin}:climate" in ui.pending,
+        enabled = weather != null,
         onClick = { if (weather != null) vm.smartClimate(car.vin) },
     )
     // Guard on `weather` itself, not just the derived `ambientF`, so a future
