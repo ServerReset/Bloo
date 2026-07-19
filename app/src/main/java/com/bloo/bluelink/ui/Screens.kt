@@ -9395,14 +9395,14 @@ private fun StatusRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
         )
-        AnimatedContent(
-            targetState = value,
-            transitionSpec = {
-                (fadeIn(tween(160)) + slideInVertically { it / 2 }) togetherWith
-                (fadeOut(tween(100)) + slideOutVertically { -it / 2 })
-            },
-            label = "statusVal",
-        ) { v -> WiggleText(v, style = LocalTextStyle.current, fontWeight = FontWeight.Medium) }
+        // Was a hand-rolled AnimatedContent + WiggleText -- uicommon's shared
+        // AnimatedValue already implements this (used elsewhere in this file
+        // and now watch's ChargeRing); this is that same value-cell pattern
+        // duplicated once per pebble-row composable instead of centralized.
+        com.bloo.uicommon.AnimatedValue(
+            value = value,
+            style = LocalTextStyle.current.copy(fontWeight = FontWeight.Medium),
+        )
     }
 }
 
