@@ -393,9 +393,18 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun WideTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
-        val infoW = w * 0.52f
+        val showButtons = c.actions.isNotEmpty() && c.layoutMode == "controls"
         Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(14.dp)) {
-            Column(modifier = GlanceModifier.fillMaxHeight().width(infoW), verticalAlignment = Alignment.CenterVertically) {
+            // A fixed 52%-of-width info column left this tile with a wide dead
+            // gap before the buttons (the text never needed that much room),
+            // and left the ENTIRE right half blank whenever there were no
+            // buttons to show at all. Sizing to content + defaultWeight on
+            // whichever side needs to stretch uses the full tile width in
+            // both cases.
+            Column(
+                modifier = if (showButtons) GlanceModifier.fillMaxHeight() else GlanceModifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(c.snap.name.take(14), maxLines = 1, modifier = GlanceModifier.padding(end = 6.dp),
                         style = TextStyle(color = onBg(c), fontSize = 14.sp, fontWeight = FontWeight.Bold))
@@ -407,7 +416,7 @@ class BlooWidget : GlanceAppWidget() {
                     Text("${formatDistance(it, c.metric)} ${if (c.snap.hasBattery) "range" else "left"}", maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 12.sp))
                 }
             }
-            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
+            if (showButtons) {
                 Spacer(GlanceModifier.width(12.dp))
                 val take = c.actions.take(4)
                 val cols = if (take.size >= 3 && h >= 150.dp) 2 else 1
