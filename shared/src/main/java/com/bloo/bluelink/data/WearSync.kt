@@ -384,6 +384,12 @@ data class WearSettingsPayload(
      *  it on every watch tap/slider-tick/PIN-digit -- see WatchApp's root
      *  LocalHapticFeedback override. */
     val hapticsEnabled: Boolean = true,
+    /** "simple" or "advanced" -- mirrors the phone's Settings view mode so the
+     *  watch can hide the same power-user options the phone does, one shared
+     *  choice instead of the watch showing everything unconditionally while
+     *  the phone hides it. One-way (phone -> watch): the watch has no UI of
+     *  its own to change this, unlike aiEnabled/auroraEnabled above. */
+    val settingsMode: String = "simple",
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */

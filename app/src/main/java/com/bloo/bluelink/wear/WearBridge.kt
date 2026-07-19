@@ -162,6 +162,7 @@ object WearBridge {
             auroraColorMode = appearance.auroraColorMode,
             auroraCustomColor = appearance.auroraCustomColor,
             hapticsEnabled = appearance.hapticsEnabled,
+            settingsMode = store.settingsMode(),
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))

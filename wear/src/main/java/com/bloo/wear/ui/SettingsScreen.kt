@@ -67,6 +67,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     var pinFlow by remember { mutableStateOf<PinFlowMode?>(null) }
+    // Mirrors the phone's Simple/Advanced settings mode (synced one-way via
+    // WearSettingsPayload.settingsMode) -- the watch had no such concept at
+    // all before, showing every power-user row unconditionally even when the
+    // phone hides the same rows in simple mode.
+    val advanced = ui.settings?.settingsMode == "advanced"
     var confirmSignOut by remember { mutableStateOf(false) }
     // Auto-reset the destructive confirm so a stale "tap again" can't sign you out later.
     LaunchedEffect(confirmSignOut) {
@@ -261,7 +266,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
-        item {
+        if (advanced) item {
             SettingSection("Aurora background") {
                 val enabled = ui.settings?.auroraEnabled == true
                 Text(
@@ -304,7 +309,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
-        item {
+        if (advanced) item {
             SettingSection("Watch text size") {
                 // A local draft during the drag -- setFontScale does a DataStore
                 // write AND a Wearable Data Layer push to the phone, so it
@@ -329,7 +334,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
-        item {
+        if (advanced) item {
             SettingSection("Tile chips") {
                 Text(
                     "Pick up to two actions for the glanceable Tile.",

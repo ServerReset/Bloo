@@ -1926,7 +1926,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Switch between simple and advanced settings view. */
     fun setSettingsMode(mode: String) {
         _state.update { it.copy(settingsMode = mode) }
-        viewModelScope.launch { settingsStore.setSettingsMode(mode) }
+        viewModelScope.launch {
+            settingsStore.setSettingsMode(mode)
+            // settingsMode isn't part of Appearance, so it isn't covered by the
+            // appearance.collect mirror below -- republish explicitly so the
+            // watch hides/shows the same advanced-only rows immediately,
+            // same as setAiEnabled above.
+            com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value)
+        }
     }
 
     fun setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
