@@ -72,18 +72,6 @@ data class SeatConfig(
 /** User-confirmed powertrain (the US API only exposes EV vs gas). */
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
-/**
- * Frosted (flat blurred tint) vs Liquid glass (brighter, more refractive)
- * floating-UI style. Ultra glass is Liquid glass everywhere Liquid applies,
- * plus it extends the same real blur/refraction to the pebble section
- * backgrounds too, not just floating chrome (icons, search bar, pills).
- */
-enum class GlassStyle(val label: String) {
-    FROSTED("Frosted"),
-    LIQUID("Liquid glass"),
-    ULTRA("Ultra glass"),
-}
-
 /** When the biometric app-lock re-engages after the app leaves the foreground. */
 enum class LockTiming(val label: String) {
     OFF("Off"),
@@ -131,7 +119,6 @@ class SettingsStore(private val context: Context) {
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
         val SETTINGS_MODE = stringPreferencesKey("settings_mode")
-        val GLASS_STYLE = stringPreferencesKey("glass_style")
         /** Watch's own PIN lock enabled/timing, mirrored here purely as a backup
          *  record (see WearLocalPayload's doc comment) -- the phone never reads
          *  or acts on these, and never pushes them back down to the watch. */
@@ -182,8 +169,6 @@ class SettingsStore(private val context: Context) {
         val unitSystem: String = "imperial",
         /** Haptic feedback across the UI. */
         val hapticsEnabled: Boolean = true,
-        /** Frosted vs liquid-glass style for floating UI (search bar, floating buttons, widget). */
-        val glassStyle: GlassStyle = GlassStyle.LIQUID,
         /** Watch's own PIN lock enabled/timing -- a backup record only, mirrored
          *  from the watch. See [SettingsStore.Keys.WATCH_PIN_ENABLED]'s comment. */
         val watchPinLockEnabled: Boolean = false,
@@ -227,15 +212,9 @@ class SettingsStore(private val context: Context) {
             auroraCustomColor = prefs[Keys.AURORA_CUSTOM_COLOR],
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
             useFahrenheit = (prefs[Keys.UNIT_SYSTEM] ?: "imperial") != "metric",
-            glassStyle = prefs[Keys.GLASS_STYLE]?.let { runCatching { GlassStyle.valueOf(it) }.getOrNull() }
-                ?: GlassStyle.LIQUID,
             watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
             watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
         )
-    }
-
-    suspend fun setGlassStyle(value: GlassStyle) {
-        editTracked { it[Keys.GLASS_STYLE] = value.name }
     }
 
     suspend fun setHapticsEnabled(value: Boolean) {

@@ -289,7 +289,6 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
-import com.bloo.bluelink.data.GlassStyle
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
@@ -324,8 +323,6 @@ import kotlin.math.roundToInt
 import kotlin.math.tan
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 
 /** Which [ReorderColumn.introKey]s have already played their cold-start
  *  intro (see `staggerInOnColdStart`), so it plays once per key per process
@@ -372,23 +369,8 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // One Haze source for the whole app: the root background (below) is what
-    // every floating icon/search bar blurs, regardless of which screen is on
-    // top. Haze tracks source/effect nodes by shared state, not literal
-    // parent-child nesting, so this works across the AnimatedContent screen
-    // swap below -- but unlike the reverted refraction-library attempt, this
-    // is Haze's own lightweight per-node blur (no shared GraphicsLayer that
-    // multiple simultaneous consumers all fight over), which this app
-    // already ran crash-free before. The source Box is also deliberately
-    // NOT the same node the biometric lock's `.blur(lockBlur)` animates on
-    // (see below) -- keeping haze's own capture off a node whose blur
-    // radius is separately animating avoids stacking two different kinds of
-    // "resample this every frame" work on the exact same layer.
-    val hazeState = rememberHazeState()
     CompositionLocalProvider(
         LocalHaptics provides haptics,
-        LocalHazeState provides hazeState,
-        LocalGlassStyle provides appearance.glassStyle,
     ) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
     // status/navigation bars; screen content draws on top of it.
@@ -418,8 +400,7 @@ fun BlooApp(vm: AppViewModel) {
                         scheme.surfaceContainerLow,
                     ),
                 ),
-            )
-            .hazeSource(state = hazeState),
+            ),
     ) {
     Scaffold(
         containerColor = Color.Transparent,
@@ -1618,10 +1599,7 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
 /**
  * The app's shared "important pop-up" dialog shell. Update-available and
  * Drive-sync-setup both route through this now instead of two separately
- * hand-rolled AlertDialogs that merely happened to look similar -- one real
- * shared composable, and both get actual Liquid Glass (GlassBackdrop's real
- * blur, not just a flat tint) the same way the rest of the app's floating
- * chrome does, which the plain default AlertDialog surface never had.
+ * hand-rolled AlertDialogs that merely happened to look similar.
  */
 @Composable
 private fun GlassAlertDialog(
@@ -1638,10 +1616,9 @@ private fun GlassAlertDialog(
         containerColor = Color.Transparent,
         title = {
             Box {
-                GlassBackdrop(blockShape, Modifier.matchParentSize())
                 Surface(
                     shape = blockShape,
-                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(liquid = 0.55f, frosted = 0.92f)),
+                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.92f)),
                 ) {
                     Row(
                         Modifier.padding(16.dp, 14.dp, 16.dp, 0.dp),
@@ -1656,10 +1633,9 @@ private fun GlassAlertDialog(
         },
         text = {
             Box {
-                GlassBackdrop(blockShape, Modifier.matchParentSize())
                 Surface(
                     shape = blockShape,
-                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(liquid = 0.55f, frosted = 0.92f)),
+                    color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.92f)),
                 ) {
                     Column(
                         Modifier.padding(16.dp, 12.dp, 16.dp, 12.dp).verticalScroll(rememberScrollState()),
@@ -2897,7 +2873,6 @@ private fun FloatingIcon(
             .dropShadow(CircleShape),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            GlassBackdropCircle(Modifier.matchParentSize())
             Icon(icon, contentDescription = description)
         }
     }
@@ -3713,7 +3688,6 @@ private fun VehicleDetailContent(
                     modifier = Modifier.dropShadow(RoundedCornerShape(50)),
                 ) {
                     Box {
-                        GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
                         Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                             Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         }
@@ -3814,7 +3788,6 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 modifier = Modifier.dropShadow(RoundedCornerShape(50)),
             ) {
               Box {
-                GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 }
@@ -4982,31 +4955,14 @@ private fun Pebble(
         label = "pebbleCorner",
     )
     val fillHeight = LocalPebbleFillHeight.current
-    val ultraGlass = isUltraGlass()
     val pebbleShape = RoundedCornerShape(corner)
     Box(Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)) {
-        // Ultra glass extends the same real blur/refraction floating chrome
-        // uses to the pebble backgrounds themselves, not just icons/search --
-        // the Card below goes translucent so this shows through it.
-        if (ultraGlass) {
-            GlassBackdrop(pebbleShape, Modifier.matchParentSize())
-        }
         Card(
             Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier),
             shape = pebbleShape,
             colors = CardDefaults.cardColors(
-                // Ultra glass needs enough tint to stay legible over whatever's
-                // blurred behind it -- 0.28 read fine over a plain background
-                // but washed out text against a bright photo/wallpaper behind
-                // the blur. A firmer 0.46 keeps the glass read (still see-
-                // through, still blurred) while guaranteeing the tile's own
-                // tone -- not the backdrop's -- dominates contrast. contentColor
-                // is pinned to onSurface rather than left to derive from the
-                // now-translucent containerColor, which resolves to Unspecified
-                // (no scheme match) and would otherwise silently fall back to
-                // whatever ambient LocalContentColor happens to be in scope.
-                containerColor = if (ultraGlass) containerColor.copy(alpha = 0.46f) else containerColor,
-                contentColor = if (ultraGlass) MaterialTheme.colorScheme.onSurface else contentColorFor(containerColor),
+                containerColor = containerColor,
+                contentColor = contentColorFor(containerColor),
             ),
         ) {
             // animateContentSize gives a smooth, correctly-measured collapse (no
@@ -7698,19 +7654,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                         )
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                Text("Floating UI glass", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(6.dp))
-                MorphSegmented(
-                    options = GlassStyle.entries.map { SegmentOption(it.name, it.label, null) },
-                    selectedKey = appearance.glassStyle.name,
-                    onSelect = { runCatching { vm.setGlassStyle(GlassStyle.valueOf(it)) } },
-                )
-                Text(
-                    "Applies to floating buttons, the settings search bar, and the home-screen widget.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                   // AnimatedVisibility lays out a single child, not an implicit
                   // Column of its content lambda's composables -- without this
@@ -7888,13 +7831,12 @@ onValueChange = { vibrancyDraft = it },
                 // itself and its individual result cards already work.
                 Surface(
                     shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(liquid = 0.92f, frosted = 0.98f)),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.98f)),
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth().dropShadow(RoundedCornerShape(28.dp), blurRadius = 16.dp, offsetY = 6.dp),
                 ) {
                     Box {
-                        GlassBackdrop(RoundedCornerShape(28.dp), Modifier.matchParentSize())
                         Column(
                             Modifier
                                 .fillMaxWidth()
@@ -7943,7 +7885,6 @@ onValueChange = { vibrancyDraft = it },
                 modifier = Modifier.dropShadow(RoundedCornerShape(50)),
             ) {
                 Box {
-                    GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
                     Text(
                         "Settings",
                         Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -7969,7 +7910,6 @@ onValueChange = { vibrancyDraft = it },
                 // has no backdrop slot of its own, so the blur is drawn here,
                 // behind it, at the same corner radius it clips its own
                 // background to (20.dp).
-                GlassBackdrop(RoundedCornerShape(20.dp), Modifier.matchParentSize())
                 MorphSegmented(
                     options = listOf(
                         SegmentOption("simple", "Simple", null),
@@ -8374,7 +8314,7 @@ private fun GlowySearchBar(
             Surface(
                 onClick = { if (!expanded) onFocusChange(true) },
                 shape = RoundedCornerShape(50),
-                color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(liquid = 0.45f, frosted = 0.80f)),
+                color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.80f)),
                 contentColor = scheme.onSurface,
                 tonalElevation = if (expanded) 10.dp else 6.dp,
                 border = BorderStroke(
@@ -8397,7 +8337,6 @@ private fun GlowySearchBar(
                     .dropShadow(RoundedCornerShape(50)),
             ) {
                 Box {
-                    GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
                     // Cross-fades + scales between the collapsed and expanded
                     // content instead of an instant swap -- the pill's WIDTH
                     // already animates smoothly, but the content inside used to
@@ -8524,7 +8463,6 @@ private fun SearchSuggestions(state: UiState, onPick: (String) -> Unit) {
                 modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
             ) {
                 Box {
-                    GlassBackdrop(RoundedCornerShape(50), Modifier.matchParentSize())
                     Text(
                         example,
                         Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -9519,8 +9457,7 @@ private fun DriveSyncSetupDialog(
     // Routed through the same GlassAlertDialog shell as UpdatePromptDialog
     // (icon+bold title, informative content, stacked full-width buttons) --
     // one real shared composable instead of two separately hand-rolled
-    // AlertDialogs that merely happened to look similar, and both now get
-    // real Liquid Glass instead of a flat surface fill.
+    // AlertDialogs that merely happened to look similar.
     GlassAlertDialog(
         onDismissRequest = onDismissRequest,
         icon = Icons.Filled.Cloud,

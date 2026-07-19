@@ -131,15 +131,6 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Real hardware-accelerated blur/glass for floating UI (search bar,
-    // floating buttons) — Glance widgets can't use this (RemoteViews has no
-    // blur primitive), see BlooWidget's simulated tint. This app ran this
-    // exact dependency crash-free before; a later attempt at a full
-    // refraction library (io.github.kyant0:backdrop) was reverted after it
-    // crashed post-unlock, per documented, unresolved upstream bugs in that
-    // library for this app's multi-consumer usage pattern.
-    implementation("dev.chrisbanes.haze:haze:2.0.0-alpha03")
-    implementation("dev.chrisbanes.haze:haze-blur:2.0.0-alpha03")
 
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.
