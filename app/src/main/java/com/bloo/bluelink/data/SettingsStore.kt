@@ -82,7 +82,13 @@ enum class LockTiming(val label: String) {
 }
 
 /** Reorderable detail sections (pebbles), in their default order. */
-val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "ai", "climate", "info", "location", "weather", "trips", "diagnostics")
+// "climate" ahead of "ai": pre-heating/cooling the car before walking out to
+// it is the single most common "glance and go" action this app exists for,
+// while AI summary is a passive, network-dependent read -- the old order put
+// a "Summarize" button ahead of every actual control on both phone and watch
+// (the watch's tile order mirrors this list) for anyone who hasn't
+// customized their section order.
+val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "climate", "ai", "info", "location", "weather", "trips", "diagnostics")
 
 /** Pebbles the user may hide (the others are essential). */
 val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trips", "info", "diagnostics", "ai")

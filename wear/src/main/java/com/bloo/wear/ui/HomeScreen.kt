@@ -786,7 +786,12 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         MorphButton(
             label = if (locked) "Locked" else "Unlocked",
             icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-            active = locked,
+            // Was `active = locked` -- highlighted the *opposite* state from
+            // the dedicated Lock tile one card below (WearTiles.LOCK, which
+            // highlights unlocked as the noteworthy state, matching the
+            // phone/complication). Two lock buttons a swipe apart teaching
+            // contradictory rules for what "highlighted" means.
+            active = !locked,
             activeColor = MaterialTheme.colorScheme.primary,
             pending = "${car.vin}:doors" in ui.pending,
             onClick = { vm.toggleLock(car.vin) },
@@ -809,6 +814,16 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 @Composable
 private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Climate", Icons.Filled.Thermostat) {
     val d = ui.draftFor(car.vin)
+    // Stacked right above Smart Climate, with a near-identical button --
+    // Smart Climate already explains itself ("Ambient: 58° · adjusts ±10°");
+    // without an equivalent line here the two read as two unexplained
+    // buttons doing the same thing rather than "manual vs. smart".
+    Text(
+        "Pick your own temperature",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(4.dp))
     MorphButton(
         label = if (car.climateOn == true) "Climate on" else "Start climate",
         icon = Icons.Filled.Thermostat,

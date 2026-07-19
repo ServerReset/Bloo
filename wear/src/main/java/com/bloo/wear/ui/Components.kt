@@ -127,8 +127,12 @@ fun SectionCard(
             // hint appearing, a preset row being deleted) snapped instantly
             // while every button/dot/page transition elsewhere in the app is
             // spring-animated -- the one un-animated size change left in an
-            // otherwise motion-consistent app.
-            .animateContentSize(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)),
+            // otherwise motion-consistent app. StiffnessLow+LowBouncy (the
+            // slowest, bounciest combination in the file, vs. every other
+            // spring here using Medium/High stiffness) noticeably overshot
+            // and settled slowly for something that fires on routine events
+            // like a status refresh clearing an alert row mid-scroll.
+            .animateContentSize(spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow)),
     ) {
         Column(
             Modifier.padding(horizontal = 6.dp, vertical = 8.dp),

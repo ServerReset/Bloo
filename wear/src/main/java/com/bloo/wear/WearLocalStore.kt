@@ -58,7 +58,7 @@ object WearTiles {
 object WearPebbles {
     /** Pebble order on the phone (mirrors the app's DEFAULT_SECTIONS). */
     val DEFAULT_ORDER = listOf(
-        "summary", "controls", "charge", "ai", "climate",
+        "summary", "controls", "charge", "climate", "ai",
         "info", "location", "weather", "trips", "diagnostics",
     )
 
