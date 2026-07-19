@@ -152,6 +152,14 @@ data class WearUi(
     /** Optimistic per-car pebble orders the watch just set, held until the phone
      *  echoes the same order back via [settings]. */
     val pebbleOverride: Map<String, List<String>> = emptyMap(),
+    /** Optimistic overrides for settings fields the watch itself just changed
+     *  (aiEnabled/auroraEnabled/auroraColorMode), held until the phone's echo
+     *  matches -- same reasoning as [pebbleOverride]. Without this, any OTHER
+     *  PATH_SETTINGS publish landing between the optimistic toggle and its
+     *  own echo (a concurrent theme change, or one of the many other events
+     *  that already trigger a settings republish) carried the pre-toggle
+     *  value and stomped the toggle back to stale. */
+    val settingsOverride: Map<String, Any?> = emptyMap(),
     /** A newer CI build than what's installed, if found and not snoozed/disabled.
      *  Wear OS has no reliable on-device sideload flow, so acting on this opens
      *  the run's page on the connected phone rather than installing anything
@@ -268,7 +276,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     val stillPending = u.pebbleOverride.filterKeys { vin ->
                         WearPebbles.normalize(s?.pebbleOrders?.get(vin) ?: emptyList()) != u.pebbleOverride[vin]
                     }
-                    u.copy(settings = s, pebbleOverride = stillPending)
+                    val stillPendingSettings = u.settingsOverride.filterKeys { key ->
+                        val incoming = when (key) {
+                            "aiEnabled" -> s?.aiEnabled
+                            "auroraEnabled" -> s?.auroraEnabled
+                            "auroraColorMode" -> s?.auroraColorMode
+                            else -> null
+                        }
+                        incoming != u.settingsOverride[key]
+                    }
+                    val effectiveSettings = s?.copy(
+                        aiEnabled = (stillPendingSettings["aiEnabled"] as? Boolean) ?: s.aiEnabled,
+                        auroraEnabled = (stillPendingSettings["auroraEnabled"] as? Boolean) ?: s.auroraEnabled,
+                        auroraColorMode = (stillPendingSettings["auroraColorMode"] as? String) ?: s.auroraColorMode,
+                    )
+                    u.copy(settings = effectiveSettings, pebbleOverride = stillPending, settingsOverride = stillPendingSettings)
                 }
             }
         }
@@ -304,6 +326,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 // stale/duplicate reply (e.g. after a timeout already cleared it)
                 // shouldn't clobber unrelated busy state or messages.
                 _ui.update { if (it.aiBusy == r.vin) it.copy(aiBusy = null, message = r.message) else it }
+            }
+        }
+        viewModelScope.launch {
+            WearCommandEvents.results.collect { r ->
+                // command()'s relay branch has no ack channel of its own -- it
+                // applies its optimistic flip the instant the message SEND
+                // succeeds, not once the phone's execution actually does. On
+                // a real failure (the phone's BlueLink/Kia call itself
+                // errored), re-pull the car's real status rather than trying
+                // to hand-invert the optimistic value here -- FLASH_LIGHTS/
+                // HORN_AND_LIGHTS have no state to invert at all, and a fresh
+                // fetch is correct for every action uniformly.
+                if (!r.ok) {
+                    _ui.update { it.copy(message = r.message ?: "Command failed") }
+                    refreshStatus(r.vin, surface = false)
+                }
             }
         }
         viewModelScope.launch {
@@ -647,11 +685,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun flashLights(vin: String) = command(
         vin, "hornLights",
         explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.FLASH_LIGHTS),
+        // Momentary and otherwise invisible on the watch itself (the lights
+        // are on the car, not the wrist) -- with no successMessage, a
+        // successful tap gave zero acknowledgement at all.
+        successMessage = "Lights flashed",
     ) { v, repo, _ -> repo.flashLights(v) }
 
     fun hornAndLights(vin: String) = command(
         vin, "hornLights",
         explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.HORN_AND_LIGHTS),
+        successMessage = "Horn & lights sent",
     ) { v, repo, _ -> repo.hornAndLights(v) }
 
     fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
@@ -1082,14 +1125,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  toggle and AI tile react instantly; the phone's echo (or a future
      *  settings push) settles it for real. */
     fun setAiEnabled(enabled: Boolean) {
-        _ui.update { u -> u.copy(settings = u.settings?.copy(aiEnabled = enabled)) }
+        _ui.update { u ->
+            u.copy(settings = u.settings?.copy(aiEnabled = enabled), settingsOverride = u.settingsOverride + ("aiEnabled" to enabled))
+        }
         viewModelScope.launch { WearComms.publishAiToggle(ctx, enabled) }
     }
 
     /** Turn the watch's own aurora background on/off. Same optimistic-update +
      *  phone-echo pattern as [setAiEnabled]. */
     fun setAuroraEnabled(enabled: Boolean) {
-        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraEnabled = enabled)) }
+        _ui.update { u ->
+            u.copy(settings = u.settings?.copy(auroraEnabled = enabled), settingsOverride = u.settingsOverride + ("auroraEnabled" to enabled))
+        }
         viewModelScope.launch { WearComms.publishAuroraToggle(ctx, enabled) }
     }
 
@@ -1100,7 +1147,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  or off as a side effect of just changing its colour. */
     fun setAuroraColorMode(mode: String) {
         val enabled = _ui.value.settings?.auroraEnabled ?: return
-        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraColorMode = mode)) }
+        _ui.update { u ->
+            u.copy(settings = u.settings?.copy(auroraColorMode = mode), settingsOverride = u.settingsOverride + ("auroraColorMode" to mode))
+        }
         viewModelScope.launch { WearComms.publishAuroraToggle(ctx, enabled, colorMode = mode) }
     }
 

@@ -81,6 +81,12 @@ class WearListenerService : WearableListenerService() {
             WearSync.PATH_COMMAND_RESULT -> serviceScope.launch {
                 runCatching {
                     val result = WearSync.decodeResult(raw) ?: return@launch
+                    // A live WearViewModel reverts its optimistic state and
+                    // surfaces a message off this immediately (see
+                    // WearCommandEvents' doc comment); the notification is a
+                    // backstop in case the app was closed mid-request, same
+                    // as PATH_SYNC_RESULT/PATH_AI_RESULT below.
+                    WearCommandEvents.emit(result)
                     WearNotifications.post(
                         applicationContext,
                         ("result" + result.vin + result.action).hashCode(),
