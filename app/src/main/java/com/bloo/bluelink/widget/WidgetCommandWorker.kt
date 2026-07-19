@@ -69,6 +69,18 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                                 store.updateVehicle(WearCommandRunner.optimistic(it, WearCommandRunner.inverse(wearAction)))
                             }
                         }
+                        // The button reverting is the only signal a tap had happened
+                        // before this -- indistinguishable from a render glitch. A
+                        // toast is the one feedback channel available with no
+                        // activity/UI context, matching how in-app command failures
+                        // already surface a message via runCommand/AppViewModel.
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                ctx,
+                                result.message ?: "Widget command failed",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                         return
                     }
                     AppLog.log("Widget: ${wearAction} → ok")
