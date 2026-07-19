@@ -167,6 +167,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -6412,7 +6413,18 @@ private fun ChargeLimitPill(
                 color = buttonContainer(),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                // Both the current value and what tapping actually does (bump
+                // by 10%, wrapping at 100%) were purely visual -- TalkBack
+                // announced only the label text with no indication this half
+                // was itself a stepper, distinct from "Set" on the right.
+                modifier = Modifier.weight(1f).fillMaxHeight()
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "$label, $limit percent"
+                        onClick(label = "Increase by 10 percent") {
+                            onValueChange(if (limit >= 100) 50 else limit + 10)
+                            true
+                        }
+                    },
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
