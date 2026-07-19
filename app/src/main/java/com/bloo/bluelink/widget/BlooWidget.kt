@@ -116,8 +116,8 @@ class BlooWidget : GlanceAppWidget() {
             accent = ColorProvider(accentColor),
             onAccent = ColorProvider(onAccent),
             charge = ColorProvider(Color(com.bloo.bluelink.data.BlooColors.chargeGreen)),
-            unlocked = ColorProvider(Color(0xFFE0574B)),
-            climate = ColorProvider(Color(0xFF16B8C6)),
+            unlocked = ColorProvider(Color(com.bloo.bluelink.data.BlooColors.heat)),
+            climate = ColorProvider(Color(com.bloo.bluelink.data.BlooColors.climateTeal)),
             pending = ColorProvider(Color(0.55f, 0.55f, 0.60f, 0.55f)),
             tile = ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.13f)),
         )
@@ -139,14 +139,19 @@ class BlooWidget : GlanceAppWidget() {
             GlanceTheme {
                 val w = LocalSize.current.width
                 val h = LocalSize.current.height
+                // Pill shape only makes sense on 1-2 unit widgets -- past that,
+                // a near-circular corner radius clips text/buttons against the
+                // curve with no room to compensate, so it silently falls back
+                // to the normal size-based corner instead of forcing a pill
+                // shape the layout was never padded for.
+                val pillEligible = pillShape && w < 180.dp && h < 180.dp
                 val corner = when {
-                    pillShape -> 999.dp
+                    pillEligible -> 999.dp
                     w < 90.dp || h < 90.dp -> 16.dp
                     w < 180.dp || h < 130.dp -> 22.dp
                     else -> 28.dp
                 }
-                // Pill shape only for 1-2 unit widgets; push content in to avoid clipping
-                val pillPad = if (pillShape && (w < 180.dp || h < 180.dp)) 8.dp else 0.dp
+                val pillPad = if (pillEligible) 8.dp else 0.dp
                 val bgAlpha = 1f - bgAlphaLevel / 9f // 1.0 (opaque) -> 0.1 (transparent)
                 val themeBg = if (appearance.themeMode.name == "AMOLED") ColorProvider(Color(0xFF000000))
                               else GlanceTheme.colors.widgetBackground

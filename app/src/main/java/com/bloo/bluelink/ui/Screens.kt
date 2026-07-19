@@ -4537,6 +4537,17 @@ private fun PaletteEditorDialog(
     var tertiaryColor by remember(editing) {
         mutableStateOf(editing?.tertiaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: Color(0xFF00696E))
     }
+    // Was a single un-confirmed tap that permanently deleted a saved custom
+    // palette -- same "tap again to confirm" + 4s auto-reset pattern as the
+    // climate preset delete nub, so this destructive action isn't one
+    // mis-tap away from losing work either.
+    var confirmDelete by remember(editing) { mutableStateOf(false) }
+    LaunchedEffect(confirmDelete) {
+        if (confirmDelete) {
+            delay(4000)
+            confirmDelete = false
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -4548,8 +4559,14 @@ private fun PaletteEditorDialog(
                     fontWeight = FontWeight.Bold,
                 )
                 if (editing != null) {
-                    IconButton(onClick = { onDelete(paletteId); onDismiss() }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Delete palette")
+                    IconButton(onClick = {
+                        if (confirmDelete) { onDelete(paletteId); onDismiss() } else { confirmDelete = true }
+                    }) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = if (confirmDelete) "Confirm delete palette" else "Delete palette",
+                            tint = if (confirmDelete) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                        )
                     }
                 }
             }
@@ -6285,6 +6302,25 @@ private fun PresetPill(
     )
     val leftFg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
 
+    // Delete was a single un-confirmable tap right beside the much larger,
+    // frequently-tapped Apply half -- a slightly mis-aimed tap silently and
+    // irreversibly dropped a saved preset. Now requires a second tap, same
+    // "tap again to confirm" pattern (with the same 4s auto-reset) used for
+    // Sign out and the watch's own preset-delete confirm.
+    var confirmDelete by remember { mutableStateOf(false) }
+    LaunchedEffect(confirmDelete) {
+        if (confirmDelete) {
+            delay(4000)
+            confirmDelete = false
+        }
+    }
+    val deleteBg by androidx.compose.animation.animateColorAsState(
+        if (confirmDelete) MaterialTheme.colorScheme.error else buttonContainer(),
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "presetDeleteBg",
+    )
+    val deleteFg = if (confirmDelete) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface
+
     // The drag handle wraps the whole pill so long-press anywhere reorders.
     Row(
         modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min),
@@ -6326,9 +6362,18 @@ private fun PresetPill(
         }
         // Delete nub — inner (left) corners match the gap, outer (right) corners are pill-rounded.
         Surface(
-            onClick = { haptics?.tick(); onDelete() },
-            color = buttonContainer(),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            onClick = {
+                if (confirmDelete) {
+                    haptics?.tick()
+                    onDelete()
+                    confirmDelete = false
+                } else {
+                    haptics?.tick()
+                    confirmDelete = true
+                }
+            },
+            color = deleteBg,
+            contentColor = deleteFg,
             shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
             modifier = Modifier.fillMaxHeight(),
         ) {
@@ -6336,7 +6381,11 @@ private fun PresetPill(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 14.dp),
             ) {
-                Icon(Icons.Filled.Close, contentDescription = "Delete $name", modifier = Modifier.size(15.dp))
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = if (confirmDelete) "Confirm delete $name" else "Delete $name",
+                    modifier = Modifier.size(15.dp),
+                )
             }
         }
     }
@@ -7099,6 +7148,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                 state.accounts.forEachIndexed { i, creds ->
                     if (i > 0) Spacer(Modifier.height(16.dp))
                     var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
+                    // Was a single un-confirmed tap that signed the account out
+                    // immediately -- same "tap again to confirm" + 4s
+                    // auto-reset pattern used for the climate preset/palette
+                    // deletes above, so every destructive action in the app
+                    // now asks for the same second tap instead of some firing
+                    // instantly and others not.
+                    var confirmSignOut by remember(creds.brand) { mutableStateOf(false) }
+                    LaunchedEffect(confirmSignOut) {
+                        if (confirmSignOut) {
+                            delay(4000)
+                            confirmSignOut = false
+                        }
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         StatusRow("Email", creds.email)
@@ -7125,8 +7187,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                                 )
                             }
                             MorphTextButton(
-                                "Sign out",
-                                onClick = { vm.logout(creds.brand) },
+                                if (confirmSignOut) "Tap again to confirm" else "Sign out",
+                                onClick = {
+                                    if (confirmSignOut) { vm.logout(creds.brand); confirmSignOut = false }
+                                    else confirmSignOut = true
+                                },
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
                             )
