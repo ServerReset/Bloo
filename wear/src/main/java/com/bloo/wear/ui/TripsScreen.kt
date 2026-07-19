@@ -11,7 +11,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -22,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.formatEfficiency
@@ -29,6 +35,7 @@ import com.bloo.bluelink.data.formatTripDistance
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -104,13 +111,49 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         item { ListHeader { Text("Recent trips", textAlign = TextAlign.Center) } }
 
         if (trips.isNullOrEmpty()) {
+            // A genuine fetch failure used to render the exact same "No
+            // recent trips reported" text a car with a truly empty history
+            // would show -- indistinguishable from "you've just never driven
+            // this car", when what actually happened was a network/API
+            // error. Gets its own icon/title/retry, matching the richer
+            // empty-state pattern HomeScreen uses for "No cars yet".
+            val failed = vin in ui.tripsErrors
             item {
-                Text(
-                    if (loading) "Loading…" else "No recent trips reported",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        if (failed) Icons.Filled.WifiOff else Icons.Filled.Route,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = if (failed) MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    )
+                    Text(
+                        if (failed) "Couldn't load trips" else "No trips yet",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        if (failed) "Check your connection and try again." else "Trips will appear once you've driven.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    if (failed) {
+                        MorphButton(
+                            label = "Retry",
+                            icon = Icons.Filled.Refresh,
+                            active = false,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            pending = false,
+                            onClick = { vm.loadTrips(vin) },
+                        )
+                    }
+                }
             }
         } else {
             for (index in trips.indices) {

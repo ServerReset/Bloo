@@ -275,9 +275,13 @@ class BlooWidget : GlanceAppWidget() {
             if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
                 Spacer(GlanceModifier.width(8.dp))
                 val take = c.actions.take(4)
-                // Horizontal row on short widgets — one row only
+                // A flat 50dp-per-button reserved a fixed strip regardless of
+                // what was actually left after the info column -- overflowing
+                // (silently clipped by RemoteViews) on narrower widgets, or
+                // leaving a gap before the tile's right edge on wider ones.
+                // defaultWeight() on both sides shares the row honestly.
                 ButtonGrid(c, take, cols = take.size, showLabel = false, iconSize = 22.dp,
-                    modifier = GlanceModifier.fillMaxHeight().width((take.size * 50).dp))
+                    modifier = GlanceModifier.fillMaxHeight().defaultWeight())
             }
         }
     }

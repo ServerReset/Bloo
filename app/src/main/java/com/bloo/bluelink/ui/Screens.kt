@@ -8651,10 +8651,15 @@ private fun SettingsSearchResults(
     // Floating above busy/aurora content needs real separation -- a plain
     // default Card blends into whatever's behind it. Elevated container +
     // actual shadow (not just tonal elevation) so results clearly pop.
+    val resultCardShape = RoundedCornerShape(16.dp)
     val resultCardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
-    val resultCardElevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    // These float over busy/aurora content the same way the search bar and
+    // "Try asking" panel above them do, but were left on plain tonal-
+    // elevation Cards -- the one inconsistency in an otherwise unified
+    // floating-chrome look within this exact panel.
+    val resultCardModifier = Modifier.fillMaxWidth().dropShadow(resultCardShape, blurRadius = 10.dp, offsetY = 3.dp).frostedRim(resultCardShape)
     if (results.isEmpty()) {
-        Card(Modifier.fillMaxWidth(), colors = resultCardColors, elevation = resultCardElevation) {
+        Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
             Text(
                 "No matches for “$query”",
                 Modifier.padding(16.dp),
@@ -8663,7 +8668,7 @@ private fun SettingsSearchResults(
         }
     } else {
         results.forEach { e ->
-            Card(Modifier.fillMaxWidth(), colors = resultCardColors, elevation = resultCardElevation) {
+            Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     e.content()
@@ -8701,7 +8706,8 @@ private fun SettingsSearchResults(
             }
         }
         Card(
-            Modifier.fillMaxWidth(),
+            resultCardModifier,
+            shape = resultCardShape,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -8746,7 +8752,8 @@ private fun SettingsSearchResults(
         val reply = state.aiSearchReply
         if (thinking || reply != null) {
             Card(
-                Modifier.fillMaxWidth(),
+                resultCardModifier,
+                shape = resultCardShape,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

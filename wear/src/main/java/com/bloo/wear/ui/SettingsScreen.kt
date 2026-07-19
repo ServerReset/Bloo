@@ -6,7 +6,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,10 +43,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -127,30 +121,22 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(4.dp))
+                Text("Units", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
                 val metric = ui.localSettings.unitSystem == "metric"
-                Row(
-                    Modifier.fillMaxWidth()
-                        // A hand-rolled toggle row with no role/state -- TalkBack
-                        // announced "Units, Metric (km, °C), double tap to
-                        // activate" with no indication this is a binary switch
-                        // or what double-tapping does.
-                        .semantics(mergeDescendants = true) {
-                            role = Role.Switch
-                            stateDescription = if (metric) "Metric" else "Imperial"
-                        }
-                        .clickable(onClickLabel = if (metric) "Switch to Imperial" else "Switch to Metric") {
-                            vm.setUnitSystem(if (metric) "imperial" else "metric")
-                        },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Units", style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        if (metric) "Metric (km, °C)" else "Imperial (mi, °F)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
+                // Was a hand-rolled clickable Row with no background/border/
+                // icon -- the only setting on this screen with zero visual
+                // affordance that it's interactive, next to segmented
+                // controls and MorphButtons everywhere else. Same control
+                // this screen already uses for Lock-after/Aurora colour mode.
+                MorphSegmented(
+                    options = listOf(
+                        WearSegmentOption("imperial", "Imperial"),
+                        WearSegmentOption("metric", "Metric"),
+                    ),
+                    selectedKey = if (metric) "metric" else "imperial",
+                    onSelect = { key -> vm.setUnitSystem(key) },
+                )
                 ui.settings?.uiScale?.let {
                     Spacer(Modifier.height(4.dp))
                     Text("Text scale: ${"%.2f".format(it)}×", style = MaterialTheme.typography.bodySmall)

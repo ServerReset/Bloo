@@ -1198,14 +1198,25 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
 private fun AiCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("AI Summary", Icons.Filled.AutoAwesome) {
     val summary = ui.extras.ai[car.vin]
     val busy = ui.aiBusy == car.vin
-    if (summary != null) {
+    if (summary != null && !busy) {
         Text(
             summary,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(8.dp))
-    } else if (!busy) {
+    } else if (busy) {
+        // Without this, the card had nothing above the button at all while
+        // summarizing -- only the button's own tiny 18dp spinner communicated
+        // that anything was happening, which on a round watch face read as a
+        // blank, possibly-broken card mid-tap.
+        Text(
+            "Thinking…",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+    } else {
         Text(
             "A quick plain-English rundown of your car, written on your phone.",
             style = MaterialTheme.typography.labelSmall,

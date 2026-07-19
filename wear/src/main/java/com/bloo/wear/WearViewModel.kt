@@ -166,6 +166,11 @@ data class WearUi(
      *  didn't, so it could be tapped repeatedly with no feedback that
      *  anything was happening. */
     val resyncBusy: Boolean = false,
+    /** VINs whose last trip fetch failed (network/API error), so TripsScreen
+     *  can show "Couldn't load trips" instead of the exact same "No recent
+     *  trips" text a car with a genuinely empty history would show. Cleared
+     *  by the next successful fetch for that VIN. */
+    val tripsErrors: Set<String> = emptySet(),
 ) {
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
     fun chargeDraftFor(vin: String): ChargeLimitDraft = chargeLimitDrafts[vin] ?: ChargeLimitDraft()
@@ -564,8 +569,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         tripsFetched.add(vin)
         mark("$vin:trips") {
             runCatching { BlueLinkGate.statusMutex.withLock { repoFor(v.brand).trips(v) } }
-                .onSuccess { list -> trips = trips + (vin to list); publish() }
-                .onFailure { tripsFetched.remove(vin); AppLog.log("Watch trips failed: ${it.message}") }
+                .onSuccess { list ->
+                    trips = trips + (vin to list)
+                    _ui.update { it.copy(tripsErrors = it.tripsErrors - vin) }
+                    publish()
+                }
+                .onFailure {
+                    tripsFetched.remove(vin)
+                    AppLog.log("Watch trips failed: ${it.message}")
+                    _ui.update { u -> u.copy(tripsErrors = u.tripsErrors + vin) }
+                }
         }
     }
 
