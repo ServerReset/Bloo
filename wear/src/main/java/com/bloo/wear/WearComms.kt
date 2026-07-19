@@ -131,23 +131,34 @@ object WearComms {
         }
 
     /** Ask for fresh data: relay a refresh to the phone, or refresh standalone. */
-    suspend fun requestSync(context: Context, vin: String, refresh: Boolean) {
+    /** @return true if the phone actually got (or, for [refresh], a standalone
+     *  fallback compensated for) this request. [refresh] == false (used by
+     *  [WearViewModel.resync] to just ask the phone to push whatever it
+     *  already has) has no standalone fallback -- a send failure there used
+     *  to do nothing at all, silently dropping the sync request with no
+     *  signal back to the caller that "resync finished" didn't mean "resync
+     *  worked". */
+    suspend fun requestSync(context: Context, vin: String, refresh: Boolean): Boolean =
         withContext(Dispatchers.IO) {
             val node = phoneNodeId(context)
             val command = WearCommand(vin = vin, action = if (refresh) WearAction.REFRESH else "")
             if (node != null) {
-                runCatching {
+                val sent = runCatching {
                     Tasks.await(
                         Wearable.getMessageClient(context).sendMessage(
                             node, WearSync.PATH_SYNC_REQUEST, WearSync.encodeCommand(command).toByteArray(),
                         ), 10, TimeUnit.SECONDS,
                     )
-                }.onFailure { if (refresh) WearCommandRunner.refresh(context, vin) }
+                }.isSuccess
+                if (!sent && refresh) WearCommandRunner.refresh(context, vin)
+                sent || refresh
             } else if (refresh) {
                 WearCommandRunner.refresh(context, vin)
+                true
+            } else {
+                false
             }
         }
-    }
 
     /** Publish the watch's live climate draft so the phone mirrors it. Written as
      *  a DataItem on the shared [WearSync.PATH_CLIMATE] channel. */

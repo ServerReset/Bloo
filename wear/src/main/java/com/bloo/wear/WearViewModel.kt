@@ -561,11 +561,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ui.update { it.copy(resyncBusy = true) }
             try {
-                runCatching { WearComms.requestSync(ctx, "", refresh = false) }
+                // requestSync(refresh = false) has no standalone fallback --
+                // a failed send used to be silently swallowed, so resyncBusy
+                // finishing implied "resync worked" even when the phone never
+                // got the request at all (e.g. briefly out of BT range).
+                val requested = runCatching { WearComms.requestSync(ctx, "", refresh = false) }.getOrDefault(false)
                 runCatching { WearComms.pullLatest(ctx) }
                 snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
                 refreshConnection()
                 if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
+                if (!requested) _ui.update { it.copy(message = "Bring your phone nearby to sync") }
             } finally {
                 _ui.update { it.copy(resyncBusy = false) }
             }
