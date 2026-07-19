@@ -555,7 +555,9 @@ class BlooWidget : GlanceAppWidget() {
             else -> c.theme.accent
         }
         val fg = if (bg == c.theme.accent) c.theme.onAccent else ColorProvider(Color.White)
-        Box(GlanceModifier.background(bg).cornerRadius(9.dp).padding(horizontal = 8.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+        // 999.dp clamps to a true pill at the chip's actual (short) height --
+        // 9.dp only happened to look right at one specific tier's text size.
+        Box(GlanceModifier.background(bg).cornerRadius(999.dp).padding(horizontal = 8.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
             Text(label, maxLines = 1, style = TextStyle(color = fg, fontSize = 10.sp, fontWeight = FontWeight.Bold))
         }
     }

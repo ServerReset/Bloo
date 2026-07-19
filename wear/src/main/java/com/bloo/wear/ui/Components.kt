@@ -18,6 +18,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -94,11 +95,18 @@ fun SectionCard(
     // Box with the same clip+background reproduces the identical flat-tonal
     // look (this call only ever set containerColor, no border/elevation/
     // interaction-dependent styling that a real Card would otherwise add).
+    val cardShape = RoundedCornerShape(12.dp)
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            .clip(cardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            // Buttons inside these cards already have a visible outline
+            // (see MorphButton), so without one here the card containing
+            // them read as flatter/less "material" than its own contents --
+            // backwards from what should draw the eye. A faint rim gives
+            // the card the same depth language.
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), cardShape),
     ) {
         Column(
             Modifier.padding(horizontal = 6.dp, vertical = 8.dp),

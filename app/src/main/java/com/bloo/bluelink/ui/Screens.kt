@@ -2870,7 +2870,8 @@ private fun FloatingIcon(
             .padding(outerPadding)
             .size(48.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
-            .dropShadow(CircleShape),
+            .dropShadow(CircleShape)
+            .frostedRim(CircleShape),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = description)
@@ -3685,7 +3686,7 @@ private fun VehicleDetailContent(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                     contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.dropShadow(RoundedCornerShape(50)),
+                    modifier = Modifier.dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
                 ) {
                     Box {
                         Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -3785,7 +3786,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.dropShadow(RoundedCornerShape(50)),
+                modifier = Modifier.dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
             ) {
               Box {
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -4021,9 +4022,12 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
  */
 @Composable
 private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+    val shape = RoundedCornerShape(PebbleCornerCollapsed)
     Surface(
-        modifier = Modifier.fillMaxWidth().height(ControlHeight).then(dragHandle),
-        shape = RoundedCornerShape(PebbleCornerCollapsed),
+        modifier = Modifier.fillMaxWidth().height(ControlHeight).then(dragHandle)
+            .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
+            .frostedRim(shape),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -4958,7 +4962,11 @@ private fun Pebble(
     val pebbleShape = RoundedCornerShape(corner)
     Box(Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)) {
         Card(
-            Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier),
+            Modifier
+                .fillMaxWidth()
+                .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
+                .dropShadow(pebbleShape, blurRadius = 12.dp, offsetY = 4.dp)
+                .frostedRim(pebbleShape),
             shape = pebbleShape,
             colors = CardDefaults.cardColors(
                 containerColor = containerColor,
@@ -7882,7 +7890,7 @@ onValueChange = { vibrancyDraft = it },
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.dropShadow(RoundedCornerShape(50)),
+                modifier = Modifier.dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
             ) {
                 Box {
                     Text(
@@ -7901,7 +7909,8 @@ onValueChange = { vibrancyDraft = it },
             Box(
                 Modifier
                     .width(172.dp)
-                    .dropShadow(RoundedCornerShape(20.dp)),
+                    .dropShadow(RoundedCornerShape(20.dp))
+                    .frostedRim(RoundedCornerShape(20.dp)),
             ) {
                 // Match the "Settings" title pill right next to it (same glass
                 // treatment, same track height) instead of the ordinary
@@ -8334,7 +8343,8 @@ private fun GlowySearchBar(
                 // halo above, just darker and offset downward.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .dropShadow(RoundedCornerShape(50)),
+                    .dropShadow(RoundedCornerShape(50))
+                    .frostedRim(RoundedCornerShape(50)),
             ) {
                 Box {
                     // Cross-fades + scales between the collapsed and expanded
@@ -9514,14 +9524,23 @@ private fun BlooDialog(
     text: @Composable ColumnScope.() -> Unit,
     confirmButton: @Composable RowScope.() -> Unit,
 ) {
+    val dialogShape = RoundedCornerShape(16.dp)
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
+        title = { Surface(
+            shape = dialogShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.96f)),
+            modifier = Modifier.dropShadow(dialogShape, blurRadius = 14.dp, offsetY = 5.dp).frostedRim(dialogShape),
+        ) {
             Row(Modifier.padding(16.dp, 12.dp, 16.dp, 0.dp), verticalAlignment = Alignment.CenterVertically) {
                 title()
             }
         } },
-        text = { Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface) {
+        text = { Surface(
+            shape = dialogShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.96f)),
+            modifier = Modifier.frostedRim(dialogShape),
+        ) {
             // Scrollable: variable-length content (e.g. the climate-choice
             // dialog's preset list) can otherwise exceed the dialog's height
             // with no way to reach entries past the bottom edge.
