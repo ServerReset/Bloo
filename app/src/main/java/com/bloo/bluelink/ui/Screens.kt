@@ -4212,15 +4212,24 @@ private fun PrimaryActions(
             offTextColor = MaterialTheme.colorScheme.error,
             // Kia's US API has no equivalent endpoint (see Vehicle.supportsHornLights),
             // so these only appear for Hyundai/Genesis, matching what those apps show.
+            // Were bare IconButtons -- a lone bolt/speaker glyph with no label
+            // reads as ambiguous decoration next to a row of actual labelled
+            // buttons (Unlock). Small MorphButtons with MorphButtonLabel match
+            // every other icon+text control in the app instead.
             extraAction = if (v.supportsHornLights) {
                 {
                     val hlPending = state.isPending(v.vin, "hornLights")
-                    IconButton(onClick = { vm.flashLights(v) }, enabled = !hlPending) {
-                        Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights")
-                    }
-                    IconButton(onClick = { vm.hornAndLights(v) }, enabled = !hlPending) {
-                        Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights")
-                    }
+                    MorphButton(
+                        onClick = { vm.flashLights(v) },
+                        enabled = !hlPending,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    ) { MorphButtonLabel(Icons.Filled.FlashOn, "Lights", pending = false, iconSize = 16.dp) }
+                    Spacer(Modifier.width(6.dp))
+                    MorphButton(
+                        onClick = { vm.hornAndLights(v) },
+                        enabled = !hlPending,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    ) { MorphButtonLabel(Icons.Filled.Campaign, "Horn", pending = false, iconSize = 16.dp) }
                 }
             } else null,
         )
@@ -7330,115 +7339,115 @@ private fun SettingsScreen(vm: AppViewModel) {
                 ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
 
                 Text(
-                    "Manual backup",
+                    "Automatic Drive sync",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "A one-time snapshot of your theme, palettes, tile order and " +
-                        "preferences as a file — share it anywhere, or restore it later. " +
-                        "Sign-in credentials are never included.",
+                    "Keeps a Google Drive file continuously up to date, so every " +
+                        "signed-in device converges on the same settings automatically.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(10.dp))
+                if (showDriveDialog) {
+                    DriveSyncSetupDialog(
+                        onDismissRequest = { showDriveDialog = false },
+                        onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
+                        onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
+                    )
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MorphTextButton(
-                        "Export",
+                        if (state.syncUri != null) "Change Drive file" else "Set up auto-sync",
                         modifier = Modifier.weight(1f),
-                        onClick = { vm.exportSettings(context) },
+                        onClick = { showDriveDialog = true },
                     )
-                    MorphTextButton(
-                        "Restore",
-                        modifier = Modifier.weight(1f),
-                        onClick = { settingsImportLauncher.launch("application/json") },
+                    if (state.syncUri != null) {
+                        MorphTextButton(
+                            "Disable",
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.clearSyncUri() },
+                        )
+                    }
+                }
+                if (state.syncUri != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Settings auto-sync to Drive in the background and on every " +
+                            "refresh. Changes made on another device are merged automatically.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
+                    if (lastSyncLabel.isNotBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Last synced $lastSyncLabel",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (state.syncError != null) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Sync failed: ${state.syncError}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        // Was no way to retry short of pulling to refresh or
+                        // waiting for the next 2h background attempt.
+                        MorphTextButton(
+                            "Sync now",
+                            onClick = { vm.retryDriveSync() },
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("wifi", "Wi-Fi only", null),
+                            SegmentOption("any", "Any network", null),
+                        ),
+                        selectedKey = if (state.syncWifiOnly) "wifi" else "any",
+                        onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
                 }
 
-                // Advanced-only: continuous background sync setup (Drive file
-                // picking, Wi-Fi-only toggle) is more involved than the basic
-                // one-shot Export/Restore above -- a novice user is more likely
-                // to want "save a backup file" than "wire up a live sync".
+                // Advanced-only: a one-shot export/import file is a power-user
+                // fallback (moving settings by hand, a local backup outside
+                // Drive) next to the always-on automatic sync above, which is
+                // what most people actually want and shouldn't be buried.
                 AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                   Column {
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "Automatic Drive sync",
+                        "Manual backup",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Keeps a Google Drive file continuously up to date, so every " +
-                            "signed-in device converges on the same settings automatically.",
+                        "A one-time snapshot of your theme, palettes, tile order and " +
+                            "preferences as a file — share it anywhere, or restore it later. " +
+                            "Sign-in credentials are never included.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(10.dp))
-                    if (showDriveDialog) {
-                        DriveSyncSetupDialog(
-                            onDismissRequest = { showDriveDialog = false },
-                            onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
-                            onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
-                        )
-                    }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MorphTextButton(
-                            if (state.syncUri != null) "Change Drive file" else "Set up auto-sync",
+                            "Export",
                             modifier = Modifier.weight(1f),
-                            onClick = { showDriveDialog = true },
+                            onClick = { vm.exportSettings(context) },
                         )
-                        if (state.syncUri != null) {
-                            MorphTextButton(
-                                "Disable",
-                                modifier = Modifier.weight(1f),
-                                onClick = { vm.clearSyncUri() },
-                            )
-                        }
-                    }
-                    if (state.syncUri != null) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "Settings auto-sync to Drive in the background and on every " +
-                                "refresh. Changes made on another device are merged automatically.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
-                        val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
-                        if (lastSyncLabel.isNotBlank()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                "Last synced $lastSyncLabel",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (state.syncError != null) {
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                "Sync failed: ${state.syncError}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            // Was no way to retry short of pulling to refresh or
-                            // waiting for the next 2h background attempt.
-                            MorphTextButton(
-                                "Sync now",
-                                onClick = { vm.retryDriveSync() },
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        MorphSegmented(
-                            options = listOf(
-                                SegmentOption("wifi", "Wi-Fi only", null),
-                                SegmentOption("any", "Any network", null),
-                            ),
-                            selectedKey = if (state.syncWifiOnly) "wifi" else "any",
-                            onSelect = { vm.setSyncWifiOnly(it == "wifi") },
+                        MorphTextButton(
+                            "Restore",
+                            modifier = Modifier.weight(1f),
+                            onClick = { settingsImportLauncher.launch("application/json") },
                         )
                     }
                   }
@@ -9426,7 +9435,9 @@ private fun SecretRow(label: String, value: String) {
         Text(
             if (show) value else "•".repeat(value.length.coerceIn(4, 10)),
             fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
+        Spacer(Modifier.width(10.dp))
         MorphTextButton(if (show) "Hide" else "Show", onClick = { show = !show })
     }
 }
@@ -9490,9 +9501,15 @@ private fun StatusRow(label: String, value: String) {
         // AnimatedValue already implements this (used elsewhere in this file
         // and now watch's ChargeRing); this is that same value-cell pattern
         // duplicated once per pebble-row composable instead of centralized.
+        // Colour pinned to full-strength onSurface rather than inherited --
+        // Pebble's Card sets its content color from containerColor (usually
+        // surfaceVariant), so an uncoloured value here rendered at
+        // onSurfaceVariant strength, barely distinguishable from the dimmed
+        // label right next to it despite being the actually-important half
+        // of the row.
         com.bloo.uicommon.AnimatedValue(
             value = value,
-            style = LocalTextStyle.current.copy(fontWeight = FontWeight.Medium),
+            style = LocalTextStyle.current.copy(fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface),
         )
     }
 }
@@ -9526,31 +9543,23 @@ private fun StepRow(label: String, value: String, valueColor: Color = Color.Unsp
 
 /**
  * The app's one toggle control for boolean settings. Ground-up redesign away
- * from a plain label next to a stock Material [Switch] -- the whole row now
- * washes toward the primary color and its own corners morph rounder when on
- * (the same active-fill + pill-morph language [MorphButton] uses for every
- * other control in the app), with a custom pill track+thumb standing in for
- * the Switch so this shares that vocabulary too instead of being the one
+ * from a plain label next to a stock Material [Switch] -- a custom pill
+ * track+thumb (spring-timed like [MorphButton]) stands in for the Switch so
+ * this shares that pill-morph vocabulary too instead of being the one
  * default-Material holdout in an otherwise fully custom UI.
+ *
+ * An earlier version of this also washed the whole row toward the primary
+ * color and rounded its corners when checked, matching how MorphButton fills
+ * solid on activation -- dropped after feedback that stacked next to a
+ * card's own background it read as a second nested box rather than a
+ * highlight, especially over the AI toggle's already-boxed row.
  */
 @Composable
 fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val haptics = LocalHaptics.current
-    val rowPct by animateFloatAsState(
-        if (checked) 22f else 12f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "toggleRowShape",
-    )
-    val rowBg by androidx.compose.animation.animateColorAsState(
-        if (checked) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "toggleRowBg",
-    )
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(percent = rowPct.roundToInt()))
-            .background(rowBg)
             // toggleable (not clickable) gives this its own Role.Switch + checked
             // semantics node -- the track below clears its own (identical) node
             // so TalkBack sees ONE correctly-announced toggle for the row
@@ -9567,7 +9576,7 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
                 if (next) haptics?.toggleOn() else haptics?.toggleOff()
                 onChange(next)
             }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
