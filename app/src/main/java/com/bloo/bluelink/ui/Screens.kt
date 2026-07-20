@@ -544,13 +544,6 @@ fun BlooApp(vm: AppViewModel) {
                 LockOverlay(vm)
             }
         }
-        // App-wide, not tied to any one screen; skipped while locked so a
-        // biometric prompt and an update prompt never compete for attention.
-        if (!state.locked) {
-            state.updateInfo?.let { info ->
-                UpdatePromptDialog(info = info, vm = vm)
-            }
-        }
     }
     }
 
@@ -1559,94 +1552,9 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
     )
 }
 
-/**
- * Bloo isn't on the Play Store, so this is its own update surface: shown once
- * per cold start when a newer build than this one has landed on the default
- * branch. Every push now publishes a rolling GitHub Release (see android.yml)
- * with the raw phone/watch APKs attached as plain public assets -- unlike the
- * Actions artifacts from the same build, no GitHub sign-in and no zip/unzip
- * step, so the primary action can download the APK directly instead of
- * opening a browser page and walking through several manual steps.
- */
-@Composable
-private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: AppViewModel) {
-    val context = LocalContext.current
-    val scheme = MaterialTheme.colorScheme
-    val state by vm.state.collectAsState()
-    // Old releases (published before phoneApkUrl existed) or a failed asset
-    // upload leave this null -- fall back to opening the release page in a
-    // browser, where a person can still find and tap the asset link by hand.
-    val hasDirectDownload = info.run.phoneApkUrl != null
-    GlassAlertDialog(
-        onDismissRequest = vm::dismissUpdate,
-        icon = Icons.Filled.Info,
-        title = "Update available",
-        text = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(shape = RoundedCornerShape(8.dp), color = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer) {
-                    Text("Build #${info.run.runNumber}", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                }
-                info.run.displayTitle?.let { title ->
-                    Text(title, style = MaterialTheme.typography.bodySmall, color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Surface(shape = RoundedCornerShape(12.dp), color = scheme.surfaceVariant.copy(alpha = 0.5f)) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
-                    Text(
-                        if (hasDirectDownload) "1. Tap \"Download & Install\" below" else "1. Download the APK below",
-                        style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
-                    )
-                    // Android's Play Protect flags any APK that didn't come
-                    // from the Play Store, unsigned-by-Google or not --
-                    // without this tip, "Blocked by Play Protect" reads like
-                    // the install genuinely failed rather than one more tap.
-                    Text(
-                        "2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
-                        style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (state.updateDownloading) {
-                Spacer(Modifier.height(2.dp))
-                val progress = state.updateDownloadProgress
-                if (progress != null) {
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                    Text("${(progress * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
-            }
-        },
-        buttons = {
-            MorphButton(
-                onClick = {
-                    if (hasDirectDownload) {
-                        vm.downloadAndInstallUpdate()
-                    } else {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                        vm.dismissUpdate()
-                    }
-                },
-                enabled = !state.updateDownloading,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-            ) {
-                if (state.updateDownloading) {
-                    LoadingIndicator(Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Downloading…", fontWeight = FontWeight.SemiBold)
-                } else {
-                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (hasDirectDownload) "Download & Install" else "Open GitHub Release", fontWeight = FontWeight.SemiBold)
-                }
-            }
-            MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.fillMaxWidth())
-            MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.fillMaxWidth())
-        },
-    )
-}
+// UpdatePromptDialog used to live here -- replaced by UpdateAvailableTile
+// (see below Screens.kt), a standalone pebble pinned under the hero tile
+// instead of an interrupting popup. See its doc comment for why.
 
 /**
  * The app's shared "important pop-up" dialog shell. Update-available and
@@ -2465,12 +2373,17 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             Surface(
                                 onClick = { pillScope.launch { scrollToTopFn?.invoke() } },
                                 shape = RoundedCornerShape(50),
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                                // Was a flat surfaceContainerHighest + shadowElevation --
+                                // every other piece of floating chrome (FloatingIcon, the
+                                // other two name pills) uses this same glass treatment;
+                                // this one was quietly left on the old, pre-glass look.
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                                 contentColor = MaterialTheme.colorScheme.onSurface,
-                                shadowElevation = 2.dp,
+                                modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
                             ) {
                                 Row(
                                     Modifier
+                                        .heightIn(min = 48.dp)
                                         .animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
                                         .padding(horizontal = 16.dp, vertical = 9.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -3299,13 +3212,6 @@ private fun HeroHeader(
     dragHandle: Modifier = Modifier,
     height: Dp = 150.dp,
     metric: Boolean = false,
-    updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
-    onOpenUpdate: (() -> Unit)? = null,
-    updateDownloading: Boolean = false,
-    updateDownloadProgress: Float? = null,
-    updateApkReady: Boolean = false,
-    onDownloadUpdate: (() -> Unit)? = null,
-    onInstallUpdate: (() -> Unit)? = null,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
     val heroAlpha = remember { Animatable(0f) }
@@ -3343,65 +3249,142 @@ private fun HeroHeader(
             ),
         shape = heroShape,
     ) {
-        Column(
-            Modifier
-                .padding(16.dp)
-                // So the update banner below expands/collapses the whole card
-                // smoothly instead of the card just snapping to its new height.
-                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
-        ) {
+        Column(Modifier.padding(16.dp)) {
             HeroVisual(v, imageUrl, height)
             Spacer(Modifier.height(16.dp))
             ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
-            if (updateAvailable != null && onOpenUpdate != null) {
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Row(
-                        Modifier
-                            .weight(1f)
-                            // Tapping the icon/text (not the action button) still
-                            // opens the full dialog -- "Remind me"/"Not now" and
-                            // the browser fallback live there, they just aren't
-                            // needed for the common one-or-two-tap path anymore.
-                            .then(if (onOpenUpdate != null) Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenUpdate) else Modifier),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.SystemUpdate,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
+        }
+    }
+}
+
+/**
+ * Bloo isn't on the Play Store, so this is its own update surface: a
+ * standalone tile pinned directly below the hero tile whenever the checker
+ * has found a newer build, animating in/out instead of interrupting with a
+ * popup. Every push publishes a rolling GitHub Release (see android.yml)
+ * with the raw phone/watch APKs attached as plain public assets, so the
+ * primary button can download the APK directly instead of opening a browser
+ * page and walking through several manual steps.
+ */
+@Composable
+private fun UpdateAvailableTile(state: UiState, vm: AppViewModel) {
+    val info = state.updateAvailable
+    AnimatedVisibility(
+        visible = info != null && !state.updateTileDismissed,
+        enter = fadeIn(tween(220)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+        exit = fadeOut(tween(160)) + shrinkVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+    ) {
+        if (info == null) return@AnimatedVisibility
+        val context = LocalContext.current
+        val scheme = MaterialTheme.colorScheme
+        val hasDirectDownload = info.run.phoneApkUrl != null
+        val shape = RoundedCornerShape(PebbleCornerCollapsed)
+        val outline by vm.appearance.collectAsState()
+        // The gap to the hero tile above rides along with this same
+        // AnimatedVisibility instead of being a fixed Spacer at the call
+        // site -- otherwise dismissing the tile would shrink the card to
+        // nothing but leave a small dead gap where it used to be.
+        Spacer(Modifier.height(12.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth()
+                .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
+                .then(
+                    if (outline.pebbleOutline) {
+                        Modifier.border(BorderStroke(1.dp, scheme.outline.copy(alpha = 0.55f)), shape)
+                    } else Modifier,
+                ),
+            shape = shape,
+            colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(22.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Update available", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            info.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${info.run.runNumber}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onPrimaryContainer.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("Update available", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text(
-                                updateAvailable.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${updateAvailable.run.runNumber}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
                     }
-                    Spacer(Modifier.width(8.dp))
-                    when {
-                        updateDownloading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LoadingIndicator(Modifier.size(16.dp))
-                            Text(
-                                updateDownloadProgress?.let { "${(it * 100).toInt()}%" } ?: "Downloading…",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        // Downloaded and sitting in cache: this tap only has to
-                        // hand it to the system installer, no network wait.
-                        updateApkReady && onInstallUpdate != null -> MorphTextButton("Install", onClick = onInstallUpdate)
-                        onDownloadUpdate != null -> MorphTextButton("Update", onClick = onDownloadUpdate)
-                        onOpenUpdate != null -> MorphTextButton("Update", onClick = onOpenUpdate)
+                }
+                // A fully opaque container in the card's own contentColor pair --
+                // not a translucent overlay blended over glass, which is what
+                // made this text hard to read back when this lived in a dialog.
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = scheme.onPrimaryContainer.copy(alpha = 0.08f),
+                    contentColor = scheme.onPrimaryContainer,
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            if (hasDirectDownload) "1. Tap \"Update\" below" else "1. Download the APK below",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            if (hasDirectDownload) "2. Tap \"Install\" once it's downloaded" else "2. Open the downloaded file",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        // Android's Play Protect flags any APK that didn't come
+                        // from the Play Store, unsigned-by-Google or not --
+                        // without this tip, "Blocked by Play Protect" reads
+                        // like the install genuinely failed rather than one
+                        // more tap.
+                        Text(
+                            "3. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
+                }
+                if (state.updateDownloading) {
+                    val progress = state.updateDownloadProgress
+                    if (progress != null) {
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = scheme.onPrimaryContainer, trackColor = scheme.onPrimaryContainer.copy(alpha = 0.2f))
+                        Text("${(progress * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = scheme.onPrimaryContainer.copy(alpha = 0.85f))
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scheme.onPrimaryContainer, trackColor = scheme.onPrimaryContainer.copy(alpha = 0.2f))
+                    }
+                }
+                MorphButton(
+                    onClick = {
+                        when {
+                            state.updateApkReady -> vm.installDownloadedUpdate()
+                            hasDirectDownload -> vm.downloadUpdateInBackground()
+                            else -> {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                                vm.dismissUpdate()
+                            }
+                        }
+                    },
+                    enabled = !state.updateDownloading,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                ) {
+                    if (state.updateDownloading) {
+                        LoadingIndicator(Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Downloading…", fontWeight = FontWeight.SemiBold)
+                    } else {
+                        Icon(
+                            if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
+                            contentDescription = null, modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            when {
+                                state.updateApkReady -> "Install"
+                                hasDirectDownload -> "Update"
+                                else -> "Open GitHub Release"
+                            },
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
+                    MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -4355,13 +4338,8 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val hMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
-    HeroHeader(
-        v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm, state.drivingLabel(v), metric = hMetric,
-        updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
-        updateDownloading = state.updateDownloading, updateDownloadProgress = state.updateDownloadProgress,
-        updateApkReady = state.updateApkReady,
-        onDownloadUpdate = { vm.downloadUpdateInBackground() }, onInstallUpdate = { vm.installDownloadedUpdate() },
-    )
+    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm, state.drivingLabel(v), metric = hMetric)
+    UpdateAvailableTile(state, vm)
     // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
     // CompactMainTile) which always wrap it in a Surface that establishes a
     // readable contentColor. StateControl's status label falls back to
@@ -4455,14 +4433,16 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
     val enabled = !state.loading
     val mSingle = vm.appearance.collectAsState().value.unitSystem == "metric"
     when (section) {
-        "summary" -> HeroHeader(
-            v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
-            state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
-            updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
-            updateDownloading = state.updateDownloading, updateDownloadProgress = state.updateDownloadProgress,
-            updateApkReady = state.updateApkReady,
-            onDownloadUpdate = { vm.downloadUpdateInBackground() }, onInstallUpdate = { vm.installDownloadedUpdate() },
-        )
+        // The update tile always rides right along with the hero tile,
+        // whichever slot "summary" ends up in, instead of being reorderable
+        // or hideable on its own -- it's status, not a pebble.
+        "summary" -> Column(Modifier.fillMaxWidth()) {
+            HeroHeader(
+                v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
+                state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
+            )
+            UpdateAvailableTile(state, vm)
+        }
         "controls" -> ControlsPebble(v, state, vm, dragHandle)
         "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
         // The "charge" slot is the powertrain's energy pebble: charging for an
@@ -4567,7 +4547,6 @@ private fun PrimaryActions(
                         contentPadding = PaddingValues(0.dp),
                         modifier = Modifier.size(50.dp),
                     ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(22.dp)) }
-                    Spacer(Modifier.width(2.dp))
                 }
             } else null,
         )
@@ -5345,8 +5324,14 @@ private fun StateControl(
             }
         }
         // An optional secondary control (e.g. the charge-port toggle) sits just
-        // left of the primary action button.
-        if (extraAction != null) extraAction()
+        // left of the primary action button. Wrapped in its own Row so it's a
+        // single child of the outer Row -- inlined directly, every button and
+        // Spacer it emits was itself getting the outer Row's 12dp spacedBy on
+        // top of its own internal spacing, ballooning a couple of dp of
+        // intended gap into a huge dead zone between the buttons.
+        if (extraAction != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) { extraAction() }
+        }
         val haptics = LocalHaptics.current
         // Pill when off, rounded rectangle + highlight colour when on - same as
         // the climate/charge controls.
@@ -10114,10 +10099,9 @@ private fun DriveSyncSetupDialog(
     onOpenFromDrive: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // Routed through the same GlassAlertDialog shell as UpdatePromptDialog
-    // (icon+bold title, informative content, stacked full-width buttons) --
-    // one real shared composable instead of two separately hand-rolled
-    // AlertDialogs that merely happened to look similar.
+    // Routed through the same GlassAlertDialog shell used elsewhere (icon+bold
+    // title, informative content, stacked full-width buttons) rather than a
+    // one-off hand-rolled AlertDialog.
     GlassAlertDialog(
         onDismissRequest = onDismissRequest,
         icon = Icons.Filled.Cloud,

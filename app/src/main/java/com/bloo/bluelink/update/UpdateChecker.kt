@@ -48,7 +48,14 @@ object UpdateChecker {
         val run = UpdateApi.fetchLatestSuccessfulRun(branch)
         store.setLastCheckedAt(now)
         if (run == null) return UpdateCheckResult.Failed("Could not reach GitHub (rate limited or offline)")
-        if (run.runNumber <= BuildConfig.BUILD_RUN_NUMBER) return UpdateCheckResult.UpToDate
+        if (run.runNumber <= BuildConfig.BUILD_RUN_NUMBER) {
+            store.clearAvailable()
+            return UpdateCheckResult.UpToDate
+        }
+        // Persisted (not just returned) so WearBridge can mirror it to the
+        // watch on the next settings publish without AppViewModel having to
+        // thread the result through every publishSettings call site.
+        store.setAvailable(run.runNumber, run.displayTitle, run.htmlUrl)
         return UpdateCheckResult.Available(UpdateInfo(run))
     }
 

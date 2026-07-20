@@ -5,7 +5,9 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -32,6 +34,9 @@ class UpdateStore(private val context: Context) {
     private val keyLastCheckedAt = longPreferencesKey("last_checked_at")
     private val keySnoozeUntil = longPreferencesKey("snooze_until")
     private val keyChecksEnabled = booleanPreferencesKey("checks_enabled")
+    private val keyAvailableRun = intPreferencesKey("available_run")
+    private val keyAvailableTitle = stringPreferencesKey("available_title")
+    private val keyAvailableUrl = stringPreferencesKey("available_url")
 
     suspend fun lastCheckedAt(): Long =
         context.updateDataStore.data.first()[keyLastCheckedAt] ?: 0L
@@ -53,4 +58,29 @@ class UpdateStore(private val context: Context) {
     suspend fun setChecksEnabled(enabled: Boolean) {
         context.updateDataStore.edit { it[keyChecksEnabled] = enabled }
     }
+
+    /** The last build the checker found newer than what's installed, persisted
+     *  (not just in AppViewModel's in-memory UiState) so WearBridge can read
+     *  it independently and mirror it to the watch on every settings publish,
+     *  the same way it already reads SettingsStore.aiEnabled() -- see
+     *  WearBridge.publishSettingsNow. 0 = none available. */
+    suspend fun setAvailable(runNumber: Int, displayTitle: String?, htmlUrl: String) {
+        context.updateDataStore.edit {
+            it[keyAvailableRun] = runNumber
+            if (displayTitle != null) it[keyAvailableTitle] = displayTitle else it.remove(keyAvailableTitle)
+            it[keyAvailableUrl] = htmlUrl
+        }
+    }
+
+    suspend fun clearAvailable() {
+        context.updateDataStore.edit {
+            it.remove(keyAvailableRun)
+            it.remove(keyAvailableTitle)
+            it.remove(keyAvailableUrl)
+        }
+    }
+
+    suspend fun availableRunNumber(): Int = context.updateDataStore.data.first()[keyAvailableRun] ?: 0
+    suspend fun availableTitle(): String? = context.updateDataStore.data.first()[keyAvailableTitle]
+    suspend fun availableHtmlUrl(): String? = context.updateDataStore.data.first()[keyAvailableUrl]
 }

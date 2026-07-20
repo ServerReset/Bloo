@@ -148,6 +148,12 @@ import kotlin.math.roundToInt
 /** Synthetic tile key for the alerts card (not part of the user-orderable set). */
 private const val TILE_ALERTS = "alerts"
 
+/** Synthetic tile key for the "Update available" card -- like TILE_ALERTS, not
+ *  part of the user-orderable set. Always rides directly below the summary
+ *  tile (see visibleTiles), mirroring the phone's UpdateAvailableTile, which
+ *  is likewise pinned under the hero tile rather than a reorderable pebble. */
+private const val TILE_UPDATE = "update"
+
 /** Number of active warnings (open doors/windows/trunk/hood + tire/fluid/key alerts). */
 private val CarView.alertCount: Int
     get() = doorsOpen.size + windowsOpen.size +
@@ -271,6 +277,7 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
             else -> true // summary, lock, climate, comfort, info, assist, more
         }
         if (show) out.add(key)
+        if (key == WearTiles.SUMMARY && ui.settings?.updateAvailable != null) out.add(TILE_UPDATE)
     }
     return out
 }
@@ -575,6 +582,7 @@ private fun TileContent(
 ) {
     when (key) {
         TILE_ALERTS -> AlertsCard(car)
+        TILE_UPDATE -> UpdateAvailableCard(vm, ui)
         WearTiles.SUMMARY -> SummaryCard(vm, ui, car)
         WearTiles.CLIMATE -> ClimateCard(vm, ui, car)
         WearTiles.SMART_CLIMATE -> SmartClimateCard(vm, ui, car)
@@ -714,6 +722,36 @@ private fun AlertsCard(car: CarView) {
             }
             Spacer(Modifier.height(5.dp))
             warnings.forEach { (label, value) -> StatusRow(label, value, valueColor = errColor) }
+        }
+    }
+}
+
+/** Mirrors the phone's UpdateAvailableTile -- shown whenever the phone has
+ *  found a newer build (see WearSettingsPayload.updateAvailable). The watch
+ *  has no download/install flow of its own, so its one action opens the
+ *  GitHub Release on the paired phone instead. */
+@Composable
+private fun UpdateAvailableCard(vm: WearViewModel, ui: WearUi) {
+    val info = ui.settings?.updateAvailable ?: return
+    val context = LocalContext.current
+    AnimatedVisibility(visible = true, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 4 }) {
+        SectionCard("Update available", Icons.Filled.SystemUpdate) {
+            Text(
+                info.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${info.runNumber}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(6.dp))
+            MorphButton(
+                label = "Open on phone",
+                icon = Icons.Filled.OpenInNew,
+                active = false,
+                activeColor = MaterialTheme.colorScheme.primary,
+                pending = false,
+                onClick = { WearRemote.openOnPhone(context, info.htmlUrl) },
+            )
         }
     }
 }
