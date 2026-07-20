@@ -19,8 +19,6 @@ import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.data.WearSessionDto
 import com.bloo.bluelink.data.WearStatePayload
 import com.bloo.bluelink.data.WearSync
-import com.bloo.bluelink.data.WearUpdateInfo
-import com.bloo.bluelink.data.UpdateStore
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
@@ -150,16 +148,6 @@ object WearBridge {
         val pebbleOrders = vins.associateWith { store.sectionOrder(it) }
         val hiddenSections = vins.associateWith { store.hiddenSections(it) }
 
-        val updateStore = UpdateStore(context)
-        val availableRun = updateStore.availableRunNumber()
-        val updateAvailable = if (availableRun > 0) {
-            WearUpdateInfo(
-                runNumber = availableRun,
-                displayTitle = updateStore.availableTitle(),
-                htmlUrl = updateStore.availableHtmlUrl() ?: "https://github.com/serverreset/bloo/releases",
-            )
-        } else null
-
         val payload = WearSettingsPayload(
             dark = dark,
             useFahrenheit = appearance.useFahrenheit,
@@ -175,7 +163,6 @@ object WearBridge {
             auroraCustomColor = appearance.auroraCustomColor,
             hapticsEnabled = appearance.hapticsEnabled,
             settingsMode = store.settingsMode(),
-            updateAvailable = updateAvailable,
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))

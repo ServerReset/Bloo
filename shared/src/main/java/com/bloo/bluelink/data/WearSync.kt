@@ -390,24 +390,6 @@ data class WearSettingsPayload(
      *  the phone hides it. One-way (phone -> watch): the watch has no UI of
      *  its own to change this, unlike aiEnabled/auroraEnabled above. */
     val settingsMode: String = "simple",
-    /** Mirrors the phone's AppViewModel.UiState.updateAvailable -- a newer CI
-     *  build than what's installed, if one was found and hasn't been
-     *  dismissed. One-way (phone -> watch): the watch can't download/install
-     *  its own update, so it just surfaces the fact and points back to the
-     *  phone. Null when there's nothing to show. */
-    val updateAvailable: WearUpdateInfo? = null,
-)
-
-/** The small slice of the phone's UpdateInfo the watch actually needs to
- *  show its own "Update available" card -- see [WearSettingsPayload.updateAvailable]. */
-@Serializable
-data class WearUpdateInfo(
-    val runNumber: Int,
-    val displayTitle: String? = null,
-    /** The GitHub Release page -- opened on the phone via RemoteActivityHelper
-     *  when the watch's card is tapped, since the watch itself has no APK
-     *  install flow. */
-    val htmlUrl: String,
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */

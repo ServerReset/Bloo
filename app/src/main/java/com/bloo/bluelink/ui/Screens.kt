@@ -7438,7 +7438,6 @@ private fun SettingsScreen(vm: AppViewModel) {
     val notif by vm.notifications.collectAsState()
     val state by vm.state.collectAsState()
     val logs by vm.logs.collectAsState()
-    val updateChecksEnabled by vm.updateChecksEnabled.collectAsState()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val canBio = remember { vm.canUseBiometrics() }
@@ -8009,52 +8008,11 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
-            // Updates
-            SettingsCard("Updates") {
-                val build = vm.currentBuildNumber
-                StepRow("CI build", if (build > 0) "#$build" else "Local build")
-                Spacer(Modifier.height(2.dp))
-                // Star of David with spin animation on tap
-                var starRot by remember { mutableStateOf(0f) }
-                val starAngle by androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = starRot,
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = 0.4f, stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
-                    ),
-                    label = "starSpin",
-                )
-                Text(
-                    "Built by Lord Reset with OpenCode \u2721",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable { starRot += 360f },
-                )
-                Spacer(Modifier.height(8.dp))
-                ToggleRow("Check automatically", updateChecksEnabled) { vm.setUpdateChecksEnabled(it) }
-                Spacer(Modifier.height(8.dp))
-                MorphTextButton(
-                    if (state.updateChecking) "Checking…" else "Check now",
-                    onClick = { vm.checkForUpdatesNow() },
-                    enabled = !state.updateChecking && build > 0,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Bloo isn't on the Play Store, so this checks GitHub Actions for newer " +
-                        "builds instead. When one's found, a prompt lets you open it, snooze " +
-                        "for a few days, or dismiss it for now.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                state.updateCheckFailed?.let { err ->
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Check failed: $err",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
+            // The Updates card (CI build number, manual "Check now", auto-check
+            // toggle) used to live here -- removed. Updates check automatically
+            // now (cold start + every refresh, plus a periodic background
+            // worker) and present themselves via the update tile pinned under
+            // the hero tile; no settings/manual controls needed any more.
 
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
@@ -9096,10 +9054,6 @@ private fun SettingsSearchResults(
     }
     add("Open links in app", "browser tab links") {
         ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
-    }
-    add("Check for updates", "update github actions build version") {
-        val updateChecksEnabled by vm.updateChecksEnabled.collectAsState()
-        ToggleRow("Check for updates", updateChecksEnabled) { vm.setUpdateChecksEnabled(it) }
     }
     add("Service due alerts", "notification reminder service") {
         ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }

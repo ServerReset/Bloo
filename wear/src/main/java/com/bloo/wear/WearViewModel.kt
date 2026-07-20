@@ -161,12 +161,10 @@ data class WearUi(
      *  value and stomped the toggle back to stale. */
     val settingsOverride: Map<String, Any?> = emptyMap(),
     /** A newer CI build than what's installed, if found and not snoozed/disabled.
-     *  Wear OS has no reliable on-device sideload flow, so acting on this opens
-     *  the run's page on the connected phone rather than installing anything
-     *  on the watch itself. */
+     *  Checked entirely independently of the phone -- see runUpdateCheck. */
     val updateRun: com.bloo.bluelink.data.WorkflowRun? = null,
-    /** True while a manual "Check now" is in flight. */
-    val updateChecking: Boolean = false,
+    /** True while the update APK is downloading (see downloadAndInstallUpdate). */
+    val updateDownloading: Boolean = false,
     /** True when the PIN lock gate (see PinLockScreen) is covering the app. */
     val pinLocked: Boolean = false,
     /** True while a manual "Sync from phone" (resync) is in flight -- every
@@ -975,30 +973,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { localStore.setUpdateSnoozeUntil(System.currentTimeMillis() + UPDATE_SNOOZE_MS) }
     }
 
-    fun setUpdateChecksEnabled(enabled: Boolean) {
-        viewModelScope.launch { localStore.setUpdateChecksEnabled(enabled) }
-        if (!enabled) _ui.update { it.copy(updateRun = null) }
-    }
-
-    /** Manual "Check now": forces past the disabled/debounce/snooze gates and
-     *  reports the outcome (banner if newer, else a brief message). */
-    fun checkForUpdatesNow() {
-        if (_ui.value.updateChecking) return
-        _ui.update { it.copy(updateChecking = true) }
-        viewModelScope.launch {
-            val found = runUpdateCheck(force = true)
-            _ui.update {
-                it.copy(
-                    updateChecking = false,
-                    message = if (!found) "You're on the latest build." else it.message,
-                )
-            }
-        }
-    }
-
-    /** The single update-check path, shared by the cold-start check (force=false,
-     *  honors enabled/debounce/snooze) and the manual "Check now" (force=true,
-     *  bypasses them). Returns whether a newer build was surfaced. */
+    /** The single update-check path: runs once at cold start (see init below),
+     *  entirely independent of the phone -- same GitHub Actions endpoint the
+     *  phone uses (in :shared), compared against this watch's OWN build
+     *  number, not the phone's. No manual "Check now" any more -- this is the
+     *  only check, and its result (updateRun) drives the More tile's banner
+     *  automatically. Returns whether a newer build was surfaced. */
     private suspend fun runUpdateCheck(force: Boolean): Boolean {
         if (com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER <= 0) return false
         val settings = localStore.flow.first()
@@ -1023,11 +1003,39 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     /** The GitHub Actions build number this watch app was compiled from. */
     val currentBuildNumber: Int get() = com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER
 
-    /** Wear OS has no reliable on-device sideload flow, so this opens the
-     *  build's page on the connected phone instead. */
-    fun openUpdateOnPhone() {
-        val url = _ui.value.updateRun?.htmlUrl ?: return
-        com.bloo.wear.WearRemote.openOnPhone(ctx, url)
+    /** Downloads the watch's OWN update APK (Bloo-Wear.apk) and hands it
+     *  straight to the system installer, entirely on-device -- no phone
+     *  needed at all. Falls back to opening the release page on the phone
+     *  only if this particular release has no wear asset (an old release
+     *  published before wearApkUrl existed, or a failed asset upload). */
+    fun downloadAndInstallUpdate() {
+        val run = _ui.value.updateRun ?: return
+        val url = run.wearApkUrl
+        if (url == null) {
+            com.bloo.wear.WearRemote.openOnPhone(ctx, run.htmlUrl)
+            return
+        }
+        if (_ui.value.updateDownloading) return
+        _ui.update { it.copy(updateDownloading = true) }
+        viewModelScope.launch {
+            val dest = java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo-Wear.apk")
+            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { }
+            _ui.update { it.copy(updateDownloading = false) }
+            if (!ok) {
+                _ui.update { it.copy(message = "Download failed — check your connection and try again.") }
+                return@launch
+            }
+            runCatching {
+                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(intent)
+            }.onFailure {
+                _ui.update { it2 -> it2.copy(message = "Downloaded, but couldn't open the installer.") }
+            }
+        }
     }
 
     fun setFontScale(scale: Float) {

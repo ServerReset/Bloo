@@ -37,6 +37,7 @@ class UpdateStore(private val context: Context) {
     private val keyAvailableRun = intPreferencesKey("available_run")
     private val keyAvailableTitle = stringPreferencesKey("available_title")
     private val keyAvailableUrl = stringPreferencesKey("available_url")
+    private val keyLastNotifiedRun = intPreferencesKey("last_notified_run")
 
     suspend fun lastCheckedAt(): Long =
         context.updateDataStore.data.first()[keyLastCheckedAt] ?: 0L
@@ -60,10 +61,10 @@ class UpdateStore(private val context: Context) {
     }
 
     /** The last build the checker found newer than what's installed, persisted
-     *  (not just in AppViewModel's in-memory UiState) so WearBridge can read
-     *  it independently and mirror it to the watch on every settings publish,
-     *  the same way it already reads SettingsStore.aiEnabled() -- see
-     *  WearBridge.publishSettingsNow. 0 = none available. */
+     *  (not just in AppViewModel's in-memory UiState) so UpdateCheckWorker --
+     *  which runs on its own periodic schedule, independent of the app being
+     *  open -- can read the same result the in-app check would have found.
+     *  0 = none available. */
     suspend fun setAvailable(runNumber: Int, displayTitle: String?, htmlUrl: String) {
         context.updateDataStore.edit {
             it[keyAvailableRun] = runNumber
@@ -83,4 +84,13 @@ class UpdateStore(private val context: Context) {
     suspend fun availableRunNumber(): Int = context.updateDataStore.data.first()[keyAvailableRun] ?: 0
     suspend fun availableTitle(): String? = context.updateDataStore.data.first()[keyAvailableTitle]
     suspend fun availableHtmlUrl(): String? = context.updateDataStore.data.first()[keyAvailableUrl]
+
+    /** The run number UpdateCheckWorker last posted a notification for, so it
+     *  doesn't nag with a fresh notification every ~12h about the same build
+     *  someone hasn't installed yet -- only a genuinely newer one. */
+    suspend fun lastNotifiedRun(): Int = context.updateDataStore.data.first()[keyLastNotifiedRun] ?: 0
+
+    suspend fun setLastNotifiedRun(runNumber: Int) {
+        context.updateDataStore.edit { it[keyLastNotifiedRun] = runNumber }
+    }
 }

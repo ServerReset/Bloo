@@ -414,73 +414,10 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
-        item {
-            SettingSection("Updates") {
-                Text(
-                    if (vm.currentBuildNumber > 0) "Build #${vm.currentBuildNumber}" else "Local build",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(6.dp))
-                MorphButton(
-                    label = if (ui.updateChecking) "Checking…" else "Check now",
-                    icon = Icons.Filled.Refresh,
-                    active = false,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    pending = ui.updateChecking,
-                    onClick = { vm.checkForUpdatesNow() },
-                )
-                Spacer(Modifier.height(4.dp))
-                MorphButton(
-                    label = if (ui.localSettings.updateChecksEnabled) "Auto-check on" else "Auto-check off",
-                    icon = Icons.Filled.Refresh,
-                    active = ui.localSettings.updateChecksEnabled,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    pending = false,
-                    onClick = { vm.setUpdateChecksEnabled(!ui.localSettings.updateChecksEnabled) },
-                )
-                // "Check now" finishing used to just silently revert its own
-                // label, with no confirmation an update was (or wasn't) found
-                // beyond a transient snackbar -- fade in real result content
-                // instead, the same way AiCard swaps in its summary.
-                AnimatedVisibility(
-                    visible = !ui.updateChecking && ui.updateRun != null,
-                    enter = fadeIn(tween(200)) + expandVertically(tween(200)),
-                    exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
-                ) {
-                    Column {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "Update available: build #${ui.updateRun?.runNumber ?: ""}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        MorphButton(
-                            label = "Open on phone",
-                            icon = Icons.Filled.Sync,
-                            active = false,
-                            activeColor = MaterialTheme.colorScheme.tertiary,
-                            pending = false,
-                            onClick = { vm.openUpdateOnPhone() },
-                        )
-                    }
-                }
-                AnimatedVisibility(
-                    visible = !ui.updateChecking && ui.updateRun == null && ui.localSettings.updateLastCheckedAt > 0,
-                    enter = fadeIn(tween(200)) + expandVertically(tween(200)),
-                    exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
-                ) {
-                    Text(
-                        "You're up to date",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-            }
-        }
+        // The Updates settings section (manual "Check now", auto-check toggle)
+        // used to live here -- removed. Updates check automatically and
+        // present themselves via the More tile's banner (see HomeScreen's
+        // MoreCard), no settings/manual controls needed any more.
 
         item {
             SettingSection("Sync") {

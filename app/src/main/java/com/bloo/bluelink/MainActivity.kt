@@ -21,6 +21,7 @@ import com.bloo.bluelink.ui.BlooTheme
 import com.bloo.bluelink.widget.WidgetRefreshWorker
 import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.DriveSyncWorker
+import com.bloo.bluelink.work.UpdateCheckWorker
 
 class MainActivity : FragmentActivity() {
 
@@ -56,6 +57,10 @@ class MainActivity : FragmentActivity() {
         // Drive settings sync used to only run while the app was foregrounded and
         // a refresh settled — a no-op periodic worker when sync isn't configured.
         DriveSyncWorker.schedule(applicationContext)
+        // Bloo isn't on the Play Store, so it checks its own GitHub Actions builds
+        // for updates; this is that check running even when the app is closed,
+        // presenting a newer build via notification instead of the in-app tile.
+        UpdateCheckWorker.schedule(applicationContext)
         ContextCompat.registerReceiver(
             this,
             screenReceiver,

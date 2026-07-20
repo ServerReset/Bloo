@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Grants read access to the cache subfolder holding a downloaded update
+     APK via FileProvider, handed to the system package installer. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="apk" path="apk/" />
+</paths>

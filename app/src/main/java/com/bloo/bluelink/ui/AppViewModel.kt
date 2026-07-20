@@ -154,13 +154,8 @@ data class UiState(
     val updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
     /** "Remind me"/"Not now" on the update tile: hides it for this build
      *  without forgetting [updateAvailable] -- a later check that finds a
-     *  *different* build (or the user tapping "Check now") clears this so
-     *  the tile can come back. */
+     *  *different* build clears this so the tile can come back. */
     val updateTileDismissed: Boolean = false,
-    /** True while a manual "Check now" request is in flight. */
-    val updateChecking: Boolean = false,
-    /** Non-null when the last update check failed (network/API error). */
-    val updateCheckFailed: String? = null,
     /** True while the update APK is being downloaded in-app (see
      *  AppViewModel.downloadUpdateInBackground). */
     val updateDownloading: Boolean = false,
@@ -335,9 +330,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
 
     private val updateStore = com.bloo.bluelink.data.UpdateStore(app)
-
-    val updateChecksEnabled: StateFlow<Boolean> =
-        updateStore.checksEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
@@ -892,16 +884,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             updateTileDismissed = it.updateTileDismissed && sameBuild,
                         )
                     }
-                is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
-                    _state.update { it.copy(updateCheckFailed = result.error) }
+                is com.bloo.bluelink.update.UpdateCheckResult.Failed -> Unit // silent -- next refresh tries again
                 is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
                     _state.update { it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false) }
-            }
-            // The watch has no update checker of its own -- it only ever learns
-            // about a newer build from this sync, so push it right away instead
-            // of waiting for some unrelated appearance change to piggyback on.
-            if (result !is com.bloo.bluelink.update.UpdateCheckResult.Failed) {
-                com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value)
             }
         }
     }
@@ -1179,24 +1164,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  enough - no persisted state needed. updateAvailable is left alone so a
      *  later refresh finding the same build doesn't re-show it, but a genuinely
      *  different build still will (see checkForUpdate's sameBuild check). */
-    fun dismissUpdate() = _state.update { it.copy(updateTileDismissed = true, updateCheckFailed = null) }
+    fun dismissUpdate() = _state.update { it.copy(updateTileDismissed = true) }
 
     /** "Remind me in a few days": persists a snooze that outlasts the checker's
      *  normal debounce window too. */
     fun snoozeUpdate() {
-        _state.update { it.copy(updateTileDismissed = true, updateCheckFailed = null) }
+        _state.update { it.copy(updateTileDismissed = true) }
         viewModelScope.launch { com.bloo.bluelink.update.UpdateChecker.snooze(getApplication()) }
-    }
-
-    fun setUpdateChecksEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            updateStore.setChecksEnabled(enabled)
-            if (!enabled) {
-                updateStore.clearAvailable()
-                com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value)
-            }
-        }
-        if (!enabled) _state.update { it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false, updateCheckFailed = null) }
     }
 
     private fun apkCacheFile(): java.io.File {
@@ -1252,36 +1226,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (!launchApkInstaller(dest)) {
             _state.update { it.copy(message = "Couldn't open the installer — find Bloo.apk in your downloads.") }
-        }
-    }
-
-    /** Manual "Check now": ignores the debounce/snooze/enabled gates (force),
-     *  and reports the outcome - the update tile reappears (even if it was
-     *  previously dismissed for this exact build) if there's a newer build,
-     *  else a brief "you're up to date" message. */
-    fun checkForUpdatesNow() {
-        if (_state.value.updateChecking) return
-        _state.update { it.copy(updateChecking = true, updateCheckFailed = null) }
-        viewModelScope.launch {
-            val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = true)
-            _state.update {
-                when (result) {
-                    is com.bloo.bluelink.update.UpdateCheckResult.Available -> {
-                        val sameBuild = it.updateAvailable?.run?.runNumber == result.info.run.runNumber
-                        it.copy(
-                            updateChecking = false, updateAvailable = result.info, updateCheckFailed = null,
-                            updateApkReady = it.updateApkReady && sameBuild, updateTileDismissed = false,
-                        )
-                    }
-                    is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
-                        it.copy(updateChecking = false, updateAvailable = null, updateApkReady = false, updateTileDismissed = false, message = "You're on the latest build.", messageType = "success")
-                    is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
-                        it.copy(updateChecking = false, updateCheckFailed = result.error)
-                }
-            }
-            if (result !is com.bloo.bluelink.update.UpdateCheckResult.Failed) {
-                com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value)
-            }
         }
     }
 
