@@ -809,6 +809,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         pendingShortcut = null
         val idx = _state.value.vehicles.indexOf(v)
         if (idx >= 0) selectIndex(idx)
+        // selectIndex only updates which car is current, not which screen is
+        // showing -- tapping a car-specific widget while the app was sitting
+        // on Settings (or any other screen) previously selected the right car
+        // underneath without ever bringing it into view. A widget/shortcut
+        // tap always means "look at this car," so force back to the garage.
+        _state.update { it.copy(screen = Screen.Garage, expandedIndex = null) }
         val status = _state.value.statusFor(v)
         when (cmd) {
             // Toggles: do the opposite of the last-known state.

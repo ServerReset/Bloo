@@ -258,7 +258,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -2602,7 +2601,39 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            // Edge-trace refresh gesture lives here, on the actual PARENT of
+            // VerticalPager below, not on a separate sibling Box overlapping
+            // it -- sibling dispatch order between two unrelated composables
+            // is ambiguous and kept letting this steal the vertical swipe
+            // despite two earlier attempts (never consuming; then watching on
+            // the Final pass). Parent/child order is NOT ambiguous: the
+            // default Main pass runs leaf-to-root, so VerticalPager's own
+            // drag recognizer (the child) always gets first crack at a given
+            // event, and by the time it bubbles up to this parent's handler,
+            // change.isConsumed already reflects whether the pager claimed
+            // it. This is the actual textbook nested-gesture-priority
+            // pattern, not another guess at pass ordering between siblings.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    edgeTraceHolding = true
+                    val slop = viewConfiguration.touchSlop
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed || change.isConsumed) break
+                            val dx = abs(change.position.x - down.position.x)
+                            val dy = abs(change.position.y - down.position.y)
+                            if (dx > slop || dy > slop) break
+                        }
+                    } finally { if (edgeTraceHolding) edgeTraceHolding = false }
+                }
+            },
+    ) {
         // Native vertical paging. The pager owns the swipe gesture and pages on
         // any vertical drag; tall tiles scroll their own content first and the
         // pager nested-scrolls to the next/previous tile once a tile is at its
@@ -2669,54 +2700,11 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 )
             }
         }
-        // Edge-trace overlay: when holding, a line traces the screen edge clockwise
-        // from the top-left. Full circuit = refresh. Drawn on top of everything.
-        //
-        // This sits on top of (a sibling of, drawn after) the full-screen
-        // VerticalPager above, so an unconditional down.consume() here claimed
-        // every touch before the pager's own drag detector ever saw it --
-        // silently breaking vertical swipe-to-page-tiles on the cover screen
-        // entirely, since literally every touch on screen started here first.
-        // Never consuming anything fixes that: this handler only *watches* the
-        // stream to detect a stationary hold, ceding the moment real movement
-        // (a swipe) appears, so the pager underneath is always free to claim
-        // its own drag the instant it exceeds slop.
-        //
-        // Reports of swipe still not working after switching to the Initial
-        // pass pointed at the actual remaining gap: watching on Initial never
-        // consumed anything, but it also never CHECKED whether something else
-        // -- the vertical pager's own drag recognizer -- had already claimed
-        // the gesture by the time slop was crossed. Two independent gesture
-        // recognizers both just "watching" the same raw stream isn't a
-        // conflict by itself, but this one still had to *give up* the moment
-        // a real drag started, and slop-distance alone can't tell "the pager
-        // just claimed this" apart from "still deciding." Final pass runs
-        // strictly after every other pass for every node has finished, so by
-        // the time this handler sees an event here, consumption state is
-        // settled -- checking change.isConsumed is now a reliable signal
-        // that the pager (or anything else) already took the gesture,
-        // regardless of sibling dispatch order.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
-                        edgeTraceHolding = true
-                        val slop = viewConfiguration.touchSlop
-                        try {
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Final)
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed || change.isConsumed) break
-                                val dx = abs(change.position.x - down.position.x)
-                                val dy = abs(change.position.y - down.position.y)
-                                if (dx > slop || dy > slop) break
-                            }
-                        } finally { if (edgeTraceHolding) edgeTraceHolding = false }
-                    }
-                },
-        ) {
+        // Edge-trace ring: when holding (gesture handler lives on the outer
+        // Box now, see above), a line traces the screen edge clockwise from
+        // the top-left. Full circuit = refresh. Purely decorative here --
+        // this Box has no pointerInput of its own to conflict with anything.
+        Box(Modifier.fillMaxSize()) {
             if (edgeTraceProgress.value > 0.001f) {
                 val accent = MaterialTheme.colorScheme.primary
                 Canvas(Modifier.fillMaxSize()) {
@@ -4354,19 +4342,21 @@ private fun PrimaryActions(
             extraAction = if (v.supportsHornLights) {
                 {
                     val hlPending = state.isPending(v.vin, "hornLights")
+                    // Same fixed size as MorphExpandButton (the arrow dropdown
+                    // button), not an arbitrary smaller circle.
                     MorphButton(
                         onClick = { vm.flashLights(v) },
                         enabled = !hlPending,
                         contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(40.dp),
-                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(18.dp)) }
+                        modifier = Modifier.size(50.dp),
+                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) }
                     Spacer(Modifier.width(6.dp))
                     MorphButton(
                         onClick = { vm.hornAndLights(v) },
                         enabled = !hlPending,
                         contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(40.dp),
-                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(18.dp)) }
+                        modifier = Modifier.size(50.dp),
+                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(22.dp)) }
                     Spacer(Modifier.width(8.dp))
                 }
             } else null,
@@ -6777,14 +6767,35 @@ private fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
 private fun degLabel(valueF: String, fahrenheit: Boolean): String =
     com.bloo.bluelink.data.degLabel(valueF, fahrenheit)
 
-/** A descriptive name for a vibrancy multiplier (0 = greyscale, 1 = default, 2 = ultra). */
-private fun vibrancyLabel(v: Float): String = when {
-    v < 0.2f -> "Greyscale"
-    v < 0.6f -> "Muted"
-    v < 0.9f -> "Subdued"
-    v < 1.15f -> "Default"
-    v < 1.6f -> "Vivid"
-    else -> "Ultra"
+// Five fixed stops instead of a free continuous 0-2 range with 20 snap
+// points -- most of those were indistinguishable by eye, and "what number is
+// this" isn't a useful question for a saturation slider. Each label names
+// what you'd actually see, ending on "Best Buy TV" (a factor of 2.5 -- since
+// saturate() coerces the HSV saturation channel to a hard 1.0 ceiling, this
+// already pushes virtually every color to maximum saturation, the visual
+// definition of "showroom TV wall" oversaturation).
+private val VibrancySteps = floatArrayOf(0f, 0.5f, 1f, 1.6f, 2.5f)
+private val VibrancyLabels = listOf("Monochrome", "A bit of color", "Normal", "Extra", "Best Buy TV")
+private fun vibrancyIndexFor(v: Float): Int =
+    VibrancySteps.indices.minByOrNull { kotlin.math.abs(VibrancySteps[it] - v) } ?: 2
+
+/** Shared by the main Appearance card and the settings-search quick-jump
+ *  preview so the 5-stop mapping lives in exactly one place. */
+@Composable
+private fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
+    var indexDraft by remember(appearance.vibrancy) { mutableFloatStateOf(vibrancyIndexFor(appearance.vibrancy).toFloat()) }
+    StepRow("Vibrancy", VibrancyLabels[indexDraft.roundToInt().coerceIn(0, 4)])
+    AnimatedSlider(
+        value = indexDraft,
+        onValueChange = { indexDraft = it },
+        valueRange = 0f..4f,
+        steps = 3,
+        onValueSettled = {
+            val idx = it.roundToInt().coerceIn(0, 4)
+            indexDraft = idx.toFloat()
+            vm.setVibrancySoon(VibrancySteps[idx])
+        },
+    )
 }
 
 // --- Location -------------------------------------------------------------
@@ -8074,15 +8085,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    var vibrancyDraft by remember(appearance.vibrancy) { mutableFloatStateOf(appearance.vibrancy) }
-                    StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
-                    AnimatedSlider(
-                        value = vibrancyDraft,
-onValueChange = { vibrancyDraft = it },
-                    valueRange = 0f..2f,
-                    steps = 19,
-                    onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
-                    )
+                    VibrancySlider(appearance, vm)
                   }
                 }
             }
@@ -8248,9 +8251,12 @@ onValueChange = { vibrancyDraft = it },
             Box(
                 Modifier
                     .width(172.dp)
-                    .ambientRing(RoundedCornerShape(20.dp))
-                    .dropShadow(RoundedCornerShape(20.dp))
-                    .frostedRim(RoundedCornerShape(20.dp)),
+                    // Was 20.dp -- MorphSegmented's own track corner is 16.dp,
+                    // so the outline ring drawn here never actually matched
+                    // the pill's real corners underneath it.
+                    .ambientRing(RoundedCornerShape(16.dp))
+                    .dropShadow(RoundedCornerShape(16.dp))
+                    .frostedRim(RoundedCornerShape(16.dp)),
             ) {
                 // Match the "Settings" title pill right next to it (same glass
                 // treatment, same track height) instead of the ordinary
@@ -8862,17 +8868,9 @@ private fun SettingsSearchResults(
             onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
         )
     }
-    add("Colour vibrancy", "color saturation vivid material you") {
+    add("Colour vibrancy", "color saturation vivid material you monochrome best buy tv") {
         // Deferred-commit, same as the main Appearance card's slider — see there.
-        var vibrancyDraft by remember(appearance.vibrancy) { mutableFloatStateOf(appearance.vibrancy) }
-        StepRow("Vibrancy", vibrancyLabel(vibrancyDraft))
-        AnimatedSlider(
-            value = vibrancyDraft,
-            onValueChange = { vibrancyDraft = it },
-            valueRange = 0f..2f,
-            steps = 19,
-            onValueSettled = { vibrancyDraft = (it * 10).roundToInt() / 10f; vm.setVibrancySoon(vibrancyDraft) },
-        )
+        VibrancySlider(appearance, vm)
     }
     add("Open links in app", "browser tab links") {
         ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
