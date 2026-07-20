@@ -133,7 +133,10 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -7414,13 +7417,35 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ActivityResultContracts.OpenDocument(),
                 ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
 
-                Text(
-                    "Automatic Drive sync",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
+                // Icon + status caption up front, matching the icon-led header
+                // every other multi-row card in Settings uses (Quick tiles, AI)
+                // -- this card was the one still opening on two stacked lines
+                // of plain text with no at-a-glance state.
+                val driveConfigured = state.syncUri != null
+                val driveIcon = when {
+                    driveConfigured && state.syncError != null -> Icons.Filled.CloudOff
+                    driveConfigured -> Icons.Filled.CloudDone
+                    else -> Icons.Filled.CloudSync
+                }
+                val driveTint = when {
+                    driveConfigured && state.syncError != null -> MaterialTheme.colorScheme.error
+                    driveConfigured -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(driveIcon, contentDescription = null, tint = driveTint, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Automatic Drive sync", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        val statusLabel = when {
+                            !driveConfigured -> "Not set up"
+                            state.syncError != null -> "Sync failed"
+                            else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Set up"
+                        }
+                        Text(statusLabel, style = MaterialTheme.typography.labelSmall, color = driveTint)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
                 Text(
                     "Keeps a Google Drive file continuously up to date, so every " +
                         "signed-in device converges on the same settings automatically.",
@@ -7498,14 +7523,15 @@ private fun SettingsScreen(vm: AppViewModel) {
                 // what most people actually want and shouldn't be buried.
                 AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                   Column {
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "Manual backup",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Manual backup", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Text(
                         "A one-time snapshot of your theme, palettes, tile order and " +
                             "preferences as a file — share it anywhere, or restore it later. " +
