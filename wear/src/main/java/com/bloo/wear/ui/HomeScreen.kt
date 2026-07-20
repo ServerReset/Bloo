@@ -1602,7 +1602,15 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                     )
                     Card(
                         onClick = {},
-                        colors = CardDefaults.cardColors(containerColor = cardTint),
+                        // contentColor left to default would derive from
+                        // contentColorFor(cardTint) -- cardTint is a
+                        // mid-animation interpolated Color, so during the
+                        // drag-highlight transition it's neither
+                        // surfaceContainerHigh nor surfaceContainerLow
+                        // exactly, missing contentColorFor's exact-match
+                        // lookup and silently falling back to an implicit
+                        // ambient color instead of onSurface.
+                        colors = CardDefaults.cardColors(containerColor = cardTint, contentColor = MaterialTheme.colorScheme.onSurface),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
