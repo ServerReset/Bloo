@@ -28,6 +28,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -475,7 +479,30 @@ private fun CarColumn(
             visible = centerTile.isNotEmpty() && centerTile != WearTiles.SUMMARY,
             phoneConnected = ui.phoneConnected,
         )
+
+        // The system clock (Wear's TimeText) draws itself over whatever this
+        // app renders at the very top-center -- same gap as the phone's
+        // status bar, matched with the same soft blurred scrim treatment.
+        TopClockScrim()
     }
+}
+
+/** Soft blurred scrim behind the system clock (TimeText), same treatment as
+ *  the phone's status bar scrim -- see StatusBarScrim in the phone app. */
+@Composable
+private fun BoxScope.TopClockScrim() {
+    Box(
+        Modifier
+            .align(Alignment.TopCenter)
+            .fillMaxWidth()
+            .height(34.dp)
+            .background(
+                Brush.verticalGradient(
+                    listOf(MaterialTheme.colorScheme.background.copy(alpha = 0.5f), Color.Transparent),
+                ),
+            )
+            .blur(14.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+    )
 }
 
 /**

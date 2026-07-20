@@ -2248,6 +2248,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             }
                         }
                     }
+                    StatusBarScrim()
                     if (count > 1) {
                         PagerDots(
                             current = exReal(exPager.currentPage),
@@ -2345,6 +2346,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
                         }
                     }
+                    StatusBarScrim()
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
                         PagerDots(
@@ -2998,6 +3000,30 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
             }
         }
     }
+}
+
+/**
+ * A soft blurred scrim behind the status bar so scrolling content underneath
+ * (a car photo, Aurora, dense text) doesn't fight the system clock/battery
+ * icons drawn on top of it. Not the normal (non-cover-screen) layouts -- the
+ * cover screen already reserves real space above its content instead of
+ * drawing under the status bar at all, so it has nothing to scrim.
+ */
+@Composable
+private fun StatusBarScrim() {
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(topInset + 28.dp)
+            .background(
+                Brush.verticalGradient(
+                    listOf(scheme.surface.copy(alpha = 0.55f), Color.Transparent),
+                ),
+            )
+            .blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+    )
 }
 
 /** A small translucent circular icon button used as a floating overlay control.
