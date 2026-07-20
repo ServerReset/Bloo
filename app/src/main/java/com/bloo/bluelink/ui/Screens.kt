@@ -100,6 +100,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ScrollState
@@ -225,7 +226,9 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -2243,6 +2246,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 LaunchedEffect(exPager) {
                     snapshotFlow { exPager.settledPage }.collect { vm.expand(exReal(it)) }
                 }
+                val exSwipeSpeed = rememberPagerSwipeVelocity(exPager)
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = exPager,
@@ -2274,18 +2278,24 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // itself, was the earlier jitter. Setting renderEffect
                         // inside this graphicsLayer lambda instead is read only
                         // at draw time (no recomposition/relayout at all), so
-                        // it's effectively free to update every frame. Horizontal
-                        // radius leads vertical for a directional "swipe smear"
-                        // rather than a flat blur.
+                        // it's effectively free to update every frame.
+                        // Keyed off exSwipeSpeed (pages/sec), not the page's
+                        // static offset from center -- actual motion blur
+                        // should track how fast content is currently sliding,
+                        // so it's near zero on a slow drag or once settled and
+                        // strong mid-fling, the same way a camera would smear
+                        // a fast-moving subject. Horizontal leads vertical for
+                        // a directional smear along the swipe axis.
                         Box(Modifier.fillMaxSize().graphicsLayer {
                             alpha = 1f - effectiveOff * 0.2f
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
                             rotationZ = effectiveOff * if (page >= exPager.currentPage) 1.2f else -1.2f
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && effectiveOff > 0.015f) {
+                            val speed = exSwipeSpeed.value
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && speed > 0.15f) {
                                 renderEffect = BlurEffect(
-                                    radiusX = (effectiveOff * 22f).coerceAtMost(16f),
-                                    radiusY = (effectiveOff * 9f).coerceAtMost(7f),
+                                    radiusX = (speed * 6.5f).coerceAtMost(28f),
+                                    radiusY = (speed * 2f).coerceAtMost(9f),
                                     edgeTreatment = TileMode.Decal,
                                 )
                             }
@@ -2329,6 +2339,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         vm.selectIndex((realBlock(page) * perPage).coerceIn(0, count - 1))
                     }
                 }
+                val gridSwipeSpeed = rememberPagerSwipeVelocity(pager)
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
                 var carNameVisible by remember { mutableStateOf(false) }
                 var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
@@ -2362,18 +2373,22 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // jitter was the per-frame relayout of a plain
                         // Modifier.blur(x.dp), not the blur pass itself --
                         // renderEffect set inside this graphicsLayer lambda is
-                        // draw-time only, so directional motion blur is back
-                        // without the relayout cost.
+                        // draw-time only. Keyed off gridSwipeSpeed (actual
+                        // pages/sec the pager is moving), not the static
+                        // per-page offset -- real motion blur tracks speed,
+                        // not position, so it appears mid-fling and clears
+                        // once the page is actually slowing down or settled.
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
                                 alpha = 1f - effectiveOff * 0.2f
                                 scaleX = 1f - effectiveOff * 0.06f
                                 scaleY = 1f - effectiveOff * 0.06f
                                 rotationZ = effectiveOff * if (page >= pager.currentPage) 1.2f else -1.2f
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && effectiveOff > 0.015f) {
+                                val speed = gridSwipeSpeed.value
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && speed > 0.15f) {
                                     renderEffect = BlurEffect(
-                                        radiusX = (effectiveOff * 22f).coerceAtMost(16f),
-                                        radiusY = (effectiveOff * 9f).coerceAtMost(7f),
+                                        radiusX = (speed * 6.5f).coerceAtMost(28f),
+                                        radiusY = (speed * 2f).coerceAtMost(9f),
                                         edgeTreatment = TileMode.Decal,
                                     )
                                 }
@@ -3063,6 +3078,44 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
             }
         }
     }
+}
+
+/**
+ * Tracks how fast a pager is actually moving (pages/second, unsigned),
+ * smoothed to avoid frame-to-frame flicker. This is what real motion blur
+ * should key off -- how fast something is currently sliding across the
+ * screen -- not how far a page sits from center, which is just a static
+ * depth cue and stays constant even while the drag is stationary.
+ */
+@Composable
+private fun rememberPagerSwipeVelocity(pagerState: PagerState): State<Float> {
+    val velocity = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(pagerState) {
+        var lastPos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+        var lastFrameNanos = 0L
+        while (true) {
+            withFrameNanos { frameNanos ->
+                val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                if (lastFrameNanos != 0L) {
+                    val dt = (frameNanos - lastFrameNanos) / 1_000_000_000f
+                    if (dt > 0f) {
+                        val instant = abs(pos - lastPos) / dt
+                        // Fast attack so a flick shows blur immediately, slower
+                        // decay so it eases out instead of cutting off the
+                        // instant your finger stops rather than the content.
+                        velocity.floatValue = if (instant > velocity.floatValue) {
+                            instant
+                        } else {
+                            velocity.floatValue * 0.75f + instant * 0.25f
+                        }
+                    }
+                }
+                lastPos = pos
+                lastFrameNanos = frameNanos
+            }
+        }
+    }
+    return velocity
 }
 
 /**
