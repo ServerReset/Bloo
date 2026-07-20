@@ -2059,6 +2059,27 @@ private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
     return base * factor
 }
 
+/** Which screen edge a camera cutout is flush against. Cover-screen code used
+ *  to always assume "top" -- wrong for any device whose cover-display cutout
+ *  coordinate space reports it against a different edge (bottom, left, or
+ *  right, depending on how that device rotates its outer display). */
+private enum class CameraEdge { TOP, BOTTOM, LEFT, RIGHT }
+
+/** Figures out which edge of a [viewWidthPx] x [viewHeightPx] screen the
+ *  cutout [rect] sits flush against, by comparing its margin to each edge --
+ *  whichever margin is smallest is the edge it's cut into. Returns null for
+ *  a null rect (no cutout at all). */
+private fun cameraEdgeOf(rect: android.graphics.Rect?, viewWidthPx: Int, viewHeightPx: Int): CameraEdge? {
+    if (rect == null) return null
+    val margins = mapOf(
+        CameraEdge.TOP to rect.top,
+        CameraEdge.BOTTOM to (viewHeightPx - rect.bottom),
+        CameraEdge.LEFT to rect.left,
+        CameraEdge.RIGHT to (viewWidthPx - rect.right),
+    )
+    return margins.minByOrNull { it.value }?.key
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun GarageScreen(state: UiState, vm: AppViewModel) {
@@ -2609,11 +2630,28 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             view.rootWindowInsets?.displayCutout?.boundingRects?.firstOrNull()
         else null
     }
-    // Top padding for tile content: push below the camera + comfortable gap.
-    // Falls back to the standard 10 dp when there is no cutout.
-    val tileTopPadding: Dp = cameraHole?.let { r ->
-        with(density) { r.bottom.toDp() + 12.dp }
-    } ?: coverScaled(10.dp)
+    // Was always treated as a top cutout regardless of where it actually sat
+    // -- fine for the common case, wrong for any cover screen whose cutout
+    // coordinate space reports it against a different edge. Figure out which
+    // edge it's really flush against, then clear THAT edge by however much
+    // room the cutout actually needs, leaving the other three at their
+    // normal cover-screen insets instead of blindly padding the top.
+    val cameraEdge = remember(cameraHole, view) { cameraEdgeOf(cameraHole, view.width, view.height) }
+    // The gap from the screen edge, past the cutout, plus a comfortable
+    // margin -- i.e. exactly how much dead space this side needs reserved
+    // so content flows around the camera instead of under it.
+    val cameraClearance: Dp? = cameraHole?.let { r ->
+        with(density) {
+            val clearancePx = when (cameraEdge) {
+                CameraEdge.TOP -> r.bottom
+                CameraEdge.BOTTOM -> view.height - r.top
+                CameraEdge.LEFT -> r.right
+                CameraEdge.RIGHT -> view.width - r.left
+                null -> 0
+            }
+            clearancePx.toDp() + 12.dp
+        }
+    }
     // Decorative ring color — subtle outline that acknowledges the camera hole.
     val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
 
@@ -2692,16 +2730,24 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
             CompositionLocalProvider(
                 LocalForceExpanded provides true,
                 LocalPebbleFillHeight provides true,
-                LocalCameraHolePx provides cameraHole,
                 LocalCoverScrollState provides tileScroll,
             ) {
+                // Baseline insets when that edge isn't the one the camera is
+                // cut into; maxOf below only ever grows a side past its
+                // baseline to clear the cutout, never shrinks it.
+                val baseStart = coverScaled(10.dp)
+                val baseTop = coverScaled(10.dp)
+                val baseBottom = coverScaled(24.dp)
+                val baseEnd = if (tiles.size > 1) coverScaled(22.dp) else coverScaled(10.dp)
                 Box(
                     Modifier
                         .fillMaxSize()
                         .navigationBarsPadding()
                         .padding(
-                            start = coverScaled(10.dp), top = tileTopPadding, bottom = coverScaled(24.dp),
-                            end = if (tiles.size > 1) coverScaled(22.dp) else coverScaled(10.dp),
+                            start = if (cameraEdge == CameraEdge.LEFT) maxOf(baseStart, cameraClearance ?: baseStart) else baseStart,
+                            top = if (cameraEdge == CameraEdge.TOP) maxOf(baseTop, cameraClearance ?: baseTop) else baseTop,
+                            bottom = if (cameraEdge == CameraEdge.BOTTOM) maxOf(baseBottom, cameraClearance ?: baseBottom) else baseBottom,
+                            end = if (cameraEdge == CameraEdge.RIGHT) maxOf(baseEnd, cameraClearance ?: baseEnd) else baseEnd,
                         ),
                 ) {
                     when (val tile = tiles[i]) {
@@ -2958,10 +3004,6 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val scheme = MaterialTheme.colorScheme
     val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
     val carCount = state.vehicles.size
-    // If the camera is at the top-center, nudge the car name row to the right so
-    // it doesn't try to render behind the hole area. The tile-level padding already
-    // cleared the camera vertically; this avoids horizontal crowding on the title row.
-    val cameraHole = LocalCameraHolePx.current
 
     // Entrance animation: slide up gently + fade in on first composition.
     val alpha = remember { Animatable(0f) }
@@ -3622,13 +3664,6 @@ private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
 private val CompactKnownTiles = setOf(
     "climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai"
 )
-
-/**
- * The front-facing camera cutout rect for the current display, in raw screen
- * pixels (display coordinate system), or null when there is no cutout. Provided
- * by [CompactCar] so every cover-screen tile can react to the camera hole.
- */
-private val LocalCameraHolePx = staticCompositionLocalOf<android.graphics.Rect?> { null }
 
 /**
  * When set, [Pebble] in fill-height cover-screen mode uses this scroll state
