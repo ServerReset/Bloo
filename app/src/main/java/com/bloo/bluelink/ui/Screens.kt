@@ -1726,11 +1726,34 @@ private fun AuroraBackground(
         DisposableEffect(ctx) {
             val mgr = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+            // Raw accelerometer values bake in however the phone is generally
+            // being held, not just active tilting -- held upright to look at
+            // (the overwhelmingly common case), gravity alone puts values[1]
+            // near +-9.8, a huge constant offset next to the deliberate ~0.5
+            // multiplier below. That pinned the blobs off in one direction
+            // (reading as "not centered") and saturated well past where any
+            // real hand tilt could move them further (reading as "motion does
+            // nothing"). rawX/rawY track the sensor directly; baseX/baseY
+            // track the same signal on a much slower average -- "how you're
+            // generally holding it right now" -- and tilt is only the
+            // difference between the two, so genuine movement still shows up
+            // small and centred regardless of the phone's constant baseline
+            // angle, and re-centres itself if you settle into holding it
+            // differently for a while.
+            var rawX = 0f; var rawY = 0f
+            var baseX = 0f; var baseY = 0f
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    val alpha = 0.02f
-                    tiltX = tiltX * (1 - alpha) + (-event.values[0] * 0.06f) * alpha
-                    tiltY = tiltY * (1 - alpha) + (event.values[1] * 0.06f) * alpha
+                    val fastAlpha = 0.08f
+                    val slowAlpha = 0.01f
+                    val x = -event.values[0]
+                    val y = event.values[1]
+                    rawX = rawX * (1 - fastAlpha) + x * fastAlpha
+                    rawY = rawY * (1 - fastAlpha) + y * fastAlpha
+                    baseX = baseX * (1 - slowAlpha) + x * slowAlpha
+                    baseY = baseY * (1 - slowAlpha) + y * slowAlpha
+                    tiltX = (rawX - baseX) * 0.06f
+                    tiltY = (rawY - baseY) * 0.06f
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
@@ -1843,7 +1866,10 @@ private fun AuroraBackground(
                     drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
                 blob(basePrimary.copy(alpha = (0.30f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread, (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread, 0.45f * explodeSize)
                 blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread, (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread, 0.40f * explodeSize)
-                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.22f, 0.58f, p3) + tiltX) * explodeSpread, (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread, 0.38f * explodeSize)
+                // fx range was 0.22-0.58 (centred at 0.40, visibly left of the
+                // other two blobs' 0.50) -- the whole composite wash read as
+                // biased toward one side even before any tilt was applied.
+                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread, (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread, 0.38f * explodeSize)
             },
     )
 }
@@ -3807,10 +3833,8 @@ private fun VehicleDetailContent(
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
                 ) {
-                    Box {
-                        Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                            Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                        }
+                    Box(Modifier.height(48.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+                        Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -3907,10 +3931,8 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
             ) {
-              Box {
-                Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                    Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                }
+              Box(Modifier.height(48.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+                  Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
               }
             }
         }
@@ -4291,24 +4313,31 @@ private fun PrimaryActions(
             offTextColor = MaterialTheme.colorScheme.error,
             // Kia's US API has no equivalent endpoint (see Vehicle.supportsHornLights),
             // so these only appear for Hyundai/Genesis, matching what those apps show.
-            // Were bare IconButtons -- a lone bolt/speaker glyph with no label
-            // reads as ambiguous decoration next to a row of actual labelled
-            // buttons (Unlock). Small MorphButtons with MorphButtonLabel match
-            // every other icon+text control in the app instead.
+            // Labelled MorphButtons ("Lights"/"Horn" text pills) were too wide for
+            // this row -- they squeezed the weighted name/state column (the
+            // "Locked"/"Unlocked" label) down to nothing, silently dropping it
+            // from view. Small circular icon-only buttons -- MorphButton already
+            // morphs pill-to-square on press, same "go square when tapped"
+            // language as everywhere else -- fit beside the label instead of
+            // crowding it out; contentDescription keeps them labelled for
+            // TalkBack even with no visible text.
             extraAction = if (v.supportsHornLights) {
                 {
                     val hlPending = state.isPending(v.vin, "hornLights")
                     MorphButton(
                         onClick = { vm.flashLights(v) },
                         enabled = !hlPending,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    ) { MorphButtonLabel(Icons.Filled.FlashOn, "Lights", pending = false, iconSize = 16.dp) }
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.size(40.dp),
+                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(18.dp)) }
                     Spacer(Modifier.width(6.dp))
                     MorphButton(
                         onClick = { vm.hornAndLights(v) },
                         enabled = !hlPending,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    ) { MorphButtonLabel(Icons.Filled.Campaign, "Horn", pending = false, iconSize = 16.dp) }
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.size(40.dp),
+                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(18.dp)) }
+                    Spacer(Modifier.width(8.dp))
                 }
             } else null,
         )
