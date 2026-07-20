@@ -1638,7 +1638,16 @@ private fun GlassAlertDialog(
         val dialogView = LocalView.current
         SideEffect {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                (dialogView.parent as? DialogWindowProvider)?.window?.decorView?.forceDarkAllowed = false
+                val decorView = (dialogView.parent as? DialogWindowProvider)?.window?.decorView
+                // Reflection, not a direct call: setForceDarkAllowed isn't
+                // exposed as a resolvable View method against every compileSdk
+                // stub this project has built against, even though it's a
+                // real public API on-device at this API level.
+                runCatching {
+                    android.view.View::class.java
+                        .getMethod("setForceDarkAllowed", Boolean::class.javaPrimitiveType)
+                        .invoke(decorView, false)
+                }
             }
         }
         Surface(
@@ -2800,6 +2809,7 @@ private fun VerticalPagerDots(
             // Same gap as PagerDots below -- only ever had Material's own weak
             // tonal shadowElevation, no real shadow or rim, on a pill that
             // floats over the same unpredictable car-photo backgrounds.
+            .ambientRing(RoundedCornerShape(cornerRadius))
             .dropShadow(RoundedCornerShape(cornerRadius))
             .frostedRim(RoundedCornerShape(cornerRadius)),
         shape = RoundedCornerShape(cornerRadius),
@@ -2965,6 +2975,7 @@ private fun FloatingIcon(
             .padding(outerPadding)
             .size(48.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
+            .ambientRing(CircleShape)
             .dropShadow(CircleShape)
             .frostedRim(CircleShape),
     ) {
@@ -3049,6 +3060,7 @@ private fun PagerDots(
                 // pill). This is one of the most visible floating pills in the
                 // app (car-switcher dots at the top of the garage), so it
                 // shouldn't have been the one left out.
+                .ambientRing(CircleShape)
                 .dropShadow(CircleShape)
                 .frostedRim(CircleShape),
             shape = CircleShape,
@@ -3790,7 +3802,7 @@ private fun VehicleDetailContent(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                     contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
+                    modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
                 ) {
                     Box {
                         Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -3890,7 +3902,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
+                modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
             ) {
               Box {
                 Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -8132,7 +8144,7 @@ onValueChange = { vibrancyDraft = it },
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
+                modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
             ) {
                 Box {
                     Text(
@@ -8151,6 +8163,7 @@ onValueChange = { vibrancyDraft = it },
             Box(
                 Modifier
                     .width(172.dp)
+                    .ambientRing(RoundedCornerShape(20.dp))
                     .dropShadow(RoundedCornerShape(20.dp))
                     .frostedRim(RoundedCornerShape(20.dp)),
             ) {

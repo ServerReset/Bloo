@@ -6,8 +6,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.dropShadow
 
 /**
  * The alpha floating chrome's own solid tint should use for its base fill --
@@ -54,3 +56,18 @@ fun Modifier.frostedRim(shape: Shape): Modifier {
         shape,
     )
 }
+
+/**
+ * A soft, symmetric dark halo with no offset, drawn all the way around the
+ * shape. [com.bloo.uicommon.dropShadow]'s own default (used right alongside
+ * this on every floating piece of chrome) is offset downward for a depth
+ * cue, which only ever darkens the backdrop on one side -- against a bright
+ * patch of car photo elsewhere around the shape (above it, or to a side),
+ * nothing was darkening the background there, and frostedRim's onSurface-tinted
+ * border (white in dark mode) washes out the same way against a light photo.
+ * Meant to be chained before dropShadow/frostedRim on anything that floats
+ * over an unpredictable photo background.
+ */
+@Composable
+fun Modifier.ambientRing(shape: Shape): Modifier =
+    this.dropShadow(shape, color = Color.Black.copy(alpha = 0.30f), blurRadius = 10.dp, offsetY = 0.dp, offsetX = 0.dp)
