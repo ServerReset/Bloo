@@ -268,25 +268,25 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun ShortWideTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
+        // At this size "controls" fully replaces the info column instead of
+        // squeezing a button strip in beside it (matching TallNarrowTile and
+        // the tiniest tier, which already do a full swap) -- otherwise this
+        // was the one remaining tier where switching to Controls only ever
+        // ADDED something rather than changing what the widget is for.
+        if (c.layoutMode == "controls" && c.actions.isNotEmpty()) {
+            val take = c.actions.take(4)
+            ButtonGrid(c, take, cols = take.size.coerceAtMost(4), showLabel = false, iconSize = 24.dp,
+                modifier = base.padding(6.dp))
+            return
+        }
         Row(
             base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = GlanceModifier.defaultWeight()) {
+            Column(modifier = GlanceModifier.fillMaxWidth()) {
                 Text(c.snap.name.take(12), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 9.sp))
                 Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 20.sp))
                 c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 11.sp)) }
-            }
-            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
-                Spacer(GlanceModifier.width(8.dp))
-                val take = c.actions.take(4)
-                // A flat 50dp-per-button reserved a fixed strip regardless of
-                // what was actually left after the info column -- overflowing
-                // (silently clipped by RemoteViews) on narrower widgets, or
-                // leaving a gap before the tile's right edge on wider ones.
-                // defaultWeight() on both sides shares the row honestly.
-                ButtonGrid(c, take, cols = take.size, showLabel = false, iconSize = 22.dp,
-                    modifier = GlanceModifier.fillMaxHeight().defaultWeight())
             }
         }
     }

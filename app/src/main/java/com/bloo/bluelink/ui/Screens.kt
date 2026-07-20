@@ -253,6 +253,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -2206,9 +2207,35 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                        // Same fade/scale/tilt/blur-with-bounce transition the
+                        // expanded single-car pager already uses -- this,
+                        // the default view most people see swiping between
+                        // cars day to day, previously had no per-page
+                        // transform at all, just a plain flat scroll.
+                        val pageOff by remember(page) {
+                            derivedStateOf {
+                                ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+                            }
+                        }
+                        val snapBounce by animateFloatAsState(
+                            targetValue = if (pageOff < 0.01f) 0f else 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "pageBounce",
+                        )
+                        val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         val start = page * perPage
                         val end = minOf(start + perPage, count)
-                        Row(Modifier.fillMaxSize()) {
+                        Row(
+                            Modifier.fillMaxSize().graphicsLayer {
+                                alpha = 1f - effectiveOff * 0.2f
+                                scaleX = 1f - effectiveOff * 0.06f
+                                scaleY = 1f - effectiveOff * 0.06f
+                                rotationZ = effectiveOff * if (page >= pager.currentPage) 2f else -2f
+                            }.then(
+                                if (effectiveOff > 0.01f) Modifier.blur((effectiveOff * 6).dp, (effectiveOff * 3).dp)
+                                else Modifier
+                            ),
+                        ) {
                             for (i in start until end) {
                                 val gv = vehicles[i]
                                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -2576,17 +2603,25 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
         // stream to detect a stationary hold, ceding the moment real movement
         // (a swipe) appears, so the pager underneath is always free to claim
         // its own drag the instant it exceeds slop.
+        //
+        // Reports of swipe still not working after that fix pointed at one more
+        // gap: this ran on the default Main pass, the same pass the pager's own
+        // scrollable() uses to claim a drag -- observing on Initial instead
+        // guarantees this handler only ever watches events that already
+        // reached here on the way *down* the tree, strictly before the pager's
+        // own Main-pass recognizer runs, so there's no possible ordering
+        // ambiguity between two Main-pass consumers left to race.
         Box(
             Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         edgeTraceHolding = true
                         val slop = viewConfiguration.touchSlop
                         try {
                             while (true) {
-                                val event = awaitPointerEvent()
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                 if (!change.pressed) break
                                 val dx = abs(change.position.x - down.position.x)
@@ -2744,10 +2779,14 @@ private fun VerticalPagerDots(
                         true
                     }
                 }
-            },
+            }
+            // Same gap as PagerDots below -- only ever had Material's own weak
+            // tonal shadowElevation, no real shadow or rim, on a pill that
+            // floats over the same unpredictable car-photo backgrounds.
+            .dropShadow(RoundedCornerShape(cornerRadius))
+            .frostedRim(RoundedCornerShape(cornerRadius)),
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp).copy(alpha = surfaceAlpha),
-        shadowElevation = if (scrubbing) 8.dp else 2.dp,
     ) {
         Column(
             Modifier.padding(horizontal = hPad, vertical = vPad),
@@ -2985,10 +3024,18 @@ private fun PagerDots(
                     } else {
                         Modifier.semantics { contentDescription = "Car ${current + 1} of $count" }
                     },
-                ),
+                )
+                // Was relying only on Material's own tonal shadowElevation (2dp) --
+                // barely-there against a car photo, same gap as every other
+                // piece of floating chrome the frostedRim/dropShadow pass
+                // already covers (FloatingIcon, the name pill, the Settings
+                // pill). This is one of the most visible floating pills in the
+                // app (car-switcher dots at the top of the garage), so it
+                // shouldn't have been the one left out.
+                .dropShadow(CircleShape)
+                .frostedRim(CircleShape),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.7f),
-            shadowElevation = 2.dp,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         ) {
             Row(
                 Modifier.padding(horizontal = 10.dp, vertical = 6.dp),

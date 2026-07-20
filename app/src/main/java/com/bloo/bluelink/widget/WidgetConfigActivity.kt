@@ -4,11 +4,8 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,7 +18,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -41,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -246,16 +241,6 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
             onSelect = { layoutMode = it },
         )
 
-        Spacer(Modifier.height(14.dp))
-        SectionLabel("Preview")
-        WidgetPreview(
-            car = cars.firstOrNull { it.vin == selectedVin },
-            pillShape = pillShape,
-            backgroundAlpha = backgroundAlpha,
-            photoBg = photoBg,
-            layoutMode = layoutMode,
-        )
-
         Spacer(Modifier.height(18.dp))
         MorphButton(
             onClick = {
@@ -279,52 +264,6 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         MorphTextButton("Cancel", onCancel, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(12.dp))
     }
-}
-
-/**
- * A representative small-tile preview so the shape/transparency/layout
- * options above are visible before saving instead of only discoverable
- * after placing the widget on the home screen. Fixed at a size (160×96) that
- * makes pill shape's ~1.5×1.5-cell eligibility cutoff demonstrable rather
- * than a mystery.
- */
-@Composable
-private fun WidgetPreview(car: VehicleSnapshot?, pillShape: Boolean, backgroundAlpha: Int, photoBg: Boolean, layoutMode: String) {
-    val scheme = MaterialTheme.colorScheme
-    val corner = if (pillShape) 999.dp else 20.dp
-    val bgAlpha = (1f - backgroundAlpha / 9f).coerceIn(0.12f, 1f)
-    val bg = if (photoBg) scheme.tertiaryContainer else scheme.surfaceContainerHigh.copy(alpha = bgAlpha)
-    val shape = RoundedCornerShape(corner)
-    Box(
-        Modifier
-            .width(160.dp)
-            .height(96.dp)
-            .clip(shape)
-            .background(bg)
-            .border(BorderStroke(1.dp, scheme.outline.copy(alpha = 0.22f)), shape)
-            .padding(12.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Column {
-            Text(car?.name ?: "Your car", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(3.dp))
-            Text(
-                if (layoutMode == "controls") "Lock  ·  Climate" else "72%  ·  210 mi",
-                style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant,
-            )
-            if (photoBg) {
-                Spacer(Modifier.height(2.dp))
-                Text("Photo background", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant.copy(alpha = 0.8f))
-            }
-        }
-    }
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "Actual size/shape depends on where you place it on your home screen.",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-    )
 }
 
 @Composable
