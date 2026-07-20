@@ -67,6 +67,16 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: "Build #${{ github.run_number }}"
           prerelease: true
+          generate_release_notes: true
+          body: |
+            ### How to install
+            1. Download `Bloo.apk` below (and `Bloo-Wear.apk` for the watch).
+            2. Open the downloaded file from your notification shade or Downloads app.
+            3. If Android shows **"Blocked by Play Protect"**, tap **"More details"**, then **"Install anyway"** and confirm with your biometrics or device password.
+
+            Already have Bloo installed? Just open the app and pull to refresh — it'll offer to download and install this build for you.
+
+            ### What's changed
           files: |
             app/build/outputs/apk/debug/Bloo.apk
             wear/build/outputs/apk/debug/Bloo-Wear.apk

@@ -249,6 +249,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -2266,18 +2268,27 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             label = "pageBounce",
                         )
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
-                        // Real-time full-screen blur recomputed every drag
-                        // frame (touch move events fire far faster than this
-                        // needs to redraw) was the actual jitter -- fade/
-                        // scale/rotate are cheap compositor-only graphicsLayer
-                        // transforms with no re-render cost; blur forces a
-                        // full pixel re-blur of the whole page on every frame
-                        // of the drag, which is not free at any page size.
+                        // A plain Modifier.blur(x.dp) reconstructs and re-lays-out
+                        // its own modifier node every time its dp args change --
+                        // that per-drag-frame relayout, not the GPU blur pass
+                        // itself, was the earlier jitter. Setting renderEffect
+                        // inside this graphicsLayer lambda instead is read only
+                        // at draw time (no recomposition/relayout at all), so
+                        // it's effectively free to update every frame. Horizontal
+                        // radius leads vertical for a directional "swipe smear"
+                        // rather than a flat blur.
                         Box(Modifier.fillMaxSize().graphicsLayer {
                             alpha = 1f - effectiveOff * 0.2f
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
                             rotationZ = effectiveOff * if (page >= exPager.currentPage) 1.2f else -1.2f
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && effectiveOff > 0.015f) {
+                                renderEffect = BlurEffect(
+                                    radiusX = (effectiveOff * 22f).coerceAtMost(16f),
+                                    radiusY = (effectiveOff * 9f).coerceAtMost(7f),
+                                    edgeTreatment = TileMode.Decal,
+                                )
+                            }
                         }) {
                             val pv = vehicles[exReal(page)]
                             CarThemeOverride(
@@ -2347,15 +2358,25 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
-                        // Same fix as the expanded pager above: dropped the
-                        // real-time blur, the actual source of the jitter --
-                        // fade/scale/rotate are cheap compositor transforms.
+                        // Same fix as the expanded pager above: the earlier
+                        // jitter was the per-frame relayout of a plain
+                        // Modifier.blur(x.dp), not the blur pass itself --
+                        // renderEffect set inside this graphicsLayer lambda is
+                        // draw-time only, so directional motion blur is back
+                        // without the relayout cost.
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
                                 alpha = 1f - effectiveOff * 0.2f
                                 scaleX = 1f - effectiveOff * 0.06f
                                 scaleY = 1f - effectiveOff * 0.06f
                                 rotationZ = effectiveOff * if (page >= pager.currentPage) 1.2f else -1.2f
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && effectiveOff > 0.015f) {
+                                    renderEffect = BlurEffect(
+                                        radiusX = (effectiveOff * 22f).coerceAtMost(16f),
+                                        radiusY = (effectiveOff * 9f).coerceAtMost(7f),
+                                        edgeTreatment = TileMode.Decal,
+                                    )
+                                }
                             },
                         ) {
                             for (i in start until end) {
@@ -4438,28 +4459,26 @@ private fun PrimaryActions(
             extraAction = if (v.supportsHornLights) {
                 {
                     val hlPending = state.isPending(v.vin, "hornLights")
-                    // Was 50dp to exactly match MorphExpandButton (the arrow
-                    // dropdown button) -- on the cover screen's much narrower
-                    // row (PrimaryActions is called there with near-zero
-                    // contentPadding specifically so the label has room; see
-                    // CompactMainTile), that plus the Unlock button left the
-                    // weighted "Locked"/"Unlocked" label squeezed down to a
-                    // sliver, wrapping mid-word. 40dp is the largest size
-                    // that still leaves the label enough room there.
+                    // 50dp to match MorphExpandButton (the arrow dropdown
+                    // button). The label-wrapping bug this used to cause on
+                    // the cover screen's narrow row wasn't from the button
+                    // size -- it was the loose spacing around them eating
+                    // the weighted "Locked"/"Unlocked" label's room. Keeping
+                    // them tight instead fixes that without shrinking them.
                     MorphButton(
                         onClick = { vm.flashLights(v) },
                         enabled = !hlPending,
                         contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(40.dp),
-                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(18.dp)) }
-                    Spacer(Modifier.width(4.dp))
+                        modifier = Modifier.size(50.dp),
+                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) }
+                    Spacer(Modifier.width(2.dp))
                     MorphButton(
                         onClick = { vm.hornAndLights(v) },
                         enabled = !hlPending,
                         contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(40.dp),
-                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(18.dp)) }
-                    Spacer(Modifier.width(6.dp))
+                        modifier = Modifier.size(50.dp),
+                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(22.dp)) }
+                    Spacer(Modifier.width(2.dp))
                 }
             } else null,
         )
