@@ -141,6 +141,7 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Check
@@ -195,6 +196,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -1565,10 +1567,11 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: AppViewModel) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
+    val state by vm.state.collectAsState()
     // Old releases (published before phoneApkUrl existed) or a failed asset
-    // upload leave this null -- fall back to the release page, where a
-    // person can still find and tap the asset link by hand.
-    val downloadUrl = info.run.phoneApkUrl ?: info.run.htmlUrl
+    // upload leave this null -- fall back to opening the release page in a
+    // browser, where a person can still find and tap the asset link by hand.
+    val hasDirectDownload = info.run.phoneApkUrl != null
     GlassAlertDialog(
         onDismissRequest = vm::dismissUpdate,
         icon = Icons.Filled.Info,
@@ -1585,27 +1588,57 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
             Surface(shape = RoundedCornerShape(12.dp), color = scheme.surfaceVariant.copy(alpha = 0.5f)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
-                    Text("1. Download the APK below", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    Text("2. Open it from the download notification", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    Text("3. Tap \"More details\" → \"Install without scanning\"", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text(
+                        if (hasDirectDownload) "1. Tap \"Download & Install\" below" else "1. Download the APK below",
+                        style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
+                    )
+                    // Android's Play Protect flags any APK that didn't come
+                    // from the Play Store, unsigned-by-Google or not --
+                    // without this tip, "Blocked by Play Protect" reads like
+                    // the install genuinely failed rather than one more tap.
+                    Text(
+                        "2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
+                        style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (state.updateDownloading) {
+                Spacer(Modifier.height(2.dp))
+                val progress = state.updateDownloadProgress
+                if (progress != null) {
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                    Text("${(progress * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
         },
         buttons = {
             MorphButton(
                 onClick = {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))) }
-                    vm.dismissUpdate()
+                    if (hasDirectDownload) {
+                        vm.downloadAndInstallUpdate()
+                    } else {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                        vm.dismissUpdate()
+                    }
                 },
+                enabled = !state.updateDownloading,
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
             ) {
-                Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (info.run.phoneApkUrl != null) "Download APK" else "Open GitHub Release", fontWeight = FontWeight.SemiBold)
+                if (state.updateDownloading) {
+                    LoadingIndicator(Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Downloading…", fontWeight = FontWeight.SemiBold)
+                } else {
+                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (hasDirectDownload) "Download & Install" else "Open GitHub Release", fontWeight = FontWeight.SemiBold)
+                }
             }
-            MorphTextButton("Remind me", onClick = vm::snoozeUpdate, modifier = Modifier.fillMaxWidth())
-            MorphTextButton("Not now", onClick = vm::dismissUpdate, modifier = Modifier.fillMaxWidth())
+            MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.fillMaxWidth())
+            MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.fillMaxWidth())
         },
     )
 }

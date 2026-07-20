@@ -161,6 +161,11 @@ data class UiState(
     val updateChecking: Boolean = false,
     /** Non-null when the last update check failed (network/API error). */
     val updateCheckFailed: String? = null,
+    /** True while the update APK is being downloaded in-app (see
+     *  AppViewModel.downloadAndInstallUpdate). */
+    val updateDownloading: Boolean = false,
+    /** 0-1 while [updateDownloading], or null before/after (indeterminate). */
+    val updateDownloadProgress: Float? = null,
     /** Settings mode: "simple" (essential settings) or "advanced" (all settings). */
     val settingsMode: String = "simple",
     /** Per-VIN default preset ID for the one-tap climate Start button. */
@@ -403,18 +408,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-        // Bloo isn't on the Play Store, so check its own GitHub Actions build
-        // channel once per cold start (debounced internally — see UpdateChecker).
-        viewModelScope.launch {
-            when (val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication())) {
-                is com.bloo.bluelink.update.UpdateCheckResult.Available ->
-                    _state.update { it.copy(updateInfo = result.info, updateAvailable = result.info) }
-                is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
-                    _state.update { it.copy(updateCheckFailed = result.error) }
-                is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
-                    _state.update { it.copy(updateAvailable = null) }
-            }
-        }
+        // Bloo isn't on the Play Store, so check its own build channel once
+        // per cold start (debounced internally — see UpdateChecker). Also
+        // re-run on every user-triggered refresh, see refreshStatus below.
+        checkForUpdate()
         // Restore the last-known status/location from disk so the UI shows
         // stale-but-useful data immediately, before any network call returns.
         viewModelScope.launch {
@@ -856,11 +853,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         loadStatus(v, refresh = false, errorMessage = "Couldn't load status", surfaceErrors = false)
     }
 
-    fun refreshStatus(v: Vehicle) =
+    fun refreshStatus(v: Vehicle) {
         loadStatus(
             v, refresh = true, errorMessage = "Refresh failed",
             logSuccess = "Status refreshed for ${v.name}", surfaceErrors = true,
         )
+        // A manual pull-to-refresh is exactly the moment someone's actively
+        // looking at the app and wants everything current -- piggyback the
+        // (internally debounced, so this doesn't hammer the network on rapid
+        // refreshes) update check here instead of only ever firing once at
+        // cold start, which could go a whole session without re-checking.
+        checkForUpdate()
+    }
+
+    /** Shared by the cold-start check and every refreshStatus() call. Debounced/
+     *  snoozed internally (see UpdateChecker) -- safe to call as often as this is. */
+    private fun checkForUpdate() {
+        viewModelScope.launch {
+            when (val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication())) {
+                is com.bloo.bluelink.update.UpdateCheckResult.Available ->
+                    _state.update { it.copy(updateInfo = result.info, updateAvailable = result.info) }
+                is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
+                    _state.update { it.copy(updateCheckFailed = result.error) }
+                is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
+                    _state.update { it.copy(updateAvailable = null) }
+            }
+        }
+    }
 
     /**
      * Fetches one car's status. All fetches funnel through [statusMutex] so they
@@ -1149,6 +1168,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setUpdateChecksEnabled(enabled: Boolean) {
         viewModelScope.launch { updateStore.setChecksEnabled(enabled) }
         if (!enabled) _state.update { it.copy(updateInfo = null, updateCheckFailed = null, updateAvailable = null) }
+    }
+
+    /** Downloads the update APK in-app and hands it straight to the system
+     *  package installer -- previously "Update" just opened a browser page,
+     *  leaving the actual download-then-open-the-file steps to the user. */
+    fun downloadAndInstallUpdate() {
+        val url = _state.value.updateInfo?.run?.phoneApkUrl
+        if (url == null) {
+            _state.update { it.copy(message = "No direct download for this build — use the browser link instead.") }
+            return
+        }
+        if (_state.value.updateDownloading) return
+        _state.update { it.copy(updateDownloading = true, updateDownloadProgress = 0f) }
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val dest = java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo.apk")
+            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
+                _state.update { it.copy(updateDownloadProgress = progress) }
+            }
+            _state.update { it.copy(updateDownloading = false, updateDownloadProgress = null) }
+            if (!ok) {
+                _state.update { it.copy(message = "Download failed — check your connection and try again.") }
+                return@launch
+            }
+            runCatching {
+                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(intent)
+            }.onFailure {
+                _state.update { it2 -> it2.copy(message = "Downloaded, but couldn't open the installer — find Bloo.apk in your downloads.") }
+            }
+        }
     }
 
     /** Manual "Check now": ignores the debounce/snooze/enabled gates (force), and

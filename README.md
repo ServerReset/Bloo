@@ -48,18 +48,17 @@ Requires Android Studio Meerkat or newer (AGP 9.1, Kotlin 2.2.20).
 
 ## Installing
 
-CI builds are available as zip artifacts from GitHub Actions. Each run produces a zip file containing both the phone and watch APKs.
+Every push publishes a rolling [GitHub Release](../../releases) tagged `build-<run number>` with the phone (`Bloo.apk`) and watch (`Bloo-Wear.apk`) APKs attached as direct downloads -- plain public files, no GitHub sign-in and no zip/unzip step.
 
 To install:
 
-1. Download the zip artifact for your platform from the latest [Actions run](../../actions/workflows/android.yml)
-2. Unzip the file on your phone or computer
-3. Open the APK file on your Android phone
-4. Tap **"More details"** to expand the Play Protect warning, then tap **"Install without scanning"** and confirm with your biometrics or device password
+1. Download `Bloo.apk` (and `Bloo-Wear.apk` for the watch) from the [latest release](../../releases)
+2. Open the downloaded file from your notification shade or Downloads app
+3. If Android shows **"Blocked by Play Protect"**, tap **"More details"**, then **"Install anyway"** and confirm with your biometrics or device password
 
 The warning appears because Bloo is not signed with Google Play Store keys. I cannot publish on the Play Store because it costs money I do not have, and Hyundai would not approve an unofficial app on their platform. The app is safe, open source, and does not collect any data. All credentials are stored encrypted on-device.
 
-When a new version is available, the Updates section in Settings will show a CI build number. Tap "Check now" to find the latest build, then follow the steps above to download and install the updated APK from the Actions page.
+Once installed, the app checks for newer builds itself (on cold start and every pull-to-refresh) and can download and hand the APK straight to the system installer from an in-app prompt -- the steps above are only needed for the very first install. The Updates section in Settings also has a manual "Check now".
 
 ## Architecture
 

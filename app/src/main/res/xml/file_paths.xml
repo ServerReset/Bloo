@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Grants read access to a subfolder of the app's private cache dir, for
-     sharing a temporary settings-backup file via FileProvider. -->
+<!-- Grants read access to subfolders of the app's private cache dir via
+     FileProvider: "exports" for a shared settings-backup file, "apk" for a
+     downloaded update APK handed to the system package installer. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="exports" path="exports/" />
+    <cache-path name="apk" path="apk/" />
 </paths>

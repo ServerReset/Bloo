@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** A completed GitHub build of the app, normalised to what the update flow
@@ -109,4 +110,46 @@ object UpdateApi {
             }
         }.getOrNull()
     }
+
+    // A multi-MB download needs real headroom -- the 20s readTimeout on the
+    // metadata client above is tuned for a small JSON response, not a whole
+    // APK over a slow connection.
+    private val downloadClient: OkHttpClient = client.newBuilder()
+        .readTimeout(5, TimeUnit.MINUTES)
+        .build()
+
+    /** Streams [url] to [destination], reporting 0-1 progress as bytes land
+     *  (skipped/left at 0 if the server doesn't report Content-Length).
+     *  Returns true only once the file is fully written. */
+    suspend fun downloadApk(url: String, destination: File, onProgress: (Float) -> Unit): Boolean =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val request = Request.Builder().url(url).get().build()
+                downloadClient.newCall(request).execute().use { resp ->
+                    if (!resp.isSuccessful) return@use false
+                    val responseBody = resp.body ?: return@use false
+                    val total = responseBody.contentLength()
+                    destination.parentFile?.mkdirs()
+                    // Write to a temp file first -- a failed/cancelled download
+                    // overwriting the previous good APK in place would leave a
+                    // truncated, uninstallable file behind with no way to tell
+                    // it apart from a real one.
+                    val tmp = File(destination.parentFile, "${destination.name}.tmp")
+                    responseBody.byteStream().use { input ->
+                        tmp.outputStream().use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            var written = 0L
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                output.write(buffer, 0, read)
+                                written += read
+                                if (total > 0) onProgress((written.toFloat() / total).coerceIn(0f, 1f))
+                            }
+                        }
+                    }
+                    tmp.renameTo(destination)
+                }
+            }.getOrDefault(false)
+        }
 }
