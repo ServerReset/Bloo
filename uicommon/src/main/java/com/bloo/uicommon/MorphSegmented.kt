@@ -109,7 +109,8 @@ fun MorphSegmented(
     val currentSelectedKey by rememberUpdatedState(selectedKey)
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentOnTick by rememberUpdatedState(onTick)
-    val trackShape = RoundedCornerShape(20.dp)
+    // Slightly less rounded than before (was 20.dp) -- a small tune-down per feedback.
+    val trackShape = RoundedCornerShape(16.dp)
     Box(
         modifier = modifier.fillMaxWidth().clip(trackShape).background(containerColor)
             .then(if (borderColor != null) Modifier.border(BorderStroke(1.dp, borderColor), trackShape) else Modifier),
@@ -129,7 +130,20 @@ fun MorphSegmented(
             var dragXPx by remember { mutableStateOf<Float?>(null) }
             val segWidthPx = with(density) { segWidth.toPx() }
             val gapPx = with(density) { gap.toPx() }
-            val restingXPx = (segWidthPx + gapPx) * selectedIndex
+            // On drag release, dragXPx clears immediately, but the new
+            // selectedIndex only arrives after currentOnSelect's state change
+            // round-trips back down through the caller -- for that gap (often
+            // a full frame or more) restingXPx still reflected the OLD index,
+            // so the indicator visibly snapped back toward where it used to
+            // be before jerking again to the correct spot ("jumpy when you
+            // let go"). pendingIndex holds the just-picked index as the
+            // resting target the instant the drag ends, so there's nothing
+            // to snap back to; it clears itself once the real prop catches up.
+            var pendingIndex by remember { mutableStateOf<Int?>(null) }
+            LaunchedEffect(selectedIndex) {
+                if (pendingIndex == selectedIndex) pendingIndex = null
+            }
+            val restingXPx = (segWidthPx + gapPx) * (pendingIndex ?: selectedIndex)
             // A raw pixel Animatable driving graphicsLayer's translationX, not
             // animateDpAsState + Modifier.offset(x = ...dp) -- offset() moves
             // the layout position, so every single pixel of finger movement
@@ -235,6 +249,7 @@ fun MorphSegmented(
                             if (claimed) {
                                 val x = dragXPx ?: offsetFor(down.position.x)
                                 val idx = indexFor(x)
+                                pendingIndex = idx
                                 dragXPx = null
                                 if (options[idx].key != currentSelectedKey) {
                                     currentOnTick()
