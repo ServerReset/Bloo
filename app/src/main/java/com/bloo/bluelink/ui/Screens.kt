@@ -2193,10 +2193,17 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             label = "expand",
         ) { isExpanded ->
             if (isExpanded) {
-                // Full-screen car; swipe left/right to switch cars.
-                val exPager = rememberPagerState(initialPage = (expandedIdx ?: 0).coerceIn(0, count - 1)) { count }
+                // Full-screen car; swipe left/right to switch cars. Infinite
+                // wrap-around: start in the middle of a huge virtual range and
+                // map each virtual page back onto a real car with modulo --
+                // same technique the cover screen's tile pager already uses.
+                val exLoop = count > 1
+                val exVirtualCount = if (exLoop) count * 1000 else count
+                val exStart = (if (exLoop) exVirtualCount / 2 else 0) + (expandedIdx ?: 0).coerceIn(0, count - 1)
+                val exPager = rememberPagerState(initialPage = exStart) { exVirtualCount }
+                fun exReal(virtualPage: Int) = ((virtualPage % count) + count) % count
                 LaunchedEffect(exPager) {
-                    snapshotFlow { exPager.settledPage }.collect { vm.expand(it) }
+                    snapshotFlow { exPager.settledPage }.collect { vm.expand(exReal(it)) }
                 }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
@@ -2226,7 +2233,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         }.then(if (effectiveOff > 0.01f) Modifier.blur(
                             (effectiveOff * 6).dp, (effectiveOff * 3).dp
                         ) else Modifier)) {
-                            val pv = vehicles[page]
+                            val pv = vehicles[exReal(page)]
                             CarThemeOverride(
                                 paletteId = appearance.carCustomPaletteIds[pv.vin],
                                 customPalettes = appearance.customPalettes,
@@ -2239,21 +2246,29 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     if (count > 1) {
                         PagerDots(
-                            current = exPager.currentPage,
+                            current = exReal(exPager.currentPage),
                             count = count,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha),
-                            onRefresh = { vm.refreshStatus(vehicles[exPager.settledPage]) },
+                            onRefresh = { vm.refreshStatus(vehicles[exReal(exPager.settledPage)]) },
                         )
                     }
                 }
             } else {
                 val pageCount = (count + perPage - 1) / perPage
+                // Infinite wrap-around, same technique as the expanded pager
+                // and the cover screen's tile pager: start in the middle of a
+                // huge virtual range and map each virtual page back onto a
+                // real block of cars with modulo.
+                val loopMulti = pageCount > 1
+                val virtualPageCount = if (loopMulti) pageCount * 1000 else pageCount
+                val initialBlock = (state.currentIndex.coerceIn(0, count - 1)) / perPage
                 val pager = rememberPagerState(
-                    initialPage = (state.currentIndex.coerceIn(0, count - 1)) / perPage,
-                ) { pageCount }
+                    initialPage = (if (loopMulti) virtualPageCount / 2 else 0) + initialBlock,
+                ) { virtualPageCount }
+                fun realBlock(virtualPage: Int) = ((virtualPage % pageCount) + pageCount) % pageCount
                 LaunchedEffect(pager, perPage) {
                     snapshotFlow { pager.settledPage }.collect { page ->
-                        vm.selectIndex((page * perPage).coerceIn(0, count - 1))
+                        vm.selectIndex((realBlock(page) * perPage).coerceIn(0, count - 1))
                     }
                 }
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
@@ -2278,7 +2293,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             label = "pageBounce",
                         )
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
-                        val start = page * perPage
+                        val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
@@ -2324,7 +2339,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
                         PagerDots(
-                            current = pager.currentPage,
+                            current = realBlock(pager.currentPage),
                             count = pageCount,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha),
                             onRefresh = { vm.refreshStatus(vehicles[state.currentIndex]) },
@@ -2444,9 +2459,17 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance) {
     val vehicles = state.vehicles
     val count = vehicles.size
-    val pager = rememberPagerState(initialPage = state.currentIndex.coerceIn(0, count - 1)) { count }
+    // Infinite wrap-around, matching every other car-switching pager in the
+    // app (the expanded pager, the default grid) and the cover screen's own
+    // tile pager, which already looped.
+    val loopCars = count > 1
+    val virtualCarCount = if (loopCars) count * 1000 else count
+    val pager = rememberPagerState(
+        initialPage = (if (loopCars) virtualCarCount / 2 else 0) + state.currentIndex.coerceIn(0, count - 1),
+    ) { virtualCarCount }
+    fun realCar(virtualPage: Int) = ((virtualPage % count) + count) % count
     LaunchedEffect(pager) {
-        snapshotFlow { pager.settledPage }.collect { vm.selectIndex(it) }
+        snapshotFlow { pager.settledPage }.collect { vm.selectIndex(realCar(it)) }
     }
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
@@ -2457,7 +2480,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         userScrollEnabled = !scrubbing.value,
         beyondViewportPageCount = 1,
     ) { page ->
-        val v = vehicles[page]
+        val v = vehicles[realCar(page)]
         val pageOff by remember(page) {
             derivedStateOf {
                 val delta = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction)
@@ -2659,26 +2682,33 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
         // (a swipe) appears, so the pager underneath is always free to claim
         // its own drag the instant it exceeds slop.
         //
-        // Reports of swipe still not working after that fix pointed at one more
-        // gap: this ran on the default Main pass, the same pass the pager's own
-        // scrollable() uses to claim a drag -- observing on Initial instead
-        // guarantees this handler only ever watches events that already
-        // reached here on the way *down* the tree, strictly before the pager's
-        // own Main-pass recognizer runs, so there's no possible ordering
-        // ambiguity between two Main-pass consumers left to race.
+        // Reports of swipe still not working after switching to the Initial
+        // pass pointed at the actual remaining gap: watching on Initial never
+        // consumed anything, but it also never CHECKED whether something else
+        // -- the vertical pager's own drag recognizer -- had already claimed
+        // the gesture by the time slop was crossed. Two independent gesture
+        // recognizers both just "watching" the same raw stream isn't a
+        // conflict by itself, but this one still had to *give up* the moment
+        // a real drag started, and slop-distance alone can't tell "the pager
+        // just claimed this" apart from "still deciding." Final pass runs
+        // strictly after every other pass for every node has finished, so by
+        // the time this handler sees an event here, consumption state is
+        // settled -- checking change.isConsumed is now a reliable signal
+        // that the pager (or anything else) already took the gesture,
+        // regardless of sibling dispatch order.
         Box(
             Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
                         edgeTraceHolding = true
                         val slop = viewConfiguration.touchSlop
                         try {
                             while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val event = awaitPointerEvent(PointerEventPass.Final)
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) break
+                                if (!change.pressed || change.isConsumed) break
                                 val dx = abs(change.position.x - down.position.x)
                                 val dy = abs(change.position.y - down.position.y)
                                 if (dx > slop || dy > slop) break
