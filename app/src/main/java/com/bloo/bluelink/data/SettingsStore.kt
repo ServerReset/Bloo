@@ -122,6 +122,7 @@ class SettingsStore(private val context: Context) {
         val UI_SCALE = stringPreferencesKey("ui_scale")
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
+        val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
         val AURORA = stringPreferencesKey("aurora_background")
         val AURORA_MOTION = stringPreferencesKey("aurora_motion")
         val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
@@ -180,6 +181,11 @@ class SettingsStore(private val context: Context) {
         val unitSystem: String = "imperial",
         /** Haptic feedback across the UI. */
         val hapticsEnabled: Boolean = true,
+        /** Hairline rim on pebbles/hero card. Off by default -- most of the app's
+         *  "floating chrome" (buttons, dialogs, the search bar) always has one,
+         *  but pebbles are the majority of on-screen surface area, and a rim on
+         *  every single one read as busier than most people want as the default. */
+        val pebbleOutline: Boolean = false,
         /** Watch's own PIN lock enabled/timing -- a backup record only, mirrored
          *  from the watch. See [SettingsStore.Keys.WATCH_PIN_ENABLED]'s comment. */
         val watchPinLockEnabled: Boolean = false,
@@ -225,11 +231,16 @@ class SettingsStore(private val context: Context) {
             useFahrenheit = (prefs[Keys.UNIT_SYSTEM] ?: "imperial") != "metric",
             watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
             watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
+            pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
         )
     }
 
     suspend fun setHapticsEnabled(value: Boolean) {
         editTracked { it[Keys.HAPTICS] = value.toString() }
+    }
+
+    suspend fun setPebbleOutline(value: Boolean) {
+        editTracked { it[Keys.PEBBLE_OUTLINE] = value.toString() }
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {

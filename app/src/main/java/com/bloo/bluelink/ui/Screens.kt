@@ -2218,9 +2218,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         }
                         // Spring-bouncy page transition: off-screen pages fade, shrink,
                         // and tilt slightly — snapping back with a subtle overshoot.
+                        // Was DampingRatioMediumBouncy/StiffnessMedium -- a
+                        // real overshoot-and-settle on every single page
+                        // change read as jittery rather than fluid for
+                        // something that fires on every car swipe. The app's
+                        // standard "snappy but settled" spring instead.
                         val snapBounce by animateFloatAsState(
                             targetValue = if (pageOff < 0.01f) 0f else 1f,
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             label = "pageBounce",
                         )
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
@@ -2228,7 +2233,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             alpha = 1f - effectiveOff * 0.2f
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
-                            rotationZ = effectiveOff * if (page >= exPager.currentPage) 2f else -2f
+                            rotationZ = effectiveOff * if (page >= exPager.currentPage) 1.2f else -1.2f
                         }.then(if (effectiveOff > 0.01f) Modifier.blur(
                             (effectiveOff * 6).dp, (effectiveOff * 3).dp
                         ) else Modifier)) {
@@ -2286,9 +2291,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
                             }
                         }
+                        // Was DampingRatioMediumBouncy/StiffnessMedium -- a
+                        // real overshoot-and-settle on every single page
+                        // change read as jittery rather than fluid for
+                        // something that fires on every car swipe. The app's
+                        // standard "snappy but settled" spring instead.
                         val snapBounce by animateFloatAsState(
                             targetValue = if (pageOff < 0.01f) 0f else 1f,
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             label = "pageBounce",
                         )
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
@@ -2299,7 +2309,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 alpha = 1f - effectiveOff * 0.2f
                                 scaleX = 1f - effectiveOff * 0.06f
                                 scaleY = 1f - effectiveOff * 0.06f
-                                rotationZ = effectiveOff * if (page >= pager.currentPage) 2f else -2f
+                                rotationZ = effectiveOff * if (page >= pager.currentPage) 1.2f else -1.2f
                             }.then(
                                 if (effectiveOff > 0.01f) Modifier.blur((effectiveOff * 6).dp, (effectiveOff * 3).dp)
                                 else Modifier
@@ -3142,6 +3152,7 @@ private fun HeroHeader(
     imageUrl: String?,
     hasBattery: Boolean,
     hasFuel: Boolean,
+    vm: AppViewModel,
     drivingLabel: String? = null,
     dragHandle: Modifier = Modifier,
     height: Dp = 150.dp,
@@ -3164,10 +3175,21 @@ private fun HeroHeader(
         ),
         label = "heroCorner",
     )
-    Card(modifier = Modifier.fillMaxWidth().then(dragHandle).graphicsLayer {
-        alpha = heroAlpha.value
-        translationY = heroOffset.value
-    }, shape = RoundedCornerShape(corner)) {
+    val heroShape = RoundedCornerShape(corner)
+    val heroOutline by vm.appearance.collectAsState()
+    Card(
+        modifier = Modifier.fillMaxWidth().then(dragHandle).graphicsLayer {
+            alpha = heroAlpha.value
+            translationY = heroOffset.value
+        }
+            // Every other pebble gets this via the shared Pebble() wrapper --
+            // the hero card rolls its own Card and was the one card in the
+            // whole per-car stack with no shadow or rim at all. The rim half
+            // respects the same off-by-default Pebble outline setting.
+            .dropShadow(heroShape, blurRadius = 12.dp, offsetY = 4.dp)
+            .then(if (heroOutline.pebbleOutline) Modifier.frostedRim(heroShape) else Modifier),
+        shape = heroShape,
+    ) {
         Column(
             Modifier
                 .padding(16.dp)
@@ -4156,7 +4178,7 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val hMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
     HeroHeader(
-        v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric = hMetric,
+        v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm, state.drivingLabel(v), metric = hMetric,
         updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
     )
     // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
@@ -4253,7 +4275,7 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
     val mSingle = vm.appearance.collectAsState().value.unitSystem == "metric"
     when (section) {
         "summary" -> HeroHeader(
-            v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
+            v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
             state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
             updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
         )
@@ -5180,13 +5202,19 @@ private fun Pebble(
     )
     val fillHeight = LocalPebbleFillHeight.current
     val pebbleShape = RoundedCornerShape(corner)
+    // Off by default -- see Appearance.pebbleOutline's doc comment. Most
+    // floating chrome always has a rim, but pebbles are the majority of
+    // on-screen surface area, so a rim on every single one is a much bigger
+    // visual commitment than one more floating button.
+    val pebbleAppearance by vm.appearance.collectAsState()
+    val pebbleOutline = pebbleAppearance.pebbleOutline
     Box(Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)) {
         Card(
             Modifier
                 .fillMaxWidth()
                 .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
                 .dropShadow(pebbleShape, blurRadius = 12.dp, offsetY = 4.dp)
-                .frostedRim(pebbleShape),
+                .then(if (pebbleOutline) Modifier.frostedRim(pebbleShape) else Modifier),
             shape = pebbleShape,
             colors = CardDefaults.cardColors(
                 containerColor = containerColor,
@@ -8086,6 +8114,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                     Spacer(Modifier.height(10.dp))
                     VibrancySlider(appearance, vm)
+                    Spacer(Modifier.height(10.dp))
+                    ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
                   }
                 }
             }
