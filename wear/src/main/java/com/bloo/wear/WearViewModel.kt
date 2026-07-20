@@ -387,10 +387,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 else publish()
             }
         }
-        // A lightweight, independent check (same GitHub Actions endpoint the
-        // phone uses, in :shared) — Wear OS has no reliable on-device sideload
-        // flow, so acting on this opens the run page on the connected phone
-        // rather than downloading/installing anything on the watch itself.
+        // Cold-start update check -- see runUpdateCheck's own doc comment.
         viewModelScope.launch { runUpdateCheck(force = false) }
         bootstrap()
     }

@@ -30,7 +30,6 @@ sealed class UpdateCheckResult {
  */
 object UpdateChecker {
 
-    private const val CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
     private const val SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L // 3 days
 
     /** Check for an update. Returns the result — available, up-to-date, or failed. */
@@ -47,14 +46,7 @@ object UpdateChecker {
         val run = UpdateApi.fetchLatestSuccessfulRun(branch)
         store.setLastCheckedAt(now)
         if (run == null) return UpdateCheckResult.Failed("Could not reach GitHub (rate limited or offline)")
-        if (run.runNumber <= BuildConfig.BUILD_RUN_NUMBER) {
-            store.clearAvailable()
-            return UpdateCheckResult.UpToDate
-        }
-        // Persisted (not just returned) so WearBridge can mirror it to the
-        // watch on the next settings publish without AppViewModel having to
-        // thread the result through every publishSettings call site.
-        store.setAvailable(run.runNumber, run.displayTitle, run.htmlUrl)
+        if (run.runNumber <= BuildConfig.BUILD_RUN_NUMBER) return UpdateCheckResult.UpToDate
         return UpdateCheckResult.Available(UpdateInfo(run))
     }
 

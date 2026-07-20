@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 
@@ -30,9 +29,6 @@ class UpdateStore(private val context: Context) {
 
     private val keyLastCheckedAt = longPreferencesKey("last_checked_at")
     private val keySnoozeUntil = longPreferencesKey("snooze_until")
-    private val keyAvailableRun = intPreferencesKey("available_run")
-    private val keyAvailableTitle = stringPreferencesKey("available_title")
-    private val keyAvailableUrl = stringPreferencesKey("available_url")
     private val keyLastNotifiedRun = intPreferencesKey("last_notified_run")
 
     suspend fun lastCheckedAt(): Long =
@@ -48,31 +44,6 @@ class UpdateStore(private val context: Context) {
     suspend fun setSnoozeUntil(millis: Long) {
         context.updateDataStore.edit { it[keySnoozeUntil] = millis }
     }
-
-    /** The last build the checker found newer than what's installed, persisted
-     *  (not just in AppViewModel's in-memory UiState) so UpdateCheckWorker --
-     *  which runs on its own periodic schedule, independent of the app being
-     *  open -- can read the same result the in-app check would have found.
-     *  0 = none available. */
-    suspend fun setAvailable(runNumber: Int, displayTitle: String?, htmlUrl: String) {
-        context.updateDataStore.edit {
-            it[keyAvailableRun] = runNumber
-            if (displayTitle != null) it[keyAvailableTitle] = displayTitle else it.remove(keyAvailableTitle)
-            it[keyAvailableUrl] = htmlUrl
-        }
-    }
-
-    suspend fun clearAvailable() {
-        context.updateDataStore.edit {
-            it.remove(keyAvailableRun)
-            it.remove(keyAvailableTitle)
-            it.remove(keyAvailableUrl)
-        }
-    }
-
-    suspend fun availableRunNumber(): Int = context.updateDataStore.data.first()[keyAvailableRun] ?: 0
-    suspend fun availableTitle(): String? = context.updateDataStore.data.first()[keyAvailableTitle]
-    suspend fun availableHtmlUrl(): String? = context.updateDataStore.data.first()[keyAvailableUrl]
 
     /** The run number UpdateCheckWorker last posted a notification for, so it
      *  doesn't nag with a fresh notification every ~12h about the same build

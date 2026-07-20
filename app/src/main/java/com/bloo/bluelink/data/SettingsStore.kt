@@ -1296,9 +1296,4 @@ class SettingsStore(private val context: Context) {
         setWeatherLocation(loc.latitude, loc.longitude, label)
         return true
     }
-
-    /** Set the unit system from a Fahrenheit/Celsius toggle. Maps F → imperial, C → metric. */
-    suspend fun setUseFahrenheit(value: Boolean) {
-        setUnitSystem(if (value) "imperial" else "metric")
-    }
 }

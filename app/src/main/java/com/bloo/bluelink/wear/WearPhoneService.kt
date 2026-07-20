@@ -7,6 +7,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearAiResult
+import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.data.WearExtras
 import com.bloo.bluelink.data.WearSync
 import com.bloo.bluelink.data.WearSyncResult
@@ -72,7 +73,7 @@ class WearPhoneService : WearableListenerService() {
                     return
                 }
                 scope.launch {
-                    val result = WearBridge.execute(applicationContext, command)
+                    val result = WearCommandRunner.execute(applicationContext, command)
                     if (result.ok) AppLog.log("Phone relay: ${command.action} → ok")
                     else AppLog.log("⚠ Phone relay: ${command.action} → ${result.message}")
                     runCatching {
@@ -95,7 +96,7 @@ class WearPhoneService : WearableListenerService() {
                     val ctx = applicationContext
                     when (command?.action) {
                         WearAction.REFRESH -> {
-                            WearBridge.refresh(ctx, command.vin)
+                            WearCommandRunner.refresh(ctx, command.vin)
                             WearBridge.refreshAllSurfaces(ctx)
                         }
                         WearAction.DRIVE_SYNC -> {

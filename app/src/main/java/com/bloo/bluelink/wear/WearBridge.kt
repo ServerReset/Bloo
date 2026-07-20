@@ -13,9 +13,6 @@ import com.bloo.bluelink.ui.blooColorScheme
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAuthBundle
-import com.bloo.bluelink.data.WearCommand
-import com.bloo.bluelink.data.WearCommandResult
-import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.data.WearSessionDto
 import com.bloo.bluelink.data.WearStatePayload
 import com.bloo.bluelink.data.WearSync
@@ -28,10 +25,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * The phone half of the watch sync. It mirrors car snapshots + sessions to the
- * Wearable Data Layer and runs the commands the watch forwards (delegating to the
- * shared [WearCommandRunner], the same stored-session pattern the Quick-Settings
- * tiles use) — so the watch never needs the credentials to lock a door.
+ * The phone half of the watch sync: mirrors car snapshots + sessions to the
+ * Wearable Data Layer. Commands the watch forwards are run by
+ * [com.bloo.bluelink.data.WearCommandRunner] directly (the same
+ * stored-session pattern the Quick-Settings tiles use, so the watch never
+ * needs the credentials to lock a door) -- this object handles everything
+ * else: publishing, Drive sync, and re-fanning updates out to every surface.
  */
 object WearBridge {
 
@@ -245,12 +244,6 @@ object WearBridge {
             }
         }
     }
-
-    suspend fun execute(context: Context, command: WearCommand): WearCommandResult =
-        WearCommandRunner.execute(context, command)
-
-    suspend fun refresh(context: Context, vin: String) =
-        WearCommandRunner.refresh(context, vin)
 
     /** Trigger a Drive sync: download settings from Drive, import them, and re-publish
      *  to the watch. Called when the watch requests a Drive sync. Returns the

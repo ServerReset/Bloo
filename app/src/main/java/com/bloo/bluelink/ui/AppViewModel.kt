@@ -329,8 +329,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SettingsStore.NotificationPrefs(),
         )
 
-    private val updateStore = com.bloo.bluelink.data.UpdateStore(app)
-
     private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
         alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions) }
