@@ -3253,9 +3253,15 @@ private fun HeroHeader(
             // Every other pebble gets this via the shared Pebble() wrapper --
             // the hero card rolls its own Card and was the one card in the
             // whole per-car stack with no shadow or rim at all. The rim half
-            // respects the same off-by-default Pebble outline setting.
+            // respects the same off-by-default Pebble outline setting, and
+            // uses the same bolder border Pebble() does (not frostedRim --
+            // see its comment there for why that read as "not working").
             .dropShadow(heroShape, blurRadius = 12.dp, offsetY = 4.dp)
-            .then(if (heroOutline.pebbleOutline) Modifier.frostedRim(heroShape) else Modifier),
+            .then(
+                if (heroOutline.pebbleOutline) {
+                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), heroShape)
+                } else Modifier,
+            ),
         shape = heroShape,
     ) {
         Column(
@@ -4432,22 +4438,28 @@ private fun PrimaryActions(
             extraAction = if (v.supportsHornLights) {
                 {
                     val hlPending = state.isPending(v.vin, "hornLights")
-                    // Same fixed size as MorphExpandButton (the arrow dropdown
-                    // button), not an arbitrary smaller circle.
+                    // Was 50dp to exactly match MorphExpandButton (the arrow
+                    // dropdown button) -- on the cover screen's much narrower
+                    // row (PrimaryActions is called there with near-zero
+                    // contentPadding specifically so the label has room; see
+                    // CompactMainTile), that plus the Unlock button left the
+                    // weighted "Locked"/"Unlocked" label squeezed down to a
+                    // sliver, wrapping mid-word. 40dp is the largest size
+                    // that still leaves the label enough room there.
                     MorphButton(
                         onClick = { vm.flashLights(v) },
                         enabled = !hlPending,
                         contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(50.dp),
-                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) }
-                    Spacer(Modifier.width(6.dp))
+                        modifier = Modifier.size(40.dp),
+                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(18.dp)) }
+                    Spacer(Modifier.width(4.dp))
                     MorphButton(
                         onClick = { vm.hornAndLights(v) },
                         enabled = !hlPending,
                         contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(50.dp),
-                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(22.dp)) }
-                    Spacer(Modifier.width(8.dp))
+                        modifier = Modifier.size(40.dp),
+                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(18.dp)) }
+                    Spacer(Modifier.width(6.dp))
                 }
             } else null,
         )
@@ -5194,6 +5206,14 @@ private fun StateControl(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = stateColor,
                                     fontWeight = FontWeight.Bold,
+                                    // If this column ever gets squeezed tight
+                                    // again (extraAction content changes,
+                                    // narrower screens), ellipsize instead of
+                                    // wrapping mid-word ("Locke"/"d" on two
+                                    // lines) -- a clipped label at least still
+                                    // reads as one intact word.
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
@@ -5282,7 +5302,18 @@ private fun Pebble(
                 .fillMaxWidth()
                 .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
                 .dropShadow(pebbleShape, blurRadius = 12.dp, offsetY = 4.dp)
-                .then(if (pebbleOutline) Modifier.frostedRim(pebbleShape) else Modifier),
+                // frostedRim's alpha (0.10-0.24) is tuned for chrome floating
+                // over an unpredictable car photo, where it only has to beat
+                // that photo's contrast -- against a flat dark pebble
+                // background it was nearly imperceptible, reading as "this
+                // setting does nothing" even though it was working. A
+                // dedicated, considerably bolder border here instead, so
+                // toggling this is actually visible.
+                .then(
+                    if (pebbleOutline) {
+                        Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), pebbleShape)
+                    } else Modifier,
+                ),
             shape = pebbleShape,
             colors = CardDefaults.cardColors(
                 containerColor = containerColor,
