@@ -1834,8 +1834,7 @@ private fun AuroraBackground(
 @Composable
 private fun LockOverlay(vm: AppViewModel) {
     val context = LocalContext.current
-    val cfg = LocalConfiguration.current
-    val compact = cfg.screenHeightDp < 440
+    val compact = isCompactCoverScreen()
     fun authenticate() {
         context.findFragmentActivity()?.let { activity ->
             showBiometricPrompt(
@@ -2028,6 +2027,38 @@ private fun EmptyScreen(vm: AppViewModel) {
 /** Minimum comfortable width for one car column before we add another. */
 private const val MIN_CARD_DP = 320
 
+/** Screen height (dp) below which the phone gets the compact cover-screen
+ *  layout -- a folding phone's small outer display (Galaxy Z Flip's ~260-280dp
+ *  square cover, for instance), not a full unfolded/candybar phone screen.
+ *  GarageScreen and LockOverlay used to each pick their own cutoff (570 vs
+ *  440), so a screen sized between them got the compact UI on one but the
+ *  full-size one on the other for the exact same physical device -- one
+ *  shared threshold instead. Width is checked separately (see isCompactCoverScreen)
+ *  so a wide-but-short screen (a tablet in landscape) doesn't false-positive. */
+private const val COVER_SCREEN_HEIGHT_DP = 570
+private const val COVER_SCREEN_WIDTH_DP = 600
+
+/** True on a folding phone's compact cover screen; false on a full phone,
+ *  foldable-unfolded, or tablet screen. See [COVER_SCREEN_HEIGHT_DP]. */
+@Composable
+private fun isCompactCoverScreen(): Boolean {
+    val cfg = LocalConfiguration.current
+    return cfg.screenWidthDp < COVER_SCREEN_WIDTH_DP && cfg.screenHeightDp < COVER_SCREEN_HEIGHT_DP
+}
+
+/** Scales a "reference" spacing/padding value for the compact cover-screen
+ *  layout so a tiny cover screen (a Z Flip's ~260dp-wide square) doesn't lose
+ *  proportionally more room to fixed insets than a larger one (a Z Flip 6 or
+ *  Razr+'s taller cover) does. [refWidthDp] is the width the base value was
+ *  tuned against; clamped to +-40% so this nudges spacing rather than
+ *  drastically re-laying things out at either extreme. */
+@Composable
+private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
+    val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    val factor = (widthDp / refWidthDp).coerceIn(0.6f, 1.4f)
+    return base * factor
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun GarageScreen(state: UiState, vm: AppViewModel) {
@@ -2092,9 +2123,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val count = vehicles.size
     val cfg = LocalConfiguration.current
     val widthDp = cfg.screenWidthDp
-    val heightDp = cfg.screenHeightDp
-    val large = widthDp >= 600
-    val compact = !large && heightDp < 570
+    val large = widthDp >= COVER_SCREEN_WIDTH_DP
+    val compact = isCompactCoverScreen()
     // Only show cover-screen hints once per session.
     var coverHintShown by rememberSaveable { mutableStateOf(false) }
     // Detect a device that likely has a cover screen: look for a camera cutout
@@ -2583,7 +2613,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     // Falls back to the standard 10 dp when there is no cutout.
     val tileTopPadding: Dp = cameraHole?.let { r ->
         with(density) { r.bottom.toDp() + 12.dp }
-    } ?: 10.dp
+    } ?: coverScaled(10.dp)
     // Decorative ring color — subtle outline that acknowledges the camera hole.
     val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
 
@@ -2670,8 +2700,8 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                         .fillMaxSize()
                         .navigationBarsPadding()
                         .padding(
-                            start = 10.dp, top = tileTopPadding, bottom = 24.dp,
-                            end = if (tiles.size > 1) 22.dp else 10.dp,
+                            start = coverScaled(10.dp), top = tileTopPadding, bottom = coverScaled(24.dp),
+                            end = if (tiles.size > 1) coverScaled(22.dp) else coverScaled(10.dp),
                         ),
                 ) {
                     when (val tile = tiles[i]) {
@@ -2971,7 +3001,7 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                         .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
                 )
             }
-            Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxSize().padding(coverScaled(14.dp)), verticalArrangement = Arrangement.spacedBy(coverScaled(10.dp))) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // The car-switching dots live at top-center of the screen
                     // (see CompactCar), not here.
