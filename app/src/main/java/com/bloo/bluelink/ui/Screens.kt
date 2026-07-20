@@ -2229,14 +2229,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             label = "pageBounce",
                         )
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
+                        // Real-time full-screen blur recomputed every drag
+                        // frame (touch move events fire far faster than this
+                        // needs to redraw) was the actual jitter -- fade/
+                        // scale/rotate are cheap compositor-only graphicsLayer
+                        // transforms with no re-render cost; blur forces a
+                        // full pixel re-blur of the whole page on every frame
+                        // of the drag, which is not free at any page size.
                         Box(Modifier.fillMaxSize().graphicsLayer {
                             alpha = 1f - effectiveOff * 0.2f
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
                             rotationZ = effectiveOff * if (page >= exPager.currentPage) 1.2f else -1.2f
-                        }.then(if (effectiveOff > 0.01f) Modifier.blur(
-                            (effectiveOff * 6).dp, (effectiveOff * 3).dp
-                        ) else Modifier)) {
+                        }) {
                             val pv = vehicles[exReal(page)]
                             CarThemeOverride(
                                 paletteId = appearance.carCustomPaletteIds[pv.vin],
@@ -2305,16 +2310,16 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
+                        // Same fix as the expanded pager above: dropped the
+                        // real-time blur, the actual source of the jitter --
+                        // fade/scale/rotate are cheap compositor transforms.
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
                                 alpha = 1f - effectiveOff * 0.2f
                                 scaleX = 1f - effectiveOff * 0.06f
                                 scaleY = 1f - effectiveOff * 0.06f
                                 rotationZ = effectiveOff * if (page >= pager.currentPage) 1.2f else -1.2f
-                            }.then(
-                                if (effectiveOff > 0.01f) Modifier.blur((effectiveOff * 6).dp, (effectiveOff * 3).dp)
-                                else Modifier
-                            ),
+                            },
                         ) {
                             for (i in start until end) {
                                 val gv = vehicles[i]
