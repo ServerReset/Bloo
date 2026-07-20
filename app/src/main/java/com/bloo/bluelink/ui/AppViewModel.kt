@@ -166,6 +166,12 @@ data class UiState(
     val updateDownloading: Boolean = false,
     /** 0-1 while [updateDownloading], or null before/after (indeterminate). */
     val updateDownloadProgress: Float? = null,
+    /** True once the update APK has finished downloading and is sitting in
+     *  the cache ready to hand to the installer -- lets the hero pebble's
+     *  banner button do "tap to download, tap again to install" without ever
+     *  opening the full update dialog. Reset by a fresh update check finding
+     *  a different/no build available. */
+    val updateApkReady: Boolean = false,
     /** Settings mode: "simple" (essential settings) or "advanced" (all settings). */
     val settingsMode: String = "simple",
     /** Per-VIN default preset ID for the one-tap climate Start button. */
@@ -872,11 +878,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             when (val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication())) {
                 is com.bloo.bluelink.update.UpdateCheckResult.Available ->
-                    _state.update { it.copy(updateInfo = result.info, updateAvailable = result.info) }
+                    _state.update {
+                        // A previously-downloaded APK is only still good if it's
+                        // for this same build -- a newer one showing up means the
+                        // cached file is stale.
+                        val stillReady = it.updateApkReady && it.updateAvailable?.run?.runNumber == result.info.run.runNumber
+                        it.copy(updateInfo = result.info, updateAvailable = result.info, updateApkReady = stillReady)
+                    }
                 is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
                     _state.update { it.copy(updateCheckFailed = result.error) }
                 is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
-                    _state.update { it.copy(updateAvailable = null) }
+                    _state.update { it.copy(updateAvailable = null, updateApkReady = false) }
             }
         }
     }
@@ -1170,20 +1182,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!enabled) _state.update { it.copy(updateInfo = null, updateCheckFailed = null, updateAvailable = null) }
     }
 
+    private fun apkCacheFile(): java.io.File {
+        val ctx = getApplication<Application>()
+        return java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo.apk")
+    }
+
+    private fun launchApkInstaller(dest: java.io.File): Boolean {
+        val ctx = getApplication<Application>()
+        return runCatching {
+            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            ctx.startActivity(intent)
+        }.isSuccess
+    }
+
     /** Downloads the update APK in-app and hands it straight to the system
-     *  package installer -- previously "Update" just opened a browser page,
-     *  leaving the actual download-then-open-the-file steps to the user. */
+     *  package installer -- used by the full update dialog, where "Update" is
+     *  the only tap the user gets so download-then-install has to happen as
+     *  one continuous action. */
     fun downloadAndInstallUpdate() {
-        val url = _state.value.updateInfo?.run?.phoneApkUrl
+        val url = (_state.value.updateInfo ?: _state.value.updateAvailable)?.run?.phoneApkUrl
         if (url == null) {
             _state.update { it.copy(message = "No direct download for this build — use the browser link instead.") }
             return
         }
         if (_state.value.updateDownloading) return
-        _state.update { it.copy(updateDownloading = true, updateDownloadProgress = 0f) }
+        _state.update { it.copy(updateDownloading = true, updateDownloadProgress = 0f, updateApkReady = false) }
         viewModelScope.launch {
-            val ctx = getApplication<Application>()
-            val dest = java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo.apk")
+            val dest = apkCacheFile()
             val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
                 _state.update { it.copy(updateDownloadProgress = progress) }
             }
@@ -1192,16 +1221,49 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(message = "Download failed — check your connection and try again.") }
                 return@launch
             }
-            runCatching {
-                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                ctx.startActivity(intent)
-            }.onFailure {
-                _state.update { it2 -> it2.copy(message = "Downloaded, but couldn't open the installer — find Bloo.apk in your downloads.") }
+            if (!launchApkInstaller(dest)) {
+                _state.update { it.copy(message = "Downloaded, but couldn't open the installer — find Bloo.apk in your downloads.") }
             }
+        }
+    }
+
+    /** The hero pebble's "Update" banner button, first tap: downloads the APK
+     *  in the background with no dialog and no installer prompt yet -- lets
+     *  someone start the update mid-something-else and come back to it. The
+     *  banner's button then swaps to "Install" (see [installDownloadedUpdate])
+     *  once this finishes, all without ever opening the full update popup. */
+    fun downloadUpdateInBackground() {
+        val url = _state.value.updateAvailable?.run?.phoneApkUrl
+        if (url == null) {
+            _state.update { it.copy(message = "No direct download for this build — use the browser link instead.") }
+            return
+        }
+        if (_state.value.updateDownloading || _state.value.updateApkReady) return
+        _state.update { it.copy(updateDownloading = true, updateDownloadProgress = 0f) }
+        viewModelScope.launch {
+            val dest = apkCacheFile()
+            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
+                _state.update { it.copy(updateDownloadProgress = progress) }
+            }
+            _state.update { it.copy(updateDownloading = false, updateDownloadProgress = null, updateApkReady = ok) }
+            if (!ok) {
+                _state.update { it.copy(message = "Download failed — check your connection and try again.") }
+            }
+        }
+    }
+
+    /** The hero pebble banner's second tap, once [downloadUpdateInBackground]
+     *  has finished: the APK is already sitting in cache, so this just hands
+     *  it to the system installer. */
+    fun installDownloadedUpdate() {
+        if (!_state.value.updateApkReady) return
+        val dest = apkCacheFile()
+        if (!dest.exists()) {
+            _state.update { it.copy(updateApkReady = false, message = "The downloaded update is gone — tap Update to fetch it again.") }
+            return
+        }
+        if (!launchApkInstaller(dest)) {
+            _state.update { it.copy(message = "Couldn't open the installer — find Bloo.apk in your downloads.") }
         }
     }
 
@@ -1215,10 +1277,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = true)
             _state.update {
                 when (result) {
-                    is com.bloo.bluelink.update.UpdateCheckResult.Available ->
-                        it.copy(updateChecking = false, updateInfo = result.info, updateAvailable = result.info, updateCheckFailed = null)
+                    is com.bloo.bluelink.update.UpdateCheckResult.Available -> {
+                        val stillReady = it.updateApkReady && it.updateAvailable?.run?.runNumber == result.info.run.runNumber
+                        it.copy(
+                            updateChecking = false, updateInfo = result.info, updateAvailable = result.info,
+                            updateCheckFailed = null, updateApkReady = stillReady,
+                        )
+                    }
                     is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
-                        it.copy(updateChecking = false, updateAvailable = null, message = "You're on the latest build.", messageType = "success")
+                        it.copy(updateChecking = false, updateAvailable = null, updateApkReady = false, message = "You're on the latest build.", messageType = "success")
                     is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
                         it.copy(updateChecking = false, updateCheckFailed = result.error)
                 }

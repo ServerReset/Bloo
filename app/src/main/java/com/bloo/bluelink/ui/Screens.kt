@@ -3301,6 +3301,11 @@ private fun HeroHeader(
     metric: Boolean = false,
     updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
     onOpenUpdate: (() -> Unit)? = null,
+    updateDownloading: Boolean = false,
+    updateDownloadProgress: Float? = null,
+    updateApkReady: Boolean = false,
+    onDownloadUpdate: (() -> Unit)? = null,
+    onInstallUpdate: (() -> Unit)? = null,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
     val heroAlpha = remember { Animatable(0f) }
@@ -3353,25 +3358,50 @@ private fun HeroHeader(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Filled.SystemUpdate,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Update available", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(
-                            updateAvailable.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${updateAvailable.run.runNumber}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            // Tapping the icon/text (not the action button) still
+                            // opens the full dialog -- "Remind me"/"Not now" and
+                            // the browser fallback live there, they just aren't
+                            // needed for the common one-or-two-tap path anymore.
+                            .then(if (onOpenUpdate != null) Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenUpdate) else Modifier),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.SystemUpdate,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
                         )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Update available", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                updateAvailable.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${updateAvailable.run.runNumber}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                     Spacer(Modifier.width(8.dp))
-                    MorphTextButton("Update", onClick = onOpenUpdate)
+                    when {
+                        updateDownloading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            LoadingIndicator(Modifier.size(16.dp))
+                            Text(
+                                updateDownloadProgress?.let { "${(it * 100).toInt()}%" } ?: "Downloading…",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        // Downloaded and sitting in cache: this tap only has to
+                        // hand it to the system installer, no network wait.
+                        updateApkReady && onInstallUpdate != null -> MorphTextButton("Install", onClick = onInstallUpdate)
+                        onDownloadUpdate != null -> MorphTextButton("Update", onClick = onDownloadUpdate)
+                        onOpenUpdate != null -> MorphTextButton("Update", onClick = onOpenUpdate)
+                    }
                 }
             }
         }
@@ -4328,6 +4358,9 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     HeroHeader(
         v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm, state.drivingLabel(v), metric = hMetric,
         updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
+        updateDownloading = state.updateDownloading, updateDownloadProgress = state.updateDownloadProgress,
+        updateApkReady = state.updateApkReady,
+        onDownloadUpdate = { vm.downloadUpdateInBackground() }, onInstallUpdate = { vm.installDownloadedUpdate() },
     )
     // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
     // CompactMainTile) which always wrap it in a Surface that establishes a
@@ -4426,6 +4459,9 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
             v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
             state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
             updateAvailable = state.updateAvailable, onOpenUpdate = { vm.reopenUpdatePrompt() },
+            updateDownloading = state.updateDownloading, updateDownloadProgress = state.updateDownloadProgress,
+            updateApkReady = state.updateApkReady,
+            onDownloadUpdate = { vm.downloadUpdateInBackground() }, onInstallUpdate = { vm.installDownloadedUpdate() },
         )
         "controls" -> ControlsPebble(v, state, vm, dragHandle)
         "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
