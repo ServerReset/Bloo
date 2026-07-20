@@ -875,7 +875,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  snoozed internally (see UpdateChecker) -- safe to call as often as this is. */
     private fun checkForUpdate() {
         viewModelScope.launch {
-            when (val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication())) {
+            val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication())
+            when (result) {
                 is com.bloo.bluelink.update.UpdateCheckResult.Available ->
                     _state.update {
                         // A previously-downloaded APK is only still good if it's
