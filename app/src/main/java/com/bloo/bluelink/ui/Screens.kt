@@ -1554,16 +1554,21 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 
 /**
  * Bloo isn't on the Play Store, so this is its own update surface: shown once
- * per cold start when a newer GitHub Actions build than this one has landed
- * on the default branch. Actions artifacts need a GitHub-authenticated
- * browser session to download (the app itself has no token to fetch them
- * with), so the primary action opens the run's page rather than downloading
- * anything in-app — both the phone and watch APKs are attached there.
+ * per cold start when a newer build than this one has landed on the default
+ * branch. Every push now publishes a rolling GitHub Release (see android.yml)
+ * with the raw phone/watch APKs attached as plain public assets -- unlike the
+ * Actions artifacts from the same build, no GitHub sign-in and no zip/unzip
+ * step, so the primary action can download the APK directly instead of
+ * opening a browser page and walking through several manual steps.
  */
 @Composable
 private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: AppViewModel) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
+    // Old releases (published before phoneApkUrl existed) or a failed asset
+    // upload leave this null -- fall back to the release page, where a
+    // person can still find and tap the asset link by hand.
+    val downloadUrl = info.run.phoneApkUrl ?: info.run.htmlUrl
     GlassAlertDialog(
         onDismissRequest = vm::dismissUpdate,
         icon = Icons.Filled.Info,
@@ -1580,17 +1585,16 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
             Surface(shape = RoundedCornerShape(12.dp), color = scheme.surfaceVariant.copy(alpha = 0.5f)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
-                    Text("1. Open the Actions run page", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    Text("2. Download the zip artifact for your device", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    Text("3. Unzip the file and open the APK", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    Text("4. Tap \"More details\" → \"Install without scanning\"", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text("1. Download the APK below", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text("2. Open it from the download notification", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text("3. Tap \"More details\" → \"Install without scanning\"", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
             }
         },
         buttons = {
             MorphButton(
                 onClick = {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))) }
                     vm.dismissUpdate()
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -1598,7 +1602,7 @@ private fun UpdatePromptDialog(info: com.bloo.bluelink.update.UpdateInfo, vm: Ap
             ) {
                 Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Open GitHub Actions", fontWeight = FontWeight.SemiBold)
+                Text(if (info.run.phoneApkUrl != null) "Download APK" else "Open GitHub Release", fontWeight = FontWeight.SemiBold)
             }
             MorphTextButton("Remind me", onClick = vm::snoozeUpdate, modifier = Modifier.fillMaxWidth())
             MorphTextButton("Not now", onClick = vm::dismissUpdate, modifier = Modifier.fillMaxWidth())

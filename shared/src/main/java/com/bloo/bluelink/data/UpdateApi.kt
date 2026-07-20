@@ -4,32 +4,42 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-/** A completed GitHub Actions build of the app, normalised to what the
- *  update flow needs. */
-data class WorkflowRun(val runNumber: Int, val htmlUrl: String, val displayTitle: String? = null)
+/** A completed GitHub build of the app, normalised to what the update flow
+ *  needs. [phoneApkUrl]/[wearApkUrl] are direct, public, unzipped asset
+ *  download links (null only for a stale release published before this
+ *  field existed, or if an asset failed to upload). */
+data class WorkflowRun(
+    val runNumber: Int,
+    val htmlUrl: String,
+    val displayTitle: String? = null,
+    val phoneApkUrl: String? = null,
+    val wearApkUrl: String? = null,
+)
 
 /**
- * Checks GitHub Actions for the latest successful build. Bloo isn't on the
- * Play Store and doesn't reliably cut tagged Releases (that job in
- * android.yml only fires on a manual "vN" tag push), so this is the app's
- * real update channel: every ordinary push already builds and uploads APK
- * artifacts, and BuildConfig.BUILD_RUN_NUMBER (baked in at CI build time)
- * says which one is currently installed. Key-less, public REST endpoint, no
- * auth needed to read run metadata (only artifact *downloads* need a token,
- * which is why the update prompt opens the run's page in a browser instead
- * of fetching the APK itself).
+ * Checks GitHub for the latest build. Bloo isn't on the Play Store, so this
+ * is the app's real update channel: every ordinary push publishes a rolling
+ * pre-release (see android.yml's "Publish build as a GitHub Release" step)
+ * tagged "build-<run number>" with the raw phone/watch APKs attached as
+ * public release assets — no auth and no zip needed to download them,
+ * unlike the Actions artifacts from the same build (which this used to read
+ * instead, before that was the actual reason the update flow needed a
+ * browser + manual unzip). BuildConfig.BUILD_RUN_NUMBER (baked in at CI
+ * build time) says which one is currently installed.
  */
 object UpdateApi {
 
     private const val OWNER = "ServerReset"
     private const val REPO = "Bloo"
-    private const val WORKFLOW_FILE = "android.yml"
+    private const val PHONE_ASSET_NAME = "Bloo.apk"
+    private const val WEAR_ASSET_NAME = "Bloo-Wear.apk"
 
     /** The branch new builds land on — see UpdateChecker/WearViewModel. */
     const val DEFAULT_BRANCH = "claude/great-faraday-QuX3x"
@@ -42,28 +52,36 @@ object UpdateApi {
         .build()
 
     @Serializable
-    private data class WorkflowRunsResponse(
-        @SerialName("workflow_runs") val workflowRuns: List<WorkflowRunResponse> = emptyList(),
+    private data class ReleaseAsset(
+        val name: String = "",
+        @SerialName("browser_download_url") val browserDownloadUrl: String = "",
     )
 
     @Serializable
-    private data class WorkflowRunResponse(
-        @SerialName("run_number") val runNumber: Int = 0,
+    private data class ReleaseResponse(
+        @SerialName("tag_name") val tagName: String = "",
         @SerialName("html_url") val htmlUrl: String = "",
-        @SerialName("display_title") val displayTitle: String? = null,
+        val name: String? = null,
+        val draft: Boolean = false,
+        val assets: List<ReleaseAsset> = emptyList(),
     )
 
-    /** The latest successful build (from an ordinary push, not a PR) on
-     *  [branch], or null on any failure. */
+    /** The latest published build release (from an ordinary push), or null
+     *  on any failure. Release list is newest-first by creation date, and
+     *  includes pre-releases (unlike the /releases/latest endpoint, which
+     *  explicitly excludes them) — every build release is a pre-release.
+     *
+     *  [branch] is unused: GitHub's release list has no server-side branch
+     *  filter (a release is tied to a tag, not a source branch), and in
+     *  practice this repo only ever pushes to one branch at a time. Kept in
+     *  the signature so callers (UpdateChecker, WearViewModel) don't need a
+     *  matching change for what would be a no-op today. */
     suspend fun fetchLatestSuccessfulRun(branch: String): WorkflowRun? = withContext(Dispatchers.IO) {
         runCatching {
-            val url = "https://api.github.com/repos/$OWNER/$REPO/actions/workflows/$WORKFLOW_FILE/runs"
+            val url = "https://api.github.com/repos/$OWNER/$REPO/releases"
                 .toHttpUrl()
                 .newBuilder()
-                .addQueryParameter("branch", branch)
-                .addQueryParameter("status", "success")
-                .addQueryParameter("event", "push")
-                .addQueryParameter("per_page", "1")
+                .addQueryParameter("per_page", "5")
                 .build()
             val request = Request.Builder()
                 .url(url)
@@ -74,10 +92,20 @@ object UpdateApi {
             client.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
                 val body = resp.body?.string() ?: return@use null
-                val parsed = json.decodeFromString(WorkflowRunsResponse.serializer(), body)
-                val run = parsed.workflowRuns.firstOrNull() ?: return@use null
-                if (run.runNumber <= 0 || run.htmlUrl.isBlank()) return@use null
-                WorkflowRun(runNumber = run.runNumber, htmlUrl = run.htmlUrl, displayTitle = run.displayTitle)
+                val releases = json.decodeFromString(ListSerializer(ReleaseResponse.serializer()), body)
+                // "build-<N>" tags from the rolling per-push release; skips
+                // drafts and anything from the separate tagged "vN" release
+                // job, which doesn't follow this naming convention at all.
+                val release = releases.firstOrNull { !it.draft && it.tagName.startsWith("build-") } ?: return@use null
+                val runNumber = release.tagName.removePrefix("build-").toIntOrNull() ?: return@use null
+                if (release.htmlUrl.isBlank()) return@use null
+                WorkflowRun(
+                    runNumber = runNumber,
+                    htmlUrl = release.htmlUrl,
+                    displayTitle = release.name,
+                    phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME }?.browserDownloadUrl,
+                    wearApkUrl = release.assets.firstOrNull { it.name == WEAR_ASSET_NAME }?.browserDownloadUrl,
+                )
             }
         }.getOrNull()
     }
