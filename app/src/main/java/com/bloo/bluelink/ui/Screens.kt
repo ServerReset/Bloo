@@ -210,6 +210,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -225,6 +226,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -1624,6 +1626,21 @@ private fun GlassAlertDialog(
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(28.dp)
     Dialog(onDismissRequest = onDismissRequest) {
+        // Dialog() opens its own platform Window, which doesn't inherit the
+        // app's forceDarkAllowed=false the way the main Activity window does
+        // -- on API 29+ Android's automatic Force Dark heuristic was
+        // re-inverting already-dark, explicitly-colored text drawn here
+        // (this dialog's title and body rendered near-black on a near-black
+        // card, while the identical text elsewhere in the app -- inside the
+        // Activity's own window -- rendered correctly). Disabling it on this
+        // window specifically stops Android from "helpfully" reprocessing
+        // colors Compose already resolved correctly.
+        val dialogView = LocalView.current
+        SideEffect {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                (dialogView.parent as? DialogWindowProvider)?.window?.decorView?.forceDarkAllowed = false
+            }
+        }
         Surface(
             shape = shape,
             color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.97f)),
