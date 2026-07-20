@@ -2,7 +2,7 @@ package com.bloo.uicommon
 
 import android.graphics.BlurMaskFilter
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Paint
@@ -22,6 +22,17 @@ import androidx.compose.ui.unit.dp
  * there against most backgrounds. Shared between phone and watch (pure
  * Compose graphics APIs, no Material dependency) so every piece of floating
  * chrome on both platforms uses the same technique.
+ *
+ * drawWithCache, not drawBehind: the Paint/BlurMaskFilter/Path used to get
+ * rebuilt from scratch on every single draw call, static pebble or not. For
+ * anything that redraws every frame of an animation -- exactly what a
+ * floating button fading in via AnimatedVisibility does -- that meant
+ * reallocating a native BlurMaskFilter every frame, which is exactly the
+ * kind of per-frame allocation that shows up as the shadow visibly glitching/
+ * popping in rather than fading smoothly with the rest of the content.
+ * drawWithCache rebuilds the cached block only when [size] (or anything else
+ * it reads) actually changes, reusing the same Paint/Path on every redraw
+ * in between -- including every frame of a fade.
  */
 fun Modifier.dropShadow(
     shape: Shape,
@@ -29,7 +40,7 @@ fun Modifier.dropShadow(
     blurRadius: Dp = 14.dp,
     offsetY: Dp = 5.dp,
     offsetX: Dp = 0.dp,
-): Modifier = this.drawBehind {
+): Modifier = this.drawWithCache {
     val paint = Paint().asFrameworkPaint().apply {
         this.color = color.toArgb()
         isAntiAlias = true
@@ -42,11 +53,15 @@ fun Modifier.dropShadow(
         is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
         is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
         is Outline.Generic -> outline.path
-    }
-    drawIntoCanvas { canvas ->
-        canvas.save()
-        canvas.translate(offsetX.toPx(), offsetY.toPx())
-        canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
-        canvas.restore()
+    }.asAndroidPath()
+    val offXPx = offsetX.toPx()
+    val offYPx = offsetY.toPx()
+    onDrawBehind {
+        drawIntoCanvas { canvas ->
+            canvas.save()
+            canvas.translate(offXPx, offYPx)
+            canvas.nativeCanvas.drawPath(path, paint)
+            canvas.restore()
+        }
     }
 }

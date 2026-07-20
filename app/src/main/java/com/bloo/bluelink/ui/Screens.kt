@@ -100,7 +100,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ScrollState
@@ -197,7 +196,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -226,9 +224,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -252,8 +248,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -2205,7 +2199,6 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 LaunchedEffect(exPager) {
                     snapshotFlow { exPager.settledPage }.collect { vm.expand(exReal(it)) }
                 }
-                val exSwipeSpeed = rememberPagerSwipeVelocity(exPager)
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = exPager,
@@ -2231,33 +2224,15 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             label = "pageBounce",
                         )
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
-                        // A plain Modifier.blur(x.dp) reconstructs and re-lays-out
-                        // its own modifier node every time its dp args change --
-                        // that per-drag-frame relayout, not the GPU blur pass
-                        // itself, was the earlier jitter. Setting renderEffect
-                        // inside this graphicsLayer lambda instead is read only
-                        // at draw time (no recomposition/relayout at all), so
-                        // it's effectively free to update every frame.
-                        // Keyed off exSwipeSpeed (pages/sec), not the page's
-                        // static offset from center -- actual motion blur
-                        // should track how fast content is currently sliding,
-                        // so it's near zero on a slow drag or once settled and
-                        // strong mid-fling, the same way a camera would smear
-                        // a fast-moving subject. Horizontal leads vertical for
-                        // a directional smear along the swipe axis.
+                        // No blur -- tried both a position-driven and later a
+                        // velocity-driven version here; both read as worse than
+                        // no blur at all. Just the cheap fade/scale/tilt
+                        // graphicsLayer transforms now.
                         Box(Modifier.fillMaxSize().graphicsLayer {
                             alpha = 1f - effectiveOff * 0.2f
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
                             rotationZ = effectiveOff * if (page >= exPager.currentPage) 1.2f else -1.2f
-                            val speed = exSwipeSpeed.value
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && speed > 0.15f) {
-                                renderEffect = BlurEffect(
-                                    radiusX = (speed * 6.5f).coerceAtMost(28f),
-                                    radiusY = (speed * 2f).coerceAtMost(9f),
-                                    edgeTreatment = TileMode.Decal,
-                                )
-                            }
                         }) {
                             val pv = vehicles[exReal(page)]
                             CarThemeOverride(
@@ -2298,7 +2273,6 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         vm.selectIndex((realBlock(page) * perPage).coerceIn(0, count - 1))
                     }
                 }
-                val gridSwipeSpeed = rememberPagerSwipeVelocity(pager)
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
                 var carNameVisible by remember { mutableStateOf(false) }
                 var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
@@ -2328,29 +2302,13 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
-                        // Same fix as the expanded pager above: the earlier
-                        // jitter was the per-frame relayout of a plain
-                        // Modifier.blur(x.dp), not the blur pass itself --
-                        // renderEffect set inside this graphicsLayer lambda is
-                        // draw-time only. Keyed off gridSwipeSpeed (actual
-                        // pages/sec the pager is moving), not the static
-                        // per-page offset -- real motion blur tracks speed,
-                        // not position, so it appears mid-fling and clears
-                        // once the page is actually slowing down or settled.
+                        // No blur -- see the expanded pager above.
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
                                 alpha = 1f - effectiveOff * 0.2f
                                 scaleX = 1f - effectiveOff * 0.06f
                                 scaleY = 1f - effectiveOff * 0.06f
                                 rotationZ = effectiveOff * if (page >= pager.currentPage) 1.2f else -1.2f
-                                val speed = gridSwipeSpeed.value
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && speed > 0.15f) {
-                                    renderEffect = BlurEffect(
-                                        radiusX = (speed * 6.5f).coerceAtMost(28f),
-                                        radiusY = (speed * 2f).coerceAtMost(9f),
-                                        edgeTreatment = TileMode.Decal,
-                                    )
-                                }
                             },
                         ) {
                             for (i in start until end) {
@@ -2549,13 +2507,17 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                 abs(delta).coerceIn(0f, 1f)
             }
         }
-                        Box(Modifier.fillMaxSize().graphicsLayer {
-                            alpha = 1f - pageOff * 0.2f
-                            scaleX = 1f - pageOff * 0.06f
-                            scaleY = 1f - pageOff * 0.06f
-                        }.then(if (pageOff > 0.01f) Modifier.blur(
-                            (pageOff * 8).dp, (pageOff * 4).dp
-                        ) else Modifier)) {
+        // No blur -- see the other two car pagers' history for why: a plain
+        // Modifier.blur(x.dp) reconstructs and re-lays-out its own modifier
+        // node on every drag frame (the jitter this exact pattern caused
+        // elsewhere), and this cover-screen pager had never actually been
+        // updated when that got fixed there. Just the cheap graphicsLayer
+        // fade/scale transforms now, consistent with the other pagers.
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            alpha = 1f - pageOff * 0.2f
+            scaleX = 1f - pageOff * 0.06f
+            scaleY = 1f - pageOff * 0.06f
+        }) {
             CarThemeOverride(
                 paletteId = appearance.carCustomPaletteIds[v.vin],
                 customPalettes = appearance.customPalettes,
@@ -3075,44 +3037,6 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
 }
 
 /**
- * Tracks how fast a pager is actually moving (pages/second, unsigned),
- * smoothed to avoid frame-to-frame flicker. This is what real motion blur
- * should key off -- how fast something is currently sliding across the
- * screen -- not how far a page sits from center, which is just a static
- * depth cue and stays constant even while the drag is stationary.
- */
-@Composable
-private fun rememberPagerSwipeVelocity(pagerState: PagerState): State<Float> {
-    val velocity = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(pagerState) {
-        var lastPos = pagerState.currentPage + pagerState.currentPageOffsetFraction
-        var lastFrameNanos = 0L
-        while (true) {
-            withFrameNanos { frameNanos ->
-                val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
-                if (lastFrameNanos != 0L) {
-                    val dt = (frameNanos - lastFrameNanos) / 1_000_000_000f
-                    if (dt > 0f) {
-                        val instant = abs(pos - lastPos) / dt
-                        // Fast attack so a flick shows blur immediately, slower
-                        // decay so it eases out instead of cutting off the
-                        // instant your finger stops rather than the content.
-                        velocity.floatValue = if (instant > velocity.floatValue) {
-                            instant
-                        } else {
-                            velocity.floatValue * 0.75f + instant * 0.25f
-                        }
-                    }
-                }
-                lastPos = pos
-                lastFrameNanos = frameNanos
-            }
-        }
-    }
-    return velocity
-}
-
-/**
  * A soft blurred scrim behind the status bar so scrolling content underneath
  * (a car photo, Aurora, dense text) doesn't fight the system clock/battery
  * icons drawn on top of it. Not the normal (non-cover-screen) layouts -- the
@@ -3342,10 +3266,15 @@ private fun HeroHeader(
  * Bloo isn't on the Play Store, so this is its own update surface: a
  * standalone tile pinned directly below the hero tile whenever the checker
  * has found a newer build, animating in/out instead of interrupting with a
- * popup. Every push publishes a rolling GitHub Release (see android.yml)
- * with the raw phone/watch APKs attached as plain public assets, so the
- * primary button can download the APK directly instead of opening a browser
- * page and walking through several manual steps.
+ * popup. Collapse/expand reuses the exact same [PebbleShell] every other
+ * pebble is built on (this isn't tied to a car/section, hence PebbleShell
+ * directly rather than the [Pebble] wrapper) -- collapsed, the header action
+ * button doubles as the primary control and shows live download state
+ * (Update / downloading % / Install); expanded, it adds install steps, this
+ * build's release notes, and Remind-me/Not-now. Every push publishes a
+ * rolling GitHub Release (see android.yml) with the raw phone/watch APKs
+ * attached as plain public assets, so the primary action can download the
+ * APK directly instead of opening a browser page.
  */
 @Composable
 private fun UpdateAvailableTile(state: UiState, vm: AppViewModel) {
@@ -3357,116 +3286,85 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel) {
     ) {
         if (info == null) return@AnimatedVisibility
         val context = LocalContext.current
-        val scheme = MaterialTheme.colorScheme
         val hasDirectDownload = info.run.phoneApkUrl != null
-        val shape = RoundedCornerShape(PebbleCornerCollapsed)
-        val outline by vm.appearance.collectAsState()
-        // The gap to the hero tile above rides along with this same
-        // AnimatedVisibility instead of being a fixed Spacer at the call
+        // Keyed on the build number so a genuinely different build (see
+        // checkForUpdate's sameBuild check) starts collapsed again rather
+        // than inheriting whatever expand state an earlier build was left in.
+        var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
+        // Rides along with the same AnimatedVisibility as the tile itself
+        // (see PebbleList's spacedBy) instead of a fixed Spacer at the call
         // site -- otherwise dismissing the tile would shrink the card to
         // nothing but leave a small dead gap where it used to be.
         Spacer(Modifier.height(12.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth()
-                .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
-                .then(
-                    if (outline.pebbleOutline) {
-                        Modifier.border(BorderStroke(1.dp, scheme.outline.copy(alpha = 0.55f)), shape)
-                    } else Modifier,
-                ),
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer, contentColor = scheme.onPrimaryContainer),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(22.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Update available", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(
-                            info.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${info.run.runNumber}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onPrimaryContainer.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                // A fully opaque container in the card's own contentColor pair --
-                // not a translucent overlay blended over glass, which is what
-                // made this text hard to read back when this lived in a dialog.
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = scheme.onPrimaryContainer.copy(alpha = 0.08f),
-                    contentColor = scheme.onPrimaryContainer,
-                ) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            if (hasDirectDownload) "1. Tap \"Update\" below" else "1. Download the APK below",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            if (hasDirectDownload) "2. Tap \"Install\" once it's downloaded" else "2. Open the downloaded file",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        // Android's Play Protect flags any APK that didn't come
-                        // from the Play Store, unsigned-by-Google or not --
-                        // without this tip, "Blocked by Play Protect" reads
-                        // like the install genuinely failed rather than one
-                        // more tap.
-                        Text(
-                            "3. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-                if (state.updateDownloading) {
-                    val progress = state.updateDownloadProgress
-                    if (progress != null) {
-                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = scheme.onPrimaryContainer, trackColor = scheme.onPrimaryContainer.copy(alpha = 0.2f))
-                        Text("${(progress * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = scheme.onPrimaryContainer.copy(alpha = 0.85f))
-                    } else {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scheme.onPrimaryContainer, trackColor = scheme.onPrimaryContainer.copy(alpha = 0.2f))
-                    }
-                }
-                MorphButton(
-                    onClick = {
-                        when {
-                            state.updateApkReady -> vm.installDownloadedUpdate()
-                            hasDirectDownload -> vm.downloadUpdateInBackground()
-                            else -> {
-                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                                vm.dismissUpdate()
-                            }
+        PebbleShell(
+            expanded = expanded,
+            onToggle = { expanded = !expanded },
+            icon = Icons.Filled.SystemUpdate,
+            title = "Update available",
+            vm = vm,
+            summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${info.run.runNumber}",
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            headerAction = PebbleHeaderAction(
+                label = when {
+                    state.updateDownloading -> state.updateDownloadProgress?.let { "${(it * 100).roundToInt()}%" } ?: "Downloading…"
+                    state.updateApkReady -> "Install"
+                    hasDirectDownload -> "Update"
+                    else -> "Open"
+                },
+                icon = if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
+                pending = state.updateDownloading,
+                onClick = {
+                    when {
+                        state.updateApkReady -> vm.installDownloadedUpdate()
+                        hasDirectDownload -> vm.downloadUpdateInBackground()
+                        else -> {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                            vm.dismissUpdate()
                         }
-                    },
-                    enabled = !state.updateDownloading,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                ) {
-                    if (state.updateDownloading) {
-                        LoadingIndicator(Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Downloading…", fontWeight = FontWeight.SemiBold)
-                    } else {
-                        Icon(
-                            if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
-                            contentDescription = null, modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            when {
-                                state.updateApkReady -> "Install"
-                                hasDirectDownload -> "Update"
-                                else -> "Open GitHub Release"
-                            },
-                            fontWeight = FontWeight.SemiBold,
-                        )
                     }
+                },
+            ),
+        ) {
+            val scheme = MaterialTheme.colorScheme
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = scheme.surfaceContainerHighest,
+                contentColor = scheme.onSurface,
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
+                    Text(
+                        if (hasDirectDownload) "1. Tap \"Update\" above" else "1. Download the APK above",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        if (hasDirectDownload) "2. Tap \"Install\" once it's downloaded" else "2. Open the downloaded file",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    // Android's Play Protect flags any APK that didn't come
+                    // from the Play Store, unsigned-by-Google or not --
+                    // without this tip, "Blocked by Play Protect" reads
+                    // like the install genuinely failed rather than one
+                    // more tap.
+                    Text(
+                        "3. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
-                    MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
-                }
+            }
+            info.run.releaseNotes?.let { notes ->
+                Text("What's new", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
+                Text(
+                    notes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 12,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
+                MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -4437,10 +4335,21 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
 @Composable
 private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val shape = RoundedCornerShape(PebbleCornerCollapsed)
+    // Was frostedRim unconditionally -- every other pebble instead gates a
+    // bolder dedicated border on the pebbleOutline setting (see Pebble()),
+    // frostedRim's alpha being tuned for chrome over a car photo and nearly
+    // invisible against a flat pebble background either way. This pebble
+    // rolls its own Surface instead of going through Pebble(), so it had been
+    // missed -- the setting simply did nothing here.
+    val pebbleOutline = vm.appearance.collectAsState().value.pebbleOutline
     Surface(
         modifier = Modifier.fillMaxWidth().height(ControlHeight).then(dragHandle)
             .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
-            .frostedRim(shape),
+            .then(
+                if (pebbleOutline) {
+                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
+                } else Modifier,
+            ),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -4591,38 +4500,18 @@ private fun PrimaryActions(
             offTextColor = MaterialTheme.colorScheme.error,
             // Kia's US API has no equivalent endpoint (see Vehicle.supportsHornLights),
             // so these only appear for Hyundai/Genesis, matching what those apps show.
-            // Labelled MorphButtons ("Lights"/"Horn" text pills) were too wide for
-            // this row -- they squeezed the weighted name/state column (the
-            // "Locked"/"Unlocked" label) down to nothing, silently dropping it
-            // from view. Small circular icon-only buttons -- MorphButton already
-            // morphs pill-to-square on press, same "go square when tapped"
-            // language as everywhere else -- fit beside the label instead of
-            // crowding it out; contentDescription keeps them labelled for
-            // TalkBack even with no visible text.
-            extraAction = if (v.supportsHornLights) {
-                {
-                    val hlPending = state.isPending(v.vin, "hornLights")
-                    // 50dp to match MorphExpandButton (the arrow dropdown
-                    // button). The label-wrapping bug this used to cause on
-                    // the cover screen's narrow row wasn't from the button
-                    // size -- it was the loose spacing around them eating
-                    // the weighted "Locked"/"Unlocked" label's room. Keeping
-                    // them tight instead fixes that without shrinking them.
-                    MorphButton(
-                        onClick = { vm.flashLights(v) },
-                        enabled = !hlPending,
-                        contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(50.dp),
-                    ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) }
-                    Spacer(Modifier.width(2.dp))
-                    MorphButton(
-                        onClick = { vm.hornAndLights(v) },
-                        enabled = !hlPending,
-                        contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(50.dp),
-                    ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(22.dp)) }
-                }
-            } else null,
+            // A connected M3 button group with the Lock/Unlock button (see
+            // StateControl/connectedGroupShape) -- icon-only, since a labelled
+            // "Lights"/"Horn" pill this size squeezed the weighted name/state
+            // column (the "Locked"/"Unlocked" label) down to nothing. contentDescription
+            // keeps them labelled for TalkBack even with no visible text.
+            groupActions = if (v.supportsHornLights) {
+                val hlPending = state.isPending(v.vin, "hornLights")
+                listOf(
+                    GroupIconAction(Icons.Filled.FlashOn, "Flash lights", !hlPending) { vm.flashLights(v) },
+                    GroupIconAction(Icons.Filled.Campaign, "Horn & lights", !hlPending) { vm.hornAndLights(v) },
+                )
+            } else emptyList(),
         )
     }
 }
@@ -5058,6 +4947,31 @@ private fun PaletteEditorDialog(
     )
 }
 
+/** One icon-only segment in a connected button group (see [connectedGroupShape]). */
+private data class GroupIconAction(
+    val icon: ImageVector,
+    val contentDescription: String,
+    val enabled: Boolean,
+    val onClick: () -> Unit,
+)
+
+/**
+ * Shape for segment [index] of [count] in a Material 3 "connected" button
+ * group (m3.material.io/components/button-groups): the group's outer corners
+ * are fully round, every seam between two segments is a small square corner
+ * instead, so the row reads as one continuous shape split into parts rather
+ * than a row of separate pills sitting next to each other. Pair with a 2dp
+ * gap between segments -- the spec's connected-group spacing at any size.
+ */
+private fun connectedGroupShape(index: Int, count: Int, smallCorner: Dp = 12.dp): RoundedCornerShape {
+    // 999dp clamps to a true half-height round on any button size, same trick
+    // MorphButton's own pill shape and the widget's pill mode both already use.
+    val outer = 999.dp
+    val startCorner = if (index == 0) outer else smallCorner
+    val endCorner = if (index == count - 1) outer else smallCorner
+    return RoundedCornerShape(topStart = startCorner, bottomStart = startCorner, topEnd = endCorner, bottomEnd = endCorner)
+}
+
 /**
  * The one button style used across the whole app. It rests as a **pill** and
  * becomes a **rounded rectangle** only while [active] (an on/toggled state) - or
@@ -5078,6 +4992,12 @@ fun MorphButton(
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    // A fixed shape to use instead of the animated pill<->square morph --
+    // for a connected button-group segment (see ButtonGroupRow), whose inner/
+    // outer corners are asymmetric and static by definition (that's what
+    // "connected" means; morphing a segment's shape independently would break
+    // the group's single continuous silhouette).
+    shape: Shape? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val pressed by interactionSource.collectIsPressedAsState()
@@ -5109,7 +5029,7 @@ fun MorphButton(
             // leverage place to fix it.
             .semantics { selected = active },
         enabled = enabled,
-        shape = RoundedCornerShape(percent = pct.roundToInt()),
+        shape = shape ?: RoundedCornerShape(percent = pct.roundToInt()),
         interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
             containerColor = bg,
@@ -5283,7 +5203,7 @@ private fun StateControl(
     highlightColor: Color = MaterialTheme.colorScheme.primary,
     highlightContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     offTextColor: Color? = null,
-    extraAction: (@Composable () -> Unit)? = null,
+    groupActions: List<GroupIconAction> = emptyList(),
 ) {
     // Which state is the "highlighted" (on) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
@@ -5368,7 +5288,7 @@ private fun StateControl(
                                     color = stateColor,
                                     fontWeight = FontWeight.Bold,
                                     // If this column ever gets squeezed tight
-                                    // again (extraAction content changes,
+                                    // again (groupActions content changes,
                                     // narrower screens), ellipsize instead of
                                     // wrapping mid-word ("Locke"/"d" on two
                                     // lines) -- a clipped label at least still
@@ -5397,30 +5317,42 @@ private fun StateControl(
                 }
             }
         }
-        // An optional secondary control (e.g. the charge-port toggle) sits just
-        // left of the primary action button. Wrapped in its own Row so it's a
-        // single child of the outer Row -- inlined directly, every button and
-        // Spacer it emits was itself getting the outer Row's 12dp spacedBy on
-        // top of its own internal spacing, ballooning a couple of dp of
-        // intended gap into a huge dead zone between the buttons.
-        if (extraAction != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) { extraAction() }
-        }
         val haptics = LocalHaptics.current
-        // Pill when off, rounded rectangle + highlight colour when on - same as
-        // the climate/charge controls.
-        MorphButton(
-            onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() },
-            enabled = enabled && !pending,
-            active = highlighted,
-            activeContainerColor = highlightColor,
-            activeContentColor = highlightContentColor,
-            // Same pill height as the pebble header actions (the row stays
-            // ControlHeight tall, so the button is vertically centred in it).
-            modifier = Modifier.heightIn(min = 50.dp),
-        ) {
-            val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-            MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
+        // Any extra icon actions (horn/lights) plus the lock/unlock button
+        // form one Material 3 "connected" button group -- a single Row (one
+        // child of the outer Row, so its own 2dp spacing isn't also getting
+        // the outer Row's 12dp spacedBy piled on top) instead of a separate
+        // icon cluster sitting next to an unrelated pill.
+        val segmentCount = groupActions.size + 1
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+            groupActions.forEachIndexed { i, action ->
+                MorphButton(
+                    onClick = action.onClick,
+                    enabled = action.enabled,
+                    contentPadding = PaddingValues(0.dp),
+                    shape = connectedGroupShape(i, segmentCount),
+                    modifier = Modifier.size(50.dp),
+                ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(22.dp)) }
+            }
+            // Pill when off, rounded rectangle + highlight colour when on - same
+            // as the climate/charge controls -- except when it's part of a
+            // group, where the connected shape takes over (see MorphButton's
+            // shape param doc): a connected group's silhouette is static, not
+            // something one segment morphs independently of the others.
+            MorphButton(
+                onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() },
+                enabled = enabled && !pending,
+                active = highlighted,
+                activeContainerColor = highlightColor,
+                activeContentColor = highlightContentColor,
+                shape = if (groupActions.isNotEmpty()) connectedGroupShape(segmentCount - 1, segmentCount) else null,
+                // Same pill height as the pebble header actions (the row stays
+                // ControlHeight tall, so the button is vertically centred in it).
+                modifier = Modifier.heightIn(min = 50.dp),
+            ) {
+                val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+                MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
+            }
         }
     }
 }
@@ -5448,6 +5380,42 @@ private fun Pebble(
 ) {
     val forceExpanded = LocalForceExpanded.current
     val expanded = forceExpanded || state.isPebbleExpanded(v.vin, section)
+    PebbleShell(
+        expanded = expanded,
+        onToggle = { vm.togglePebble(v, section) },
+        icon = icon,
+        title = title,
+        vm = vm,
+        dragHandle = dragHandle,
+        summary = summary,
+        containerColor = containerColor,
+        headerAction = headerAction,
+        forceExpanded = forceExpanded,
+        content = content,
+    )
+}
+
+/**
+ * The actual expand/collapse pebble shell -- [Pebble] derives [expanded]/
+ * [onToggle] from a car+section key (state.isPebbleExpanded/vm.togglePebble);
+ * this takes them directly so anything that isn't tied to a specific
+ * vehicle/section (the update tile) can still get the exact same collapsible
+ * card instead of a hand-rolled lookalike.
+ */
+@Composable
+private fun PebbleShell(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    icon: ImageVector,
+    title: String,
+    vm: AppViewModel,
+    dragHandle: Modifier = Modifier,
+    summary: String? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    headerAction: PebbleHeaderAction? = null,
+    forceExpanded: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val haptics = LocalHaptics.current
     // Collapsed = pill-soft corners; expanded morphs to a tighter rounded square.
     val corner by animateDpAsState(
@@ -5506,7 +5474,7 @@ private fun Pebble(
                             if (forceExpanded) Modifier
                             else Modifier.clickable {
                                 if (expanded) haptics?.tick() else haptics?.click()
-                                vm.togglePebble(v, section)
+                                onToggle()
                             },
                         )
                         .then(dragHandle)
@@ -5550,12 +5518,12 @@ private fun Pebble(
                             SplitExpandButton(
                                 action = headerAction,
                                 expanded = expanded,
-                                onToggle = { vm.togglePebble(v, section) },
+                                onToggle = onToggle,
                             )
                         } else {
                             MorphExpandButton(
                                 expanded = expanded,
-                                onToggle = { vm.togglePebble(v, section) },
+                                onToggle = onToggle,
                             )
                         }
                     }

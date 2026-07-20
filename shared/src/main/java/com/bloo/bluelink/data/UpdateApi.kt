@@ -22,6 +22,10 @@ data class WorkflowRun(
     val displayTitle: String? = null,
     val phoneApkUrl: String? = null,
     val wearApkUrl: String? = null,
+    /** The release's markdown body -- install steps + generated changelog
+     *  (see android.yml's "Publish build" step), shown as this build's patch
+     *  notes in the update tile. Null for a release with no body. */
+    val releaseNotes: String? = null,
 )
 
 /**
@@ -63,6 +67,7 @@ object UpdateApi {
         @SerialName("tag_name") val tagName: String = "",
         @SerialName("html_url") val htmlUrl: String = "",
         val name: String? = null,
+        val body: String? = null,
         val draft: Boolean = false,
         val assets: List<ReleaseAsset> = emptyList(),
     )
@@ -106,6 +111,7 @@ object UpdateApi {
                     displayTitle = release.name,
                     phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME }?.browserDownloadUrl,
                     wearApkUrl = release.assets.firstOrNull { it.name == WEAR_ASSET_NAME }?.browserDownloadUrl,
+                    releaseNotes = release.body?.takeIf { it.isNotBlank() },
                 )
             }
         }.getOrNull()
