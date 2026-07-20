@@ -11,6 +11,7 @@ import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
+import com.bloo.bluelink.widget.WidgetInfoField
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -667,7 +668,7 @@ class SettingsStore(private val context: Context) {
     suspend fun clearWidgetConfig(widgetId: Int) {
         editTracked {
             // Remove every per-widget key so a re-used widget id starts clean.
-            listOf("vin", "actions", "pending", "auth", "photobg", "loc", "addr", "lat", "lon").forEach { suffix ->
+            listOf("vin", "actions", "info", "pending", "auth", "photobg", "loc", "addr", "lat", "lon").forEach { suffix ->
                 it.remove(stringPreferencesKey("widget_${widgetId}_$suffix"))
                 it.remove(booleanPreferencesKey("widget_${widgetId}_$suffix"))
             }
@@ -731,6 +732,21 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setWidgetLayoutMode(widgetId: Int, value: String) {
         editTracked { it[stringPreferencesKey("widget_${widgetId}_layout")] = value.takeIf { it in setOf("info", "controls") } ?: "info" }
+    }
+
+    /** Ordered "info" mode stats to show, below 3×3 (see WidgetInfoField) -- the
+     *  same idea as widgetConfig's action list, but for info mode instead of
+     *  controls mode. Empty stored value = not configured yet, falls back to
+     *  the pre-existing fixed set so upgrading doesn't change anyone's widget. */
+    suspend fun widgetInfoFields(widgetId: Int): List<String> {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_info")]
+            ?: return WidgetInfoField.DEFAULTS.map { it.key }
+        val fields = raw.split(",").filter { it.isNotBlank() }
+        return fields.ifEmpty { WidgetInfoField.DEFAULTS.map { it.key } }
+    }
+
+    suspend fun setWidgetInfoFields(widgetId: Int, fields: List<String>) {
+        editTracked { it[stringPreferencesKey("widget_${widgetId}_info")] = fields.joinToString(",") }
     }
 
     /** Drive URI for auto-backup; null when not configured. */

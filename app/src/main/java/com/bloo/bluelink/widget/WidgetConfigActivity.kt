@@ -100,6 +100,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
     var layoutMode by remember { mutableStateOf("info") }
     var backgroundAlpha by remember { mutableStateOf(0) }
     val actions = remember { mutableStateListOf<String>().apply { addAll(WidgetAction.DEFAULTS.map { it.key }) } }
+    val infoFields = remember { mutableStateListOf<String>().apply { addAll(WidgetInfoField.DEFAULTS.map { it.key }) } }
 
     LaunchedEffect(Unit) {
         val store = SettingsStore(context)
@@ -117,6 +118,8 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         } else {
             selectedVin = cars.firstOrNull()?.vin
         }
+        val existingInfo = store.widgetInfoFields(widgetId)
+        if (existingInfo.isNotEmpty()) { infoFields.clear(); infoFields.addAll(existingInfo) }
         loaded = true
     }
 
@@ -165,6 +168,32 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                             else if (actions.size < 4) actions.add(action.key)
                         },
                         label = action.label,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("Info fields")
+        Text(
+            "Which stats show in Info mode below 3×3 -- larger widgets always show everything.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        WidgetInfoField.ALL.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                pair.forEach { field ->
+                    MorphChip(
+                        selected = field.key in infoFields,
+                        onClick = {
+                            if (field.key in infoFields) infoFields.remove(field.key)
+                            else infoFields.add(field.key)
+                        },
+                        label = field.label,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -248,6 +277,7 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
                 scope.launch {
                     val store = SettingsStore(context)
                     store.setWidgetConfig(widgetId, vin, actions.toList())
+                    store.setWidgetInfoFields(widgetId, infoFields.toList())
                     store.setWidgetRequireAuth(widgetId, requireAuth)
                     store.setWidgetPhotoBackground(widgetId, photoBg)
                     store.setWidgetShowLocation(widgetId, showLocation)

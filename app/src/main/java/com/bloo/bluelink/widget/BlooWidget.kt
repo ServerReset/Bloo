@@ -99,6 +99,10 @@ class BlooWidget : GlanceAppWidget() {
         val address: String?,
         val layoutMode: String,  // "info" shows data, "controls" shows buttons
         val metric: Boolean = false,
+        /** "Info" mode stats to show below 3×3 -- see WidgetInfoField. Each
+         *  tile checks membership for the specific fields it has room for;
+         *  LargeTile (3×3+) ignores this and always shows everything. */
+        val infoFields: List<WidgetInfoField> = WidgetInfoField.DEFAULTS,
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -133,18 +137,25 @@ class BlooWidget : GlanceAppWidget() {
         val photoBgActive = photoBgOn && photo != null
         val pillShape = settings.widgetPillShape(widgetId)
         val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
+        val infoFields = settings.widgetInfoFields(widgetId).mapNotNull { WidgetInfoField.fromKey(it) }
+            .ifEmpty { WidgetInfoField.DEFAULTS }
         val bgAlphaLevel = settings.widgetBackgroundAlpha(widgetId) // 0 (opaque) - 9 (transparent)
 
         provideContent {
             GlanceTheme {
                 val w = LocalSize.current.width
                 val h = LocalSize.current.height
-                // Pill shape only makes sense on 1-2 unit widgets -- past that,
-                // a near-circular corner radius clips text/buttons against the
-                // curve with no room to compensate, so it silently falls back
-                // to the normal size-based corner instead of forcing a pill
-                // shape the layout was never padded for.
-                val pillEligible = pillShape && w < 180.dp && h < 180.dp
+                // Pill shape needs at least one narrow dimension -- a 999dp
+                // corner radius clips to a stadium against whichever side is
+                // shorter, which is exactly the point for a 1-wide-many-tall
+                // or 1-tall-many-wide strip. Was gated on BOTH w and h being
+                // under 180dp, which silently excluded every long strip (the
+                // exact shape a pill reads best on) and only ever applied to
+                // roughly-square 1-2 unit tiles. Large-in-both-dimensions
+                // tiles (a 4x4+ square) still correctly fall back -- a
+                // near-circular radius there clips text/buttons with no room
+                // to compensate.
+                val pillEligible = pillShape && minOf(w, h) < 180.dp
                 val corner = when {
                     pillEligible -> 999.dp
                     w < 90.dp || h < 90.dp -> 16.dp
@@ -201,7 +212,7 @@ class BlooWidget : GlanceAppWidget() {
                         SetupTile(base, configIntent(context, widgetId))
                     } else {
                         val metric = appearance.unitSystem == "metric"
-                        val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address, layoutMode, metric)
+                        val c = Ctx(widgetId, snap, actions, theme, pending, requireAuth, photoBgActive, showLocation, map, photo, address, layoutMode, metric, infoFields)
                         when {
                             w < 70.dp || (w < 80.dp && h < 80.dp) ->
                                 if (layoutMode == "controls") ControlsTile(c, base) else InfoTile(c, base)
@@ -230,14 +241,23 @@ class BlooWidget : GlanceAppWidget() {
     @Composable
     private fun InfoTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
+        // Only room for 3 short lines at this size -- name/percent/lock-dot,
+        // each independently toggleable via the Info fields picker (range and
+        // model have no room here regardless of selection).
         Box(
             base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(c.snap.name.take(6), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 8.sp))
-                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 20.sp))
-                Box(GlanceModifier.size(5.dp).background(stateColor(c.snap, c.theme)).cornerRadius(3.dp)) {}
+                if (WidgetInfoField.NAME in c.infoFields) {
+                    Text(c.snap.name.take(6), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 8.sp))
+                }
+                if (WidgetInfoField.PERCENT in c.infoFields) {
+                    Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 20.sp))
+                }
+                if (WidgetInfoField.LOCK in c.infoFields) {
+                    Box(GlanceModifier.size(5.dp).background(stateColor(c.snap, c.theme)).cornerRadius(3.dp)) {}
+                }
             }
         }
     }
@@ -291,38 +311,57 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    /** 1 column wide, any height -- from a short 1x2 up to a full 1x5 strip.
+     *  Scales with height instead of a fixed-size block that leaves a tall
+     *  widget mostly empty below it: content is centered in whatever room
+     *  there is, and genuinely tall sizes get a status row and a second
+     *  info line the shorter sizes have no room for. */
     @Composable
     private fun TallNarrowTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
+        val h = LocalSize.current.height
+        val narrow = LocalSize.current.width < 90.dp
         if (c.layoutMode == "controls") {
-            // Controls mode: buttons stacked vertically in 1 column
-            ControlsTile(c, base)
+            if (c.actions.isEmpty()) return
+            // 1 column, not ControlsTile's 2 -- this tier is narrow enough that
+            // 2 columns squeezed buttons into overlapping slivers. Rows already
+            // grow to fill whatever height is available (see ButtonGrid), so a
+            // tall strip naturally gets bigger buttons instead of 2 small ones
+            // stacked above empty space.
+            val take = c.actions.take(if (h >= 260.dp) 4 else if (h >= 180.dp) 3 else 2)
+            ButtonGrid(c, take, cols = 1, showLabel = h >= 220.dp, iconSize = if (h >= 260.dp) 26.dp else 20.dp,
+                modifier = base.padding(6.dp))
             return
         }
-        val narrow = LocalSize.current.width < 90.dp
         Column(
             base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(c.snap.name.take(10), maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = if (narrow) 10.sp else 12.sp))
-            Spacer(GlanceModifier.height(2.dp))
-            // Stack percent digits vertically when very narrow to avoid clipping
-            if (narrow && c.snap.percent != null) {
-                VerticalNumber(c.snap.percent.toString() + "%", onBg(c))
-            } else {
-                Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 26.sp))
+            if (WidgetInfoField.NAME in c.infoFields) {
+                Text(c.snap.name.take(10), maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = if (narrow) 10.sp else 12.sp))
+                Spacer(GlanceModifier.height(2.dp))
             }
-            Spacer(GlanceModifier.height(2.dp))
-            c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = if (narrow) 9.sp else 11.sp)) }
-            Spacer(GlanceModifier.height(8.dp))
-            // "Info" mode hides the action buttons everywhere, not just on
-            // the smallest tiers -- previously most tiers ignored layoutMode
-            // entirely and always showed both info and buttons together, so
-            // switching the setting had no visible effect on anything but
-            // the tiniest widget sizes.
-            if (c.actions.isNotEmpty() && c.layoutMode == "controls") {
-                ButtonGrid(c, c.actions.take(4), cols = 1, showLabel = false, iconSize = 24.dp,
-                    modifier = GlanceModifier.fillMaxWidth().defaultWeight())
+            // Stack percent digits vertically when very narrow to avoid clipping
+            if (WidgetInfoField.PERCENT in c.infoFields) {
+                if (narrow && c.snap.percent != null) {
+                    VerticalNumber(c.snap.percent.toString() + "%", onBg(c))
+                } else {
+                    Text(c.snap.percent?.let { "$it%" } ?: "—", maxLines = 1, style = TextStyle(color = onBg(c), fontWeight = FontWeight.Bold, fontSize = 26.sp))
+                }
+                Spacer(GlanceModifier.height(2.dp))
+            }
+            if (WidgetInfoField.RANGE in c.infoFields) {
+                c.snap.rangeMi?.let { Text(formatDistance(it, c.metric), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = if (narrow) 9.sp else 11.sp)) }
+            }
+            // Extra rows only a genuinely tall strip has room for.
+            if (h >= 200.dp && WidgetInfoField.LOCK in c.infoFields) {
+                Spacer(GlanceModifier.height(10.dp))
+                StateChip(c)
+            }
+            if (h >= 280.dp && WidgetInfoField.MODEL in c.infoFields && c.snap.model.isNotBlank()) {
+                Spacer(GlanceModifier.height(10.dp))
+                Text(c.snap.model.take(16), maxLines = 1, style = TextStyle(color = onBgV(c), fontSize = 10.sp))
             }
         }
     }
