@@ -105,6 +105,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -2211,8 +2212,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
                             }
                         }
-                        // Spring-bouncy page transition: off-screen pages fade, shrink,
-                        // and tilt slightly — snapping back with a subtle overshoot.
+                        // Spring-bouncy page transition: off-screen pages fade and
+                        // shrink slightly — snapping back with a subtle overshoot.
                         // Was DampingRatioMediumBouncy/StiffnessMedium -- a
                         // real overshoot-and-settle on every single page
                         // change read as jittery rather than fluid for
@@ -2224,15 +2225,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             label = "pageBounce",
                         )
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
-                        // No blur -- tried both a position-driven and later a
-                        // velocity-driven version here; both read as worse than
-                        // no blur at all. Just the cheap fade/scale/tilt
-                        // graphicsLayer transforms now.
+                        // No blur, no rotationZ tilt -- tried both a position-driven
+                        // and later a velocity-driven blur here, and the tilt on top
+                        // of the fade/scale, and all of it together read as worse
+                        // than the plain fade/scale alone. Just that now.
                         Box(Modifier.fillMaxSize().graphicsLayer {
                             alpha = 1f - effectiveOff * 0.2f
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
-                            rotationZ = effectiveOff * if (page >= exPager.currentPage) 1.2f else -1.2f
                         }) {
                             val pv = vehicles[exReal(page)]
                             CarThemeOverride(
@@ -2279,11 +2279,11 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                        // Same fade/scale/tilt-with-bounce transition the
-                        // expanded single-car pager already uses -- this,
-                        // the default view most people see swiping between
-                        // cars day to day, previously had no per-page
-                        // transform at all, just a plain flat scroll.
+                        // Same fade/scale-with-bounce transition the expanded
+                        // single-car pager already uses -- this, the default view
+                        // most people see swiping between cars day to day,
+                        // previously had no per-page transform at all, just a
+                        // plain flat scroll.
                         val pageOff by remember(page) {
                             derivedStateOf {
                                 ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
@@ -2302,13 +2302,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
-                        // No blur -- see the expanded pager above.
+                        // No blur, no rotationZ tilt -- see the expanded pager above.
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
                                 alpha = 1f - effectiveOff * 0.2f
                                 scaleX = 1f - effectiveOff * 0.06f
                                 scaleY = 1f - effectiveOff * 0.06f
-                                rotationZ = effectiveOff * if (page >= pager.currentPage) 1.2f else -1.2f
                             },
                         ) {
                             for (i in start until end) {
@@ -3292,7 +3291,7 @@ private fun HeroHeader(
  * APK directly instead of opening a browser page.
  */
 @Composable
-private fun UpdateAvailableTile(state: UiState, vm: AppViewModel) {
+private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Modifier = Modifier) {
     val info = state.updateAvailable
     AnimatedVisibility(
         visible = info != null && !state.updateTileDismissed,
@@ -3306,14 +3305,10 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel) {
         // checkForUpdate's sameBuild check) starts collapsed again rather
         // than inheriting whatever expand state an earlier build was left in.
         var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
-        // Rides along with the same AnimatedVisibility as the tile itself
-        // (see PebbleList's spacedBy) instead of a fixed Spacer at the call
-        // site -- otherwise dismissing the tile would shrink the card to
-        // nothing but leave a small dead gap where it used to be.
-        Spacer(Modifier.height(12.dp))
         PebbleShell(
             expanded = expanded,
             onToggle = { expanded = !expanded },
+            dragHandle = dragHandle,
             icon = Icons.Filled.SystemUpdate,
             title = "Update available",
             vm = vm,
@@ -4040,7 +4035,10 @@ private fun VehicleDetailContent(
 @Composable
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
     val hotspot = state.hotspotFor(v.vin)
-        ?.takeIf { it in state.sectionsFor(v) && !state.isPebbleHidden(v.vin, it) }
+        ?.takeIf {
+            it in state.sectionsFor(v) && !state.isPebbleHidden(v.vin, it) &&
+                (it != "update" || state.updateAvailable != null)
+        }
     val hotDrag = remember { HotSeatDrag() }
     val controls: @Composable ColumnScope.() -> Unit = {
         CarHeaderRow(v, state, onExpand = null, reserveEnd = false)
@@ -4203,7 +4201,8 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
     } else {
         var menu by remember { mutableStateOf(false) }
         val options = state.sectionsFor(v).filter {
-            it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it)
+            it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it) &&
+                (it != "update" || state.updateAvailable != null)
         }
         val hotDrag = LocalHotSeatDrag.current
         val hovered = hotDrag?.overSlot == true
@@ -4332,7 +4331,9 @@ private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val hMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
     HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm, state.drivingLabel(v), metric = hMetric)
-    UpdateAvailableTile(state, vm)
+    // Update tile lives in the "pebbles" column's PebbleList as its own
+    // reorderable/pinnable "update" section now, not hardcoded into this
+    // fixed critical-info column -- see SinglePebble.
     // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
     // CompactMainTile) which always wrap it in a Surface that establishes a
     // readable contentColor. StateControl's status label falls back to
@@ -4393,7 +4394,8 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
     val sections = allSections.filter {
         it !in exclude &&
             !state.isPebbleHidden(v.vin, it) &&
-            (it != "ai" || state.aiEnabled)
+            (it != "ai" || state.aiEnabled) &&
+            (it != "update" || state.updateAvailable != null)
     }
     val hotDrag = LocalHotSeatDrag.current
     ReorderColumn(
@@ -4437,16 +4439,14 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
     val enabled = !state.loading
     val mSingle = vm.appearance.collectAsState().value.unitSystem == "metric"
     when (section) {
-        // The update tile always rides right along with the hero tile,
-        // whichever slot "summary" ends up in, instead of being reorderable
-        // or hideable on its own -- it's status, not a pebble.
-        "summary" -> Column(Modifier.fillMaxWidth()) {
-            HeroHeader(
-                v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
-                state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
-            )
-            UpdateAvailableTile(state, vm)
-        }
+        "summary" -> HeroHeader(
+            v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
+            state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
+        )
+        // Its own reorderable/pinnable slot now, like every other pebble --
+        // only actually present in the list while state.updateAvailable != null
+        // (see PebbleList's filter and the two hotspot-eligibility checks).
+        "update" -> UpdateAvailableTile(state, vm, dragHandle)
         "controls" -> ControlsPebble(v, state, vm, dragHandle)
         "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
         // The "charge" slot is the powertrain's energy pebble: charging for an
@@ -4984,12 +4984,15 @@ private data class GroupIconAction(
  * than a row of separate pills sitting next to each other. Pair with a 2dp
  * gap between segments -- the spec's connected-group spacing at any size.
  */
-private fun connectedGroupShape(index: Int, count: Int, smallCorner: Dp = 12.dp): RoundedCornerShape {
-    // 999dp clamps to a true half-height round on any button size, same trick
-    // MorphButton's own pill shape and the widget's pill mode both already use.
-    val outer = 999.dp
-    val startCorner = if (index == 0) outer else smallCorner
-    val endCorner = if (index == count - 1) outer else smallCorner
+// [cornerPercent] is the same 50 (pill) <-> 28 (pressed/active) morph every
+// other MorphButton animates through -- passed in per-frame from the segment's
+// own MorphButton so a segment still visibly squeezes on press instead of
+// being frozen into a static silhouette just because it's part of a group.
+private fun connectedGroupShape(index: Int, count: Int, cornerPercent: Int, smallCorner: Dp = 12.dp): RoundedCornerShape {
+    val outer = CornerSize(percent = cornerPercent)
+    val inner = CornerSize(smallCorner)
+    val startCorner = if (index == 0) outer else inner
+    val endCorner = if (index == count - 1) outer else inner
     return RoundedCornerShape(topStart = startCorner, bottomStart = startCorner, topEnd = endCorner, bottomEnd = endCorner)
 }
 
@@ -5013,12 +5016,13 @@ fun MorphButton(
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-    // A fixed shape to use instead of the animated pill<->square morph --
-    // for a connected button-group segment (see ButtonGroupRow), whose inner/
-    // outer corners are asymmetric and static by definition (that's what
-    // "connected" means; morphing a segment's shape independently would break
-    // the group's single continuous silhouette).
-    shape: Shape? = null,
+    // An asymmetric shape to use instead of the plain pill<->square morph --
+    // for a connected button-group segment (see StateControl), whose inner
+    // (seam) corners stay small and square while the outer corner is the one
+    // that morphs. Given the same animated corner percent [MorphButton] uses
+    // internally, so a segment still visibly squeezes on press instead of
+    // being frozen into a static silhouette just because it's part of a group.
+    shapeForCorner: ((cornerPercent: Int) -> Shape)? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val pressed by interactionSource.collectIsPressedAsState()
@@ -5050,7 +5054,7 @@ fun MorphButton(
             // leverage place to fix it.
             .semantics { selected = active },
         enabled = enabled,
-        shape = shape ?: RoundedCornerShape(percent = pct.roundToInt()),
+        shape = shapeForCorner?.invoke(pct.roundToInt()) ?: RoundedCornerShape(percent = pct.roundToInt()),
         interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
             containerColor = bg,
@@ -5351,7 +5355,7 @@ private fun StateControl(
                     onClick = action.onClick,
                     enabled = action.enabled,
                     contentPadding = PaddingValues(0.dp),
-                    shape = connectedGroupShape(i, segmentCount),
+                    shapeForCorner = { cp -> connectedGroupShape(i, segmentCount, cp) },
                     modifier = Modifier.size(50.dp),
                 ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(22.dp)) }
             }
@@ -5366,7 +5370,11 @@ private fun StateControl(
                 active = highlighted,
                 activeContainerColor = highlightColor,
                 activeContentColor = highlightContentColor,
-                shape = if (groupActions.isNotEmpty()) connectedGroupShape(segmentCount - 1, segmentCount) else null,
+                shapeForCorner = if (groupActions.isNotEmpty()) {
+                    { cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp) }
+                } else {
+                    null
+                },
                 // Same pill height as the pebble header actions (the row stays
                 // ControlHeight tall, so the button is vertically centred in it).
                 modifier = Modifier.heightIn(min = 50.dp),

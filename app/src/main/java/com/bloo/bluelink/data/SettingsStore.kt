@@ -94,7 +94,7 @@ enum class LockTiming(val label: String) {
 // a "Summarize" button ahead of every actual control on both phone and watch
 // (the watch's tile order mirrors this list) for anyone who hasn't
 // customized their section order.
-val DEFAULT_SECTIONS = listOf("summary", "controls", "charge", "climate", "ai", "info", "location", "weather", "trips", "diagnostics")
+val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climate", "ai", "info", "location", "weather", "trips", "diagnostics")
 
 /** Pebbles the user may hide (the others are essential). */
 val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trips", "info", "diagnostics", "ai")

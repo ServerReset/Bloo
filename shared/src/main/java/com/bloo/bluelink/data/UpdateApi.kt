@@ -135,6 +135,13 @@ object UpdateApi {
         return notes
             .lineSequence()
             .dropWhile { it.isBlank() || it.trim() == "## What's Changed" }
+            // Direct pushes (no PR) leave GitHub's auto-generated section with no
+            // bullet entries at all -- just its own trailing "**Full Changelog**:
+            // <compare-url>" line, which the tile's plain Text() renders as raw
+            // "**...**" asterisks instead of bold. That link isn't useful patch-note
+            // content on its own, so drop it; if nothing else is left, there's
+            // nothing worth a "What's new" section for.
+            .filterNot { it.trim().startsWith("**Full Changelog**") }
             .joinToString("\n")
             .trim()
             .takeIf { it.isNotBlank() }
