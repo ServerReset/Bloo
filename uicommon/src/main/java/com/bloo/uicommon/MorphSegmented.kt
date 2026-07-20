@@ -216,45 +216,54 @@ fun MorphSegmented(
                             val down = awaitFirstDown(requireUnconsumed = false)
                             val slop = viewConfiguration.touchSlop
                             var claimed = false
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) {
-                                    if (!claimed) {
-                                        change.consume()
-                                        val idx = indexFor(offsetFor(down.position.x))
-                                        if (options[idx].key != currentSelectedKey) {
-                                            currentOnTick()
-                                            currentOnSelect(options[idx].key)
-                                        }
-                                    }
-                                    break
-                                }
-                                if (!claimed) {
-                                    val dx = abs(change.position.x - down.position.x)
-                                    val dy = abs(change.position.y - down.position.y)
-                                    when {
-                                        dx > slop && dx >= dy -> {
-                                            claimed = true
+                            // A width change mid-drag (rotation, entering/leaving a
+                            // compact layout) re-keys this pointerInput on n/stepPx
+                            // and cancels this coroutine outright -- without the
+                            // finally below, dragXPx was only ever cleared at the
+                            // natural end of the loop, so a cancelled drag left the
+                            // indicator frozen at its last dragged position forever.
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) {
+                                        if (!claimed) {
                                             change.consume()
-                                            dragXPx = offsetFor(change.position.x)
+                                            val idx = indexFor(offsetFor(down.position.x))
+                                            if (options[idx].key != currentSelectedKey) {
+                                                currentOnTick()
+                                                currentOnSelect(options[idx].key)
+                                            }
                                         }
-                                        dy > slop -> break
+                                        break
                                     }
-                                } else if (change.positionChanged()) {
-                                    change.consume()
-                                    dragXPx = offsetFor(change.position.x)
+                                    if (!claimed) {
+                                        val dx = abs(change.position.x - down.position.x)
+                                        val dy = abs(change.position.y - down.position.y)
+                                        when {
+                                            dx > slop && dx >= dy -> {
+                                                claimed = true
+                                                change.consume()
+                                                dragXPx = offsetFor(change.position.x)
+                                            }
+                                            dy > slop -> break
+                                        }
+                                    } else if (change.positionChanged()) {
+                                        change.consume()
+                                        dragXPx = offsetFor(change.position.x)
+                                    }
                                 }
-                            }
-                            if (claimed) {
-                                val x = dragXPx ?: offsetFor(down.position.x)
-                                val idx = indexFor(x)
-                                pendingIndex = idx
+                                if (claimed) {
+                                    val x = dragXPx ?: offsetFor(down.position.x)
+                                    val idx = indexFor(x)
+                                    pendingIndex = idx
+                                    if (options[idx].key != currentSelectedKey) {
+                                        currentOnTick()
+                                        currentOnSelect(options[idx].key)
+                                    }
+                                }
+                            } finally {
                                 dragXPx = null
-                                if (options[idx].key != currentSelectedKey) {
-                                    currentOnTick()
-                                    currentOnSelect(options[idx].key)
-                                }
                             }
                         }
                     },

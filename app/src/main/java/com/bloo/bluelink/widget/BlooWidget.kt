@@ -137,8 +137,11 @@ class BlooWidget : GlanceAppWidget() {
         val photoBgActive = photoBgOn && photo != null
         val pillShape = settings.widgetPillShape(widgetId)
         val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
+        // No ifEmpty{DEFAULTS} fallback here -- SettingsStore.widgetInfoFields
+        // already distinguishes "never configured" (returns DEFAULTS itself)
+        // from "every field deliberately deselected" (returns an empty list,
+        // which has to stay empty -- see its doc comment).
         val infoFields = settings.widgetInfoFields(widgetId).mapNotNull { WidgetInfoField.fromKey(it) }
-            .ifEmpty { WidgetInfoField.DEFAULTS }
         val bgAlphaLevel = settings.widgetBackgroundAlpha(widgetId) // 0 (opaque) - 9 (transparent)
 
         provideContent {

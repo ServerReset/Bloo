@@ -2,16 +2,13 @@ package com.bloo.bluelink.data
 
 import android.content.Context
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 
 // A corruption handler so a file damaged by an interrupted write/power loss
 // resets to empty prefs instead of rethrowing an uncaught exception out of
@@ -33,7 +30,6 @@ class UpdateStore(private val context: Context) {
 
     private val keyLastCheckedAt = longPreferencesKey("last_checked_at")
     private val keySnoozeUntil = longPreferencesKey("snooze_until")
-    private val keyChecksEnabled = booleanPreferencesKey("checks_enabled")
     private val keyAvailableRun = intPreferencesKey("available_run")
     private val keyAvailableTitle = stringPreferencesKey("available_title")
     private val keyAvailableUrl = stringPreferencesKey("available_url")
@@ -51,13 +47,6 @@ class UpdateStore(private val context: Context) {
 
     suspend fun setSnoozeUntil(millis: Long) {
         context.updateDataStore.edit { it[keySnoozeUntil] = millis }
-    }
-
-    val checksEnabled: Flow<Boolean> =
-        context.updateDataStore.data.map { it[keyChecksEnabled] ?: true }
-
-    suspend fun setChecksEnabled(enabled: Boolean) {
-        context.updateDataStore.edit { it[keyChecksEnabled] = enabled }
     }
 
     /** The last build the checker found newer than what's installed, persisted

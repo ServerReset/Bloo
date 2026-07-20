@@ -118,8 +118,14 @@ private fun WidgetConfigScreen(widgetId: Int, onDone: () -> Unit, onCancel: () -
         } else {
             selectedVin = cars.firstOrNull()?.vin
         }
-        val existingInfo = store.widgetInfoFields(widgetId)
-        if (existingInfo.isNotEmpty()) { infoFields.clear(); infoFields.addAll(existingInfo) }
+        // Unconditional, unlike the actions block above -- widgetInfoFields()
+        // already returns DEFAULTS for a never-configured widget, so an empty
+        // result here means the saved selection really is empty (every chip
+        // deliberately deselected), not "nothing to load." Guarding on
+        // isNotEmpty() the way actions does would silently keep this screen's
+        // still-DEFAULTS-seeded state instead of showing what was actually saved.
+        infoFields.clear()
+        infoFields.addAll(store.widgetInfoFields(widgetId))
         loaded = true
     }
 

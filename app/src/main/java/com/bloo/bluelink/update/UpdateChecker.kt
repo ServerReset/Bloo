@@ -37,7 +37,6 @@ object UpdateChecker {
     suspend fun checkPhone(context: Context, force: Boolean = false): UpdateCheckResult {
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return UpdateCheckResult.UpToDate
         val store = UpdateStore(context)
-        if (!force && !store.checksEnabled.first()) return UpdateCheckResult.UpToDate
         val now = System.currentTimeMillis()
         // Skip rapid re-checks (1 minute debounce), but always check on cold start.
         if (!force && now - store.lastCheckedAt() < 60_000L) return UpdateCheckResult.UpToDate

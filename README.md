@@ -58,7 +58,7 @@ To install:
 
 The warning appears because Bloo is not signed with Google Play Store keys. I cannot publish on the Play Store because it costs money I do not have, and Hyundai would not approve an unofficial app on their platform. The app is safe, open source, and does not collect any data. All credentials are stored encrypted on-device.
 
-Once installed, the app checks for newer builds itself (on cold start and every pull-to-refresh) and can download and hand the APK straight to the system installer from an in-app prompt -- the steps above are only needed for the very first install. The Updates section in Settings also has a manual "Check now".
+Once installed, updates are entirely automatic and need no configuration: the app checks on cold start and every pull-to-refresh, plus a periodic background check even while it's closed, surfacing a tile that downloads and hands the APK straight to the system installer -- the steps above are only needed for the very first install. The watch checks and installs its own updates the same way, independently of the phone.
 
 ## Architecture
 

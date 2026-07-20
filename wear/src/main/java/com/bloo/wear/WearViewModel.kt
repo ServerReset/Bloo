@@ -982,7 +982,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun runUpdateCheck(force: Boolean): Boolean {
         if (com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER <= 0) return false
         val settings = localStore.flow.first()
-        if (!force && !settings.updateChecksEnabled) return false
         val now = System.currentTimeMillis()
         if (!force && now - settings.updateLastCheckedAt < UPDATE_CHECK_INTERVAL_MS) return false
         if (!force && now < settings.updateSnoozeUntil) return false

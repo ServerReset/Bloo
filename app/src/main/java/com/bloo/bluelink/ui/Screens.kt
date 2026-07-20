@@ -2461,6 +2461,15 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance) {
     val vehicles = state.vehicles
     val count = vehicles.size
+    // count - 1 goes negative with zero cars, and coerceIn(0, -1) throws
+    // (min > max) before the pager below ever gets a chance to handle an
+    // empty list gracefully -- the caller's own LaunchedEffect already
+    // anticipates this exact case (compact && vehicles.isEmpty()) with its
+    // own message, so it's a real state to guard, not a hypothetical one.
+    if (count == 0) {
+        EmptyScreen(vm)
+        return
+    }
     // Infinite wrap-around, matching every other car-switching pager in the
     // app (the expanded pager, the default grid) and the cover screen's own
     // tile pager, which already looped.

@@ -143,8 +143,7 @@ data class WearLocalSettings(
     /** Per pool-slot pinned car VIN; null = unconfigured (follows the selected car).
      *  Sized [WearTilePool.SIZE]. */
     val tileCarVins: List<String?> = List(WearTilePool.SIZE) { null },
-    /** Update-check debounce/snooze/enable state - see WearViewModel's check. */
-    val updateChecksEnabled: Boolean = true,
+    /** Update-check debounce/snooze state - see WearViewModel's check. */
     val updateLastCheckedAt: Long = 0L,
     val updateSnoozeUntil: Long = 0L,
     /** Whether the watch's own PIN lock is armed. Only meaningful when [hasPin]
@@ -167,7 +166,6 @@ class WearLocalStore(private val context: Context) {
     private val keyTileActions = stringPreferencesKey("tile_actions")
     private fun keyTileCarVin(index: Int) = stringPreferencesKey("tile_car_vin_$index")
     private val keyUnitSystem = stringPreferencesKey("unit_system")
-    private val keyUpdateChecksEnabled = booleanPreferencesKey("update_checks_enabled")
     private val keyUpdateLastCheckedAt = longPreferencesKey("update_last_checked_at")
     private val keyUpdateSnoozeUntil = longPreferencesKey("update_snooze_until")
     private val keyPinLockEnabled = booleanPreferencesKey("pin_lock_enabled")
@@ -195,7 +193,6 @@ class WearLocalStore(private val context: Context) {
             unitSystem = prefs[keyUnitSystem] ?: "imperial",
             tileActions = actions,
             tileCarVins = tileCarVins,
-            updateChecksEnabled = prefs[keyUpdateChecksEnabled] ?: true,
             updateLastCheckedAt = prefs[keyUpdateLastCheckedAt] ?: 0L,
             updateSnoozeUntil = prefs[keyUpdateSnoozeUntil] ?: 0L,
             pinLockEnabled = prefs[keyPinLockEnabled] ?: false,
@@ -210,10 +207,6 @@ class WearLocalStore(private val context: Context) {
 
     suspend fun setUnitSystem(value: String) {
         context.wearLocalStore.edit { it[keyUnitSystem] = value }
-    }
-
-    suspend fun setUpdateChecksEnabled(enabled: Boolean) {
-        context.wearLocalStore.edit { it[keyUpdateChecksEnabled] = enabled }
     }
 
     suspend fun setUpdateLastCheckedAt(millis: Long) {
