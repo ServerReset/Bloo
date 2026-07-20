@@ -2279,7 +2279,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                        // Same fade/scale/tilt/blur-with-bounce transition the
+                        // Same fade/scale/tilt-with-bounce transition the
                         // expanded single-car pager already uses -- this,
                         // the default view most people see swiping between
                         // cars day to day, previously had no per-page

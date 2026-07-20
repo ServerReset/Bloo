@@ -111,10 +111,33 @@ object UpdateApi {
                     displayTitle = release.name,
                     phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME }?.browserDownloadUrl,
                     wearApkUrl = release.assets.firstOrNull { it.name == WEAR_ASSET_NAME }?.browserDownloadUrl,
-                    releaseNotes = release.body?.takeIf { it.isNotBlank() },
+                    releaseNotes = extractChangelog(release.body),
                 )
             }
         }.getOrNull()
+    }
+
+    // android.yml's release-publish step writes a body of its own install
+    // steps followed by a "### What's changed" marker, then (with
+    // generate_release_notes: true) GitHub appends its own auto-generated
+    // "## What's Changed" changelog after that. The update tile already
+    // shows its own dedicated install-steps card, so showing the release
+    // body verbatim under "What's new" duplicated those same 3 steps
+    // together with raw, unrendered "###"/"##" markdown headers -- only the
+    // changelog after the marker (with GitHub's own redundant heading line
+    // stripped too) is what that section actually needs.
+    private const val CHANGELOG_MARKER = "### What's changed"
+
+    private fun extractChangelog(body: String?): String? {
+        if (body.isNullOrBlank()) return null
+        val marker = body.indexOf(CHANGELOG_MARKER)
+        val notes = if (marker >= 0) body.substring(marker + CHANGELOG_MARKER.length) else body
+        return notes
+            .lineSequence()
+            .dropWhile { it.isBlank() || it.trim() == "## What's Changed" }
+            .joinToString("\n")
+            .trim()
+            .takeIf { it.isNotBlank() }
     }
 
     // A multi-MB download needs real headroom -- the 20s readTimeout on the
