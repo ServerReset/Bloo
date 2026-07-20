@@ -2494,47 +2494,76 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
     val scrubbing = remember { mutableStateOf(false) }
-    HorizontalPager(
-        state = pager,
-        modifier = Modifier.fillMaxSize(),
-        userScrollEnabled = !scrubbing.value,
-        beyondViewportPageCount = 1,
-    ) { page ->
-        val v = vehicles[realCar(page)]
-        val pageOff by remember(page) {
-            derivedStateOf {
-                val delta = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction)
-                abs(delta).coerceIn(0f, 1f)
-            }
-        }
-        // No blur -- see the other two car pagers' history for why: a plain
-        // Modifier.blur(x.dp) reconstructs and re-lays-out its own modifier
-        // node on every drag frame (the jitter this exact pattern caused
-        // elsewhere), and this cover-screen pager had never actually been
-        // updated when that got fixed there. Just the cheap graphicsLayer
-        // fade/scale transforms now, consistent with the other pagers.
-        Box(Modifier.fillMaxSize().graphicsLayer {
-            alpha = 1f - pageOff * 0.2f
-            scaleX = 1f - pageOff * 0.06f
-            scaleY = 1f - pageOff * 0.06f
-        }) {
-            CarThemeOverride(
-                paletteId = appearance.carCustomPaletteIds[v.vin],
-                customPalettes = appearance.customPalettes,
-                themeMode = appearance.themeMode,
-                vibrancy = appearance.vibrancy,
-            ) {
-                CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
-                    CompactCar(v, state, vm)
+    // Hide the page indicators while a refresh is in flight (pull-to-refresh /
+    // manual refresh) so the loading indicator owns the screen. Shared by both
+    // dot rows below (car-switch AND per-car tile) instead of each keeping its
+    // own separate Animatable of the exact same value.
+    val dotsAlpha by animateFloatAsState(
+        targetValue = if (state.refreshing) 0f else 1f,
+        animationSpec = tween(durationMillis = 250),
+        label = "coverDotsFade",
+    )
+    Box(Modifier.fillMaxSize()) {
+        HorizontalPager(
+            state = pager,
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = !scrubbing.value,
+            beyondViewportPageCount = 1,
+        ) { page ->
+            val v = vehicles[realCar(page)]
+            val pageOff by remember(page) {
+                derivedStateOf {
+                    val delta = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction)
+                    abs(delta).coerceIn(0f, 1f)
                 }
             }
+            // No blur -- see the other two car pagers' history for why: a plain
+            // Modifier.blur(x.dp) reconstructs and re-lays-out its own modifier
+            // node on every drag frame (the jitter this exact pattern caused
+            // elsewhere), and this cover-screen pager had never actually been
+            // updated when that got fixed there. Just the cheap graphicsLayer
+            // fade/scale transforms now, consistent with the other pagers.
+            Box(Modifier.fillMaxSize().graphicsLayer {
+                alpha = 1f - pageOff * 0.2f
+                scaleX = 1f - pageOff * 0.06f
+                scaleY = 1f - pageOff * 0.06f
+            }) {
+                CarThemeOverride(
+                    paletteId = appearance.carCustomPaletteIds[v.vin],
+                    customPalettes = appearance.customPalettes,
+                    themeMode = appearance.themeMode,
+                    vibrancy = appearance.vibrancy,
+                ) {
+                    CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
+                        CompactCar(v, state, vm, dotsAlpha)
+                    }
+                }
+            }
+        }
+        // Car-switching dots, hoisted out of CompactCar (a per-page composable)
+        // and up to here -- a sibling of the whole pager, not inside any one
+        // page's fade/scale graphicsLayer -- so it doesn't itself fade and
+        // shrink along with the outgoing/incoming car during a swipe, exactly
+        // like every other car pager's PagerDots already stays put outside
+        // the per-page transform.
+        if (count > 1) {
+            PagerDots(
+                current = realCar(pager.currentPage),
+                count = count,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 10.dp)
+                    .alpha(dotsAlpha),
+                onRefresh = { vm.refreshStatus(vehicles[realCar(pager.settledPage)]) },
+            )
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
+private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: Float) {
     val status = state.statusFor(v)
     val isGen5W = remember(v.brand, v.generation) {
         v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
@@ -2570,16 +2599,6 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
     // Suspend native tile paging while the right-rail scrubber is driving the
     // pager, so a scrub drag can't also be read as a page swipe.
     val coverScrubbing = LocalCoverScrubbing.current
-
-    val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
-    val carCount = state.vehicles.size
-    // Hide the page indicators while a refresh is in flight (pull-to-refresh /
-    // manual refresh) so the loading indicator owns the screen.
-    val dotsAlpha by animateFloatAsState(
-        targetValue = if (state.refreshing) 0f else 1f,
-        animationSpec = tween(durationMillis = 250),
-        label = "coverDotsFade",
-    )
 
     // ---- Camera cutout detection ----
     // Read the front camera's bounding rect from the display cutout API.
@@ -2777,20 +2796,8 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel) {
                 }
             }
         }
-        // Car-switching dots, always at top-center (every tile, including main).
-        if (carCount > 1) {
-            PagerDots(
-                current = carIndex,
-                count = carCount,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 10.dp)
-                    .alpha(dotsAlpha),
-                onRefresh = { vm.refreshStatus(v) },
-            )
-        }
         // Vertical page dots on the right edge - show which pebble tile is visible.
+        // (Car-switching dots are hoisted up to CompactGarage -- see there.)
         if (tiles.size > 1) {
             VerticalPagerDots(
                 current = current,
@@ -3126,6 +3133,14 @@ private fun PagerDots(
             holding = false
             delay(300)
             expandProgress.animateTo(0f, tween(200))
+        } else if (expandProgress.value > 0f) {
+            // Released (or the gesture was cancelled) before the hold
+            // completed -- LaunchedEffect(holding) cancels the coroutine
+            // above outright when holding flips back to false, which used to
+            // leave the ring frozen at whatever fill it had reached instead
+            // of easing back to nothing (matches the edge-trace gesture's
+            // own release/cancel handling elsewhere on the cover screen).
+            expandProgress.animateTo(0f, tween(200))
         }
     }
 
@@ -3303,7 +3318,13 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel) {
             title = "Update available",
             vm = vm,
             summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${info.run.runNumber}",
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            // No containerColor override -- PebbleShell's own default
+            // (surfaceVariant) is what every ordinary pebble uses too
+            // (Climate, Charge, Info, ...); this used primaryContainer,
+            // which read as a special/different-looking tile instead of
+            // fitting in with the rest of the per-car stack. AI's pebble is
+            // the one deliberate exception (tertiaryContainer) -- this
+            // wasn't meant to be another one.
             headerAction = PebbleHeaderAction(
                 label = when {
                     state.updateDownloading -> state.updateDownloadProgress?.let { "${(it * 100).roundToInt()}%" } ?: "Downloading…"
