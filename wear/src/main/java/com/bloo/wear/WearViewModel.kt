@@ -19,6 +19,7 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.StatusCache
+import com.bloo.bluelink.data.UPDATE_SNOOZE_MS
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.VehicleStatus
@@ -47,7 +48,6 @@ import kotlin.coroutines.resume
 enum class WearScreen { Loading, SignedOut, Ready }
 
 private const val UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
-private const val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L // 3 days
 
 /** A fully resolved per-car view, merging live status with the phone snapshot. */
 data class CarView(
@@ -110,8 +110,8 @@ data class CarView(
 
 /** The editable climate settings for one car (seats are 0–3 heat steps). */
 data class ClimateDraft(
-    val tempF: Int = 72,
-    val duration: Int = 10,
+    val tempF: Int = com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F,
+    val duration: Int = com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN,
     val defrost: Boolean = false,
     val steering: Boolean = false,
     val seatDriver: Int = 0,   // 0 off, 1 low, 2 med, 3 high (heat)
@@ -702,6 +702,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
             updateDraft(vin) { it.copy(activePresetId = null) }
         } else {
+            // The car rejects remote climate commands while it's moving --
+            // this standalone (non-relayed) path is watch-connectivity-direct
+            // and had no such gate at all, unlike the main phone UI's own
+            // Start button.
+            if (st?.isDriving == true) error("Can't start climate while driving")
             val d = _ui.value.draftFor(vin)
             repo.startClimate(v, d.toRequest())
             // A manual start isn't a saved preset.
@@ -764,7 +769,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 seatRearRight = r.seatRearRight.apiValue,
             ),
             onFailure = { updateDraft(vin) { previousDraft } },
-        ) { v, repo, _ ->
+        ) { v, repo, st ->
+            if (st?.isDriving == true) error("Can't start climate while driving")
             repo.startClimate(v, preset.request)
             flip(vin) { it.copy(airCtrlOn = true) }
         }
@@ -953,8 +959,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setSeatPassenger(vin: String, step: Int) = updateDraft(vin) { it.copy(seatPassenger = step.coerceIn(0, 3), activePresetId = null) }
     fun setSeatRearLeft(vin: String, step: Int) = updateDraft(vin) { it.copy(seatRearLeft = step.coerceIn(0, 3), activePresetId = null) }
     fun setSeatRearRight(vin: String, step: Int) = updateDraft(vin) { it.copy(seatRearRight = step.coerceIn(0, 3), activePresetId = null) }
-    fun setAcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(ac = value.coerceIn(50, 100)) }
-    fun setDcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(dc = value.coerceIn(50, 100)) }
+    fun setAcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(ac = value.coerceIn(com.bloo.bluelink.data.CHARGE_LIMIT_RANGE)) }
+    fun setDcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(dc = value.coerceIn(com.bloo.bluelink.data.CHARGE_LIMIT_RANGE)) }
 
     private fun updateChargeDraft(vin: String, f: (ChargeLimitDraft) -> ChargeLimitDraft) {
         _ui.update { u -> u.copy(chargeLimitDrafts = u.chargeLimitDrafts + (vin to f(u.chargeDraftFor(vin)))) }
@@ -1254,7 +1260,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
                 ),
                 onFailure = { updateDraft(vin) { previousDraft } },
-            ) { v, repo, _ ->
+            ) { v, repo, st ->
+                if (st?.isDriving == true) error("Can't start climate while driving")
                 repo.startClimate(v, d.toRequest(tempF = targetF, defrost = false))
                 flip(vin) { it.copy(airCtrlOn = true) }
             }

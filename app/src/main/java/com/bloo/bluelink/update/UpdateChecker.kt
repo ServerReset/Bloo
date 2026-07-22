@@ -2,6 +2,7 @@ package com.bloo.bluelink.update
 
 import android.content.Context
 import com.bloo.bluelink.BuildConfig
+import com.bloo.bluelink.data.UPDATE_SNOOZE_MS
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.data.WorkflowRun
@@ -30,8 +31,6 @@ sealed class UpdateCheckResult {
  */
 object UpdateChecker {
 
-    private const val SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L // 3 days
-
     /** Check for an update. Returns the result — available, up-to-date, or failed. */
     suspend fun checkPhone(context: Context, force: Boolean = false): UpdateCheckResult {
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return UpdateCheckResult.UpToDate
@@ -52,6 +51,6 @@ object UpdateChecker {
 
     /** "Remind me in a few days": suppress even a still-due check until then. */
     suspend fun snooze(context: Context) {
-        UpdateStore(context).setSnoozeUntil(System.currentTimeMillis() + SNOOZE_MS)
+        UpdateStore(context).setSnoozeUntil(System.currentTimeMillis() + UPDATE_SNOOZE_MS)
     }
 }

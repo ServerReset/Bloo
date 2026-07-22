@@ -46,8 +46,19 @@ object WearCommandRunner {
                     WearAction.UNLOCK -> { repo.unlock(v); snap.copy(locked = false) }
                     WearAction.TOGGLE_CLIMATE ->
                         if (snap.climateOn == true) { repo.stopClimate(v); snap.copy(climateOn = false) }
-                        else { repo.startClimate(v, climate); snap.copy(climateOn = true) }
-                    WearAction.CLIMATE_ON -> { repo.startClimate(v, climate); snap.copy(climateOn = true) }
+                        else {
+                            // The car rejects remote climate commands while it's
+                            // moving (same gate the phone UI's own Start button
+                            // applies) -- this is the standalone watch path and
+                            // the widget/relay path (both funnel through here),
+                            // neither of which checked this before.
+                            if (snap.isDriving) error("Can't start climate while driving")
+                            repo.startClimate(v, climate); snap.copy(climateOn = true)
+                        }
+                    WearAction.CLIMATE_ON -> {
+                        if (snap.isDriving) error("Can't start climate while driving")
+                        repo.startClimate(v, climate); snap.copy(climateOn = true)
+                    }
                     WearAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = false) }
                     WearAction.TOGGLE_CHARGE ->
                         if (snap.charging == true) { repo.stopCharge(v); snap.copy(charging = false) }

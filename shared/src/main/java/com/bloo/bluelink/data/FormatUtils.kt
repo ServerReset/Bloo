@@ -59,6 +59,39 @@ fun smartClimateTargetF(ambientF: Int): Int {
     }
 }
 
+/** The valid range for a car's AC/DC charge-limit percentage sliders. Was
+ *  duplicated as a literal `50..100` at 5 call sites (phone's ChargePebble
+ *  slider, the watch's setAcLimit/setDcLimit clamps and its two SliderRows)
+ *  -- still consistent everywhere today, but the exact same shape as the
+ *  climate-range bug: nothing forced them to stay that way. */
+val CHARGE_LIMIT_RANGE = 50..100
+
+/** How long a vehicle's cached status is trusted before it's treated as
+ *  stale (worth nudging the user to pull-to-refresh). Three different
+ *  hardcoded values for this same concept had accumulated: AppViewModel's
+ *  own auto-refresh check used 10 minutes, the phone UI's "pull to refresh"
+ *  hint used 15, and the watch's home screen used 30 -- with no indication
+ *  any of the differences were deliberate. Picked 15 minutes (the phone UI's
+ *  existing value, the one actually user-facing as copy) as the one
+ *  reasonable default for all three. */
+val STALE_STATUS_MS = 15L * 60 * 1000L
+
+/** How long an available update is snoozed for after "Remind me" / "Not
+ *  now" -- was defined identically (byte-for-byte the same math) in
+ *  UpdateChecker.kt (phone) and WearViewModel.kt (watch) instead of once
+ *  here. */
+val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L
+
+/** The climate request used when nothing else is configured -- no saved
+ *  preset, no smart-climate weather data, just "turn it on." Was
+ *  independently typed in at 6 call sites (TileCommandRunner, AppViewModel's
+ *  shortcut handling, the phone UI's slider initial state, WearCommand's and
+ *  WearViewModel's ClimateDraft's wire/default values) -- still consistent
+ *  everywhere today, but exactly the same "hand-copied constant" shape as
+ *  the climate-range bug. */
+const val DEFAULT_CLIMATE_TEMP_F = 72
+const val DEFAULT_CLIMATE_DURATION_MIN = 10
+
 /** Charger-plug type label for [EvStatus.batteryPlugin]. Was defined
  *  separately on phone and watch and had already drifted ("AC (level 2)" vs
  *  "AC") despite mapping the exact same wire value. */

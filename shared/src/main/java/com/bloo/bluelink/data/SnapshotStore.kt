@@ -40,6 +40,14 @@ data class VehicleSnapshot(
     val engineOn: Boolean? = null,
     val lat: Double? = null,
     val lon: Double? = null,
+    /** mph, from the last fetched status's vehicleLocation.speed, if the car
+     *  reported one. Lets out-of-process command runners (Quick Settings
+     *  tiles, the widget, the watch's own standalone/relay path) apply the
+     *  same "car rejects climate commands while driving" gate the main phone
+     *  UI's own AppViewModel.isDriving() already does -- those runners only
+     *  ever see a [VehicleSnapshot], never the live location state the main
+     *  UI tracks separately. */
+    val speedMph: Double? = null,
     val updated: String? = null,
     /** Wall-clock (ms) when this snapshot last got fresh data from the car; 0 =
      *  unknown. Lets glanceable surfaces flag stale data instead of showing an
@@ -66,6 +74,11 @@ data class VehicleSnapshot(
     )
 }
 
+/** True when the last known speed reading says the car is moving -- the
+ *  snapshot-based equivalent of AppViewModel.isDriving(), for the
+ *  out-of-process command runners that only ever see a [VehicleSnapshot]. */
+val VehicleSnapshot.isDriving: Boolean get() = (speedMph ?: 0.0) > 0.0
+
 /** Fold a freshly fetched status into an existing snapshot. */
 fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
     // Use hasBattery (the user's manual powertrain override), not the raw
@@ -85,6 +98,7 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
         engineOn = status.engine ?: engineOn,
         lat = status.vehicleLocation?.coord?.lat ?: lat,
         lon = status.vehicleLocation?.coord?.lon ?: lon,
+        speedMph = status.vehicleLocation?.speed?.value ?: speedMph,
         updated = status.dateTime ?: updated,
         // merged() folds in a status we JUST fetched, so this data is now current.
         fetchedAt = System.currentTimeMillis(),

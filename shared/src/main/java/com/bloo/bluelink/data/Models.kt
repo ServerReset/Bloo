@@ -101,7 +101,15 @@ data class VehicleStatus(
     val smartKeyBatteryWarning: Boolean? = null,
     val fuelLevel: Int? = null,
     val tirePressure: TirePressure? = null,
-)
+) {
+    /** True when the embedded location's last-known speed says the car is
+     *  moving. The main phone UI's AppViewModel.isDriving() layers a live GPS
+     *  reading on top of this same check; this bare version is what the
+     *  watch's own standalone command path (no separate GPS tracking of its
+     *  own) uses to apply the same "car rejects climate commands while
+     *  driving" gate before starting climate. */
+    val isDriving: Boolean get() = (vehicleLocation?.speed?.value ?: 0.0) > 0.0
+}
 
 /** Per-window open state (0 closed, 1 open), like [DoorOpen]. */
 @Serializable

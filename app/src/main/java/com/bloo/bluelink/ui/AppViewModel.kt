@@ -13,6 +13,8 @@ import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.formatPlaceName
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
+import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
@@ -22,6 +24,7 @@ import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.maskEmail
+import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
@@ -585,8 +588,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (shouldLock) _state.update { it.copy(locked = true) }
         }
         // Prompt to refresh if data is stale after returning from background.
-        if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > 10 * 60 * 1000L) {
-            val anyStale = _state.value.lastFetched.values.any { System.currentTimeMillis() - it > 10 * 60 * 1000L }
+        if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > STALE_STATUS_MS) {
+            val anyStale = _state.value.lastFetched.values.any { System.currentTimeMillis() - it > STALE_STATUS_MS }
             if (anyStale) reportInfo("Data may be stale — pull down to refresh")
         }
     }
@@ -812,7 +815,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Toggles: do the opposite of the last-known state.
             "doors" -> if (status?.doorLock == true) unlock(v) else lock(v)
             "climate" -> if (status?.airCtrlOn == true) stopClimate(v) else {
-                startClimate(v, ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+                startClimate(v, ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN))
             }
             "lock" -> lock(v)
             "unlock" -> unlock(v)
@@ -1015,6 +1018,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             engineOn = status?.engine,
             lat = status?.vehicleLocation?.coord?.lat,
             lon = status?.vehicleLocation?.coord?.lon,
+            speedMph = status?.vehicleLocation?.speed?.value,
             updated = status?.dateTime,
             // A non-null status is freshly-fetched data; null means we're building a
             // placeholder snapshot with no live status yet (leave fetchedAt unknown).

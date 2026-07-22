@@ -721,7 +721,7 @@ private fun AlertsCard(car: CarView) {
 @Composable
 private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard(null) {
     val alertCount = car.alertCount
-    val isStale = car.fetchedAt != null && System.currentTimeMillis() - car.fetchedAt > 30 * 60 * 1000L
+    val isStale = car.fetchedAt != null && System.currentTimeMillis() - car.fetchedAt > com.bloo.bluelink.data.STALE_STATUS_MS
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(contentAlignment = Alignment.TopEnd) {
             ChargeRing(car.percent, size = 60.dp, charging = car.charging == true)
@@ -1096,8 +1096,8 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
         color = if (isDirty) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(2.dp))
-    SliderRow("AC", "$ac%", ac, 50, 100, 10) { vm.setAcLimit(car.vin, it) }
-    SliderRow("DC", "$dc%", dc, 50, 100, 10) { vm.setDcLimit(car.vin, it) }
+    SliderRow("AC", "$ac%", ac, com.bloo.bluelink.data.CHARGE_LIMIT_RANGE.first, com.bloo.bluelink.data.CHARGE_LIMIT_RANGE.last, 10) { vm.setAcLimit(car.vin, it) }
+    SliderRow("DC", "$dc%", dc, com.bloo.bluelink.data.CHARGE_LIMIT_RANGE.first, com.bloo.bluelink.data.CHARGE_LIMIT_RANGE.last, 10) { vm.setDcLimit(car.vin, it) }
     Spacer(Modifier.height(4.dp))
     MorphButton(
         label = "Apply limits",

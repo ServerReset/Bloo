@@ -63,20 +63,31 @@ object TileCommandRunner {
         target: String,
     ): String {
         if (snap.climateOn == true) { repo.stopClimate(v); return "Stopping climate" }
+        // The car rejects remote climate commands while it's moving (same
+        // gate the main phone UI's AppViewModel.isDriving() already applies
+        // to its own Start button) -- this was the one climate-starting path
+        // with no such check at all, so a Quick Settings tile tap while
+        // driving used to just silently fail against the car with no
+        // explanation surfaced to the user.
+        if (snap.isDriving) error("Can't start climate while driving")
         val req = when {
             target == "smart" -> {
                 val lat = snap.lat
                 val lon = snap.lon
                 if (lat == null || lon == null) error("No location for smart climate")
                 val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
-                ClimateRequest(tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)), defrost = false, durationMinutes = 10)
+                ClimateRequest(
+                    tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
+                    defrost = false,
+                    durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
+                )
             }
             target != "default" -> {
                 val preset = SettingsStore(ctx).climatePresets(v.vin).firstOrNull { it.id == target }
                     ?: error("Preset unavailable")
                 preset.request
             }
-            else -> ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10)
+            else -> ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN)
         }
         repo.startClimate(v, req)
         return "Starting climate"
@@ -92,13 +103,20 @@ object TileCommandRunner {
         else -> "Sending…"
     }
 
-    /** The snapshot a tile command is expected to produce, for instant feedback. */
-    fun optimistic(snap: VehicleSnapshot, cmd: String): VehicleSnapshot = when (cmd) {
-        "doors" -> snap.copy(locked = !(snap.locked ?: false))
-        "lock" -> snap.copy(locked = true)
-        "unlock" -> snap.copy(locked = false)
-        "charge" -> snap.copy(charging = !(snap.charging ?: false))
-        "climate" -> snap.copy(climateOn = !(snap.climateOn ?: false))
-        else -> snap
+    /** The snapshot a tile command is expected to produce, for instant feedback.
+     *  Delegates to [WearCommandRunner.optimistic] (mapping the tile's own
+     *  "doors"/"lock"/"unlock"/"charge"/"climate" vocabulary onto [WearAction])
+     *  instead of re-deriving the same lock/charge/climate flips independently
+     *  -- this used to be a byte-for-byte duplicate of that function. */
+    fun optimistic(snap: VehicleSnapshot, cmd: String): VehicleSnapshot {
+        val action = when (cmd) {
+            "doors" -> WearAction.TOGGLE_LOCK
+            "lock" -> WearAction.LOCK
+            "unlock" -> WearAction.UNLOCK
+            "charge" -> WearAction.TOGGLE_CHARGE
+            "climate" -> WearAction.TOGGLE_CLIMATE
+            else -> return snap
+        }
+        return WearCommandRunner.optimistic(snap, action)
     }
 }

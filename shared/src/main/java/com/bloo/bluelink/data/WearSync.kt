@@ -260,8 +260,8 @@ data class WearCommand(
     val action: String,
     /** Climate settings to use for [WearAction.CLIMATE_ON]/[WearAction.TOGGLE_CLIMATE].
      *  Seats are [SeatLevel.apiValue] ints (0 = off) so the wire format stays flat. */
-    val tempF: Int = 72,
-    val durationMinutes: Int = 10,
+    val tempF: Int = DEFAULT_CLIMATE_TEMP_F,
+    val durationMinutes: Int = DEFAULT_CLIMATE_DURATION_MIN,
     val defrost: Boolean = false,
     val steeringWheelHeat: Boolean = false,
     val seatFrontLeft: Int = 0,
@@ -448,8 +448,8 @@ data class WearPresets(
 @Serializable
 data class ClimateSync(
     val activePresetId: String? = null,
-    val tempF: Int = 72,
-    val durationMinutes: Int = 10,
+    val tempF: Int = DEFAULT_CLIMATE_TEMP_F,
+    val durationMinutes: Int = DEFAULT_CLIMATE_DURATION_MIN,
     val defrost: Boolean = false,
     val steering: Boolean = false,
     val seatFrontLeft: Int = 0,

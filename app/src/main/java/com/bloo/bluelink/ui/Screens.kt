@@ -297,7 +297,11 @@ import coil.request.ImageRequest
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
+import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
+import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.EvTrip
@@ -2091,7 +2095,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
         if (currentFetchedAt != null &&
             currentFetchedAt < sessionStartMs &&
-            System.currentTimeMillis() - currentFetchedAt > 15 * 60 * 1000L) {
+            System.currentTimeMillis() - currentFetchedAt > STALE_STATUS_MS) {
             // Give the automatic background fetch time to land. If it returns fresh
             // data, currentFetchedAt changes → this effect restarts → delay is
             // cancelled → user never sees a spurious "stale" toast.
@@ -6295,8 +6299,8 @@ private fun ClimatePebble(
 ) {
     val pending = state.isPending(v.vin, "climate")
     val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
-    var tempF by remember(v.vin) { mutableIntStateOf(72) }
-    var duration by remember(v.vin) { mutableIntStateOf(10) }
+    var tempF by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_TEMP_F) }
+    var duration by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_DURATION_MIN) }
     var defrost by remember(v.vin) { mutableStateOf(false) }
     var steeringHeat by remember(v.vin) { mutableStateOf(false) }
     var driver by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
@@ -7039,7 +7043,7 @@ private fun ChargeLimitPill(
         AnimatedSlider(
             value = limit.toFloat(),
             onValueChange = { onValueChange((it / 10f).roundToInt() * 10) },
-            valueRange = 50f..100f,
+            valueRange = CHARGE_LIMIT_RANGE.first.toFloat()..CHARGE_LIMIT_RANGE.last.toFloat(),
             steps = 4,
         )
         Spacer(Modifier.height(6.dp))
