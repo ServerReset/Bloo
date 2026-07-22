@@ -96,7 +96,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     companion object {
         /**
          * Registers the 30-minute periodic alert poll. No network [Constraints]
-         * are set here (unlike the other work/*.kt workers in this app) --
+         * are set here (unlike the other workers in this app's work package) --
          * status fetches inside [doWork] are individually wrapped in
          * [runCatching] and simply produce no alerts for that car if offline, so
          * there's no need to gate the whole periodic schedule on connectivity.

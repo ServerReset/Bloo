@@ -238,7 +238,7 @@ data class WearStatePayload(
  *  independent app updates; an unrecognized action string is just ignored by
  *  whichever side receives it instead of failing to decode entirely.
  *  TOGGLE_* actions ask the receiver to flip whatever the current state is;
- *  the explicit *_ON/*_OFF/LOCK/UNLOCK variants force a specific state
+ *  the explicit _ON / _OFF / LOCK / UNLOCK variants force a specific state
  *  regardless of the current one. */
 object WearAction {
     const val TOGGLE_LOCK = "toggle_lock"
