@@ -2867,7 +2867,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
 /** Vertical sibling of [PagerDots] for the cover-screen tile stack.
  *
  * Long-pressing the indicator expands it into a scrubber: slide finger up/down
- * to jump between pages quickly. Each 40 dp of drag moves one page.
+ * to jump between pages quickly. Each 14 dp of drag moves one page.
  */
 @Composable
 private fun VerticalPagerDots(
@@ -2916,8 +2916,15 @@ private fun VerticalPagerDots(
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubCorner")
     val surfaceAlpha by animateFloatAsState(if (scrubbing) 0.92f else 0.7f, label = "scrubAlpha")
 
-    Surface(
+    Box(
+        // The resting pill is only as wide as its 7dp dot column plus 6dp
+        // padding on each side (~19dp) -- a fifth of the app's own 48dp
+        // minimum touch target (FloatingIcon, standard IconButtons), on this
+        // screen's most cramped device widths, for the only way to enter the
+        // scrub gesture. The gesture/semantics live on this wider invisible
+        // Box; the Surface below stays visually as narrow as before.
         modifier = modifier
+            .widthIn(min = 48.dp)
             .pointerInput(count) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -2958,56 +2965,61 @@ private fun VerticalPagerDots(
                         true
                     }
                 }
-            }
-            // Same gap as PagerDots below -- only ever had Material's own weak
-            // tonal shadowElevation, no real shadow or rim, on a pill that
-            // floats over the same unpredictable car-photo backgrounds.
-            .ambientRing(RoundedCornerShape(cornerRadius))
-            .dropShadow(RoundedCornerShape(cornerRadius))
-            .frostedRim(RoundedCornerShape(cornerRadius)),
-        shape = RoundedCornerShape(cornerRadius),
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp).copy(alpha = surfaceAlpha),
+            },
+        contentAlignment = Alignment.CenterEnd,
     ) {
-        Column(
-            Modifier.padding(horizontal = hPad, vertical = vPad),
-            verticalArrangement = Arrangement.spacedBy(itemSpacing),
-            horizontalAlignment = Alignment.End,
+        Surface(
+            modifier = Modifier
+                // Same gap as PagerDots below -- only ever had Material's own weak
+                // tonal shadowElevation, no real shadow or rim, on a pill that
+                // floats over the same unpredictable car-photo backgrounds.
+                .ambientRing(RoundedCornerShape(cornerRadius))
+                .dropShadow(RoundedCornerShape(cornerRadius))
+                .frostedRim(RoundedCornerShape(cornerRadius)),
+            shape = RoundedCornerShape(cornerRadius),
+            color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp).copy(alpha = surfaceAlpha),
         ) {
-            repeat(count) { i ->
-                val selected = i == current
-                val scrubSelected = scrubbing && i == scrubTargetPage
-                val highlight = selected || scrubSelected
-                val dotH by animateDpAsState(
-                    if (highlight) 28.dp else 7.dp,
-                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                    label = "vdotH",
-                )
-                val dotW by animateDpAsState(
-                    if (scrubbing) 10.dp else 7.dp,
-                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                    label = "vdotW",
-                )
-                val color by androidx.compose.animation.animateColorAsState(
-                    when {
-                        selected -> MaterialTheme.colorScheme.primary
-                        scrubSelected -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.outlineVariant
-                    },
-                    label = "vdotC",
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    if (scrubbing) {
-                        Text(
-                            tileName(tiles[i]),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
-                            color = color,
-                        )
+            Column(
+                Modifier.padding(horizontal = hPad, vertical = vPad),
+                verticalArrangement = Arrangement.spacedBy(itemSpacing),
+                horizontalAlignment = Alignment.End,
+            ) {
+                repeat(count) { i ->
+                    val selected = i == current
+                    val scrubSelected = scrubbing && i == scrubTargetPage
+                    val highlight = selected || scrubSelected
+                    val dotH by animateDpAsState(
+                        if (highlight) 28.dp else 7.dp,
+                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        label = "vdotH",
+                    )
+                    val dotW by animateDpAsState(
+                        if (scrubbing) 10.dp else 7.dp,
+                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        label = "vdotW",
+                    )
+                    val color by androidx.compose.animation.animateColorAsState(
+                        when {
+                            selected -> MaterialTheme.colorScheme.primary
+                            scrubSelected -> MaterialTheme.colorScheme.secondary
+                            else -> MaterialTheme.colorScheme.outlineVariant
+                        },
+                        label = "vdotC",
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (scrubbing) {
+                            Text(
+                                tileName(tiles[i]),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
+                                color = color,
+                            )
+                        }
+                        Box(Modifier.width(dotW).height(dotH).clip(CircleShape).background(color))
                     }
-                    Box(Modifier.width(dotW).height(dotH).clip(CircleShape).background(color))
                 }
             }
         }
@@ -3070,6 +3082,8 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = scheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
                     FloatingIcon(Icons.Filled.Refresh, "Refresh", { vm.refreshStatus(v) }, outerPadding = 2.dp)
@@ -3117,9 +3131,10 @@ private fun StatusBarScrim() {
 }
 
 /** A small translucent circular icon button used as a floating overlay control.
- *  [outerPadding] is the breathing room around the 44dp circle - the default
- *  suits free-floating overlay corners; tight rows (the cover screen's title
- *  row) pass less so the row doesn't inflate to 68dp on a ~260dp-tall screen. */
+ *  [outerPadding] is the breathing room around the 48dp circle - the default
+ *  (12dp, a 72dp footprint) suits free-floating overlay corners; tight rows
+ *  (the cover screen's title row, at 2dp) keep that footprint down to 52dp on
+ *  a ~260dp-tall screen. */
 @Composable
 private fun FloatingIcon(
     icon: ImageVector,
@@ -9562,46 +9577,6 @@ private fun TileEmptyHint(text: String) {
     }
 }
 
-/**
- * A miniature of the real Quick Settings shade tile: a rounded pill with a leading
- * icon bubble, the tile label, and a state line. Filled with the accent when
- * [active] (mirrors BlooTileService's STATE_ACTIVE rendering) so the preview is honest.
- */
-@Composable
-private fun TileShadePreview(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    active: Boolean,
-    modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(28.dp),
-) {
-    val scheme = MaterialTheme.colorScheme
-    val container by androidx.compose.animation.animateColorAsState(
-        if (active) scheme.primary else scheme.surfaceVariant,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-        label = "previewBg",
-    )
-    val onContainer = if (active) scheme.onPrimary else scheme.onSurface
-    val bubble = if (active) scheme.onPrimary.copy(alpha = 0.20f) else scheme.surface
-    val bubbleIcon = if (active) scheme.onPrimary else scheme.onSurfaceVariant
-    Surface(shape = shape, color = container, contentColor = onContainer, modifier = modifier) {
-        Row(
-            Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(Modifier.size(38.dp).clip(CircleShape).background(bubble), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = bubbleIcon, modifier = Modifier.size(20.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = onContainer.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
 /** Per-car Quick Settings tile manager with live previews. Each car gets its
  *  own tonal card (mirroring CarSettingsCard's per-car container elsewhere in
  *  Settings) so two cars' tile groups never read as one continuous list. */
@@ -9688,9 +9663,13 @@ private fun tileSummary(cmd: String, climateTarget: String, presetName: String?)
 }
 
 /**
- * One configured tile, styled after the climate-preset cards: a tappable summary
- * row (icon + name + what it does) that expands into an inline editor with chip
- * pickers for the action, a custom name, and — for climate — what it runs.
+ * One configured tile, built on the exact same [PebbleShell] every car pebble
+ * uses (see [UpdateAvailableTile] for the other non-car-scoped caller) instead
+ * of a bespoke static-shape split row -- its collapsed header IS the live
+ * preview (icon, name, current state), and its [PebbleHeaderAction] doubles as
+ * the actual "Add" button so the common case (configure once, add it) never
+ * needs to expand at all. Expanding is only for changing the action, custom
+ * name, what climate runs, or removing the tile.
  */
 @Composable
 private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewModel) {
@@ -9722,137 +9701,73 @@ private fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewMo
         "charge" -> Icons.Filled.Bolt
         else -> Icons.Filled.DirectionsCar
     }
+    val title = if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd))
 
-    val chevron by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-        label = "tileChevron",
-    )
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 5.dp)
-            .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+    PebbleShell(
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+        icon = headerIcon,
+        title = title,
+        vm = vm,
+        summary = liveLabel ?: tileSummary(cmd, target, presetName),
+        headerAction = PebbleHeaderAction(
+            label = "Add",
+            icon = Icons.Filled.Add,
+            active = active,
+            onClick = { addTileToQuickSettings(context, index, cmd, title, unlocked = status?.doorLock == false) },
+        ),
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
-            // Split button: the preview is the wide "value" half, the chevron gets
-            // its own holding shape as the narrow half — same pill<->rounded-rect
-            // morph convention as PresetPill/ChargeLimitPill, so a row with a
-            // dropdown reads as one deliberate two-part control instead of a bare
-            // floating arrow icon.
-            Row(
-                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                // A faithful preview of the shade tile itself, so users see exactly
-                // what the QS tile will read (mirrors BlooTileService state rendering).
-                TileShadePreview(
-                    icon = headerIcon,
-                    title = if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd)),
-                    subtitle = liveLabel ?: tileSummary(cmd, target, presetName),
-                    active = active,
-                    shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 12.dp, bottomEnd = 12.dp),
-                    modifier = Modifier.weight(1f).fillMaxHeight().clickable { expanded = !expanded },
-                )
-                Surface(
-                    onClick = { expanded = !expanded },
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp, topEnd = 28.dp, bottomEnd = 28.dp),
-                    modifier = Modifier.fillMaxHeight(),
-                ) {
-                    Box(Modifier.fillMaxHeight().padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = if (expanded) "Collapse" else "Edit tile",
-                            modifier = Modifier.size(20.dp).rotate(chevron),
-                        )
-                    }
-                }
+        Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        MorphSegmented(
+            options = TileActions.map { (key, label, icon) ->
+                SegmentOption(key, if (key == "doors") "Lock" else label, icon)
+            },
+            selectedKey = cmd,
+            onSelect = { key -> vm.setTileAssignment(index, vin, key) },
+        )
+
+        if (cmd != "open") {
+            Spacer(Modifier.height(10.dp))
+            var name by remember(state.tileLabels.getOrNull(index)) {
+                mutableStateOf(customName.orEmpty())
             }
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it; vm.setTileLabel(index, it) },
+                label = { Text("Custom name (optional)") },
+                singleLine = true,
+                shape = FieldShape,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), expandFrom = Alignment.Top),
-                exit = fadeOut(tween(150)) + shrinkVertically(tween(180), shrinkTowards = Alignment.Top),
-            ) {
-                Column {
-                    Spacer(Modifier.height(12.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    Spacer(Modifier.height(10.dp))
-                    Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    MorphSegmented(
-                        options = TileActions.map { (key, label, icon) ->
-                            SegmentOption(key, if (key == "doors") "Lock" else label, icon)
-                        },
-                        selectedKey = cmd,
-                        onSelect = { key -> vm.setTileAssignment(index, vin, key) },
-                    )
+        if (cmd == "climate") {
+            Spacer(Modifier.height(10.dp))
+            Text("Runs", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            MorphSegmented(
+                options = buildList {
+                    add(SegmentOption("default", "Basic", null))
+                    add(SegmentOption("smart", "Smart", null))
+                    presets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
+                },
+                selectedKey = target,
+                onSelect = { vm.setTileClimateTarget(index, it) },
+            )
+        }
 
-                    if (cmd != "open") {
-                        Spacer(Modifier.height(10.dp))
-                        var name by remember(state.tileLabels.getOrNull(index)) {
-                            mutableStateOf(customName.orEmpty())
-                        }
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it; vm.setTileLabel(index, it) },
-                            label = { Text("Custom name (optional)") },
-                            singleLine = true,
-                            shape = FieldShape,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-
-                    if (cmd == "climate") {
-                        Spacer(Modifier.height(10.dp))
-                        Text("Runs", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(4.dp))
-                        MorphSegmented(
-                            options = buildList {
-                                add(SegmentOption("default", "Basic", null))
-                                add(SegmentOption("smart", "Smart", null))
-                                presets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
-                            },
-                            selectedKey = target,
-                            onSelect = { vm.setTileClimateTarget(index, it) },
-                        )
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    val addLabel = if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd))
-                    MorphButton(
-                        onClick = {
-                            addTileToQuickSettings(
-                                context, index, cmd, addLabel,
-                                unlocked = status?.doorLock == false,
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Add to Quick Settings", fontWeight = FontWeight.SemiBold)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    MorphButton(
-                        onClick = { vm.setTileAssignment(index, null, null) },
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                    ) {
-                        Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Remove tile", fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
+        Spacer(Modifier.height(4.dp))
+        MorphButton(
+            onClick = { vm.setTileAssignment(index, null, null) },
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        ) {
+            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Remove tile", fontWeight = FontWeight.SemiBold)
         }
     }
 }
