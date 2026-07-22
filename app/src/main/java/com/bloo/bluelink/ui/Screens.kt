@@ -1033,6 +1033,13 @@ private fun CarFeatureWizard(
     }
 }
 
+/**
+ * One wizard page: a static list of the four [Powertrain] options, each a
+ * selectable [Surface] row. Selecting a row calls [AppViewModel.setPowertrain]
+ * directly (there's no local "pending" selection) -- the row's highlighted
+ * state is driven straight off `state.powertrainOf(vehicle)`, so the whole
+ * row list recomposes the instant the view model's state updates.
+ */
 @Composable
 private fun WizardPowertrainPage(
     vehicle: com.bloo.bluelink.data.Vehicle?,
@@ -1093,6 +1100,12 @@ private fun WizardPowertrainPage(
     }
 }
 
+/**
+ * One wizard page: renders a heat/cool toggle-chip row per [SeatPositions]
+ * entry, each row wired straight to its own persisted flag via
+ * [AppViewModel.setSeatFlag] -- no local staging state, so a tap is reflected
+ * immediately once the view model emits the updated [SeatConfig].
+ */
 @Composable
 private fun WizardSeatsPage(
     vehicle: com.bloo.bluelink.data.Vehicle?,
@@ -1195,6 +1208,8 @@ private fun WizardToggleChip(label: String, selected: Boolean, onClick: () -> Un
     }
 }
 
+/** One wizard page for the single "heated steering wheel" flag; same
+ *  direct-to-view-model wiring as the other wizard pages, just one row. */
 @Composable
 private fun WizardSteeringPage(
     vehicle: com.bloo.bluelink.data.Vehicle?,
@@ -1269,7 +1284,19 @@ private fun WizardFeatureToggle(
 
 private class Burst(val x: Float, val y: Float, val start: Float, val life: Float, val hue: Float, val count: Int, val maxR: Float)
 
-/** A short, lightweight particle-burst fireworks animation drawn on a Canvas. */
+/**
+ * A short, lightweight particle-burst fireworks animation drawn on a Canvas.
+ *
+ * Seven [Burst]s are generated once (`remember`) with randomized position,
+ * start-delay, lifetime, hue, particle count, and max radius. A single
+ * [Animatable] `t` is driven from 0 to 1 over 2.6s and is the *only* thing
+ * that changes over time; each burst reads its own local progress
+ * `(t - start) / life` from that shared clock and is invisible outside
+ * [0, 1]. For a visible burst, particles are placed evenly around a circle
+ * of growing radius `local * maxR`, faded out via `alpha = 1 - local`, and
+ * given a small downward drift (`local² * height * 0.06`) to mimic gravity.
+ * Nothing here loops -- once `t` reaches 1 all bursts are permanently done.
+ */
 @Composable
 private fun FireworksOverlay(modifier: Modifier = Modifier) {
     val bursts = remember {
@@ -1311,6 +1338,21 @@ private fun FireworksOverlay(modifier: Modifier = Modifier) {
 
 private val FieldShape = RoundedCornerShape(18.dp)
 
+/**
+ * Sign-in form supporting all three brands from one screen. All fields
+ * (email/password/pin/brand) are local `mutableStateOf` -- nothing is
+ * persisted until [onLogin] fires, so switching brands mid-entry doesn't
+ * lose the typed email/password. Selecting a brand via [MorphSegmented]
+ * only changes copy/labels/validation shape shown here; brand-specific
+ * strings (subtitle, email label, forgot-password URL, sign-in button
+ * label) are recomputed from `brand` on every recomposition and each swap
+ * cross-fades via [AnimatedContent] rather than snapping instantly.
+ * The PIN field is only shown for brands that don't use OTP login
+ * (`!brand.usesOtpLogin`); Kia instead gets a one-time-passcode dialog
+ * elsewhere ([KiaOtpDialog]) after submitting. `formVisible` flips true one
+ * frame after first composition purely to trigger the initial slide-up-and-
+ * fade-in entrance animation.
+ */
 @Composable
 private fun LoginScreen(
     loading: Boolean,
@@ -1691,6 +1733,30 @@ private fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
     return if (phase < periodMs) phase.toFloat() / periodMs else 2f - phase.toFloat() / periodMs
 }
 
+/**
+ * Draws the animated gradient-blob backdrop used behind the login screen,
+ * onboarding, and (optionally) the garage. Colors, motion style, and the
+ * pull-to-refresh "explosion" pulse are all independent concerns composed
+ * together here:
+ *  - [colorMode] picks how the blob hues are derived: "material" uses the
+ *    theme's primary/secondary/tertiary directly, "custom" derives
+ *    complementary/analogous hues from [appearance]'s stored hex color via
+ *    HSV rotation, and the default ("complementary") derives a hue from the
+ *    surface color rotated 180°.
+ *  - [motionMode] picks whether the blobs drift on their own (`static`,
+ *    driven by [triangleWave]-based ease loops further below) or track the
+ *    phone's tilt via the accelerometer (`motion`). In Motion mode, a fast
+ *    exponential-moving-average of the raw sensor reading is compared
+ *    against a much slower moving average of the same signal; the
+ *    difference isolates *deliberate* tilting from however the phone is
+ *    generally being held, so the background doesn't sit permanently
+ *    off-center just because the phone rests at an angle.
+ *  - `refreshing` drives a one-shot grow/hold/shrink pulse (`explosion`, an
+ *    [Animatable]) via [LaunchedEffect], keyed on `refreshing` itself so a
+ *    pull-to-refresh that resolves near-instantly still visibly completes a
+ *    full grow-then-shrink cycle instead of snapping back before the eye
+ *    can register it.
+ */
 @Composable
 private fun AuroraBackground(
     modifier: Modifier = Modifier,
@@ -2127,6 +2193,35 @@ private fun cameraEdgeOf(rect: android.graphics.Rect?, viewWidthPx: Int, viewHei
     return margins.minByOrNull { it.value }?.key
 }
 
+/**
+ * Top-level garage screen: picks between three fundamentally different
+ * layouts based on screen size/shape and dispatches to the right one, then
+ * (for the "normal phone" case) owns the pager(s) that let the user swipe
+ * between cars.
+ *
+ * Layout selection:
+ *  - `compact` (a folding phone's small cover screen, see
+ *    [isCompactCoverScreen]) short-circuits straight to [CompactGarage] and
+ *    returns early -- none of the pager/expand logic below applies there.
+ *  - `large` (wide enough for [perPage] > 1 car side by side) enables the
+ *    dual/multi-column view and "expand one car to fill the screen" gesture.
+ *  - Otherwise, the default single-column swipe-between-cars view.
+ *
+ * State plumbing specific to this screen:
+ *  - `pullFractionState`/`dotsAlpha`/`refreshShift` together drive how the
+ *    floating page-indicator dots and other overlays react live as the user
+ *    pulls to refresh -- fading/sliding out of the way during the pull and
+ *    springing back once it resolves -- rather than only reacting once
+ *    `state.refreshing` flips.
+ *  - The expanded ([HorizontalPager] over `exPager`) and collapsed
+ *    (multi-car-per-page `pager`) pagers both use the "start in the middle
+ *    of a huge virtual page range, map back to a real index with modulo"
+ *    trick to fake infinite wrap-around swiping in both directions.
+ *  - A `LaunchedEffect(currentVehicle?.vin, currentFetchedAt)` watches for
+ *    stale data and only warns the user if a fresh background refresh
+ *    doesn't land within 25s (see the inline comment below for why the
+ *    delay is cancellable).
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun GarageScreen(state: UiState, vm: AppViewModel) {
@@ -2566,7 +2661,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     }
 }
 
-/** Cover-screen layout: swipe left/right for cars, up/down for section tiles. */
+/**
+ * Cover-screen layout: swipe left/right for cars, up/down for section tiles.
+ *
+ * Owns one [HorizontalPager] (`pager`) for switching between cars, using the
+ * same "virtual page count = real count * 1000, start in the middle, map
+ * back with modulo" trick as the other car pagers in this file to fake
+ * infinite wrap-around. Each car's page then hosts its own vertical tile
+ * pager/scrubber further down (not shown in this snippet) for swiping
+ * between that car's pebbles; `scrubbing` is shared mutable state that, when
+ * true, disables `userScrollEnabled` on this horizontal pager so a
+ * long-press-drag scrub of the vertical tile indicator can't accidentally
+ * also trigger a car-switch swipe underneath it.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance) {
@@ -2676,6 +2783,26 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     }
 }
 
+/**
+ * One car's page inside [CompactGarage]'s pager: a vertical stack of pebble
+ * "tiles" (main summary, climate, charge, location, ...), one per screen,
+ * navigated with the same infinite-wrap virtual-page trick as the car
+ * pager itself. Also owns three independent, cover-screen-only concerns
+ * layered into the same [Box]:
+ *  - Camera-cutout avoidance: detects which edge ([cameraEdgeOf]) a punch-hole
+ *    camera sits against and pads only that edge enough to clear it, then
+ *    draws a decorative ring around the hole so it reads as intentional.
+ *  - The edge-trace refresh gesture: a long-press-and-hold that fills an
+ *    animated ring around the screen edge over 1.2s; completing the hold
+ *    (without releasing or moving past touch slop) triggers a refresh. Its
+ *    pointerInput lives on the outer parent [Box], deliberately relying on
+ *    Compose's leaf-to-root gesture dispatch so [VerticalPager]'s own drag
+ *    recognizer (a child, and therefore evaluated first) gets first claim on
+ *    any real vertical drag before this handler ever sees it.
+ *  - Per-tile scroll position (`tileScrollStates`), keyed by tile name so a
+ *    tall tile's scroll offset survives being paged away from and back to,
+ *    and survives the user reordering pebbles (unlike keying by index).
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: Float) {
@@ -3364,6 +3491,15 @@ private fun PagerDots(
 
 // --- Hero header + charge/fuel bar ---------------------------------------
 
+/**
+ * The car's hero card: photo/visual on top, [ChargeFuelBar] below. Corner
+ * radius eases between 24dp and 40dp (animateDpAsState) when `charging`
+ * flips, as a subtle "something is happening" cue distinct from any text or
+ * icon change. Fades and slides up 16dp on first composition
+ * (`heroAlpha`/`heroOffset`, both [Animatable]s driven once in
+ * `LaunchedEffect(Unit)`) so it enters in step with the rest of the
+ * per-car stack rather than popping in instantly.
+ */
 @Composable
 private fun HeroHeader(
     v: Vehicle,
@@ -3565,6 +3701,15 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
     }
 }
 
+/**
+ * The battery/fuel percentage readout: headline percent + range, a status
+ * line beneath (charging details > driving/parked > plain "Battery"/"Fuel"
+ * label, in that priority order), and a gradient progress bar. The bar's
+ * fill animates via a spring (`animatedFrac`) rather than snapping to the
+ * new percentage, and -- when plugged in -- a small dot marks the
+ * charge-limit target percentage on the track so the user can see at a
+ * glance how much further it'll charge.
+ */
 @Composable
 private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean, drivingLabel: String? = null, metric: Boolean = false) {
     val fuelPct = status?.fuelLevel
@@ -3841,6 +3986,22 @@ private fun Modifier.animatePlacement(): Modifier = composed {
  * reorder correctly; the live order is committed via [onReorder] on drop.
  *
  * Designed to live inside an existing scroll container (it is a plain Column).
+ *
+ * Drag mechanism: `order` is local mutable state (re-synced from [items]
+ * whenever nothing is being dragged). `draggingKey` identifies which item is
+ * currently held; that item is excluded from [animatePlacement] and instead
+ * manually translated by `offsetY`, a running total of vertical drag delta
+ * (via [detectDragGesturesAfterLongPress]'s `onDrag`). On every drag tick,
+ * `offsetY` is compared against the *next* or *previous* item's measured
+ * height (tracked per-key in `heights`, populated by each row's own
+ * `onSizeChanged`): once the drag has moved past half that neighbor's
+ * height, the two items swap places in `order` and `offsetY` is reduced by
+ * that neighbor's height, so the dragged item's on-screen position stays
+ * continuous through the swap rather than jumping. Every other (non-dragged)
+ * row uses [animatePlacement] to glide smoothly to its new slot when the
+ * list order changes underneath it. [staggerInOnColdStart]/[introKey] are
+ * unrelated to dragging -- they drive a one-time entrance stagger, see
+ * [coldStartIntroPlayed].
  */
 @Composable
 private fun <T> ReorderColumn(
@@ -4104,6 +4265,9 @@ private class HotSeatDrag {
 
 private val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }
 
+/** Trivial full-size [Box] wrapper; exists as a distinct composable purely so
+ *  the hot-seat drag machinery has a single, stable, named host to reason
+ *  about/hang [LocalHotSeatDrag] state around rather than an anonymous Box. */
 @Composable
 private fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
     Box(Modifier.fillMaxSize()) { content() }
@@ -4111,7 +4275,17 @@ private fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
 
 // --- Full detail ----------------------------------------------------------
 
-/** Single-column car view (phones, and each column of the grid). */
+/**
+ * Single-column car view (phones, and each column of the grid). Everything
+ * scrolls together in one [Column] inside [Refreshable] (header row, then
+ * the reorderable [PebbleList]). `nameHidden` is a [derivedStateOf] over the
+ * scroll position -- once the user has scrolled the car name (roughly its
+ * own height) out of view, a floating name pill fades in as a substitute, so
+ * scrolling never leaves the screen not knowing which car it's looking at.
+ * When [onNameHiddenChanged] is supplied (single-car-per-page mode in
+ * [GarageScreen]), that pill is hoisted to the parent instead of rendered
+ * inline here, so it can float independent of this column's own layout.
+ */
 @Composable
 private fun VehicleDetailContent(
     v: Vehicle,
@@ -4176,7 +4350,22 @@ private fun VehicleDetailContent(
     }
 }
 
-/** Wide expanded view: critical info in one column, pebbles in the other. */
+/**
+ * Wide expanded view: critical info in one column, pebbles in the other.
+ *
+ * `controls` and `pebbles` are held as `@Composable` lambdas (not directly
+ * inlined) so [flipped] can freely swap which one renders in the left vs.
+ * right [Column] without re-creating either column's content -- each
+ * column's own [rememberScrollState] (`controlsScroll`/`pebblesScroll`) is
+ * hoisted here rather than created inside `controls`/`pebbles` themselves,
+ * so a scroll position sticks with its *content* across a flip rather than
+ * with whichever physical column (left/right) currently renders it.
+ * [HotspotSlot] lets one pebble be pinned into the info column permanently
+ * (excluded from the normal reorderable pebble list via `exclude` above);
+ * [HotSeatDrag] (provided via [LocalHotSeatDrag]) is the cross-column drag
+ * state that lets a pebble be dragged from the scrolling list directly onto
+ * that slot to pin it.
+ */
 @Composable
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
     val hotspot = state.hotspotFor(v.vin)
@@ -4386,7 +4575,17 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
 /** How far the floating overlays (dots, buttons) slide down during a refresh. */
 private val RefreshPullShift = 96.dp
 
-/** Wraps content with the pull-to-refresh gesture with an overlay indicator. */
+/**
+ * Wraps content with the pull-to-refresh gesture with an overlay indicator.
+ * Delegates the actual gesture recognition/animation state to Material 3's
+ * [rememberPullToRefreshState] (`ptrState`); this composable's own job is
+ * publishing that pull distance out to [LocalPullFraction] (so sibling
+ * overlays elsewhere in [GarageScreen] can react to the live pull, not just
+ * the boolean `state.refreshing`), and manually positioning the loading
+ * indicator by hand rather than letting Material lay it out, so it can
+ * slide fully off-screen above the content when idle and only ease into
+ * view as the user pulls.
+ */
 @Composable
 private fun Refreshable(
     v: Vehicle,
@@ -4645,6 +4844,14 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
     }
 }
 
+/**
+ * The lock/unlock [StateControl] plus its brand-conditional grouped
+ * Flash-lights/Horn-and-lights icon actions -- shared by every place a
+ * car's primary quick-action needs to render (the dual-column critical
+ * column, [ControlsPebble], and the cover screen's main tile), each
+ * supplying its own [contentPadding] to line the icon up with that
+ * particular container's own inset convention.
+ */
 @Composable
 private fun PrimaryActions(
     v: Vehicle,
@@ -4820,7 +5027,22 @@ private fun CustomPaletteSwatch(
     }
 }
 
-/** Canvas-based colour picker: hue bar + saturation/value square. */
+/**
+ * Canvas-based colour picker: hue bar + saturation/value square.
+ *
+ * Internal state is plain HSV floats (`hue`/`sat`/`value`), seeded once from
+ * the incoming [color] on first composition and never re-synced from it
+ * afterward -- each drag on either Canvas computes a new HSV component
+ * straight from the touch position (`awaitEachGesture` + a manual
+ * down/while-pressed loop, since neither Canvas needs multi-touch or a
+ * standard drag-gesture detector) and calls `update()`, which converts back
+ * to RGB and reports it via [onColorChange]. `hexInput` is a separate text
+ * mirror of the same colour: it's kept in sync from `picked` (but only
+ * refreshed when the *canvas* changes the colour, not on every keystroke),
+ * so a manually typed hex value only overwrites the canvas state once
+ * `commitHex()` runs (on Done/focus-loss), not while the user is still
+ * mid-edit.
+ */
 @Composable
 private fun ColorPickerCanvas(
     color: Color,
@@ -6333,6 +6555,39 @@ private fun onOff(v: Int) = if (v == 0) "Off" else "On"
 
 // --- Climate --------------------------------------------------------------
 
+/**
+ * The climate control pebble -- by far the most stateful pebble in the app.
+ * Local editable state (temp, duration, defrost, steering-wheel heat, and
+ * all four seat levels) is `remember(v.vin)`-keyed so switching cars resets
+ * to that car's own values rather than carrying over the previous car's.
+ *
+ * Three things keep this state in sync with the outside world:
+ *  1. On first composition per car, `vm.loadSavedClimate` restores whatever
+ *     was last saved for this car (`settingsLoaded` gates the debounced
+ *     save below so it doesn't immediately re-save the values it just
+ *     loaded).
+ *  2. `remoteClimate` (from `state.climateSync`) mirrors whatever the watch
+ *     app or another session set; a [LaunchedEffect] keyed on it snaps all
+ *     the local state to match whenever it changes.
+ *  3. A single debounced [LaunchedEffect] keyed on `(currentReq,
+ *     activePresetId)` persists + publishes the current settings back out
+ *     (to storage and to the watch) after they stop changing -- the actual
+ *     400ms debounce lives in the ViewModel's own coroutine scope rather
+ *     than in this effect, specifically so a car-switch or pebble collapse
+ *     that removes this composable from the tree within that window can't
+ *     silently cancel and drop the pending save.
+ *
+ * `activePresetId` tracks which saved preset (if any) matches the live
+ * settings exactly; it's cleared automatically the moment any control
+ * drifts away from that preset's exact values, so the "active" highlight
+ * only ever marks a true match, never a stale one.
+ *
+ * The header's Start/Stop button is context-sensitive: while climate is
+ * already on it stops it; while the pebble is expanded (sliders visible) it
+ * starts with exactly what's shown; while collapsed in Simple mode it
+ * computes a "smart" one-tap target temperature from the current weather
+ * instead of making the user open the pebble first.
+ */
 @Composable
 private fun ClimatePebble(
     v: Vehicle,
@@ -7662,6 +7917,29 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
 
 // --- Settings -------------------------------------------------------------
 
+/**
+ * The whole Settings screen: one long scrolling [Column] of [SettingsCard]s
+ * (Accounts, AI, App shortcuts, Cars, Backup & sync, Appearance, Quick
+ * Settings tiles, and more further down), plus a floating search bar hoisted
+ * outside the scroll so it can stay pinned to the bottom of the screen.
+ *
+ * Two things apply globally across the whole screen:
+ *  - Simple vs. Advanced mode (`state.settingsMode`): several cards/sections
+ *    are wrapped in `AnimatedVisibility(visible = advanced, ...)` using one
+ *    shared `advancedEnter`/`advancedExit` transition spec, so toggling the
+ *    mode reveals or hides every advanced-only section in visual lockstep
+ *    rather than each one animating independently.
+ *  - Settings search: `query` (live, updates every keystroke, purely for
+ *    filtering the on-screen list of matching settings) is intentionally
+ *    kept separate from `submittedQuery` (only set on an explicit
+ *    submit/tap), since a mis-typed partial query must never itself trigger
+ *    a real command or an AI request -- only a deliberate submission does.
+ *
+ * [BackHandler] is layered: while the search pill is expanded or has text,
+ * back collapses/clears search first (matching how every other "expanded
+ * surface" in the app treats back); only once search is already idle does
+ * back return to the garage.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreen(vm: AppViewModel) {
