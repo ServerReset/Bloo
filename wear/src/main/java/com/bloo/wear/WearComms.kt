@@ -173,14 +173,25 @@ object WearComms {
             }.isSuccess
         }
 
-    /** Ask for fresh data: relay a refresh to the phone, or refresh standalone. */
-    /** @return true if the phone actually got (or, for [refresh], a standalone
-     *  fallback compensated for) this request. [refresh] == false (used by
-     *  [WearViewModel.resync] to just ask the phone to push whatever it
-     *  already has) has no standalone fallback -- a send failure there used
-     *  to do nothing at all, silently dropping the sync request with no
-     *  signal back to the caller that "resync finished" didn't mean "resync
-     *  worked". */
+    /**
+     * Ask for fresh data: relay a refresh request to the phone (which has the
+     * already-authenticated session), falling back to the watch's own
+     * standalone connection whenever the phone can't be reached at all -- no
+     * paired node, or the message send itself failed/timed out.
+     *
+     * @return true only if the phone itself actually received the request.
+     * This is deliberately NOT "true if we got fresh data by any means" --
+     * [WearViewModel.resync] relies on this exact meaning to tell the user
+     * "bring your phone nearby to sync" specifically when the phone wasn't
+     * reachable, even though the standalone fallback below may well have
+     * quietly gotten them a partial update anyway. The fallback itself used
+     * to only run when [refresh] was true (a forced live pull); the lighter
+     * [refresh] == false case (just "resend whatever you already have," used
+     * by [WearViewModel.resync]) had no fallback at all -- a failed send
+     * there silently did nothing, dropping the request on the floor with no
+     * compensating standalone attempt. `force = refresh` keeps the fallback's
+     * own aggressiveness matched to what was actually asked for either way.
+     */
     suspend fun requestSync(context: Context, vin: String, refresh: Boolean): Boolean =
         withContext(Dispatchers.IO) {
             val node = phoneNodeId(context)
@@ -193,13 +204,11 @@ object WearComms {
                         ), 10, TimeUnit.SECONDS,
                     )
                 }.isSuccess
-                if (!sent && refresh) WearCommandRunner.refresh(context, vin)
+                if (!sent) WearCommandRunner.refresh(context, vin, force = refresh)
                 sent || refresh
-            } else if (refresh) {
-                WearCommandRunner.refresh(context, vin)
-                true
             } else {
-                false
+                WearCommandRunner.refresh(context, vin, force = refresh)
+                refresh
             }
         }
 

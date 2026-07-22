@@ -269,9 +269,10 @@ fun PinEntryScreen(
  * comparison) and flips `pinLocked` back to false on success. `error` here is
  * purely local transient UI state -- set to "Wrong PIN" on a failed attempt
  * (which also triggers [PinEntryScreen]'s shake/haptic-reject via its own
- * `error` param) and cleared on success. There is no attempt counter or
- * lockout anywhere in this flow: a wrong PIN just re-shows the pad with no
- * limit on retries and no escalating delay.
+ * `error` param) and cleared on success. [WearViewModel.submitPin] itself now
+ * enforces a consecutive-failure lockout (see its own doc comment); when
+ * active, its `lockoutMessage` callback param is shown here in place of the
+ * generic "Wrong PIN" text instead.
  */
 @Composable
 fun PinLockScreen(vm: WearViewModel) {
@@ -285,7 +286,7 @@ fun PinLockScreen(vm: WearViewModel) {
             title = "Enter PIN",
             error = error,
             onSubmit = { pin ->
-                vm.submitPin(pin) { ok -> error = if (ok) null else "Wrong PIN" }
+                vm.submitPin(pin) { ok, lockoutMessage -> error = if (ok) null else (lockoutMessage ?: "Wrong PIN") }
             },
         )
     }

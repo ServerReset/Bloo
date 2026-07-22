@@ -54,6 +54,10 @@ enum class WearScreen { Loading, SignedOut, Ready }
 // a restart-happy user doesn't hammer the endpoint every launch.
 private const val UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
 
+/** See [WearViewModel.submitPin]'s doc comment: consecutive-wrong-PIN lockout. */
+private const val PIN_MAX_ATTEMPTS = 5
+private const val PIN_LOCKOUT_MS = 30_000L // 30s
+
 /** A fully resolved per-car view, merging live status with the phone snapshot. */
 data class CarView(
     val vin: String,
@@ -693,10 +697,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ui.update { it.copy(resyncBusy = true) }
             try {
-                // requestSync(refresh = false) has no standalone fallback --
-                // a failed send used to be silently swallowed, so resyncBusy
-                // finishing implied "resync worked" even when the phone never
-                // got the request at all (e.g. briefly out of BT range).
+                // requestSync's own return value means "the phone actually got
+                // this" specifically (not "we got fresh data by any means") --
+                // see its doc comment. A standalone fallback now runs whenever
+                // the phone can't be reached, so this resync isn't a total
+                // no-op when that happens, but `requested` staying false still
+                // correctly drives the "bring your phone nearby" message below.
                 val requested = runCatching { WearComms.requestSync(ctx, "", refresh = false) }.getOrDefault(false)
                 runCatching { WearComms.pullLatest(ctx) }
                 snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
@@ -1282,6 +1288,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- PIN lock ------------------------------------------------------------
 
+    // In-memory only -- resets on process death/app restart, which is an
+    // accepted tradeoff. This is a brute-force-slowing cooldown for a 4-digit
+    // on-device PIN (see WearLocalStore.verifyPin's own doc comment noting
+    // there was previously no attempt-counting or lockout anywhere in this
+    // flow at all), not a hard security boundary that needs to survive a
+    // process restart.
+    private var pinFailCount = 0
+    private var pinLockedUntilMs = 0L
+
     /** Called from MainActivity's onStart with the timestamp the app was
      *  backgrounded at (0 if it was never backgrounded this process), mirroring
      *  the phone's AppViewModel.maybeRelock. */
@@ -1300,12 +1315,43 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (shouldLock) _ui.update { it.copy(pinLocked = true) }
     }
 
-    /** Attempt to unlock with an entered PIN. Reports success/failure via [onResult]. */
-    fun submitPin(pin: String, onResult: (Boolean) -> Unit) {
+    /**
+     * Attempt to unlock with an entered PIN. Reports success via the first
+     * [onResult] param; the second is an optional user-facing message (a
+     * lockout countdown) the caller should show instead of its own generic
+     * "Wrong PIN" text.
+     *
+     * After [PIN_MAX_ATTEMPTS] consecutive wrong guesses, further attempts
+     * are rejected outright -- without even calling [WearLocalStore.verifyPin]
+     * -- until [PIN_LOCKOUT_MS] has passed, closing the "every call is an
+     * independent, unrate-limited comparison" gap that store's own doc
+     * comment used to call out. A correct PIN (whether it's the first try or
+     * after some wrong ones) resets the fail count back to zero.
+     */
+    fun submitPin(pin: String, onResult: (ok: Boolean, lockoutMessage: String?) -> Unit) {
         viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            if (now < pinLockedUntilMs) {
+                val secondsLeft = (pinLockedUntilMs - now) / 1000L + 1
+                onResult(false, "Too many attempts. Wait ${secondsLeft}s")
+                return@launch
+            }
             val ok = localStore.verifyPin(pin)
-            if (ok) _ui.update { it.copy(pinLocked = false) }
-            onResult(ok)
+            if (ok) {
+                pinFailCount = 0
+                pinLockedUntilMs = 0L
+                _ui.update { it.copy(pinLocked = false) }
+                onResult(true, null)
+            } else {
+                pinFailCount++
+                if (pinFailCount >= PIN_MAX_ATTEMPTS) {
+                    pinLockedUntilMs = now + PIN_LOCKOUT_MS
+                    pinFailCount = 0
+                    onResult(false, "Too many attempts. Wait ${PIN_LOCKOUT_MS / 1000}s")
+                } else {
+                    onResult(false, null)
+                }
+            }
         }
     }
 
