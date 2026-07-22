@@ -16,6 +16,37 @@ fun formatPlaceName(a: android.location.Address): String? =
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
+/** The Fahrenheit range every supported car's climate target temperature can
+ *  actually be set to. Was hardcoded as (60, 85) in six different places
+ *  (phone's ClimatePebble x4, TileCommandRunner, the watch's smart-climate
+ *  calc and its HomeScreen preview) while the temperature slider itself --
+ *  the one thing actually driven by what the car will accept -- used 62..82.
+ *  A "smart" target clamped to the wrong, wider range could still ask the
+ *  car for something outside what it supports. */
+val CLIMATE_TEMP_RANGE_F = 62..82
+
+/**
+ * A one-tap "smart" target temperature for the given outside [ambientF],
+ * always clamped into [CLIMATE_TEMP_RANGE_F]. Moderate weather (70-89F warm,
+ * 41-69F cool) runs a gentle 10F off ambient, same as before; genuinely
+ * extreme weather (90F+ or 40F and below) goes straight for the most
+ * aggressive setting the car allows instead of a flat offset -- clamping a
+ * flat "ambient - 10" into the range on a truly hot day lands at the
+ * range's WARM end (e.g. 100F - 10 = 90, clamped up to 82, the LEAST
+ * aggressive cooling setting available), the opposite of what "smart"
+ * cooling should do on an extreme day.
+ */
+fun smartClimateTargetF(ambientF: Int): Int {
+    val min = CLIMATE_TEMP_RANGE_F.first
+    val max = CLIMATE_TEMP_RANGE_F.last
+    return when {
+        ambientF >= 90 -> min // Really hot: max cold.
+        ambientF >= 70 -> (ambientF - 10).coerceIn(min, max)
+        ambientF <= 40 -> max // Really cold: max hot.
+        else -> (ambientF + 10).coerceIn(min, max)
+    }
+}
+
 /** Charger-plug type label for [EvStatus.batteryPlugin]. Was defined
  *  separately on phone and watch and had already drifted ("AC (level 2)" vs
  *  "AC") despite mapping the exact same wire value. */

@@ -62,9 +62,7 @@ object TileCommandRunner {
                 if (lat == null || lon == null) error("No location for smart climate")
                 val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
                 val ambientF = (w.tempC * 9.0 / 5.0 + 32).toInt()
-                val tempF = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
-                            else (ambientF + 10).coerceIn(60, 85)
-                ClimateRequest(tempF = tempF, defrost = false, durationMinutes = 10)
+                ClimateRequest(tempF = smartClimateTargetF(ambientF), defrost = false, durationMinutes = 10)
             }
             target != "default" -> {
                 val preset = SettingsStore(ctx).climatePresets(v.vin).firstOrNull { it.id == target }

@@ -296,6 +296,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.EvTrip
@@ -305,6 +306,7 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.smartClimateTargetF
 import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.dropShadow
@@ -2415,16 +2417,30 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 2 },
                             modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
                         ) {
+                            // A percent-based RoundedCornerShape(50) (radius = half of
+                            // min(width, height)) here -- unlike the other two name
+                            // pills below, which never resize -- would make dropShadow/
+                            // ambientRing's cached outline (see DropShadow.kt: only
+                            // rebuilt when its own `size` read changes) chase this
+                            // pill's own width while the Row's animateContentSize
+                            // below is mid-transition, visibly lagging a beat behind
+                            // the pill's own (always-correct, uncached) Surface clip --
+                            // exactly the "square shadow that snaps right after a
+                            // second" a user would see. A fixed 24dp radius (half the
+                            // pill's own 48dp height) gives the identical resting pill
+                            // shape without the corner radius depending on a value
+                            // that's animating out from under it.
+                            val pillShape = RoundedCornerShape(24.dp)
                             Surface(
                                 onClick = { pillScope.launch { scrollToTopFn?.invoke() } },
-                                shape = RoundedCornerShape(50),
+                                shape = pillShape,
                                 // Was a flat surfaceContainerHighest + shadowElevation --
                                 // every other piece of floating chrome (FloatingIcon, the
                                 // other two name pills) uses this same glass treatment;
                                 // this one was quietly left on the old, pre-glass look.
                                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                                 contentColor = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
+                                modifier = Modifier.ambientRing(pillShape).dropShadow(pillShape).frostedRim(pillShape),
                             ) {
                                 Row(
                                     Modifier
@@ -6375,6 +6391,10 @@ private fun ClimatePebble(
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val simpleMode = state.settingsMode != "advanced"
     var showClimateChoice by remember { mutableStateOf(false) }
+    // Whether the pebble's own body (the live sliders below) is actually on
+    // screen right now -- mirrors Pebble()'s own expanded computation exactly
+    // so this and the header's Start button agree on what "expanded" means.
+    val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "climate")
 
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
@@ -6391,11 +6411,17 @@ private fun ClimatePebble(
             },
             icon = Icons.Filled.AcUnit,
             onClick = {
-                if (climateOn) { vm.stopClimate(v); activePresetId = null }
-                else if (simpleMode && weather != null) {
+                if (climateOn) {
+                    vm.stopClimate(v); activePresetId = null
+                } else if (expanded) {
+                    // The sliders are visible and live-editable right here --
+                    // Start should do exactly what they're currently set to,
+                    // not second-guess with the smart/preset logic meant for
+                    // the collapsed one-tap case below.
+                    startClimate()
+                } else if (simpleMode && weather != null) {
                     val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
-                    val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
-                                      else (ambientF + 10).coerceIn(60, 85)
+                    val smartTarget = smartClimateTargetF(ambientF)
                     tempF = smartTarget; defrost = false; activePresetId = null
                     vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
                 } else {
@@ -6407,8 +6433,7 @@ private fun ClimatePebble(
                         activePresetId = matchingPreset.id
                     } else if (weather != null) {
                         val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
-                        val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
-                                          else (ambientF + 10).coerceIn(60, 85)
+                        val smartTarget = smartClimateTargetF(ambientF)
                         tempF = smartTarget; defrost = false; activePresetId = null
                         vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
                     } else startClimate()
@@ -6467,11 +6492,13 @@ private fun ClimatePebble(
         )
 
         // Smart climate: read the weather where the car is (falling back to home)
-        // and pre-cool/pre-heat to ~10°F off ambient, then start.
+        // and pick a target -- see smartClimateTargetF, shared with the widget/QS
+        // tile and the watch: ~10°F off ambient normally, or the car's most
+        // aggressive setting on a genuinely extreme day, always within what the
+        // car's own climate range actually accepts.
         if (weather != null) {
             val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
-            val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
-                              else (ambientF + 10).coerceIn(60, 85)
+            val smartTarget = smartClimateTargetF(ambientF)
             val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
             val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
             val smartLabel = if (ambientF >= 70) "Cool to $targetLabel" else "Heat to $targetLabel"
@@ -6492,7 +6519,7 @@ private fun ClimatePebble(
                 Text(smartLabel, fontWeight = FontWeight.SemiBold)
             }
             Text(
-                "It's $ambientLabel where your car is — Smart climate runs 10° ${if (ambientF >= 70) "cooler" else "warmer"}.",
+                "It's $ambientLabel where your car is — Smart climate is targeting $targetLabel.",
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
             )
@@ -6520,8 +6547,7 @@ private fun ClimatePebble(
                 text = {
                     if (weather != null) {
                         val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
-                        val smartTarget = if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85)
-                                          else (ambientF + 10).coerceIn(60, 85)
+                        val smartTarget = smartClimateTargetF(ambientF)
                         MorphButton(onClick = {
                             tempF = smartTarget; defrost = false; activePresetId = null
                             vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
@@ -6546,7 +6572,7 @@ private fun ClimatePebble(
         // Was a hand-rolled version of the same blue->green->warm mapping
         // uicommon.tempColor() now centralizes (shared with the watch, which
         // had drifted to a different, unanimated palette).
-        val tempRange = 62f..82f
+        val tempRange = CLIMATE_TEMP_RANGE_F.first.toFloat()..CLIMATE_TEMP_RANGE_F.last.toFloat()
         val tempColor = com.bloo.uicommon.tempColor(tempF, tempRange.start, tempRange.endInclusive)
         if (fahrenheit) {
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {

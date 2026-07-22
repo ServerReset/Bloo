@@ -874,7 +874,7 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
     val label = if (ambientF != null) {
         val action = if (ambientF >= 70) "Cool" else "Heat"
         if (car.climateOn == true) "Smart climate on" else "$action to ~${
-            degLabel((if (ambientF >= 70) (ambientF - 10).coerceIn(60, 85) else (ambientF + 10).coerceIn(60, 85)).toString(), fahrenheit)
+            degLabel(com.bloo.bluelink.data.smartClimateTargetF(ambientF).toString(), fahrenheit)
         }"
     } else {
         "No weather data"

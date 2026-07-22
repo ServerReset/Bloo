@@ -1205,18 +1205,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Smart climate: reads the weather at the car's location (or home weather as
-     * fallback), then starts climate at [offset]°F cooler than ambient on a hot
-     * day or [offset]°F warmer than ambient on a cold day. Threshold is 70°F.
+     * fallback), then starts climate at a target picked by
+     * [com.bloo.bluelink.data.smartClimateTargetF] -- shared with the phone and
+     * the widget/QS tile so all three pick the exact same target, clamped to
+     * what the car's climate range actually accepts.
      */
-    fun smartClimate(vin: String, offset: Int = 10) {
+    fun smartClimate(vin: String) {
         val extras = _ui.value.extras
         val weather = extras.carWeather[vin] ?: extras.homeWeather ?: run {
             _ui.update { it.copy(message = "No weather data — can't run smart climate") }
             return
         }
         val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).toInt()
-        val targetF = if (ambientF >= 70) (ambientF - offset).coerceIn(60, 85)
-                      else (ambientF + offset).coerceIn(60, 85)
+        val targetF = com.bloo.bluelink.data.smartClimateTargetF(ambientF)
         // Decide on/off HERE (same statuses-then-snapshots priority buildCarView
         // uses) rather than inside the block: the relay path never runs the block,
         // so the computed targetF used to be silently discarded - the phone got a
