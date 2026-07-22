@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import java.util.TimeZone
+import kotlin.math.roundToInt
 
 /** "Springfield, IL" (locality/subAdminArea + adminArea) from a reverse-
  *  geocode result, falling back to the raw first address line. Was defined
@@ -15,6 +16,17 @@ fun formatPlaceName(a: android.location.Address): String? =
 
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
+
+/** °C -> whole-degree °F, for turning a live weather reading into the
+ *  [ambientF] input smart-climate calculations branch on. Was reimplemented
+ *  inline at 7 call sites (phone's ClimatePebble x4, TileCommandRunner, the
+ *  watch's smartClimate() and its HomeScreen preview) -- 3 of them truncated
+ *  (`.toInt()`) while the other 4 rounded (`.roundToInt()`), so the exact
+ *  same live weather reading near a whole-degree boundary could resolve to a
+ *  different ambientF, and therefore a different smart-climate target and a
+ *  different "Cool"/"Heat" label, depending on which of these entry points
+ *  you happened to use. */
+fun ambientFahrenheit(tempC: Double): Int = (tempC * 9.0 / 5.0 + 32.0).roundToInt()
 
 /** The Fahrenheit range every supported car's climate target temperature can
  *  actually be set to. Was hardcoded as (60, 85) in six different places

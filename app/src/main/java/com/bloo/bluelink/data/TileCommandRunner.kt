@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Runs a Quick-Settings-tile command with the stored session and folds the
@@ -19,18 +20,25 @@ object TileCommandRunner {
             ?: return Result(false, "Car not found")
         val v = snap.toVehicle()
         val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(ctx), CredentialStore(ctx))
-        return runCatching {
-            when (cmd) {
-                "doors" ->
-                    if (snap.locked == true) { repo.unlock(v); "Unlocking ${v.name}" }
-                    else { repo.lock(v); "Locking ${v.name}" }
-                "lock" -> { repo.lock(v); "Locking ${v.name}" }
-                "unlock" -> { repo.unlock(v); "Unlocking ${v.name}" }
-                "charge" ->
-                    if (snap.charging == true) { repo.stopCharge(v); "Stopping charge" }
-                    else { repo.startCharge(v); "Starting charge" }
-                "climate" -> runClimate(ctx, repo, v, snap, climateTarget)
-                else -> "Done"
+        // Same lock WearCommandRunner.execute()/the phone UI's own command path
+        // already take -- BlueLink 502s on overlapping requests for the same
+        // account, and this was the one command-executing path (Quick Settings
+        // tile taps) that skipped it, so a tile tap racing a background status
+        // refresh or another in-flight command had no protection at all.
+        return BlueLinkGate.statusMutex.withLock {
+            runCatching {
+                when (cmd) {
+                    "doors" ->
+                        if (snap.locked == true) { repo.unlock(v); "Unlocking ${v.name}" }
+                        else { repo.lock(v); "Locking ${v.name}" }
+                    "lock" -> { repo.lock(v); "Locking ${v.name}" }
+                    "unlock" -> { repo.unlock(v); "Unlocking ${v.name}" }
+                    "charge" ->
+                        if (snap.charging == true) { repo.stopCharge(v); "Stopping charge" }
+                        else { repo.startCharge(v); "Starting charge" }
+                    "climate" -> runClimate(ctx, repo, v, snap, climateTarget)
+                    else -> "Done"
+                }
             }
         }.fold(
             onSuccess = { msg ->
@@ -61,8 +69,7 @@ object TileCommandRunner {
                 val lon = snap.lon
                 if (lat == null || lon == null) error("No location for smart climate")
                 val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
-                val ambientF = (w.tempC * 9.0 / 5.0 + 32).toInt()
-                ClimateRequest(tempF = smartClimateTargetF(ambientF), defrost = false, durationMinutes = 10)
+                ClimateRequest(tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)), defrost = false, durationMinutes = 10)
             }
             target != "default" -> {
                 val preset = SettingsStore(ctx).climatePresets(v.vin).firstOrNull { it.id == target }

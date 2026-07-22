@@ -870,7 +870,7 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate", Icons.Filled.Thermostat) {
     val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
     val weather: WearWeather? = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
-    val ambientF = weather?.let { ((it.tempC * 9.0 / 5.0) + 32).toInt() }
+    val ambientF = weather?.let { com.bloo.bluelink.data.ambientFahrenheit(it.tempC) }
     val label = if (ambientF != null) {
         val action = if (ambientF >= 70) "Cool" else "Heat"
         if (car.climateOn == true) "Smart climate on" else "$action to ~${

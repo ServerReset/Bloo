@@ -1216,7 +1216,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             _ui.update { it.copy(message = "No weather data — can't run smart climate") }
             return
         }
-        val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).toInt()
+        val ambientF = com.bloo.bluelink.data.ambientFahrenheit(weather.tempC)
         val targetF = com.bloo.bluelink.data.smartClimateTargetF(ambientF)
         // Decide on/off HERE (same statuses-then-snapshots priority buildCarView
         // uses) rather than inside the block: the relay path never runs the block,

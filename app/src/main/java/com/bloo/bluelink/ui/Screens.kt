@@ -294,6 +294,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
@@ -6420,7 +6421,7 @@ private fun ClimatePebble(
                     // the collapsed one-tap case below.
                     startClimate()
                 } else if (simpleMode && weather != null) {
-                    val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+                    val ambientF = ambientFahrenheit(weather.tempC)
                     val smartTarget = smartClimateTargetF(ambientF)
                     tempF = smartTarget; defrost = false; activePresetId = null
                     vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
@@ -6432,7 +6433,7 @@ private fun ClimatePebble(
                         vm.startClimate(v, matchingPreset.request)
                         activePresetId = matchingPreset.id
                     } else if (weather != null) {
-                        val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+                        val ambientF = ambientFahrenheit(weather.tempC)
                         val smartTarget = smartClimateTargetF(ambientF)
                         tempF = smartTarget; defrost = false; activePresetId = null
                         vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
@@ -6497,7 +6498,7 @@ private fun ClimatePebble(
         // aggressive setting on a genuinely extreme day, always within what the
         // car's own climate range actually accepts.
         if (weather != null) {
-            val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+            val ambientF = ambientFahrenheit(weather.tempC)
             val smartTarget = smartClimateTargetF(ambientF)
             val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
             val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
@@ -6546,7 +6547,7 @@ private fun ClimatePebble(
                 title = { Text("Start climate", fontWeight = FontWeight.Bold) },
                 text = {
                     if (weather != null) {
-                        val ambientF = ((weather.tempC * 9.0 / 5.0) + 32).roundToInt()
+                        val ambientF = ambientFahrenheit(weather.tempC)
                         val smartTarget = smartClimateTargetF(ambientF)
                         MorphButton(onClick = {
                             tempF = smartTarget; defrost = false; activePresetId = null
@@ -7063,13 +7064,18 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     }
 
     // Separate AC (home / level-2) and DC (fast) charge-limit targets, each
-    // defaulting to 80% (a healthy daily ceiling) until the car's real
-    // targets load in. Both pills' "Set" sends BOTH values together
-    // (setChargeLimits(v, acLimit, dcLimit)), so leaving one un-seeded at the
-    // 80% default meant tapping "Set" on just the AC pill silently reset a
-    // DC target that had never actually been 80% -- and vice versa.
+    // seeded to a healthy default until the car's real targets load in --
+    // 80% for AC (a daily ceiling), 90% for DC (fast-charging past that is
+    // inefficient anyway; matches the default the watch/shared side already
+    // uses -- see WearCommand's acLimit/dcLimit defaults in WearSync.kt --
+    // this used to default BOTH to 80%, so tapping "Set" before the real DC
+    // target loaded could silently push a DC target lower than intended).
+    // Both pills' "Set" sends BOTH values together (setChargeLimits(v,
+    // acLimit, dcLimit)), so leaving one un-seeded at a wrong default meant
+    // tapping "Set" on just the AC pill silently reset a DC target that had
+    // never actually been what it was seeded to -- and vice versa.
     var acLimit by remember(v.vin) { mutableIntStateOf(80) }
-    var dcLimit by remember(v.vin) { mutableIntStateOf(80) }
+    var dcLimit by remember(v.vin) { mutableIntStateOf(90) }
     var limitsSeeded by remember(v.vin) { mutableStateOf(false) }
     LaunchedEffect(v.vin, ev?.reservChargeInfos) {
         if (limitsSeeded) return@LaunchedEffect
