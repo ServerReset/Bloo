@@ -1487,6 +1487,19 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
             pending = ui.updateDownloading,
             onClick = { vm.downloadAndInstallUpdate() },
         )
+        // The phone's own update pebble shows the release's changelog; this
+        // banner previously only ever showed the bare button, with no way to
+        // see what's actually in the update before installing it.
+        ui.updateRun.releaseNotes?.takeIf { it.isNotBlank() }?.let { notes ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                notes,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Spacer(Modifier.height(4.dp))
         MorphButton(
             label = "Remind me",
