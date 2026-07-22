@@ -2207,9 +2207,21 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         beyondViewportPageCount = 1,
                         pageSize = androidx.compose.foundation.pager.PageSize.Fill,
                     ) { page ->
-                        val pageOff by remember(page) {
+                        // Only the discretized "settled" boolean is read here in
+                        // composable scope (via derivedStateOf, so it only
+                        // invalidates on the rare 0.01 threshold crossing) --
+                        // the continuous pager offset used to be read as a plain
+                        // val (pageOff/effectiveOff) right in this scope, which
+                        // subscribed the WHOLE page composable -- CarThemeOverride,
+                        // VehicleDetailContent, every pebble in it -- to recompose
+                        // on literally every drag frame. That, not the since-removed
+                        // blur/tilt, was the real remaining swipe jank: the actual
+                        // continuous offset is now only ever read inside
+                        // graphicsLayer{} below, which is draw-phase only and never
+                        // triggers recomposition.
+                        val settled by remember(page) {
                             derivedStateOf {
-                                ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+                                ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) } < 0.01f
                             }
                         }
                         // Spring-bouncy page transition: off-screen pages fade and
@@ -2219,17 +2231,18 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // change read as jittery rather than fluid for
                         // something that fires on every car swipe. The app's
                         // standard "snappy but settled" spring instead.
-                        val snapBounce by animateFloatAsState(
-                            targetValue = if (pageOff < 0.01f) 0f else 1f,
+                        val snapBounce = animateFloatAsState(
+                            targetValue = if (settled) 0f else 1f,
                             animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             label = "pageBounce",
                         )
-                        val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         // No blur, no rotationZ tilt -- tried both a position-driven
                         // and later a velocity-driven blur here, and the tilt on top
                         // of the fade/scale, and all of it together read as worse
                         // than the plain fade/scale alone. Just that now.
                         Box(Modifier.fillMaxSize().graphicsLayer {
+                            val off = ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+                            val effectiveOff = off * (1f - snapBounce.value * 0.3f)
                             alpha = 1f - effectiveOff * 0.2f
                             scaleX = 1f - effectiveOff * 0.06f
                             scaleY = 1f - effectiveOff * 0.06f
@@ -2273,6 +2286,21 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         vm.selectIndex((realBlock(page) * perPage).coerceIn(0, count - 1))
                     }
                 }
+                // The above only pushes the pager's own settles into
+                // state.currentIndex, never the other direction -- so an
+                // external change (a widget/shortcut tap selecting a specific
+                // car while this pager was already composed on a different
+                // one) updated currentIndex, and the floating name pill below
+                // read it correctly, but the pager itself just sat there on
+                // whatever car it last settled on. A widget tap always means
+                // "look at this car now," so jump (no animated fly-through
+                // across a potentially large virtual-page delta) the instant
+                // currentIndex moves out from under the page actually shown.
+                LaunchedEffect(state.currentIndex) {
+                    val targetBlock = state.currentIndex.coerceIn(0, count - 1) / perPage
+                    val delta = targetBlock - realBlock(pager.currentPage)
+                    if (delta != 0) pager.scrollToPage(pager.currentPage + delta)
+                }
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
                 var carNameVisible by remember { mutableStateOf(false) }
                 var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
@@ -2284,9 +2312,17 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // most people see swiping between cars day to day,
                         // previously had no per-page transform at all, just a
                         // plain flat scroll.
-                        val pageOff by remember(page) {
+                        // See the expanded pager above for why only the
+                        // discretized "settled" boolean is read in composable
+                        // scope -- the continuous offset used to be baked into a
+                        // plain effectiveOff val here, subscribing this entire
+                        // per-page Row (every VehicleDetailContent, every pebble)
+                        // to recompose on every single drag frame. That was the
+                        // real remaining cause of "still juttery" swiping even
+                        // after the blur/tilt removal.
+                        val settled by remember(page) {
                             derivedStateOf {
-                                ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+                                ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) } < 0.01f
                             }
                         }
                         // Was DampingRatioMediumBouncy/StiffnessMedium -- a
@@ -2294,17 +2330,18 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // change read as jittery rather than fluid for
                         // something that fires on every car swipe. The app's
                         // standard "snappy but settled" spring instead.
-                        val snapBounce by animateFloatAsState(
-                            targetValue = if (pageOff < 0.01f) 0f else 1f,
+                        val snapBounce = animateFloatAsState(
+                            targetValue = if (settled) 0f else 1f,
                             animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             label = "pageBounce",
                         )
-                        val effectiveOff = pageOff * (1f - snapBounce * 0.3f)
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
                         // No blur, no rotationZ tilt -- see the expanded pager above.
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
+                                val off = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+                                val effectiveOff = off * (1f - snapBounce.value * 0.3f)
                                 alpha = 1f - effectiveOff * 0.2f
                                 scaleX = 1f - effectiveOff * 0.06f
                                 scaleY = 1f - effectiveOff * 0.06f
@@ -2490,6 +2527,16 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.collect { vm.selectIndex(realCar(it)) }
     }
+    // Mirror of the default garage pager's own fix: react to currentIndex
+    // changing out from under an already-composed pager (e.g. a widget tap
+    // selecting a specific car while the cover screen was already showing a
+    // different one) by snapping to it, instead of only ever pushing this
+    // pager's own settles into currentIndex one-way.
+    LaunchedEffect(state.currentIndex) {
+        val target = state.currentIndex.coerceIn(0, count - 1)
+        val delta = target - realCar(pager.currentPage)
+        if (delta != 0) pager.scrollToPage(pager.currentPage + delta)
+    }
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
     val scrubbing = remember { mutableStateOf(false) }
@@ -2554,7 +2601,10 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                     .statusBarsPadding()
                     .padding(top = 10.dp)
                     .alpha(dotsAlpha),
-                onRefresh = { vm.refreshStatus(vehicles[realCar(pager.settledPage)]) },
+                // No hold-to-refresh here -- the cover screen's own edge-trace
+                // gesture (drag down from the top edge) is already the refresh
+                // affordance in this mode; the dots are display-only.
+                onRefresh = null,
             )
         }
     }
@@ -3108,8 +3158,14 @@ private fun FloatingIcon(
     }
 }
 
-/** Page indicator dots with long-press-to-refresh — holding the indicator for
- *  one second triggers [onRefresh] (mirrors the watch's CarNameOverlay pattern). */
+/** Page indicator dots, optionally with long-press-to-refresh — holding the
+ *  indicator for one second triggers [onRefresh] (mirrors the watch's
+ *  CarNameOverlay pattern). Passing null drops the whole gesture (and its
+ *  fill-ring) entirely instead of just disarming the action -- the cover
+ *  screen's own edge-trace gesture already owns refresh there, and even a
+ *  quick tap-through on the dots (e.g. brushing them mid-swipe) started that
+ *  ring filling for a frame, which read as a spurious "refresh" flicker on
+ *  every plain press. */
 @Composable
 private fun PagerDots(
     current: Int,
@@ -3121,31 +3177,33 @@ private fun PagerDots(
     val expandProgress = remember { Animatable(0f) }
     var holding by remember { mutableStateOf(false) }
 
-    LaunchedEffect(holding) {
-        if (holding) {
-            expandProgress.snapTo(0f)
-            expandProgress.animateTo(
-                1f,
-                animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-            )
-            onRefresh?.invoke()
-            holding = false
-            delay(300)
-            expandProgress.animateTo(0f, tween(200))
-        } else if (expandProgress.value > 0f) {
-            // Released (or the gesture was cancelled) before the hold
-            // completed -- LaunchedEffect(holding) cancels the coroutine
-            // above outright when holding flips back to false, which used to
-            // leave the ring frozen at whatever fill it had reached instead
-            // of easing back to nothing (matches the edge-trace gesture's
-            // own release/cancel handling elsewhere on the cover screen).
-            expandProgress.animateTo(0f, tween(200))
+    if (onRefresh != null) {
+        LaunchedEffect(holding) {
+            if (holding) {
+                expandProgress.snapTo(0f)
+                expandProgress.animateTo(
+                    1f,
+                    animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+                )
+                onRefresh.invoke()
+                holding = false
+                delay(300)
+                expandProgress.animateTo(0f, tween(200))
+            } else if (expandProgress.value > 0f) {
+                // Released (or the gesture was cancelled) before the hold
+                // completed -- LaunchedEffect(holding) cancels the coroutine
+                // above outright when holding flips back to false, which used to
+                // leave the ring frozen at whatever fill it had reached instead
+                // of easing back to nothing (matches the edge-trace gesture's
+                // own release/cancel handling elsewhere on the cover screen).
+                expandProgress.animateTo(0f, tween(200))
+            }
         }
     }
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         // Overlay ring that fills as the user holds
-        if (expandProgress.value > 0.01f) {
+        if (onRefresh != null && expandProgress.value > 0.01f) {
             CircularProgressIndicator(
                 progress = { expandProgress.value.coerceIn(0f, 1f) },
                 modifier = Modifier.size(36.dp),
@@ -3155,16 +3213,22 @@ private fun PagerDots(
         }
         Surface(
             modifier = Modifier
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        down.consume()
-                        haptics?.tick()
-                        holding = true
-                        try { waitForUpOrCancellation() }
-                        finally { holding = false }
-                    }
-                }
+                .then(
+                    if (onRefresh != null) {
+                        Modifier.pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                down.consume()
+                                haptics?.tick()
+                                holding = true
+                                try { waitForUpOrCancellation() }
+                                finally { holding = false }
+                            }
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
                 // This whole control is a raw pointerInput gesture (long-press
                 // to refresh) with zero semantics -- with TalkBack's touch
                 // exploration intercepting single-finger gestures, it was both
