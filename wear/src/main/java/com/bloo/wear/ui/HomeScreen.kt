@@ -155,6 +155,47 @@ private val CarView.alertCount: Int
         (if (tireWarning) 1 else 0) + (if (lowFuel) 1 else 0) +
         (if (washerLow) 1 else 0) + (if (brakeLow) 1 else 0) + (if (keyFobLow) 1 else 0)
 
+/**
+ * Root screen for the watch app: one horizontally-swipeable page per car, each
+ * page itself a vertically-scrolling stack of "cards" (see [CarColumn]).
+ *
+ * Mechanics:
+ * - `ui.cars` (from [WearViewModel] / [WearUi], which the caller recomposes
+ *   this composable on whenever it changes) drives everything: an empty list
+ *   short-circuits into the "No cars yet" placeholder before any pager state
+ *   is even created.
+ * - The whole pager subtree is wrapped in `key(ui.cars.map { it.vin })` so
+ *   that if the *set* of cars changes (a car added/removed/re-ordered), the
+ *   [HorizontalPager] and its [rememberPagerState] are thrown away and
+ *   rebuilt from scratch rather than trying to reconcile stale page indices
+ *   against a different list of VINs.
+ * - `listStates` (each car's [ScalingLazyListState], i.e. its scroll
+ *   position) is deliberately declared *outside* that `key()` block so a
+ *   VIN-list refresh doesn't wipe every car's scroll position along with the
+ *   pager -- only cards for cars that actually disappear get their state
+ *   evicted (via the `retainAll` in the `LaunchedEffect` below).
+ * - `activeCarIndex` is derived from `carPager.settledPage` (not
+ *   `currentPage`) so it only updates once a swipe has fully settled, not
+ *   mid-drag -- this is what "active" downstream (rotary focus, the
+ *   `onCarShown` call) means by "the page the user is actually looking at".
+ * - The `LaunchedEffect(activeCarIndex)` calls `vm.onCarShown(vin)` once per
+ *   car per session of being scrolled to, guarded by `lastShownVin`, so
+ *   swiping back and forth over the same car doesn't repeatedly re-trigger
+ *   whatever side effect that call has (e.g. analytics or a refresh ping).
+ * - Inside the pager's page content, `pageOff` measures how far a given page
+ *   has scrolled from being centered (0 = fully settled, 1 = fully off
+ *   screen) and drives a cheap fade + shrink via `graphicsLayer` so pages
+ *   feel like they're gently receding as they leave, instead of hard-cutting.
+ * - `active` is true only for the settled page with no scroll in progress;
+ *   it's threaded down into [CarColumn] so only that one page's list claims
+ *   rotary (crown/bezel) input focus -- the pre-composed neighbor pages
+ *   (kept warm via `beyondViewportPageCount = 1`) must not fight over it.
+ * - If the car has a custom color role set (`ui.settings?.carColors`), the
+ *   page's content is wrapped in its own [MaterialTheme] with a derived
+ *   [androidx.wear.compose.material3.ColorScheme] (see `schemeFrom`) so each
+ *   car's cards can carry a per-car accent color without a global theme
+ *   override affecting every other page.
+ */
 @Composable
 fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit = {}) {
     if (ui.cars.isEmpty()) {
@@ -562,7 +603,16 @@ internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
     }
 }
 
-/** Render a single tile by key. Plain composable so it can repeat for wrap-around. */
+/**
+ * Render a single tile by key. Plain composable (not remembered/cached) so it
+ * can repeat for wrap-around: [CarColumn] builds a virtual list several
+ * `tileCount`-long "cycles" deep and calls this once per virtual index with
+ * `tiles[i % tileCount]`, so the *same* key (e.g. "summary") is composed at
+ * many different virtual indices simultaneously across the wrapped list.
+ * The `when` below is an exhaustive dispatch from tile key to the card
+ * composable that renders it; each branch just forwards whatever subset of
+ * (vm, ui, car, callbacks) that particular card needs.
+ */
 @Composable
 private fun TileContent(
     key: String,
@@ -592,14 +642,30 @@ private fun TileContent(
     }
 }
 
-/** Tile-progress dots laid along the right-hand arc of the (round) screen. */
+/**
+ * Tile-progress dots laid along the right-hand arc of the (round) screen,
+ * one dot per on-screen tile in [CarColumn] (doors/climate/charge/etc, not
+ * to be confused with [CurvedIndicator]'s one-dot-per-car page indicator).
+ *
+ * Caps the number of rendered dots at 12 ([shown]) regardless of how many
+ * tiles a car actually has -- a car with, say, 20 tiles would otherwise draw
+ * 20 tiny dots that blur together on a ~200px watch face. When `total`
+ * exceeds that cap, [active] is computed by *proportionally* mapping
+ * `activeIndex` (0..total-1) onto the compressed 0..shown-1 dot range, so the
+ * highlighted dot's position along the arc still roughly tracks how far
+ * through the tile list the user has scrolled, rather than jumping straight
+ * to the same physical dot for every tile past the 12th.
+ */
 @Composable
 private fun CurvedDotIndicator(total: Int, activeIndex: Int) {
     if (total <= 1) return
     val shown = min(total, 12)
     val active = if (total <= shown) {
+        // Fewer tiles than dots: index maps 1:1, just clamp for safety.
         activeIndex.coerceIn(0, shown - 1)
     } else {
+        // More tiles than dots: rescale activeIndex's position in [0, total-1]
+        // onto [0, shown-1] and round to the nearest whole dot.
         ((activeIndex.toFloat() / (total - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
     }
     val selected = MaterialTheme.colorScheme.primary
@@ -689,7 +755,15 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
  *  Fades in with a subtle vertical slide when alerts appear. */
 @Composable
 private fun AlertsCard(car: CarView) {
+    // Collapse a list of open-item names (e.g. doors ["Front left", "Trunk"])
+    // to a single value string: the one name if there's exactly one, otherwise
+    // a count ("2 open") so the row doesn't have to wrap a long comma list.
     fun openSummary(items: List<String>) = if (items.size == 1) items.first() else "${items.size} open"
+    // Build the visible warning rows from this car's live status booleans/lists.
+    // Each `if` below reads one flag off CarView (already computed upstream
+    // from the vehicle's raw status payload) and appends a (label, value) pair
+    // only when that condition is actually true -- this card renders nothing
+    // (see `if (warnings.isEmpty()) return` below) when the list stays empty.
     val warnings = buildList {
         if (car.doorsOpen.isNotEmpty()) add("Doors" to openSummary(car.doorsOpen))
         if (car.windowsOpen.isNotEmpty()) add("Windows" to openSummary(car.windowsOpen))
@@ -718,6 +792,19 @@ private fun AlertsCard(car: CarView) {
     }
 }
 
+/**
+ * The always-first, headerless "hero" card: charge/fuel ring, range, current
+ * activity line (driving/charging/plugged-in), freshness of the last fetch,
+ * an alert-count badge, and the two most-used quick actions (lock, climate).
+ *
+ * Recomposes whenever [car] changes (a new live-status push from the phone
+ * replaces the whole [CarView] for its VIN) or when [ui.localSettings] /
+ * [ui.phoneConnected] change. `isStale` is a plain derived boolean (not
+ * `remember`ed) recomputed on every recomposition against
+ * `System.currentTimeMillis()`, so the "how long ago" freshness color only
+ * actually updates when *something else* causes a recomposition (a new
+ * status push, a settings change, etc.) -- it is not a ticking clock.
+ */
 @Composable
 private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard(null) {
     val alertCount = car.alertCount
@@ -827,6 +914,21 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     }
 }
 
+/**
+ * Manual climate control: start/stop, a target-temperature slider, a run
+ * duration slider, and a defrost toggle.
+ *
+ * All the editable values here come from `ui.draftFor(car.vin)` -- a
+ * per-car, in-memory "draft" of pending climate settings kept in
+ * [WearViewModel] -- not directly from the car's last-reported state. That
+ * draft is what lets the sliders show and react to the *user's* in-progress
+ * choice immediately (no round trip to the car needed to move a slider),
+ * while `car.climateOn` (the actual reported state) is used separately to
+ * decide button active/toggled styling and labels ("Climate on" vs "Start
+ * climate"). Each `SliderRow`/`MorphButton` callback (`vm.setClimateTemp`,
+ * `vm.setClimateDuration`, `vm.toggleDefrost`, `vm.toggleClimate`) writes
+ * straight into that draft/command layer in the view model.
+ */
 @Composable
 private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Climate", Icons.Filled.Thermostat) {
     val d = ui.draftFor(car.vin)

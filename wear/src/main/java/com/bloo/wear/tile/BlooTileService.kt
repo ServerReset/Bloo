@@ -58,11 +58,22 @@ abstract class BlooTileService : TileService() {
 
     protected abstract val poolIndex: Int
 
+    // ProtoLayout Tiles are NOT Compose: the system (Wear OS Tiles surface,
+    // rendered outside this process's own UI) calls back into this Service on
+    // its own binder thread whenever it wants a fresh layout, and expects a
+    // ListenableFuture back rather than a suspend function. `executor` is a
+    // single dedicated thread used to run the (blocking, via runBlocking)
+    // buildTile() work off the caller's thread; `tileScope` is a separate
+    // coroutine scope (IO dispatcher) used only for the fire-and-forget network
+    // relay of a tap-triggered command, which must NOT block tile rendering.
     private val executor = Executors.newSingleThreadExecutor()
     private val tileScope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
     )
 
+    // The system can destroy/recreate this Service between tile requests (it's
+    // not kept warm), so both the executor and the coroutine scope must be
+    // torn down here to avoid leaking a thread / dangling coroutines each time.
     override fun onDestroy() {
         super.onDestroy()
         tileScope.cancel()
@@ -77,11 +88,25 @@ abstract class BlooTileService : TileService() {
         const val BOLT    = "img_bolt"
     }
 
+    // Called by the Tiles system (the framework's TileRenderer/Tile Manager,
+    // running out-of-process) whenever the tile needs to (re-)render: on first
+    // pin, on a freshness-interval timeout (see FRESHNESS_MS/FRESHNESS_CHARGING_MS
+    // below), when the user taps something on the tile (state carries the
+    // clicked element's id via `currentState.lastClickableId`), or on a push
+    // from refreshWearGlanceables(). The actual layout building happens
+    // synchronously inside buildTile() on `executor` so this call returns
+    // immediately with a Future the system awaits.
     override fun onTileRequest(
         requestParams: RequestBuilders.TileRequest,
     ): ListenableFuture<TileBuilders.Tile> =
         Futures.submit(Callable { buildTile(requestParams) }, executor)
 
+    // Called once (and cached by the system) to map the string ids used by
+    // Img.* inside the layout to actual Android drawable resources. This is
+    // ProtoLayout's resource-indirection: the layout tree returned by
+    // onTileRequest only ever references resources by string id, never by
+    // resource id directly, because the layout is serialized and rendered in a
+    // separate process/surface that doesn't have this app's resource table.
     override fun onTileResourcesRequest(
         requestParams: RequestBuilders.ResourcesRequest,
     ): ListenableFuture<ResourceBuilders.Resources> =
@@ -95,6 +120,8 @@ abstract class BlooTileService : TileService() {
                 .build()
         )
 
+    /** Wraps a drawable resource id into the ProtoLayout ImageResource type
+     *  required by [onTileResourcesRequest]'s id->resource map. */
     private fun imgRes(resId: Int): ResourceBuilders.ImageResource =
         ResourceBuilders.ImageResource.Builder()
             .setAndroidResourceByResId(
@@ -104,6 +131,9 @@ abstract class BlooTileService : TileService() {
             )
             .build()
 
+    /** Bundles everything [buildTile] resolves from disk/DataStore in one pass,
+     *  so the rest of the layout-building code below doesn't need to re-read
+     *  or thread multiple separate values through. */
     private data class TileResult(
         val car: VehicleSnapshot?,
         val roles: WearColorRoles,
@@ -111,9 +141,21 @@ abstract class BlooTileService : TileService() {
         val metric: Boolean,
     )
 
+    /**
+     * Synchronously builds the full [TileBuilders.Tile] returned to the Tiles
+     * system for this request. Runs on `executor` (see [onTileRequest]), and
+     * internally uses [runBlocking] to await the DataStore reads/writes below
+     * since ProtoLayout's TileService callback contract is synchronous (a
+     * Future, not a suspend fun) despite reading suspend-based stores.
+     */
     private fun buildTile(params: RequestBuilders.TileRequest): TileBuilders.Tile {
         val ctx = applicationContext
         val device = params.deviceConfiguration
+        // Non-null only when this request was triggered by the user tapping a
+        // clickable element on the previously-rendered tile (a chip/button built
+        // via cmd()); on a freshness-timeout or push-triggered refresh this is
+        // whatever id was last recorded by the SYSTEM, not necessarily a fresh
+        // tap -- see the dedupe check further down before treating it as one.
         val clickId = params.currentState.lastClickableId
         try {
 
@@ -190,7 +232,15 @@ abstract class BlooTileService : TileService() {
         }
     }
 
-    /** Resolve the full color roles from the phone-synced settings. Falls back to dark defaults. */
+    /** Resolve the full color roles from the phone-synced settings. Falls back to dark defaults.
+     *  Mechanism: reads the first emitted value from WearSettingsStore's flow
+     *  (a DataStore-backed Flow synced over the Data Layer from the phone),
+     *  preferring a per-car color override (`carColors[vin]`, set when the
+     *  phone assigns a distinct theme to that specific vehicle) over the
+     *  global `colors` payload; if neither exists, or the whole read throws
+     *  (no sync has happened yet, corrupt store, etc. -- via runCatching),
+     *  falls back to the hardcoded [DEFAULT_ROLES] dark palette so the tile
+     *  always has *something* coherent to render. */
     private suspend fun resolveRoles(ctx: android.content.Context, vin: String?): WearColorRoles =
         runCatching {
             val payload = WearSettingsStore(ctx).flow.first()
@@ -201,6 +251,11 @@ abstract class BlooTileService : TileService() {
 
     // ── Empty / not-configured layout ────────────────────────────────────────
 
+    /** The layout shown when no car snapshot is available for this tile's
+     *  pool slot (fresh install, no phone sync yet, or the pinned car's VIN no
+     *  longer exists and there's no fallback selected car either). Just a
+     *  short message plus a single chip that opens the app -- deliberately
+     *  minimal since there's no vehicle data to build a real layout from. */
     private fun emptyLayout(
         ctx: android.content.Context,
         device: DeviceParameters,
@@ -219,6 +274,15 @@ abstract class BlooTileService : TileService() {
 
     // ── Main car layout ───────────────────────────────────────────────────────
 
+    /**
+     * Builds the full glanceable layout for a resolved car snapshot: a
+     * progress arc (charge/fuel %) wrapping the tile edge, a center column
+     * (car name / big percentage / status line), and 1-2 action chips below.
+     * Pure function of its arguments -- everything it needs (snapshot, theme
+     * roles, chosen actions, a per-render nonce for click-id uniqueness, and
+     * the metric/imperial unit preference) is passed in rather than read from
+     * disk here, so this can't accidentally do blocking I/O on the render path.
+     */
     private fun carLayout(
         ctx: android.content.Context,
         device: DeviceParameters,

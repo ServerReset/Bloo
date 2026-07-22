@@ -60,6 +60,10 @@ class KiaRepository(
         pendingDeviceId = null
     }
 
+    // Persists a freshly-obtained Kia session (sid + rmtoken + deviceId) as a
+    // generic SessionStore.Session tagged with Brand.KIA, so it round-trips through
+    // the same store used by every other brand; toKia() below does the reverse
+    // conversion when reading it back out.
     private suspend fun save(session: KiaSession, username: String, pin: String) {
         store.save(
             SessionStore.Session(
@@ -73,6 +77,8 @@ class KiaRepository(
         )
     }
 
+    // Drops the in-memory vinkey cache (it's meaningless without a session) before
+    // clearing the persisted session, so a subsequent login starts with a clean slate.
     override suspend fun logout() {
         summaries.clear()
         store.clear(Brand.KIA)
@@ -80,10 +86,17 @@ class KiaRepository(
 
     // --- Vehicles / status ---------------------------------------------------
 
+    // Every vehicles() call re-fetches summaries from the API (via fetchSummaries,
+    // which also repopulates the `summaries` cache) rather than reading the cache,
+    // so the returned list always reflects the account's current garage.
     override suspend fun vehicles(): List<Vehicle> = withSession { s ->
         fetchSummaries(s).map { it.toVehicle() }
     }
 
+    // When `refresh` is requested, wakes the car with forceRefresh() first (a
+    // separate API call that tells the car to phone home with live data) and only
+    // then reads status(); without `refresh`, just reads whatever the server last
+    // cached, avoiding the extra wake call for lightweight/background polls.
     override suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus? = withSession { s ->
         val summary = summaryFor(s, v)
         if (refresh) api.forceRefresh(s, summary)
@@ -118,6 +131,10 @@ class KiaRepository(
 
     // --- Plumbing --------------------------------------------------------
 
+    // Maps a Kia-specific vehicle summary onto the shared cross-brand Vehicle model;
+    // `generation` is left blank since Kia's API doesn't expose a head-unit
+    // generation (see Vehicle.supportsConnectedStore in Brand.kt, which treats a
+    // blank generation for Kia as always-eligible rather than "unknown/old").
     private fun KiaVehicleSummary.toVehicle() = Vehicle(
         vin = id,
         regId = key,
@@ -128,6 +145,10 @@ class KiaRepository(
         isEv = isEv,
     )
 
+    // Fetches the account's full vehicle-summary list from the API and replaces the
+    // entire `summaries` cache with it (clear, then repopulate keyed by vehicle id),
+    // rather than merging — so a car removed from the account also disappears from
+    // the cache instead of lingering with stale data.
     private suspend fun fetchSummaries(s: KiaSession): List<KiaVehicleSummary> =
         api.vehicles(s).also { list ->
             summaries.clear()

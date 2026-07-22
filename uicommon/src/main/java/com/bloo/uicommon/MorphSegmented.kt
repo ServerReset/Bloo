@@ -73,6 +73,13 @@ data class SegmentOption(val key: String, val label: String, val icon: ImageVect
  * module stays neutral to compose.material3 vs wear.compose.material3.
  *
  * @param onTick Called each time the selection actually changes (for a haptic).
+ * @param options The segments to render, in display order; each becomes one
+ *   equal-width pill in the track.
+ * @param selectedKey The currently committed selection (matched against
+ *   [SegmentOption.key]); drives where the highlight rests when not being dragged.
+ * @param onSelect Called with the newly chosen key on tap or on drag-release.
+ * @param trackHeight Defaults taller (48.dp) when any option carries an icon so
+ *   icon + label both fit comfortably; otherwise a slightly shorter text-only track.
  */
 @Composable
 fun MorphSegmented(
@@ -94,8 +101,13 @@ fun MorphSegmented(
      *  updated visually unchanged. */
     borderColor: Color? = null,
 ) {
+    // Falls back to the first option (index 0) if selectedKey doesn't match any
+    // option's key -- e.g. a caller passes a stale/unsupported key -- rather than
+    // producing a -1 index that would crash every offset/width calculation below.
     val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
+    // Inset between the track's outer edge and the row of segments.
     val trackPad = 4.dp
+    // Horizontal breathing room between adjacent segment pills.
     val gap = 4.dp
     // pointerInput below is keyed on (n, stepPx) only, so its gesture-handling
     // coroutine is launched once and keeps running (awaitEachGesture loops
@@ -115,13 +127,25 @@ fun MorphSegmented(
         modifier = modifier.fillMaxWidth().clip(trackShape).background(containerColor)
             .then(if (borderColor != null) Modifier.border(BorderStroke(1.dp, borderColor), trackShape) else Modifier),
     ) {
+        // BoxWithConstraints exposes maxWidth (the available width after trackPad is
+        // applied) so segment width can be computed by dividing that width evenly
+        // among n segments minus the gaps between them -- ordinary Row/Arrangement
+        // weighting can't give this composable the raw pixel width it needs for the
+        // pointerInput math below, since gesture coordinates arrive in px, not dp.
         BoxWithConstraints(Modifier.padding(trackPad).height(trackHeight)) {
             val n = options.size
             // Exact per-segment width so the highlight is flush with each pill's own
             // edges — no residual gap between the highlight and the track border.
             val segWidth = (maxWidth - gap * (n - 1)) / n
             val density = LocalDensity.current
+            // Everything from here on (gesture tracking, indicator translation) works
+            // in raw pixels rather than Dp, so segWidth/gap are converted once via the
+            // current density. stepPx is the horizontal distance from one segment's
+            // left edge to the next (segment width + the gap after it) -- the "pitch"
+            // used by indexFor() to quantize a pixel offset back to a segment index.
             val stepPx = with(density) { (segWidth + gap).toPx() }
+            // The furthest pixel offset the indicator's left edge can reach: the left
+            // edge of the last segment. Used to clamp drag/tap positions in offsetFor.
             val maxXPx = with(density) { (segWidth * (n - 1) + gap * (n - 1)).toPx() }
 
             // While the finger is down, the highlight tracks it 1:1 (no spring lag);
@@ -190,11 +214,21 @@ fun MorphSegmented(
             // and fades as the spring settles — gives the sliding highlight a fluid,
             // refractive feel without a real directional blur.
             val isMoving = dragXPx != null
+            // snap() jumps motionBlurX straight to 6f the instant dragging starts (no
+            // ramp-up lag behind the finger); the spring only governs the fade back to
+            // 0f once the finger lifts, so the blur relaxes smoothly instead of
+            // vanishing abruptly the same frame the drag ends.
             val motionBlurX by animateFloatAsState(
                 targetValue = if (isMoving) 6f else 0f,
                 animationSpec = if (isMoving) snap() else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
                 label = "segMotionBlur",
             )
+            // The sliding highlight pill. Declared before the Row of segment labels
+            // below, so it draws underneath them in z-order -- the labels' text stays
+            // legible on top of the highlight as it passes beneath. Its horizontal
+            // position comes purely from graphicsLayer's translationX (a draw-phase
+            // transform, see the comment on indicatorXPx above), never from layout,
+            // so moving it never triggers a relayout of the sibling Row.
             Box(
                 Modifier
                     .width(segWidth)
@@ -203,6 +237,9 @@ fun MorphSegmented(
                     .then(if (motionBlurX > 0.5f) Modifier.blur(motionBlurX.dp, 0.dp) else Modifier)
                     .background(indicatorColor, RoundedCornerShape(14.dp)),
             )
+            // The row of segment labels/icons, layered on top of the indicator Box
+            // above and hosting the single pointerInput gesture detector that drives
+            // both dragging the highlight and tapping a segment directly.
             Row(
                 Modifier
                     .fillMaxSize()
@@ -215,6 +252,13 @@ fun MorphSegmented(
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             val slop = viewConfiguration.touchSlop
+                            // `claimed` is the gesture's little state machine: false means
+                            // "undecided, still watching for enough movement to tell a tap
+                            // from a drag"; once dx crosses the slop threshold horizontally
+                            // it flips true and every subsequent move updates dragXPx
+                            // directly. If the pointer is released while still undecided
+                            // (claimed == false) that's treated as a tap at the release
+                            // point rather than a drag.
                             var claimed = false
                             // A width change mid-drag (rotation, entering/leaving a
                             // compact layout) re-keys this pointerInput on n/stepPx
@@ -241,18 +285,34 @@ fun MorphSegmented(
                                         val dx = abs(change.position.x - down.position.x)
                                         val dy = abs(change.position.y - down.position.y)
                                         when {
+                                            // Movement is more horizontal than vertical and past
+                                            // the slop threshold: commit to a drag, consume the
+                                            // event so no ancestor sees it, and start tracking the
+                                            // finger's raw x position for the indicator.
                                             dx > slop && dx >= dy -> {
                                                 claimed = true
                                                 change.consume()
                                                 dragXPx = offsetFor(change.position.x)
                                             }
+                                            // Movement is vertical past the slop threshold before
+                                            // horizontal movement was confirmed: this isn't a drag
+                                            // on this control at all, so break out without
+                                            // consuming -- letting an ancestor (e.g. a scrollable
+                                            // list) handle it instead.
                                             dy > slop -> break
                                         }
                                     } else if (change.positionChanged()) {
+                                        // Already dragging: keep following the finger 1:1 every
+                                        // frame (see indicatorXPx's snapTo above).
                                         change.consume()
                                         dragXPx = offsetFor(change.position.x)
                                     }
                                 }
+                                // Gesture ended after being claimed as a drag: commit whatever
+                                // segment the release point maps to as the new selection, and
+                                // stash it in pendingIndex so the resting position doesn't
+                                // visibly snap back before the caller's prop round-trips (see
+                                // the comment on pendingIndex above).
                                 if (claimed) {
                                     val x = dragXPx ?: offsetFor(down.position.x)
                                     val idx = indexFor(x)
@@ -269,8 +329,14 @@ fun MorphSegmented(
                     },
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
+                // One Box per option, laid out left-to-right at a fixed segWidth so
+                // each one lines up exactly with the sliding indicator underneath it.
                 options.forEachIndexed { i, opt ->
                     val isSelected = i == visualIndex
+                    // Foreground colour springs between selected/unselected rather than
+                    // snapping, so text/icon tint fades in step with the indicator's
+                    // own motion instead of flipping abruptly the instant visualIndex
+                    // changes.
                     val fg by animateColorAsState(
                         if (isSelected) selectedTextColor else unselectedTextColor,
                         spring(stiffness = Spring.StiffnessMediumLow),
@@ -307,6 +373,12 @@ fun MorphSegmented(
                         contentAlignment = Alignment.Center,
                     ) {
                         Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                            // Only rendered when the option supplies an icon (the watch
+                            // build typically omits icons entirely, see SegmentOption's
+                            // doc). Icon grows slightly and gets more breathing room from
+                            // the label when selected, echoing the same "active choice
+                            // reads bigger/bolder" treatment as the label's font weight
+                            // below.
                             opt.icon?.let { icon ->
                                 Image(
                                     painter = rememberVectorPainter(icon),

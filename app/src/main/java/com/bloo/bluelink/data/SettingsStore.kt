@@ -102,9 +102,34 @@ val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trip
 /** Number of configurable Quick Settings tiles (room for ~two per car). */
 const val TILE_COUNT = 12
 
-/** App appearance preferences, kept separate from the session so sign-out keeps them. */
+/**
+ * App appearance preferences, kept separate from the session so sign-out keeps them.
+ *
+ * Mechanically, this class is a thin typed wrapper around a single Jetpack
+ * DataStore<Preferences> instance ([Context.settingsDataStore]), which is itself
+ * just a flat string/boolean key-value bag persisted to a file on disk. There is
+ * no schema migration framework here: every getter reads the current value (or a
+ * hardcoded default when the key is absent, which is what "this preference was
+ * never set" always looks like) and every setter writes through [editTracked],
+ * a wrapper around DataStore's `edit {}` that also records which keys changed so
+ * Google Drive sync (see [performDriveSync]) can tell which values are "dirty"
+ * (changed locally but not yet uploaded).
+ *
+ * Because DataStore only stores primitives, anything structured (climate presets,
+ * custom palettes, per-widget action lists, the full settings backup itself) is
+ * JSON-encoded with kotlinx.serialization into a single string value under one
+ * key, then decoded back out on read. Anything keyed per-car interpolates the
+ * vehicle's VIN directly into the preference key name (e.g. "plate_$vin",
+ * "climate_$vin") rather than using a nested/structured key space, since
+ * Preferences DataStore only supports a flat namespace.
+ */
 class SettingsStore(private val context: Context) {
 
+    /** All strongly-typed, non-interpolated preference keys used directly by
+     *  name below. Per-car/per-tile/per-widget keys are instead built ad hoc
+     *  with string interpolation (see e.g. [seatConfig], [tileConfig]) since
+     *  Preferences DataStore has no notion of a keyed sub-namespace — this
+     *  object only holds the ones that are the same for the whole app. */
     private object Keys {
         val THEME = stringPreferencesKey("theme_mode")
         val FONT = stringPreferencesKey("font_choice")
@@ -193,6 +218,14 @@ class SettingsStore(private val context: Context) {
         val watchPinLockTiming: String = "immediate",
     )
 
+    // A reactive view of every appearance-related preference at once: each time
+    // the underlying DataStore file changes (from any editTracked() call, on
+    // this device or, via Drive sync, effectively from another), the Flow
+    // re-emits a freshly-decoded Appearance snapshot. Every field below applies
+    // the same pattern: read the raw string/boolean for its key, and if it's
+    // absent (never set) or fails to parse (enum renamed, corrupt value) fall
+    // back to a hardcoded default rather than throwing — this flow is collected
+    // eagerly near app launch, so a decode failure here must never crash startup.
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         val palJson = Json { ignoreUnknownKeys = true }
         val palSer = ListSerializer(CustomPaletteData.serializer())
@@ -236,6 +269,16 @@ class SettingsStore(private val context: Context) {
         )
     }
 
+    // Simple appearance setters below: each just writes one Keys.* string value
+    // through editTracked() (which persists it to DataStore and marks the key
+    // dirty for the next Drive sync upload). Booleans are stored as their
+    // String.toString() ("true"/"false") rather than a native boolean pref
+    // because Preferences DataStore keys are typed per-instance (a
+    // booleanPreferencesKey and stringPreferencesKey with the same name are
+    // different keys) and this file mixes both conventions depending on when
+    // the field was added; the corresponding read side above always parses
+    // with toBooleanStrictOrNull() and falls back to the field's default.
+
     suspend fun setHapticsEnabled(value: Boolean) {
         editTracked { it[Keys.HAPTICS] = value.toString() }
     }
@@ -248,6 +291,9 @@ class SettingsStore(private val context: Context) {
         editTracked { it[Keys.BIOMETRIC] = enabled.toString() }
     }
 
+    /** Stores the enum's name() as a string; read back with LockTiming.valueOf(),
+     *  falling back to LockTiming.IMMEDIATE if the stored name no longer matches
+     *  an enum constant (e.g. after a rename). */
     suspend fun setLockTiming(value: LockTiming) {
         editTracked { it[Keys.LOCK_TIMING] = value.name }
     }
@@ -268,6 +314,12 @@ class SettingsStore(private val context: Context) {
 
     // --- Notifications --------------------------------------------------
 
+    /** App-wide (not per-car) notification toggles and thresholds. [service]
+     *  gates the persistent foreground-service notification; [doorOpen] and
+     *  [running] gate the "door left open" / "engine left running" alerts,
+     *  each firing once the condition has held continuously for its paired
+     *  *Minutes threshold (see [doorOpenSince]/[engineOnSince] below, which
+     *  track how long the condition has been true per car). */
     data class NotificationPrefs(
         val service: Boolean = true,
         val doorOpen: Boolean = true,
@@ -276,6 +328,9 @@ class SettingsStore(private val context: Context) {
         val runningMinutes: Int = 10,
     )
 
+    /** One-shot read of [NotificationPrefs] (vs. the [notifications] Flow below,
+     *  which stays subscribed) — used where a caller just needs the current
+     *  values once, e.g. deciding whether to schedule a check at all. */
     suspend fun notificationPrefs(): NotificationPrefs {
         val p = context.settingsDataStore.data.first()
         return NotificationPrefs(
@@ -287,6 +342,8 @@ class SettingsStore(private val context: Context) {
         )
     }
 
+    /** Reactive equivalent of [notificationPrefs] for UI that needs to update
+     *  live when the user changes a toggle in Settings while the screen is open. */
     val notifications: Flow<NotificationPrefs> = context.settingsDataStore.data.map { p ->
         NotificationPrefs(
             service = p[booleanPreferencesKey("notify_service")] ?: true,
@@ -297,6 +354,9 @@ class SettingsStore(private val context: Context) {
         )
     }
 
+    // One setter per NotificationPrefs field; `.let {}` just discards editTracked's
+    // Unit return so these can stay one-expression functions (`=` body) rather
+    // than needing an explicit block body.
     suspend fun setNotifyService(v: Boolean) =
         editTracked { it[booleanPreferencesKey("notify_service")] = v }.let {}
 
@@ -313,6 +373,15 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("notify_running_min")] = v.toString() }.let {}
 
     // Transient alert bookkeeping (per car), used to fire each alert only once.
+    // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a
+    // door open (or engine running), it stamps "door_since_$vin"/"engine_since_$vin"
+    // with the current time via the setters below. On each subsequent check it
+    // reads that timestamp back and compares elapsed time against the configured
+    // *Minutes threshold; once the threshold is crossed AND the per-condition
+    // alertFired(key) flag isn't already set, it fires the notification and
+    // flips alertFired to true so it won't repeat. The *Since value is cleared
+    // (set to null, which removes the key) as soon as the condition stops being
+    // true, so the next occurrence starts timing from zero again.
     suspend fun doorOpenSince(vin: String): Long? =
         context.settingsDataStore.data.first()[stringPreferencesKey("door_since_$vin")]?.toLongOrNull()
 
@@ -333,6 +402,10 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** Whether a specific alert (identified by an arbitrary caller-defined
+     *  [key], typically something like "door_$vin" or "running_$vin") has
+     *  already fired for its current occurrence, so callers don't notify twice
+     *  for the same continuous door-open/engine-running spell. */
     suspend fun alertFired(key: String): Boolean =
         context.settingsDataStore.data.first()[booleanPreferencesKey("alert_$key")] ?: false
 
@@ -356,6 +429,11 @@ class SettingsStore(private val context: Context) {
         editTracked { it[Keys.AURORA] = value.toString() }
     }
 
+    // Both setters below validate the incoming string against the fixed set of
+    // legal values and silently fall back to the default if it's anything else
+    // (e.g. a stale string from a future app version we don't recognize),
+    // rather than storing garbage that the appearance Flow above would then
+    // have to re-validate on every read.
     suspend fun setAuroraMotion(value: String) {
         editTracked { it[Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
     }
@@ -455,6 +533,20 @@ class SettingsStore(private val context: Context) {
 
     // --- Per-car seat capability (the API has no reliable flags) ---------
 
+    /**
+     * Reads the per-seat heat/cool capability flags for [vin], each stored under
+     * its own short-suffixed key (e.g. "seat_dh_$vin" for driver-heat).
+     *
+     * Migration mechanism: earlier app versions only tracked one flag per axle
+     * (front heat/cool, rear heat/cool) rather than per-individual-seat. Each new
+     * per-seat key is looked up first; if it's absent (the user's data predates
+     * the per-seat split, or this specific seat was never touched since), the
+     * matching old grouped flag is used as the fallback, and if THAT is also
+     * absent a hardcoded default applies. This means an existing user's old
+     * front-heat=true setting transparently becomes both driver-heat=true and
+     * passenger-heat=true the first time this is read, without any explicit
+     * one-time migration step or version bump.
+     */
     suspend fun seatConfig(vin: String): SeatConfig {
         val p = context.settingsDataStore.data.first()
         fun b(key: String): Boolean? = p[booleanPreferencesKey(key)]
@@ -500,6 +592,25 @@ class SettingsStore(private val context: Context) {
 
     // --- Per-car section order -------------------------------------------
 
+    /**
+     * The order in which detail-pebble sections should render for [vin],
+     * reconciled against [DEFAULT_SECTIONS] so app updates that add a brand-new
+     * section (or a user's stored list that's stale/corrupt) still produce a
+     * complete, valid ordering rather than silently dropping the new section
+     * forever.
+     *
+     * Mechanism: the saved comma-separated order is read and filtered down to
+     * only names still present in DEFAULT_SECTIONS (drops anything renamed or
+     * removed since). If nothing valid is left, the whole default order is used
+     * as-is. Otherwise, any DEFAULT_SECTIONS entries missing from the saved list
+     * (i.e. new since the user last customized their order) are inserted:
+     * "summary"/"controls" are always pinned back to the very front (in
+     * DEFAULT_SECTIONS order) since they're the primary at-a-glance sections;
+     * every other missing section is inserted immediately after the nearest
+     * section that precedes it in DEFAULT_SECTIONS order and IS present in the
+     * user's list, so a newly-added section lands in a sensible relative spot
+     * instead of always being tacked onto the end.
+     */
     suspend fun sectionOrder(vin: String): List<String> {
         val saved = context.settingsDataStore.data.first()[stringPreferencesKey("sections_$vin")]
             ?.split(",")?.filter { it.isNotBlank() }
@@ -526,12 +637,24 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("sections_$vin")] = order.joinToString(",") }
     }
 
+    /** Shared helper: reads [key] as a comma-separated string and splits it back
+     *  into a Set, dropping empty segments (so a stored empty string decodes to
+     *  an empty set rather than a set containing one blank element). Used for
+     *  every "set of section names" preference (collapsed/hidden sections here)
+     *  since Preferences DataStore has no native Set<String> support for
+     *  primitives written as plain strings elsewhere in this file. */
     private fun csv(p: androidx.datastore.preferences.core.Preferences, key: String): Set<String> =
         p[stringPreferencesKey(key)]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     suspend fun collapsedSections(vin: String): Set<String> =
         csv(context.settingsDataStore.data.first(), "collapsed_$vin")
 
+    /** Toggles [section] in or out of [vin]'s collapsed set: reads the current
+     *  CSV-encoded set, adds or removes the section, then re-encodes and writes
+     *  it back — a read-modify-write pair inside one editTracked() transaction
+     *  so a concurrent write to the same key can't be lost between the read and
+     *  the write (DataStore's edit{} block runs with the current prefs snapshot
+     *  passed in, not a stale one captured earlier). */
     suspend fun setSectionCollapsed(vin: String, section: String, collapsed: Boolean) {
         editTracked {
             val set = csv(it, "collapsed_$vin").toMutableSet()
@@ -543,6 +666,9 @@ class SettingsStore(private val context: Context) {
     suspend fun hiddenSections(vin: String): Set<String> =
         csv(context.settingsDataStore.data.first(), "hidden_$vin")
 
+    /** Same read-modify-write pattern as [setSectionCollapsed], for the
+     *  independent "hidden" set (a hidden section is fully removed from view;
+     *  a collapsed one is still shown, just closed by default). */
     suspend fun setSectionHidden(vin: String, section: String, hidden: Boolean) {
         editTracked {
             val set = csv(it, "hidden_$vin").toMutableSet()
@@ -582,7 +708,13 @@ class SettingsStore(private val context: Context) {
 
     // --- Quick Settings tiles --------------------------------------------
 
-    /** Per-tile assignment: (vin, command) or null if unassigned. */
+    /** Per-tile assignment: (vin, command) or null if unassigned.
+     *  Each of the [TILE_COUNT] tiles gets two independent string keys, keyed by
+     *  its numeric [index] ("tile_0_vin", "tile_0_cmd", "tile_1_vin", …). Both
+     *  must be present and non-blank for the tile to count as configured — if
+     *  either is missing (e.g. the car was removed and its keys cleared but the
+     *  command key survived some other way) the tile is treated as fully
+     *  unassigned rather than half-configured. */
     suspend fun tileConfig(index: Int): Pair<String, String>? {
         val p = context.settingsDataStore.data.first()
         val vin = p[stringPreferencesKey("tile_${index}_vin")]?.takeIf { it.isNotBlank() } ?: return null
@@ -590,6 +722,8 @@ class SettingsStore(private val context: Context) {
         return vin to cmd
     }
 
+    /** Passing null/blank for either [vin] or [cmd] clears both keys, unassigning
+     *  the tile entirely (a tile can't be half-configured — see [tileConfig]). */
     suspend fun setTileConfig(index: Int, vin: String?, cmd: String?) {
         editTracked {
             val vk = stringPreferencesKey("tile_${index}_vin")
@@ -649,7 +783,15 @@ class SettingsStore(private val context: Context) {
 
     // --- Home-screen widgets -------------------------------------------------
 
-    /** Per-widget assignment: (pinned vin, ordered action keys) or null. */
+    /** Per-widget assignment: (pinned vin, ordered action keys) or null.
+     *  [widgetId] is Android's AppWidgetManager-assigned id for that specific
+     *  home-screen widget instance, so each placed widget gets its own
+     *  independent set of "widget_<id>_*" keys below — unlike tiles (a fixed
+     *  [TILE_COUNT] slots) an arbitrary number of widgets can exist, hence
+     *  keying by the OS-provided id rather than a small fixed index. Only the
+     *  vin key is required for a widget to count as configured; a missing
+     *  actions key just means no action buttons were chosen (empty list), not
+     *  that the widget is unconfigured. */
     suspend fun widgetConfig(widgetId: Int): Pair<String, List<String>>? {
         val p = context.settingsDataStore.data.first()
         val vin = p[stringPreferencesKey("widget_${widgetId}_vin")]?.takeIf { it.isNotBlank() } ?: return null
@@ -948,6 +1090,10 @@ class SettingsStore(private val context: Context) {
 
     // --- Per-car powertrain override -------------------------------------
 
+    /** Null means "not confirmed by the user yet" — the US Hyundai/Genesis API
+     *  only distinguishes EV vs. gas, so the app asks the user to disambiguate
+     *  hybrid/PHEV during car setup and stores their answer here; callers fall
+     *  back to whatever the API-derived guess was when this is null. */
     suspend fun powertrain(vin: String): Powertrain? =
         context.settingsDataStore.data.first()[stringPreferencesKey("ptrain_$vin")]
             ?.let { runCatching { Powertrain.valueOf(it) }.getOrNull() }
@@ -956,6 +1102,10 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("ptrain_$vin")] = value.name }
     }
 
+    // Remaining global appearance setters (theme/font/dynamic-color/palette):
+    // each stores its enum's name() (or, for dynamicColor, a "true"/"false"
+    // string) under its fixed Keys.* entry; decoding happens once, centrally,
+    // in the `appearance` Flow above.
     suspend fun setThemeMode(mode: ThemeMode) {
         editTracked { it[Keys.THEME] = mode.name }
     }
@@ -995,6 +1145,11 @@ class SettingsStore(private val context: Context) {
         return runCatching { climateJson.decodeFromString(presetListSerializer, raw) }.getOrElse { emptyList() }
     }
 
+    /** Insert-or-replace by id: the whole preset list is re-read, decoded, the
+     *  matching entry (by [ClimatePreset.id]) is replaced in place if found or
+     *  appended if not, then the entire list is re-encoded and written back as
+     *  one JSON string — there's no partial-update of a single preset within
+     *  the stored JSON, the whole array is always rewritten. */
     suspend fun saveClimatePreset(vin: String, preset: ClimatePreset) {
         val existing = climatePresets(vin).toMutableList()
         val idx = existing.indexOfFirst { it.id == preset.id }

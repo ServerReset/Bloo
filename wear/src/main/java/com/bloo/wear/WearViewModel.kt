@@ -45,6 +45,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.coroutines.resume
 
+/** Top-level screen the watch is showing: initial data load, no logged-in
+ *  account, or the normal car-list/detail UI. */
 enum class WearScreen { Loading, SignedOut, Ready }
 
 private const val UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
@@ -188,6 +190,8 @@ data class WearUi(
         pebbleOverride[vin] ?: settings?.pebbleOrders?.get(vin) ?: WearPebbles.DEFAULT_ORDER
 }
 
+/** Map the watch UI's 0–3 heat step (Off/Low/Med/High) to the API's
+ *  [SeatLevel] enum. The watch has no cooling control, only heat. */
 private fun seatLevelOf(step: Int): SeatLevel = when (step) {
     1 -> SeatLevel.LOW_HEAT
     2 -> SeatLevel.MED_HEAT
@@ -218,8 +222,41 @@ private fun seatStepOf(level: SeatLevel): Int = when (level) {
     else -> 0
 }
 
+/** Display labels for the 0–3 seat-heat steps used by [seatStepOf]/[seatLevelOf]. */
 val seatStepLabels = listOf("Off", "Low", "Med", "High")
 
+/**
+ * The Wear OS app's single ViewModel. Every user-visible piece of state (car
+ * list, climate drafts, presets, settings, PIN lock, update banner) flows
+ * through the single [_ui] StateFlow exposed as [ui].
+ *
+ * The central architectural quirk of this ViewModel, relative to a normal
+ * single-device ViewModel, is that almost every command (lock/unlock, climate,
+ * charge, charge limits, horn/lights) can execute in one of two completely
+ * different ways depending on whether a phone is currently reachable over the
+ * Wearable Data Layer:
+ *
+ *  - "Relayed": the command is serialized into a [com.bloo.bluelink.data.WearCommand]
+ *    and sent to the phone (see [WearComms.send]), which owns the real
+ *    BlueLink/network session and actually talks to the car. The watch has no
+ *    ack channel for the phone's own execution result here -- it only knows
+ *    whether the SEND succeeded, not whether the phone's subsequent API call
+ *    did. A later out-of-band failure notice can arrive via
+ *    [WearCommandEvents.results] (wired up in [init]) and triggers a
+ *    corrective status refresh rather than trying to hand-roll a revert.
+ *  - "Standalone": when no phone is reachable, the watch has its own signed-in
+ *    BlueLink session (see [repoFor]/[repos]) and calls the vehicle API
+ *    directly, exactly like the phone app would.
+ *
+ * Both paths apply the SAME "optimistic" local-state update pattern before any
+ * network confirmation comes back: the relay path patches [snapshots]/
+ * [statuses] via [com.bloo.bluelink.data.WearCommandRunner.optimistic] inside
+ * [command], while the standalone path patches [statuses] via [flip] once its
+ * own suspend block returns successfully. Either way, [publish] is called
+ * immediately afterward so the UI reacts instantly instead of waiting on a
+ * round trip. All shared command logic funnels through the private [command]
+ * helper near the bottom of this file.
+ */
 class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     private val ctx get() = getApplication<Application>()
@@ -230,16 +267,35 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val repos = mutableMapOf<Brand, VehicleRepository>()
     private val localStore = WearLocalStore(ctx)
 
+    // These @Volatile fields are the ViewModel's real source of truth; [_ui] is
+    // just a derived projection rebuilt by [publish] (via [buildCarView])
+    // whenever one of them changes. They're plain vars (not StateFlows)
+    // because they're written from both the main-thread command functions and
+    // background coroutines (snapshot collection, status fetches), and are
+    // read synchronously by buildCarView on every publish() -- @Volatile gives
+    // safe publication across threads without needing a full Mutex for what
+    // are simple map-replacement writes.
+    /** The garage's vehicle list, either fetched live (standalone) or derived
+     *  from phone-synced [snapshots] (see [loadGarage]). */
     @Volatile
     private var vehicles: List<Vehicle> = emptyList()
+    /** Live, richly-detailed status per VIN as fetched directly from the
+     *  vehicle API (standalone commands) or synced down; [buildCarView]
+     *  prefers this over [snapshots] wherever both have a field. */
     @Volatile
     private var statuses: Map<String, VehicleStatus> = emptyMap()
+    /** The phone's lightweight, always-available view of each car -- what the
+     *  UI falls back to when [statuses] hasn't been fetched yet for a VIN. */
     @Volatile
     private var snapshots: Map<String, com.bloo.bluelink.data.VehicleSnapshot> = emptyMap()
+    /** Wall-clock time (ms) each VIN's [statuses] entry was last fetched, for
+     *  the "last updated" display. */
     @Volatile
     private var fetchedAt: Map<String, Long> = emptyMap()
     @Volatile
     private var trips: Map<String, List<EvTrip>> = emptyMap()
+    /** Reverse-geocoded place names per VIN, filled in lazily by
+     *  [ensurePlaceName] and never persisted -- recomputed each app session. */
     @Volatile
     private var placeNames: Map<String, String> = emptyMap()
     @Volatile
@@ -250,6 +306,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // SECOND call's block() was still running -- the pending spinner/disabled
     // state vanished, and the button became tappable again, mid-request.
     private var pendingCounts: Map<String, Int> = emptyMap()
+    // Exposed as a Set (just the keys) because that's all the UI needs to
+    // know -- "is this key busy" -- the refcount itself is [mark]'s private
+    // bookkeeping for handling overlapping in-flight calls correctly.
     private val pending: Set<String> get() = pendingCounts.keys
 
     // Cars whose status we've already fetched this session, so paging back and
@@ -262,6 +321,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(WearUi())
     val ui = _ui.asStateFlow()
 
+    /** Lazily create (and cache) the standalone [VehicleRepository] for
+     *  [brand], used by the watch's own direct/standalone command path. One
+     *  repository instance is reused per brand for the life of the ViewModel
+     *  so its underlying session/token state persists across calls. */
     private fun repoFor(brand: Brand) =
         repos.getOrPut(brand) { repositoryFor(brand, sessionStore, credentialStore) }
 
@@ -292,6 +355,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        // Presets are stored on-disk (WearPresetsStore, a DataStore-backed
+        // store) and synced with the phone; this just mirrors whatever is
+        // currently persisted into ui.presets so both the watch's own writes
+        // (saveCurrentAsPreset/deletePreset) and phone-originated syncs show
+        // up the same way, through the same collector.
         viewModelScope.launch {
             WearPresetsStore(ctx).flow.collect { p -> _ui.update { it.copy(presets = p.byVin) } }
         }
@@ -310,9 +378,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        // WearLocalSettings (font scale, unit system, PIN-lock config) lives
+        // entirely on-device -- it's never synced FROM the phone, only pushed
+        // TO it (see pushLocalPinSettings/setFontScale/setUnitSystem) so the
+        // phone can show the watch's preferences too. This just keeps ui
+        // mirrored to whatever's currently on disk.
         viewModelScope.launch {
             localStore.flow.collect { s -> _ui.update { it.copy(localSettings = s) } }
         }
+        // Reply channel for syncDrive(): the phone posts its Drive-sync
+        // result here once its own work finishes, which both clears the busy
+        // spinner and surfaces a message. If the phone never replies,
+        // syncDrive's own delay(15_000) safety net clears driveSyncBusy
+        // instead so this collector effectively races that timeout.
         viewModelScope.launch {
             WearSyncEvents.results.collect { r ->
                 _ui.update { it.copy(driveSyncBusy = false, message = r.message ?: if (r.ok) "Settings synced" else "Sync failed") }

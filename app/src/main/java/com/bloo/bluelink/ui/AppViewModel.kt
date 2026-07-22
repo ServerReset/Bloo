@@ -332,12 +332,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SettingsStore.NotificationPrefs(),
         )
 
+    /**
+     * Evaluates this car's freshly-fetched [status] against the user's alert
+     * thresholds (door-open duration, engine-running duration, etc. — see
+     * [CarAlerts]), posts a system notification for every alert that fires, and
+     * additionally surfaces the FIRST one as an in-app snackbar message so it's
+     * visible even if the app is already in the foreground (where a system
+     * notification is easy to miss). Called after every successful status load.
+     */
     private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
         alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions) }
         alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text) } }
     }
 
+    // Simple notification-preference setters: each just fires a coroutine that
+    // writes one field to SettingsStore's DataStore. They don't touch _state
+    // directly because `notifications` above is already a StateFlow mirroring
+    // settingsStore.notifications, so the UI picks up the change automatically
+    // once the write completes and the underlying Flow re-emits.
     fun setNotifyService(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyService(v) }
     fun setNotifyDoor(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyDoor(v) }
     fun setDoorOpenMinutes(m: Int) = viewModelScope.launch { settingsStore.setDoorOpenMinutes(m) }
@@ -353,6 +366,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        // Everything below launches independent coroutines in viewModelScope
+        // (so they're all cancelled together when the ViewModel is cleared) and
+        // most of them are long-lived `collect` loops on a Flow — they never
+        // complete, they just re-run their body every time the upstream Flow
+        // emits a new value, for the lifetime of the ViewModel. Each one is
+        // one-directional (phone state -> watch), independent of the others,
+        // and safe to fire in any order since they only ever read from
+        // settingsStore/_state and write out to the watch bridge.
         // Mirror appearance/preferences to a paired watch whenever they change,
         // so the watch theme + settings always match the phone live.
         viewModelScope.launch {
@@ -425,9 +446,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        // Cold-start auto-login: if any brand has saved credentials (from a
+        // previous session), silently restore all of them and start loading the
+        // garage — this is the one-time launch path, separate from the
+        // interactive login() below.
         viewModelScope.launch {
             val brands = store.loggedInBrands()
             if (brands.isEmpty()) return@launch
+            // repoFor(it) lazily creates+caches one VehicleRepository per brand
+            // in the `repos` map (see repoFor above) so later calls just reuse it.
             brands.forEach { repoFor(it) }
             _state.update { it.copy(accounts = credentialStore.loadAll()) }
             val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
@@ -440,7 +467,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Auth ------------------------------------------------------------
 
-    /** Sign in (or add another account). Multiple brands can be active at once. */
+    /**
+     * Sign in (or add another account). Multiple brands can be active at once.
+     * Validates the fields locally first (PIN is skipped for brands that use a
+     * one-time-code login instead of a PIN), then branches: Kia always goes
+     * through [loginKia]'s two-step OTP dance, everything else does a normal
+     * synchronous BlueLinkRepository login wrapped in [launchBusy] (so the
+     * "loading" spinner shows and any thrown exception becomes a snackbar).
+     * On success the credentials are persisted (so next cold start auto-logs-in)
+     * and the garage is (re)loaded to pull in the newly-added account's cars.
+     */
     fun login(username: String, password: String, pin: String, brand: Brand) {
         if (username.isBlank() || password.isBlank() || (pin.isBlank() && !brand.usesOtpLogin)) {
             _state.update { it.copy(message = "Email, password and PIN are all required") }
@@ -464,6 +500,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // held here between the steps and only persisted once fully signed in.
     private var kiaPending: Credentials? = null
 
+    /**
+     * Step 1 of Kia login: attempt sign-in with just username/password/PIN. Kia's
+     * API either logs straight in ([KiaAuth.LoggedIn]) or demands a one-time code
+     * ([KiaAuth.OtpRequired]) — which branch happens depends on the account and
+     * isn't knowable ahead of time. On the OTP branch the credentials are stashed
+     * in [kiaPending] (NOT yet persisted to [credentialStore]) and the UI is told
+     * to show the OTP challenge; [kiaSendOtp]/[kiaVerifyOtp] complete the flow.
+     */
     private fun loginKia(username: String, password: String, pin: String) {
         launchBusy {
             when (val auth = kiaRepo().startLogin(username, password, pin)) {
@@ -511,6 +555,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(kiaOtp = null) }
     }
 
+    /** Finish a fully-authenticated Kia login (reached from either the direct
+     *  [KiaAuth.LoggedIn] branch or after [kiaVerifyOtp] succeeds): persist the
+     *  credentials now that they're verified, refresh the account list, close
+     *  the login form, and load the garage. */
     private suspend fun finishKiaLogin(creds: Credentials) {
         credentialStore.save(creds)
         AppLog.log("Signed in as ${maskEmail(creds.email)} (Kia)")
@@ -526,6 +574,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         else s.copy(addingAccount = false)
     }
 
+    /**
+     * Sign out of one brand. The server-side logout call is best-effort
+     * (`runCatching` — a failed logout call shouldn't block clearing local
+     * state), but clearing the cached credentials and dropping the brand's
+     * cached [VehicleRepository] from [repos] always happens so the app
+     * forgets that brand for good. If that was the LAST signed-in account, the
+     * whole [UiState] is replaced with a fresh one pointed at the login screen
+     * (wiping any stale per-VIN data for the signed-out cars); otherwise the
+     * garage is reloaded so it no longer shows that brand's vehicles.
+     */
     fun logout(brand: Brand) {
         viewModelScope.launch {
             runCatching { repoFor(brand).logout() }

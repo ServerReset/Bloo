@@ -18,12 +18,16 @@ private val Context.statusCacheStore by preferencesDataStore(
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
+// Wire format persisted as a single JSON string under one DataStore key. Everything
+// is keyed by VIN (the map keys), so one payload can hold every vehicle on the
+// account at once. All fields default to empty so decoding an old/partial payload
+// (or the corruption-handler's emptyPreferences() fallback) still parses cleanly.
 @Serializable
 private data class CachePayload(
     val statuses: Map<String, VehicleStatus> = emptyMap(),
     val locations: Map<String, GeoLocation> = emptyMap(),
-    val placeNames: Map<String, String> = emptyMap(),
-    val fetched: Map<String, Long> = emptyMap(),
+    val placeNames: Map<String, String> = emptyMap(), // reverse-geocoded label per VIN, cached to avoid re-geocoding
+    val fetched: Map<String, Long> = emptyMap(), // epoch-millis timestamp of when each VIN's data was fetched
 )
 
 /**
@@ -33,6 +37,9 @@ private data class CachePayload(
  */
 class StatusCache(private val context: Context) {
 
+    // ignoreUnknownKeys lets old cache files survive future field additions without
+    // crashing decode; encodeDefaults ensures every field is always written so a
+    // reader on an older app version (or after a rollback) still finds all keys present.
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val key = stringPreferencesKey("payload")
 
@@ -43,6 +50,14 @@ class StatusCache(private val context: Context) {
         val fetched: Map<String, Long>,
     )
 
+    /**
+     * Reads the single DataStore entry, decodes it from JSON, and unpacks it into a
+     * [Cached]. Takes only the first emitted value from the DataStore Flow (`.first()`)
+     * since this is a one-shot read, not an ongoing subscription. If the key is absent
+     * (first run) or decoding fails for any reason (corrupt/incompatible JSON), falls
+     * back to an all-empty [CachePayload] via `runCatching { }.getOrNull() ?: CachePayload()`
+     * rather than throwing, so a bad cache never blocks app startup.
+     */
     suspend fun load(): Cached {
         val raw = context.statusCacheStore.data.first()[key]
         val p = raw?.let { runCatching { json.decodeFromString(CachePayload.serializer(), it) }.getOrNull() }
@@ -50,6 +65,12 @@ class StatusCache(private val context: Context) {
         return Cached(p.statuses, p.locations, p.placeNames, p.fetched)
     }
 
+    /**
+     * Serializes the given maps into one [CachePayload] JSON blob and writes it as a
+     * single atomic DataStore edit (DataStore's `edit` runs the whole block as one
+     * transaction), replacing whatever was previously stored under [key] wholesale —
+     * there is no per-VIN partial update, callers must pass the full merged state.
+     */
     suspend fun save(
         statuses: Map<String, VehicleStatus>,
         locations: Map<String, GeoLocation>,

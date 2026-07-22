@@ -68,9 +68,45 @@ import kotlinx.coroutines.flow.first
  * live toggle state (climate on = teal, charging = green, unlocked = red). Two
  * per-widget options: use the car's photo as a full-bleed background, and show a
  * live location/map box on large sizes.
+ *
+ * HOW GLANCE WORKS, MECHANICALLY: this is NOT normal Jetpack Compose. Glance
+ * composables ([Box], [Column], [Row], [Text], [Image], etc., all from the
+ * `androidx.glance.*` packages, not `androidx.compose.foundation.layout.*`)
+ * don't draw pixels directly the way a real Compose UI does. Instead, when
+ * [provideGlance] runs, Glance walks the composition tree it produced and
+ * translates each node into an actual Android [android.widget.RemoteViews]
+ * tree — the same limited, cross-process-safe view hierarchy App Widgets have
+ * always used (frames, linear layouts, text views, image views...). That
+ * RemoteViews tree is what the launcher process actually inflates and draws;
+ * this app's process is not running when the widget sits idle on the home
+ * screen. This is why Glance composables can't use arbitrary Compose runtime
+ * features: no custom Canvas drawing, no arbitrary animation, no state that
+ * lives only in this process, and only the handful of layout primitives that
+ * have a RemoteViews equivalent. Every render is a fresh, one-shot conversion
+ * from scratch — there's no persistent Composer holding state between updates
+ * the way there is in a real running Compose UI; anything that needs to
+ * persist between widget updates (pending-action flag, cached bitmaps, chosen
+ * config) has to live in [SettingsStore]/[SnapshotStore] or the on-disk/
+ * in-memory caches below, and gets re-read at the top of every [provideGlance]
+ * call. Clicks work the same way: a Glance `clickable(...)` modifier doesn't
+ * attach a listener the way Compose's `Modifier.clickable` does (there's
+ * nothing listening — the app isn't running) — it instead bakes a
+ * [android.app.PendingIntent] into the RemoteViews tree, either one that
+ * starts an activity ([actionStartActivity], used for "open the app" and the
+ * biometric-gated auth flow) or one that fires an [androidx.glance.appwidget.action.ActionCallback]
+ * via [actionRunCallback] (used for silent background actions — this briefly
+ * wakes the app's process just long enough to run [WidgetActionCallback.onAction]
+ * and update the RemoteViews in place, without ever showing UI). See the
+ * "Click routing" section below for exactly how each button type is wired.
  */
 class BlooWidget : GlanceAppWidget() {
 
+    // SizeMode.Exact makes Glance re-invoke provideGlance (and therefore this
+    // whole composition) separately for every concrete pixel size the widget
+    // is resized to on the home screen, rather than rendering once for a
+    // small set of size "buckets" -- this is what lets each tier composable
+    // below pick its own layout purely from LocalSize.current instead of
+    // guessing which bucket it landed in.
     override val sizeMode = SizeMode.Exact
 
     /** Palette + semantic state colors, resolved once per render off the app theme. */
@@ -105,6 +141,25 @@ class BlooWidget : GlanceAppWidget() {
         val infoFields: List<WidgetInfoField> = WidgetInfoField.DEFAULTS,
     )
 
+    /**
+     * Glance's entry point for rendering one widget instance. Called by the
+     * Glance runtime whenever this widget needs to be (re)rendered -- on
+     * placement, on an explicit `updateAll()`/`update()` call from the workers
+     * elsewhere in this file, and whenever its size changes (see [sizeMode]).
+     *
+     * Runs in two phases:
+     *  1. Everything before `provideContent { ... }` is plain suspend Kotlin:
+     *     read this widget's saved config and the latest cached vehicle
+     *     snapshot from disk (never a live network call -- a widget render
+     *     must stay fast and cheap), resolve the theme/accent colors, and
+     *     decode/cache any bitmaps (car photo, location map tile) it needs.
+     *  2. The `provideContent { ... }` block is the actual Glance composition
+     *     -- this is what gets translated into RemoteViews (see the class doc
+     *     comment above). It picks one of the Tier composables below based on
+     *     the widget's current pixel size and hands it everything gathered in
+     *     phase 1 via [Ctx], so none of the tier composables need to touch
+     *     Context/DataStore themselves.
+     */
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val settings = SettingsStore(context)
         val widgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
@@ -265,15 +320,23 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
-    /** Controls-only: chunky buttons filling the tile edge-to-edge (for tiny controls-mode). */
+    /** Controls-only: chunky buttons filling the tile edge-to-edge (for tiny controls-mode).
+     *  Bails out (renders nothing) when no actions are configured, rather than showing
+     *  an empty box -- the caller in [provideGlance] still draws the pending spinner /
+     *  background around whatever this returns. */
     @Composable
     private fun ControlsTile(c: Ctx, base: GlanceModifier) {
         if (c.actions.isEmpty()) return
+        // Only ever the first 4 actions -- a widget can have at most 4 configured
+        // (see WidgetConfigActivity), this coerce is just defensive.
         val take = c.actions.take(4)
         ButtonGrid(c, take, cols = take.size.coerceAtMost(2), showLabel = false, iconSize = 18.dp,
             modifier = GlanceModifier.fillMaxSize().padding(4.dp))
     }
 
+    /** Shown for every tile size when this widget instance has no car assigned yet
+     *  (i.e. [provideGlance] found `snap == null`). Tapping anywhere on it launches
+     *  [WidgetConfigActivity] via [configIntent] so the user can pick a car. */
     @Composable
     private fun SetupTile(base: GlanceModifier, intent: Intent) {
         Box(base.clickable(actionStartActivity(intent)), contentAlignment = Alignment.Center) {
@@ -413,6 +476,9 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    /** Roughly-square mid-size widget (under 220x130.dp): name, percent + range
+     *  side by side, a state chip, and optionally a 2-column button block below
+     *  filling the remaining vertical space via defaultWeight(). */
     @Composable
     private fun SquareTile(c: Ctx, w: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
@@ -441,6 +507,10 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    /** Wide, short-ish widget (roomier than [ShortWideTile] but under [LargeTile]'s
+     *  height threshold): info column on the left, optional button column on the
+     *  right that only appears in controls mode -- see the comment on the Column
+     *  sizing below for why the info column's width strategy changed. */
     @Composable
     private fun WideTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
@@ -477,6 +547,13 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    /** The biggest tile tier (roughly 3x3 home-screen cells and up): full name,
+     *  state chip, percent/range hero numbers, and a right-hand side panel that's
+     *  either the live location map, the car photo, or nothing -- plus, in
+     *  controls mode, a footer row/grid of buttons. Font sizes and column counts
+     *  scale further with height/width via the `tall`/`pctSize`/`footerCols` locals
+     *  below so a 3x3 and a 5x5 both feel proportioned rather than the 5x5 just
+     *  having empty margins. */
     @Composable
     private fun LargeTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
@@ -605,6 +682,12 @@ class BlooWidget : GlanceAppWidget() {
         }
     }
 
+    /** The small rounded status pill ("Locked" / "Charging" / "Climate on" / etc.)
+     *  shown next to the car name on most tiers. Priority when several states are
+     *  true at once: charging beats unlocked beats climate-on beats the plain
+     *  accent-colored default -- matches [stateColor]'s priority for the InfoTile
+     *  status dot, so the widget never shows two different "which state matters
+     *  most" answers depending on tile size. */
     @Composable
     private fun StateChip(c: Ctx) {
         val label = vehicleStateLabel(c.snap.engineOn, c.snap.charging, c.snap.climateOn, c.snap.locked)
@@ -633,6 +716,16 @@ class BlooWidget : GlanceAppWidget() {
 
     private class ActionVisual(val iconRes: Int, val bg: ColorProvider, val fg: ColorProvider, val label: String)
 
+    /**
+     * Resolve one action button's icon/background/foreground/label from the car's
+     * current live state, so e.g. the "Doors" button shows a lock icon on a red
+     * background and reads "Lock" when the car is unlocked, and shows an unlock
+     * icon on the accent color reading "Unlock" when it's locked -- same for
+     * climate (teal when on) and charge (green when charging). If this exact
+     * action is the one currently in flight ([pending] == [action]'s key) that
+     * overrides everything else with a spinner icon and the muted pending color,
+     * regardless of what state the car itself is in.
+     */
     private fun actionVisual(action: WidgetAction, snap: VehicleSnapshot, pending: String?, theme: Theme): ActionVisual {
         val isPending = pending == action.key
         val isClimateActive = snap.climateOn == true && action.key in CLIMATE_KEYS
@@ -659,6 +752,10 @@ class BlooWidget : GlanceAppWidget() {
         return ActionVisual(iconRes, bg, fg, label)
     }
 
+    /** Same priority order as [actionVisual]'s background resolution (charging >
+     *  unlocked > climate-on > accent default), but for the InfoTile's tiny status
+     *  dot rather than a full button, so the smallest widget size still tells the
+     *  most important current state apart at a glance. */
     private fun stateColor(snap: VehicleSnapshot, theme: Theme): ColorProvider = when {
         snap.charging == true -> theme.charge
         snap.locked == false -> theme.unlocked
@@ -686,6 +783,10 @@ class BlooWidget : GlanceAppWidget() {
         )
     }
 
+    /** Build the intent that opens the app straight to [vin]'s car page, reusing the
+     *  same [Shortcuts]-based routing the launcher shortcuts and app-open widget
+     *  button share -- [MainActivity.handleShortcutIntent] is what actually reads
+     *  these extras once the activity starts. */
     private fun openIntent(ctx: Context, vin: String): Intent =
         Intent(ctx, MainActivity::class.java).apply {
             action = Shortcuts.ACTION
@@ -708,6 +809,8 @@ class BlooWidget : GlanceAppWidget() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
+    /** Build the intent that opens [WidgetConfigActivity] pre-targeted at this
+     *  specific widget instance, used by [SetupTile] for a never-configured widget. */
     private fun configIntent(context: Context, widgetId: Int): Intent =
         Intent(context, WidgetConfigActivity::class.java).apply {
             data = Uri.parse("bloo://widget/config/$widgetId")
@@ -758,6 +861,10 @@ class BlooWidget : GlanceAppWidget() {
         private val bitmapCache = object : android.util.LruCache<String, Bitmap>(6 * 1024 * 1024) {
             override fun sizeOf(key: String, value: Bitmap) = value.byteCount
         }
+        // Grouped by the state they visually react to (not by exact WidgetAction key)
+        // so e.g. both the toggle "climate" button and the explicit "climate_on"/
+        // "climate_off" buttons all light up teal together when climate is active,
+        // rather than only the specific button that happens to match the toggle.
         private val CLIMATE_KEYS = setOf("climate", "climate_on", "climate_off")
         private val LOCK_KEYS = setOf("doors", "lock", "unlock")
         private val CHARGE_KEYS = setOf("charge", "start_charge", "stop_charge")

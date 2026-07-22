@@ -350,6 +350,24 @@ import androidx.compose.ui.graphics.toArgb
  *  page the user actually sees composes. */
 private val coldStartIntroPlayed = mutableSetOf<Any>()
 
+/**
+ * Root composable for the whole phone app. Owns nothing itself beyond a
+ * snackbar host and a haptics engine -- all real state lives in [vm] and is
+ * collected here as Compose state so this function (and everything below it)
+ * recomposes whenever [AppViewModel.state] or [AppViewModel.appearance] emits.
+ *
+ * Structure, outside-in:
+ *  - A [CompositionLocalProvider] makes the shared [Haptics] instance
+ *    available to every descendant via [LocalHaptics].
+ *  - A full-bleed vertical gradient paints behind the transparent system
+ *    bars (edge-to-edge), inside a [Box] that can be blurred as a unit.
+ *  - A [Scaffold] hosts the snackbar and, via [AnimatedContent] keyed on the
+ *    current [Screen], cross-fades/slides between the Login, Empty,
+ *    Onboarding, CarSetup, Garage, and Settings top-level screens.
+ *  - A biometric lock overlay ([LockOverlay]) is drawn last, on top of
+ *    everything, and blurs+dims the content behind it while [state.locked]
+ *    is true.
+ */
 @Composable
 fun BlooApp(vm: AppViewModel) {
     val state by vm.state.collectAsState()
@@ -560,6 +578,13 @@ private data class WizardPage(
     val vin: String? = null,
 )
 
+/**
+ * Flattens the per-vehicle setup wizard into one linear list of pages: for
+ * each vehicle, a POWERTRAIN page, then a SEATS page, then a STEERING page,
+ * in that order. The resulting list drives a single [HorizontalPager] in
+ * [CarSetupWizardScreen], so a multi-car setup becomes one continuous swipe
+ * sequence instead of nested per-car flows.
+ */
 private fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
     vehicles.forEach { v ->
         add(WizardPage(WizardStepKind.POWERTRAIN, v.vin))
@@ -568,7 +593,18 @@ private fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): Lis
     }
 }
 
-/** First-run: one scrollable page with welcome, per-car config, and permissions. */
+/**
+ * First-run: one scrollable page with welcome, per-car config, and permissions.
+ *
+ * On first composition (`LaunchedEffect(Unit)`) it fires the one-time
+ * celebratory fireworks sound/haptic and starts a plain countdown timer
+ * (`countdown`, ticking down from 15 once per second via `delay(1_000)`).
+ * The countdown is local `mutableIntStateOf` state, so each decrement just
+ * recomposes whatever reads `countdown` below (typically a "you can continue
+ * in Ns" style hint) without touching the view model. `BackHandler {}` with
+ * an empty body swallows the system back gesture/button entirely, so the
+ * user can't back out of onboarding before finishing setup.
+ */
 @Composable
 private fun OnboardingScreen(vm: AppViewModel) {
     val context = LocalContext.current
@@ -865,6 +901,15 @@ private fun CarSetupWizardScreen(vm: AppViewModel, vins: List<String>) {
     )
 }
 
+/**
+ * Renders a linear, swipe-free (button-driven) wizard over [pages]: a top
+ * progress bar, the current page's content cross-faded/slid in via
+ * [AnimatedContent] keyed on [pageIndex], and a Back/Next footer. Only
+ * [pageIndex] is local state -- advancing or retreating just mutates that
+ * int, which drives both the progress bar's target and which page content
+ * is shown. Reaching "Next" on the last page calls [onComplete] instead of
+ * advancing further.
+ */
 @Composable
 private fun CarFeatureWizard(
     vm: AppViewModel,

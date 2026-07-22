@@ -55,6 +55,10 @@ enum class Brand(
     val usesOtpLogin: Boolean get() = this == KIA
 
     companion object {
+        // Looks up an enum entry by its exact `name` (e.g. "KIA"); falls back to
+        // HYUNDAI (the original, pre-multi-brand default) if `name` is null or
+        // doesn't match any current entry, so a legacy/blank stored value never
+        // throws NoSuchElementException.
         fun fromName(name: String?): Brand =
             entries.firstOrNull { it.name == name } ?: HYUNDAI
 
@@ -93,6 +97,8 @@ data class BrandLinks(
     /** Connected-car content store (Features on Demand: themes, lighting…). */
     val storeUrl: String,
 ) {
+    // Builds the Play Store listing URL on the fly from appPackage rather than
+    // storing it as its own field, since it's always the same template per package id.
     val playStoreUrl: String get() = "https://play.google.com/store/apps/details?id=$appPackage"
 }
 

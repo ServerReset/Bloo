@@ -39,6 +39,11 @@ fun WiggleText(
     maxLines: Int = 1,
     reduceMotion: Boolean = false,
 ) {
+    // Strips out anything that isn't a digit (units, "°", separators, etc.) and
+    // parses what's left as an integer, so this matches "67", "67°", "67F" and the
+    // like -- but not multi-number strings, since filtering digits from e.g.
+    // "6-7" would also collapse to "67" and falsely trigger. Any non-numeric
+    // leftover (toIntOrNull returning null) simply never equals 67.
     val isSixSeven = text.filter { it.isDigit() }.toIntOrNull() == 67
     if (!isSixSeven || reduceMotion) {
         // BasicText defaults to TextOverflow.Clip -- a value long enough to
@@ -48,6 +53,11 @@ fun WiggleText(
         BasicText(text, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
         return
     }
+    // A continuously-looping "phase" value that sweeps 0 -> 2π every 620ms and then
+    // restarts (RepeatMode.Restart, so it snaps back to 0 rather than reversing) --
+    // effectively a free-running clock in radians driving the sine wave below.
+    // LinearEasing keeps the sweep rate constant so the wave travels smoothly
+    // rather than speeding up/slowing down.
     val transition = rememberInfiniteTransition(label = "wiggle67")
     val phase by transition.animateFloat(
         initialValue = 0f,
@@ -55,8 +65,17 @@ fun WiggleText(
         animationSpec = infiniteRepeatable(tween(620, easing = LinearEasing), RepeatMode.Restart),
         label = "wigglePhase",
     )
+    // How far up/down (in px) each character travels at the peak of its bounce,
+    // scaled relative to the text's own font size so the wiggle looks proportional
+    // at any text size rather than a fixed pixel amount.
     val amplitude = with(LocalDensity.current) { (style.fontSize.value * 0.22f).dp.toPx() }
     Row {
+        // Each character is its own BasicText with its own graphicsLayer offset, so
+        // they can each be displaced independently to form a travelling wave: adding
+        // `i * 1.1f` to the shared phase before taking sin() gives every subsequent
+        // character a slightly later point in the same sine cycle, so the bounce
+        // ripples left-to-right across the digits rather than every digit bobbing
+        // perfectly in sync.
         text.forEachIndexed { i, ch ->
             BasicText(
                 ch.toString(),

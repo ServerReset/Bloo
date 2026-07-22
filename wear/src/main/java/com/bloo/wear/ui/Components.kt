@@ -87,6 +87,12 @@ import kotlin.math.tan
  * screen shape, so on a genuinely round watch their text/card edges sat
  * noticeably closer to the curved bezel than Home's did -- worst on the
  * reorder screen, which used only 8dp total.
+ *
+ * Mechanism: reads the current [androidx.compose.ui.platform.LocalConfiguration]
+ * composition local (recomposes automatically if config ever changes, e.g. a
+ * multi-window/display config swap) and picks between the two supplied
+ * constants based on its `isScreenRound` flag. No measurement or layout pass
+ * is involved -- this is a pure lookup, cheap enough to call on every screen.
  */
 @Composable
 fun roundSafeHorizontalPadding(flat: Dp = 14.dp, round: Dp = 22.dp): Dp =
@@ -174,6 +180,19 @@ fun SectionCard(
  * The Wear text-entry pattern: tapping launches the system input overlay
  * (keyboard / voice / handwriting) and the typed text comes back via RemoteInput.
  * Returns a lambda to trigger it.
+ *
+ * Mechanism: [rememberLauncherForActivityResult] registers an
+ * ActivityResultContracts.StartActivityForResult() launcher tied to this
+ * composable's lifecycle (registered once, survives recomposition because it's
+ * `remember`ed internally by the launcher API). Calling the returned lambda
+ * builds a RemoteInput "action" intent (the same system surface the watch uses
+ * for notification quick-replies) carrying one RemoteInput slot keyed by [KEY]
+ * with [label] as its prompt, then launches it. When the system input overlay
+ * returns, the launcher's callback pulls the typed/spoken text back out of the
+ * result Intent's extras via [RemoteInput.getResultsFromIntent], keyed by the
+ * same [KEY] constant used to build the request -- and only invokes [onResult]
+ * if non-null/non-blank text actually came back (a cancelled overlay returns a
+ * null `res.data`, which the early return guards against).
  */
 @Composable
 fun rememberWearTextInput(label: String, onResult: (String) -> Unit): () -> Unit {
@@ -196,7 +215,21 @@ private const val KEY = "bloo_input"
 
 /** Charge/fuel percentage as a ring with the value centred. The ring colour
  *  reflects state: green while charging, red when critically low, else accent.
- *  Percentage ring and color animate smoothly on value change. */
+ *  Percentage ring and color animate smoothly on value change.
+ *
+ *  Mechanism: `percent` is treated as "unknown" when null -- the ring still
+ *  renders (so layout never collapses/jumps when a snapshot briefly lacks a
+ *  reading) but shows a "—" label and defaults the color branch's null-percent
+ *  case to 100 (i.e. "not critically low") so a momentarily-missing percent
+ *  never flashes error-red. The progress value is clamped to 0..100 before
+ *  converting to the CircularProgressIndicator's 0f..1f range, guarding
+ *  against out-of-range API data driving the indicator past full or negative.
+ *  Both the fill fraction and the ring's color are wrapped in their own
+ *  `animateFloatAsState`/`animateColorAsState`, so a snapshot update (say,
+ *  percent jumping 42 -> 45, or charging flipping true) tweens smoothly
+ *  instead of snapping -- each animation runs independently and on its own
+ *  duration (progress: 800ms, color: 400ms), since a color change is meant to
+ *  read faster than the physical fill sweeping around. */
 @Composable
 fun ChargeRing(
     percent: Int?,
@@ -249,12 +282,25 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     // like it's re-fetching the same map tile on every poll).
     val latKey = (lat * 10000).toInt()
     val lonKey = (lon * 10000).toInt()
+    // `remember(latKey, lonKey)` only recomputes the tile math when the rounded
+    // key actually changes, so this whole block (including the network-bound
+    // URL) is stable across recompositions caused by unrelated state.
     val tile = remember(latKey, lonKey) {
+        // Standard "slippy map" Web Mercator tile projection at fixed zoom 15:
+        // convert lat/lon (degrees) into fractional tile coordinates (xf, yf) in
+        // the 0..n range, where n = 2^zoom is the number of tiles per axis at
+        // this zoom level. `xf` is a simple linear scale of longitude; `yf` uses
+        // the standard Mercator latitude formula (via tan/cos/ln) that maps
+        // latitude non-linearly so the map's y-axis stays visually undistorted.
         val z = 15
         val n = (1 shl z).toDouble()
         val latRad = Math.toRadians(lat)
         val xf = (lon + 180.0) / 360.0 * n
         val yf = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * n
+        // Truncating to Int gives the actual tile indices (xt, yt) to fetch;
+        // the fractional remainder (xf - xt, yf - yt) is the car's position
+        // *within* that tile (0..1 on each axis), used below to place the
+        // marker dot at the right pixel offset inside the downloaded image.
         val xt = xf.toInt()
         val yt = yf.toInt()
         Triple("https://tile.openstreetmap.org/$z/$xt/$yt.png", (xf - xt).toFloat(), (yf - yt).toFloat())
@@ -265,7 +311,14 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val marker = MaterialTheme.colorScheme.error
     val placeholder = MaterialTheme.colorScheme.surfaceContainerHigh
     val context = androidx.compose.ui.platform.LocalContext.current
+    // Bumped by the retry tap below; resets to 0 whenever the underlying tile
+    // `url` changes (car moved to a new tile) via the `remember(url)` key, so a
+    // stale retry counter from a previous location never lingers.
     var retryKey by remember(url) { mutableStateOf(0) }
+    // Appending a `?retry=N` query param busts Coil's cache key (which is
+    // derived from the request URL) without changing the actual tile fetched —
+    // this forces a fresh network attempt on tap instead of Coil just
+    // re-serving the same cached failure.
     val loadUrl = if (retryKey > 0) "$url?retry=$retryKey" else url
     val asyncPainter = rememberAsyncImagePainter(
         model = loadUrl,
@@ -604,6 +657,23 @@ fun weatherIcon(code: Int, isDay: Boolean): ImageVector =
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     com.bloo.bluelink.data.weatherTemp(tempC, fahrenheit)
 
+/**
+ * Watch-side wrapper over the shared `:uicommon` AnimatedValue that crossfades
+ * a piece of text when it changes (e.g. a percentage or a status string
+ * ticking over), instead of the new value popping in instantly.
+ *
+ * Mechanism: this function itself does no animation -- it just resolves the
+ * final TextStyle to hand off. [color] defaults to [Color.Unspecified]
+ * (Compose's "no color specified" sentinel), and since a TextStyle can't
+ * meaningfully render "unspecified", it's resolved here to the theme's
+ * onSurface color before merging into [style]; [fontWeight] similarly only
+ * overrides the style's own weight when explicitly passed. The actual
+ * crossfade/transition logic, plus honoring the system's reduce-motion
+ * setting (read here via [LocalReduceMotion] and passed straight through),
+ * lives in the shared `com.bloo.uicommon.AnimatedValue` implementation so the
+ * phone and watch never have two independently-tuned animations for the same
+ * concept.
+ */
 @Composable
 fun AnimatedValue(
     value: String,

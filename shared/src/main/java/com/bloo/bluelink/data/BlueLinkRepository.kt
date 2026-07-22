@@ -47,6 +47,12 @@ class BlueLinkRepository(
     private val brand: Brand,
 ) : VehicleRepository {
 
+    /**
+     * Authenticates against the brand's API and persists the resulting tokens plus
+     * the caller-supplied [pin]/[username] as a new [SessionStore.Session] for this
+     * brand. Note the PIN itself is never sent to or validated by the login call —
+     * it's only remembered here so it can be attached as a header on later commands.
+     */
     suspend fun login(username: String, password: String, pin: String) {
         val token = api.login(username, password)
         store.save(
@@ -62,6 +68,9 @@ class BlueLinkRepository(
 
     override suspend fun logout() = store.clear(brand)
 
+    // Stamps each vehicle returned by the API with this repository's brand code,
+    // since the raw API response doesn't distinguish brand and the UI/other layers
+    // need it to route subsequent calls (and to disambiguate vehicles across brands).
     override suspend fun vehicles(): List<Vehicle> = withSession { s ->
         api.vehicles(s.accessToken, s.username).map { it.copy(brandIndicator = brand.code) }
     }
@@ -116,7 +125,20 @@ class BlueLinkRepository(
         withSession { s -> api.stopCharge(s.accessToken, s.username, s.pin, v) }
     }
 
-    /** Runs [block] with this brand's session, refreshing the token once on 401/403. */
+    /**
+     * Runs [block] with this brand's session, refreshing the token once on 401/403.
+     *
+     * Mechanism: loads the persisted [SessionStore.Session] for this brand (throwing
+     * if there is none, i.e. not logged in) and invokes [block] with it. If that call
+     * throws a [BlueLinkException] whose HTTP code is 401 or 403 (token expired/
+     * rejected) AND a refresh token is available, it calls [BlueLinkApi.refresh] to
+     * obtain a new access/refresh token pair, persists it via
+     * [SessionStore.updateAccessToken], reloads the now-updated session from the
+     * store, and retries [block] exactly once with the fresh session. Any other
+     * exception, or a second failure after the refreshed retry, propagates to the
+     * caller unchanged — there is no further retry loop, so a persistent auth
+     * failure surfaces immediately rather than looping.
+     */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
         val session = store.load(brand) ?: throw BlueLinkException("Not logged in")
         return try {

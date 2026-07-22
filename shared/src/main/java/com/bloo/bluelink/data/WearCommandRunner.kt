@@ -12,6 +12,16 @@ import kotlinx.coroutines.sync.withLock
  */
 object WearCommandRunner {
 
+    /**
+     * Executes one [WearCommand] end-to-end: looks up the target vehicle's current
+     * [VehicleSnapshot], builds a fresh brand-specific [VehicleRepository] and
+     * [ClimateRequest] from the command's fields, dispatches the right repository
+     * call for [command].action inside the process-wide [BlueLinkGate] lock, and
+     * (on success) writes the resulting optimistic-but-now-confirmed snapshot back to
+     * [SnapshotStore] plus an [AppLog] line. Any thrown exception during dispatch is
+     * caught by the outer `runCatching`/`getOrElse` and turned into a failed
+     * [WearCommandResult] with the exception's message, rather than propagating.
+     */
     suspend fun execute(context: Context, command: WearCommand): WearCommandResult {
         val store = SnapshotStore(context)
         val snap = store.current().vehicles.firstOrNull { it.vin == command.vin }

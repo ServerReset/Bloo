@@ -55,6 +55,16 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/**
+ * The setup/edit screen the OS launches whenever a Bloo widget is dropped on
+ * the home screen (declared as this widget's configuration activity in the
+ * manifest/app widget provider info), and that Bloo also opens directly when
+ * the user taps an unconfigured [BlooWidget]'s [com.bloo.bluelink.widget.BlooWidget.SetupTile].
+ * A regular (non-Glance) Compose activity -- unlike the widget itself, this
+ * screen runs as normal foreground UI with the app process alive, so it can
+ * use full Compose freely; it only has to hand its choices back to
+ * [SettingsStore] and trigger one widget re-render when done.
+ */
 class WidgetConfigActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +75,11 @@ class WidgetConfigActivity : FragmentActivity() {
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
         if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) { finish(); return }
 
+        // Per the App Widget configuration-activity contract: default the result
+        // to CANCELED up front. If the user backs out (system back button, not
+        // the in-screen Cancel button which calls finish() the same way) without
+        // ever reaching finishWith(), the host correctly tears the widget back
+        // down instead of leaving an unconfigured placeholder on the home screen.
         setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
 
         setContent {
@@ -76,6 +91,11 @@ class WidgetConfigActivity : FragmentActivity() {
         }
     }
 
+    /** Called once the user taps Save (after [WidgetConfigScreen] has already
+     *  persisted every field to [SettingsStore]): force one immediate re-render
+     *  of every Glance widget so this instance picks up the new config right
+     *  away instead of waiting for its next natural update, then report
+     *  RESULT_OK with this widget's id so the host actually keeps it placed. */
     private fun finishWith(widgetId: Int) {
         lifecycleScope.launch {
             runCatching { BlooWidget().updateAll(applicationContext) }
