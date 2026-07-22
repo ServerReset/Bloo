@@ -262,6 +262,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
@@ -3036,6 +3037,13 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
     // cover-screen-only interaction (the normal phone layout doesn't use it).
     val edgeTraceProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     var edgeTraceHolding by remember { mutableStateOf(false) }
+    // The tile-scrubber dots (VerticalPagerDots) are a sibling inside this same
+    // Box, so a press over them still reaches this pointerInput during the
+    // normal ancestor dispatch -- without carving out their bounds, holding
+    // the dots to scrub also started the edge-trace refresh ring underneath,
+    // since edge-trace begins timing on raw down regardless of what else the
+    // touch lands on. Populated by the dots' own onGloballyPositioned below.
+    var dotsBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     LaunchedEffect(edgeTraceHolding) {
         if (edgeTraceHolding) {
             edgeTraceProgress.snapTo(0f)
@@ -3074,6 +3082,11 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    // A press starting inside the tile-scrubber dots' own hit
+                    // area belongs entirely to their long-press-to-scrub
+                    // gesture -- don't also start timing an edge-trace hold
+                    // for it (see dotsBounds' declaration above).
+                    if (dotsBounds?.contains(down.position) == true) return@awaitEachGesture
                     edgeTraceHolding = true
                     val slop = viewConfiguration.touchSlop
                     try {
@@ -3203,7 +3216,11 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                     val delta = targetTile - currTile
                     vPager.scrollToPage((currPage + delta).coerceIn(0, virtualCount - 1))
                 },
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp).alpha(dotsAlpha),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 6.dp)
+                    .alpha(dotsAlpha)
+                    .onGloballyPositioned { dotsBounds = it.boundsInParent() },
             )
         }
     }
@@ -3410,7 +3427,22 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
                     model = if (img.startsWith("/")) java.io.File(img) else img,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().alpha(0.22f),
+                    // Was 0.22f -- on a cover screen's already-dark surfaceContainer
+                    // this read as barely-there rather than a photo background. A
+                    // top/bottom gradient scrim (below) keeps the title row and
+                    // bottom actions legible now that the photo itself is much more
+                    // visible, instead of dimming the whole tile uniformly to get there.
+                    modifier = Modifier.fillMaxSize().alpha(0.5f),
+                )
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0f to scheme.surfaceContainer.copy(alpha = 0.6f),
+                            0.3f to Color.Transparent,
+                            0.7f to Color.Transparent,
+                            1f to scheme.surfaceContainer.copy(alpha = 0.6f),
+                        ),
+                    ),
                 )
             } else {
                 Box(
