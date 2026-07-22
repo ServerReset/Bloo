@@ -20,18 +20,33 @@ import java.util.concurrent.TimeUnit
  */
 class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
+    // These four all delegate straight to the [brand] passed at construction
+    // time, so one BlueLinkApi instance can be pointed at either Hyundai or
+    // Genesis (both share this same API shape, just different base URLs and
+    // OAuth credentials) just by constructing it with a different Brand.
     private val baseUrl get() = brand.baseUrl
     private val host get() = brand.host
     private val clientId get() = brand.clientId
     private val clientSecret get() = brand.clientSecret
 
     companion object {
+        // Two different User-Agent strings the real endpoints expect depending
+        // on which call is being made: plain okhttp's default-looking UA for
+        // most authenticated calls, and Postman's UA specifically for the OAuth
+        // token endpoints (mirrors what the reverse-engineered reference clients
+        // observed the real app sending to each).
         const val UA_OKHTTP = "okhttp/3.12.0"
         const val UA_POSTMAN = "PostmanRuntime/7.26.10"
     }
 
     private val json = Json {
+        // The real API's payloads evolve (new fields, generation-specific
+        // quirks) faster than this client's models are updated, so unknown
+        // keys are ignored instead of throwing.
         ignoreUnknownKeys = true
+        // Some fields the API sometimes sends as a type our model doesn't
+        // expect (numbers where a string is modeled, etc.) get coerced to a
+        // best-effort value instead of failing the whole decode.
         coerceInputValues = true
         isLenient = true
     }
@@ -48,6 +63,10 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         )
         .build()
 
+    // The two request-body content types this API's endpoints expect: plain
+    // JSON for most commands, and form-urlencoded specifically for
+    // lock/unlock (see [formCommand] below) — sending the wrong one for a
+    // given endpoint results in the server rejecting the body.
     private val jsonMedia = "application/json".toMediaType()
     private val formMedia = "application/x-www-form-urlencoded".toMediaType()
 

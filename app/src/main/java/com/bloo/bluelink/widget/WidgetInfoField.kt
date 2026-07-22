@@ -16,7 +16,11 @@ enum class WidgetInfoField(val key: String, val label: String) {
     MODEL("model", "Model");
 
     companion object {
+        /** All defined fields, in declaration order -- used to populate the field picker UI. */
         val ALL = entries
+
+        /** Looks up a field by its persisted [key] string; returns null (not a crash) if the
+         *  stored key doesn't match any current field, e.g. after a field is renamed/removed. */
         fun fromKey(key: String): WidgetInfoField? = entries.firstOrNull { it.key == key }
 
         /** Matches what the fixed layouts already showed before this was

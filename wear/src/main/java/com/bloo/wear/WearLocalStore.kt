@@ -177,6 +177,13 @@ class WearLocalStore(private val context: Context) {
     // is touched, and read as a fallback for slot 0 until then.
     private val keyTileCarVinLegacy = stringPreferencesKey("tile_car_vin")
 
+    /** Reactive view of every watch-local setting, derived straight from the
+     *  DataStore Preferences [Flow] -- any write anywhere in this class
+     *  triggers DataStore to emit a new `prefs` snapshot here, which this
+     *  `map` turns into a fully-populated [WearLocalSettings] (applying
+     *  defaults/coercion/validation for every field so collectors never see
+     *  a raw/partial preferences state). Collectors (e.g. WearViewModel)
+     *  therefore stay in sync automatically without polling. */
     val flow: Flow<WearLocalSettings> = context.wearLocalStore.data.map { prefs ->
         val fontScale = (prefs[keyFontScale] ?: 1f).coerceIn(0.8f, 1.4f)
         val actions = prefs[keyTileActions]
@@ -184,6 +191,11 @@ class WearLocalStore(private val context: Context) {
             ?.filter { it in TILE_CHIP_ACTIONS }
             ?.takeIf { it.isNotEmpty() }
             ?: listOf("lock", "climate")
+        // Build the per-slot VIN list: for slot 0, if the new per-slot key has
+        // never been written, fall back to reading the old pre-pool single-VIN
+        // key so an install that pinned a car before the pool existed keeps
+        // showing that same car in slot 0 until it's explicitly changed (see
+        // setTileCarVin, which clears the legacy key once slot 0 is touched).
         val tileCarVins = (0 until WearTilePool.SIZE).map { i ->
             val v = prefs[keyTileCarVin(i)]?.takeIf { it.isNotBlank() }
             if (v == null && i == 0) prefs[keyTileCarVinLegacy]?.takeIf { it.isNotBlank() } else v
@@ -201,18 +213,28 @@ class WearLocalStore(private val context: Context) {
         )
     }
 
+    /** Persist the display scale, clamped to the same [0.8, 1.4] range the
+     *  [flow] mapping re-clamps on read (defence in depth against a stray
+     *  out-of-range value ever reaching DataStore in the first place). */
     suspend fun setFontScale(f: Float) {
         context.wearLocalStore.edit { it[keyFontScale] = f.coerceIn(0.8f, 1.4f) }
     }
 
+    /** Persist "imperial" or "metric" verbatim -- no validation here, the
+     *  [flow] mapping just falls back to "imperial" if this is ever anything
+     *  else. */
     suspend fun setUnitSystem(value: String) {
         context.wearLocalStore.edit { it[keyUnitSystem] = value }
     }
 
+    /** Record when the last update check ran, used by the update-check
+     *  debounce logic elsewhere to avoid checking too frequently. */
     suspend fun setUpdateLastCheckedAt(millis: Long) {
         context.wearLocalStore.edit { it[keyUpdateLastCheckedAt] = millis }
     }
 
+    /** Record until when update-check reminders should be suppressed after the
+     *  user dismisses/snoozes one. */
     suspend fun setUpdateSnoozeUntil(millis: Long) {
         context.wearLocalStore.edit { it[keyUpdateSnoozeUntil] = millis }
     }

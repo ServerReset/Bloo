@@ -18,6 +18,22 @@ import kotlinx.coroutines.launch
  *
  * Background work is dispatched to [serviceScope] to avoid blocking the binder
  * thread with DataStore disk I/O.
+ *
+ * Mechanism: [WearableListenerService] is the system-managed counterpart to
+ * the two Wearable Data Layer transports described in [WearComms]'s doc
+ * comment. Android instantiates (or wakes) this service and calls one of the
+ * two callbacks below whenever the phone-side app touches the Data Layer,
+ * regardless of whether the watch's own UI process is running:
+ *  - [onDataChanged] fires for DataItem changes (anything published via
+ *    `DataClient.putDataItem`, e.g. vehicle state, settings, presets) --
+ *    delivered as a batch of events since several DataItems can change
+ *    together in one phone-side publish.
+ *  - [onMessageReceived] fires for one-shot messages (anything sent via
+ *    `MessageClient.sendMessage`) -- delivered one at a time, used here for
+ *    command/sync/AI *results* coming back from the phone after the watch
+ *    asked it to do something.
+ * Both callbacks dispatch their path constant (from the shared [WearSync]
+ * object) through a `when` to decide what the payload actually is.
  */
 class WearListenerService : WearableListenerService() {
 
@@ -28,6 +44,12 @@ class WearListenerService : WearableListenerService() {
         serviceScope.cancel()
     }
 
+    /** Called by the system with a batch of DataItem change events. Each event
+     *  is filtered to TYPE_CHANGED (ignoring TYPE_DELETED, which this app
+     *  doesn't act on) and its raw payload string extracted via
+     *  [DataMapItem.fromDataItem]; the (path, payload) pairs are collected
+     *  first and only then processed on [serviceScope], keeping this
+     *  synchronous callback itself fast (it runs on a binder thread). */
     override fun onDataChanged(events: com.google.android.gms.wearable.DataEventBuffer) {
         val updates = events.mapNotNull { event ->
             if (event.type != com.google.android.gms.wearable.DataEvent.TYPE_CHANGED) return@mapNotNull null
@@ -75,6 +97,14 @@ class WearListenerService : WearableListenerService() {
         }
     }
 
+    /** Called by the system for each one-shot MessageClient message. Unlike
+     *  [onDataChanged] there's no batching or filtering step here -- the raw
+     *  byte payload is decoded straight to UTF-8 and dispatched by path. Every
+     *  branch does two things: emits the decoded result on an in-process
+     *  event bus ([WearCommandEvents]/[WearSyncEvents]/[WearAiEvents]) for a
+     *  currently-running [com.bloo.wear.WearViewModel] to react to
+     *  immediately, and posts a system notification as a backstop for the
+     *  case where the watch app isn't running to see that event at all. */
     override fun onMessageReceived(event: MessageEvent) {
         val raw = String(event.data ?: ByteArray(0))
         when (event.path) {

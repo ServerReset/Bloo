@@ -29,6 +29,14 @@ import kotlin.coroutines.resume
  */
 class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
+    /**
+     * WorkManager's entry point for this worker. Reads the command parameters that were
+     * packed into [inputData] by [enqueue], resolves them into a concrete [WidgetAction],
+     * runs it via [execute], and -- regardless of success/failure/cancellation -- clears
+     * the widget's pending-spinner flag and forces a widget redraw in the `finally` block.
+     * On success it also pushes the fresh snapshot out to the watch and quick-settings tile
+     * so every surface stays in sync after a command completes.
+     */
     override suspend fun doWork(): Result {
         val widgetId = inputData.getInt(KEY_WIDGET_ID, -1)
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
@@ -56,6 +64,19 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         return Result.success()
     }
 
+    /**
+     * Dispatches the tapped [action] according to its [WidgetAction.Kind]:
+     * - COMMAND: sends [wearAction] to the car via [WearCommandRunner.execute]; on failure,
+     *   reverts the optimistic snapshot flip (see [dispatch]) and surfaces a Toast, then bails
+     *   out early. On success it waits 4s (giving the car time to actually act before polling)
+     *   and force-refreshes the snapshot so the widget shows the real post-command state.
+     * - REFRESH: just re-fetches the current snapshot, no command sent.
+     * - LOCATION: refreshes the snapshot, then reverse-geocodes the vehicle's last known
+     *   lat/lon into a human-readable address and renders a small map tile, both cached
+     *   per-widget for the Glance UI to read back synchronously.
+     * - OPEN: a no-op here; this kind is handled by directly launching the app and never
+     *   reaches the worker/enqueue path at all.
+     */
     private suspend fun execute(ctx: Context, widgetId: Int, vin: String, action: WidgetAction, wearAction: String?) {
         when (action.kind) {
             WidgetAction.Kind.COMMAND -> {
@@ -159,6 +180,11 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
     private suspend fun downloadAndCacheMapTile(ctx: Context, widgetId: Int, lat: Double, lon: Double) {
         withContext(Dispatchers.IO) {
             runCatching {
+                // Standard Web Mercator (Slippy Map) tile math: at zoom level `zoom` the world
+                // is an n×n grid of 256px tiles. xFull/yFull are the car's *fractional* tile
+                // coordinates -- the integer part picks the tile, the fractional part is where
+                // inside that tile the car actually sits (used below to place the pin and to
+                // decide which of the 4 neighboring tiles to stitch together).
                 val zoom = 15
                 val n = 1 shl zoom
                 val xFull = (lon + 180.0) / 360.0 * n
@@ -168,15 +194,22 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 val yt = yFull.toInt()
                 val xOff = xFull - xt
                 val yOff = yFull - yt
+                // Pick the top-left tile of the 2x2 mosaic: if the car sits in the right/bottom
+                // half of its tile, that tile becomes the top-left of the mosaic (so the car ends
+                // up roughly centered); otherwise the tile to its left/above is used instead.
                 // Clamp so we never request tile -1 or n (tile servers 404 those).
                 val x0 = (if (xOff > 0.5) xt else xt - 1).coerceAtLeast(0)
                 val y0 = (if (yOff > 0.5) yt else yt - 1).coerceAtLeast(0)
 
+                // 512x512 canvas = 2x2 grid of 256px tiles, drawn one at a time below.
                 val stitched = android.graphics.Bitmap.createBitmap(512, 512, android.graphics.Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(stitched)
 
                 for (dy in 0..1) {
                     for (dx in 0..1) {
+                        // Each tile is fetched and drawn independently inside its own runCatching,
+                        // so one failed/edge-of-world tile just leaves a gap instead of aborting
+                        // the whole mosaic.
                         runCatching {
                             val tx = x0 + dx
                             val ty = y0 + dy
@@ -214,6 +247,8 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
     }
 
     companion object {
+        // Keys used to pack/unpack the WorkManager Data bundle (see enqueue/doWork) --
+        // WorkManager persists this data, so it must be primitive/String, not the enum itself.
         const val KEY_WIDGET_ID = "widget_id"
         const val KEY_VIN = "vin"
         const val KEY_ACTION = "action"
@@ -245,6 +280,11 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             enqueue(ctx, widgetId, vin, action, resolved)
         }
 
+        /**
+         * Builds the WorkManager [Data] payload for a single command and enqueues it as
+         * unique work keyed by widget id, so at most one [WidgetCommandWorker] instance
+         * ever runs per widget at a time (see policy note below).
+         */
         fun enqueue(
             ctx: Context,
             widgetId: Int,
@@ -275,6 +315,12 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
  * (so the app never opens) when the widget doesn't require authentication.
  */
 class WidgetActionCallback : ActionCallback {
+    /**
+     * Glance invokes this directly on the UI/main coroutine when a widget button wired to
+     * this callback is tapped. [parameters] carries whatever was attached to the button's
+     * `actionParametersOf(...)` at compose time; all three keys are required, so a missing
+     * one (shouldn't happen in practice) silently no-ops the tap rather than crashing.
+     */
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val widgetId = parameters[KEY_WIDGET] ?: return
         val vin = parameters[KEY_VIN] ?: return

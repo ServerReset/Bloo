@@ -49,6 +49,9 @@ import kotlin.coroutines.resume
  *  account, or the normal car-list/detail UI. */
 enum class WearScreen { Loading, SignedOut, Ready }
 
+// How often runUpdateCheck() is allowed to hit the GitHub Actions API on its
+// own (no manual "check now" exists) -- gates the cold-start check in init so
+// a restart-happy user doesn't hammer the endpoint every launch.
 private const val UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
 
 /** A fully resolved per-car view, merging live status with the phone snapshot. */
@@ -129,6 +132,13 @@ data class ClimateDraft(
  *  actual current limit" (the sliders only override once the user drags them). */
 data class ChargeLimitDraft(val ac: Int? = null, val dc: Int? = null)
 
+/**
+ * The single immutable snapshot of everything the watch UI renders, exposed
+ * via [WearViewModel.ui]. Rebuilt wholesale by [WearViewModel.publish] every
+ * time any underlying source (vehicle status, snapshots, settings, drafts,
+ * pending commands, etc.) changes -- Compose screens just collect [WearViewModel.ui]
+ * and never touch the ViewModel's private mutable state directly.
+ */
 data class WearUi(
     val screen: WearScreen = WearScreen.Loading,
     val cars: List<CarView> = emptyList(),

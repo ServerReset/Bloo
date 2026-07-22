@@ -22,6 +22,15 @@ class WidgetAuthActivity : FragmentActivity() {
 
     private var widgetId: Int = -1
 
+    /**
+     * Parses the widget/VIN/action out of the launching [Intent] (put there by the widget's
+     * click PendingIntent -- see BlooWidget), bailing out with no UI if either is missing.
+     * Then decides, per-widget, whether to actually show the biometric prompt: only if the
+     * action itself demands auth (`action.requiresAuth`), the device is capable of biometric
+     * or credential auth right now (`canAuth`), AND the user has that requirement turned on
+     * for this specific widget (`requireAuth`, read asynchronously from [SettingsStore]).
+     * Any one of those being false skips straight to running the action unprompted.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
@@ -44,6 +53,11 @@ class WidgetAuthActivity : FragmentActivity() {
         }
     }
 
+    /**
+     * Shows the system biometric/credential prompt configured for [authenticators]. On success
+     * it proceeds to [run] the action; on any error (including user cancellation) it just
+     * finishes the transparent activity without running anything, leaving the widget untouched.
+     */
     private fun promptThenRun(action: WidgetAction, vin: String, authenticators: Int) {
         val prompt = BiometricPrompt(
             this,
@@ -66,6 +80,12 @@ class WidgetAuthActivity : FragmentActivity() {
         prompt.authenticate(info)
     }
 
+    /**
+     * Executes the (now-authorized) action: OPEN just launches the main app and exits;
+     * anything else is handed to [WidgetCommandWorker.dispatch] to optimistically update
+     * the snapshot and enqueue the actual background command, then this activity always
+     * finishes afterward via the `finally`, whether dispatch succeeded or threw.
+     */
     private fun run(action: WidgetAction, vin: String) {
         if (action.kind == WidgetAction.Kind.OPEN) {
             openApp(vin)
@@ -91,6 +111,8 @@ class WidgetAuthActivity : FragmentActivity() {
         overridePendingTransition(0, 0)
     }
 
+    /** Builds and fires the same launch intent [Shortcuts] uses elsewhere so MainActivity
+     *  handles it identically to a shortcut/tile "open" tap, landing on the given [vin]. */
     private fun openApp(vin: String) {
         val intent = Intent(this, MainActivity::class.java).apply {
             action = Shortcuts.ACTION

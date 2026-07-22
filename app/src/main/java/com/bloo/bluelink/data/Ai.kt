@@ -21,7 +21,13 @@ import kotlin.coroutines.resumeWithException
  */
 class Ai(context: Context) {
 
+    // Application context, not the passed-in context, so this class (and the
+    // lazily-created summarizer below) can safely outlive whatever short-lived
+    // Activity/Fragment context originally constructed it.
     private val app = context.applicationContext
+    // A same-thread "executor" used only to bridge Google's ListenableFuture
+    // callback API into a coroutine below; it just runs the callback inline on
+    // whichever thread completes the future; there's no actual thread pool here.
     private val direct = Executor { it.run() }
 
     private companion object {
@@ -29,6 +35,9 @@ class Ai(context: Context) {
         const val MIN_ARTICLE_CHARS = 400
     }
 
+    // Created on first use (and only once, thanks to `by lazy`) so constructing
+    // an Ai instance is cheap and the actual ML Kit client — and whatever
+    // resources it holds — is only spun up if summarization is ever invoked.
     private val summarizer: Summarizer by lazy {
         Summarization.getClient(
             SummarizerOptions.builder(app)

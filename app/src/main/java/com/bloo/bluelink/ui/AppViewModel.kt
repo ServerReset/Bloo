@@ -566,6 +566,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         loadGarageInternal()
     }
 
+    /** Show the login form again on top of an already-loaded garage, so the
+     *  user can sign into a second (or third) brand without losing the first. */
     fun beginAddAccount() = _state.update { it.copy(addingAccount = true) }
     fun cancelAddAccount() = _state.update { s ->
         // If the user arrived here by backing out of the biometric prompt, "Cancel"
@@ -621,6 +623,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  Sets lockedToLogin so Cancel on the login form re-locks instead of bypassing auth. */
     fun lockToLogin() = _state.update { it.copy(locked = false, addingAccount = true, lockedToLogin = true) }
 
+    /** Persist how long after backgrounding the app should re-lock (see
+     *  [maybeRelock], which reads this back out of [SettingsStore] on the next
+     *  foreground). Fire-and-forget: the write is async, nothing in [_state]
+     *  reflects the new value directly since the lock-timing setting itself
+     *  isn't rendered anywhere that needs it synchronously. */
     fun setLockTiming(value: LockTiming) {
         viewModelScope.launch { settingsStore.setLockTiming(value) }
     }
@@ -652,19 +659,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Whether the device currently has usable biometrics (fingerprint/face)
+     *  enrolled -- gates whether [UiState.locked] / [maybeRelock] can ever
+     *  apply, since there's nothing to authenticate against otherwise.
+     *  BIOMETRIC_WEAK is used (rather than STRONG) so a wider range of
+     *  device authenticators (including some face-only ones) still qualify. */
     fun canUseBiometrics(): Boolean =
         BiometricManager.from(getApplication())
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
             BiometricManager.BIOMETRIC_SUCCESS
 
+    /** Turn the biometric app-lock on/off in Settings. Persists only -- the
+     *  actual locking/unlocking flow is driven separately by [maybeRelock]
+     *  and [unlocked] reading this flag back out on each foreground. */
     fun setBiometricLock(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
     }
 
     // --- Garage / vehicles ----------------------------------------------
 
+    /** Public entry point for a full garage (re)load, wrapped in [launchBusy]
+     *  so [UiState.loading] shows and any thrown exception becomes a snackbar. */
     fun loadGarage() = launchBusy { loadGarageInternal() }
 
+    /** Re-entrancy guard around [loadGarageInner]: the [loadingGarage] flag
+     *  (checked/set here, not inside [loadGarageInner] itself so every caller
+     *  goes through this one gate) makes sure only one garage load runs at a
+     *  time -- e.g. a login finishing and a manual pull-to-refresh landing at
+     *  the same moment shouldn't run two overlapping fetches of every brand's
+     *  vehicle list. `@Volatile` because this can be read/written from
+     *  different coroutines dispatched onto different threads. */
     private suspend fun loadGarageInternal() {
         if (loadingGarage) return
         loadingGarage = true
@@ -844,7 +868,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         ensureStatus(v)
     }
 
+    /** Large-screen only: expand one car to full screen (also selects it, so
+     *  the two indices never disagree about which car is "current"). */
     fun expand(index: Int) = _state.update { it.copy(expandedIndex = index, currentIndex = index) }
+    /** Back out of the expanded single-car view to the grid. */
     fun collapse() = _state.update { it.copy(expandedIndex = null) }
 
     /**
@@ -1088,6 +1115,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /** Re-sort a freshly-fetched vehicle list to match the user's saved
+     *  drag-and-drop [order] (a list of VINs). Any VIN in [order] that no
+     *  longer matches a fetched vehicle is simply skipped (mapNotNull), and
+     *  any newly-appeared vehicle not yet in [order] (a car added to the
+     *  account since the order was last saved) is appended at the end rather
+     *  than dropped, so new cars still show up somewhere. */
     private fun applyOrder(vehicles: List<Vehicle>, order: List<String>): List<Vehicle> {
         if (order.isEmpty()) return vehicles
         val byVin = vehicles.associateBy { it.vin }
@@ -1096,6 +1129,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return ordered + rest
     }
 
+    /** Set (or, with a blank string, clear) a custom car photo URL. */
     fun setVehicleImage(vin: String, url: String) {
         _state.update {
             it.copy(
@@ -1140,6 +1174,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles); persistSnapshots() }
     }
 
+    /** Toggle one seat-heater/cooler (or steering-wheel-heat) capability flag
+     *  for a car. [field] is a short code ("dh" = driver heat, "dc" = driver
+     *  cool, "ph"/"pc" = passenger, "rlh"/"rlc"/"rrh"/"rrc" = rear left/right,
+     *  "sw" = steering wheel) mapped to the matching [SeatConfig] property;
+     *  an unrecognized code is a no-op (`else -> current`). These flags don't
+     *  come from the vehicle API -- they record which seat features the user
+     *  says this specific trim actually has, so the climate UI only offers
+     *  controls that will work. */
     fun setSeatFlag(v: Vehicle, field: String, value: Boolean) {
         val current = _state.value.seatConfigs[v.vin] ?: SeatConfig()
         val updated = when (field) {

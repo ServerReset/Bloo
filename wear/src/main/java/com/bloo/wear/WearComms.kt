@@ -23,10 +23,44 @@ import java.util.concurrent.TimeUnit
  * holds the tested, authenticated session); falls back to running the command
  * itself with the synced session when no phone is reachable — that's the
  * standalone-on-Wi-Fi/cell path.
+ *
+ * Mechanism: this object talks to the phone through Android's Wearable Data
+ * Layer API, which offers two distinct transports and this file deliberately
+ * picks between them per call:
+ *  - [Wearable.getMessageClient] ("MessageClient") sends a one-shot byte-array
+ *    message directly to a specific, currently-connected node (see
+ *    [phoneNodeId]). It requires a live connection right now -- if the phone
+ *    isn't reachable the send simply fails -- but it's fire-and-forget/low
+ *    latency and doesn't linger once delivered. Used here for commands
+ *    ([relayCommand], [relayToPhone]) and sync requests ([requestSync]),
+ *    where "the phone wasn't there" is a meaningful, actionable outcome (the
+ *    watch falls back to running standalone instead).
+ *  - [Wearable.getDataClient] ("DataClient") instead publishes a versioned
+ *    "DataItem" keyed by a path (e.g. [WearSync.PATH_CLIMATE]); the system
+ *    syncs the latest item to every node whenever they're next connected, and
+ *    each node's own listener (a [WearListenerService] on the watch, the
+ *    phone's counterpart) is notified of the change. This is used for
+ *    published state that should always reflect "the latest known value"
+ *    rather than a single event -- climate drafts, presets, pebble order,
+ *    local settings, toggles -- and for [pullLatest], which reads back
+ *    whatever DataItems currently exist so the UI has something to show
+ *    immediately on launch, before the next live DataChanged callback fires.
+ *  - Every path constant (PATH_COMMAND, PATH_CLIMATE, PATH_LOCAL, ...) lives
+ *    in the shared [WearSync] object so both the phone and watch modules
+ *    agree on routing; the receiving side switches on `item.uri.path` /
+ *    `event.path` to dispatch to the right handler (see
+ *    [WearListenerService] and the phone's equivalent listener).
  */
 object WearComms {
 
-    /** The id of a connected phone node, or null when none is reachable. */
+    /** The id of a connected phone node, or null when none is reachable.
+     *  Queries [Wearable.getNodeClient] for all nodes currently paired with
+     *  this watch, then prefers one flagged `isNearby` (in direct Bluetooth
+     *  range, lowest latency) over any other reachable node (e.g. reachable
+     *  only via cloud/Internet relay), falling back to whichever node is
+     *  reported first if none is nearby. Returns null (rather than throwing)
+     *  on any failure or timeout, which every caller treats as "no phone
+     *  available -- go standalone". */
     suspend fun phoneNodeId(context: Context): String? = withContext(Dispatchers.IO) {
         runCatching {
             val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes, 10, TimeUnit.SECONDS)
@@ -35,7 +69,10 @@ object WearComms {
     }
 
     /** Run a command: optimistic local flip, then relay to the phone (or execute
-     *  it standalone). */
+     *  it standalone). Split into [applyOptimistic] (fast, local, synchronous
+     *  from the caller's point of view) and [relayCommand] (slow, network-bound)
+     *  so callers that only need the local flip to have landed can await just
+     *  that half -- see [applyOptimistic]'s own doc comment. */
     suspend fun send(context: Context, command: WearCommand) {
         val resolved = applyOptimistic(context, command)
         relayCommand(context, resolved)
@@ -93,7 +130,13 @@ object WearComms {
     }
 
     /** Execute a command on the watch's own connection and, on failure, post a
-     *  native watch notification — the phone isn't there to report the outcome. */
+     *  native watch notification — the phone isn't there to report the outcome.
+     *  On failure this also reverts the optimistic flip [applyOptimistic] made
+     *  earlier by writing the inverse action's optimistic state back into the
+     *  snapshot store, so a UI that already jumped to "locked" because of the
+     *  optimistic update flips back to "unlocked" once the real command is
+     *  known to have failed, instead of showing a state that never actually
+     *  happened on the car. */
     private suspend fun runStandalone(context: Context, command: WearCommand) {
         val result = WearCommandRunner.execute(context, command)
         if (!result.ok) {
@@ -161,7 +204,11 @@ object WearComms {
         }
 
     /** Publish the watch's live climate draft so the phone mirrors it. Written as
-     *  a DataItem on the shared [WearSync.PATH_CLIMATE] channel. */
+     *  a DataItem on the shared [WearSync.PATH_CLIMATE] channel. `.setUrgent()`
+     *  asks the system to sync this item as soon as possible rather than
+     *  batching it with other pending Data Layer traffic -- climate is a live
+     *  draft the user is actively dragging, so a delayed sync would make the
+     *  phone's mirrored slider visibly lag behind the watch's. */
     suspend fun publishClimate(context: Context, state: WearClimateState) {
         withContext(Dispatchers.IO) {
             runCatching {
@@ -287,6 +334,10 @@ object WearComms {
                         }
                     }
                 } finally {
+                    // DataItemBuffer holds a native Parcel-backed cursor; it must be
+                    // released explicitly (it isn't a normal GC'd object) or its
+                    // underlying resources leak -- the `finally` guarantees this runs
+                    // even if persisting one of the items above throws.
                     items.release()
                 }
             }
