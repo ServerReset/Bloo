@@ -786,53 +786,51 @@ private fun OnboardingScreen(vm: AppViewModel) {
     }
 }
 
-/** Step 1: a short, staggered-in welcome + feature highlights. */
+/**
+ * Step 1: a short welcome + feature highlights. No per-item entrance
+ * animation here -- [AnimatedContent]'s own slide/fade in [OnboardingScreen]
+ * already animates the whole page in, and layering a second, blur-based
+ * entrance on top of every single line/card (as this page used to) fought
+ * with that slide and read as jittery rather than smooth.
+ */
 @Composable
 private fun OnboardingIntroPage() {
     val scheme = MaterialTheme.colorScheme
-    StaggerFadeIn(delay = 0, offset = 24) {
-        Text("👋", style = MaterialTheme.typography.displayMedium)
-    }
+    Text("👋", style = MaterialTheme.typography.displayMedium)
     Spacer(Modifier.height(4.dp))
-    StaggerFadeIn(delay = 80, offset = 20) {
-        Text(
-            "Welcome to Bloo",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Black,
-            color = scheme.onSurface,
-        )
-    }
-    StaggerFadeIn(delay = 160, offset = 16) {
-        Text(
-            "Control your Hyundai, Genesis, or Kia from your phone -- lock, climate, " +
-                "charge status, and more. Let's get your car set up.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = scheme.onSurfaceVariant,
-        )
-    }
+    Text(
+        "Welcome to Bloo",
+        style = MaterialTheme.typography.displaySmall,
+        fontWeight = FontWeight.Black,
+        color = scheme.onSurface,
+    )
+    Text(
+        "Control your Hyundai, Genesis, or Kia from your phone -- lock, climate, " +
+            "charge status, and more. Let's get your car set up.",
+        style = MaterialTheme.typography.bodyLarge,
+        color = scheme.onSurfaceVariant,
+    )
     Spacer(Modifier.height(8.dp))
     val highlights = listOf(
         Triple(Icons.Filled.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
         Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
         Triple(Icons.Filled.SwapHoriz, "Multiple cars", "Swipe between every car on your account"),
     )
-    highlights.forEachIndexed { i, (icon, title, body) ->
-        StaggerFadeIn(delay = 240 + i * 90, offset = 16) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = scheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth(),
+    highlights.forEach { (icon, title, body) ->
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = scheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Row(
-                    Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
-                    Column {
-                        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    }
+                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+                Column {
+                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
             }
         }
@@ -843,21 +841,17 @@ private fun OnboardingIntroPage() {
 @Composable
 private fun OnboardingSetupPage(vm: AppViewModel, context: android.content.Context, canBio: Boolean) {
     val scheme = MaterialTheme.colorScheme
-    StaggerFadeIn(delay = 0, offset = 20) {
-        Text(
-            "Quick setup",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            color = scheme.onSurface,
-        )
-    }
-    StaggerFadeIn(delay = 80, offset = 16) {
-        Text(
-            "Both optional -- turn them on now or skip and enable them later in Settings.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = scheme.onSurfaceVariant,
-        )
-    }
+    Text(
+        "Quick setup",
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Black,
+        color = scheme.onSurface,
+    )
+    Text(
+        "Both optional -- turn them on now or skip and enable them later in Settings.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = scheme.onSurfaceVariant,
+    )
     Spacer(Modifier.height(4.dp))
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -867,59 +861,55 @@ private fun OnboardingSetupPage(vm: AppViewModel, context: android.content.Conte
         val notifLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> notifGranted = granted }
-        StaggerFadeIn(delay = 160, offset = 16) {
-            MorphButton(
-                onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
-                active = notifGranted,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
-            ) {
-                Icon(
-                    if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (notifGranted) "Notifications enabled" else "Enable notifications",
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+        MorphButton(
+            onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+            active = notifGranted,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (notifGranted) "Notifications enabled" else "Enable notifications",
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 
     if (canBio) {
         var bioEnabled by remember { mutableStateOf(false) }
-        StaggerFadeIn(delay = 240, offset = 16) {
-            MorphButton(
-                onClick = {
-                    if (!bioEnabled) {
-                        context.findFragmentActivity()?.let { activity ->
-                            showBiometricPrompt(
-                                activity = activity,
-                                title = "Enable fingerprint lock",
-                                subtitle = "Confirm to require it when opening Bloo",
-                                onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
-                                onError = {},
-                            )
-                        }
+        MorphButton(
+            onClick = {
+                if (!bioEnabled) {
+                    context.findFragmentActivity()?.let { activity ->
+                        showBiometricPrompt(
+                            activity = activity,
+                            title = "Enable fingerprint lock",
+                            subtitle = "Confirm to require it when opening Bloo",
+                            onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
+                            onError = {},
+                        )
                     }
-                },
-                active = bioEnabled,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
-            ) {
-                Icon(
-                    if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (bioEnabled) "Fingerprint lock enabled" else "Enable fingerprint lock",
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+                }
+            },
+            active = bioEnabled,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (bioEnabled) "Fingerprint lock enabled" else "Enable fingerprint lock",
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
@@ -937,105 +927,87 @@ private fun OnboardingCarPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     if (vehicle == null) return
-    StaggerFadeIn(delay = 0, offset = 20) {
-        Text(
-            "Set up",
-            style = MaterialTheme.typography.labelLarge,
-            color = scheme.primary,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-    StaggerFadeIn(delay = 60, offset = 16) {
-        Text(
-            vehicle.name,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            color = scheme.onSurface,
-        )
-    }
-    StaggerFadeIn(delay = 120, offset = 16) {
-        Text(
-            "Bloo cannot read powertrain or feature info from the API. Set them once here so the right controls appear.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = scheme.onSurfaceVariant,
-        )
+    Text(
+        "Set up",
+        style = MaterialTheme.typography.labelLarge,
+        color = scheme.primary,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        vehicle.name,
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Black,
+        color = scheme.onSurface,
+    )
+    Text(
+        "Bloo cannot read powertrain or feature info from the API. Set them once here so the right controls appear.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = scheme.onSurfaceVariant,
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Powertrain", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
+        val currentPt = state.powertrainOf(vehicle)
+        PowertrainPicker(current = currentPt) { pt -> vm.setPowertrain(vehicle, pt) }
     }
 
-    StaggerFadeIn(delay = 180, offset = 16) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Powertrain", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-            val currentPt = state.powertrainOf(vehicle)
-            PowertrainPicker(current = currentPt) { pt -> vm.setPowertrain(vehicle, pt) }
-        }
-    }
-
-    StaggerFadeIn(delay = 240, offset = 16) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Seats", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(scheme.surfaceContainerHigh)
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-            ) {
-                SeatPositions.forEachIndexed { i, pos ->
-                    if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
-                    WizardSeatRow(pos.label, pos.heat(sc), pos.cool(sc),
-                        { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Seats", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(scheme.surfaceContainerHigh)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            SeatPositions.forEachIndexed { i, pos ->
+                if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+                WizardSeatRow(pos.label, pos.heat(sc), pos.cool(sc),
+                    { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
             }
         }
     }
 
-    StaggerFadeIn(delay = 300, offset = 16) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-            Surface(
-                onClick = { vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
-                shape = RoundedCornerShape(50),
-                color = if (sc.steeringWheel) scheme.secondaryContainer else scheme.surfaceContainerHighest,
-                contentColor = if (sc.steeringWheel) scheme.onSecondaryContainer else scheme.onSurface,
-                border = if (sc.steeringWheel) null else BorderStroke(1.dp, scheme.outlineVariant),
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
+        Surface(
+            onClick = { vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
+            shape = RoundedCornerShape(50),
+            color = if (sc.steeringWheel) scheme.secondaryContainer else scheme.surfaceContainerHighest,
+            contentColor = if (sc.steeringWheel) scheme.onSecondaryContainer else scheme.onSurface,
+            border = if (sc.steeringWheel) null else BorderStroke(1.dp, scheme.outlineVariant),
+        ) {
+            Row(
+                Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    if (sc.steeringWheel) {
-                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                    }
-                    Text("Steering wheel heat", style = MaterialTheme.typography.labelMedium)
+                if (sc.steeringWheel) {
+                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
                 }
+                Text("Steering wheel heat", style = MaterialTheme.typography.labelMedium)
             }
         }
     }
 }
 
-/** Final step: a quick, staggered tip list covering the app's core gestures. */
+/** Final step: a quick tip list covering the app's core gestures. */
 @Composable
 private fun OnboardingCrashCoursePage() {
     val scheme = MaterialTheme.colorScheme
-    StaggerFadeIn(delay = 0, offset = 20) {
-        Text("🎉", style = MaterialTheme.typography.displayMedium)
-    }
+    Text("🎉", style = MaterialTheme.typography.displayMedium)
     Spacer(Modifier.height(4.dp))
-    StaggerFadeIn(delay = 80, offset = 16) {
-        Text(
-            "You're all set",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            color = scheme.onSurface,
-        )
-    }
-    StaggerFadeIn(delay = 140, offset = 16) {
-        Text(
-            "A few things that make Bloo quick to use:",
-            style = MaterialTheme.typography.bodyLarge,
-            color = scheme.onSurfaceVariant,
-        )
-    }
+    Text(
+        "You're all set",
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Black,
+        color = scheme.onSurface,
+    )
+    Text(
+        "A few things that make Bloo quick to use:",
+        style = MaterialTheme.typography.bodyLarge,
+        color = scheme.onSurfaceVariant,
+    )
     Spacer(Modifier.height(4.dp))
     val tips = listOf(
         Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "If you have more than one, swipe left or right on the garage screen"),
@@ -1043,23 +1015,21 @@ private fun OnboardingCrashCoursePage() {
         Triple(Icons.Filled.Refresh, "Hold to refresh", "Press and hold the refresh control to pull the latest status from your car"),
         Triple(Icons.Filled.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
     )
-    tips.forEachIndexed { i, (icon, title, body) ->
-        StaggerFadeIn(delay = 200 + i * 90, offset = 16) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = scheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth(),
+    tips.forEach { (icon, title, body) ->
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = scheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Row(
-                    Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
-                    Column {
-                        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    }
+                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+                Column {
+                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
             }
         }
@@ -6112,12 +6082,27 @@ private fun PebbleShell(
                     // Column (no AnimatedVisibility, which would break weight()).
                     if (expanded) {
                         val bodyScroll = LocalCoverScrollState.current ?: rememberScrollState()
-                        Column(
-                            Modifier.weight(1f).fadingEdges(bodyScroll).verticalScroll(bodyScroll)
-                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            content = content,
-                        )
+                        // BoxWithConstraints captures the real available height
+                        // (undisturbed by verticalScroll, which is applied one
+                        // level in) so heightIn(min = ...) below can force the
+                        // scrolling Column to at least that tall. A short tile's
+                        // content then centers within that height via
+                        // spacedBy(..., CenterVertically) instead of collapsing
+                        // to the top with dead space underneath; a tall tile's
+                        // content still exceeds it and scrolls exactly as before.
+                        BoxWithConstraints(Modifier.weight(1f)) {
+                            val minHeight = maxHeight
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .fadingEdges(bodyScroll)
+                                    .verticalScroll(bodyScroll)
+                                    .heightIn(min = minHeight)
+                                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                                content = content,
+                            )
+                        }
                     }
                 } else {
                     // Normal pebbles: animate the body fading + sliding open/closed.
@@ -10603,28 +10588,6 @@ private fun CommandButton(
         Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(8.dp))
         Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-/** A staggered fade-in + slide-up entrance for onboarding sections. */
-@Composable
-private fun StaggerFadeIn(delay: Int, offset: Int = 16, content: @Composable () -> Unit) {
-    val animAlpha = remember { Animatable(0f) }
-    val animY = remember { Animatable(offset.toFloat()) }
-    LaunchedEffect(Unit) {
-        if (delay > 0) delay(delay.toLong())
-        launch { animAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
-        launch { animY.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
-    }
-    val staggerBlur by animateFloatAsState(
-        targetValue = if (animAlpha.value < 0.5f) 4f else 0f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "staggerBlur",
-    )
-    Box(Modifier.graphicsLayer { alpha = animAlpha.value; translationY = animY.value }.then(
-        if (staggerBlur > 0.5f) Modifier.blur(staggerBlur.dp, 0.dp) else Modifier
-    )) {
-        content()
     }
 }
 
