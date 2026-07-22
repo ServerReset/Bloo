@@ -76,7 +76,11 @@ data class CustomPaletteData(
 /** The Expressive scheme is authored around this primary hue (see [LightExpressive]). */
 private const val BasePaletteHue = 217f
 
-/** Rotate a colour's hue (HSV) by [degrees]; preserves saturation/value/alpha. */
+/** Rotate a colour's hue (HSV) by [degrees]; preserves saturation/value/alpha.
+ *  Converts to HSV, shifts the hue channel by [degrees] wrapping modulo 360 (the double
+ *  `(x % 360f + 360f) % 360f` handles negative deltas correctly, since Kotlin's `%` can
+ *  return a negative remainder), then converts back, re-applying the original alpha
+ *  (HSVToColor itself doesn't carry alpha through). */
 private fun Color.rotateHue(degrees: Float): Color {
     if (degrees == 0f) return this
     val hsv = FloatArray(3)
@@ -85,6 +89,8 @@ private fun Color.rotateHue(degrees: Float): Color {
     return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
 }
 
+/** The hue channel (0..360) of this colour in HSV space, used to measure how far a
+ *  user-picked colour has drifted from the palette's reference hue. */
 private fun Color.extractHue(): Float {
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(toArgb(), hsv)
@@ -229,13 +235,21 @@ private val ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(40.dp),
 )
 
-/** Map each weight of a variable font via fontVariationSettings (wght axis). */
+/** Map each weight of a variable font via fontVariationSettings (wght axis). A variable
+ *  font ships as a single file with a continuous "wght" (weight) axis rather than separate
+ *  bold/regular files; [axis] is the numeric weight value (400=regular..800=extra bold) fed
+ *  into that axis, and [weight] is just the Compose [FontWeight] this entry gets registered
+ *  under so [FontFamily] can pick the closest match when text asks for that weight. */
 private fun variableFont(resId: Int, weight: FontWeight, axis: Int) = Font(
     resId,
     weight,
     variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
 )
 
+/** Builds the [FontFamily] for a [FontChoice]: the system default needs nothing extra,
+ *  while the two custom variable fonts register five distinct weight variants each (via
+ *  [variableFont]) so normal/medium/semibold/bold/extrabold text all render distinctly
+ *  instead of the renderer synthesizing (faux-bolding) missing weights. */
 private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
     FontChoice.SYSTEM -> FontFamily.Default
     FontChoice.ATKINSON -> FontFamily(
@@ -316,6 +330,10 @@ fun blooColorScheme(
 ): ColorScheme {
     val canDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
+    // Priority order for the base scheme: dynamic (Material You, extracted from the user's
+    // wallpaper by the OS) wins if enabled and available; otherwise a user custom palette
+    // recolors the hand-tuned Expressive base; otherwise one of the built-in enum palettes
+    // recolors it instead. Each combination picks the light or dark variant per [dark].
     val base = when {
         canDynamic && dark -> dynamicDarkColorScheme(context)
         canDynamic && !dark -> dynamicLightColorScheme(context)
@@ -325,6 +343,9 @@ fun blooColorScheme(
         else -> LightExpressive.applyPalette(colorPalette)
     }
 
+    // AMOLED mode overrides just the background/surface tiers to true (or near-true) black
+    // to actually turn off OLED pixels for the big flat areas, while leaving every other
+    // role (text, accents, containers) exactly as the resolved base scheme already has them.
     val amoled = if (themeMode == ThemeMode.AMOLED) {
         val black = Color(0xFF000000)
         base.copy(
@@ -340,7 +361,10 @@ fun blooColorScheme(
         base
     }
 
-    // Vibrancy: scale the saturation of every tinted colour role.
+    // Vibrancy: scale the saturation of every tinted colour role. Neutral roles (background/
+    // surface/onSurface etc, already resolved above into `amoled`) are deliberately left out
+    // of this .copy() -- only accent and semantic (error) roles get the saturation scale, so
+    // vibrancy affects how "punchy" the UI's colours look without tinting plain backgrounds.
     return if (vibrancy == 1f) amoled else {
         fun Color.v() = saturate(vibrancy)
         amoled.copy(
@@ -368,6 +392,17 @@ fun blooColorScheme(
     }
 }
 
+/**
+ * The app's root theme wrapper, applied once around the whole Compose tree (see
+ * [com.bloo.bluelink.MainActivity]). Resolves [themeMode]/[dynamicColor]/[colorPalette]/
+ * [customPalette]/[vibrancy] into a concrete [ColorScheme] via [blooColorScheme] (the same
+ * function used to mirror colours to the watch, so both surfaces always agree), applies
+ * [uiScale] by scaling the font-scale component of [LocalDensity] (so a user's "make
+ * everything bigger" preference scales text-driven layout without needing every composable
+ * to read a separate scale value), and reads the system's global animator-duration-scale
+ * setting once (`remember`, so it isn't re-queried every recomposition) to drive
+ * [LocalReduceMotion] for composables that should skip animation when it's off.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BlooTheme(

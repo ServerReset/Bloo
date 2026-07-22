@@ -42,6 +42,11 @@ fun glassContainerAlpha(frosted: Float = 0.74f): Float = frosted
 @Composable
 fun Modifier.frostedRim(shape: Shape): Modifier {
     val onSurface = MaterialTheme.colorScheme.onSurface
+    // A single 1dp border stroke, but painted with a vertical gradient brush instead of a
+    // flat color: brightest at the top edge (0.24 alpha), dimmest through the middle
+    // (0.10), then a touch brighter again at the bottom (0.16) -- the top-lit/bottom-dim
+    // asymmetry is what reads as a physical highlight, since Compose's border draws this
+    // same brush uniformly all the way around the shape's outline.
     return this.border(
         BorderStroke(
             1.dp,
