@@ -74,6 +74,12 @@ private fun PinDots(filled: Int, showError: Boolean) {
     }
 }
 
+/** A single round keypad button. Tracks its own pressed state via a
+ *  [MutableInteractionSource] and drives three independent animated values off
+ *  it (scale, background colour, border colour) so a tap reads as a soft
+ *  "press in, fill with the primary colour, border disappears" rather than a
+ *  flat Material ripple -- consistent with the app's other custom-animated
+ *  controls (MorphButton et al.) rather than a stock clickable. */
 @Composable
 private fun PinKey(label: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
@@ -116,6 +122,13 @@ private fun PinKey(label: String, onClick: () -> Unit) {
     }
 }
 
+/** A standard 3x4 numeric keypad layout (1-9, then a blank/0/backspace row).
+ *  The blank bottom-left cell is rendered as an equally-sized invisible
+ *  [Spacer] rather than simply omitted, so the "0" and "⌫" keys below/above it
+ *  stay aligned in the same grid column as the digits above -- an empty
+ *  string in the `rows` data is the marker for "render a spacer here, not a
+ *  key". Tapping "⌫" routes to [onBackspace]; every other key routes to
+ *  [onDigit] with that key's own label as the digit typed. */
 @Composable
 private fun PinKeypad(onDigit: (String) -> Unit, onBackspace: () -> Unit) {
     val rows = listOf(
@@ -247,7 +260,19 @@ fun PinEntryScreen(
     }
 }
 
-/** The full-screen gate shown while [WearViewModel]'s pinLocked state is true. */
+/**
+ * The full-screen gate shown while [WearViewModel]'s pinLocked state is true.
+ * Mechanism: this composable itself holds no PIN logic at all -- it's purely
+ * a thin UI wrapper around [PinEntryScreen] that forwards whatever 4 digits
+ * were typed to [WearViewModel.submitPin], which does the actual verification
+ * (delegating to [com.bloo.wear.WearLocalStore.verifyPin]'s salted-hash
+ * comparison) and flips `pinLocked` back to false on success. `error` here is
+ * purely local transient UI state -- set to "Wrong PIN" on a failed attempt
+ * (which also triggers [PinEntryScreen]'s shake/haptic-reject via its own
+ * `error` param) and cleared on success. There is no attempt counter or
+ * lockout anywhere in this flow: a wrong PIN just re-shows the pad with no
+ * limit on retries and no escalating delay.
+ */
 @Composable
 fun PinLockScreen(vm: WearViewModel) {
     var error by remember { mutableStateOf<String?>(null) }

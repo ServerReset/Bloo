@@ -72,6 +72,13 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
     // --- Auth ------------------------------------------------------------
 
+    /** Exchange a username/password for a fresh access+refresh token pair.
+     *  Mechanism: builds a small JSON body with the raw credentials, POSTs it
+     *  to the oauth/token endpoint with the Postman UA (this endpoint
+     *  specifically expects that UA per the reverse-engineered clients), and
+     *  decodes the response straight into [TokenResponse]. Any failure
+     *  (network, non-2xx, bad JSON) is normalised into a [BlueLinkException]
+     *  by [execute]. */
     suspend fun login(username: String, password: String): TokenResponse = execute {
         val body = json.encodeToString(
             kotlinx.serialization.json.JsonObject.serializer(),
@@ -92,6 +99,9 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         json.decodeFromString(TokenResponse.serializer(), call(request))
     }
 
+    /** Exchange a still-valid refresh token for a new access token, without
+     *  requiring the user's password again. Same request shape/endpoint
+     *  family as [login], just a different path and body field. */
     suspend fun refresh(refreshToken: String): TokenResponse = execute {
         val body = json.encodeToString(
             kotlinx.serialization.json.JsonObject.serializer(),
@@ -113,6 +123,12 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
     // --- Vehicles --------------------------------------------------------
 
+    /** Fetch every car enrolled on this account. Mechanism: GETs the
+     *  enrollment endpoint (keyed by username in the URL path itself, not
+     *  just the auth token), including `includeNonConnectedVehicles` so cars
+     *  without an active Blue Link subscription still show up, then maps
+     *  each nested [EnrolledVehicle]/[VehicleDetails] onto the flat [Vehicle]
+     *  shape the rest of the app uses. */
     suspend fun vehicles(accessToken: String, username: String): List<Vehicle> = execute {
         val request = Request.Builder()
             .url("$baseUrl/ac/v2/enrollment/details/$username")
@@ -130,6 +146,12 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
     // --- Commands --------------------------------------------------------
 
+    /** Fetch the car's current status. [refresh] controls whether the car is
+     *  asked to report *fresh* telemetry (a live poll, slower and rate
+     *  limited) via the REFRESH header, versus just returning whatever the
+     *  server last cached from the car — the caller decides which trade-off
+     *  it wants. Returns null if the server responds with no vehicleStatus
+     *  at all (car has never reported one). */
     suspend fun status(token: String, username: String, pin: String, v: Vehicle, refresh: Boolean): VehicleStatus? =
         execute {
             val request = baseRequest("/ac/v2/rcs/rvs/vehicleStatus", token, username, pin, v)
@@ -139,6 +161,11 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus
         }
 
+    /** Fetch the car's last-known GPS fix via the dedicated (rate-limited)
+     *  findMyCar endpoint. Returns null if either coordinate is missing from
+     *  the response (a partial/incomplete fix isn't usable), otherwise wraps
+     *  the coordinate plus reported speed into the platform-neutral
+     *  [GeoLocation]. */
     suspend fun location(token: String, username: String, pin: String, v: Vehicle): GeoLocation? =
         execute {
             val request = baseRequest("/ac/v2/rcs/rfc/findMyCar", token, username, pin, v)
@@ -165,9 +192,12 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             json.decodeFromString(EvTripDetailsResponse.serializer(), call(request)).tripdetails
         }
 
+    /** Lock the doors. Confusingly named endpoint: "rdo/off" locks (remote
+     *  door operation, off = secured), not the other way around. */
     suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/off", token, username, pin, v)
 
+    /** Unlock the doors ("rdo/on" — see [lock] for the naming logic). */
     suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
@@ -268,7 +298,11 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         callWithRetry(request)
     }
 
-    /** Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) in percent. */
+    /** Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) in percent.
+     *  Mechanism: both targets are always sent together in one call — the
+     *  API's targetsoc/set endpoint takes the full list, so there's no way to
+     *  update just one plug type's target without also re-sending the other's
+     *  current value. */
     suspend fun setChargeTargets(
         token: String, username: String, pin: String, v: Vehicle, acPercent: Int, dcPercent: Int,
     ): String = execute {
@@ -294,6 +328,9 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         call(request)
     }
 
+    /** Shared body for the form-urlencoded commands (lock/unlock): a
+     *  minimal `userName=...&vin=...` body posted with [formMedia], on top of
+     *  the usual [baseRequest] auth/vehicle headers. */
     private suspend fun formCommand(
         path: String, token: String, username: String, pin: String, v: Vehicle,
     ): String = execute {
@@ -322,6 +359,13 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         call(request)
     }
 
+    /** Builds the common header set every authenticated command request
+     *  needs (auth token in two different header names, vehicle identifiers,
+     *  locale/routing headers the API expects even though most of their
+     *  values never vary) — [path] is joined onto [baseUrl] and the caller
+     *  still needs to attach its own HTTP method + body before calling
+     *  build(). Centralising this means a new command only has to specify
+     *  what's actually different about it. */
     private fun baseRequest(
         path: String, token: String, username: String, pin: String, v: Vehicle,
     ): Request.Builder = Request.Builder()
@@ -369,6 +413,13 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         }
     }
 
+    /** Executes [request] synchronously (must run off the main thread — all
+     *  callers go through [execute]'s Dispatchers.IO) and returns the raw
+     *  response body text. On a non-2xx response, logs the failure (path +
+     *  extracted message, never headers/body verbatim, so tokens/PINs in
+     *  request headers don't end up in the log) and throws so the caller
+     *  never has to check isSuccessful itself. `.use` ensures the response
+     *  body is closed even when an exception is thrown reading it. */
     private fun call(request: Request): String {
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
@@ -394,6 +445,13 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         return message?.takeIf { it.isNotBlank() } ?: "Request failed (HTTP $code)"
     }
 
+    /** Runs [block] on the IO dispatcher (network calls shouldn't block the
+     *  caller's thread) and normalises any thrown exception into a
+     *  [BlueLinkException] — a [BlueLinkException] thrown deeper (e.g. by
+     *  [call]) passes through unchanged so its HTTP code/message survive,
+     *  while any other exception (IOException, SerializationException, etc.)
+     *  is wrapped so every public method on this class has one exception
+     *  type callers need to handle. */
     private suspend fun <T> execute(block: suspend () -> T): T = withContext(Dispatchers.IO) {
         try {
             block()
@@ -405,6 +463,12 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     }
 }
 
+/** Flattens the API's nested [VehicleDetails] onto the UI-facing [Vehicle]
+ *  shape, filling in sensible fallbacks for anything the API left blank: an
+ *  unnamed car falls back to its model name, then to the last 6 VIN
+ *  characters; a missing generation defaults to "2" (the most common case
+ *  among the reference clients' sample data); isEv is derived from the
+ *  single-character evStatus code ("E" specifically, case-insensitively). */
 private fun VehicleDetails.toVehicle(): Vehicle = Vehicle(
     vin = vin,
     regId = regid,
@@ -416,6 +480,11 @@ private fun VehicleDetails.toVehicle(): Vehicle = Vehicle(
     odometer = odometer,
 )
 
+/** The one exception type every [BlueLinkApi] public method can throw (see
+ *  [BlueLinkApi.execute]). [code] carries the HTTP status when the failure
+ *  came from a server response (null for a pure network/parse failure),
+ *  which callers use to distinguish e.g. an expired-session 401 from a
+ *  generic error. */
 class BlueLinkException(
     message: String,
     cause: Throwable? = null,

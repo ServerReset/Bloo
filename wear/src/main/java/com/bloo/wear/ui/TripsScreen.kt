@@ -49,6 +49,18 @@ import kotlinx.coroutines.launch
 // the watch's narrower card (no weekday, matching the previous local format).
 private fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw, includeWeekday = false)
 
+/**
+ * Recent-trips list for one car. [ui].trips is a per-VIN cache
+ * (`Map<String, List<Trip>?>`) that this screen doesn't populate itself --
+ * [LaunchedEffect] keyed on [vin] fires [WearViewModel.loadTrips] once per
+ * distinct VIN shown (re-firing if the user navigates to a different car's
+ * trips screen), and the result later lands in [ui] reactively via whatever
+ * upstream flow backs it. Three states are rendered from that same cache:
+ * a first-load spinner (no cached list yet AND a fetch is in flight, per
+ * `"$vin:trips" in ui.pending`), a rich empty state distinguishing "never
+ * driven" from "fetch failed" (see the comment below), and the populated list
+ * itself, one [SectionCard] per trip.
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
@@ -141,6 +153,15 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                 }
             }
         } else {
+            // One SectionCard per trip, keyed by its position in the list
+            // (trips have no stable id of their own here) rather than by date,
+            // since two trips could share the same start date. Each field is
+            // rendered only `?.let`/`?.takeIf`'d in when the data actually
+            // exists/is meaningful -- idle time and regen are hidden entirely
+            // when zero rather than shown as a bare "0", and efficiency is
+            // only computed (and shown) when both a distance and a non-zero
+            // used-kWh figure are present, since dividing by zero or missing
+            // data would produce a meaningless number.
             for (index in trips.indices) {
                 val t = trips[index]
                 item(key = index) {

@@ -25,6 +25,15 @@ import java.util.concurrent.TimeUnit
  */
 class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
+    /**
+     * Runs on WorkManager's periodic 15-min schedule (see [schedule]). Each step is wrapped
+     * in its own `runCatching` so one surface failing (e.g. no paired watch) never blocks the
+     * others from updating -- the worker still reports success even if some pushes failed,
+     * since there's nothing actionable to retry differently next cycle. Order: refresh the
+     * cached vehicle snapshot for all vehicles (empty [vin] + `force = false` means "whichever
+     * cars are known, server cache is fine"), then fan that snapshot out to widgets, watch,
+     * and the quick-settings tile.
+     */
     override suspend fun doWork(): Result {
         val ctx = applicationContext
         runCatching { WearCommandRunner.refresh(ctx, vin = "", force = false) }
@@ -49,9 +58,14 @@ class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<WidgetRefreshWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(
+                    // Skip runs entirely while offline rather than letting them fail/retry --
+                    // there'd be nothing to fetch anyway.
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
                 .build()
+            // KEEP policy: if this periodic work is already scheduled (e.g. called again on
+            // every app launch), leave the existing schedule alone instead of resetting its
+            // timer, so the 15-min cadence isn't perpetually restarted.
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
@@ -59,6 +73,8 @@ class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             )
         }
 
+        /** Stops the periodic refresh entirely, e.g. when the last widget is removed
+         *  or the user signs out, so it doesn't keep polling for nothing. */
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(NAME)
         }

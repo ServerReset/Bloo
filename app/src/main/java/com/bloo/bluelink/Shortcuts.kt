@@ -19,6 +19,8 @@ object Shortcuts {
     /** Selectable per-car shortcut actions (toggles + open), in priority order. */
     val ACTIONS = listOf("doors", "climate", "open")
 
+    /** Human-readable label for a shortcut command, used in the in-app shortcut picker
+     *  UI (distinct from [label], which produces the actual OS-shown shortcut text). */
     fun actionLabel(cmd: String): String = when (cmd) {
         "doors" -> "Lock / unlock"
         "climate" -> "Climate"
@@ -33,6 +35,9 @@ object Shortcuts {
         else -> name.take(10) to "Open $name"
     }
 
+    /** The stable shortcut id used both to identify a shortcut to the OS and as the key
+     *  in the [enabled] set passed to [refresh] -- must stay in sync with the ids built
+     *  inline in [carShortcut]/[oemShortcut] below. */
     private fun id(cmd: String, vin: String) = "${cmd}_$vin"
 
     /**
@@ -58,6 +63,7 @@ object Shortcuts {
         }
     }
 
+    /** Builds the shortcut for one car+command pair (e.g. "Doors · lock/unlock <car>"). */
     private fun carShortcut(context: Context, v: Vehicle, cmd: String): ShortcutInfoCompat {
         val (short, long) = label(cmd, v.name)
         val icon = when (cmd) {
@@ -68,11 +74,18 @@ object Shortcuts {
         return shortcut(context, "${cmd}_${v.vin}", v.vin, cmd, short, long, icon)
     }
 
+    /** Builds the "Open the <brand> app" shortcut for whichever car happens to be first
+     *  of its brand (see the `distinctBy { it.brand }` call site in [refresh]) -- the vin
+     *  is just carried along for the intent extras; any car of that brand would do since
+     *  this shortcut just opens the app, it doesn't act on that specific vehicle. */
     private fun oemShortcut(context: Context, v: Vehicle): ShortcutInfoCompat {
         val name = v.brand.links.appName
         return shortcut(context, "bluelink_${v.brand.name}", v.vin, "bluelink", name, "Open the $name app", R.drawable.ic_shortcut_car)
     }
 
+    /** Common shortcut-building plumbing: wraps vin+cmd into the same [ACTION] intent
+     *  [MainActivity.handleShortcutIntent] parses, then assembles the OS-facing
+     *  [ShortcutInfoCompat] (labels, icon, and that intent) that actually gets registered. */
     private fun shortcut(
         context: Context,
         id: String,

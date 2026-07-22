@@ -45,6 +45,21 @@ import kotlinx.coroutines.launch
  * Launched by the watch-face complication picker when the user picks/configures a
  * Bloo complication. Lets them choose which car THIS slot shows, stored keyed by
  * the complication instance id, then requests an immediate update for that slot.
+ *
+ * Mechanism: a complication data source can declare (via its manifest entry)
+ * that it's configurable, in which case the system launches this Activity
+ * -- instead of going straight to rendering -- the first time the user adds
+ * it to a watch-face slot, passing the complication's numeric instance id and
+ * the ComponentName of the specific data source class (there can be more than
+ * one complication service in this app) as extras. This activity's whole job
+ * is to let the user finish that one-time (or later re-opened) setup: it
+ * writes the chosen car's VIN into [ComplicationCarStore] keyed by
+ * (dataSource, complicationId) -- the same store [ChargeComplication] and its
+ * siblings read from in their own onComplicationRequest -- then explicitly
+ * asks the system ([ComplicationDataSourceUpdateRequester]) to re-render that
+ * one instance immediately, rather than waiting for its next natural refresh.
+ * `setResult(RESULT_OK/RESULT_CANCELED)` communicates success/cancellation
+ * back to the watch-face configuration flow that launched this.
  */
 class ComplicationConfigActivity : ComponentActivity() {
 
@@ -53,6 +68,10 @@ class ComplicationConfigActivity : ComponentActivity() {
         setResult(RESULT_CANCELED)
 
         val complicationId = intent.getIntExtra(EXTRA_COMPLICATION_ID, -1)
+        // The provider ComponentName's short class name (e.g. "ChargeComplication",
+        // stripped of its package prefix) doubles as the per-data-source key used
+        // throughout ComplicationCarStore -- this app can have several distinct
+        // complication services, each configuring its own slots independently.
         val component: ComponentName? = if (Build.VERSION.SDK_INT >= 33) {
             intent.getParcelableExtra(EXTRA_PROVIDER_COMPONENT, ComponentName::class.java)
         } else {
@@ -147,6 +166,12 @@ class ComplicationConfigActivity : ComponentActivity() {
         }
     }
 
+    /** Pin this complication instance to a specific car: persists the VIN
+     *  keyed by (dataSource, complicationId), then tells the system to
+     *  re-request data for that instance right away (`runCatching` since the
+     *  requester call can fail if the data source has since been
+     *  unregistered -- non-fatal, the pin is already saved and will apply
+     *  on the next natural refresh regardless), and closes with RESULT_OK. */
     private fun choose(dataSource: String, complicationId: Int, component: ComponentName, vin: String) {
         lifecycleScope.launch {
             ComplicationCarStore(applicationContext).setVin(dataSource, complicationId, vin)
@@ -160,6 +185,9 @@ class ComplicationConfigActivity : ComponentActivity() {
         }
     }
 
+    /** Unpin this complication instance so it goes back to following whichever
+     *  car is currently selected in the main app, instead of a fixed VIN --
+     *  same immediate-refresh-then-close pattern as [choose]. */
     private fun followSelected(dataSource: String, complicationId: Int, component: ComponentName) {
         lifecycleScope.launch {
             ComplicationCarStore(applicationContext).clear(dataSource, complicationId)

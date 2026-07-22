@@ -17,6 +17,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
  */
 class Haptics(context: Context) {
 
+    // API 31 (S) moved vibrator access behind VibratorManager; below that the vibrator
+    // is fetched directly from the Context (deprecated but still the only path pre-S).
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
     } else {
@@ -37,8 +39,14 @@ class Haptics(context: Context) {
                 ) == true
             }.getOrDefault(false)
 
+    /** Whether the motor can vary vibration strength, not just on/off -- gates whether
+     *  [oneShot]/[waveform] pass through a real amplitude or fall back to DEFAULT_AMPLITUDE. */
     private val hasAmplitude = vibrator?.hasAmplitudeControl() == true
 
+    /** Central gate every effect funnels through: skips entirely if haptics are disabled,
+     *  there's no effect to play, or the device genuinely has no vibrator motor. Any
+     *  platform exception from the actual vibrate() call is swallowed since a missed
+     *  haptic is never worth crashing over. */
     private fun play(effect: VibrationEffect?) {
         if (!enabled || effect == null) return
         val v = vibrator ?: return
@@ -54,6 +62,9 @@ class Haptics(context: Context) {
         }
     }
 
+    /** Multi-step fallback for devices without composition primitives: [timings] and
+     *  [amplitudes] are parallel arrays alternating off/on segments in milliseconds and
+     *  0-255 strength (the `-1` argument means "don't repeat, play once end-to-end"). */
     private fun waveform(timings: LongArray, amplitudes: IntArray) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (hasAmplitude) play(VibrationEffect.createWaveform(timings, amplitudes, -1))
@@ -121,6 +132,9 @@ class Haptics(context: Context) {
      */
     fun slotSettle() {
         if (composes) {
+            // 16 ticks, each one both later (delay *= 1.22, capped at 150ms) and weaker
+            // (scale *= 0.92, floored at 0.25) than the last -- the growing gap plus
+            // shrinking strength together read as something spinning down to a stop.
             val c = VibrationEffect.startComposition()
             var delay = 16
             var scale = 0.85f
@@ -191,6 +205,9 @@ class Haptics(context: Context) {
 
     // --- Composition helpers --------------------------------------------
 
+    /** Small DSL so each effect above can declare its primitives as a plain `add(...)`
+     *  list instead of manually managing a [VibrationEffect.Composition] builder; wraps
+     *  the whole built sequence into one [play] call once [build] finishes adding steps. */
     private inline fun composed(build: CompositionBuilder.() -> Unit) {
         val c = VibrationEffect.startComposition()
         CompositionBuilder(c).build()
@@ -198,6 +215,8 @@ class Haptics(context: Context) {
     }
 
     private class CompositionBuilder(val c: VibrationEffect.Composition) {
+        /** [scale] is per-primitive strength (0..1); [delayMs] is the gap before this
+         *  primitive starts, relative to the previous one finishing. */
         fun add(primitive: Int, scale: Float, delayMs: Int) {
             c.addPrimitive(primitive, scale, delayMs)
         }

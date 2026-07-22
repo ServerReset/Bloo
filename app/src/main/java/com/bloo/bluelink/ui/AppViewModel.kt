@@ -550,6 +550,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Back out of the Kia OTP challenge screen: drops the stashed
+     *  credentials (they were never persisted) and clears the challenge UI. */
     fun kiaCancelOtp() {
         kiaPending = null
         _state.update { it.copy(kiaOtp = null) }
@@ -1247,8 +1249,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Dismiss the post-onboarding "check out Settings" hint on the garage
+     *  (in-memory only -- it's a one-time nudge, not worth persisting). */
     fun dismissSettingsHint() = _state.update { it.copy(showSettingsHint = false) }
 
+    /** Dismiss the coach mark pointing at Settings' back arrow. */
     fun dismissSettingsCoach() = _state.update { it.copy(showSettingsCoach = false) }
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {
@@ -1275,11 +1280,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { com.bloo.bluelink.update.UpdateChecker.snooze(getApplication()) }
     }
 
+    /** Fixed on-disk location for the downloaded update APK, inside the app's
+     *  cache dir (so the system can reclaim it under storage pressure, and
+     *  it's automatically cleaned up on uninstall). Always the same filename,
+     *  so a later download simply overwrites a stale one. */
     private fun apkCacheFile(): java.io.File {
         val ctx = getApplication<Application>()
         return java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo.apk")
     }
 
+    /** Hand an already-downloaded APK to the system package installer via a
+     *  FileProvider content:// URI (a file:// URI would be rejected under
+     *  the FileUriExposedException policy on modern Android). Wrapped in
+     *  runCatching since there's no reliable way to know in advance whether
+     *  an installer activity will actually be available to resolve the
+     *  intent; returns whether the install UI was successfully launched. */
     private fun launchApkInstaller(dest: java.io.File): Boolean {
         val ctx = getApplication<Application>()
         return runCatching {
@@ -1347,6 +1362,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Toggle "run AI summaries automatically" -- when on, [autoSummarize] is
+     *  invoked after every status load/command instead of requiring a manual
+     *  tap on Summarize. Updates [_state] immediately (so the switch reflects
+     *  the change without waiting on the DataStore write) and persists async. */
     fun setAiAuto(value: Boolean) {
         _state.update { it.copy(aiAuto = value) }
         viewModelScope.launch { settingsStore.setAiAuto(value) }
@@ -1379,7 +1398,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Summarize a car's last-fetched status with on-device Gemini Nano. */
+    /**
+     * Manual "Summarize" tap. Requires a status already in [UiState.statuses]
+     * (if there isn't one, it asks the user to refresh first rather than
+     * triggering a fetch itself); marks the VIN busy so the button can show a
+     * spinner and a second tap is ignored via the guard above, runs the model
+     * off the main thread inside [viewModelScope], and always clears the busy
+     * flag on either branch of [Result.fold] -- success writes the summary
+     * into [UiState.aiSummaries], failure logs and surfaces a snackbar.
+     */
     fun summarizeCar(v: Vehicle) {
         if (v.vin in _state.value.aiBusy) return
         val status = _state.value.statusFor(v) ?: run {
@@ -1420,6 +1447,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Dismiss the AI search-answer card. */
     fun clearAiReply() = _state.update { it.copy(aiSearchReply = null) }
 
     /**
@@ -1541,6 +1569,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // These two are global (not per-tile) toggles for how Quick Settings tiles
+    // behave, following the same shape as setTileAssignment/setTileLabel/
+    // setTileClimateTarget above: update _state for immediate UI feedback,
+    // persist to SettingsStore, then poke BlooTileService so the system tiles
+    // (which read their state independently, not via this StateFlow) refresh
+    // right away instead of waiting for their next natural update tick.
+
+    /** Whether tiles run their command in the background vs. opening the app. */
     fun setTileBackground(value: Boolean) {
         _state.update { it.copy(tileBackground = value) }
         viewModelScope.launch {
@@ -1549,6 +1585,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Whether tapping a tile also kicks a throttled status refresh. */
     fun setTileLiveRefresh(value: Boolean) {
         _state.update { it.copy(tileLiveRefresh = value) }
         viewModelScope.launch {
@@ -1617,6 +1654,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Climate-preset CRUD: each of these three follows the same optimistic
+    // pattern -- compute the new per-VIN preset list, write it into
+    // UiState.climatePresets immediately so the UI updates without waiting on
+    // disk I/O, then persist the same change to SettingsStore asynchronously.
+    // The [_state.map { it.climatePresets }...] collector in init mirrors the
+    // result to the watch, so none of these need to publish to the watch
+    // themselves.
+
+    /** Save the current climate draft as a new named preset (a fresh
+     *  timestamp-based id, so presets never collide even if named the same). */
     fun saveClimatePreset(v: Vehicle, name: String, req: ClimateRequest) {
         val preset = ClimatePreset(
             id = System.currentTimeMillis().toString(),
@@ -1629,6 +1676,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.saveClimatePreset(v.vin, preset) }
     }
 
+    /** Remove one saved preset by id. */
     fun deleteClimatePreset(v: Vehicle, id: String) {
         _state.update {
             val updated = it.climatePresets[v.vin].orEmpty().filter { p -> p.id != id }
@@ -1637,6 +1685,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.deleteClimatePreset(v.vin, id) }
     }
 
+    /** Persist a new drag-and-drop order for a car's saved presets. */
     fun reorderClimatePresets(v: Vehicle, ordered: List<ClimatePreset>) {
         _state.update { it.copy(climatePresets = it.climatePresets + (v.vin to ordered)) }
         viewModelScope.launch { settingsStore.setClimatePresets(v.vin, ordered) }
@@ -1708,6 +1757,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Turn a lat/lon into a short human-readable place name (e.g. a
+     *  neighborhood or city) using the on-device/Play-services Geocoder. Runs
+     *  on Dispatchers.IO since Geocoder does blocking network/disk lookups.
+     *  Wrapped in runCatching -- geocoding can fail (no network, unsupported
+     *  locale, no result for the coordinates) and callers treat a null result
+     *  as "just don't show a place name," not an error worth surfacing. */
     private suspend fun reverseGeocode(loc: GeoLocation): String? = withContext(Dispatchers.IO) {
         runCatching {
             val results = Geocoder(getApplication(), Locale.getDefault())
@@ -1717,6 +1772,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // --- Commands (per-action pending + optimistic state flip) -----------
+    //
+    // Every remote command below (lock/unlock, lights, climate, charging) is a
+    // thin one-liner that just calls runCommand with:
+    //   - a "vin:action" key so its own pending-spinner / MIN_COMMAND_LOCK_MS
+    //     double-tap guard is independent of every other action on the car
+    //     (locking doesn't block a simultaneous climate command, etc.),
+    //   - a success message logged to AppLog and surfaced as a toast,
+    //   - an optional "optimistic" lambda that patches the cached
+    //     VehicleStatus immediately (before the network call returns) so the
+    //     UI flips state right away instead of waiting out a full round trip
+    //     -- null for commands with no simple boolean to flip (lights,
+    //     charge-limit), and
+    //   - the suspend `block` that actually calls the repository.
+    // See runCommand's own doc comment below for exactly how the pending set,
+    // the optimistic patch, the statusMutex serialization, and the failure
+    // rollback (a follow-up refreshStatus) all fit together.
 
     /**
      * The endpoint family (EV vs ICE) is chosen from [v.isEv], but the user can
@@ -1726,30 +1797,60 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun electric(v: Vehicle): Vehicle =
         if (_state.value.hasBattery(v)) v.copy(isEv = true) else v
 
+    // Lock/unlock share the "doors" action key, so a lock command in flight
+    // blocks a rapid-fire unlock (and vice versa) rather than letting them
+    // race each other through the API. Each optimistically flips
+    // VehicleStatus.doorLock the instant the command is accepted.
     fun lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repoFor(v).lock(v) }
     fun unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repoFor(v).unlock(v) }
 
+    // Both share the "hornLights" action key (only one can run at a time) and
+    // have no boolean toggle to optimistically flip -- these are momentary
+    // actions (the car doesn't have a persistent "lights are flashing" state
+    // worth reflecting), so `optimistic` is null and the UI only shows the
+    // pending spinner until the command completes.
     fun flashLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Lights flashing", null) { repoFor(v).flashLights(v) }
     fun hornAndLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Horn & lights", null) { repoFor(v).hornAndLights(v) }
 
+    /** Turn climate off; optimistically flips [VehicleStatus.airCtrlOn] to
+     *  false so the climate toggle in the UI responds immediately. */
     fun stopClimate(v: Vehicle) =
         runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repoFor(v).stopClimate(v) }
 
+    /** Start climate with the given [req] (temp/duration/defrost/seat
+     *  heating/etc). Shares the "climate" action key with [stopClimate] so
+     *  starting and stopping can't race each other on the same car. */
     fun startClimate(v: Vehicle, req: ClimateRequest) =
         runCommand(v.vin, "climate", "Climate on (${req.tempF}°F)", { it.copy(airCtrlOn = true) }) {
             repoFor(v).startClimate(v, req)
         }
 
+    // startCharge/stopCharge/setChargeLimits all route the vehicle through
+    // electric(v) before calling the repository -- unlike the commands above,
+    // these hit EV-only endpoints, so a car the user has manually marked as a
+    // PHEV (which the API itself may still report as gas/isEv=false) needs
+    // isEv forced true here or the call would go to the wrong (ICE) endpoint.
+
+    /** Begin charging; optimistically sets [VehicleStatus.evStatus]'s
+     *  batteryCharge to true (a no-op patch if evStatus is itself null, since
+     *  the nested `?.copy` on a null receiver stays null). */
     fun startCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
             repoFor(v).startCharge(electric(v))
         }
 
+    /** Stop charging; mirrors [startCharge]'s optimistic-patch shape but with
+     *  the flag flipped false. Shares the "charge" action key with it. */
     fun stopCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) }) {
             repoFor(v).stopCharge(electric(v))
         }
 
+    /** Set the AC (slow/L2) and DC (fast) charge-target percentages. Its own
+     *  "chargeLimit" action key (distinct from "charge") so setting limits
+     *  doesn't block a concurrent start/stop-charge tap, and vice versa; no
+     *  optimistic patch since VehicleStatus doesn't carry a single field that
+     *  maps cleanly onto "the limits are now X/Y" the way charging on/off does. */
     fun setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
         runCommand(v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)", null) {
             repoFor(v).setChargeTargets(electric(v), acPercent, dcPercent)
@@ -1822,6 +1923,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Settings / nav --------------------------------------------------
 
+    /** Navigate to the Settings screen (the car carousel keeps its state
+     *  behind it, restored as-is by [closeSettings]). */
     fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
     fun closeSettings() {
         // Always return to the card/grid view (collapse any expanded car).
@@ -1834,11 +1937,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Appearance/preference setters (setThemeMode through setColorPalette,
+    // and again setPebbleOutline/setAuroraBackground/.../setUnitSystem further
+    // below): each just writes one field to SettingsStore's DataStore and
+    // returns. None of them touch _state directly because `appearance` above
+    // is already a StateFlow mirroring settingsStore.appearance -- the UI
+    // picks up the change automatically once the DataStore write completes
+    // and that Flow re-emits, and the init-block collector separately mirrors
+    // the same Flow out to a paired watch. setThemeMode and setDynamicColor
+    // are the two exceptions that do extra work (see their own comments).
+    // Deviates from the group pattern above: the home-screen widget renders
+    // itself with its own theme resolution that isn't reactive to the
+    // DataStore Flow the way Compose UI is, so it needs an explicit nudge to
+    // repaint after a theme change; best-effort (runCatching) since a missing
+    // widget instance is not an error.
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
         settingsStore.setThemeMode(mode)
         runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
     }
     fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
+    // Deviates from the group pattern above: turning dynamic (Material You)
+    // color on means every car's custom fixed palette id would otherwise sit
+    // around unused but still selected -- clear them all so switching back to
+    // a fixed palette later doesn't silently resurrect a stale per-car choice
+    // that no longer matches what's shown while dynamic color was active.
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch {
         settingsStore.setDynamicColor(enabled)
         if (enabled) settingsStore.clearAllCarPaletteIds()
@@ -1992,6 +2114,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Weather ---------------------------------------------------------
 
+    /** Un-set the "home" weather location: clears the saved lat/lon/label and
+     *  drops any already-fetched reading so the weather pebble hides itself. */
     fun clearWeatherLocation() = viewModelScope.launch {
         settingsStore.setWeatherLocation(null, null, null)
         _state.update { it.copy(homeWeather = null) }
@@ -2050,7 +2174,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Swap which dual-column side the "hot spot" pebble lives on. */
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
+    /** Open in-app links (maps, OEM app store page, etc.) inside a custom
+     *  tab instead of handing off to an external browser. */
     fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
 
     // Deferred variants for the settings sliders: these two values recompose
@@ -2064,6 +2191,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setVibrancy(value) }
     fun setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
+    // More of the same appearance-setter pattern described above the
+    // setThemeMode group: DataStore write only, UI updates via the
+    // `appearance` StateFlow mirror. setAuroraMotion/setAuroraColorMode
+    // configure the animated background's speed and how it picks colors
+    // (theme-derived vs. a fixed custom one); setAuroraCustomColor supplies
+    // that fixed color (or null to fall back to theme-derived).
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
 
     fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
@@ -2074,9 +2207,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAuroraCustomColor(value: String?) = viewModelScope.launch { settingsStore.setAuroraCustomColor(value) }
 
+    /** Imperial vs. metric display throughout the app. */
     fun setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }
 
+    /** Wipe the in-memory activity log shown in Settings (not persisted, so
+     *  nothing to clear on disk). */
     fun clearLogs() = AppLog.clear()
+    /** Dismiss the current snackbar. */
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     /** Surface (and log) an error raised by the UI layer. */
@@ -2103,6 +2240,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Set (or clear, with null) which saved preset the one-tap climate Start
+     *  button runs for this car -- read back out in [bootstrapDriveSync]'s
+     *  restore step into [UiState.defaultClimatePresets]. */
     fun setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
         settingsStore.setDefaultClimatePreset(vin, id)
     }
@@ -2119,6 +2259,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Shared wrapper for the handful of operations that should show the
+     * app-wide loading spinner ([UiState.loading]) rather than a per-action
+     * one: sets loading=true and clears any stale message, runs [block] inside
+     * viewModelScope, and in a finally-block always clears loading=false
+     * regardless of success/failure -- so a thrown exception can never leave
+     * the spinner stuck on. Any exception [block] throws is caught here,
+     * logged, and turned into a snackbar message instead of crashing the
+     * ViewModel's coroutine scope.
+     */
     private fun launchBusy(block: suspend () -> Unit) {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, message = null) }

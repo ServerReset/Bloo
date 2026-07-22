@@ -59,12 +59,31 @@ import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import kotlinx.coroutines.launch
 
+/**
+ * The Settings screen: a single scrollable [ScalingLazyColumn] made up of one
+ * [SettingSection] card per topic (Accounts, Appearance, PIN lock, AI
+ * Summaries, Aurora, text size, Tile chips, per-slot Tile car pinning, Tile
+ * order, Sync, Phone status, Refresh, Sign out). Most of the state driving
+ * these sections lives upstream in [WearUi] (itself derived from
+ * [WearViewModel]'s combination of phone-synced settings and local watch-only
+ * settings); this composable is mostly read-only rendering plus wiring each
+ * control's `onClick`/`onSelect` back to the corresponding `vm.setXxx` call.
+ * Two pieces of genuinely local state exist here: [pinFlow] (which PIN
+ * management flow, if any, is currently overlaid on top of this screen) and
+ * `confirmSignOut` (a local two-tap-to-confirm guard for the destructive
+ * sign-out action, see below).
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     val state = rememberScalingLazyListState()
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
+    // Rotary bezel/crown input on Wear OS scrolls whichever element currently
+    // has input focus, not whatever's simply on screen -- so this list must
+    // explicitly claim focus itself (below, via .focusRequester(focusRequester)
+    // .focusable()) or a rotary turn would do nothing until the user first
+    // tapped something to focus it.
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     var pinFlow by remember { mutableStateOf<PinFlowMode?>(null) }
     // Mirrors the phone's Simple/Advanced settings mode (synced one-way via
@@ -356,6 +375,13 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         activeColor = MaterialTheme.colorScheme.primary,
                         pending = false,
                         onClick = {
+                            // Toggling a chip on appends it then keeps only the
+                            // last two distinct entries -- since the Tile only
+                            // has room for two chips, adding a third silently
+                            // bumps out the oldest-picked one rather than the
+                            // toggle being rejected outright or growing an
+                            // unbounded list that setTileActions would have to
+                            // truncate anyway.
                             val on = !checked
                             val next = if (on) (actions + key).distinct().takeLast(2) else actions - key
                             vm.setTileActions(next)

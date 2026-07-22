@@ -75,6 +75,8 @@ class KiaUsaApi {
         val API = "${Brand.KIA.baseUrl}/apigw/v1/"
         private val CLIENT_ID = Brand.KIA.clientId
         private val SECRET_KEY = Brand.KIA.clientSecret
+        // Mimics an actual iOS Kia Connect client build, since the API appears
+        // to key some behavior off a recognized User-Agent string.
         private const val USER_AGENT = "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0"
 
         /** A fresh, stable device id (persist it; the rmtoken is bound to it). */
@@ -96,11 +98,18 @@ class KiaUsaApi {
 
     // --- Headers ---------------------------------------------------------
 
+    /** Current time formatted as an RFC 1123 date string in GMT — the exact
+     *  format HTTP's own Date header uses, which the Kia API expects as its
+     *  own `date` header on every request (see [apiHeaders]). */
     private fun rfc1123Date(): String =
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("GMT") }
             .format(System.currentTimeMillis())
 
+    /** The full set of headers every Kia API call needs regardless of
+     *  endpoint (client/device identification, locale, a fresh timestamp) —
+     *  [authedHeaders] below layers session-specific headers (sid/vinkey) on
+     *  top of this for calls that need an active session. */
     private fun Request.Builder.apiHeaders(deviceId: String): Request.Builder = this
         .header("content-type", "application/json;charset=utf-8")
         .header("accept", "application/json")
@@ -124,6 +133,9 @@ class KiaUsaApi {
         .header("date", rfc1123Date())
         .header("deviceid", deviceId)
 
+    /** [apiHeaders] plus the two headers that identify *which* logged-in
+     *  session and *which* car a command applies to — every authenticated
+     *  call (status, lock/unlock, climate, etc.) goes through this. */
     private fun Request.Builder.authedHeaders(session: KiaSession, vehicle: KiaVehicleSummary): Request.Builder =
         apiHeaders(session.deviceId).header("sid", session.sid).header("vinkey", vehicle.key)
 
@@ -218,6 +230,11 @@ class KiaUsaApi {
 
     // --- Vehicles --------------------------------------------------------
 
+    /** Fetch every vehicle registered on this Kia account. Mechanism: calls
+     *  ownr/gvl (get vehicle list), then walks payload.vehicleSummary — an
+     *  entry with no vehicleIdentifier is dropped entirely (mapNotNull) since
+     *  there's nothing to key the car by; fuelType == 4 is the API's encoding
+     *  for a pure EV. */
     suspend fun vehicles(session: KiaSession): List<KiaVehicleSummary> = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(API + "ownr/gvl").get()
             .apiHeaders(session.deviceId).header("sid", session.sid).build()
@@ -238,6 +255,17 @@ class KiaUsaApi {
 
     // --- Status / location ----------------------------------------------
 
+    /** Fetch the car's current status. Mechanism: posts a request body to
+     *  cmm/gvi (get vehicle info) that explicitly opts into the sub-sections
+     *  this app cares about (location, vehicleStatus) while opting out of
+     *  ones it doesn't (weather, functionalCards) to keep the response
+     *  smaller; the response wraps the actual status in a one-element
+     *  vehicleInfoList array (returns null if that's empty/missing). Because
+     *  cmm/gvi's own response doesn't include EV charge-limit targets, EVs
+     *  get a second request ([chargeTargets]) merged in afterward — done as
+     *  a best-effort (runCatching) so a failure fetching just the charge
+     *  targets doesn't blank out the rest of an otherwise-successful status
+     *  fetch. */
     suspend fun status(session: KiaSession, vehicle: KiaVehicleSummary): VehicleStatus? = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             put("vehicleConfigReq", buildJsonObject {
@@ -383,15 +411,26 @@ class KiaUsaApi {
 
     // --- Commands --------------------------------------------------------
 
+    // These four are simple no-body GET commands — see [getCommand] for the
+    // shared mechanism (fire the request, discard the response body, only
+    // care whether it succeeded).
     suspend fun lock(session: KiaSession, v: KiaVehicleSummary) = getCommand("rems/door/lock", session, v)
     suspend fun unlock(session: KiaSession, v: KiaVehicleSummary) = getCommand("rems/door/unlock", session, v)
     suspend fun stopClimate(session: KiaSession, v: KiaVehicleSummary) = getCommand("rems/stop", session, v)
     suspend fun stopCharge(session: KiaSession, v: KiaVehicleSummary) = getCommand("evc/cancel", session, v)
 
+    /** Start charging. chargeRatio is fixed at 100 -- the actual AC/DC charge
+     *  *limit* percentages are configured separately via [setChargeTargets];
+     *  this call is just the on/off trigger. */
     suspend fun startCharge(session: KiaSession, v: KiaVehicleSummary) = withContext(Dispatchers.IO) {
         postCommand("evc/charge", session, v, buildJsonObject { put("chargeRatio", 100) })
     }
 
+    /** Set EV charge target SOC for AC and DC in percent. Mechanism: like the
+     *  Hyundai/Genesis equivalent, both targets are sent together in one
+     *  targetSOClist body (plugType 0 = DC, 1 = AC — same encoding used
+     *  throughout this codebase), since the endpoint has no way to update
+     *  just one without resending the other's current value too. */
     suspend fun setChargeTargets(session: KiaSession, v: KiaVehicleSummary, ac: Int, dc: Int) = withContext(Dispatchers.IO) {
         postCommand(
             "evc/sts", session, v,
@@ -404,6 +443,14 @@ class KiaUsaApi {
         )
     }
 
+    /** Start climate / remote start. Mechanism: Kia's API represents the two
+     *  ends of the temperature range as the literal strings "LOW"/"HIGH"
+     *  rather than accepting a numeric value outside 62-82°F, so any
+     *  requested temp beyond that range gets mapped to the matching sentinel
+     *  string instead of the number itself; seat heat/vent settings are only
+     *  included in the body at all when at least one seat isn't OFF
+     *  ([anySeat]), keeping the payload minimal when the user hasn't touched
+     *  seat controls. */
     suspend fun startClimate(session: KiaSession, v: KiaVehicleSummary, req: ClimateRequest) = withContext(Dispatchers.IO) {
         val tempValue: String = when {
             req.tempF < 62 -> "LOW"
@@ -449,12 +496,21 @@ class KiaUsaApi {
         else -> buildJsonObject { put("heatVentType", 0); put("heatVentLevel", 1); put("heatVentStep", 0) }
     }
 
+    /** Shared shape for the simple no-body GET commands (lock/unlock/stop):
+     *  build the URL, attach session+vehicle headers, run it via [call]
+     *  (which already throws on any failure) and discard the parsed
+     *  response — these commands only need a success/failure signal. */
     private suspend fun getCommand(path: String, session: KiaSession, v: KiaVehicleSummary) = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(API + path).get().authedHeaders(session, v).build()
         call(req)
         Unit
     }
 
+    /** Shared shape for commands that need a JSON request body (charge,
+     *  climate start, charge targets) — same header/error handling as
+     *  [getCommand], just POSTing [body] instead of a bodyless GET. Runs
+     *  synchronously; callers wrap it in withContext(Dispatchers.IO)
+     *  themselves. */
     private fun postCommand(path: String, session: KiaSession, v: KiaVehicleSummary, body: JsonObject) {
         val req = Request.Builder().url(API + path)
             .post(body.toString().toRequestBody(jsonMedia)).authedHeaders(session, v).build()
@@ -513,8 +569,19 @@ class KiaUsaApi {
             .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
 
     // --- JSON helpers ----------------------------------------------------
+    // Kia's payloads are deeply nested and inconsistently shaped across
+    // endpoints/vehicle generations, so rather than modeling every possible
+    // shape with @Serializable data classes, [parseStatus] and friends walk
+    // the raw JsonElement tree with these small typed-cast helpers — each one
+    // safely returns null (never throws) when the element isn't the expected
+    // type or is missing, letting the caller fall back with `?:` instead of
+    // needing try/catch everywhere.
 
+    /** Cast to a JsonObject, or null if this isn't one (missing/wrong-shaped key). */
     private fun JsonElement?.obj(): JsonObject? = this as? JsonObject
+    /** Cast to a String, treating the literal JSON string "null" the same as
+     *  an absent value (some Kia fields are inconsistently sent as that
+     *  literal instead of a true JSON null). */
     private fun JsonElement?.str(): String? = (this as? JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
     private fun JsonElement?.int(): Int? = (this as? JsonPrimitive)?.intOrNull
     private fun JsonElement?.dbl(): Double? = (this as? JsonPrimitive)?.doubleOrNull

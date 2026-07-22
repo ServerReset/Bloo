@@ -31,14 +31,36 @@ import kotlinx.coroutines.launch
  */
 abstract class BlooTileService : TileService() {
 
+    /** Which of the 12 pool slots (see [TILE_CLASSES]) this concrete subclass backs;
+     *  used to look up its per-tile config/label in [SettingsStore]. */
     abstract val index: Int
+
+    // TileService instances are recreated/torn down by the system frequently (any time the
+    // shade opens/closes), so this scope is tied to *this instance's* lifetime, not a
+    // singleton -- SupervisorJob keeps one failed child coroutine from cancelling the rest.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    /**
+     * Called by the system whenever this tile becomes visible in the Quick Settings shade
+     * (shade pulled down, or the tile scrolled into view) -- this is the TileService
+     * lifecycle's cue that [qsTile] is now safe to read/mutate. There's no matching
+     * "refresh periodically while visible" hook, so a coroutine is kicked off once here to
+     * paint current state; [onStopListening] (not overridden) is the mirror-image call when
+     * the shade closes, at which point further `qsTile` access would be invalid.
+     */
     override fun onStartListening() {
         super.onStartListening()
         scope.launch { render() }
     }
 
+    /**
+     * Reads this tile's assigned car+command from settings and the latest cached vehicle
+     * snapshot, then paints [qsTile]'s state/icon/label/subtitle to match and pushes it with
+     * [Tile.updateTile]. If no car/command has been assigned yet, shows a generic inactive
+     * "unassigned" tile instead. Every settings/store read is wrapped in `runCatching` so a
+     * transient failure (e.g. store not yet initialized) degrades to a sane fallback rather
+     * than leaving the tile in a broken half-drawn state or crashing the host process.
+     */
     private suspend fun render() {
         val tile = qsTile ?: return
         val ctx = applicationContext
@@ -108,6 +130,15 @@ abstract class BlooTileService : TileService() {
         else -> cmd.replaceFirstChar { it.uppercase() }
     }
 
+    /**
+     * Called by the system when the user taps this tile in the shade. Re-reads the tile's
+     * config fresh (rather than trusting whatever [render] last painted) since the tap could
+     * follow a stale render. Three mutually exclusive outcomes based on this tile's config:
+     * an unassigned tile or an "open" action just opens the app; otherwise, depending on the
+     * user's global "run in background" preference, either fires the command silently via
+     * WorkManager ([runBackground]) or opens a brief transparent activity that visibly runs
+     * it ([launchActionActivity]).
+     */
     override fun onClick() {
         super.onClick()
         val ctx = applicationContext
@@ -161,6 +192,16 @@ abstract class BlooTileService : TileService() {
         collapseAndStart(intent)
     }
 
+    /**
+     * Starts [intent] while collapsing the Quick Settings shade so the activity is actually
+     * visible to the user instead of appearing behind it. API 34+ deprecated passing a raw
+     * Intent to `startActivityAndCollapse` in favor of a PendingIntent (keyed by [index] so
+     * each tile slot gets its own distinct PendingIntent, otherwise FLAG_UPDATE_CURRENT would
+     * make them collide); older OS versions still use the deprecated raw-Intent overload.
+     * If the device is currently locked ([isLocked], a TileService property), the launch is
+     * deferred until after [unlockAndRun] gets the user through the lock screen -- firing an
+     * activity intent while locked would otherwise silently fail.
+     */
     private fun collapseAndStart(intent: Intent) {
         val run = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -240,7 +281,15 @@ abstract class BlooTileService : TileService() {
             }.getOrDefault(false)
         }
 
-        /** Ask the system to refresh all of Bloo's active tiles. */
+        /**
+         * Ask the system to refresh all of Bloo's active tiles. [TileService.requestListeningState]
+         * (a static method inherited from the base class) tells the system to re-deliver
+         * [onStartListening] to the named tile service *if* it's currently active/visible --
+         * this doesn't force a tile to appear, it just makes an already-shown tile repaint,
+         * which is how [render] gets re-run after something changes (e.g. a command completes)
+         * without waiting for the user to manually reopen the shade. Any given tile might not
+         * currently be added/visible, so failures here are expected and swallowed per-tile.
+         */
         fun requestUpdates(context: Context) {
             TILE_CLASSES.forEach { cls ->
                 runCatching { requestListeningState(context, ComponentName(context, cls)) }
@@ -249,6 +298,10 @@ abstract class BlooTileService : TileService() {
     }
 }
 
+// One trivial concrete subclass per pool slot: Android requires each Quick Settings tile to
+// be backed by its own manifest-declared TileService class (a single service can't expose
+// multiple independent tiles), so this is the boilerplate needed to offer 12 configurable
+// tile slots via one shared implementation above.
 class BlooTile1 : BlooTileService() { override val index = 0 }
 class BlooTile2 : BlooTileService() { override val index = 1 }
 class BlooTile3 : BlooTileService() { override val index = 2 }

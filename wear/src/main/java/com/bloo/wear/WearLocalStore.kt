@@ -24,6 +24,9 @@ private val Context.wearLocalStore by preferencesDataStore(
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
+/** The full catalogue of watch-only Tile identifiers -- both the flat set of
+ *  individual Tile keys (used for e.g. per-slot ordering) and, via
+ *  [DEFAULT_ORDER], their default display order before a user reorders them. */
 object WearTiles {
     const val SUMMARY = "summary"
     const val CLIMATE = "climate"
@@ -252,13 +255,23 @@ class WearLocalStore(private val context: Context) {
     // handled".
     private fun keyTileLastClick(poolIndex: Int) = stringPreferencesKey("tile_last_click_$poolIndex")
 
+    /** Read back the last-handled clickable id for one pool slot, so
+     *  BlooTileService can compare it against the id on an incoming
+     *  onTileRequest and decide whether that tap has already been executed. */
     suspend fun tileLastClick(poolIndex: Int): String? =
         context.wearLocalStore.data.first()[keyTileLastClick(poolIndex)]
 
+    /** Record that clickable [id] has now been handled for pool slot [poolIndex]. */
     suspend fun setTileLastClick(poolIndex: Int, id: String) {
         context.wearLocalStore.edit { it[keyTileLastClick(poolIndex)] = id }
     }
 
+    /** Persist which action chips the glanceable Tile shows. Filters to known
+     *  [TILE_CHIP_ACTIONS] (dropping anything unrecognised), de-dupes, caps at
+     *  two (the Tile only has room for two chips), and never allows an empty
+     *  result -- falling back to just "lock" rather than storing a Tile with
+     *  no actions at all. Stored as a single comma-joined string since
+     *  DataStore Preferences has no native list type. */
     suspend fun setTileActions(actions: List<String>) {
         val clean = actions.filter { it in TILE_CHIP_ACTIONS }.distinct().take(2).ifEmpty { listOf("lock") }
         context.wearLocalStore.edit { it[keyTileActions] = clean.joinToString(",") }
@@ -279,10 +292,16 @@ class WearLocalStore(private val context: Context) {
     // just the enabled flag + timing to the phone for its settings backup --
     // see that payload's doc comment for why the hash itself is excluded.
 
+    /** Arm/disarm the lock without touching the stored PIN itself -- see
+     *  [WearLocalSettings.pinLockEnabled]'s doc comment for why this is
+     *  gated by [hasPin] rather than meaningful on its own. */
     suspend fun setPinLockEnabled(enabled: Boolean) {
         context.wearLocalStore.edit { it[keyPinLockEnabled] = enabled }
     }
 
+    /** Persist how long after the watch app is put away the lock should
+     *  engage. Falls back to "immediate" for any value not in
+     *  [PIN_LOCK_TIMINGS] rather than storing garbage. */
     suspend fun setPinLockTiming(value: String) {
         context.wearLocalStore.edit { it[keyPinLockTiming] = value.takeIf { v -> v in PIN_LOCK_TIMINGS } ?: "immediate" }
     }
@@ -306,6 +325,15 @@ class WearLocalStore(private val context: Context) {
         }
     }
 
+    /** Check [rawPin] against the stored salted hash. Reads the salt and hash
+     *  fresh from DataStore each call (rather than caching them) so this
+     *  always checks against whatever is currently persisted. Returns false
+     *  -- rather than throwing -- if no PIN is set, the salt fails to decode,
+     *  or the hash doesn't match; the caller can't distinguish "no PIN set"
+     *  from "wrong PIN" from this return value alone. Note there is no
+     *  attempt-counting or lockout here (or anywhere else in this store) --
+     *  every call is an independent, unrate-limited comparison; the caller
+     *  (WearViewModel) is responsible for any UX around repeated failures. */
     suspend fun verifyPin(rawPin: String): Boolean {
         val prefs = context.wearLocalStore.data.first()
         val saltB64 = prefs[keyPinSalt] ?: return false
@@ -314,6 +342,12 @@ class WearLocalStore(private val context: Context) {
         return hashPin(rawPin, salt) == expected
     }
 
+    /** SHA-256 the salt concatenated with the UTF-8 PIN bytes (salt fed into
+     *  the digest first, then the PIN), producing a deterministic lowercase
+     *  hex string. The salt is per-installation-random ([setPin] generates a
+     *  fresh one each time a PIN is set via [SecureRandom]), so the same PIN
+     *  produces a different hash on every device/reset, defeating precomputed
+     *  rainbow-table lookups against the stored hash. */
     private fun hashPin(pin: String, salt: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256").apply {
             update(salt)

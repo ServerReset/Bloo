@@ -28,6 +28,32 @@ import java.util.concurrent.TimeUnit
  */
 class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
+    /**
+     * WorkManager's entry point, invoked on each periodic tick (see [schedule]).
+     *
+     * Mechanism, in order:
+     * 1. Cheap early exit: if the user never configured a Drive sync file
+     *    ([SettingsStore.syncUri] is null), returns success immediately without
+     *    doing any work -- this keeps the periodic job registered (so it's
+     *    ready to go the moment sync *is* configured) while making every tick
+     *    a no-op cost until then.
+     * 2. Runs the actual sync via [SettingsStore.performDriveSync], wrapped in
+     *    [runCatching] so an unexpected exception doesn't crash the worker;
+     *    it's instead treated the same as a null outcome below (silently
+     *    succeeds this run rather than retrying, since we don't know what
+     *    failed or whether retrying would help).
+     * 3. If settings were actually imported/changed by the sync, proactively
+     *    pushes the fresh appearance settings to the watch and refreshes the
+     *    home-screen widget -- both wrapped in their own [runCatching] since
+     *    this worker can run with the app's process not currently alive, so
+     *    there's no live ViewModel that would otherwise pick up the DataStore
+     *    change reactively and do this itself.
+     * 4. If the sync reported an error, logs it and returns [Result.retry] so
+     *    WorkManager retries with the exponential backoff configured in
+     *    [schedule] instead of waiting for the next full periodic interval.
+     * 5. Otherwise (no error, sync attempted and either succeeded or found
+     *    nothing new to import) returns [Result.success].
+     */
     override suspend fun doWork(): Result {
         val ctx = applicationContext
         val store = SettingsStore(ctx)
@@ -57,6 +83,8 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
     }
 
     companion object {
+        // Unique work name used below so re-calling schedule() (e.g. on every
+        // app start) doesn't stack up duplicate periodic jobs.
         private const val NAME = "bloo_drive_sync"
 
         /** Every 2 hours is frequent enough that changes propagate within a normal
@@ -64,6 +92,13 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
          *  low-urgency settings-sync convenience feature. */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<DriveSyncWorker>(2, TimeUnit.HOURS)
+                // Requires any usable network connection (not Wi-Fi-only at the
+                // WorkManager level) since the Wi-Fi-only preference, if the user
+                // set one, is instead re-checked inside performDriveSync() itself
+                // every run -- letting the constraint here stay the loosest
+                // possible so the worker is scheduled to run as often as intended
+                // and only skips the actual network call when the user's own
+                // preference says to.
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
@@ -72,6 +107,10 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
                 // default's much longer first backoff step.
                 .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
                 .build()
+            // enqueueUniquePeriodicWork + KEEP: if a periodic job under this name
+            // is already scheduled, leave the existing one running as-is rather
+            // than replacing it -- so calling schedule() again (e.g. on every app
+            // launch) doesn't reset the periodic timer or cancel an in-flight run.
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 NAME,
                 ExistingPeriodicWorkPolicy.KEEP,

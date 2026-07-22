@@ -52,6 +52,18 @@ import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import kotlinx.coroutines.launch
 
+/**
+ * The watch's own sign-in screen, used when there's no phone connected (or no
+ * account synced yet) to pull credentials from. Holds brand/email/password/PIN
+ * as local Compose state until "Sign in" is tapped, at which point they're
+ * handed to [WearViewModel.login] wholesale -- this composable does no
+ * validation itself, it's purely a form. Kia is special-cased: its sign-in
+ * flow is a one-time code that can't practically be typed on a watch keyboard,
+ * so that branch shows an [InfoCallout] instead of input fields and hides the
+ * "Sign in" button entirely (see the comment further down). While
+ * [ui].busy is true this renders only a spinner and returns early, replacing
+ * the whole form rather than overlaying it.
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LoginScreen(vm: WearViewModel, ui: WearUi) {
@@ -60,6 +72,11 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
 
+    // rememberWearTextInput (see its own definition) launches the system's
+    // remote/voice/handwriting text-entry UI and streams the result back into
+    // these locals via each lambda -- there's no on-watch physical keyboard,
+    // so every text field on this screen is actually a button that triggers
+    // this external input flow rather than an inline TextField.
     val emailInput = rememberWearTextInput("Email") { email = it }
     val passwordInput = rememberWearTextInput("Password") { password = it }
     val pinInput = rememberWearTextInput("PIN") { pin = it }

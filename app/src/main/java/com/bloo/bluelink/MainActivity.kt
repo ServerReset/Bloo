@@ -23,6 +23,14 @@ import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.DriveSyncWorker
 import com.bloo.bluelink.work.UpdateCheckWorker
 
+/**
+ * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the
+ * process-wide setup that only needs to happen once per launch -- scheduling the
+ * background workers that keep widgets/watch/tiles fresh, wiring up the screen-off
+ * receiver used for app-lock timing, and routing shortcut intents into the ViewModel.
+ * All actual screen/business logic lives in [AppViewModel] and the Compose tree; this
+ * class is deliberately thin plumbing around the Android Activity lifecycle.
+ */
 class MainActivity : FragmentActivity() {
 
     private val viewModel: AppViewModel by viewModels()
@@ -39,6 +47,16 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    /**
+     * Runs once when the Activity's process/window is created (not on every foreground --
+     * see [onStart]/[onStop] for that). Order of operations: configure edge-to-edge system
+     * bars, schedule all of the app's background WorkManager jobs (each `schedule()` call is
+     * itself idempotent/unique-work-keyed, so calling this on every cold start doesn't create
+     * duplicate schedules), register the screen-off receiver used by the app-lock timer, route
+     * in any shortcut intent that launched this instance, then finally hand off to Compose via
+     * [setContent] -- which reads the current [AppViewModel.appearance] as Compose state so the
+     * whole UI recomposes live if theme/appearance settings change while it's open.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Fully transparent system bars so the app's gradient shows through and
@@ -89,11 +107,21 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    /** Records the wall-clock time the Activity left the foreground, so the next
+     *  [onStart] can measure how long the app was backgrounded for the app-lock check. */
     override fun onStop() {
         super.onStop()
         backgroundedAt = System.currentTimeMillis()
     }
 
+    /**
+     * Fires every time the Activity returns to the foreground (including the very first
+     * launch). [firstStart] distinguishes that initial launch -- where [AppViewModel]'s own
+     * init logic already decides whether to show the lock screen -- from every subsequent
+     * warm resume, where [viewModel.maybeRelock] re-evaluates using how long the app was
+     * backgrounded ([backgroundedAt]) and whether the screen actually turned off meanwhile
+     * ([screenOffWhileAway], set by [screenReceiver]); both flags are reset for the next cycle.
+     */
     override fun onStart() {
         super.onStart()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
@@ -104,11 +132,16 @@ class MainActivity : FragmentActivity() {
         screenOffWhileAway = false
     }
 
+    /** Unregister the screen-off receiver so it doesn't leak past this Activity instance. */
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenReceiver) }
         super.onDestroy()
     }
 
+    /** Called instead of a fresh [onCreate] when this Activity is already running and
+     *  receives a new launch Intent (e.g. tapping another shortcut/notification while the
+     *  app is open) -- must replace the stored intent via [setIntent] so a later config
+     *  change/recreation doesn't re-process the stale original intent. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

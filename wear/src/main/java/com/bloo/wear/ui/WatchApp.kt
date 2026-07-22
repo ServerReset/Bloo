@@ -124,6 +124,18 @@ private object NoOpHapticFeedback : HapticFeedback {
     override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {}
 }
 
+/**
+ * The watch app's true root composable. Collects [WearViewModel.ui] as
+ * Compose state (so every downstream screen recomposes reactively off a
+ * single state holder) and does two cross-cutting things before handing off
+ * to the rest of the tree: swaps in a [NoOpHapticFeedback] app-wide when the
+ * phone-synced haptics setting is off (see that object's own doc comment for
+ * why this is done via [CompositionLocalProvider] rather than per-call-site),
+ * and gates the entire app behind [PinLockScreen] whenever
+ * `ui.pinLocked` is true -- the lock screen fully replaces
+ * [WatchAppContent] rather than overlaying it, so no other screen's
+ * composition (and its state) even exists underneath while locked.
+ */
 @Composable
 fun WatchApp(vm: WearViewModel) {
     val ui by vm.ui.collectAsState()
@@ -141,6 +153,16 @@ fun WatchApp(vm: WearViewModel) {
     }
 }
 
+/**
+ * The unlocked app: an optional [WearAuroraBackground] behind a transparent
+ * [AppScaffold], which in turn hosts a [SwipeDismissableNavHost] switching on
+ * [ui].screen for the top-level Loading/SignedOut/Ready states, plus (once
+ * Ready) a nested nav graph between home/settings/login/trips/reorder
+ * destinations. The Box wrapping everything is what actually lets the aurora
+ * gradient show through: AppScaffold's own background is forced transparent
+ * whenever aurora is on so it doesn't paint over the gradient sitting behind
+ * it in the same Box.
+ */
 @Composable
 private fun WatchAppContent(vm: WearViewModel, ui: WearUi) {
     val auroraOn = ui.settings?.auroraEnabled == true

@@ -968,6 +968,31 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     )
 }
 
+/**
+ * One-tap climate: instead of the user picking a temperature (see
+ * [ClimateCard]), this derives a sensible target from the current ambient
+ * weather reading and starts climate at that target directly.
+ *
+ * Mechanics:
+ * - `weather` prefers this specific car's own weather reading
+ *   (`ui.extras.carWeather[car.vin]`, populated when the car has a location
+ *   fix the phone could resolve weather for) and falls back to
+ *   `ui.extras.homeWeather` (the phone's own location) when the car has none
+ *   -- both arrive asynchronously and passively from the phone, so either can
+ *   be null for a while after app start.
+ * - `ambientF` converts that reading's Celsius temperature to Fahrenheit via
+ *   [com.bloo.bluelink.data.ambientFahrenheit] purely so the >=70 threshold
+ *   and [com.bloo.bluelink.data.smartClimateTargetF] below (both Fahrenheit-
+ *   based) have a consistent unit to work with, regardless of the user's
+ *   display-unit preference (`fahrenheit`, used only for the *label* text).
+ * - The button label is computed fresh on every recomposition from three
+ *   pieces of state: whether we have an ambient reading at all (`ambientF`),
+ *   whether climate is already on (`car.climateOn`), and if not, which
+ *   direction the smart target implies (>=70°F ambient -> "Cool", else
+ *   "Heat") plus the actual computed target temperature via
+ *   [com.bloo.bluelink.data.smartClimateTargetF] rendered through [degLabel]
+ *   in the user's preferred unit.
+ */
 @Composable
 private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate", Icons.Filled.Thermostat) {
     val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
@@ -1009,6 +1034,19 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
     }
 }
 
+/**
+ * Steering-wheel heat and per-seat heat/vent level controls.
+ *
+ * Like [ClimateCard], every control here reads and writes `ui.draftFor(car.vin)`
+ * -- the in-memory per-car draft in [WearViewModel] -- not the car's live
+ * reported state, and each `SliderRow`/`MorphButton` `onClick`/callback pushes
+ * straight back into that same draft (`vm.toggleSteering`, `vm.setSeatDriver`,
+ * etc.). These settings aren't sent to the car on their own; per the helper
+ * text rendered at the top of the card ("Applied when you start climate"),
+ * they only take effect the next time climate is actually started, bundled
+ * in with whatever temperature/duration the user has dialed in on the
+ * Climate/Smart Climate cards.
+ */
 @Composable
 private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort", Icons.Filled.AirlineSeatReclineNormal) {
     val d = ui.draftFor(car.vin)
@@ -1049,6 +1087,35 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     }
 }
 
+/**
+ * Saved climate presets for this car: a list of named, one-tap "apply this
+ * whole climate configuration" buttons, plus a way to save the current draft
+ * as a new preset and to delete existing ones.
+ *
+ * Mechanics:
+ * - `list` comes from `ui.presets[car.vin]` (kept in sync with the phone),
+ *   not from the local draft -- each preset itself is just a saved bundle of
+ *   draft values.
+ * - A preset button shows as "active" only when it's both the currently
+ *   applied preset (`ui.draftFor(car.vin).activePresetId == preset.id`) *and*
+ *   climate is actually on (`car.climateOn == true`); tapping an already-active
+ *   preset toggles climate off instead of re-applying it, tapping any other
+ *   preset calls `vm.applyPreset` which overwrites the draft with that
+ *   preset's values and starts climate.
+ * - Deleting is a two-tap confirm, not a swipe or long-press: `confirmDeleteId`
+ *   tracks which single preset (if any) is currently armed for delete. A
+ *   `LaunchedEffect` keyed on it auto-disarms after 4 seconds so a "tap again
+ *   to confirm" state can't linger indefinitely and get accidentally
+ *   triggered by a later, unrelated tap.
+ * - The delete control's background/foreground colors and a press-triggered
+ *   scale bounce are driven by small `animateColorAsState`/`animateFloatAsState`
+ *   springs (not baked-in Modifier states) so the confirm-armed look and the
+ *   tap feedback both animate smoothly rather than snapping.
+ * - `rememberWearTextInput` opens the watch's text/voice entry UI for naming
+ *   a new preset; its callback fires once with whatever name the user
+ *   entered and forwards straight to `vm.saveCurrentAsPreset`, which snapshots
+ *   the *current* draft (not any particular preset) under that name.
+ */
 @Composable
 private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets", Icons.Filled.Thermostat) {
     val list = ui.presets[car.vin].orEmpty()
@@ -1162,6 +1229,20 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     )
 }
 
+/**
+ * Battery-electric charge status/control card: start/stop charging plus a
+ * read-only snapshot of battery %, range, plug state, and time-to-full.
+ *
+ * Unlike [LimitsCard] below, nothing here is a draft the user edits --
+ * `car.charging`/`car.percent`/`car.rangeMi`/`car.chargerLabel`/
+ * `car.timeToFullMin` are all read straight off the car's last-reported
+ * [CarView] snapshot, so every row here updates only when a fresh status
+ * push replaces `car` (this composable has no local state of its own). The
+ * only actionable control is the charge toggle button; each status row below
+ * it is conditionally rendered only when the underlying value is non-null
+ * (via `?.let { ... }`), so a car that hasn't reported, say, a
+ * `timeToFullMin` simply omits that row rather than showing a placeholder.
+ */
 @Composable
 private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge", Icons.Filled.Bolt) {
     val metric = ui.localSettings.unitSystem == "metric"
@@ -1181,6 +1262,34 @@ private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
     car.timeToFullMin?.takeIf { it > 0 }?.let { StatusRow("Time to full", fmtMinutes(it)) }
 }
 
+/**
+ * AC/DC charge-limit sliders, with an explicit "Apply limits" step rather
+ * than committing on every drag.
+ *
+ * How the sliders reconcile local drag state with the car's real reported
+ * limits:
+ * - `ui.chargeDraftFor(car.vin)` is a per-car draft in [WearViewModel] holding
+ *   *nullable* `ac`/`dc` fields -- null means "the user hasn't touched this
+ *   slider since the last apply/sync", not "zero".
+ * - The value actually shown on each slider (`ac`, `dc`) prefers the draft
+ *   value if one exists, and only falls back to the car's real last-reported
+ *   limit (`car.acLimit`/`car.dcLimit`), and only after that falls back to a
+ *   hardcoded guess (80/90) for a car that has never reported a limit at all.
+ *   This is what lets a slider immediately reflect the user's finger while
+ *   dragging (via `vm.setAcLimit`/`vm.setDcLimit` writing into the draft) yet
+ *   still show the car's *actual* limit for any slider the user hasn't moved.
+ * - `isDirty` is true only when a draft value exists AND differs from the
+ *   car's real reported limit -- so a draft that happens to equal what the
+ *   car already reports (e.g. the user dragged back to the original value)
+ *   correctly reads as "nothing to apply" again, not stuck dirty.
+ * - The Apply button is `enabled = isDirty` specifically so that if the
+ *   sliders are merely showing the 80/90 fallback guess (no draft, no real
+ *   reported limit), a stray tap can't push that guessed value to the car as
+ *   if the user had deliberately chosen it.
+ * - Tapping Apply (`vm.applyChargeLimits`) is what actually sends the draft
+ *   values to the car; until then, everything shown here is purely local UI
+ *   state layered on top of (but not yet written to) the car.
+ */
 @Composable
 private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge limits", Icons.Filled.Bolt) {
     val draft = ui.chargeDraftFor(car.vin)
@@ -1216,6 +1325,11 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
     )
 }
 
+/**
+ * Last-known location card: a static map thumbnail, a resolved place name
+ * (or raw coordinates as a fallback), engine-running/staleness hints, and
+ * buttons to refresh or open the location in the phone's maps app.
+ */
 @Composable
 private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Location", Icons.Filled.LocationOn) {
     // visibleTiles() only shows this card when both are non-null; guarded
@@ -1226,6 +1340,11 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
     if (lat == null || lon == null) return@SectionCard
     val context = LocalContext.current
     // Resolve a human-readable place name the first time we have coordinates.
+    // Keyed on (vin, lat, lon) so this only re-fires when the car's actual
+    // fix changes (a new status push with different coordinates), not on
+    // every unrelated recomposition of this card; ensurePlaceName itself is
+    // expected to no-op/cache internally if it already resolved this fix,
+    // so re-running the effect after an unrelated recomposition is cheap.
     LaunchedEffect(car.vin, car.lat, car.lon) {
         if (car.lat != null && car.lon != null) vm.ensurePlaceName(car.vin, car.lat, car.lon)
     }
@@ -1286,9 +1405,15 @@ private fun WeatherCard(ui: WearUi, car: CarView) {
     // one bare-text header in the stack. Resolved up front (rather than
     // inside SectionCard's content slot) so the header can use the same
     // per-condition glyph the body already renders.
+    // Same car-weather-first, home-weather-fallback lookup SmartClimateCard
+    // uses, so the two cards always agree on which reading they're showing
+    // for this car.
     val w = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
     val headerIcon = w?.let { weatherIcon(it.code, it.isDay) } ?: Icons.Filled.WbSunny
     SectionCard("Weather", headerIcon) {
+    // No reading yet (neither the car nor home location has resolved
+    // weather) - short-circuit to a plain message instead of rendering rows
+    // full of nulls.
     if (w == null) {
         Text(
             "No weather data available",
@@ -1357,11 +1482,22 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     if (car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
     StatusRow("VIN", car.vin.takeLast(6))
     val metric = ui.localSettings.unitSystem == "metric"
+    // car.odometer arrives as a display-formatted string (e.g. "12,345"), so
+    // it has to be de-commafied before it can be parsed back into a number
+    // for the service-due math below; toDoubleOrNull (not toIntOrNull) copes
+    // with any decimal formatting some brands include.
     val odoInt = car.odometer?.replace(",", "")?.toDoubleOrNull()?.toInt()
     car.odometer?.let { StatusRow("Odometer", it) }
     car.licensePlate?.takeIf { it.isNotBlank() }?.let { StatusRow("Plate", it) }
     val lastSvc = car.lastServiceMiles
     val interval = car.serviceIntervalMiles
+    // Only rendered when the car reports both a last-service mileage and an
+    // interval -- without both, "next due" can't be computed at all. Within
+    // that, "remaining" (miles left until due) is itself optional: it needs
+    // a parsed current odometer reading, which the raw display string above
+    // might fail to parse. When it's available the row counts down
+    // ("in N mi"); when it isn't, it falls back to just stating the
+    // absolute due mileage ("at N mi") instead of hiding the row entirely.
     if (lastSvc != null && interval != null) {
         val nextDue = lastSvc + interval
         val remaining = odoInt?.let { nextDue - it }
@@ -1376,6 +1512,11 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
 @Composable
 private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Filled.Build) {
     val err = MaterialTheme.colorScheme.error
+    // Some brands/vehicles report per-wheel tire-pressure warnings
+    // (tireFl/Fr/Rl/Rr); others only ever report a single aggregate
+    // `tireWarning` flag with no per-wheel breakdown. This distinguishes
+    // which mode the car is in so the rows below can render per-wheel detail
+    // when it's available and fall back to one combined row when it isn't.
     val anyIndividualTire = car.tireFl || car.tireFr || car.tireRl || car.tireRr
     // Unlike AlertsCard/SummaryCard, which lead with an at-a-glance badge,
     // this could render up to a dozen rows with nothing summarizing "N items
@@ -1425,6 +1566,21 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
     if (car.chargerLabel != null) StatusRow("Charger", car.chargerLabel)
 }
 
+/**
+ * On-demand AI summary card: shows the last summary generated for this car
+ * (if any), a "thinking" placeholder while one is generating, or an initial
+ * explainer, plus a button to request a (re)generation.
+ *
+ * `summary` and `busy` are both plain reads of [ui] state -- there's no local
+ * state here at all: `ui.extras.ai[car.vin]` is whatever the phone last
+ * generated and pushed for this VIN, and `ui.aiBusy` is a single shared
+ * "which car (if any) currently has a summary in flight" value in
+ * [WearViewModel], compared against `car.vin` so only the matching car's
+ * card shows the busy state (other cars' AiCards, if visible on adjacent
+ * pager pages, stay in their own idle/summary state). Tapping the button
+ * calls `vm.requestAiSummary`, which is expected to set `ui.aiBusy` and
+ * eventually replace `ui.extras.ai[car.vin]` once the phone responds.
+ */
 @Composable
 private fun AiCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("AI Summary", Icons.Filled.AutoAwesome) {
     val summary = ui.extras.ai[car.vin]
@@ -1465,6 +1621,16 @@ private fun AiCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("A
     )
 }
 
+/**
+ * Static list of brand-specific "get help" shortcuts: dial roadside
+ * assistance, open the service-scheduling site, or open the owner portal --
+ * all handed off to the phone (via [WearRemote]) rather than handled on the
+ * watch itself, since the watch has no dialer or browser of its own.
+ * `car.brand.links` resolves which phone numbers/URLs to use per brand
+ * (Kia/Hyundai/Genesis each have their own roadside number and portal URLs);
+ * nothing here reads live car status, so this card never needs to recompose
+ * once `car.brand` is set.
+ */
 @Composable
 private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) {
     val context = LocalContext.current
@@ -1498,6 +1664,36 @@ private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) 
     )
 }
 
+/**
+ * Catch-all card: an alert-count summary row, a manual status refresh, brand-
+ * gated horn/lights controls, trips (EV/hybrid only), a link to Settings, the
+ * tile-reorder screen, and -- appended at the very end when one is available
+ * -- the on-device app-update banner.
+ *
+ * Most of the buttons here are simple one-shot commands (`vm.refreshStatus`,
+ * `vm.flashLights`, `vm.hornAndLights`) or navigation callbacks
+ * (`onTrips`/`onSettings`/`onReorder`) with no local state; the more
+ * involved piece is the update banner at the bottom:
+ * - It only renders at all when `ui.updateRun != null` -- that field is
+ *   non-null exactly when [WearViewModel] has detected (via its own
+ *   periodic/on-launch check) that a newer build than the one currently
+ *   installed is available; it's `null` the rest of the time, so most users
+ *   most of the time never see this section.
+ * - The button's label and pending/spinner state both key off
+ *   `ui.updateDownloading`: before a tap it reads "Update available"; once
+ *   `vm.downloadAndInstallUpdate()` is invoked and the view model flips that
+ *   flag, it switches to "Downloading…" with the button's built-in pending
+ *   spinner, giving feedback for what can be a multi-second download over
+ *   Bluetooth/Wi-Fi before the system installer takes over.
+ * - `ui.updateRun.releaseNotes` is optional and only shown when non-blank,
+ *   truncated to 4 lines with an ellipsis -- release notes can be arbitrarily
+ *   long free text from the update payload, and this card has no scroll of
+ *   its own (it's one item inside the outer [ScalingLazyColumn]).
+ * - "Remind me" (`vm.snoozeUpdate`) is the only dismissal offered; there's no
+ *   permanent "don't ask again" here because the banner is a passive row in
+ *   an already-scrollable list rather than a blocking dialog, so simply
+ *   scrolling past it already works as a lightweight dismissal.
+ */
 @Composable
 private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit) = SectionCard("More", Icons.Filled.Settings) {
     val accent = MaterialTheme.colorScheme.primary
@@ -1616,9 +1812,22 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
 
 // ---- Shared bits ---------------------------------------------------------
 
+// Seat heat/vent rows are only worth showing when the seat actually has a
+// level set: 0 from the API means "off"/unsupported, so it's treated as "no
+// row" (null) rather than rendering a row that always just says "Off".
 private fun seatLabel(v: Int?): String? = v?.takeIf { it != 0 }?.let { SeatLevel.fromApi(it).label }
 
-/** A page indicator whose dots curve along the round screen's edge. */
+/**
+ * A page indicator whose dots curve along the round screen's edge -- one dot
+ * per *car* (contrast [CurvedDotIndicator], which is one dot per *tile*
+ * within a single car's column). Used by [HomeScreen] with `anchor = 90f` to
+ * hug the bottom of the round face, positioned via Wear Compose's
+ * [CurvedLayout]/`curvedRow`, which lay their children out along an arc
+ * rather than a straight line the way a normal `Row` would. `current` is
+ * driven by `carPager.currentPage` (updated live, mid-drag), not the
+ * settled-page index HomeScreen uses elsewhere for focus/side-effects, so
+ * this indicator visually tracks the pager immediately as the user swipes.
+ */
 @Composable
 private fun CurvedIndicator(count: Int, current: Int, anchor: Float) {
     if (count <= 1) return
@@ -1652,10 +1861,23 @@ private fun CurvedIndicator(count: Int, current: Int, anchor: Float) {
  */
 @Composable
 fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
+    // `synced` is the source-of-truth order derived fresh from the phone's
+    // pebble order on every recomposition; `order` is the local, mutable copy
+    // this screen actually renders and drags around -- kept as separate state
+    // (rather than reading `synced` directly) so a drag in progress isn't
+    // immediately overwritten by the next incoming sync (see the
+    // LaunchedEffect below, which only adopts `synced` while not dragging).
     val synced = WearPebbles.reorderable(ui.pebbleOrderFor(vin))
     var order by remember(vin) { mutableStateOf(synced) }
+    // `draggingKey` is non-null for exactly the row currently being
+    // long-press-dragged; `offsetY` is that row's cumulative vertical drag
+    // distance in px since the drag started (reset to 0 on drag start/end).
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    // Measured on-screen height of each row by key, populated via
+    // onSizeChanged below; needed because the drag-reorder threshold (has the
+    // dragged row crossed half of its neighbor's height?) depends on actual
+    // rendered row heights, which vary slightly and aren't known up front.
     val heights = remember { mutableStateMapOf<String, Int>() }
 
     // Adopt incoming changes from the phone unless the user is mid-drag.

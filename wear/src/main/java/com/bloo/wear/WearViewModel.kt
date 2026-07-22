@@ -191,7 +191,9 @@ data class WearUi(
      *  by the next successful fetch for that VIN. */
     val tripsErrors: Set<String> = emptySet(),
 ) {
+    /** This car's climate draft, or a fresh default one if it's never been touched/synced. */
     fun draftFor(vin: String): ClimateDraft = climateDrafts[vin] ?: ClimateDraft()
+    /** This car's charge-limit slider draft, or a fresh (unset) one if untouched. */
     fun chargeDraftFor(vin: String): ChargeLimitDraft = chargeLimitDrafts[vin] ?: ChargeLimitDraft()
 
     /** This car's effective pebble order: a pending local change wins, else the
@@ -339,6 +341,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         repos.getOrPut(brand) { repositoryFor(brand, sessionStore, credentialStore) }
 
     init {
+        // Mirrors the phone-synced WearSettingsPayload (pebble orders, AI/aurora
+        // toggles, etc.) into ui.settings on every push. The tricky part is
+        // reconciling this against the two *local* optimistic-override maps
+        // (pebbleOverride, settingsOverride) that savePebbleOrder/setAiEnabled/
+        // setAuroraEnabled/setAuroraColorMode write to instantly, before the
+        // phone has echoed the change back: for each overridden key, compare
+        // the incoming synced value to what's overridden -- if they now match,
+        // the phone has caught up and the override is dropped (stillPending /
+        // stillPendingSettings); if they don't match yet, the override is kept
+        // and effectiveSettings substitutes it back in over the stale synced
+        // value, so a settings push that lands *between* an optimistic toggle
+        // and its own echo can't stomp the toggle back to its old value.
         viewModelScope.launch {
             WearSettingsStore(ctx).flow.collect { s ->
                 _ui.update { u ->
@@ -517,6 +531,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Re-checks whether a phone is currently reachable over the Wearable Data
+     *  Layer and updates [WearUi.phoneConnected]. This is the flag that most
+     *  screens use to decide whether to describe a command as "relayed" vs
+     *  "standalone" in their own copy -- the actual command dispatch in
+     *  [command] doesn't consult this cached flag though, it always attempts
+     *  a fresh relay send first and falls back to standalone only if that
+     *  send itself fails, so this value can be a beat stale without breaking
+     *  correctness. */
     fun refreshConnection() {
         viewModelScope.launch {
             // Resolve the (up to 10s) node lookup BEFORE update{}, so a lost CAS race
@@ -528,6 +550,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Sign in / out ----------------------------------------------------
 
+    /**
+     * Signs the watch itself into a BlueLink/Genesis account (this is the
+     * "standalone" credential path -- separate from whatever the phone is
+     * signed into). Kia is refused here because Kia's login flow needs a
+     * phone-side captcha/2FA step this watch screen can't render; Kia
+     * accounts only ever reach the watch by syncing down from the phone.
+     * On success the credentials are saved to [credentialStore] (so
+     * [repoFor] can rebuild a session after a process death) and the garage
+     * is (re)loaded.
+     */
     fun login(brand: Brand, email: String, password: String, pin: String) {
         if (email.isBlank() || password.isBlank() || pin.isBlank()) {
             _ui.update { it.copy(message = "Email, password and PIN are required") }
@@ -556,6 +588,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Logs out of every brand this watch has a standalone session for, and
+     *  wipes all in-memory and on-disk vehicle state (vehicles/statuses/trips/
+     *  snapshots) back to empty so a subsequent sign-in to a different
+     *  account can't show the previous account's cars. */
     fun signOutAll() {
         viewModelScope.launch {
             sessionStore.loggedInBrands().forEach { b ->
@@ -578,6 +614,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Loading ----------------------------------------------------------
 
+    /**
+     * Populates [vehicles] (the garage list) and moves the screen to [WearScreen.Ready].
+     * Prefers whatever the phone has already synced into [snapshots] (the
+     * common "companion" case); only falls back to hitting the vehicle-list
+     * API directly (standalone) when there are no snapshots AND no phone is
+     * currently reachable -- in that fallback it also seeds [snapshotStore]
+     * with lightweight [com.bloo.bluelink.data.VehicleSnapshot]s built from the
+     * fetch, so later app restarts have something to show even before a phone
+     * connection is ever made. Per-car live [statuses] are deliberately NOT
+     * fetched here -- that happens lazily per car via [onCarShown].
+     */
     private suspend fun loadGarage() {
         // Companion mode: rely on phone-synced snapshots. Request a push if we have nothing.
         vehicles = if (snapshots.isNotEmpty()) {
@@ -627,6 +674,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         refreshStatus(vin, surface = false)
     }
 
+    /** Force a fresh status fetch for every car in the garage (Settings'
+     *  "Refresh all cars" action), plus a phone-connection recheck. */
     fun refreshAll() {
         // sessionFetched.clear() + only ever refreshing vehicles.firstOrNull()
         // meant this silently refreshed just the first car in the garage --
@@ -693,6 +742,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Refreshes one car's live status. Unlike the command functions below,
+     * this has no standalone fallback of its own -- it only ever asks the
+     * phone to refresh and push updated data via [WearComms.requestSync].
+     * (A watch with its own standalone session still gets fresh data,
+     * indirectly, through the various command() calls' own refreshStatus/
+     * flip calls after a standalone action succeeds.) [surface] controls
+     * whether a failed relay shows a user-visible message -- background
+     * refreshes (e.g. from [onCarShown]) pass false to stay silent.
+     */
     fun refreshStatus(vin: String, surface: Boolean = true) {
         mark("$vin:refresh") {
             // Companion-first: ask the phone to refresh and push updated data.
@@ -760,6 +819,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Lock/unlock toggle. Delegates entirely to [command], which tries the
+     * relay-to-phone path first (see [command]'s doc comment for the full
+     * relay-vs-standalone mechanism); the lambda here only runs on the
+     * STANDALONE path, i.e. when relaying failed or no phone is reachable.
+     * [st] is the watch's last-known [VehicleStatus] for this car (may be
+     * null if nothing's been fetched yet), used to decide lock vs unlock.
+     * [flip] applies the optimistic local-state update once the standalone
+     * API call itself has returned successfully.
+     */
     fun toggleLock(vin: String) = command(vin, "doors") { v, repo, st ->
         if (st?.doorLock == true) { repo.unlock(v); flip(vin) { it.copy(doorLock = false) } }
         else { repo.lock(v); flip(vin) { it.copy(doorLock = true) } }
@@ -785,6 +854,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         successMessage = "Horn & lights sent",
     ) { v, repo, _ -> repo.hornAndLights(v) }
 
+    /**
+     * Climate on/off toggle -- same relay-first/standalone-fallback dispatch
+     * as [toggleLock] via [command]. The block below only executes on the
+     * standalone path. Turning OFF is unconditional; turning ON is gated by
+     * [VehicleStatus.isDriving] (see the comment on that check below), and
+     * always clears [ClimateDraft.activePresetId] since the resulting
+     * on/off state is a plain manual toggle, not a saved preset being
+     * (re)applied -- see [applyPreset] for the preset-aware equivalent.
+     */
     fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
         if (st?.airCtrlOn == true) {
             repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
@@ -803,6 +881,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Charge start/stop toggle -- same relay-first/standalone-fallback
+     *  dispatch as [toggleLock] via [command]; the block runs only on the
+     *  standalone path. [wasCharging] is read from the last-known status,
+     *  and [flip] optimistically records the inverse right after the
+     *  standalone API call succeeds (see the comment below on why this one
+     *  needed the flip added after the fact). */
     fun toggleCharge(vin: String) = command(vin, "charge") { v, repo, st ->
         val wasCharging = st?.evStatus?.batteryCharge == true
         if (wasCharging) repo.stopCharge(v) else repo.startCharge(v)
@@ -858,6 +942,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             ),
             onFailure = { updateDraft(vin) { previousDraft } },
         ) { v, repo, st ->
+            // Same driving gate as toggleClimate's start branch, and for the
+            // same reason: this is the STANDALONE path (the car's own direct
+            // connection, not relayed through the phone), so it has to
+            // enforce the "no remote climate while moving" rule itself --
+            // throwing here is caught by command()'s runCatching, which
+            // surfaces the message and fires onFailure (restoring the
+            // pre-preset draft) instead of ever calling startClimate.
             if (st?.isDriving == true) error("Can't start climate while driving")
             repo.startClimate(v, preset.request)
             flip(vin) { it.copy(airCtrlOn = true) }
@@ -919,7 +1010,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Push the AC/DC charge-limit sliders to the car. */
+    /**
+     * Push the AC/DC charge-limit sliders to the car. Goes through [command]
+     * with an explicit [com.bloo.bluelink.data.WearAction.SET_CHARGE_LIMITS]
+     * command (see the comment below on why a generic action string wasn't
+     * enough here), so it gets the same relay-first/standalone-fallback
+     * dispatch as the toggle commands. The chargeLimitDrafts entry for this
+     * VIN is cleared up front (optimistically, before the network call even
+     * starts) so the sliders immediately reflect "applied" instead of
+     * lingering as an unsaved draft; [onFailure] restores it if the
+     * standalone path's own API call fails.
+     */
     fun applyChargeLimits(vin: String) {
         val u = _ui.value
         // Send exactly what LimitsCard DISPLAYS: this car's draft, else its actual
@@ -961,6 +1062,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Central mutator for a car's [ClimateDraft]: applies [f] to the current
+     *  draft (or a fresh default one), writes it back into [WearUi], and
+     *  immediately pushes the WHOLE drafts map to the phone via
+     *  [publishClimateDrafts] so every slider/toggle change on the watch is
+     *  mirrored there in near-real-time, not just on command send. Every
+     *  slider/toggle setter below (setClimateTemp, toggleDefrost, etc.) and
+     *  the higher-level preset/smart-climate flows all funnel through this. */
     private fun updateDraft(vin: String, f: (ClimateDraft) -> ClimateDraft) {
         _ui.update { u -> u.copy(climateDrafts = u.climateDrafts + (vin to f(u.draftFor(vin)))) }
         publishClimateDrafts()
@@ -1006,6 +1114,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         persistAndPublishPresets(updated)
     }
 
+    /** Remove a saved preset for [vin] by id, then persist + sync the change,
+     *  same as [saveCurrentAsPreset]. A no-op (writes an unchanged map back)
+     *  if [id] isn't found. */
     fun deletePreset(vin: String, id: String) {
         val updated = _ui.value.presets + (vin to _ui.value.presets[vin].orEmpty().filter { it.id != id })
         _ui.update { it.copy(presets = updated) }
@@ -1013,6 +1124,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
+    /** Shared tail of [saveCurrentAsPreset]/[deletePreset]: writes the full
+     *  updated preset map to on-disk [WearPresetsStore] (so it survives a
+     *  process restart before any phone sync happens) AND pushes it to the
+     *  phone over the Data Layer, independently -- either can fail without
+     *  affecting the other, and ui.presets has already been updated by the
+     *  caller before this runs, so the UI reflects the change immediately
+     *  regardless of how the persist/publish calls turn out. */
     private fun persistAndPublishPresets(byVin: Map<String, List<ClimatePreset>>) {
         val wp = com.bloo.bluelink.data.WearPresets(byVin)
         viewModelScope.launch {
@@ -1039,6 +1157,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { runCatching { WearComms.publishClimate(ctx, WearClimateState(byVin)) } }
     }
 
+    // The climate slider/toggle setters below all follow the same shape: clamp
+    // the incoming value to its valid range, write it into this car's draft via
+    // updateDraft (which also re-syncs the whole draft to the phone), and clear
+    // activePresetId since any manual adjustment means the draft no longer
+    // exactly matches whichever preset (if any) was last applied.
     fun setClimateTemp(vin: String, value: Int) = updateDraft(vin) { it.copy(tempF = value.coerceIn(62, 82), activePresetId = null) }
     fun setClimateDuration(vin: String, value: Int) = updateDraft(vin) { it.copy(duration = value.coerceIn(1, 10), activePresetId = null) }
     fun toggleDefrost(vin: String) = updateDraft(vin) { it.copy(defrost = !it.defrost, activePresetId = null) }
@@ -1050,9 +1173,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun setAcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(ac = value.coerceIn(com.bloo.bluelink.data.CHARGE_LIMIT_RANGE)) }
     fun setDcLimit(vin: String, value: Int) = updateChargeDraft(vin) { it.copy(dc = value.coerceIn(com.bloo.bluelink.data.CHARGE_LIMIT_RANGE)) }
 
+    /** Mutator for a car's [ChargeLimitDraft], mirroring [updateDraft]'s shape
+     *  but WITHOUT a phone push -- charge-limit sliders are local-only until
+     *  [applyChargeLimits] is tapped, unlike climate drafts which sync live. */
     private fun updateChargeDraft(vin: String, f: (ChargeLimitDraft) -> ChargeLimitDraft) {
         _ui.update { u -> u.copy(chargeLimitDrafts = u.chargeLimitDrafts + (vin to f(u.chargeDraftFor(vin)))) }
     }
+    /** Clears the current snackbar/status message, e.g. once the user has seen it. */
     fun dismissMessage() { _ui.update { it.copy(message = null) } }
 
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
@@ -1128,6 +1255,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Set the watch's own display font scale (local-only setting, never read
+     *  from the phone), clamp it to a sane range, persist it, then push the
+     *  FULL local-settings bundle (font scale + unit system + PIN config) to
+     *  the phone in one message so it can display the watch's current
+     *  preferences too. Re-reads [localStore] right after writing rather than
+     *  reusing [clamped] directly for the other fields, so the pushed bundle
+     *  reflects whatever the other fields' latest persisted values are. */
     fun setFontScale(scale: Float) {
         viewModelScope.launch {
             val clamped = scale.coerceIn(0.8f, 1.4f)
@@ -1181,6 +1315,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { onResult(localStore.verifyPin(pin)) }
     }
 
+    /** Turn the PIN lock feature on/off, persist it, and push the change to
+     *  the phone (via [pushLocalPinSettings]) so it shows the same setting. */
     fun setPinLockEnabled(enabled: Boolean, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             localStore.setPinLockEnabled(enabled)
@@ -1189,6 +1325,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Change how soon backgrounding the app re-locks it (off/immediate/1min/
+     *  5min/10min -- see [maybeRelock]'s use of this value), and sync to phone. */
     fun setPinLockTiming(value: String) {
         viewModelScope.launch {
             localStore.setPinLockTiming(value)
@@ -1210,6 +1348,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Remove the stored PIN entirely (does not by itself disable the lock
+     *  feature flag -- callers are expected to call [setPinLockEnabled] too
+     *  if they want it fully turned off), and sync to phone. */
     fun clearPin(onDone: () -> Unit = {}) {
         viewModelScope.launch {
             localStore.clearPin()
@@ -1218,6 +1359,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Shared tail used by every local-settings mutator above: re-reads the
+     *  now-persisted [WearLocalSettings] bundle (so it always reflects the
+     *  very latest write, whichever field just changed) and pushes all four
+     *  fields to the phone together in one message. */
     private suspend fun pushLocalPinSettings() {
         val ls = localStore.flow.first()
         WearComms.publishLocalSettings(ctx, ls.fontScale, ls.unitSystem, ls.pinLockEnabled, ls.pinLockTiming)
@@ -1349,6 +1494,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 ),
                 onFailure = { updateDraft(vin) { previousDraft } },
             ) { v, repo, st ->
+                // Third of the three climate-start call sites gated on
+                // isDriving (with toggleClimate and applyPreset) -- same
+                // standalone-only enforcement, same reasoning: relayed
+                // commands rely on the phone's own UI/repository to apply
+                // this gate, but the standalone path talks to the car
+                // directly and has to check it here itself.
                 if (st?.isDriving == true) error("Can't start climate while driving")
                 repo.startClimate(v, d.toRequest(tempF = targetF, defrost = false))
                 flip(vin) { it.copy(airCtrlOn = true) }
@@ -1356,6 +1507,52 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * The shared dispatcher every user-facing command (lock, climate, charge,
+     * horn/lights, charge limits) funnels through. This is where the
+     * relay-vs-standalone branching described in the class doc comment
+     * actually happens:
+     *
+     * 1. Marks `"$vin:$action"` as pending via [mark] (drives per-button busy
+     *    spinners/disabled states through [WearUi.pending]).
+     * 2. Builds the [com.bloo.bluelink.data.WearCommand] to send -- either
+     *    the caller-supplied [explicit] one (needed whenever a generic
+     *    toggle verb isn't precise enough, e.g. a preset needs its exact
+     *    settings carried, not just "toggle climate") or one derived from
+     *    the string [action] via [toWearCommand].
+     * 3. Attempts to relay it to the phone with [WearComms.send]. If that
+     *    SEND succeeds (note: this only confirms the message reached the
+     *    phone, not that the phone's own BlueLink call to the car
+     *    succeeded):
+     *    - Applies an optimistic patch to [snapshots] via
+     *      [com.bloo.bluelink.data.WearCommandRunner.optimistic], then folds
+     *      the same inferred new lock/climate/charge state into [statuses]
+     *      too (so buildCarView's "prefer statuses over snapshots" rule
+     *      doesn't mask the optimistic change behind stale live status).
+     *    - Calls [publish] immediately so the UI reflects the guessed
+     *      outcome right away, shows [successMessage] if provided, and
+     *      forces the next [onCarShown] visit to re-fetch real status
+     *      ([sessionFetched] entry removed) since the optimistic guess isn't
+     *      authoritative.
+     *    - A later async failure notice for this same relay (the phone's
+     *      OWN execution actually erroring) arrives out-of-band via
+     *      [WearCommandEvents.results], wired up in [init] -- there's no
+     *      revert path here for that case, only a corrective re-fetch.
+     * 4. If the relay send itself failed (no phone reachable, or the send
+     *    threw), falls back to STANDALONE: runs [block] with the watch's own
+     *    [VehicleRepository] for this car's brand, serialized against
+     *    [BlueLinkGate.statusMutex] (shared with other status-touching calls
+     *    to avoid racing concurrent standalone requests for the same car).
+     *    On success: publishes, shows [successMessage], clears
+     *    [sessionFetched] and kicks a real [refreshStatus] (standalone calls
+     *    don't get an authoritative status back from [block] itself, so this
+     *    pulls the real post-command state). On failure: surfaces the
+     *    error message and invokes [onFailure] so the caller can roll back
+     *    any optimistic draft/UI change it made before calling [command].
+     *
+     * [onFailure] only ever fires on this standalone failure branch -- see
+     * its own inline comment for why the relay branch can't support it.
+     */
     private fun command(
         vin: String,
         action: String,
@@ -1420,6 +1617,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Builds the [com.bloo.bluelink.data.WearCommand] sent to the phone for
+     * [command]'s three generic actions ("doors"/"climate"/"charge" map to
+     * their TOGGLE_* [com.bloo.bluelink.data.WearAction]s; anything else
+     * falls back to a plain REFRESH). Used only when the caller didn't pass
+     * an `explicit` command. Always carries the car's CURRENT full
+     * [ClimateDraft] (temp, duration, defrost, steering, all four seats) on
+     * every command regardless of action, not just for "climate" -- so if a
+     * relayed climate toggle turns climate ON, the phone has the complete
+     * settings to start it with rather than just the wire protocol's bare
+     * defaults.
+     */
     private fun toWearCommand(vin: String, action: String): com.bloo.bluelink.data.WearCommand {
         // Carry the FULL climate draft, not just temp/defrost - a relayed climate
         // start used to run for the wire default of 10 minutes with no steering or
@@ -1444,6 +1653,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /** The STANDALONE path's optimistic-update primitive (the relay path's
+     *  equivalent is the inline [com.bloo.bluelink.data.WearCommandRunner.optimistic]
+     *  patch inside [command]): applies [change] to this VIN's current
+     *  [VehicleStatus] (or a blank default one if nothing's cached yet) and
+     *  writes the result back into [statuses]. Called by each command
+     *  function's block AFTER its own repository call has returned
+     *  successfully, so the UI updates immediately rather than waiting on
+     *  the follow-up [refreshStatus] call that [command] triggers next. Does
+     *  NOT call [publish] itself -- callers rely on [command]'s own publish()
+     *  right after the block returns. */
     private fun flip(vin: String, change: (VehicleStatus) -> VehicleStatus) {
         val cur = statuses[vin] ?: VehicleStatus()
         statuses = statuses + (vin to change(cur))
@@ -1455,6 +1674,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Plumbing ---------------------------------------------------------
 
+    /**
+     * Runs [block] (launched fire-and-forget in [viewModelScope]) while
+     * marking [key] as "pending" for the duration, so [WearUi.pending]
+     * reflects it and buttons/spinners bound to that key can disable/spin.
+     * Uses a per-key REFERENCE COUNT (in [pendingCounts]) rather than a
+     * plain Set, specifically to handle two overlapping calls sharing the
+     * same key correctly (e.g. a manual refresh tap while [onCarShown]'s own
+     * refresh for that same car is still in flight): incrementing on entry
+     * and decrementing in a `finally` means the key only actually leaves
+     * [pendingCounts] once every overlapping call for it has finished, not
+     * just the first one to complete -- see the comment on [pendingCounts]
+     * itself for the bug this fixed. [publish] is called both immediately
+     * (so the busy state shows right away) and again once the count drops
+     * back out, whether [block] succeeded or threw.
+     */
     private fun mark(key: String, block: suspend () -> Unit) {
         pendingCounts = pendingCounts + (key to (pendingCounts[key] ?: 0) + 1)
         publish()
@@ -1467,6 +1701,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Rebuilds the exposed [WearUi] snapshot from the ViewModel's private
+     * @Volatile source-of-truth fields ([vehicles], [statuses], [snapshots],
+     * [trips], [pendingCounts] via [pending]) and pushes it into [_ui]. This
+     * is the ONLY place [WearUi.cars]/[WearUi.trips]/[WearUi.pending] get
+     * updated -- every mutation to the underlying fields elsewhere in this
+     * class must call this afterward (directly, or via [mark]/[command]) for
+     * the UI to actually reflect the change. [screen] optionally also
+     * transitions [WearUi.screen] (e.g. to Ready once the garage loads);
+     * passing null leaves the current screen untouched.
+     */
     private fun publish(screen: WearScreen? = null) {
         _ui.update { cur ->
             cur.copy(
@@ -1478,6 +1723,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Merges the two data sources this app has for one car into the single
+     * [CarView] the UI actually renders: [statuses] (rich, freshly-fetched
+     * live status, either from a standalone repository call or synced down)
+     * and [snapshots] (the phone's lightweight always-on view). The general
+     * rule, applied per-field via `s?.field ?: snap?.field`, is that live
+     * [statuses] wins whenever present and [snapshots] is only the fallback
+     * for fields [statuses] doesn't have yet (or has never been fetched for
+     * this VIN at all) -- e.g. [percent]/[rangeMi]/[locked]/[climateOn]/
+     * [charging]. [hasBattery] is the one field that inverts this
+     * preference deliberately (see its own inline comment): it prefers the
+     * phone's manually-corrected [snap]?.hasBattery over the vehicle's raw
+     * `isEv` flag, since a PHEV the API misreports as gas-only still needs
+     * the Charge tile shown.
+     */
     private fun buildCarView(v: Vehicle): CarView {
         val s = statuses[v.vin]
         val snap = snapshots[v.vin]

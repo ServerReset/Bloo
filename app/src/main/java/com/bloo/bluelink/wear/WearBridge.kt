@@ -31,6 +31,21 @@ import kotlinx.coroutines.launch
  * stored-session pattern the Quick-Settings tiles use, so the watch never
  * needs the credentials to lock a door) -- this object handles everything
  * else: publishing, Drive sync, and re-fanning updates out to every surface.
+ *
+ * Mechanism: every `publish*` function here builds a [PutDataMapRequest] for a fixed
+ * path (the `WearSync.PATH_*` constants) and writes it via the Play Services
+ * `Wearable.getDataClient(context).putDataItem(...)` call. The Data Layer API syncs that
+ * item to any paired/reachable watch node automatically and asynchronously in the
+ * background (no explicit "is a watch connected?" check is needed -- if there's no watch,
+ * the write is just a local no-op). `.setUrgent()` asks the system to push it as soon as
+ * possible rather than batching/deferring for battery. `Tasks.await(...)` bridges the
+ * Play Services `Task` (a callback-based future) into this suspend function by blocking
+ * the calling coroutine's thread until it completes -- safe here because [scope] runs on
+ * [Dispatchers.IO], never the main thread. On the watch side, [WearSync] decodes each
+ * path's payload; changing an item's *content* is what actually triggers the watch's
+ * DataClient listener, which is why [publishNow] stamps a fresh timestamp on every push
+ * even when the underlying vehicle data hasn't changed -- otherwise a byte-identical
+ * payload would be silently coalesced/skipped by the Data Layer.
  */
 object WearBridge {
 
@@ -110,6 +125,14 @@ object WearBridge {
         scope.launch { runCatching { publishSettingsNow(app, appearance) } }
     }
 
+    /**
+     * Resolves the phone's current theme (mode, dynamic/custom palette, per-car overrides,
+     * pebble ordering/visibility) into a flat [WearSettingsPayload] of literal ARGB ints and
+     * primitives the watch can render without needing any of the phone's Compose theming
+     * code -- the watch just paints the colors it's given. Called both proactively whenever
+     * a setting changes and defensively on every periodic refresh (see [WidgetRefreshWorker])
+     * in case an earlier push was missed.
+     */
     suspend fun publishSettingsNow(context: Context, appearance: SettingsStore.Appearance) {
         val dark = when (appearance.themeMode) {
             ThemeMode.LIGHT -> false

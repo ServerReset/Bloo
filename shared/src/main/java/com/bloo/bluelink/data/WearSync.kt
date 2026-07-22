@@ -96,10 +96,25 @@ object WearSync {
     const val KEY_TIMESTAMP = "ts"
 
     val json: Json = Json {
+        // Lets one side add a new field without breaking the other side's
+        // decode — important here specifically because phone and watch are
+        // built and updated independently and won't always be running the
+        // exact same app version.
         ignoreUnknownKeys = true
+        // Wire payloads always include every field (even ones at their
+        // default value) rather than omitting defaults, so a stale receiver
+        // that doesn't know a brand-new field yet still gets a consistent,
+        // fully-populated JSON shape for the fields it does understand.
         encodeDefaults = true
     }
 
+    // Below is a repeated encode/decode pair per payload type. Every decode
+    // function follows the same defensive shape: wrap the parse in
+    // runCatching and fall back to a sensible default (an empty/default
+    // instance, or null for "we have nothing yet") rather than letting a
+    // malformed or version-skewed payload throw and crash whichever side
+    // received it — the Data Layer has no way to guarantee the sender and
+    // receiver are running matching schema versions.
     fun encodeState(payload: WearStatePayload): String =
         json.encodeToString(WearStatePayload.serializer(), payload)
 
@@ -216,7 +231,15 @@ data class WearStatePayload(
     val producedAt: Long = 0L,
 )
 
-/** Stable command verbs understood by both sides. */
+/** Stable command verbs understood by both sides. These are plain string
+ *  constants (not a Kotlin enum) specifically because they're serialized as
+ *  free-form text in [WearCommand.action] — using literal strings means
+ *  neither side needs matching enum ordinals/names to stay in lockstep across
+ *  independent app updates; an unrecognized action string is just ignored by
+ *  whichever side receives it instead of failing to decode entirely.
+ *  TOGGLE_* actions ask the receiver to flip whatever the current state is;
+ *  the explicit *_ON/*_OFF/LOCK/UNLOCK variants force a specific state
+ *  regardless of the current one. */
 object WearAction {
     const val TOGGLE_LOCK = "toggle_lock"
     const val LOCK = "lock"

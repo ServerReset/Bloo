@@ -105,6 +105,10 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
     )
 }
 
+/** The exact shape persisted to disk as a single JSON string under one
+ *  DataStore key — kept as one blob (rather than one DataStore entry per
+ *  field) so a read or write is always a single atomic operation over the
+ *  whole vehicle list + selection together. */
 @Serializable
 private data class SnapshotPayload(
     val vehicles: List<VehicleSnapshot> = emptyList(),
@@ -120,6 +124,15 @@ private val Context.snapshotDataStore by preferencesDataStore(
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
+/**
+ * Reads and writes the on-disk [VehicleSnapshot] cache described above.
+ * Every mutating method follows the same read-modify-write shape via
+ * DataStore's [edit]: decode whatever's currently on disk, apply the change,
+ * re-encode the whole payload back. DataStore's edit block itself is
+ * transactional (backed by a single file + mutex), so concurrent callers
+ * from different processes (the widget refreshing while the watch relay also
+ * writes, for instance) don't stomp on each other's writes.
+ */
 class SnapshotStore(private val context: Context) {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -128,12 +141,22 @@ class SnapshotStore(private val context: Context) {
         val PAYLOAD = stringPreferencesKey("payload")
     }
 
+    /** Live stream of the current snapshot data — re-emits whenever the
+     *  underlying DataStore file changes, so a Compose UI collecting this can
+     *  react immediately to a write made from a different process. */
     val payload: Flow<SnapshotData> = context.snapshotDataStore.data.map { prefs ->
         decode(prefs[Keys.PAYLOAD])
     }
 
+    /** One-shot read of the current snapshot data (first() takes just the
+     *  latest emission and then stops collecting), for callers that don't
+     *  need to keep observing. */
     suspend fun current(): SnapshotData = decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])
 
+    /** Replace the entire vehicle list (e.g. after a full account refresh).
+     *  Mechanism: preserves the previously-selected VIN if that car is still
+     *  present in the new list; otherwise falls back to the first vehicle so
+     *  there's always a selection as long as the list isn't empty. */
     suspend fun saveVehicles(vehicles: List<VehicleSnapshot>) {
         context.snapshotDataStore.edit { prefs ->
             val existing = decode(prefs[Keys.PAYLOAD])
@@ -158,6 +181,8 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
+    /** Change which car is the "active" one for widgets/tiles, without
+     *  touching the vehicle data itself. */
     suspend fun setSelected(vin: String) {
         context.snapshotDataStore.edit { prefs ->
             val existing = decode(prefs[Keys.PAYLOAD])
@@ -185,6 +210,12 @@ class SnapshotStore(private val context: Context) {
         return result
     }
 
+    /** Parse the raw stored JSON string into [SnapshotData]. A null [raw]
+     *  (nothing saved yet) or a JSON parse failure (corrupt/incompatible
+     *  data — belt-and-suspenders alongside the DataStore-level
+     *  corruptionHandler above) both fall back to an empty [SnapshotPayload]
+     *  rather than throwing, since every caller of this store expects to be
+     *  able to read from it even before anything has ever been written. */
     private fun decode(raw: String?): SnapshotData {
         val payload = raw?.let {
             runCatching { json.decodeFromString(SnapshotPayload.serializer(), it) }.getOrNull()
@@ -192,10 +223,16 @@ class SnapshotStore(private val context: Context) {
         return SnapshotData(payload.vehicles, payload.selectedVin)
     }
 
+    /** Decoded view of the store: every known vehicle plus which VIN is
+     *  currently selected. */
     data class SnapshotData(
         val vehicles: List<VehicleSnapshot>,
         val selectedVin: String?,
     ) {
+        /** The selected vehicle's snapshot, or the first vehicle if the
+         *  recorded selection doesn't match any known VIN (e.g. that car was
+         *  removed from the account since the selection was last saved), or
+         *  null if there are no vehicles at all. */
         val selected: VehicleSnapshot?
             get() = vehicles.firstOrNull { it.vin == selectedVin } ?: vehicles.firstOrNull()
     }

@@ -17,6 +17,37 @@ import kotlinx.coroutines.launch
  */
 class AlertActionReceiver : BroadcastReceiver() {
 
+    /**
+     * Entry point invoked when the user taps an action button on a Bloo alert
+     * notification. Runs in order:
+     * 1. Ignore anything that isn't our own [ACTION_RUN] intent (defensive --
+     *    this receiver shouldn't be reachable any other way, but `onReceive`
+     *    is a public entry point so it's still checked) and bail if any of the
+     *    required extras (VIN, action id) are missing.
+     * 2. Call [goAsync] to tell the system this BroadcastReceiver needs to keep
+     *    running past the synchronous return of `onReceive` -- without it,
+     *    Android is free to consider the receiver finished (and kill the
+     *    process) before the coroutine below, which does real network I/O, gets
+     *    a chance to complete.
+     * 3. Launch a coroutine on [Dispatchers.IO] (a fresh, receiver-scoped
+     *    CoroutineScope, since a BroadcastReceiver has no lifecycle scope of its
+     *    own to hang a coroutine off of) that:
+     *    a. Cancels the original alert notification right away, before the
+     *       network call even starts, purely so tapping the button feels
+     *       instantaneous rather than waiting on network round-trip latency.
+     *    b. Runs the actual remote command via [WearCommandRunner.execute],
+     *       wrapped in [runCatching] so a thrown exception becomes a null
+     *       result rather than crashing this coroutine.
+     *    c. Posts a short follow-up notification reusing the *same* notification
+     *       id as the original alert, so it visually replaces the (already
+     *       cancelled) alert rather than stacking a second notification. Success
+     *       text is generic; failure text prefers the command's own error
+     *       message when present, falling back to a generic one otherwise.
+     * 4. Always calls `pending.finish()` in a `finally`, regardless of success or
+     *    failure, to release the goAsync hold and let the system reclaim the
+     *    receiver -- forgetting this would eventually trigger an ANR-style
+     *    ("didn't call finish()") ill effect.
+     */
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_RUN) return
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return

@@ -56,12 +56,19 @@ object UpdateApi {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
+    /** One file attached to a GitHub Release. [name] is matched against the
+     *  known phone/watch asset filenames (see [PHONE_ASSET_NAME]/
+     *  [WEAR_ASSET_NAME]) to pick out just the two APKs from whatever else a
+     *  release might have attached. */
     @Serializable
     private data class ReleaseAsset(
         val name: String = "",
         @SerialName("browser_download_url") val browserDownloadUrl: String = "",
     )
 
+    /** Minimal slice of GitHub's Release API response — only the fields this
+     *  update flow actually reads out of what's normally a much larger
+     *  payload (ignoreUnknownKeys drops everything else). */
     @Serializable
     private data class ReleaseResponse(
         @SerialName("tag_name") val tagName: String = "",

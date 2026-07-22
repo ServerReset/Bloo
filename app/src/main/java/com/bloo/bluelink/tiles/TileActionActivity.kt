@@ -20,6 +20,17 @@ import kotlinx.coroutines.withContext
  */
 class TileActionActivity : FragmentActivity() {
 
+    /**
+     * Reads the vin/command/tile-index the tile passed via [android.content.Intent] extras
+     * (set by [BlooTileService.launchActionActivity]); missing vin/cmd means this was somehow
+     * launched without a valid tile config, so it just closes immediately. Otherwise, on a
+     * background IO dispatcher, looks up the cached snapshot (for wording the ack toast, e.g.
+     * "Locking" vs "Unlocking") and this tile's configured climate target, shows the toast on
+     * the main thread, then hands the actual command off to [TileCommandWorker.enqueue] --
+     * which runs independently via WorkManager -- before finishing this activity. Because the
+     * command is enqueued (not run inline) before finishing, it keeps running even though this
+     * activity is destroyed the moment [finishNoAnim] returns.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val vin = intent.getStringExtra(EXTRA_VIN)
@@ -39,6 +50,8 @@ class TileActionActivity : FragmentActivity() {
         }
     }
 
+    /** Finish without a window-transition animation so this invisible activity never
+     *  visibly flashes on top of whatever the user was looking at. */
     private fun finishNoAnim() {
         finishAndRemoveTask()
         @Suppress("DEPRECATION")

@@ -30,6 +30,24 @@ import kotlinx.coroutines.sync.withLock
  * Receives the watch's messages on the phone. Bound by the system whenever a
  * Data Layer message arrives on a `/bloo` path, even if the phone app's UI
  * isn't running — so "lock from my watch" works with the phone in your pocket.
+ *
+ * Mechanism: [WearableListenerService] is a manifest-declared bound Service that Play
+ * Services starts on demand (with no persistent process needed) whenever Wearable Data
+ * Layer traffic for this app arrives from a connected node. There are two distinct kinds
+ * of traffic it can deliver, handled by two separate callbacks below:
+ * - [onMessageReceived]: a one-shot, fire-and-forget message (`MessageClient.sendMessage`)
+ *   used here for request/response-style RPCs -- the watch sends a command, the phone runs
+ *   it and sends a reply message back to the same `event.sourceNodeId`. Messages aren't
+ *   persisted or replayed; if the phone is unreachable when sent, it's simply lost (the
+ *   watch's UI has to handle that as a timeout, not an explicit failure).
+ * - [onDataChanged]: fired when a *Data Item* (`DataClient.putDataItem`, written by the
+ *   watch the same way [WearBridge] writes them phone-side) changes. Data items ARE
+ *   persisted and synced-on-reconnect, so they suit state the phone must eventually learn
+ *   even if the phone was offline when the watch wrote it (climate drafts, presets, toggle
+ *   states edited on-watch).
+ * The system may deliver either callback on any binder thread, so both immediately hand
+ * off to [scope] (an IO-dispatched coroutine scope owned by this service instance) to do
+ * the actual work, keeping the callbacks themselves fast and non-blocking.
  */
 class WearPhoneService : WearableListenerService() {
 
@@ -45,6 +63,22 @@ class WearPhoneService : WearableListenerService() {
         private val extrasMutex = kotlinx.coroutines.sync.Mutex()
     }
 
+    /**
+     * Routes an incoming watch message by its Data Layer path (`event.path`), each path
+     * corresponding to one request "kind" the watch can send. [event.data] is the raw byte
+     * payload the watch encoded with [WearSync]'s matching `encode*`/`decode*` pair; a
+     * failure to decode (malformed/unexpected payload) simply returns and drops the message.
+     * - [WearSync.PATH_COMMAND]: a car command (lock/unlock/climate/etc) OR one of the two
+     *   special pseudo-commands handled inline below (AI_SUMMARY, WEATHER_DEVICE_LOCATION)
+     *   that don't touch the car at all. Ordinary commands run via [WearCommandRunner.execute]
+     *   and always send a reply on [WearSync.PATH_COMMAND_RESULT] back to `event.sourceNodeId`
+     *   (the specific watch node that sent the request) so its UI knows the outcome, then
+     *   fans the refreshed state out to every other surface via [WearBridge.refreshAllSurfaces].
+     * - [WearSync.PATH_SYNC_REQUEST]: the watch asking the phone to either force a status
+     *   refresh or kick off a Drive settings sync; REFRESH replies via the general surface
+     *   fan-out (no dedicated result message), DRIVE_SYNC replies with an explicit outcome
+     *   on [WearSync.PATH_SYNC_RESULT] since the watch needs to know success/failure/reason.
+     */
     override fun onMessageReceived(event: MessageEvent) {
         when (event.path) {
             WearSync.PATH_COMMAND -> {
@@ -127,6 +161,16 @@ class WearPhoneService : WearableListenerService() {
      * The watch writes data items too: its live climate draft on
      * [WearSync.PATH_CLIMATE] and presets it created/edited on
      * [WearSync.PATH_PRESETS]. Persist both so the phone reflects them.
+     *
+     * [events] is a buffer of every Data Item that changed since the last delivery, which
+     * can batch multiple paths together (and the buffer must not outlive this call, hence
+     * everything needed from it is extracted synchronously below before handing off to the
+     * coroutine). Each entry can be a TYPE_CHANGED (item written/updated) or TYPE_DELETED
+     * event; only CHANGED is handled since nothing here is ever cleared by deleting an item.
+     * The path allowlist below is a belt-and-suspenders filter -- in practice this service
+     * is only ever notified for paths it's registered interest in, but Data Layer delivery
+     * can occasionally include stragglers from other apps/paths, so anything unrecognized is
+     * dropped rather than falling through to the `when` and being silently ignored there too.
      */
     override fun onDataChanged(events: DataEventBuffer) {
         val updates = events.mapNotNull { event ->
@@ -205,6 +249,8 @@ class WearPhoneService : WearableListenerService() {
         }
     }
 
+    /** The system destroys this service once it's idle with nothing pending; cancel
+     *  [scope] so any in-flight coroutines are torn down rather than leaking. */
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()

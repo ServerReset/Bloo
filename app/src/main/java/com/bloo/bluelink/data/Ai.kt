@@ -48,7 +48,15 @@ class Ai(context: Context) {
         )
     }
 
-    /** True if Gemini Nano summarization is available or downloadable here. */
+    /**
+     * True if Gemini Nano summarization is available or downloadable here.
+     * Queries the current [FeatureStatus] and treats anything other than
+     * UNAVAILABLE (i.e. AVAILABLE, DOWNLOADABLE, or DOWNLOADING) as supported --
+     * a DOWNLOADABLE/DOWNLOADING status just means the model isn't on-device
+     * *yet*, which [ensureFeatureReady] will handle transparently on first real
+     * use. Any exception (e.g. the device/OS doesn't support ML Kit GenAI at
+     * all) is swallowed and reported as unsupported rather than propagated.
+     */
     suspend fun isSupported(): Boolean = runCatching {
         summarizer.checkFeatureStatus().await() != FeatureStatus.UNAVAILABLE
     }.getOrDefault(false)
@@ -56,6 +64,16 @@ class Ai(context: Context) {
     /**
      * Summarize [text] on-device, downloading the model first if needed. Throws
      * on failure so the caller can surface a real message.
+     *
+     * Order of operations: first blocks (suspending, not the calling thread)
+     * until the on-device model is downloaded and ready via [ensureFeatureReady]
+     * -- this can take a while the very first time a user summarizes anything.
+     * Then pads [text] up to ML Kit's minimum input length via [padToMinimum]
+     * (short status blurbs routinely fall under that floor), builds a single
+     * [SummarizationRequest], and runs inference. Unlike [isSupported], failures
+     * here are intentionally NOT caught -- they propagate to the caller so a
+     * real download/inference error can be shown to the user instead of a
+     * silently empty summary.
      */
     suspend fun summarize(text: String): String {
         ensureFeatureReady()
@@ -72,10 +90,28 @@ class Ai(context: Context) {
     private fun padToMinimum(text: String): String {
         if (text.length >= MIN_ARTICLE_CHARS) return text
         val sb = StringBuilder(text)
+        // Repeats the original text, each copy separated by a newline, until the
+        // combined length clears MIN_ARTICLE_CHARS. Repetition rather than any
+        // kind of padding character/filler text is deliberate: the model summarizes
+        // whatever it's given, so junk filler would risk leaking into (or skewing)
+        // the summary, whereas repeating true statements just reinforces the same
+        // facts and can't introduce anything false.
         while (sb.length < MIN_ARTICLE_CHARS) sb.append('\n').append(text)
         return sb.toString()
     }
 
+    /**
+     * Blocks (suspending) until the summarization feature is actually usable.
+     * Reads the current [FeatureStatus]; if it's DOWNLOADABLE (not yet fetched)
+     * or DOWNLOADING (fetch already in progress from a previous call), kicks off
+     * [Summarizer.downloadFeature] and suspends on a [suspendCancellableCoroutine]
+     * until one of its callbacks fires. Progress callbacks are ignored (no UI
+     * hook here); only completion/failure resume the coroutine, and each guards
+     * with `cont.isActive` since ML Kit could in principle invoke a callback
+     * after the coroutine's already been cancelled/resumed. If the status is
+     * already AVAILABLE (or, in principle, UNAVAILABLE), this returns immediately
+     * without ever starting a download.
+     */
     private suspend fun ensureFeatureReady() {
         val status = summarizer.checkFeatureStatus().await()
         if (status == FeatureStatus.DOWNLOADABLE || status == FeatureStatus.DOWNLOADING) {
@@ -94,11 +130,28 @@ class Ai(context: Context) {
         }
     }
 
+    // Adapts Google Play Services' Task callback API (onSuccess/onFailure
+    // listeners) into a single suspend call: whichever listener fires first
+    // resumes the coroutine with a value or an exception respectively. Guarded
+    // by `cont.isActive` in case both listeners could ever fire (they shouldn't,
+    // but a stale resume would otherwise crash with "already resumed").
     private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
         addOnSuccessListener { if (cont.isActive) cont.resume(it) }
         addOnFailureListener { if (cont.isActive) cont.resumeWithException(it) }
     }
 
+    // Same idea as the Task.await() above but for Guava's ListenableFuture,
+    // which only offers a Runnable-callback + Executor API rather than
+    // separate success/failure listeners. The callback runs on the `direct`
+    // executor (i.e. synchronously, on whatever thread completes the future),
+    // then calls the blocking `get()` to retrieve the result -- safe here
+    // because the future is already known to be done when the listener fires.
+    // A thrown exception from `get()` (e.g. ExecutionException) is caught and
+    // turned into a coroutine failure instead of propagating out of the
+    // listener callback. `invokeOnCancellation` propagates coroutine
+    // cancellation back to the future itself (without interrupting an
+    // in-progress task, per the `false` argument), so cancelling the caller
+    // doesn't leave the underlying work running forever unacknowledged.
     private suspend fun <T> ListenableFuture<T>.await(): T = suspendCancellableCoroutine { cont ->
         addListener({
             try {
