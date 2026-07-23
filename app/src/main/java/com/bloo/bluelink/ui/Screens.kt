@@ -6198,14 +6198,17 @@ private fun PebbleShell(
                 contentColor = contentColorFor(containerColor),
             ),
         ) {
-            // animateContentSize gives a smooth, correctly-measured collapse (no
-            // post-animation size jump). Cover-screen tiles fill instead.
+            // No animateContentSize here (cover-screen tiles fill instead) --
+            // the body below is already wrapped in its own AnimatedVisibility
+            // with expandVertically/shrinkVertically, which smoothly animates
+            // that exact same height delta on its own. Wrapping this Column in
+            // a SECOND, independently-sprung animateContentSize on top of that
+            // made every collapse/expand visibly lag and rubber-band: each
+            // frame of the inner animation is itself a "content size changed"
+            // event the outer animateContentSize then re-animates towards,
+            // compounding two springs where the collapse only needs one.
             Column(
-                if (fillHeight) {
-                    Modifier.fillMaxHeight()
-                } else {
-                    Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
-                },
+                if (fillHeight) Modifier.fillMaxHeight() else Modifier,
             ) {
                 // Header: tap anywhere to toggle, long-press to drag-reorder. The
                 // action button and chevron handle their own clicks. Fixed min height
@@ -9415,11 +9418,15 @@ private fun CarSettingsCard(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = cardBg),
     ) {
-        // Same spec as the enclosing SettingsCard/settings-screen columns
-        // (both animate the same expand/collapse height delta) -- a different
-        // spec here made this card visibly settle before the outer
-        // containers finished, reading as a double-animation/jump.
-        Column(Modifier.padding(12.dp).animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))) {
+        // No animateContentSize on this Column -- the body below is already
+        // wrapped in its own AnimatedVisibility with expandVertically/
+        // shrinkVertically, which smoothly animates that same height delta on
+        // its own. A second, independently-sprung animateContentSize here on
+        // top of it fought that animation every frame (each step of the inner
+        // spring is itself a "content size changed" event the outer one then
+        // re-animates towards), which is what made this card's collapse/
+        // expand read as janky/double-animated instead of one clean motion.
+        Column(Modifier.padding(12.dp)) {
             Row(
                 Modifier.fillMaxWidth()
                     .then(if (collapsible) Modifier.clickable { onToggle() } else Modifier)
@@ -9587,57 +9594,66 @@ private fun CarSettingsCard(
                         }
                     }
 
-                    SettingsGroup("Identity & service") {
-                        SelectionContainer { StatusRow("VIN", v.vin) }
-                        OutlinedTextField(
-                            value = state.licensePlates[v.vin] ?: "",
-                            onValueChange = { vm.setLicensePlate(v.vin, it) },
-                            label = { Text("License plate") },
-                            singleLine = true,
-                            shape = FieldShape,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Identity & service tracking and pebble visibility are both
+                    // power-user record-keeping, not something a first-time or
+                    // casual user needs to see every time they open a car's
+                    // settings -- Simple mode now only shows what actually changes
+                    // which controls appear (photo, powertrain, seat/climate
+                    // features), matching Default climate start/Palette override
+                    // above.
+                    if (state.settingsMode == "advanced") {
+                        SettingsGroup("Identity & service") {
+                            SelectionContainer { StatusRow("VIN", v.vin) }
                             OutlinedTextField(
-                                value = state.lastServiceMiles[v.vin]?.toString() ?: "",
-                                onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                                label = { Text("Last service (mi)") },
+                                value = state.licensePlates[v.vin] ?: "",
+                                onValueChange = { vm.setLicensePlate(v.vin, it) },
+                                label = { Text("License plate") },
                                 singleLine = true,
                                 shape = FieldShape,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                             )
-                            OutlinedTextField(
-                                value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
-                                onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                                label = { Text("Interval (mi)") },
-                                singleLine = true,
-                                shape = FieldShape,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-
-                    SettingsGroup("Sections shown") {
-                        val labels = mapOf(
-                            "charge" to "Charge / fuel",
-                            "climate" to "Climate",
-                            "location" to "Location",
-                            "weather" to "Weather",
-                            "trips" to "Trips",
-                            "info" to "Car info",
-                            "diagnostics" to "Diagnostics",
-                            "ai" to "AI summary",
-                        )
-                        com.bloo.bluelink.data.HIDEABLE_SECTIONS
-                            // The AI toggle only matters when AI is enabled for this device.
-                            .filter { it != "ai" || state.aiEnabled }
-                            .forEach { sec ->
-                                ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
-                                    vm.setSectionHidden(v, sec, !show)
-                                }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = state.lastServiceMiles[v.vin]?.toString() ?: "",
+                                    onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                                    label = { Text("Last service (mi)") },
+                                    singleLine = true,
+                                    shape = FieldShape,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
+                                    onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                                    label = { Text("Interval (mi)") },
+                                    singleLine = true,
+                                    shape = FieldShape,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f),
+                                )
                             }
+                        }
+
+                        SettingsGroup("Sections shown") {
+                            val labels = mapOf(
+                                "charge" to "Charge / fuel",
+                                "climate" to "Climate",
+                                "location" to "Location",
+                                "weather" to "Weather",
+                                "trips" to "Trips",
+                                "info" to "Car info",
+                                "diagnostics" to "Diagnostics",
+                                "ai" to "AI summary",
+                            )
+                            com.bloo.bluelink.data.HIDEABLE_SECTIONS
+                                // The AI toggle only matters when AI is enabled for this device.
+                                .filter { it != "ai" || state.aiEnabled }
+                                .forEach { sec ->
+                                    ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
+                                        vm.setSectionHidden(v, sec, !show)
+                                    }
+                                }
+                        }
                     }
                 }
             }
@@ -10238,12 +10254,14 @@ fun MorphSegmented(
  *  mirror. */
 @Composable
 private fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSelect: (com.bloo.bluelink.data.Powertrain) -> Unit) {
+    // An icon per option (Gas/Hybrid/PHEV/EV) instead of text-only segments --
+    // a quick visual "shape" for each choice, not just a label to read.
     MorphSegmented(
         options = listOf(
-            SegmentOption(com.bloo.bluelink.data.Powertrain.GAS.name, "Gas", null),
-            SegmentOption(com.bloo.bluelink.data.Powertrain.HYBRID.name, "Hybrid", null),
-            SegmentOption(com.bloo.bluelink.data.Powertrain.PHEV.name, "PHEV", null),
-            SegmentOption(com.bloo.bluelink.data.Powertrain.EV.name, "EV", null),
+            SegmentOption(com.bloo.bluelink.data.Powertrain.GAS.name, "Gas", Icons.Filled.LocalGasStation),
+            SegmentOption(com.bloo.bluelink.data.Powertrain.HYBRID.name, "Hybrid", Icons.Filled.Bolt),
+            SegmentOption(com.bloo.bluelink.data.Powertrain.PHEV.name, "PHEV", Icons.Filled.Power),
+            SegmentOption(com.bloo.bluelink.data.Powertrain.EV.name, "EV", Icons.Filled.FlashOn),
         ),
         selectedKey = current.name,
         onSelect = { key -> onSelect(com.bloo.bluelink.data.Powertrain.valueOf(key)) },
