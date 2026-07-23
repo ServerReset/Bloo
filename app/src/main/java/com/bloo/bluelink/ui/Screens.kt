@@ -158,6 +158,7 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -599,16 +600,27 @@ private data class OnboardingStep(val kind: OnboardingStepKind, val vin: String?
 
 /**
  * Flattens first-run onboarding into one linear list of steps: a welcome
- * intro, a combined notifications+biometrics setup step, one CAR step per
- * vehicle (each vehicle gets its own dedicated screen rather than being
- * stacked in one scroll or split into per-feature pages), and a closing
- * crash-course. Drives the single [AnimatedContent] in [OnboardingScreen]
- * the same way [buildSetupPages] drives [CarFeatureWizard].
+ * intro, a combined notifications+biometrics+sync setup step, one CAR step
+ * per vehicle that isn't already configured (each vehicle gets its own
+ * dedicated screen rather than being stacked in one scroll or split into
+ * per-feature pages), and a closing crash-course. Drives the single
+ * [AnimatedContent] in [OnboardingScreen] the same way [buildSetupPages]
+ * drives [CarFeatureWizard].
+ *
+ * [preConfiguredVins] skips a car's whole CAR step -- restoring a Drive/
+ * manual backup on the SETUP step (which always comes before any CAR step)
+ * can bring in real powertrain/seat config for a car that already had it set
+ * up on another device, and there's no reason to ask again for something the
+ * backup already answered. Empty by default: normal first-run onboarding
+ * with nothing to restore still gets one CAR step per vehicle as before.
  */
-private fun buildOnboardingSteps(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<OnboardingStep> = buildList {
+private fun buildOnboardingSteps(
+    vehicles: List<com.bloo.bluelink.data.Vehicle>,
+    preConfiguredVins: Set<String> = emptySet(),
+): List<OnboardingStep> = buildList {
     add(OnboardingStep(OnboardingStepKind.INTRO))
     add(OnboardingStep(OnboardingStepKind.SETUP))
-    vehicles.forEach { add(OnboardingStep(OnboardingStepKind.CAR, it.vin)) }
+    vehicles.forEach { if (it.vin !in preConfiguredVins) add(OnboardingStep(OnboardingStepKind.CAR, it.vin)) }
     add(OnboardingStep(OnboardingStepKind.CRASH_COURSE))
 }
 
@@ -633,8 +645,17 @@ private fun OnboardingScreen(vm: AppViewModel) {
     val canBio = remember { vm.canUseBiometrics() }
     val scheme = MaterialTheme.colorScheme
 
-    val steps = remember(state.vehicles) { buildOnboardingSteps(state.vehicles) }
+    // Snapshot of vehicles a restored backup already configured, frozen once
+    // the user moves past the SETUP step (always index 1 -- INTRO then SETUP
+    // always come first, see buildOnboardingSteps) so a live edit on a CAR
+    // page later (which also updates state.powertrains) can't retroactively
+    // shrink the step list out from under the page the user is looking at.
+    var preConfiguredVins by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pageIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(state.powertrains.keys, pageIndex) {
+        if (pageIndex <= 1) preConfiguredVins = state.powertrains.keys.toSet()
+    }
+    val steps = remember(state.vehicles, preConfiguredVins) { buildOnboardingSteps(state.vehicles, preConfiguredVins) }
     LaunchedEffect(steps) { if (pageIndex > steps.lastIndex) pageIndex = steps.lastIndex }
 
     val lastIndex = steps.lastIndex
@@ -729,7 +750,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
                     ) {
                         when (step.kind) {
                             OnboardingStepKind.INTRO -> OnboardingIntroPage()
-                            OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, context, canBio)
+                            OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio)
                             OnboardingStepKind.CAR -> {
                                 val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
                                 val sc = vehicle?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
@@ -837,9 +858,19 @@ private fun OnboardingIntroPage() {
     }
 }
 
-/** Step 2: notifications + biometrics, both optional -- Next always works. */
+/**
+ * Step 2: notifications, biometrics, and Drive/manual sync -- all optional,
+ * Next always works regardless. Each gets its own solid card (icon + title +
+ * body + action) instead of a bare full-width button floating directly on
+ * the animated Aurora background -- a moving, colourful backdrop is a poor
+ * contrast surface for plain text, and three thin buttons with nothing else
+ * around them read as an empty step. Syncing here (not just notifications +
+ * biometrics) also means a restored backup can skip the per-car setup
+ * screens later in this same flow for any car it already configured -- see
+ * [buildOnboardingSteps]' `preConfiguredVins`.
+ */
 @Composable
-private fun OnboardingSetupPage(vm: AppViewModel, context: android.content.Context, canBio: Boolean) {
+private fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: android.content.Context, canBio: Boolean) {
     val scheme = MaterialTheme.colorScheme
     Text(
         "Quick setup",
@@ -848,7 +879,7 @@ private fun OnboardingSetupPage(vm: AppViewModel, context: android.content.Conte
         color = scheme.onSurface,
     )
     Text(
-        "Both optional -- turn them on now or skip and enable them later in Settings.",
+        "All optional -- skip anything here and turn it on later in Settings.",
         style = MaterialTheme.typography.bodyMedium,
         color = scheme.onSurfaceVariant,
     )
@@ -861,55 +892,155 @@ private fun OnboardingSetupPage(vm: AppViewModel, context: android.content.Conte
         val notifLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> notifGranted = granted }
-        MorphButton(
-            onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
-            active = notifGranted,
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+        OnboardingSetupCard(
+            icon = Icons.Filled.Notifications,
+            title = "Notifications",
+            body = "Get notified about charge status, alerts, and app updates.",
+            done = notifGranted,
         ) {
-            Icon(
-                if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (notifGranted) "Notifications enabled" else "Enable notifications",
-                fontWeight = FontWeight.SemiBold,
-            )
+            MorphButton(
+                onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+                active = notifGranted,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 12.dp),
+            ) {
+                Icon(
+                    if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Notifications,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(if (notifGranted) "Enabled" else "Enable notifications", fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 
     if (canBio) {
         var bioEnabled by remember { mutableStateOf(false) }
-        MorphButton(
-            onClick = {
-                if (!bioEnabled) {
-                    context.findFragmentActivity()?.let { activity ->
-                        showBiometricPrompt(
-                            activity = activity,
-                            title = "Enable fingerprint lock",
-                            subtitle = "Confirm to require it when opening Bloo",
-                            onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
-                            onError = {},
-                        )
-                    }
-                }
-            },
-            active = bioEnabled,
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+        OnboardingSetupCard(
+            icon = Icons.Filled.Fingerprint,
+            title = "Fingerprint lock",
+            body = "Require your fingerprint to open Bloo.",
+            done = bioEnabled,
         ) {
-            Icon(
-                if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (bioEnabled) "Fingerprint lock enabled" else "Enable fingerprint lock",
-                fontWeight = FontWeight.SemiBold,
-            )
+            MorphButton(
+                onClick = {
+                    if (!bioEnabled) {
+                        context.findFragmentActivity()?.let { activity ->
+                            showBiometricPrompt(
+                                activity = activity,
+                                title = "Enable fingerprint lock",
+                                subtitle = "Confirm to require it when opening Bloo",
+                                onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
+                                onError = {},
+                            )
+                        }
+                    }
+                },
+                active = bioEnabled,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 12.dp),
+            ) {
+                Icon(
+                    if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(if (bioEnabled) "Enabled" else "Enable fingerprint lock", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+
+    // --- Sync across devices (Google Drive or a plain file) ---
+    var showDriveDialog by remember { mutableStateOf(false) }
+    val driveSaveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri -> uri?.let { vm.setSyncUri(it) } }
+    val driveOpenLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
+    if (showDriveDialog) {
+        DriveSyncSetupDialog(
+            onDismissRequest = { showDriveDialog = false },
+            onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
+            onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
+        )
+    }
+    val syncEnabled = state.syncUri != null
+    OnboardingSetupCard(
+        icon = Icons.Filled.CloudSync,
+        title = "Sync across devices",
+        body = if (syncEnabled) {
+            "Your settings and car photos back up to Google Drive automatically."
+        } else {
+            "Join an existing backup to bring in your car photos and setup automatically, or start a fresh one."
+        },
+        done = syncEnabled,
+    ) {
+        if (syncEnabled) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Drive sync enabled", fontWeight = FontWeight.SemiBold, color = scheme.primary)
+            }
+        } else {
+            MorphButton(
+                onClick = { showDriveDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 12.dp),
+            ) {
+                Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Set up Drive sync", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+/** One card in the onboarding Setup step: icon + title + body on a solid
+ *  surface -- not directly on the animated Aurora background, which made
+ *  plain text here hard to read against a busy, colourful, moving backdrop
+ *  -- with [content] (a MorphButton or a "done" status row) below. [done]
+ *  tints the icon chip to the primary color as a lightweight "this one's
+ *  handled" cue, matching the checkmark treatment MorphButton itself already
+ *  uses for its own active state. */
+@Composable
+private fun OnboardingSetupCard(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    done: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = scheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(if (done) scheme.primaryContainer else scheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (done) Icons.Filled.CheckCircle else icon,
+                        contentDescription = null,
+                        tint = if (done) scheme.onPrimaryContainer else scheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = scheme.onSurface)
+                    Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+            }
+            content()
         }
     }
 }

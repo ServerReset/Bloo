@@ -792,6 +792,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Re-reads this device's local per-car config (seat capability, powertrain,
+     * photo, license plate, service intervals, pebble order) for the currently
+     * loaded vehicles and folds it straight into state -- the same local reads
+     * [loadGarageInner] already does once at startup, no network call. A
+     * restored/imported settings backup only ever writes to [settingsStore]
+     * directly; without this, the already-composed UI (onboarding mid-flow, a
+     * Settings screen already open) kept showing whatever it loaded before the
+     * import, until some unrelated event happened to trigger a full reload.
+     */
+    private suspend fun refreshLocalCarConfig() {
+        val vehicles = _state.value.vehicles
+        if (vehicles.isEmpty()) return
+        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
+        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin)?.let { v.vin to it } }.toMap()
+        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
+        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
+        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin) }.filterValues { it.isNotBlank() }
+        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
+        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
+        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
+        _state.update {
+            it.copy(
+                seatConfigs = seatConfigs,
+                powertrains = powertrains,
+                sectionOrders = sectionOrders,
+                imageUrls = images,
+                licensePlates = plates,
+                lastServiceMiles = lastSvc,
+                serviceIntervalMiles = svcInterval,
+                climatePresets = climatePresets,
+            )
+        }
+    }
+
+    /**
      * One-time Drive-sync bootstrap: restore the saved sync URI / settings-mode /
      * last-sync-time / per-car default climate presets, then start the
      * bidirectional auto-sync collector (download-then-upload whenever a refresh
@@ -2021,11 +2056,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val error = settingsStore.importSettingsJson(json)
         AppLog.log(if (error == null) "Settings imported from backup" else "⚠ Settings import: $error")
         _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) "success" else "error") }
-        // Push the restored appearance/preferences down to the watch too --
-        // otherwise a manual restore only takes effect on the phone until
-        // some unrelated event (a pebble reorder, the next Drive sync) later
-        // happens to trigger a watch push.
         if (error == null) {
+            // Refresh the already-loaded vehicles' local config (seats, powertrain,
+            // photo, ...) so the UI reflects the restore immediately instead of
+            // waiting for some unrelated event to trigger a full garage reload.
+            refreshLocalCarConfig()
+            // Push the restored appearance/preferences down to the watch too --
+            // otherwise a manual restore only takes effect on the phone until
+            // some unrelated event (a pebble reorder, the next Drive sync) later
+            // happens to trigger a watch push.
             com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), settingsStore.appearance.first())
         }
     }
@@ -2111,6 +2150,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             importError != null -> "Auto-sync enabled, but couldn't import: $importError"
             else -> "Settings imported and auto-sync enabled"
         }
+        // Same reasoning as importSettings: reflect a real import in the
+        // already-loaded vehicles' local config right away (seats, powertrain,
+        // photo, ...) -- e.g. so onboarding can skip a per-car setup screen for
+        // a car this import already configured, instead of asking again for
+        // something the restored backup already answered.
+        if (json != null && importError == null) refreshLocalCarConfig()
         _state.update { it.copy(syncUri = uri.toString(), message = message) }
     }
 

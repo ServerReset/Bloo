@@ -1397,7 +1397,7 @@ class SettingsStore(private val context: Context) {
      *  small enough that even several cars' photos keep the whole settings
      *  backup a reasonable size for repeated auto-sync uploads, still sharp
      *  enough for the hero card / cover-screen tile it's actually shown at. */
-    private const val SYNCED_PHOTO_MAX_DIM = 640
+    private val SYNCED_PHOTO_MAX_DIM = 640
 
     /** Reads every `img_$vin` pref that points at a local file (a remote URL
      *  needs no embedding -- it already loads the same way on any device) and
