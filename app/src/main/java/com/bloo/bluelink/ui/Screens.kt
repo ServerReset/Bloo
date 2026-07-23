@@ -9109,6 +9109,12 @@ private fun SettingsScreen(vm: AppViewModel) {
             )
         }
         } // Box (wide-screen centering)
+        // Same blurred scrim GarageScreen uses behind the system clock/battery
+        // icons -- this content scrolls behind the status bar too (see the
+        // comment above the Column's top spacer). Skipped on a folding
+        // phone's compact cover screen, matching GarageScreen/LockOverlay:
+        // that tiny layout doesn't draw content under the status bar at all.
+        if (!isCompactCoverScreen()) StatusBarScrim()
         // Floating back-arrow + "Settings" label + simple/advanced button.
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),
