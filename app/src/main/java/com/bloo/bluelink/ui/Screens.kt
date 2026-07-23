@@ -213,7 +213,6 @@ import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.runtime.Composable
@@ -2188,101 +2187,134 @@ private fun LockOverlay(vm: AppViewModel) {
 @Composable
 private fun EmptyScreen(vm: AppViewModel) {
     val state by vm.state.collectAsState()
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("Bloo") },
-            actions = {
-                IconButton(onClick = { vm.openSettings() }) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                }
-                IconButton(onClick = { vm.loadGarage() }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Reload")
-                }
-            },
+    val scheme = MaterialTheme.colorScheme
+
+    // Three distinct causes used to collapse into the same "No vehicles
+    // found" / "Not signed in" copy -- including a real network/API
+    // failure, which then looked exactly like the app had silently
+    // signed the user out. Each now gets its own icon, headline, and
+    // primary action so the actual cause is always clear.
+    val loadFailed = state.accounts.isNotEmpty() && state.garageLoadError != null
+    val (icon, headline, body) = when {
+        state.accounts.isEmpty() -> Triple(
+            Icons.Filled.CloudOff,
+            "Not signed in",
+            "Sign in to your Hyundai, Kia, or Genesis account in Settings to get started.",
         )
-        // Three distinct causes used to collapse into the same "No vehicles
-        // found" / "Not signed in" copy -- including a real network/API
-        // failure, which then looked exactly like the app had silently
-        // signed the user out. Each now gets its own icon, headline, and
-        // primary action so the actual cause is always clear.
-        val loadFailed = state.accounts.isNotEmpty() && state.garageLoadError != null
-        val (icon, headline, body) = when {
-            state.accounts.isEmpty() -> Triple(
-                Icons.Filled.CloudOff,
-                "Not signed in",
-                "Sign in to your Hyundai, Kia, or Genesis account in Settings to get started.",
-            )
-            loadFailed -> Triple(
-                Icons.Filled.WifiOff,
-                "Couldn't load your vehicles",
-                "${state.garageLoadError}\n\nCheck your connection and try again.",
-            )
-            else -> Triple(
-                Icons.Filled.DirectionsCar,
-                "No vehicles found",
-                "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then tap Reload.",
-            )
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 24.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.widthIn(max = 360.dp),
+        loadFailed -> Triple(
+            Icons.Filled.WifiOff,
+            "Couldn't load your vehicles",
+            "${state.garageLoadError}\n\nCheck your connection and try again.",
+        )
+        else -> Triple(
+            Icons.Filled.DirectionsCar,
+            "No vehicles found",
+            "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then tap Reload.",
+        )
+    }
+
+    // Fade + slide up on first composition, matching HeroHeader and every
+    // other first-paint card elsewhere in the app -- this screen used to pop
+    // in instantly, one more thing that made it read as a leftover plain
+    // Material screen rather than part of the same app.
+    val contentAlpha = remember { Animatable(0f) }
+    val contentOffset = remember { Animatable(16f) }
+    LaunchedEffect(Unit) {
+        launch { contentAlpha.animateTo(1f, tween(400)) }
+        launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        // The rest of the app never sits on a flat black/theme-background
+        // screen with a stock opaque TopAppBar -- Garage, Settings, and
+        // Onboarding all float their header over an animated Aurora backdrop
+        // with a blurred status-bar scrim and translucent circular icon
+        // buttons. This was the one screen still doing it the plain way.
+        AuroraBackground(Modifier.matchParentSize())
+        StatusBarScrim()
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                val scheme = MaterialTheme.colorScheme
-                // A soft glow behind the icon instead of a bare, flat glyph
-                // floating on empty space -- the same halo technique the
-                // search bar uses for its own icon treatment.
-                Box(contentAlignment = Alignment.Center) {
-                    Box(
-                        Modifier
-                            .size(96.dp)
-                            .background(
-                                Brush.radialGradient(
-                                    listOf(scheme.primary.copy(alpha = 0.16f), Color.Transparent),
-                                ),
-                                CircleShape,
-                            ),
-                    )
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(56.dp),
-                        tint = if (loadFailed) scheme.error.copy(alpha = 0.85f) else scheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    )
-                }
                 Text(
-                    headline,
+                    "Bloo",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Black,
+                    color = scheme.onSurface,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(8.dp))
-                if (state.accounts.isEmpty()) {
-                    MorphButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Open Settings", fontWeight = FontWeight.SemiBold)
+                FloatingIcon(Icons.Filled.Refresh, "Reload", { vm.loadGarage() })
+                FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() })
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp, vertical = 24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .widthIn(max = 360.dp)
+                        .graphicsLayer {
+                            alpha = contentAlpha.value
+                            translationY = contentOffset.value
+                        },
+                ) {
+                    // A soft glow behind the icon instead of a bare, flat glyph
+                    // floating on empty space -- the same halo technique the
+                    // search bar uses for its own icon treatment.
+                    Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            Modifier
+                                .size(96.dp)
+                                .background(
+                                    Brush.radialGradient(
+                                        listOf(scheme.primary.copy(alpha = 0.16f), Color.Transparent),
+                                    ),
+                                    CircleShape,
+                                ),
+                        )
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(56.dp),
+                            tint = if (loadFailed) scheme.error.copy(alpha = 0.85f) else scheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        )
                     }
-                } else {
-                    MorphButton(onClick = { vm.loadGarage() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (loadFailed) "Try again" else "Reload", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        headline,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (state.accounts.isEmpty()) {
+                        MorphButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Open Settings", fontWeight = FontWeight.SemiBold)
+                        }
+                    } else {
+                        MorphButton(onClick = { vm.loadGarage() }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (loadFailed) "Try again" else "Reload", fontWeight = FontWeight.SemiBold)
+                        }
                     }
+                    MorphTextButton("Account Settings", onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth())
                 }
-                MorphTextButton("Account Settings", onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth())
             }
         }
     }
