@@ -8363,6 +8363,15 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Cars: drag to reorder, tap a car to expand its setup + photo. With a
             // single car there's nothing to order, so it's just shown expanded.
+            // Always visible, in both Simple and Advanced -- this used to be
+            // wrapped in the same advanced-only AnimatedVisibility as the
+            // power-user cards below it, which hid the whole section (photo,
+            // powertrain, seat/climate features, everything) from anyone in
+            // Simple mode, the app's default. The two genuinely power-user
+            // groups inside CarSettingsCard (default climate preset, palette
+            // override) already have their own `state.settingsMode ==
+            // "advanced"` checks, so gating the section as a whole here was
+            // redundant with those AND too broad.
             if (state.vehicles.isNotEmpty()) {
                 var expandedCar by remember { mutableStateOf<String?>(null) }
                 val single = state.vehicles.size == 1
@@ -8372,7 +8381,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
-                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                 SettingsCard(if (single) "Car" else "Cars") {
                     if (single) {
                         val v = state.vehicles[0]
@@ -8397,7 +8405,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                             )
                         }
                     }
-                }
                 }
             }
 
@@ -9264,6 +9271,36 @@ private fun CarSettingsCard(
                     )
                     Spacer(Modifier.width(10.dp))
                 }
+                // A thumbnail of whatever photo is set (or the same tonal
+                // gradient/car-icon fallback CarTilesHeader uses elsewhere) --
+                // this card used to be pure text with no visual trace of the
+                // photo it lets you change, so a new photo never actually
+                // showed up anywhere until you closed Settings and looked at
+                // the garage screen.
+                val thumbImg = state.imageUrls[v.vin]
+                val scheme = MaterialTheme.colorScheme
+                Box(
+                    Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!thumbImg.isNullOrBlank()) {
+                        AsyncImage(
+                            model = if (thumbImg.startsWith("/")) java.io.File(thumbImg) else thumbImg,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        Box(
+                            Modifier.fillMaxSize()
+                                .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(v.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                     Text(
@@ -9348,6 +9385,21 @@ private fun CarSettingsCard(
 
                     SettingsGroup("Photo") {
                         val storedImage = state.imageUrls[v.vin]
+                        // A live preview instead of just "Custom photo set" as plain
+                        // text -- there was no way to actually see the effect of a
+                        // photo change without leaving Settings and finding this car
+                        // on the garage screen.
+                        if (!storedImage.isNullOrBlank()) {
+                            AsyncImage(
+                                model = if (storedImage.startsWith("/")) java.io.File(storedImage) else storedImage,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                                    .clip(RoundedCornerShape(14.dp)),
+                            )
+                        }
                         if (storedImage != null && storedImage.startsWith("/")) {
                             Text(
                                 "Custom photo set",
