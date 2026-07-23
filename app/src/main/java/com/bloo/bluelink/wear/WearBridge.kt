@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.WearColorRoles
+import com.bloo.bluelink.data.WearSeatConfig
 import com.bloo.bluelink.data.WearSettingsPayload
 import com.bloo.bluelink.ui.ThemeMode
 import com.bloo.bluelink.ui.blooColorScheme
@@ -169,6 +170,20 @@ object WearBridge {
         val vins = SnapshotStore(context).current().vehicles.map { it.vin }
         val pebbleOrders = vins.associateWith { store.sectionOrder(it) }
         val hiddenSections = vins.associateWith { store.hiddenSections(it) }
+        val seatConfigs = vins.associateWith { vin ->
+            val sc = store.seatConfig(vin)
+            WearSeatConfig(
+                driverHeat = sc.driverHeat,
+                driverCool = sc.driverCool,
+                passHeat = sc.passHeat,
+                passCool = sc.passCool,
+                rearLeftHeat = sc.rearLeftHeat,
+                rearLeftCool = sc.rearLeftCool,
+                rearRightHeat = sc.rearRightHeat,
+                rearRightCool = sc.rearRightCool,
+                steeringWheel = sc.steeringWheel,
+            )
+        }
 
         val payload = WearSettingsPayload(
             dark = dark,
@@ -179,6 +194,7 @@ object WearBridge {
             carColors = carColors,
             pebbleOrders = pebbleOrders,
             hiddenSections = hiddenSections,
+            seatConfigs = seatConfigs,
             aiEnabled = store.aiEnabled(),
             auroraEnabled = appearance.auroraBackground,
             auroraColorMode = appearance.auroraColorMode,

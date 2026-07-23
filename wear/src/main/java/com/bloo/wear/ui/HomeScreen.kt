@@ -1046,44 +1046,62 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
  * they only take effect the next time climate is actually started, bundled
  * in with whatever temperature/duration the user has dialed in on the
  * Climate/Smart Climate cards.
+ *
+ * Which rows actually show is gated by `ui.settings?.seatConfigs?.get(car.vin)`
+ * -- the same user-confirmed capability the phone collects during onboarding
+ * (the car API can't reliably report this) and mirrors down over the Wear
+ * Data Layer (see [com.bloo.bluelink.data.WearSeatConfig]). Falls back to its
+ * default (driver + passenger heat only) if this car hasn't synced yet,
+ * matching the phone's own [com.bloo.bluelink.data.WearSeatConfig] default.
  */
 @Composable
 private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort", Icons.Filled.AirlineSeatReclineNormal) {
     val d = ui.draftFor(car.vin)
+    val seats = ui.settings?.seatConfigs?.get(car.vin) ?: com.bloo.bluelink.data.WearSeatConfig()
     // Moved from a trailing caption after the sliders (where it read as a
     // bare, easy-to-miss afterthought -- the only card in the file ending on
     // plain text rather than a control) to right under the header, matching
     // where SmartClimateCard's own helper text lives.
     Text("Applied when you start climate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(4.dp))
-    MorphButton(
-        label = if (d.steering) "Steering heat on" else "Steering heat",
-        icon = Icons.Filled.Whatshot,
-        active = d.steering,
-        activeColor = WearColors.heat,
-        pending = false,
-        onClick = { vm.toggleSteering(car.vin) },
-    )
-    Spacer(Modifier.height(4.dp))
-    // Rear seats only when the live status shows they exist (non-null seatRl/Rr
-    // from a fetch). With rear seats present this card stacks 5 controls with
-    // no grouping cue -- a "Front"/"Rear" label pair reads it as two clusters
-    // instead of one long undifferentiated list, without splitting into a
-    // second independently-orderable tile (which would need its own
-    // TO_TILES/DEFAULT_ORDER migration for existing users).
-    val hasRearSeats = car.seatRl != null || car.seatRr != null
-    if (hasRearSeats) {
+    if (seats.steeringWheel) {
+        MorphButton(
+            label = if (d.steering) "Steering heat on" else "Steering heat",
+            icon = Icons.Filled.Whatshot,
+            active = d.steering,
+            activeColor = WearColors.heat,
+            pending = false,
+            onClick = { vm.toggleSteering(car.vin) },
+        )
+        Spacer(Modifier.height(4.dp))
+    }
+    // Was gated on the live status reporting non-null seatRl/seatRr -- the car
+    // API can't reliably report seat-heat capability at all (same reason the
+    // phone collects it manually), so that was really just a proxy that could
+    // both under- and over-show rows relative to what the user actually
+    // configured. The synced seat config (matching the phone's own gating in
+    // ClimatePebble) is the real source of truth here.
+    val showRearRow = seats.rearLeftHeat || seats.rearRightHeat
+    if (showRearRow && (seats.driverHeat || seats.passHeat)) {
         Text("Front", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(2.dp))
     }
-    SliderRow("Driver seat", seatStepLabels[d.seatDriver], d.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(car.vin, it) }
-    SliderRow("Passenger", seatStepLabels[d.seatPassenger], d.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(car.vin, it) }
-    if (hasRearSeats) {
+    if (seats.driverHeat) {
+        SliderRow("Driver seat", seatStepLabels[d.seatDriver], d.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(car.vin, it) }
+    }
+    if (seats.passHeat) {
+        SliderRow("Passenger", seatStepLabels[d.seatPassenger], d.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(car.vin, it) }
+    }
+    if (showRearRow) {
         Spacer(Modifier.height(6.dp))
         Text("Rear", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(2.dp))
-        SliderRow("Rear left", seatStepLabels[d.seatRearLeft], d.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(car.vin, it) }
-        SliderRow("Rear right", seatStepLabels[d.seatRearRight], d.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(car.vin, it) }
+        if (seats.rearLeftHeat) {
+            SliderRow("Rear left", seatStepLabels[d.seatRearLeft], d.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(car.vin, it) }
+        }
+        if (seats.rearRightHeat) {
+            SliderRow("Rear right", seatStepLabels[d.seatRearRight], d.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(car.vin, it) }
+        }
     }
 }
 
@@ -1686,9 +1704,10 @@ private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) 
  *   spinner, giving feedback for what can be a multi-second download over
  *   Bluetooth/Wi-Fi before the system installer takes over.
  * - `ui.updateRun.releaseNotes` is optional and only shown when non-blank,
- *   truncated to 4 lines with an ellipsis -- release notes can be arbitrarily
- *   long free text from the update payload, and this card has no scroll of
- *   its own (it's one item inside the outer [ScalingLazyColumn]).
+ *   truncated to 12 lines with an ellipsis (matches the phone's own update
+ *   tile) -- release notes are now a real per-commit changelog rather than
+ *   arbitrary free text, and this card has no scroll of its own, but sits
+ *   inside the outer [ScalingLazyColumn], which does.
  * - "Remind me" (`vm.snoozeUpdate`) is the only dismissal offered; there's no
  *   permanent "don't ask again" here because the banner is a passive row in
  *   an already-scrollable list rather than a blocking dialog, so simply
@@ -1794,7 +1813,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
                 notes,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 4,
+                maxLines = 12,
                 overflow = TextOverflow.Ellipsis,
             )
         }

@@ -371,6 +371,28 @@ data class WearColorRoles(
     val onErrorContainer: Int,
 )
 
+/** Mirrors the phone's `SeatConfig` (`:app`'s `SettingsStore.kt`, not visible
+ *  from this module) -- which seats actually have heat/cool, and whether the
+ *  steering wheel is heated. The API can't reliably report this, so it's
+ *  user-confirmed once on the phone (onboarding/Settings) and synced here so
+ *  the watch's own Comfort card only shows controls the car actually has,
+ *  instead of every seat position and the steering toggle unconditionally.
+ *  Field-for-field the same shape and defaults as `SeatConfig` so an
+ *  unsynced watch (old build, not yet paired) falls back to the same
+ *  "driver + passenger heat only" default the phone itself uses. */
+@Serializable
+data class WearSeatConfig(
+    val driverHeat: Boolean = true,
+    val driverCool: Boolean = false,
+    val passHeat: Boolean = true,
+    val passCool: Boolean = false,
+    val rearLeftHeat: Boolean = false,
+    val rearLeftCool: Boolean = false,
+    val rearRightHeat: Boolean = false,
+    val rearRightCool: Boolean = false,
+    val steeringWheel: Boolean = false,
+)
+
 /** Appearance + preferences mirrored to the watch. */
 @Serializable
 data class WearSettingsPayload(
@@ -387,6 +409,9 @@ data class WearSettingsPayload(
     /** Per-VIN pebble keys the user hid on the phone, so the watch drops the
      *  matching tiles instead of still showing something the phone hides. */
     val hiddenSections: Map<String, Set<String>> = emptyMap(),
+    /** Per-VIN seat/steering-wheel heat capability, so the watch's Comfort
+     *  card only shows controls the car actually has -- see [WearSeatConfig]. */
+    val seatConfigs: Map<String, WearSeatConfig> = emptyMap(),
     /** Whether on-device AI summaries are turned on, mirrored so the watch can
      *  show the same toggle state and hide the AI tile when it's off. */
     val aiEnabled: Boolean = false,
