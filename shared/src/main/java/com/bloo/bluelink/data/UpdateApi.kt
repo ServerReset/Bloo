@@ -124,15 +124,18 @@ object UpdateApi {
         }.getOrNull()
     }
 
-    // android.yml's release-publish step writes a body of its own install
-    // steps followed by a "### What's changed" marker, then (with
-    // generate_release_notes: true) GitHub appends its own auto-generated
-    // "## What's Changed" changelog after that. The update tile already
-    // shows its own dedicated install-steps card, so showing the release
-    // body verbatim under "What's new" duplicated those same 3 steps
-    // together with raw, unrendered "###"/"##" markdown headers -- only the
-    // changelog after the marker (with GitHub's own redundant heading line
-    // stripped too) is what that section actually needs.
+    // android.yml's "Generate changelog" step writes a body of its own install
+    // steps followed by a "### What's changed" marker, then a real per-commit
+    // changelog (git log since the previous "build-N" tag) after that -- it
+    // used to rely on GitHub's own generate_release_notes for that second
+    // half instead, but that only lists merged PRs, and this repo pushes
+    // straight to its branch with no PRs, so it was silently producing an
+    // empty section (just a trailing compare-link line) on every build. The
+    // update tile already shows its own dedicated install-steps card, so
+    // showing the release body verbatim under "What's new" would duplicate
+    // those same 3 steps together with a raw, unrendered "###" markdown
+    // header -- only the changelog after the marker is what that section
+    // actually needs.
     private const val CHANGELOG_MARKER = "### What's changed"
 
     private fun extractChangelog(body: String?): String? {
@@ -141,13 +144,10 @@ object UpdateApi {
         val notes = if (marker >= 0) body.substring(marker + CHANGELOG_MARKER.length) else body
         return notes
             .lineSequence()
+            // Defensive against a release published before this format (or a
+            // manually-edited one) that still carries GitHub's own generated
+            // heading/compare-link artifacts.
             .dropWhile { it.isBlank() || it.trim() == "## What's Changed" }
-            // Direct pushes (no PR) leave GitHub's auto-generated section with no
-            // bullet entries at all -- just its own trailing "**Full Changelog**:
-            // <compare-url>" line, which the tile's plain Text() renders as raw
-            // "**...**" asterisks instead of bold. That link isn't useful patch-note
-            // content on its own, so drop it; if nothing else is left, there's
-            // nothing worth a "What's new" section for.
             .filterNot { it.trim().startsWith("**Full Changelog**") }
             .joinToString("\n")
             .trim()

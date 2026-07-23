@@ -16,6 +16,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history + tags, not the default single-commit shallow clone --
+          # the changelog step below needs to walk from the previous "build-N"
+          # tag to HEAD, and diff/list tags at all.
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -52,6 +57,36 @@ jobs:
           path: wear/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      # GitHub's own generate_release_notes only lists merged PRs since the
+      # last release -- this repo pushes straight to its branch with no PRs,
+      # so that feature was silently producing an empty "## What's Changed"
+      # section every single build (just a trailing compare-link line, which
+      # UpdateApi.extractChangelog then discarded as not real content). The
+      # in-app update tile's "What's new" section was quietly empty as a
+      # result. Real per-commit messages since the previous "build-N" tag,
+      # written into release_notes.md ourselves, is what UpdateApi actually
+      # reads as this build's patch notes.
+      - name: Generate changelog
+        if: github.event_name == 'push'
+        run: |
+          git fetch --tags --quiet
+          prev_tag=$(git tag -l 'build-*' | sed 's/^build-//' | sort -n | tail -1)
+          {
+            echo "### How to install"
+            echo "1. Download \`Bloo.apk\` below (and \`Bloo-Wear.apk\` for the watch)."
+            echo "2. Open the downloaded file from your notification shade or Downloads app."
+            echo "3. If Android shows **\"Blocked by Play Protect\"**, tap **\"More details\"**, then **\"Install anyway\"** and confirm with your biometrics or device password."
+            echo
+            echo "Already have Bloo installed? Just open the app and pull to refresh — it'll offer to download and install this build for you."
+            echo
+            echo "### What's changed"
+            if [ -n "$prev_tag" ]; then
+              git log --pretty=format:'- %s' "build-$prev_tag"..HEAD
+            else
+              git log --pretty=format:'- %s' -n 20
+            fi
+          } > release_notes.md
+
       # actions/upload-artifact above is what the in-app update flow used to
       # point at, but Actions artifacts are always served zipped AND require
       # a signed-in GitHub session to download at all -- fine for a human
@@ -67,16 +102,7 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: "Build #${{ github.run_number }}"
           prerelease: true
-          generate_release_notes: true
-          body: |
-            ### How to install
-            1. Download `Bloo.apk` below (and `Bloo-Wear.apk` for the watch).
-            2. Open the downloaded file from your notification shade or Downloads app.
-            3. If Android shows **"Blocked by Play Protect"**, tap **"More details"**, then **"Install anyway"** and confirm with your biometrics or device password.
-
-            Already have Bloo installed? Just open the app and pull to refresh — it'll offer to download and install this build for you.
-
-            ### What's changed
+          body_path: release_notes.md
           files: |
             app/build/outputs/apk/debug/Bloo.apk
             wear/build/outputs/apk/debug/Bloo-Wear.apk
