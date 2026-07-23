@@ -169,17 +169,6 @@ class BlooWidget : GlanceAppWidget() {
         }
         val actions = cfg?.second.orEmpty().mapNotNull { WidgetAction.fromKey(it) }
         val appearance = settings.appearance.first()
-        val accentColor = resolveWidgetAccent(context, appearance, snap?.vin)
-        val onAccent = if (accentColor.luminance() > 0.5f) Color(0xFF20232A) else Color.White
-        val theme = Theme(
-            accent = ColorProvider(accentColor),
-            onAccent = ColorProvider(onAccent),
-            charge = ColorProvider(Color(com.bloo.bluelink.data.BlooColors.chargeGreen)),
-            unlocked = ColorProvider(Color(com.bloo.bluelink.data.BlooColors.heat)),
-            climate = ColorProvider(Color(com.bloo.bluelink.data.BlooColors.climateTeal)),
-            pending = ColorProvider(Color(0.55f, 0.55f, 0.60f, 0.55f)),
-            tile = ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.13f)),
-        )
 
         val requireAuth = settings.widgetRequireAuth(widgetId)
         val photoBgOn = settings.widgetPhotoBackground(widgetId)
@@ -191,6 +180,28 @@ class BlooWidget : GlanceAppWidget() {
         val pending = settings.widgetPendingAction(widgetId)
         val photoBgActive = photoBgOn && photo != null
         val pillShape = settings.widgetPillShape(widgetId)
+
+        val accentColor = resolveWidgetAccent(context, appearance, snap?.vin)
+        val onAccent = if (accentColor.luminance() > 0.5f) Color(0xFF20232A) else Color.White
+        // Over a photo, every action button/status pill used to fill its cell
+        // with a fully opaque state color -- flat, hard-edged rectangles that
+        // completely hid the blurred photo underneath them instead of reading
+        // as glass over it (the background layer already fakes real glass;
+        // the foreground chrome never matched it). Baking a lower alpha into
+        // each state color here, once, means every call site that already
+        // just uses theme.accent/charge/unlocked/climate (ChunkyButton,
+        // StateChip, ...) gets the frosted look for free.
+        fun glassy(c: Color) = if (photoBgActive) c.copy(alpha = 0.62f) else c
+        val theme = Theme(
+            accent = ColorProvider(glassy(accentColor)),
+            onAccent = ColorProvider(onAccent),
+            charge = ColorProvider(glassy(Color(com.bloo.bluelink.data.BlooColors.chargeGreen))),
+            unlocked = ColorProvider(glassy(Color(com.bloo.bluelink.data.BlooColors.heat))),
+            climate = ColorProvider(glassy(Color(com.bloo.bluelink.data.BlooColors.climateTeal))),
+            pending = ColorProvider(Color(0.55f, 0.55f, 0.60f, 0.55f)),
+            tile = ColorProvider(Color(0.5f, 0.5f, 0.55f, 0.13f)),
+        )
+
         val layoutMode = settings.widgetLayoutMode(widgetId) // "info" or "controls"
         // No ifEmpty{DEFAULTS} fallback here -- SettingsStore.widgetInfoFields
         // already distinguishes "never configured" (returns DEFAULTS itself)
@@ -240,7 +251,15 @@ class BlooWidget : GlanceAppWidget() {
                             contentScale = ContentScale.Crop,
                             modifier = GlanceModifier.fillMaxSize().cornerRadius(corner),
                         )
-                        val scrimAlpha = 0.30f * bgAlpha
+                        // Was 0.30f -- too light to tame the blurred photo's own
+                        // contrast (bright windows/sky patches stayed distractingly
+                        // vivid right behind the text and buttons), which is also
+                        // why those buttons/pills got a fully-opaque background
+                        // instead of true glass -- nothing on top of them could
+                        // stay readable otherwise. A stronger scrim here is what
+                        // actually lets the buttons go translucent above (see
+                        // `glassy()`) without losing legibility.
+                        val scrimAlpha = 0.46f * bgAlpha
                         if (scrimAlpha > 0.01f) {
                             Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, scrimAlpha)))) {}
                         }
@@ -842,16 +861,28 @@ class BlooWidget : GlanceAppWidget() {
      *  this context (Glance content is built off the main render pipeline,
      *  and RenderEffect needs a live View/RenderNode) -- downscaling hard and
      *  upscaling back with bilinear filtering is a well-known cheap
-     *  approximation of a strong Gaussian blur, using only two allocation-
-     *  free bitmap scales, no per-pixel loop. */
+     *  approximation of a strong Gaussian blur, using only allocation-free
+     *  bitmap scales, no per-pixel loop.
+     *
+     *  Two downscale/upscale passes, not one straight to the smallest size --
+     *  a single jump straight to ~1/12th size averaged whole regions (a
+     *  window, a doorway) into large, hard-edged colour blobs that read as
+     *  "smeared" rather than blurred, especially with photos that have any
+     *  sharp internal contrast. Passing through an intermediate size applies
+     *  the same cheap box-blur approximation twice, which converges toward a
+     *  true Gaussian's smoother, more even falloff -- closer to real glass,
+     *  same two-bitmap-scale cost per pass. */
     private fun blurredCached(source: Bitmap, path: String): Bitmap {
         val file = java.io.File(path)
         val key = "blur:$path:${file.lastModified()}"
         bitmapCache.get(key)?.let { return it }
         return runCatching {
-            val downW = (source.width / 12).coerceAtLeast(6)
-            val downH = (source.height / 12).coerceAtLeast(6)
-            val small = Bitmap.createScaledBitmap(source, downW, downH, true)
+            val midW = (source.width / 4).coerceAtLeast(24)
+            val midH = (source.height / 4).coerceAtLeast(24)
+            val mid = Bitmap.createScaledBitmap(source, midW, midH, true)
+            val downW = (midW / 5).coerceAtLeast(6)
+            val downH = (midH / 5).coerceAtLeast(6)
+            val small = Bitmap.createScaledBitmap(mid, downW, downH, true)
             Bitmap.createScaledBitmap(small, source.width, source.height, true)
         }.getOrDefault(source).also { bitmapCache.put(key, it) }
     }
