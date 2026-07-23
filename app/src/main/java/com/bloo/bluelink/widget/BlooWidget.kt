@@ -855,35 +855,33 @@ class BlooWidget : GlanceAppWidget() {
         }.getOrNull()?.also { bitmapCache.put(key, it) }
     }
 
-    /** A soft, real blur of [source] (the already-downsampled photo bitmap),
-     *  memoised by [path]'s identity so it's computed once per photo, not on
-     *  every widget refresh tick. No RenderScript/RenderEffect available in
-     *  this context (Glance content is built off the main render pipeline,
-     *  and RenderEffect needs a live View/RenderNode) -- downscaling hard and
-     *  upscaling back with bilinear filtering is a well-known cheap
-     *  approximation of a Gaussian blur, using only allocation-free bitmap
-     *  scales, no per-pixel loop.
+    /** A soft, real blur of [source] (the already-downsampled photo bitmap,
+     *  itself capped to ~400px on its longest edge by [decodeCached] before
+     *  this ever runs), memoised by [path]'s identity so it's computed once
+     *  per photo, not on every widget refresh tick. No RenderScript/
+     *  RenderEffect available in this context (Glance content is built off
+     *  the main render pipeline, and RenderEffect needs a live View/
+     *  RenderNode) -- downscaling hard and upscaling back with bilinear
+     *  filtering is a well-known cheap approximation of a Gaussian blur,
+     *  using only an allocation-free bitmap scale down and back up, no
+     *  per-pixel loop.
      *
-     *  Total reduction is a gentle ~1/6th on each axis -- an earlier version
-     *  of this went through two passes totalling ~1/20th (meant to fix
-     *  blotchy artifacts from a single steep ~1/12th jump by smoothing over
-     *  two steps instead), but that made the *amount* of blur itself far too
-     *  aggressive: a photo shrunk to a ~1/20th-size image and blown back up
-     *  loses almost all of its actual content, reading as a low-res, over-
-     *  blurred mush rather than a photo softly seen through glass. Two passes
-     *  through an intermediate size still avoids the single-jump blotchiness,
-     *  just at a much lighter overall strength this time. */
+     *  Two earlier tuning passes both overshot: a single steep ~1/12th-size
+     *  jump was blotchy, and splitting that into two smoother passes
+     *  totalling ~1/20th just made the blur itself far too strong. Both
+     *  numbers were also being applied on TOP of a source that's already
+     *  downsampled to ~400px, not the original photo -- shrinking an
+     *  already-small image by another 6-20x leaves almost nothing behind.
+     *  A single, much gentler ~1/3rd reduction on this already-small source
+     *  is enough to read as glass without turning into a low-res mush. */
     private fun blurredCached(source: Bitmap, path: String): Bitmap {
         val file = java.io.File(path)
         val key = "blur:$path:${file.lastModified()}"
         bitmapCache.get(key)?.let { return it }
         return runCatching {
-            val midW = (source.width / 2).coerceAtLeast(80)
-            val midH = (source.height / 2).coerceAtLeast(80)
-            val mid = Bitmap.createScaledBitmap(source, midW, midH, true)
-            val downW = (midW / 3).coerceAtLeast(24)
-            val downH = (midH / 3).coerceAtLeast(24)
-            val small = Bitmap.createScaledBitmap(mid, downW, downH, true)
+            val downW = (source.width / 3).coerceAtLeast(60)
+            val downH = (source.height / 3).coerceAtLeast(60)
+            val small = Bitmap.createScaledBitmap(source, downW, downH, true)
             Bitmap.createScaledBitmap(small, source.width, source.height, true)
         }.getOrDefault(source).also { bitmapCache.put(key, it) }
     }
