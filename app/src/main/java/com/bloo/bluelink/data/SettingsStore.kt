@@ -1,6 +1,9 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -1309,6 +1312,13 @@ class SettingsStore(private val context: Context) {
      * notifications, tiles, per-car config…) as one portable JSON backup. Values
      * keep their type (string or boolean) so a re-import restores them exactly.
      * Note: account credentials live in a separate store and are never included.
+     *
+     * Per-car photos ([encodeSyncPhotos]) are embedded as a separate top-level
+     * "photos" object rather than folded into "prefs" like everything else --
+     * an `img_$vin` pref pointing at a local file path used to sync as just
+     * that path string, which meant nothing on a second device (no such file
+     * there), so a synced photo silently never actually appeared anywhere but
+     * the device it was set on.
      */
     suspend fun exportSettingsJson(): String {
         val prefs = context.settingsDataStore.data.first()
@@ -1328,10 +1338,12 @@ class SettingsStore(private val context: Context) {
                 }
             }
         }
+        val photos = encodeSyncPhotos(prefs)
         val root = buildJsonObject {
             put("_format", JsonPrimitive("bloo-settings"))
             put("_version", JsonPrimitive(BACKUP_VERSION))
             put("prefs", entries)
+            if (photos.isNotEmpty()) put("photos", JsonObject(photos))
         }
         return backupJson.encodeToString(JsonObject.serializer(), root)
     }
@@ -1341,7 +1353,11 @@ class SettingsStore(private val context: Context) {
      * any matching keys. Returns an error message on failure, or null on success.
      * Uses [editTracked] — a manual restore is a deliberate local change, so if
      * this device also has Drive auto-sync configured, the restored values are
-     * the ones the next sync should push out, not silently discard.
+     * the ones the next sync should push out, not silently discard. Embedded
+     * photos ([applySyncPhotos]) are written to local storage first (plain
+     * suspend file IO, not a DataStore edit), then their resulting `img_$vin`
+     * paths are folded into the SAME editTracked mutation as the rest of the
+     * prefs, so they're marked dirty for re-upload exactly like everything else.
      */
     suspend fun importSettingsJson(json: String): String? {
         val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }
@@ -1354,6 +1370,7 @@ class SettingsStore(private val context: Context) {
             return "This backup was made with a newer version of Bloo — update the app first"
         }
         val prefs = root["prefs"]?.jsonObject ?: return "Settings file has no data"
+        val photoPaths = applySyncPhotos(root["photos"]?.jsonObject)
         editTracked { mut ->
             prefs.forEach { (name, element) ->
                 // Never accept this device's own Drive URI/bookkeeping from a backup —
@@ -1371,8 +1388,77 @@ class SettingsStore(private val context: Context) {
                     else -> mut[stringPreferencesKey(name)] = prim.content
                 }
             }
+            photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
         }
         return null
+    }
+
+    /** Longest edge a synced photo is downscaled to before base64-embedding --
+     *  small enough that even several cars' photos keep the whole settings
+     *  backup a reasonable size for repeated auto-sync uploads, still sharp
+     *  enough for the hero card / cover-screen tile it's actually shown at. */
+    private const val SYNCED_PHOTO_MAX_DIM = 640
+
+    /** Reads every `img_$vin` pref that points at a local file (a remote URL
+     *  needs no embedding -- it already loads the same way on any device) and
+     *  returns `{vin: base64 JPEG}` for [exportSettingsJson]'s "photos" field.
+     *  Downscales to [SYNCED_PHOTO_MAX_DIM] first; a corrupt/missing file for
+     *  one car is skipped rather than failing the whole export. */
+    private fun encodeSyncPhotos(prefs: androidx.datastore.preferences.core.Preferences): Map<String, JsonPrimitive> =
+        prefs.asMap().keys.mapNotNull { key ->
+            if (!key.name.startsWith("img_")) return@mapNotNull null
+            val vin = key.name.removePrefix("img_")
+            val path = prefs[stringPreferencesKey(key.name)]?.takeIf { it.startsWith("/") } ?: return@mapNotNull null
+            val bytes = runCatching { downscaledJpegBytes(path) }.getOrNull() ?: return@mapNotNull null
+            vin to JsonPrimitive(Base64.encodeToString(bytes, Base64.NO_WRAP))
+        }.toMap()
+
+    /** Downscale-decodes [path] to at most [SYNCED_PHOTO_MAX_DIM] on its longest
+     *  edge and re-encodes as a JPEG, without ever fully decoding the original
+     *  at full resolution (bounds-only pass picks an `inSampleSize` first). */
+    private fun downscaledJpegBytes(path: String): ByteArray? {
+        val file = java.io.File(path)
+        if (!file.exists()) return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        val longest = maxOf(bounds.outWidth, bounds.outHeight)
+        while (longest / sample > SYNCED_PHOTO_MAX_DIM * 2) sample *= 2
+        val decoded = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        val scale = SYNCED_PHOTO_MAX_DIM.toFloat() / maxOf(decoded.width, decoded.height)
+        val resized = if (scale < 1f) {
+            Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1), true)
+        } else decoded
+        val out = java.io.ByteArrayOutputStream()
+        resized.compress(Bitmap.CompressFormat.JPEG, 78, out)
+        return out.toByteArray()
+    }
+
+    /** Writes any embedded per-car photos from a backup's "photos" object to
+     *  local storage (same `filesDir/cars/` directory the crop screen itself
+     *  saves to), skipping any vin whose `img_$vin` key is in [protect] --
+     *  an automatic Drive merge must not clobber a photo changed locally
+     *  since the last successful sync, same reasoning as the plain pref
+     *  merge in [mergeSettingsJson]. A fixed per-vin filename (not a fresh
+     *  timestamped one) so repeated syncs overwrite in place rather than
+     *  accumulating orphaned old photos on disk. Returns the vin -> new
+     *  local path map for the caller to fold into whichever edit block
+     *  (tracked or not) it's already running, so this lands in the SAME
+     *  transaction as the rest of that import/merge instead of a separate one. */
+    private fun applySyncPhotos(photos: JsonObject?, protect: Set<String> = emptySet()): Map<String, String> {
+        if (photos == null) return emptyMap()
+        val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
+        return photos.mapNotNull { (vin, element) ->
+            if ("img_$vin" in protect) return@mapNotNull null
+            val b64 = (element as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+            runCatching {
+                val bytes = Base64.decode(b64, Base64.NO_WRAP)
+                val file = java.io.File(dir, "car_${vin}_synced.jpg")
+                file.writeBytes(bytes)
+                vin to file.absolutePath
+            }.getOrNull()
+        }.toMap()
     }
 
     /**
@@ -1396,6 +1482,7 @@ class SettingsStore(private val context: Context) {
             return false
         }
         val prefs = root["prefs"]?.jsonObject ?: return false
+        val photoPaths = applySyncPhotos(root["photos"]?.jsonObject, protect)
         context.settingsDataStore.edit { mut ->
             prefs.forEach { (name, element) ->
                 if (name in DEVICE_LOCAL_KEYS || name in protect) return@forEach
@@ -1406,6 +1493,7 @@ class SettingsStore(private val context: Context) {
                     else -> mut[stringPreferencesKey(name)] = prim.content
                 }
             }
+            photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
         }
         return true
     }

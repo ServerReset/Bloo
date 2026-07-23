@@ -2069,6 +2069,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val json = withContext(Dispatchers.IO) {
             runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
         }
+            // A brand-new/empty file someone just created in Drive (0 bytes)
+            // has nothing to import -- that's the normal, expected case when
+            // setting up sync for the first time against a fresh file, not a
+            // corrupt or wrong one. Treated the same as `json == null` below
+            // (no import attempted, sync still enabled) instead of running it
+            // through importSettingsJson and reporting the scarier "couldn't
+            // import: Invalid settings file", which read as something had
+            // actually gone wrong.
+            ?.takeIf { it.isNotBlank() }
         // importSettingsJson returns null on success, or an error message on a
         // rejected/corrupt backup (wrong format, newer version) -- surface that
         // instead of reporting "imported" for a file that was actually rejected.
