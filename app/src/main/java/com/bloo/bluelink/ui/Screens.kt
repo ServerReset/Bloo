@@ -413,8 +413,15 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
+    // The snackbar's colour is driven by the message TYPE, but clearMessage()
+    // (called right after showing) resets messageType back to "error" for the
+    // next message. The SnackbarHost reads this at render time — after the
+    // reset — so reading state.messageType live would always paint red. Capture
+    // the type WITH the message here and let the host read the captured value.
+    var shownMessageType by remember { mutableStateOf("error") }
     LaunchedEffect(state.message) {
         state.message?.let {
+            shownMessageType = state.messageType
             scope.launch { snackbar.showSnackbar(it) }
             vm.clearMessage()
         }
@@ -471,7 +478,7 @@ fun BlooApp(vm: AppViewModel) {
                 val offsetX = remember(data) { Animatable(0f) }
                 val swipeScope = rememberCoroutineScope()
                 val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
-                val snackColors = when (state.messageType) {
+                val snackColors = when (shownMessageType) {
                     "success" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
                     "info" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
                     else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
@@ -3139,7 +3146,9 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 it in CompactKnownTiles &&
                     (it != "charge" || state.hasBattery(v)) &&
                     (it != "ai" || state.aiEnabled) &&
-                    (it != "trips" || !isGen5W) &&
+                    // Trips: EV-only feed AND not served by Gen5W head units --
+                    // gate on both so a gas car or a Gen5W car shows no empty tile.
+                    (it != "trips" || (state.hasBattery(v) && !isGen5W)) &&
                     !state.isPebbleHidden(v.vin, it)
             }
         }
@@ -4801,7 +4810,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val hotspot = state.hotspotFor(v.vin)
         ?.takeIf {
             it in state.sectionsFor(v) && !state.isPebbleHidden(v.vin, it) &&
-                (it != "trips" || state.hasBattery(v)) &&
+                (it != "trips" || (state.hasBattery(v) && !v.isGen5W)) &&
                 (it != "update" || state.updateAvailable != null)
         }
     val hotDrag = remember { HotSeatDrag() }
@@ -4967,7 +4976,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         var menu by remember { mutableStateOf(false) }
         val options = state.sectionsFor(v).filter {
             it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it) &&
-                (it != "trips" || state.hasBattery(v)) &&
+                (it != "trips" || (state.hasBattery(v) && !v.isGen5W)) &&
                 (it != "update" || state.updateAvailable != null)
         }
         val hotDrag = LocalHotSeatDrag.current
@@ -5173,7 +5182,11 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
             (it != "ai" || state.aiEnabled) &&
             // Trip history rides on the EV-only trip-details endpoint, so a
             // gas/PHEV/Kia car has nothing to show here -- gate it off battery.
-            (it != "trips" || state.hasBattery(v)) &&
+            // Also gate off Gen5W: those head units don't serve the feed, so
+            // TripsPebble renders nothing -- if it still entered the list it
+            // would leave a phantom slot with a spacedBy gap on both sides
+            // (the empty-space-between-pebbles bug).
+            (it != "trips" || (state.hasBattery(v) && !v.isGen5W)) &&
             (it != "update" || state.updateAvailable != null)
     }
     val hotDrag = LocalHotSeatDrag.current

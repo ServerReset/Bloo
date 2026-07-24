@@ -888,7 +888,7 @@ class BlooWidget : GlanceAppWidget() {
         bitmapCache.get(key)?.let { return it }
         return runCatching {
             val mutable = source.copy(Bitmap.Config.ARGB_8888, true)
-            val radius = (maxOf(mutable.width, mutable.height) / BLUR_RADIUS_DIVISOR).coerceIn(3, 9)
+            val radius = (maxOf(mutable.width, mutable.height) / BLUR_RADIUS_DIVISOR).coerceIn(2, 5)
             repeat(2) { boxBlurInPlace(mutable, radius) }
             mutable
         }.getOrDefault(source).also { bitmapCache.put(key, it) }
@@ -896,13 +896,15 @@ class BlooWidget : GlanceAppWidget() {
 
     /** Blur radius scales with image size (so a bigger decoded photo doesn't
      *  read as proportionally sharper) but is clamped to a range tuned by
-     *  eye against this widget's own ~400px source. Was divisor 30 / clamp
-     *  4-14 / three passes -- still too strong per follow-up feedback (the
-     *  fixed-radius rewrite fixed the low-res/blocky *artifacts*, but the
-     *  actual blur *amount* still needed cutting down in its own right).
-     *  Lighter radius and one fewer pass now; still enough to soften JPEG
-     *  block edges, further from "genuinely blurred" toward "gently soft". */
-    private val BLUR_RADIUS_DIVISOR = 45
+     *  eye against this widget's own ~400px source. History: divisor 30 /
+     *  clamp 4-14 / three passes was blotchy; the fixed-radius rewrite moved
+     *  to divisor 45 / clamp 3-9 / two passes; that still read as too
+     *  aggressive per feedback, so it's now divisor 70 / clamp 2-5 / two
+     *  passes -- a ~400px photo lands at radius ~5 (was ~8), softening JPEG
+     *  block edges without the heavy "genuinely blurred" mush. Two passes
+     *  stay (dropping to one lets the source's 8x8 JPEG block edges show
+     *  back through); the amount is cut via the smaller radius instead. */
+    private val BLUR_RADIUS_DIVISOR = 70
 
     /** One box-blur pass (horizontal then vertical, each an O(width*height)
      *  sliding average via per-row/per-column prefix sums, not a naive
