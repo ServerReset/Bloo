@@ -1626,56 +1626,70 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {
             val wearCommand = explicit ?: toWearCommand(vin, action)
-            val relayed = runCatching { WearComms.send(ctx, wearCommand) }.isSuccess
-            if (relayed) {
-                AppLog.log("Watch: $action relayed to phone")
-                val currentSnap = snapshots[vin]
-                if (currentSnap != null) {
-                    val newSnap = com.bloo.bluelink.data.WearCommandRunner.optimistic(currentSnap, wearCommand.action)
-                    snapshots = snapshots + (vin to newSnap)
-                    statuses[vin]?.let { s ->
-                        statuses = statuses + (vin to when (wearCommand.action) {
-                            com.bloo.bluelink.data.WearAction.TOGGLE_LOCK,
-                            com.bloo.bluelink.data.WearAction.LOCK,
-                            com.bloo.bluelink.data.WearAction.UNLOCK ->
-                                s.copy(doorLock = newSnap.locked)
-                            com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE,
-                            com.bloo.bluelink.data.WearAction.CLIMATE_ON,
-                            com.bloo.bluelink.data.WearAction.CLIMATE_OFF ->
-                                s.copy(airCtrlOn = newSnap.climateOn)
-                            com.bloo.bluelink.data.WearAction.TOGGLE_CHARGE,
-                            com.bloo.bluelink.data.WearAction.CHARGE_ON,
-                            com.bloo.bluelink.data.WearAction.CHARGE_OFF ->
-                                s.copy(evStatus = (s.evStatus ?: com.bloo.bluelink.data.EvStatus()).copy(batteryCharge = newSnap.charging ?: false))
-                            else -> s
-                        })
+            // WearComms.send both relays to the phone AND runs the standalone
+            // fallback itself (see its doc comment), reporting which happened via
+            // SendResult. The old `runCatching { send() }.isSuccess` was always
+            // true (send returned Unit), so the standalone-failure else branch was
+            // dead code and a rejected standalone command left the optimistic UI
+            // stale. Branch on the real outcome instead; treat an unexpected throw
+            // as a standalone failure (the conservative, revert-and-refresh path).
+            val result = runCatching { WearComms.send(ctx, wearCommand) }
+                .getOrDefault(WearComms.SendResult.STANDALONE_FAILED)
+            when (result) {
+                WearComms.SendResult.RELAYED -> {
+                    AppLog.log("Watch: $action relayed to phone")
+                    val currentSnap = snapshots[vin]
+                    if (currentSnap != null) {
+                        val newSnap = com.bloo.bluelink.data.WearCommandRunner.optimistic(currentSnap, wearCommand.action)
+                        snapshots = snapshots + (vin to newSnap)
+                        statuses[vin]?.let { s ->
+                            statuses = statuses + (vin to when (wearCommand.action) {
+                                com.bloo.bluelink.data.WearAction.TOGGLE_LOCK,
+                                com.bloo.bluelink.data.WearAction.LOCK,
+                                com.bloo.bluelink.data.WearAction.UNLOCK ->
+                                    s.copy(doorLock = newSnap.locked)
+                                com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE,
+                                com.bloo.bluelink.data.WearAction.CLIMATE_ON,
+                                com.bloo.bluelink.data.WearAction.CLIMATE_OFF ->
+                                    s.copy(airCtrlOn = newSnap.climateOn)
+                                com.bloo.bluelink.data.WearAction.TOGGLE_CHARGE,
+                                com.bloo.bluelink.data.WearAction.CHARGE_ON,
+                                com.bloo.bluelink.data.WearAction.CHARGE_OFF ->
+                                    s.copy(evStatus = (s.evStatus ?: com.bloo.bluelink.data.EvStatus()).copy(batteryCharge = newSnap.charging ?: false))
+                                else -> s
+                            })
+                        }
                     }
-                }
-                // The relayed optimistic flip just updated this car's displayed
-                // state, so advance its "last updated" stamp alongside it.
-                markFetched(listOf(vin))
-                publish()
-                if (successMessage != null) _ui.update { it.copy(message = successMessage) }
-                sessionFetched.remove(vin)
-                requestWidgetUpdates()
-            } else {
-                runCatching {
-                    BlueLinkGate.statusMutex.withLock { block(v, repoFor(v.brand), statuses[vin]) }
-                }.onSuccess {
-                    AppLog.log("Watch: $action ok")
-                    // The standalone block just applied fresh live state (via flip)
-                    // straight from the car API -- stamp it so the "updated X ago"
-                    // label reflects this arrival, not a stale cache seed.
+                    // The relayed optimistic flip just updated this car's displayed
+                    // state, so advance its "last updated" stamp alongside it.
                     markFetched(listOf(vin))
                     publish()
                     if (successMessage != null) _ui.update { it.copy(message = successMessage) }
                     sessionFetched.remove(vin)
+                    requestWidgetUpdates()
+                }
+                WearComms.SendResult.STANDALONE_OK -> {
+                    AppLog.log("Watch: $action ok (standalone)")
+                    // WearComms already wrote the optimistic state into the snapshot
+                    // store (which flows back in via snapshotStore.payload), so DON'T
+                    // re-patch the in-memory maps here -- just surface success and
+                    // pull the real post-command status so the label/data settle.
+                    if (successMessage != null) _ui.update { it.copy(message = successMessage) }
+                    sessionFetched.remove(vin)
                     refreshStatus(vin, surface = false)
                     requestWidgetUpdates()
-                }.onFailure { e ->
-                    AppLog.log("⚠ Watch command $action failed: ${e.message}")
-                    _ui.update { it.copy(message = e.message ?: "Command failed") }
+                }
+                WearComms.SendResult.STANDALONE_FAILED -> {
+                    AppLog.log("⚠ Watch command $action failed (standalone)")
+                    // WearComms already reverted its own optimistic snapshot write.
+                    // Roll back any optimistic draft/UI change the caller made, and
+                    // re-pull real status so nothing is left showing a state the car
+                    // never actually reached. (The specific error text isn't carried
+                    // back on SendResult -- WearComms posts it as a watch
+                    // notification -- so surface a generic message here.)
+                    _ui.update { it.copy(message = "Command failed") }
                     onFailure?.invoke()
+                    refreshStatus(vin, surface = false)
                 }
             }
         }

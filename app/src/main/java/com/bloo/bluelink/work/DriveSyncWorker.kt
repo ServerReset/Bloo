@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.wear.WearBridge
 import com.bloo.bluelink.widget.BlooWidget
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.TimeUnit
 
 /**
@@ -39,9 +40,10 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
      *    a no-op cost until then.
      * 2. Runs the actual sync via [SettingsStore.performDriveSync], wrapped in
      *    [runCatching] so an unexpected exception doesn't crash the worker;
-     *    it's instead treated the same as a null outcome below (silently
-     *    succeeds this run rather than retrying, since we don't know what
-     *    failed or whether retrying would help).
+     *    an unexpected throwable (e.g. a DataStore IOException) is logged and
+     *    turned into [Result.retry] rather than being swallowed, so a real
+     *    failure is actually surfaced and retried instead of masquerading as a
+     *    silent success.
      * 3. If settings were actually imported/changed by the sync, proactively
      *    pushes the fresh appearance settings to the watch and refreshes the
      *    home-screen widget -- both wrapped in their own [runCatching] since
@@ -58,16 +60,29 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
         val ctx = applicationContext
         val store = SettingsStore(ctx)
         if (store.syncUri() == null) return Result.success()
-        val outcome = runCatching { store.performDriveSync() }.getOrNull()
-        if (outcome?.imported == true) {
+        val result = runCatching { store.performDriveSync() }
+        val outcome = result.getOrElse { t ->
+            // An unexpected throwable (e.g. a DataStore IOException from the
+            // trailing writes) must not be swallowed into a silent success --
+            // surface it and let WorkManager retry with the configured backoff.
+            AppLog.log("⚠ Background Drive sync threw: $t")
+            return Result.retry()
+        }
+        if (outcome.imported) {
             // A live ViewModel would pick up the DataStore change reactively, but
             // this worker can run with the app process dead — explicitly push the
             // newly-imported settings out so the watch/widgets don't wait for the
-            // app to next be opened.
-            runCatching { WearBridge.publishSettingsNow(ctx, store.appearance.first()) }
-            runCatching { BlooWidget().updateAll(ctx) }
+            // app to next be opened. Bounded by a short timeout so a wedged Data
+            // Layer connection can't pin the worker slot up to WorkManager's
+            // execution ceiling.
+            runCatching {
+                withTimeout(5_000L) {
+                    WearBridge.publishSettingsNow(ctx, store.appearance.first())
+                    BlooWidget().updateAll(ctx)
+                }
+            }
         }
-        if (outcome?.error != null) {
+        if (outcome.error != null) {
             AppLog.log("⚠ Background Drive sync: ${outcome.error}")
             // Retry with WorkManager's own backoff (set below) instead of just
             // waiting up to 2h for the next periodic tick -- most failures here

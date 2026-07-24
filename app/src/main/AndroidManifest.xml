@@ -80,6 +80,12 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <!-- DATA_CHANGED is required for onDataChanged to fire at all: a
+                     WearableListenerService only receives the Data Layer actions
+                     its filter declares. Without it, every watch->phone DataItem
+                     (climate draft, pebble order, AI/aurora toggles, local prefs)
+                     is silently dropped. One <data> element covers both actions. -->
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/bloo" />
             </intent-filter>
         </service>

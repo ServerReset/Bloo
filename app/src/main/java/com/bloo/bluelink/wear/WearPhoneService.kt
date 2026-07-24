@@ -7,6 +7,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearAiResult
+import com.bloo.bluelink.data.WearClimateState
 import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.data.WearExtras
 import com.bloo.bluelink.data.WearSync
@@ -18,6 +19,7 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,7 +95,8 @@ class WearPhoneService : WearableListenerService() {
                                     event.sourceNodeId,
                                     WearSync.PATH_AI_RESULT,
                                     WearSync.encodeAiResult(result).toByteArray(),
-                                )
+                                ),
+                                10, TimeUnit.SECONDS,
                             )
                         }
                     }
@@ -116,7 +119,8 @@ class WearPhoneService : WearableListenerService() {
                                 event.sourceNodeId,
                                 WearSync.PATH_COMMAND_RESULT,
                                 WearSync.encodeResult(result).toByteArray(),
-                            )
+                            ),
+                            10, TimeUnit.SECONDS,
                         )
                     }
                     val ctx = applicationContext
@@ -146,7 +150,8 @@ class WearPhoneService : WearableListenerService() {
                                         event.sourceNodeId,
                                         WearSync.PATH_SYNC_RESULT,
                                         WearSync.encodeSyncResult(result).toByteArray(),
-                                    )
+                                    ),
+                                    10, TimeUnit.SECONDS,
                                 )
                             }
                         }
@@ -190,7 +195,17 @@ class WearPhoneService : WearableListenerService() {
             updates.forEach { (path, raw) ->
               runCatching {
                 when (path) {
-                    WearSync.PATH_CLIMATE -> ClimateSyncStore(applicationContext).save(raw)
+                    WearSync.PATH_CLIMATE -> {
+                        // Merge per-VIN rather than saving the incoming payload
+                        // wholesale: a raw overwrite would drop drafts for cars
+                        // the watch didn't include this time. Symmetric with the
+                        // PATH_PRESETS merge below; incoming wins per shared VIN.
+                        val store = ClimateSyncStore(applicationContext)
+                        val incoming = WearSync.decodeClimate(raw)
+                        val current = store.flow.first()
+                        val merged = WearClimateState(byVin = current.byVin + incoming.byVin)
+                        store.save(WearSync.encodeClimate(merged))
+                    }
                     WearSync.PATH_PRESETS -> {
                         val store = SettingsStore(applicationContext)
                         WearSync.decodePresets(raw).byVin.forEach { (vin, list) ->
@@ -280,9 +295,21 @@ class WearPhoneService : WearableListenerService() {
         // Read the current extras item from the Data Layer, patch the ai map, republish.
         extrasMutex.withLock {
             val dataClient = Wearable.getDataClient(ctx)
-            val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
-            val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
-            items?.release()
+            val items = runCatching {
+                Tasks.await(
+                    dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}")),
+                    10, TimeUnit.SECONDS,
+                )
+            }.getOrNull()
+            // A null result means the read timed out or Play Services is wedged.
+            // Republishing off a blank WearExtras would drop every other car's
+            // extras, so bail out of the lock instead of clobbering them.
+            if (items == null) {
+                AppLog.log("⚠ AI summary: extras read timed out, skipping publish")
+                return WearAiResult(vin, ok = false, message = "Couldn't sync the summary to your watch")
+            }
+            val existing = items.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }.firstOrNull() ?: WearExtras()
+            items.release()
             val updated = existing.copy(ai = existing.ai + (vin to summary))
             WearBridge.publishExtrasNow(ctx, updated)
         }
@@ -308,9 +335,21 @@ class WearPhoneService : WearableListenerService() {
         val weather = runCatching { com.bloo.bluelink.data.WeatherApi.fetch(lat, lon) }.getOrNull() ?: return
         extrasMutex.withLock {
             val dataClient = Wearable.getDataClient(ctx)
-            val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
-            val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
-            items?.release()
+            val items = runCatching {
+                Tasks.await(
+                    dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}")),
+                    10, TimeUnit.SECONDS,
+                )
+            }.getOrNull()
+            // A null result means the read timed out or Play Services is wedged.
+            // Republishing off a blank WearExtras would drop every other car's
+            // extras, so bail out of the lock instead of clobbering them.
+            if (items == null) {
+                AppLog.log("⚠ Watch weather-location request: extras read timed out, skipping publish")
+                return
+            }
+            val existing = items.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }.firstOrNull() ?: WearExtras()
+            items.release()
             WearBridge.publishExtrasNow(ctx, existing.copy(homeWeather = weather.toWear()))
         }
         AppLog.log("Weather location set from watch request")

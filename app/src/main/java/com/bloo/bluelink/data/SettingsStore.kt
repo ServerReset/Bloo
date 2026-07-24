@@ -27,8 +27,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -1036,48 +1038,82 @@ class SettingsStore(private val context: Context) {
             if (imported) AppLog.log("Drive sync: imported newer settings")
         }
         val now = System.currentTimeMillis()
-        // Snapshot the dirty set that this upload body actually carries, taken
-        // right before the body is built. Only these keys may be cleared on
-        // success -- a key edited AFTER this point (setters don't take
-        // driveSyncMutex, so a local edit can land mid-upload) isn't reflected
-        // in `body`, so it must keep its dirty flag or a later remote import
-        // could silently overwrite the un-uploaded value.
-        val uploadedDirtyKeys = dirtyKeys()
-        val body = "$now\n${exportSettingsJson()}"
         var uploadError: String? = null
-        val uploaded = runCatching {
-            withDriveRetry {
-                kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                    context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
-                        ?: error("Couldn't open the Drive file for writing")
-                    // Verify the write actually landed instead of trusting that
-                    // close() completing without throwing means the bytes are really
-                    // there -- some document providers can silently truncate or drop
-                    // a buffered write under low storage or an interrupted upload,
-                    // which previously would have reported success, advanced
-                    // lastSyncMs, and cleared the dirty set for data that was never
-                    // actually saved.
-                    val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
-                    if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
+        val uploaded: Boolean
+        // Never write on a failed read: a download error means we couldn't see
+        // the remote file's real contents this pass, so uploading now would
+        // truncate-overwrite whatever is actually there with our local state --
+        // a last-write-wins clobber of another device's possibly-newer settings.
+        // Gate the ENTIRE upload block (dirty snapshot, body build, write/verify,
+        // and the lastSyncMs/dirty-clear bookkeeping) on a clean download.
+        // First sync is unaffected: a missing/empty Drive file reads with
+        // remoteContent==null/empty WITHOUT setting downloadError, so
+        // downloadError==null still permits the initial upload.
+        if (downloadError != null) {
+            uploaded = false
+        } else {
+            // Snapshot the dirty set that this upload body actually carries, taken
+            // right before the body is built. Only these keys may be cleared on
+            // success -- a key edited AFTER this point (setters don't take
+            // driveSyncMutex, so a local edit can land mid-upload) isn't reflected
+            // in `body`, so it must keep its dirty flag or a later remote import
+            // could silently overwrite the un-uploaded value.
+            val uploadedDirtyKeys = dirtyKeys()
+            val body = "$now\n${exportSettingsJson()}"
+            uploaded = runCatching {
+                withDriveRetry {
+                    kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                        context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
+                            ?: error("Couldn't open the Drive file for writing")
+                        // Verify the write actually landed instead of trusting that
+                        // close() completing without throwing means the bytes are really
+                        // there -- some document providers can silently truncate or drop
+                        // a buffered write under low storage or an interrupted upload,
+                        // which previously would have reported success, advanced
+                        // lastSyncMs, and cleared the dirty set for data that was never
+                        // actually saved.
+                        val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                        if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
+                    }
                 }
+                AppLog.log("Drive sync: uploaded settings")
+                true
+            }.onFailure {
+                uploadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
+                AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
+            }.getOrElse { false }
+            // Only claim "last synced" when the upload actually landed --
+            // bumping it on a failure previously made the UI show "Last synced
+            // just now" right next to "Sync failed", with no way to tell sync
+            // had never succeeded.
+            if (uploaded) {
+                // Store lastSyncMs in the SAME clock domain as remoteTs (the
+                // provider's COLUMN_LAST_MODIFIED), NOT this device's wall clock:
+                // re-read the file's last-modified after the verified write so the
+                // import guard (remoteTs > lastSyncMs()) is false for our OWN write
+                // (no self-reimport next pass) and stays correct across devices
+                // regardless of wall-clock skew. Fall back to the embedded `now`
+                // header we just wrote when the provider exposes no
+                // COLUMN_LAST_MODIFIED.
+                val uploadedModifiedMs = runCatching {
+                    if (android.provider.DocumentsContract.isDocumentUri(context, parsed)) {
+                        val cursor = context.contentResolver.query(
+                            parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                            null, null, null,
+                        )
+                        cursor?.use {
+                            if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
+                            else null
+                        }
+                    } else null
+                }.getOrNull()
+                setLastSyncMs(uploadedModifiedMs ?: now)
+                // Clear ONLY the keys this upload body actually carried, not the
+                // whole set -- an edit made after the body snapshot (setters don't
+                // hold driveSyncMutex) is still pending and must stay dirty so a
+                // later remote import can't overwrite it.
+                clearDirtyKeys(uploadedDirtyKeys)
             }
-            AppLog.log("Drive sync: uploaded settings")
-            true
-        }.onFailure {
-            uploadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
-            AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
-        }.getOrElse { false }
-        // Only claim "last synced at <now>" when the upload actually landed --
-        // bumping it on a total failure (download AND upload both threw) made
-        // the UI show "Last synced just now" right next to "Sync failed" on
-        // every single attempt, with no way to tell sync had never succeeded.
-        if (uploaded) {
-            setLastSyncMs(now)
-            // Clear ONLY the keys this upload body actually carried, not the
-            // whole set -- an edit made after the body snapshot (setters don't
-            // hold driveSyncMutex) is still pending and must stay dirty so a
-            // later remote import can't overwrite it.
-            clearDirtyKeys(uploadedDirtyKeys)
         }
         val error = uploadError ?: downloadError?.takeIf { remoteContent == null }
         // Persisted (not just returned) so a failure from the background
@@ -1388,6 +1424,11 @@ class SettingsStore(private val context: Context) {
                 // breaking its own sync (or corrupting a plain settings-restore that
                 // has nothing to do with Drive at all).
                 if (key.name in DEVICE_LOCAL_KEYS) return@forEach
+                // A local-file img_ path (an absolute "/..." path) is meaningless on
+                // any other device, so it never travels in prefs -- only the base64
+                // "photos" channel below carries local photos. Remote-URL img_
+                // values (not starting with "/") still ride in prefs normally.
+                if (key.name.startsWith("img_") && value is String && value.startsWith("/")) return@forEach
                 when (value) {
                     is Boolean -> put(key.name, JsonPrimitive(value))
                     is String -> put(key.name, JsonPrimitive(value))
@@ -1395,12 +1436,21 @@ class SettingsStore(private val context: Context) {
                 }
             }
         }
+        // Tombstones: keys this device has changed (they're in the dirty set) but
+        // that no longer exist in prefs are deletions -- emit them so other devices
+        // converge on the removal instead of the deleted key silently coming back
+        // from whichever device still has it. DEVICE_LOCAL_KEYS are never portable.
+        // A re-added key reappears in prefs and so naturally drops out of _removed
+        // on the next export.
+        val presentNames = prefs.asMap().keys.map { it.name }.toSet()
+        val removed = (dirtyKeys() - presentNames - DEVICE_LOCAL_KEYS)
         val photos = encodeSyncPhotos(prefs)
         val root = buildJsonObject {
             put("_format", JsonPrimitive("bloo-settings"))
             put("_version", JsonPrimitive(BACKUP_VERSION))
             put("prefs", entries)
             if (photos.isNotEmpty()) put("photos", JsonObject(photos))
+            if (removed.isNotEmpty()) put("_removed", buildJsonArray { removed.forEach { add(JsonPrimitive(it)) } })
         }
         return backupJson.encodeToString(JsonObject.serializer(), root)
     }
@@ -1427,6 +1477,7 @@ class SettingsStore(private val context: Context) {
             return "This backup was made with a newer version of Bloo — update the app first"
         }
         val prefs = root["prefs"]?.jsonObject ?: return "Settings file has no data"
+        val removed = root["_removed"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
         val photoPaths = applySyncPhotos(root["photos"]?.jsonObject)
         editTracked { mut ->
             prefs.forEach { (name, element) ->
@@ -1446,6 +1497,16 @@ class SettingsStore(private val context: Context) {
                 }
             }
             photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
+            // Propagate deletions: a key tombstoned on the source device is removed
+            // here too (both key types, since this file mixes string/boolean prefs
+            // under the same name) so a deletion converges instead of the key
+            // resurrecting from this device's stale copy. DEVICE_LOCAL_KEYS are
+            // never touched by a backup.
+            removed.forEach { name ->
+                if (name in DEVICE_LOCAL_KEYS) return@forEach
+                mut.remove(stringPreferencesKey(name))
+                mut.remove(booleanPreferencesKey(name))
+            }
         }
         return null
     }
@@ -1539,10 +1600,20 @@ class SettingsStore(private val context: Context) {
             return false
         }
         val prefs = root["prefs"]?.jsonObject ?: return false
+        val removed = root["_removed"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
         val photoPaths = applySyncPhotos(root["photos"]?.jsonObject, protect)
         context.settingsDataStore.edit { mut ->
+            // Re-read the dirty set from THIS transaction's live prefs, not just the
+            // protect snapshot taken before the pass started: a local edit that
+            // landed between that snapshot and this edit block (setters don't hold
+            // driveSyncMutex) would otherwise be clobbered by the incoming remote
+            // value. Treat those live-dirty keys exactly like protect -- skip
+            // writing and skip removing them.
+            val liveDirty = mut[stringPreferencesKey("sync_dirty_keys")]
+                ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+            val guarded = protect + liveDirty
             prefs.forEach { (name, element) ->
-                if (name in DEVICE_LOCAL_KEYS || name in protect) return@forEach
+                if (name in DEVICE_LOCAL_KEYS || name in guarded) return@forEach
                 val prim = (element as? JsonPrimitive) ?: return@forEach
                 when {
                     prim.isString -> mut[stringPreferencesKey(name)] = prim.content
@@ -1551,6 +1622,15 @@ class SettingsStore(private val context: Context) {
                 }
             }
             photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
+            // Propagate deletions from the remote file, but never remove a key we're
+            // protecting (locally changed since our last sync, or live-dirty within
+            // this transaction) or a device-local key -- same convergence reasoning
+            // as importSettingsJson, both key types removed since names are shared.
+            removed.forEach { name ->
+                if (name in DEVICE_LOCAL_KEYS || name in guarded) return@forEach
+                mut.remove(stringPreferencesKey(name))
+                mut.remove(booleanPreferencesKey(name))
+            }
         }
         return true
     }

@@ -53,6 +53,18 @@ import java.util.concurrent.TimeUnit
  */
 object WearComms {
 
+    /** Outcome of [send]/[relayCommand] so callers can distinguish how a command
+     *  was actually dispatched:
+     *  - [RELAYED]: handed off to a reachable phone (which will report the real
+     *    car outcome later via a result message) -- the caller's optimistic
+     *    in-memory patch should stand until then.
+     *  - [STANDALONE_OK]: no phone reachable, the watch ran it itself and the
+     *    car accepted it -- the snapshot store already reflects the change.
+     *  - [STANDALONE_FAILED]: ran standalone and the car rejected/was
+     *    unreachable -- [runStandalone] has already reverted the optimistic
+     *    flip, so the caller should surface the failure rather than re-patch. */
+    enum class SendResult { RELAYED, STANDALONE_OK, STANDALONE_FAILED }
+
     /** The id of a connected phone node, or null when none is reachable.
      *  Queries [Wearable.getNodeClient] for all nodes currently paired with
      *  this watch, then prefers one flagged `isNearby` (in direct Bluetooth
@@ -73,9 +85,9 @@ object WearComms {
      *  from the caller's point of view) and [relayCommand] (slow, network-bound)
      *  so callers that only need the local flip to have landed can await just
      *  that half -- see [applyOptimistic]'s own doc comment. */
-    suspend fun send(context: Context, command: WearCommand) {
+    suspend fun send(context: Context, command: WearCommand): SendResult {
         val resolved = applyOptimistic(context, command)
-        relayCommand(context, resolved)
+        return relayCommand(context, resolved)
     }
 
     /**
@@ -109,25 +121,27 @@ object WearComms {
 
     /** The network half of [send] -- relay an already-[applyOptimistic]-resolved
      *  command to the phone, or run it standalone if unreachable. */
-    suspend fun relayCommand(context: Context, resolved: WearCommand) {
+    suspend fun relayCommand(context: Context, resolved: WearCommand): SendResult =
         withContext(Dispatchers.IO) {
             val node = phoneNodeId(context)
             if (node != null) {
-                runCatching {
+                val relayed = runCatching {
                         Tasks.await(
                             Wearable.getMessageClient(context).sendMessage(
                                 node, WearSync.PATH_COMMAND, WearSync.encodeCommand(resolved).toByteArray(),
                             ), 10, TimeUnit.SECONDS,
                         )
-                }.onFailure {
+                }.isSuccess
+                if (relayed) {
+                    SendResult.RELAYED
+                } else {
                     // Phone dropped mid-send — fall back to standalone.
-                    runStandalone(context, resolved)
+                    if (runStandalone(context, resolved)) SendResult.STANDALONE_OK else SendResult.STANDALONE_FAILED
                 }
             } else {
-                runStandalone(context, resolved)
+                if (runStandalone(context, resolved)) SendResult.STANDALONE_OK else SendResult.STANDALONE_FAILED
             }
         }
-    }
 
     /** Execute a command on the watch's own connection and, on failure, post a
      *  native watch notification — the phone isn't there to report the outcome.
@@ -137,7 +151,7 @@ object WearComms {
      *  optimistic update flips back to "unlocked" once the real command is
      *  known to have failed, instead of showing a state that never actually
      *  happened on the car. */
-    private suspend fun runStandalone(context: Context, command: WearCommand) {
+    private suspend fun runStandalone(context: Context, command: WearCommand): Boolean {
         val result = WearCommandRunner.execute(context, command)
         if (!result.ok) {
             AppLog.log("⚠ Watch standalone command failed: ${command.action} → ${result.message}")
@@ -156,6 +170,7 @@ object WearComms {
         } else {
             AppLog.log("Watch standalone: ${command.action} → ok")
         }
+        return result.ok
     }
 
     /** Relay a phone-only request (e.g. AI summary) to a connected phone — no
@@ -331,15 +346,19 @@ object WearComms {
                 val items = Tasks.await(Wearable.getDataClient(context).dataItems, 10, TimeUnit.SECONDS)
                 try {
                     items.forEach { item ->
-                        val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
-                            ?: return@forEach
-                        when (item.uri.path) {
-                            WearSync.PATH_STATE -> WearStateWriter.persistState(context, raw)
-                            WearSync.PATH_AUTH -> WearStateWriter.persistAuth(context, raw)
-                            WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(context, raw)
-                            WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(context, raw)
-                            WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(context, raw)
-                            WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(context, raw)
+                        // Per-item guard (mirrors onDataChanged): one item failing to
+                        // persist must not drop the rest of the cold-launch backfill.
+                        runCatching {
+                            val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
+                                ?: return@runCatching
+                            when (item.uri.path) {
+                                WearSync.PATH_STATE -> WearStateWriter.persistState(context, raw)
+                                WearSync.PATH_AUTH -> WearStateWriter.persistAuth(context, raw)
+                                WearSync.PATH_SETTINGS -> WearStateWriter.persistSettings(context, raw)
+                                WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(context, raw)
+                                WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(context, raw)
+                                WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(context, raw)
+                            }
                         }
                     }
                 } finally {

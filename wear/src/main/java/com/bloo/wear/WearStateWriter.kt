@@ -16,7 +16,11 @@ object WearStateWriter {
         val payload = WearSync.decodeState(raw)
         // Keep the watch's *own* car selection — saveVehicles preserves it — so a
         // phone sync doesn't yank the watch to whatever car the phone is showing.
-        SnapshotStore(context).saveVehicles(payload.vehicles)
+        // Guard against a total schema-break / unparseable JSON decoding to an empty
+        // payload: a stale car beats a blank watch, so only overwrite when we have cars.
+        if (payload.vehicles.isNotEmpty()) {
+            SnapshotStore(context).saveVehicles(payload.vehicles)
+        }
     }
 
     suspend fun persistSettings(context: Context, raw: String) {
@@ -38,6 +42,13 @@ object WearStateWriter {
     suspend fun persistAuth(context: Context, raw: String) {
         val bundle = WearSync.decodeAuth(raw)
         val store = SessionStore(context)
+        // The bundle is AUTHORITATIVE: it mirrors the phone's exact set of logged-in
+        // brands. Clear any brand the watch still holds that the phone no longer has
+        // (so a phone logout wipes the watch session); an empty bundle wipes all.
+        val bundleBrands = bundle.sessions.map { Brand.fromName(it.brand) }.toSet()
+        store.loggedInBrands()
+            .filterNot { it in bundleBrands }
+            .forEach { store.clear(it) }
         bundle.sessions.forEach { s ->
             store.save(
                 SessionStore.Session(

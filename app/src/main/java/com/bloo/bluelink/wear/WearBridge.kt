@@ -24,6 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 /**
  * The phone half of the watch sync: mirrors car snapshots + sessions to the
@@ -75,7 +76,7 @@ object WearBridge {
             // when the car states are byte-identical to the previous push.
             dataMap.putLong(WearSync.KEY_TIMESTAMP, payload.producedAt)
         }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
+        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
     }
 
     /** Fan the latest snapshot out to every downstream surface (home widget, QS
@@ -113,7 +114,7 @@ object WearBridge {
         val request = PutDataMapRequest.create(WearSync.PATH_AUTH).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeAuth(WearAuthBundle(sessions)))
         }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
+        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
     }
 
     /**
@@ -205,7 +206,7 @@ object WearBridge {
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))
         }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
+        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
     }
 
     private fun rolesOf(s: androidx.compose.material3.ColorScheme) = WearColorRoles(
@@ -251,7 +252,7 @@ object WearBridge {
                         WearSync.encodePresets(com.bloo.bluelink.data.WearPresets(byVin)),
                     )
                 }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(app).putDataItem(request))
+                Tasks.await(Wearable.getDataClient(app).putDataItem(request), 10, TimeUnit.SECONDS)
             }
         }
     }
@@ -266,7 +267,7 @@ object WearBridge {
                     dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeClimate(state))
                     dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(app).putDataItem(request))
+                Tasks.await(Wearable.getDataClient(app).putDataItem(request), 10, TimeUnit.SECONDS)
             }
         }
     }
@@ -288,7 +289,7 @@ object WearBridge {
         val request = PutDataMapRequest.create(WearSync.PATH_EXTRAS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeExtras(extras))
         }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
+        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
     }
 
     /** Trigger a Drive sync: download settings from Drive, import them, and re-publish

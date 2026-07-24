@@ -13,7 +13,9 @@ android {
         applicationId = "com.bloo.bluelink"
         // Wear OS 3+ (the first Compose-capable Wear release).
         minSdk = 30
-        targetSdk = 34
+        // Android 16 (API 36) — matches the phone app's targetSdk so both
+        // opt into the same platform behavior. compileSdk stays 37.
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1"
         vectorDrawables { useSupportLibrary = true }

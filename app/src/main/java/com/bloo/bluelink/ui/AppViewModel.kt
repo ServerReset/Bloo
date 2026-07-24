@@ -612,6 +612,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(accounts = remaining) }
                 loadGarage()
             }
+            // Push the (now reduced or empty) auth bundle to the watch on BOTH
+            // branches so a sign-out actually reaches it and wipes the revoked
+            // session -- WearStateWriter.persistAuth is authoritative to the
+            // bundle, clearing any brand not present in it.
+            com.bloo.bluelink.wear.WearBridge.publishAuth(getApplication())
         }
     }
 
@@ -729,6 +734,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         if (fetched.isEmpty()) {
+            // Still bootstrap Drive sync on an empty/failed cold start so the
+            // restore + persisted-grant check + auto-sync collector run once this
+            // session -- bootstrapDriveSync is idempotent (AtomicBoolean guard),
+            // so the non-empty path below calling it again is a no-op.
+            bootstrapDriveSync()
             _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty, garageLoadError = lastError) }
             return
         }
@@ -893,12 +903,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // implementation of that logic.
         viewModelScope.launch {
             _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
-                if (!wasRefreshing) {
-                    val outcome = withContext(Dispatchers.IO) { settingsStore.performDriveSync() }
-                    if (outcome.ran) {
-                        _state.update { it.copy(lastSyncMs = outcome.syncedAtMs, syncError = outcome.error) }
-                    }
-                }
+                // Route through the single sync path so an imported remote is
+                // actually folded into UiState (refreshLocalCarConfig), not just
+                // lastSyncMs/syncError -- same handling as setSyncUri / retryDriveSync.
+                if (!wasRefreshing) runDriveSyncNow()
             }
         }
     }
