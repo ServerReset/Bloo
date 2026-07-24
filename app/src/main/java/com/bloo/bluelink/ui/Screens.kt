@@ -8750,12 +8750,22 @@ private fun SettingsScreen(vm: AppViewModel) {
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
-                        Spacer(Modifier.height(6.dp))
-                        // Was no way to retry short of pulling to refresh or
-                        // waiting for the next 2h background attempt.
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    // Manual controls: "Sync now" force-pushes/pulls immediately
+                    // (available any time, not just after a failure), and "Test
+                    // sync" runs a non-destructive round-trip against the real
+                    // Drive file so the user can confirm it actually works.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MorphTextButton(
                             "Sync now",
-                            onClick = { vm.retryDriveSync() },
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.syncNow() },
+                        )
+                        MorphTextButton(
+                            "Test sync",
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.testSync() },
                         )
                     }
                     Spacer(Modifier.height(4.dp))

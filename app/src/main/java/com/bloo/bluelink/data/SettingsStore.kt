@@ -28,14 +28,9 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 // A corruption handler so a settings file damaged by an interrupted write / power
 // loss resets to empty prefs instead of rethrowing IOException out of every read
@@ -1139,6 +1134,80 @@ class SettingsStore(private val context: Context) {
         )
     }
 
+    /** Result of [testSyncRoundTrip]: [ok] plus a human-readable [message]
+     *  describing exactly which step passed or failed, for a Settings "Test
+     *  sync" diagnostic the user can run on a real device. */
+    data class SyncTestResult(val ok: Boolean, val message: String)
+
+    /**
+     * A non-destructive end-to-end self-test of the Drive round-trip, for the
+     * Settings "Test sync" button. Exercises the EXACT provider path
+     * [performDriveSync] relies on — persisted permission, read, truncate-write,
+     * write-verify, read-back — against the user's real configured file, but
+     * writes the file's own current bytes back VERBATIM so nothing the user has
+     * is changed. (A brand-new/empty file is written with a harmless one-line
+     * marker that the very next real sync overwrites.)
+     *
+     * This is the honest answer to "does Drive sync actually work on THIS device
+     * with THIS provider," which can't be proven by reading code alone: it
+     * catches a lost/He-revoked permission grant, a provider that rejects the
+     * "wt" truncate mode, or one that silently drops a write — the real-world
+     * failure modes. It never touches the settings DataStore, never advances
+     * lastSyncMs, and never clears the dirty set, so it's side-effect-free
+     * beyond re-writing identical bytes.
+     */
+    suspend fun testSyncRoundTrip(): SyncTestResult {
+        val uri = syncUri() ?: return SyncTestResult(false, "Drive sync isn't set up yet.")
+        val parsed = android.net.Uri.parse(uri)
+        // 1. Confirm we still hold a persisted read+write grant for this file.
+        val granted = runCatching {
+            context.contentResolver.persistedUriPermissions.any {
+                it.uri.toString() == uri && it.isReadPermission && it.isWritePermission
+            }
+        }.getOrDefault(false)
+        if (!granted) {
+            return SyncTestResult(false, "Lost access to the Drive file — set up sync again.")
+        }
+        // Serialize with real syncs so the read-then-write-back can't interleave
+        // with a concurrent performDriveSync writing different content.
+        return driveSyncMutex.withLock {
+            // 2. Read current bytes (an empty/new file reads as "" or null).
+            val current = runCatching {
+                withDriveRetry {
+                    kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                        context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                    }
+                }
+            }.getOrElse { e ->
+                val why = if (e is kotlinx.coroutines.TimeoutCancellationException) "timed out reading" else (e.message ?: "couldn't read")
+                return@withLock SyncTestResult(false, "Couldn't read the Drive file ($why).")
+            }
+            // Write the SAME bytes back so user content is unchanged; only a
+            // genuinely empty file gets a throwaway marker (overwritten by the
+            // next real sync's upload).
+            val payload = current?.takeIf { it.isNotEmpty() } ?: "bloo-sync-test"
+            // 3. Truncate-write + 4. verify, exactly as performDriveSync does.
+            val verified = runCatching {
+                withDriveRetry {
+                    kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                        context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(payload.toByteArray()) }
+                            ?: error("couldn't open for writing")
+                        val readBack = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                        readBack == payload
+                    }
+                }
+            }.getOrElse { e ->
+                val why = if (e is kotlinx.coroutines.TimeoutCancellationException) "timed out writing" else (e.message ?: "write failed")
+                return@withLock SyncTestResult(false, "Couldn't write the Drive file ($why).")
+            }
+            if (verified) {
+                SyncTestResult(true, "Drive sync is working — read, wrote and verified the file successfully.")
+            } else {
+                SyncTestResult(false, "The write didn't verify — the provider may be dropping or truncating writes.")
+            }
+        }
+    }
+
     /** Runs [block] once, and if it throws, once more after a short delay --
      *  a single retry absorbs the kind of momentary blip (Drive app still
      *  waking up, a dropped packet) that would otherwise fail an entire sync
@@ -1359,8 +1428,10 @@ class SettingsStore(private val context: Context) {
      *  keys are simply ignored — ignoreUnknownKeys); bump this only if a future
      *  change stops being purely additive (a renamed/restructured key an older
      *  client would misinterpret rather than just skip), so old clients can
-     *  detect and refuse it instead of silently importing something wrong. */
-    private val BACKUP_VERSION = 1
+     *  detect and refuse it instead of silently importing something wrong.
+     *  Single source of truth lives in [SyncMerge] (the pure, testable core);
+     *  this alias keeps the many in-class references reading by simple name. */
+    private val BACKUP_VERSION = SyncMerge.BACKUP_VERSION
 
     /** Preference keys that describe THIS device's own Drive-sync wiring (a
      *  content:// URI this app instance was granted permission for, local
@@ -1368,8 +1439,9 @@ class SettingsStore(private val context: Context) {
      *  which keys it's changed locally since its last sync) — never portable, so
      *  never included in or restored from a settings backup. A tablet that's
      *  Wi-Fi-only and a phone with unlimited data may reasonably want different
-     *  choices here, same as the Drive URI itself. */
-    private val DEVICE_LOCAL_KEYS = setOf("sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys")
+     *  choices here, same as the Drive URI itself. Defined in [SyncMerge] so the
+     *  pure export/merge core and this Context-bound store can't drift apart. */
+    private val DEVICE_LOCAL_KEYS = SyncMerge.DEVICE_LOCAL_KEYS
 
     /**
      * Wraps a settings mutation to record which preference keys it actually
@@ -1439,44 +1511,17 @@ class SettingsStore(private val context: Context) {
      */
     suspend fun exportSettingsJson(): String {
         val prefs = context.settingsDataStore.data.first()
-        val entries = buildJsonObject {
-            prefs.asMap().forEach { (key, value) ->
-                // sync_uri/sync_last_ms are this DEVICE's own Drive permission grant
-                // and sync bookkeeping, not a portable app preference — including
-                // them would make every import overwrite the receiving device's
-                // working Drive URI with one it has no permission to use, silently
-                // breaking its own sync (or corrupting a plain settings-restore that
-                // has nothing to do with Drive at all).
-                if (key.name in DEVICE_LOCAL_KEYS) return@forEach
-                // A local-file img_ path (an absolute "/..." path) is meaningless on
-                // any other device, so it never travels in prefs -- only the base64
-                // "photos" channel below carries local photos. Remote-URL img_
-                // values (not starting with "/") still ride in prefs normally.
-                if (key.name.startsWith("img_") && value is String && value.startsWith("/")) return@forEach
-                when (value) {
-                    is Boolean -> put(key.name, JsonPrimitive(value))
-                    is String -> put(key.name, JsonPrimitive(value))
-                    else -> put(key.name, JsonPrimitive(value.toString()))
-                }
-            }
-        }
-        // Tombstones: keys this device has changed (they're in the dirty set) but
-        // that no longer exist in prefs are deletions -- emit them so other devices
-        // converge on the removal instead of the deleted key silently coming back
-        // from whichever device still has it. DEVICE_LOCAL_KEYS are never portable.
-        // A re-added key reappears in prefs and so naturally drops out of _removed
-        // on the next export.
-        val presentNames = prefs.asMap().keys.map { it.name }.toSet()
-        val removed = (dirtyKeys() - presentNames - DEVICE_LOCAL_KEYS)
-        val photos = encodeSyncPhotos(prefs)
-        val root = buildJsonObject {
-            put("_format", JsonPrimitive("bloo-settings"))
-            put("_version", JsonPrimitive(BACKUP_VERSION))
-            put("prefs", entries)
-            if (photos.isNotEmpty()) put("photos", JsonObject(photos))
-            if (removed.isNotEmpty()) put("_removed", buildJsonArray { removed.forEach { add(JsonPrimitive(it)) } })
-        }
-        return backupJson.encodeToString(JsonObject.serializer(), root)
+        // Everything that decides WHICH keys/tombstones travel and how each value
+        // is encoded lives in the pure, unit-tested [SyncMerge.buildExport]: the
+        // DEVICE_LOCAL_KEYS skip, the local-file img_ path skip, the boolean/
+        // string/coerced-toString typing, and the `_removed` tombstone set
+        // (dirty keys no longer present, minus device-local). This method only
+        // does the two Android-bound things buildExport can't: snapshot the typed
+        // Preferences into a plain map, and base64-encode local car photos (which
+        // needs android.graphics.Bitmap — see [encodeSyncPhotos]).
+        val prefsMap: Map<String, Any> = prefs.asMap().entries.associate { it.key.name to it.value }
+        val photos = encodeSyncPhotos(prefs).mapValues { it.value.content }
+        return SyncMerge.buildExport(prefsMap, dirtyKeys(), photos)
     }
 
     /**
@@ -1500,34 +1545,25 @@ class SettingsStore(private val context: Context) {
         if (version > BACKUP_VERSION) {
             return "This backup was made with a newer version of Bloo — update the app first"
         }
-        val prefs = root["prefs"]?.jsonObject ?: return "Settings file has no data"
-        val removed = root["_removed"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
+        if (root["prefs"]?.jsonObject == null) return "Settings file has no data"
+        // Which keys to put (by type) and which to tombstone is decided by the
+        // pure, unit-tested [SyncMerge.parseBackup]: real JSON strings and bare
+        // numbers become string prefs, bare booleans become boolean prefs, and
+        // `_removed` becomes the remove set — all with DEVICE_LOCAL_KEYS excluded.
+        // The four guards above already validated format/version/prefs, so this is
+        // non-null; the ?: keeps the same "no data" message defensively.
+        val plan = SyncMerge.parseBackup(json) ?: return "Settings file has no data"
         val photoPaths = applySyncPhotos(root["photos"]?.jsonObject)
         editTracked { mut ->
-            prefs.forEach { (name, element) ->
-                // Never accept this device's own Drive URI/bookkeeping from a backup —
-                // exportSettingsJson no longer writes these, but reject them here too
-                // in case an older export (or a hand-edited file) still has them.
-                if (name in DEVICE_LOCAL_KEYS) return@forEach
-                val prim = (element as? JsonPrimitive) ?: return@forEach
-                when {
-                    // A real JSON string (e.g. "DARK", "true") → keep as a string pref.
-                    prim.isString -> mut[stringPreferencesKey(name)] = prim.content
-                    // A bare JSON boolean → a boolean pref (notifications, alerts, …).
-                    prim.booleanOrNull != null -> mut[booleanPreferencesKey(name)] = prim.booleanOrNull!!
-                    // Anything else (a bare number) — every numeric pref here is
-                    // stored as a string, so coerce it back to one.
-                    else -> mut[stringPreferencesKey(name)] = prim.content
-                }
-            }
+            plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
+            plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
             photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
             // Propagate deletions: a key tombstoned on the source device is removed
             // here too (both key types, since this file mixes string/boolean prefs
             // under the same name) so a deletion converges instead of the key
             // resurrecting from this device's stale copy. DEVICE_LOCAL_KEYS are
-            // never touched by a backup.
-            removed.forEach { name ->
-                if (name in DEVICE_LOCAL_KEYS) return@forEach
+            // already excluded by parseBackup.
+            plan.removes.forEach { name ->
                 mut.remove(stringPreferencesKey(name))
                 mut.remove(booleanPreferencesKey(name))
             }
@@ -1613,6 +1649,11 @@ class SettingsStore(private val context: Context) {
      * Returns whether anything was actually applied.
      */
     private suspend fun mergeSettingsJson(json: String, protect: Set<String>): Boolean {
+        // Validate format/version up front for the merge-specific behaviour a bad
+        // remote file needs: return false (don't apply anything, but let the upload
+        // half of the pass proceed), and log the newer-format case. parseBackup
+        // below applies the same guards, but doing them here keeps the AppLog line
+        // and the distinct "skip import, keep syncing" semantics intact.
         val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return false
         if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") return false
         val version = root["_version"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1
@@ -1623,8 +1664,11 @@ class SettingsStore(private val context: Context) {
             AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping import")
             return false
         }
-        val prefs = root["prefs"]?.jsonObject ?: return false
-        val removed = root["_removed"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
+        if (root["prefs"]?.jsonObject == null) return false
+        // Photos are guarded by the pre-pass `protect` snapshot only (an
+        // img_$vin changed locally since the last sync keeps its local file),
+        // computed here outside the transaction exactly as before -- writing the
+        // decoded JPEGs to disk is plain file IO, not part of the DataStore edit.
         val photoPaths = applySyncPhotos(root["photos"]?.jsonObject, protect)
         context.settingsDataStore.edit { mut ->
             // Re-read the dirty set from THIS transaction's live prefs, not just the
@@ -1632,25 +1676,22 @@ class SettingsStore(private val context: Context) {
             // landed between that snapshot and this edit block (setters don't hold
             // driveSyncMutex) would otherwise be clobbered by the incoming remote
             // value. Treat those live-dirty keys exactly like protect -- skip
-            // writing and skip removing them.
+            // writing and skip removing them. [SyncMerge.mergePlan] applies the
+            // guarded drop (and the DEVICE_LOCAL_KEYS exclusion, and value typing)
+            // purely on the prefs/tombstones; photos are handled above.
             val liveDirty = mut.dirtyKeySet()
             val guarded = protect + liveDirty
-            prefs.forEach { (name, element) ->
-                if (name in DEVICE_LOCAL_KEYS || name in guarded) return@forEach
-                val prim = (element as? JsonPrimitive) ?: return@forEach
-                when {
-                    prim.isString -> mut[stringPreferencesKey(name)] = prim.content
-                    prim.booleanOrNull != null -> mut[booleanPreferencesKey(name)] = prim.booleanOrNull!!
-                    else -> mut[stringPreferencesKey(name)] = prim.content
-                }
-            }
+            // parseBackup already succeeded on the guards above, so mergePlan is
+            // non-null here; ?: return@edit is a defensive no-op.
+            val plan = SyncMerge.mergePlan(json, guarded) ?: return@edit
+            plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
+            plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
             photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
             // Propagate deletions from the remote file, but never remove a key we're
             // protecting (locally changed since our last sync, or live-dirty within
-            // this transaction) or a device-local key -- same convergence reasoning
-            // as importSettingsJson, both key types removed since names are shared.
-            removed.forEach { name ->
-                if (name in DEVICE_LOCAL_KEYS || name in guarded) return@forEach
+            // this transaction) or a device-local key -- mergePlan already dropped
+            // both from removes; both key types removed since names are shared.
+            plan.removes.forEach { name ->
                 mut.remove(stringPreferencesKey(name))
                 mut.remove(booleanPreferencesKey(name))
             }

@@ -2356,11 +2356,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settingsStore.setDefaultClimatePreset(vin, id)
     }
 
-    /** Manual "Sync now" after a failed Drive sync -- previously the only way
-     *  to retry was pulling to refresh (which also triggers a sync) or waiting
-     *  for the next periodic worker tick, up to 2h away for a transient blip. */
+    /** Manual "Sync now": force a full Drive push/pull right now. Available
+     *  whenever sync is configured (not just after a failure) so the user can
+     *  deliberately trigger a sync without waiting for a refresh or the 2h
+     *  worker tick. Surfaces the outcome as a snackbar. */
+    fun syncNow() {
+        if (_state.value.syncUri == null) return
+        viewModelScope.launch {
+            runDriveSyncNow()
+            val err = _state.value.syncError
+            if (err == null) reportInfo("Synced with Drive") else reportError("Sync failed: $err")
+        }
+    }
+
+    /** Kept for the existing "Sync now" retry affordance shown next to a sync
+     *  error; delegates to the same path as [syncNow] without the snackbar. */
     fun retryDriveSync() {
         viewModelScope.launch { runDriveSyncNow() }
+    }
+
+    /** Settings "Test sync" diagnostic: runs a non-destructive end-to-end
+     *  round-trip against the real Drive file (permission → read → write →
+     *  verify) and reports pass/fail as a snackbar, so the user can confirm
+     *  sync actually works on their device/provider in one tap. Writes the
+     *  file's own bytes back verbatim, so no settings are changed. */
+    fun testSync() {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { settingsStore.testSyncRoundTrip() }
+            if (result.ok) reportInfo(result.message) else reportError(result.message)
+        }
     }
 
     /** Runs one [SettingsStore.performDriveSync] pass right now and folds the

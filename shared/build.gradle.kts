@@ -36,4 +36,11 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Pure-JVM unit tests (CI: testDebugUnitTest). kotlin-test-junit maps
+    // kotlin.test's @Test/assert* onto JUnit 4 AND pulls JUnit transitively, so
+    // Android's testDebugUnitTest (a JUnit-4-based task) actually discovers and
+    // runs the tests — the bare `kotlin-test` artifact provides only the assert
+    // API with no runner, so no tests would be found. Version = project Kotlin 2.2.20.
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
 }
