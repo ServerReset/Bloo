@@ -107,7 +107,11 @@ class KiaRepository(
         // Kia has no separate location endpoint; GPS rides along with the same
         // cmm/gvi fetch as status(), but api.location() skips the EV
         // charge-targets round-trip that status() adds.
-        api.location(s, summaryFor(s, v))?.coord?.let { GeoLocation(it.lat, it.lon) }
+        val coord = api.location(s, summaryFor(s, v))?.coord
+        val lat = coord?.lat
+        val lon = coord?.lon
+        // Coord.lat/lon are nullable; a partial fix isn't a usable location.
+        if (lat != null && lon != null) GeoLocation(lat, lon) else null
     }
 
     // --- Commands ------------------------------------------------------------
