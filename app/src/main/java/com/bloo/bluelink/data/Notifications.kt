@@ -164,18 +164,21 @@ object CarAlerts {
         val out = mutableListOf<Alert>()
 
         if (prefs.service) {
-            // Odometer strings can arrive with thousands separators (e.g. "12,345");
-            // strip those before parsing, and floor to an Int since fractional
-            // miles aren't meaningful for a service-interval comparison.
-            val odo = v.odometer?.replace(",", "")?.trim()?.toDoubleOrNull()?.toInt()
+            // Odometer strings can arrive with thousands separators (e.g. "12,345")
+            // and fractional miles; parseOdometerMiles strips/floors them to an Int.
+            val odo = parseOdometerMiles(v.odometer)
             val last = settings.lastServiceMiles(v.vin)
             val interval = settings.serviceIntervalMiles(v.vin)
             // "Due" mileage only exists once both the last-serviced mileage and
             // the chosen interval are known; either missing means we can't judge
             // due-ness at all (rather than treating it as "not due").
             val due = if (last != null && interval != null) last + interval else null
+            // serviceDue returns raw signed miles remaining ((last+interval) - odo),
+            // or null if any input is unknown. `remaining <= 0` is exactly the
+            // original `odo >= due` edge (fires the moment odo reaches the interval).
+            val remaining = serviceDue(odo, last, interval)
             val key = "service_${v.vin}"
-            if (due != null && odo != null && odo >= due) {
+            if (remaining != null && remaining <= 0) {
                 if (!settings.alertFired(key)) {
                     out += Alert(serviceId(v), "${v.name} is due for service", "Odometer $odo mi is past the $due mi service interval.")
                     settings.setAlertFired(key, true)

@@ -197,6 +197,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
@@ -330,6 +331,14 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.bluelink.data.targetForCurrentPlug
+import com.bloo.bluelink.data.isGen5W
+import com.bloo.bluelink.data.serviceDue
+import com.bloo.bluelink.data.parseOdometerMiles
+import com.bloo.bluelink.data.smartClimateIsCooling
+import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
+import com.bloo.bluelink.data.isPluggedIn
+import com.bloo.uicommon.topFadeScrim
+import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -3094,9 +3103,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
 @Composable
 private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: Float) {
     val status = state.statusFor(v)
-    val isGen5W = remember(v.brand, v.generation) {
-        v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
-    }
+    val isGen5W = remember(v.brand, v.generation) { v.isGen5W }
     // Cover-screen tiles follow the same order the user arranged the pebbles in
     // (state.sectionsFor). "summary" maps to the always-present "main" tile;
     // "controls" has no cover tile so it falls away. If summary was somehow
@@ -3563,7 +3570,7 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
         Box(Modifier.fillMaxSize()) {
             if (!img.isNullOrBlank()) {
                 AsyncImage(
-                    model = if (img.startsWith("/")) java.io.File(img) else img,
+                    model = rememberPhotoModel(img),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     // Was 0.22f -- on a cover screen's already-dark surfaceContainer
@@ -3586,7 +3593,7 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
             } else {
                 Box(
                     Modifier.fillMaxSize().alpha(0.18f)
-                        .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
+                        .background(carTonalBrush(scheme)),
                 )
             }
             Column(Modifier.fillMaxSize().padding(coverScaled(14.dp)), verticalArrangement = Arrangement.spacedBy(coverScaled(10.dp))) {
@@ -3995,6 +4002,46 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
     }
 }
 
+/** The tonal primary→tertiary→secondary gradient used as the fallback fill
+ *  behind car photos across the garage/settings surfaces. Callers apply their
+ *  own `.alpha(...)` where they want it dimmed -- this returns only the brush. */
+private fun carTonalBrush(scheme: ColorScheme): Brush =
+    Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))
+
+/** The clipped square thumbnail used for a car: the set photo if there is one,
+ *  else the [carTonalBrush] fallback with a centered car icon. [cornerRadius]
+ *  and [iconSize] vary per caller (the settings card vs. the tiles header). */
+@Composable
+private fun CarThumb(img: String?, size: Dp, cornerRadius: Dp, iconSize: Dp) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier.size(size).clip(RoundedCornerShape(cornerRadius)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!img.isNullOrBlank()) {
+            AsyncImage(
+                model = rememberPhotoModel(img),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize().background(carTonalBrush(scheme)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(iconSize))
+            }
+        }
+    }
+}
+
+/** The Coil model for a stored car photo: a [java.io.File] for a locally-cropped
+ *  absolute path, or the raw URL string for a pasted one. */
+@Composable
+private fun rememberPhotoModel(url: String): Any =
+    remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
+
 /** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
 private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
@@ -4005,15 +4052,11 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
                 .fillMaxWidth()
                 .height(height)
                 .clip(RoundedCornerShape(18.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(scheme.primary, scheme.tertiary, scheme.secondary),
-                    )
-                ),
+                .background(carTonalBrush(scheme)),
         )
     } else {
         // A locally-cropped photo is an absolute path; a pasted one is a URL.
-        val model: Any = if (imageUrl.startsWith("/")) java.io.File(imageUrl) else imageUrl
+        val model: Any = rememberPhotoModel(imageUrl)
         // A transparent PNG renders edge-to-edge with no opaque box, so it blends
         // seamlessly into the pebble (fit, not crop, so the whole subject shows).
         val transparent = imageUrl.endsWith(".png", ignoreCase = true)
@@ -6573,7 +6616,7 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
     // they report nothing, EV or not - so the pebble is hidden for them rather
     // than sitting permanently empty. Kia US doesn't report a generation, so it's
     // excluded from the check and keeps the pebble.
-    val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
+    val isGen5W = v.isGen5W
     if (isGen5W) return
     val trips = state.trips[v.vin]
     val loading = state.isPending(v.vin, "trips")
@@ -6634,16 +6677,15 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val inApp = appearance.linksInApp
     val metric = appearance.unitSystem == "metric"
     val location = state.locations[v.vin]
-    val odo = v.odometer?.trim()?.takeIf { it.isNotBlank() }
-    val odoInt = odo?.replace(",", "")?.toDoubleOrNull()?.toInt()
+    val odoInt = parseOdometerMiles(v.odometer)
     val plate = state.licensePlates[v.vin]
     val lastSvc = state.lastServiceMiles[v.vin]
     val interval = state.serviceIntervalMiles[v.vin]
     val nextDue = if (lastSvc != null && interval != null) lastSvc + interval else null
-    val remaining = if (nextDue != null && odoInt != null) nextDue - odoInt else null
+    val remaining = serviceDue(odoInt, lastSvc, interval)
 
     val ev = status?.evStatus
-    val plugged = (ev?.batteryPlugin ?: 0) != 0 || ev?.batteryCharge == true
+    val plugged = ev?.isPluggedIn == true || ev?.batteryCharge == true
 
     val infoSummary = if (status?.doorLock == true) "Locked" else "Unlocked"
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary) {
@@ -6760,7 +6802,7 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
         // Digital Key: Gen5W head units use DK1 (BLE/NFC dedicated app).
         // Gen3+ and all Kia models use DK2 (UWB via wallet).
         // Kia has no gen field so isGen5W is always false for them.
-        val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
+        val isGen5W = v.isGen5W
         group("Digital Car Key") {
             if (isGen5W) {
                 when (v.brand) {
@@ -7180,7 +7222,7 @@ private fun ClimatePebble(
             val smartTarget = smartClimateTargetF(ambientF)
             val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
             val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
-            val smartLabel = if (ambientF >= 70) "Cool to $targetLabel" else "Heat to $targetLabel"
+            val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
             SectionLabel("Smart climate")
             MorphButton(
                 onClick = {
@@ -7256,7 +7298,7 @@ private fun ClimatePebble(
         AnimatedSlider(
             value = duration.toFloat(),
             onValueChange = { duration = it.roundToInt() },
-            valueRange = 1f..10f,
+            valueRange = CLIMATE_DURATION_RANGE.first.toFloat()..CLIMATE_DURATION_RANGE.last.toFloat(),
             steps = 8,
         )
 
@@ -7265,7 +7307,7 @@ private fun ClimatePebble(
             ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
         }
 
-        val isGen5W = v.brand != Brand.KIA && (v.generation.trim().toIntOrNull() ?: 3) < 3
+        val isGen5W = v.isGen5W
         if (seats.any && !(isGen5W && v.isEv)) {
             SectionLabel("Seats")
             if (seats.driverHeat || seats.driverCool) {
@@ -7490,19 +7532,13 @@ private fun PresetPill(
     // irreversibly dropped a saved preset. Now requires a second tap, same
     // "tap again to confirm" pattern (with the same 4s auto-reset) used for
     // Sign out and the watch's own preset-delete confirm.
-    var confirmDelete by remember { mutableStateOf(false) }
-    LaunchedEffect(confirmDelete) {
-        if (confirmDelete) {
-            delay(4000)
-            confirmDelete = false
-        }
-    }
+    val confirm = rememberConfirmArm()
     val deleteBg by androidx.compose.animation.animateColorAsState(
-        if (confirmDelete) MaterialTheme.colorScheme.error else buttonContainer(),
+        if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
         spring(stiffness = Spring.StiffnessMediumLow),
         label = "presetDeleteBg",
     )
-    val deleteFg = if (confirmDelete) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface
+    val deleteFg = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
     Row(
@@ -7546,13 +7582,12 @@ private fun PresetPill(
         // Delete nub — inner (left) corners match the gap, outer (right) corners are pill-rounded.
         Surface(
             onClick = {
-                if (confirmDelete) {
+                if (confirm.armed) {
                     haptics?.tick()
                     onDelete()
-                    confirmDelete = false
                 } else {
                     haptics?.tick()
-                    confirmDelete = true
+                    confirm.arm()
                 }
             },
             color = deleteBg,
@@ -7566,7 +7601,7 @@ private fun PresetPill(
             ) {
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = if (confirmDelete) "Confirm delete $name" else "Delete $name",
+                    contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
                     modifier = Modifier.size(15.dp),
                 )
             }
@@ -7702,7 +7737,7 @@ private fun ChargeLimitPill(
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val ev = status?.evStatus
     val charging = ev?.batteryCharge == true
-    val plugged = (ev?.batteryPlugin != null && ev.batteryPlugin != 0) || charging
+    val plugged = ev?.isPluggedIn == true || charging
     val pending = state.isPending(v.vin, "charge")
     val limitPending = state.isPending(v.vin, "chargeLimit")
     val summary = when {
@@ -9427,28 +9462,7 @@ private fun CarSettingsCard(
                 // showed up anywhere until you closed Settings and looked at
                 // the garage screen.
                 val thumbImg = state.imageUrls[v.vin]
-                val scheme = MaterialTheme.colorScheme
-                Box(
-                    Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (!thumbImg.isNullOrBlank()) {
-                        AsyncImage(
-                            model = if (thumbImg.startsWith("/")) java.io.File(thumbImg) else thumbImg,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        Box(
-                            Modifier.fillMaxSize()
-                                .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                }
+                CarThumb(img = thumbImg, size = 44.dp, cornerRadius = 14.dp, iconSize = 20.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(v.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
@@ -9540,7 +9554,7 @@ private fun CarSettingsCard(
                         // on the garage screen.
                         if (!storedImage.isNullOrBlank()) {
                             AsyncImage(
-                                model = if (storedImage.startsWith("/")) java.io.File(storedImage) else storedImage,
+                                model = rememberPhotoModel(storedImage),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -10011,7 +10025,7 @@ private fun SettingsSearchResults(
                 singleLine = true, shape = FieldShape, modifier = Modifier.fillMaxWidth(),
             )
         }
-        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.replace(",", "")?.toDoubleOrNull()?.toInt()?.let { odoInt ->
+        parseOdometerMiles(v.odometer)?.let { odoInt ->
             add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { StatusRow("Odometer", formatDistance(odoInt, appearance.unitSystem == "metric")) }
         }
         add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin}") {
@@ -10300,27 +10314,7 @@ fun SettingsSegmentedRow(
 private fun CarTilesHeader(name: String, img: String?, assignedCount: Int, totalTiles: Int) {
     val scheme = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(
-            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (!img.isNullOrBlank()) {
-                AsyncImage(
-                    model = if (img.startsWith("/")) java.io.File(img) else img,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(
-                    Modifier.fillMaxSize()
-                        .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(22.dp))
-                }
-            }
-        }
+        CarThumb(img = img, size = 44.dp, cornerRadius = 16.dp, iconSize = 22.dp)
         Column(Modifier.weight(1f)) {
             Text(
                 name,

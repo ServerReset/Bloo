@@ -443,6 +443,11 @@ fun EvStatus.targetForCurrentPlug(): Int? = when (batteryPlugin) {
     else -> null
 }
 
+/** True when any charger is connected (any non-zero [EvStatus.batteryPlugin],
+ *  per the 0=unplugged/1=DC/2=AC encoding documented on
+ *  [EvStatus.pluggedInLabel]); a missing plug value is treated as unplugged. */
+val EvStatus.isPluggedIn: Boolean get() = (batteryPlugin ?: 0) != 0
+
 /** Shared mechanism behind [DoorOpen.openLabels]/[WindowOpen.openLabels]:
  *  both door and window state use the identical 0=closed/1=open per-position
  *  encoding, so this one helper turns the four raw Int? flags into a list of

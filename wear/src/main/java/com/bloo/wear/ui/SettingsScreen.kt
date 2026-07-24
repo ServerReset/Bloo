@@ -6,14 +6,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,31 +32,24 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
-import kotlinx.coroutines.launch
 
 /**
- * The Settings screen: a single scrollable [ScalingLazyColumn] made up of one
+ * The Settings screen: a single scrollable [RotaryScalingColumn] made up of one
  * [SettingSection] card per topic (Accounts, Appearance, PIN lock, AI
  * Summaries, Aurora, text size, Tile chips, per-slot Tile car pinning, Tile
  * order, Sync, Phone status, Refresh, Sign out). Most of the state driving
@@ -76,15 +65,6 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
-    val state = rememberScalingLazyListState()
-    val scope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
-    // Rotary bezel/crown input on Wear OS scrolls whichever element currently
-    // has input focus, not whatever's simply on screen -- so this list must
-    // explicitly claim focus itself (below, via .focusRequester(focusRequester)
-    // .focusable()) or a rotary turn would do nothing until the user first
-    // tapped something to focus it.
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     var pinFlow by remember { mutableStateOf<PinFlowMode?>(null) }
     // Mirrors the phone's Simple/Advanced settings mode (synced one-way via
     // WearSettingsPayload.settingsMode) -- the watch had no such concept at
@@ -101,19 +81,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     }
 
     Box(Modifier.fillMaxSize()) {
-    ScalingLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .onRotaryScrollEvent { e ->
-                scope.launch { state.scrollBy(e.verticalScrollPixels) }
-                true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
-        state = state,
-        contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
+    RotaryScalingColumn {
         item { ListHeader { Text("Settings", textAlign = TextAlign.Center) } }
 
         item {

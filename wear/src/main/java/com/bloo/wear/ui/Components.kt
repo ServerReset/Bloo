@@ -4,6 +4,7 @@ import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,14 +21,18 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,15 +42,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -64,6 +75,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
+import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
+import androidx.wear.compose.foundation.lazy.ScalingLazyListState
+import androidx.wear.compose.foundation.lazy.ScalingParams
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
@@ -79,6 +96,7 @@ import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.math.tan
+import kotlinx.coroutines.launch
 
 /**
  * Horizontal ScalingLazyColumn inset that actually widens on a round screen.
@@ -694,5 +712,72 @@ fun AnimatedValue(
         maxLines = maxLines,
         reduceMotion = LocalReduceMotion.current,
         modifier = modifier,
+    )
+}
+
+/**
+ * The centred "busy" state every full-screen loading view on the watch shares:
+ * a fade-in spinner over a caption (LoginScreen's "Signing in…", Trips' load,
+ * WatchApp's connect). Was copy-pasted per screen; now one component so the
+ * fade timing (200ms), spinner + 10dp gap + labelMedium/onSurfaceVariant
+ * caption all stay identical everywhere.
+ */
+@Composable
+fun BusySpinner(caption: String, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(tween(200)),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    caption,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The rotary-scrollable ScalingLazyColumn scaffold every list screen (Login,
+ * Settings, Trips, Home) hand-rolled identically: a remembered coroutine scope
+ * + FocusRequester, a LaunchedEffect(Unit) that requests focus (guarded with
+ * runCatching so a not-yet-attached requester can't crash), and the
+ * .onRotaryScrollEvent { scope.launch { state.scrollBy(...) }; true }
+ * .focusRequester(fr).focusable() modifier chain that routes the crown/bezel
+ * into the list. Centralised so the focus + rotary wiring lives in one place;
+ * callers keep their own wrapping Box/siblings and just supply the [content].
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun RotaryScalingColumn(
+    modifier: Modifier = Modifier,
+    state: ScalingLazyListState = rememberScalingLazyListState(),
+    contentPadding: PaddingValues = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(6.dp),
+    scalingParams: ScalingParams = ScalingLazyColumnDefaults.scalingParams(),
+    content: ScalingLazyListScope.() -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    ScalingLazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .onRotaryScrollEvent { e ->
+                scope.launch { state.scrollBy(e.verticalScrollPixels) }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
+        state = state,
+        contentPadding = contentPadding,
+        verticalArrangement = verticalArrangement,
+        scalingParams = scalingParams,
+        content = content,
     )
 }

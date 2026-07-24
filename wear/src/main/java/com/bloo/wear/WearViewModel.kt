@@ -9,6 +9,7 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CredentialStore
@@ -31,6 +32,7 @@ import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.repositoryFor
+import com.bloo.bluelink.data.toWearCommand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -885,15 +887,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
             updateDraft(vin) { it.copy(activePresetId = null) }
         } else {
-            // The car rejects remote climate commands while it's moving --
-            // this standalone (non-relayed) path is watch-connectivity-direct
-            // and had no such gate at all, unlike the main phone UI's own
-            // Start button.
-            if (st?.isDriving == true) error("Can't start climate while driving")
+            // startClimateStandalone enforces the "no remote climate while
+            // moving" gate (the car rejects it, and this watch-direct path has
+            // no phone UI to apply it) and does the optimistic airCtrlOn flip.
             val d = _ui.value.draftFor(vin)
-            repo.startClimate(v, d.toRequest())
+            startClimateStandalone(vin, v, repo, st, d.toRequest())
             // A manual start isn't a saved preset.
-            flip(vin) { it.copy(airCtrlOn = true) }
             updateDraft(vin) { it.copy(activePresetId = null) }
         }
     }
@@ -945,30 +944,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // toggle relay used to turn climate OFF when it was already running
             // (preset tap while on -> phone saw climateOn=true -> stopClimate) and
             // carried only the old draft's temp/defrost even when it started.
-            explicit = com.bloo.bluelink.data.WearCommand(
-                vin = vin,
-                action = com.bloo.bluelink.data.WearAction.CLIMATE_ON,
-                tempF = r.tempF,
-                durationMinutes = r.durationMinutes,
-                defrost = r.defrost,
-                steeringWheelHeat = r.steeringWheelHeat,
-                seatFrontLeft = r.seatFrontLeft.apiValue,
-                seatFrontRight = r.seatFrontRight.apiValue,
-                seatRearLeft = r.seatRearLeft.apiValue,
-                seatRearRight = r.seatRearRight.apiValue,
-            ),
+            explicit = climateOnCommand(vin, r),
             onFailure = { updateDraft(vin) { previousDraft } },
         ) { v, repo, st ->
-            // Same driving gate as toggleClimate's start branch, and for the
-            // same reason: this is the STANDALONE path (the car's own direct
-            // connection, not relayed through the phone), so it has to
-            // enforce the "no remote climate while moving" rule itself --
-            // throwing here is caught by command()'s runCatching, which
+            // Same driving gate as toggleClimate's start branch, enforced by
+            // startClimateStandalone: this is the STANDALONE path (the car's
+            // own direct connection, not relayed through the phone), so it has
+            // to apply the "no remote climate while moving" rule itself --
+            // the throw there is caught by command()'s runCatching, which
             // surfaces the message and fires onFailure (restoring the
             // pre-preset draft) instead of ever calling startClimate.
-            if (st?.isDriving == true) error("Can't start climate while driving")
-            repo.startClimate(v, preset.request)
-            flip(vin) { it.copy(airCtrlOn = true) }
+            startClimateStandalone(vin, v, repo, st, preset.request)
         }
     }
 
@@ -1179,7 +1165,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // updateDraft (which also re-syncs the whole draft to the phone), and clear
     // activePresetId since any manual adjustment means the draft no longer
     // exactly matches whichever preset (if any) was last applied.
-    fun setClimateTemp(vin: String, value: Int) = updateDraft(vin) { it.copy(tempF = value.coerceIn(62, 82), activePresetId = null) }
+    fun setClimateTemp(vin: String, value: Int) = updateDraft(vin) { it.copy(tempF = value.coerceIn(CLIMATE_TEMP_RANGE_F), activePresetId = null) }
     fun setClimateDuration(vin: String, value: Int) = updateDraft(vin) { it.copy(duration = value.coerceIn(1, 10), activePresetId = null) }
     fun toggleDefrost(vin: String) = updateDraft(vin) { it.copy(defrost = !it.defrost, activePresetId = null) }
     fun toggleSteering(vin: String) = updateDraft(vin) { it.copy(steering = !it.steering, activePresetId = null) }
@@ -1535,31 +1521,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             }
         } else {
             updateDraft(vin) { it.copy(tempF = targetF, activePresetId = null) }
+            // Smart climate starts at the computed targetF with no defrost,
+            // carrying the draft's own duration/steering/seats.
+            val smartRequest = d.toRequest(tempF = targetF, defrost = false)
             command(
                 vin, "climate",
-                explicit = com.bloo.bluelink.data.WearCommand(
-                    vin = vin,
-                    action = com.bloo.bluelink.data.WearAction.CLIMATE_ON,
-                    tempF = targetF,
-                    durationMinutes = d.duration,
-                    defrost = false,
-                    steeringWheelHeat = d.steering,
-                    seatFrontLeft = seatLevelOf(d.seatDriver).apiValue,
-                    seatFrontRight = seatLevelOf(d.seatPassenger).apiValue,
-                    seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,
-                    seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
-                ),
+                explicit = climateOnCommand(vin, smartRequest),
                 onFailure = { updateDraft(vin) { previousDraft } },
             ) { v, repo, st ->
                 // Third of the three climate-start call sites gated on
                 // isDriving (with toggleClimate and applyPreset) -- same
-                // standalone-only enforcement, same reasoning: relayed
-                // commands rely on the phone's own UI/repository to apply
-                // this gate, but the standalone path talks to the car
-                // directly and has to check it here itself.
-                if (st?.isDriving == true) error("Can't start climate while driving")
-                repo.startClimate(v, d.toRequest(tempF = targetF, defrost = false))
-                flip(vin) { it.copy(airCtrlOn = true) }
+                // standalone-only enforcement (via startClimateStandalone),
+                // same reasoning: relayed commands rely on the phone's own
+                // UI/repository to apply this gate, but the standalone path
+                // talks to the car directly and has to check it here itself.
+                startClimateStandalone(vin, v, repo, st, smartRequest)
             }
         }
     }
@@ -1729,6 +1705,38 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,
             seatRearRight = seatLevelOf(d.seatRearRight).apiValue,
         )
+    }
+
+    /** Build the explicit [com.bloo.bluelink.data.WearAction.CLIMATE_ON]
+     *  command carrying [r]'s exact settings, via the shared
+     *  [com.bloo.bluelink.data.toWearCommand] extension (which expands the four
+     *  [SeatLevel] seats to their [SeatLevel.apiValue] ints). Used by every
+     *  climate-start call site whose relay path needs the full settings carried
+     *  rather than the generic toggle verb. */
+    private fun climateOnCommand(vin: String, r: ClimateRequest): com.bloo.bluelink.data.WearCommand =
+        r.toWearCommand(vin, com.bloo.bluelink.data.WearAction.CLIMATE_ON)
+
+    /**
+     * The shared STANDALONE (non-relayed) climate-start body used by
+     * [toggleClimate], [applyPreset] and [smartClimate]. Enforces the "no
+     * remote climate while the car is moving" rule the phone's own UI applies
+     * on the relay path -- the standalone path talks to the car directly, so it
+     * has to gate here itself. The [error] throw on a moving car is deliberately
+     * propagated: it's caught by [command]'s runCatching, which surfaces the
+     * message and fires the caller's onFailure (e.g. restoring a pre-preset
+     * draft) instead of ever calling startClimate. On success, optimistically
+     * flips airCtrlOn via [flip].
+     */
+    private suspend fun startClimateStandalone(
+        vin: String,
+        v: Vehicle,
+        repo: VehicleRepository,
+        st: VehicleStatus?,
+        request: ClimateRequest,
+    ) {
+        if (st?.isDriving == true) error("Can't start climate while driving")
+        repo.startClimate(v, request)
+        flip(vin) { it.copy(airCtrlOn = true) }
     }
 
     /** The STANDALONE path's optimistic-update primitive (the relay path's

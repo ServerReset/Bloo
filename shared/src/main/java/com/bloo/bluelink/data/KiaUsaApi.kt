@@ -273,6 +273,29 @@ class KiaUsaApi {
      *  targets doesn't blank out the rest of an otherwise-successful status
      *  fetch. */
     suspend fun status(session: KiaSession, vehicle: KiaVehicleSummary): VehicleStatus? = withContext(Dispatchers.IO) {
+        val info = fetchInfo(session, vehicle) ?: return@withContext null
+        val parsed = parseStatus(info)
+        // Charge limits live on a separate endpoint (cmm/gvi omits targetSOC).
+        val ev = parsed.evStatus
+        if (ev == null) parsed
+        else {
+            val targets = runCatching { chargeTargets(session, vehicle) }.getOrNull()
+            if (targets == null) parsed else parsed.copy(evStatus = ev.copy(reservChargeInfos = targets))
+        }
+    }
+
+    /** Read just the car's GPS position. Same cmm/gvi fetch as [status] via
+     *  [fetchInfo], but skips the EV charge-targets ([chargeTargets]) round-trip
+     *  since location doesn't need them — returns null if the fetch is
+     *  empty/missing or the parsed status carries no location. */
+    suspend fun location(session: KiaSession, vehicle: KiaVehicleSummary): VehicleLocation? =
+        fetchInfo(session, vehicle)?.let { parseStatus(it).vehicleLocation }
+
+    /** Shared cmm/gvi fetch+unwrap used by [status] and [location]: posts the
+     *  request body opting into location + vehicleStatus (and out of the
+     *  sections this app ignores) and returns the one-element vehicleInfoList's
+     *  object, or null when that array is empty/missing. */
+    private suspend fun fetchInfo(session: KiaSession, vehicle: KiaVehicleSummary): JsonObject? = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             put("vehicleConfigReq", buildJsonObject {
                 put("airTempRange", "0"); put("maintenance", "1"); put("seatHeatCoolOption", "0")
@@ -287,16 +310,7 @@ class KiaUsaApi {
         val req = Request.Builder().url(API + "cmm/gvi").post(body)
             .authedHeaders(session, vehicle).build()
         val root = call(req)
-        val info = (root.path("payload", "vehicleInfoList") as? JsonArray)?.firstOrNull()?.obj()
-            ?: return@withContext null
-        val parsed = parseStatus(info)
-        // Charge limits live on a separate endpoint (cmm/gvi omits targetSOC).
-        val ev = parsed.evStatus
-        if (ev == null) parsed
-        else {
-            val targets = runCatching { chargeTargets(session, vehicle) }.getOrNull()
-            if (targets == null) parsed else parsed.copy(evStatus = ev.copy(reservChargeInfos = targets))
-        }
+        (root.path("payload", "vehicleInfoList") as? JsonArray)?.firstOrNull()?.obj()
     }
 
     /**

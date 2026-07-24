@@ -512,6 +512,39 @@ data class WearClimateState(
     val byVin: Map<String, ClimateSync> = emptyMap(),
 )
 
+/** Build the flat [WearCommand] the watch sends for a climate action from this
+ *  request, expanding the four [SeatLevel] seats to their [SeatLevel.apiValue]
+ *  ints for the wire format. */
+fun ClimateRequest.toWearCommand(vin: String, action: String): WearCommand =
+    WearCommand(
+        vin = vin,
+        action = action,
+        tempF = tempF,
+        durationMinutes = durationMinutes,
+        defrost = defrost,
+        steeringWheelHeat = steeringWheelHeat,
+        seatFrontLeft = seatFrontLeft.apiValue,
+        seatFrontRight = seatFrontRight.apiValue,
+        seatRearLeft = seatRearLeft.apiValue,
+        seatRearRight = seatRearRight.apiValue,
+    )
+
+/** Build the live [ClimateSync] draft mirrored between phone and watch from this
+ *  request, expanding the four [SeatLevel] seats to their [SeatLevel.apiValue]
+ *  ints (note [ClimateSync.steering] carries this request's [steeringWheelHeat]). */
+fun ClimateRequest.toClimateSync(activePresetId: String?): ClimateSync =
+    ClimateSync(
+        activePresetId = activePresetId,
+        tempF = tempF,
+        durationMinutes = durationMinutes,
+        defrost = defrost,
+        steering = steeringWheelHeat,
+        seatFrontLeft = seatFrontLeft.apiValue,
+        seatFrontRight = seatFrontRight.apiValue,
+        seatRearLeft = seatRearLeft.apiValue,
+        seatRearRight = seatRearRight.apiValue,
+    )
+
 /** Compact current-conditions snapshot mirrored to the watch (Celsius like the
  *  phone's Weather; the watch converts using the synced unit). */
 @Serializable

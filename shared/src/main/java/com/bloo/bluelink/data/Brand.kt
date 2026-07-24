@@ -71,6 +71,12 @@ enum class Brand(
     }
 }
 
+// Strict lookup by exact enum `name`: returns null (rather than defaulting to
+// HYUNDAI like [Brand.fromName]) when `name` is null or doesn't match any entry.
+// Use this when a missing/unknown brand should be handled by the caller.
+fun Brand.Companion.fromNameOrNull(name: String?): Brand? =
+    runCatching { name?.let { Brand.valueOf(it) } }.getOrNull()
+
 /** The telematics brand a vehicle belongs to. */
 val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)
 
@@ -148,6 +154,15 @@ val Brand.links: BrandLinks
  */
 val Vehicle.supportsConnectedStore: Boolean
     get() = brand == Brand.KIA || (generation.trim().toIntOrNull() ?: 0) >= 3
+
+/**
+ * Whether this car is an older Gen5W (pre-ccNC) Hyundai/Genesis head unit —
+ * a non-Kia car that reports head-unit generation below 3. Unlike
+ * [supportsConnectedStore], the generation fallback here is 3 (assume modern
+ * ccNC, i.e. NOT Gen5W) when the value is missing/unparseable.
+ */
+val Vehicle.isGen5W: Boolean
+    get() = brand != Brand.KIA && (generation.trim().toIntOrNull() ?: 3) < 3
 
 /** Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the
  *  Hyundai/Genesis US telematics API this app already uses for lock/unlock;

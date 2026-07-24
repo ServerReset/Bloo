@@ -104,11 +104,10 @@ class KiaRepository(
     }
 
     override suspend fun location(v: Vehicle): GeoLocation? = withSession { s ->
-        // Kia has no separate location endpoint; GPS rides along with status.
-        val coord = api.status(s, summaryFor(s, v))?.vehicleLocation?.coord
-        val lat = coord?.lat
-        val lon = coord?.lon
-        if (lat != null && lon != null) GeoLocation(lat, lon) else null
+        // Kia has no separate location endpoint; GPS rides along with the same
+        // cmm/gvi fetch as status(), but api.location() skips the EV
+        // charge-targets round-trip that status() adds.
+        api.location(s, summaryFor(s, v))?.coord?.let { GeoLocation(it.lat, it.lon) }
     }
 
     // --- Commands ------------------------------------------------------------

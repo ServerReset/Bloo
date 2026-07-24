@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -241,13 +243,11 @@ class SettingsStore(private val context: Context) {
             colorPalette = prefs[Keys.PALETTE]?.let { runCatching { ColorPalette.valueOf(it) }.getOrNull() }
                 ?: ColorPalette.BLUE,
             customPalettes = prefs[Keys.CUSTOM_PALETTES]?.let { json ->
-                runCatching { paletteJson.decodeFromString(paletteListSerializer, json) }.getOrElse { emptyList() }
+                decodeJsonOr(paletteJson, paletteListSerializer, json, emptyList())
             } ?: emptyList(),
             activeCustomPaletteId = prefs[Keys.ACTIVE_CUSTOM_PALETTE_ID],
             carCustomPaletteIds = prefs[Keys.CAR_PALETTE_IDS]?.let { json ->
-                runCatching {
-                    paletteJson.decodeFromString(MapSerializer(String.serializer(), String.serializer()), json)
-                }.getOrElse { emptyMap() }
+                decodeJsonOr(paletteJson, MapSerializer(String.serializer(), String.serializer()), json, emptyMap())
             } ?: emptyMap(),
             weatherLat = prefs[Keys.WEATHER_LAT]?.toDoubleOrNull(),
             weatherLon = prefs[Keys.WEATHER_LON]?.toDoubleOrNull(),
@@ -334,23 +334,10 @@ class SettingsStore(private val context: Context) {
         val runningMinutes: Int = 10,
     )
 
-    /** One-shot read of [NotificationPrefs] (vs. the [notifications] Flow below,
-     *  which stays subscribed) — used where a caller just needs the current
-     *  values once, e.g. deciding whether to schedule a check at all. */
-    suspend fun notificationPrefs(): NotificationPrefs {
-        val p = context.settingsDataStore.data.first()
-        return NotificationPrefs(
-            service = p[booleanPreferencesKey("notify_service")] ?: true,
-            doorOpen = p[booleanPreferencesKey("notify_door")] ?: true,
-            doorOpenMinutes = p[stringPreferencesKey("notify_door_min")]?.toIntOrNull() ?: 5,
-            running = p[booleanPreferencesKey("notify_running")] ?: true,
-            runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
-        )
-    }
-
-    /** Reactive equivalent of [notificationPrefs] for UI that needs to update
-     *  live when the user changes a toggle in Settings while the screen is open. */
-    val notifications: Flow<NotificationPrefs> = context.settingsDataStore.data.map { p ->
+    /** The single 5-field [NotificationPrefs] decode, shared by both the one-shot
+     *  [notificationPrefs] read and the reactive [notifications] Flow so the two
+     *  can't drift apart (they previously inlined the identical block twice). */
+    private fun decodeNotificationPrefs(p: Preferences): NotificationPrefs =
         NotificationPrefs(
             service = p[booleanPreferencesKey("notify_service")] ?: true,
             doorOpen = p[booleanPreferencesKey("notify_door")] ?: true,
@@ -358,6 +345,17 @@ class SettingsStore(private val context: Context) {
             running = p[booleanPreferencesKey("notify_running")] ?: true,
             runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
         )
+
+    /** One-shot read of [NotificationPrefs] (vs. the [notifications] Flow below,
+     *  which stays subscribed) — used where a caller just needs the current
+     *  values once, e.g. deciding whether to schedule a check at all. */
+    suspend fun notificationPrefs(): NotificationPrefs =
+        decodeNotificationPrefs(context.settingsDataStore.data.first())
+
+    /** Reactive equivalent of [notificationPrefs] for UI that needs to update
+     *  live when the user changes a toggle in Settings while the screen is open. */
+    val notifications: Flow<NotificationPrefs> = context.settingsDataStore.data.map { p ->
+        decodeNotificationPrefs(p)
     }
 
     // One setter per NotificationPrefs field; `.let {}` just discards editTracked's
@@ -1211,6 +1209,15 @@ class SettingsStore(private val context: Context) {
 
     // --- Per-car climate settings + presets ------------------------------
 
+    /** Shared decode-or-default for the repeated
+     *  `runCatching { json.decodeFromString(serializer, raw) }.getOrElse { default }`
+     *  pattern used to read JSON-encoded prefs — a corrupt/foreign/renamed stored
+     *  value falls back to [default] rather than throwing. The [json] instance is
+     *  passed in (climateJson vs paletteJson, both ignoreUnknownKeys=true but kept
+     *  explicit per section) rather than hardcoded here. */
+    private fun <T> decodeJsonOr(json: Json, serializer: DeserializationStrategy<T>, raw: String, default: T): T =
+        runCatching { json.decodeFromString(serializer, raw) }.getOrElse { default }
+
     private val climateJson = Json { ignoreUnknownKeys = true }
     private val presetListSerializer = ListSerializer(ClimatePreset.serializer())
 
@@ -1229,7 +1236,7 @@ class SettingsStore(private val context: Context) {
     /** User-named climate presets for a car. */
     suspend fun climatePresets(vin: String): List<ClimatePreset> {
         val raw = context.settingsDataStore.data.first()[stringPreferencesKey("climate_presets_$vin")] ?: return emptyList()
-        return runCatching { climateJson.decodeFromString(presetListSerializer, raw) }.getOrElse { emptyList() }
+        return decodeJsonOr(climateJson, presetListSerializer, raw, emptyList())
     }
 
     /** Insert-or-replace by id: the whole preset list is re-read, decoded, the
@@ -1267,7 +1274,7 @@ class SettingsStore(private val context: Context) {
 
     private suspend fun readCustomPalettes(): List<CustomPaletteData> {
         val raw = context.settingsDataStore.data.first()[Keys.CUSTOM_PALETTES] ?: return emptyList()
-        return runCatching { paletteJson.decodeFromString(paletteListSerializer, raw) }.getOrElse { emptyList() }
+        return decodeJsonOr(paletteJson, paletteListSerializer, raw, emptyList())
     }
 
     /** Insert or replace a custom palette by id. */
@@ -1300,7 +1307,7 @@ class SettingsStore(private val context: Context) {
     /** Set or clear a per-car custom palette override (null clears it → use global). */
     suspend fun setCarPaletteId(vin: String, paletteId: String?) {
         val current = context.settingsDataStore.data.first()[Keys.CAR_PALETTE_IDS]?.let { json ->
-            runCatching { paletteJson.decodeFromString(carPaletteSerializer, json) }.getOrElse { emptyMap() }
+            decodeJsonOr(paletteJson, carPaletteSerializer, json, emptyMap())
         } ?: emptyMap()
         val updated = if (paletteId == null) current - vin else current + (vin to paletteId)
         editTracked {
@@ -1377,15 +1384,22 @@ class SettingsStore(private val context: Context) {
             touched.removeAll(DEVICE_LOCAL_KEYS)
             if (touched.isNotEmpty()) {
                 val dirtyKey = stringPreferencesKey("sync_dirty_keys")
-                val existing = prefs[dirtyKey]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                val existing = prefs.dirtyKeySet()
                 prefs[dirtyKey] = (existing + touched).joinToString(",")
             }
         }
     }
 
+    /** Decode the CSV-encoded "sync_dirty_keys" pref into a Set, dropping blanks
+     *  (an unset/empty value → empty set). Shared by every site that reads the
+     *  dirty set — the tracked-edit writer, [dirtyKeys], [clearDirtyKeys], and the
+     *  live-dirty re-read in [mergeSettingsJson] — so they can't split it
+     *  inconsistently. */
+    private fun Preferences.dirtyKeySet(): Set<String> =
+        this[stringPreferencesKey("sync_dirty_keys")]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
     private suspend fun dirtyKeys(): Set<String> =
-        context.settingsDataStore.data.first()[stringPreferencesKey("sync_dirty_keys")]
-            ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+        context.settingsDataStore.data.first().dirtyKeySet()
 
     /** Clear [keys] from the dirty set via set-difference, leaving any key
      *  marked dirty after the calling upload's body was snapshotted still
@@ -1395,7 +1409,7 @@ class SettingsStore(private val context: Context) {
     private suspend fun clearDirtyKeys(keys: Set<String>) {
         context.settingsDataStore.edit { prefs ->
             val dirtyKey = stringPreferencesKey("sync_dirty_keys")
-            val remaining = (prefs[dirtyKey]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()) - keys
+            val remaining = prefs.dirtyKeySet() - keys
             if (remaining.isEmpty()) prefs.remove(dirtyKey) else prefs[dirtyKey] = remaining.joinToString(",")
         }
     }
@@ -1609,8 +1623,7 @@ class SettingsStore(private val context: Context) {
             // driveSyncMutex) would otherwise be clobbered by the incoming remote
             // value. Treat those live-dirty keys exactly like protect -- skip
             // writing and skip removing them.
-            val liveDirty = mut[stringPreferencesKey("sync_dirty_keys")]
-                ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+            val liveDirty = mut.dirtyKeySet()
             val guarded = protect + liveDirty
             prefs.forEach { (name, element) ->
                 if (name in DEVICE_LOCAL_KEYS || name in guarded) return@forEach

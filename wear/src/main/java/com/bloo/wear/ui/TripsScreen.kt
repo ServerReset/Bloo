@@ -1,18 +1,8 @@
 package com.bloo.wear.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -20,29 +10,19 @@ import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.formatEfficiency
 import com.bloo.bluelink.data.formatTripDistance
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
-import kotlinx.coroutines.launch
 
 // Was defined separately here and on the phone (Screens.kt's tripDate()) --
 // now shared/FormatUtils.kt's tripDate(), with includeWeekday = false for
@@ -61,7 +41,6 @@ private fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw
  * driven" from "fetch failed" (see the comment below), and the populated list
  * itself, one [SectionCard] per trip.
  */
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     LaunchedEffect(vin) { vm.loadTrips(vin) }
@@ -69,40 +48,11 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     val loading = "$vin:trips" in ui.pending
 
     if (trips == null && loading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            AnimatedVisibility(visible = true, enter = fadeIn(tween(200))) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "Loading trips…",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
+        BusySpinner("Loading trips…")
         return
     }
 
-    val state = rememberScalingLazyListState()
-    val scope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
-
-    ScalingLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .onRotaryScrollEvent { e ->
-                scope.launch { state.scrollBy(e.verticalScrollPixels) }
-                true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
-        state = state,
-        contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
+    RotaryScalingColumn {
         item { ListHeader { Text("Recent trips", textAlign = TextAlign.Center) } }
 
         if (trips.isNullOrEmpty()) {

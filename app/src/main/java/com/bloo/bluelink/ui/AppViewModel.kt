@@ -36,6 +36,7 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.toClimateSync
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
@@ -1776,17 +1777,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * straight back and loop.
      */
     fun publishClimateState(vin: String, presetId: String?, req: ClimateRequest) {
-        val cs = com.bloo.bluelink.data.ClimateSync(
-            activePresetId = presetId,
-            tempF = req.tempF,
-            durationMinutes = req.durationMinutes,
-            defrost = req.defrost,
-            steering = req.steeringWheelHeat,
-            seatFrontLeft = req.seatFrontLeft.apiValue,
-            seatFrontRight = req.seatFrontRight.apiValue,
-            seatRearLeft = req.seatRearLeft.apiValue,
-            seatRearRight = req.seatRearRight.apiValue,
-        )
+        val cs = req.toClimateSync(presetId)
         if (_state.value.climateSync[vin] == cs) return
         val merged = _state.value.climateSync + (vin to cs)
         _state.update { it.copy(climateSync = merged) }

@@ -30,8 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -81,7 +79,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -116,7 +113,6 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.items
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.Icon
@@ -129,6 +125,9 @@ import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.links
+import com.bloo.bluelink.data.parseOdometerMiles
+import com.bloo.bluelink.data.serviceDue
+import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
 import com.bloo.wear.WearPebbles
@@ -137,6 +136,7 @@ import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import com.bloo.wear.seatStepLabels
 import com.bloo.uicommon.dropShadow
+import com.bloo.uicommon.topFadeScrim
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -284,7 +284,10 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                     MaterialTheme(colorScheme = carScheme) { body() }
                 } else body()
             }
-            CurvedIndicator(count, carPager.currentPage, anchor = 90f)
+            // One dot per car page, hugging the bottom arc (anchor 90°).
+            // Driven by currentPage (live, mid-drag) so it tracks the swipe
+            // immediately; rendered plainly (no per-dot size/color animation).
+            CurvedDots(count = count, activeIndex = carPager.currentPage, anchor = 90f, animate = false)
             // Shown once for the whole screen, above all pages.
             MessageSnackbar(ui.message, onDismiss = { vm.dismissMessage() })
         }
@@ -507,11 +510,15 @@ private fun CarColumn(
             }
         }
 
-        // Tile-progress dots that curve along the right bezel so the round face
-        // never clips them.
-        CurvedDotIndicator(
-            total = tileCount,
+        // Tile-progress dots that curve along the right bezel (anchor 0° = 3
+        // o'clock) so the round face never clips them. One dot per tile,
+        // capped at 12, with the active dot animating as you scroll.
+        CurvedDots(
+            count = tileCount,
             activeIndex = if (tileCount > 0) centerItemIndex % tileCount else 0,
+            anchor = 0f,
+            animate = true,
+            cap = 12,
         )
 
         // Name the car once you leave its summary tile.
@@ -537,11 +544,7 @@ private fun BoxScope.TopClockScrim() {
             .align(Alignment.TopCenter)
             .fillMaxWidth()
             .height(34.dp)
-            .background(
-                Brush.verticalGradient(
-                    listOf(MaterialTheme.colorScheme.background.copy(alpha = 0.5f), Color.Transparent),
-                ),
-            )
+            .topFadeScrim(MaterialTheme.colorScheme.background.copy(alpha = 0.5f), 34.dp)
             .blur(14.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
     )
 }
@@ -643,42 +646,62 @@ private fun TileContent(
 }
 
 /**
- * Tile-progress dots laid along the right-hand arc of the (round) screen,
- * one dot per on-screen tile in [CarColumn] (doors/climate/charge/etc, not
- * to be confused with [CurvedIndicator]'s one-dot-per-car page indicator).
+ * Progress dots laid along the round screen's arc. Consolidates the two dot
+ * indicators this screen draws (which used to be near-identical copies):
  *
- * Caps the number of rendered dots at 12 ([shown]) regardless of how many
- * tiles a car actually has -- a car with, say, 20 tiles would otherwise draw
- * 20 tiny dots that blur together on a ~200px watch face. When `total`
- * exceeds that cap, [active] is computed by *proportionally* mapping
- * `activeIndex` (0..total-1) onto the compressed 0..shown-1 dot range, so the
- * highlighted dot's position along the arc still roughly tracks how far
- * through the tile list the user has scrolled, rather than jumping straight
- * to the same physical dot for every tile past the 12th.
+ * - The one-dot-per-*tile* indicator hugging the right bezel (`anchor = 0f`),
+ *   used by [CarColumn] to show scroll progress through a car's tiles. Its
+ *   dots [animate] size/color as the active dot moves, and it [cap]s the
+ *   rendered count at 12 (see below).
+ * - The one-dot-per-*car* page indicator ([HomeScreen] passes `anchor = 90f`
+ *   to hug the bottom), which tracks the pager live and renders its dots
+ *   plainly (no per-dot animation).
+ *
+ * When [count] exceeds [cap], the active dot is computed by *proportionally*
+ * mapping [activeIndex] (0..count-1) onto the compressed 0..cap-1 dot range,
+ * so a car with, say, 20 tiles draws only [cap] dots (20 tiny ones would blur
+ * together on a ~200px watch face) while the highlighted dot still roughly
+ * tracks scroll progress. The default `cap = count` reduces that mapping to
+ * 1:1 (every item gets its own dot), matching the page indicator.
  */
 @Composable
-private fun CurvedDotIndicator(total: Int, activeIndex: Int) {
-    if (total <= 1) return
-    val shown = min(total, 12)
-    val active = if (total <= shown) {
-        // Fewer tiles than dots: index maps 1:1, just clamp for safety.
+private fun CurvedDots(
+    count: Int,
+    activeIndex: Int,
+    anchor: Float,
+    animate: Boolean,
+    cap: Int = count,
+) {
+    if (count <= 1) return
+    val shown = min(count, cap)
+    val active = if (count <= shown) {
+        // Fewer items than dots: index maps 1:1, just clamp for safety.
         activeIndex.coerceIn(0, shown - 1)
     } else {
-        // More tiles than dots: rescale activeIndex's position in [0, total-1]
+        // More items than dots: rescale activeIndex's position in [0, count-1]
         // onto [0, shown-1] and round to the nearest whole dot.
-        ((activeIndex.toFloat() / (total - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
+        ((activeIndex.toFloat() / (count - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
     }
     val selected = MaterialTheme.colorScheme.primary
     val unselected = MaterialTheme.colorScheme.outlineVariant
-    // anchor 0° = 3 o'clock; dots hug the right bezel and follow the curve.
-    CurvedLayout(modifier = Modifier.fillMaxSize(), anchor = 0f, anchorType = AnchorType.Center) {
+    CurvedLayout(modifier = Modifier.fillMaxSize(), anchor = anchor, anchorType = AnchorType.Center) {
         curvedRow {
             repeat(shown) { i ->
                 curvedComposable {
                     val isOn = i == active
-                    val sz by animateDpAsState(if (isOn) 7.dp else 4.dp, tween(150), label = "cd$i")
-                    val c by animateColorAsState(if (isOn) selected else unselected, tween(150), label = "cc$i")
-                    Box(Modifier.padding(1.5.dp).size(sz).clip(CircleShape).background(c))
+                    if (animate) {
+                        val sz by animateDpAsState(if (isOn) 7.dp else 4.dp, tween(150), label = "cd$i")
+                        val c by animateColorAsState(if (isOn) selected else unselected, tween(150), label = "cc$i")
+                        Box(Modifier.padding(1.5.dp).size(sz).clip(CircleShape).background(c))
+                    } else {
+                        Box(
+                            Modifier
+                                .padding(1.5.dp)
+                                .size(if (isOn) 7.dp else 4.dp)
+                                .clip(CircleShape)
+                                .background(if (isOn) selected else unselected),
+                        )
+                    }
                 }
             }
         }
@@ -999,7 +1022,7 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
     val weather: WearWeather? = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
     val ambientF = weather?.let { com.bloo.bluelink.data.ambientFahrenheit(it.tempC) }
     val label = if (ambientF != null) {
-        val action = if (ambientF >= 70) "Cool" else "Heat"
+        val action = if (smartClimateIsCooling(ambientF)) "Cool" else "Heat"
         if (car.climateOn == true) "Smart climate on" else "$action to ~${
             degLabel(com.bloo.bluelink.data.smartClimateTargetF(ambientF).toString(), fahrenheit)
         }"
@@ -1507,9 +1530,9 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     val metric = ui.localSettings.unitSystem == "metric"
     // car.odometer arrives as a display-formatted string (e.g. "12,345"), so
     // it has to be de-commafied before it can be parsed back into a number
-    // for the service-due math below; toDoubleOrNull (not toIntOrNull) copes
-    // with any decimal formatting some brands include.
-    val odoInt = car.odometer?.replace(",", "")?.toDoubleOrNull()?.toInt()
+    // for the service-due math below; parseOdometerMiles handles the comma
+    // stripping and the decimal formatting some brands include.
+    val odoInt = parseOdometerMiles(car.odometer)
     car.odometer?.let { StatusRow("Odometer", it) }
     car.licensePlate?.takeIf { it.isNotBlank() }?.let { StatusRow("Plate", it) }
     val lastSvc = car.lastServiceMiles
@@ -1523,7 +1546,7 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     // absolute due mileage ("at N mi") instead of hiding the row entirely.
     if (lastSvc != null && interval != null) {
         val nextDue = lastSvc + interval
-        val remaining = odoInt?.let { nextDue - it }
+        val remaining = serviceDue(odoInt, lastSvc, interval)
         StatusRow(
             "Service due",
             remaining?.let { "in ${formatDistance(it.coerceAtLeast(0), metric)}" } ?: "at ${formatDistance(nextDue, metric)}",
@@ -1852,42 +1875,6 @@ private fun useFahrenheit(ui: WearUi): Boolean =
     ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
 
 /**
- * A page indicator whose dots curve along the round screen's edge -- one dot
- * per *car* (contrast [CurvedDotIndicator], which is one dot per *tile*
- * within a single car's column). Used by [HomeScreen] with `anchor = 90f` to
- * hug the bottom of the round face, positioned via Wear Compose's
- * [CurvedLayout]/`curvedRow`, which lay their children out along an arc
- * rather than a straight line the way a normal `Row` would. `current` is
- * driven by `carPager.currentPage` (updated live, mid-drag), not the
- * settled-page index HomeScreen uses elsewhere for focus/side-effects, so
- * this indicator visually tracks the pager immediately as the user swipes.
- */
-@Composable
-private fun CurvedIndicator(count: Int, current: Int, anchor: Float) {
-    if (count <= 1) return
-    val selected = MaterialTheme.colorScheme.primary
-    val unselected = MaterialTheme.colorScheme.outlineVariant
-    CurvedLayout(modifier = Modifier.fillMaxSize(), anchor = anchor, anchorType = AnchorType.Center) {
-        curvedRow {
-            repeat(count) { i ->
-                curvedComposable {
-                    // Matches CurvedDotIndicator's 4dp/7dp scale (both are
-                    // "progress along the bezel" dots that can appear on the
-                    // same screen -- they used to disagree on unselected size).
-                    Box(
-                        Modifier
-                            .padding(1.5.dp)
-                            .size(if (i == current) 7.dp else 4.dp)
-                            .clip(CircleShape)
-                            .background(if (i == current) selected else unselected)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
  * Reorder this car's pebble *groups* (so the multiple watch tiles a pebble owns
  * always move as one unit). Long-press a row and drag. On drop, the new order is
  * applied instantly and pushed to the phone as this car's section order, keeping
@@ -1919,11 +1906,6 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         if (draggingKey == null) order = synced
     }
 
-    val state = rememberScalingLazyListState()
-    val scope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
-
     // Persist (summary first) to the car's pebble order, synced to the phone.
     fun commit() {
         vm.savePebbleOrder(vin, listOf("summary") + order)
@@ -1933,16 +1915,10 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         vm.refreshTileWidgets()
     }
 
-    ScalingLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .onRotaryScrollEvent { e ->
-                scope.launch { state.scrollBy(e.verticalScrollPixels) }
-                true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
-        state = state,
+    // Rotary/focus scaffolding (crown+bezel scroll, focus-on-appear) lives in
+    // RotaryScalingColumn now; this screen keeps its own edge-scale-off params,
+    // padding and spacing.
+    RotaryScalingColumn(
         scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
         contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(flat = 8.dp, round = 18.dp), vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),

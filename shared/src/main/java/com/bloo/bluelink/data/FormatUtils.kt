@@ -68,6 +68,16 @@ fun smartClimateTargetF(ambientF: Int): Int {
     }
 }
 
+/** Whether [smartClimateTargetF] would be cooling (rather than heating) for the
+ *  given outside [ambientF] — used by callers to pick the "Cool"/"Heat" label
+ *  without recomputing the target. Matches the cool/heat partition in
+ *  [smartClimateTargetF]: 70F and up is cooling, below is heating. */
+fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
+
+/** The valid range (in minutes) for a remote-start climate run's duration. The
+ *  default within this range stays its own constant, [DEFAULT_CLIMATE_DURATION_MIN]. */
+val CLIMATE_DURATION_RANGE: IntRange = 1..10
+
 /** The valid range for a car's AC/DC charge-limit percentage sliders. Was
  *  duplicated as a literal `50..100` at 5 call sites (phone's ChargePebble
  *  slider, the watch's setAcLimit/setDcLimit clamps and its two SliderRows)
@@ -292,3 +302,19 @@ fun vehicleStateLabel(
     locked == false   -> "Unlocked"
     else              -> "—" // locked itself unknown (null) and nothing else applies.
 }
+
+/** Raw signed miles remaining until the next scheduled service: the next-due
+ *  odometer reading ([lastServiceMiles] + [intervalMiles]) minus the current
+ *  [odometerMiles]. Returns null if any input is null. The value is intentionally
+ *  left signed (negative once service is overdue) — callers apply their own
+ *  coerceAtLeast(0) / >= comparisons depending on how they present it. */
+fun serviceDue(odometerMiles: Int?, lastServiceMiles: Int?, intervalMiles: Int?): Int? {
+    if (odometerMiles == null || lastServiceMiles == null || intervalMiles == null) return null
+    return (lastServiceMiles + intervalMiles) - odometerMiles
+}
+
+/** Parse the API's odometer field (a possibly-comma-grouped, possibly-decimal
+ *  string like "12,345.6") into whole miles, or null if blank/unparseable.
+ *  Strips grouping commas and truncates any fractional part via toInt(). */
+fun parseOdometerMiles(odometer: String?): Int? =
+    odometer?.trim()?.takeIf { it.isNotBlank() }?.replace(",", "")?.toDoubleOrNull()?.toInt()
