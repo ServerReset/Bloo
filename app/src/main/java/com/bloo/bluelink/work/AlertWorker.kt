@@ -27,14 +27,12 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      * WorkManager's entry point, invoked on each ~30-minute periodic tick.
      *
      * Mechanism, in order:
-     * 1. Cheap early exit: if neither the service-due nor door-open alert types
-     *    are enabled in the user's [SettingsStore.notificationPrefs], returns
-     *    success immediately without logging into anything or making a single
-     *    network call. Note the "running" (engine-left-on) alert type isn't
-     *    checked here even though [CarAlerts.evaluate] also handles it below --
-     *    both this check and the loop still run whenever service or door-open
-     *    is on, so a "running"-only preference configuration is effectively
-     *    only evaluated as a side effect of one of the other two being enabled.
+     * 1. Cheap early exit: if none of the service-due, door-open, or "running"
+     *    (engine-left-on) alert types are enabled in the user's
+     *    [SettingsStore.notificationPrefs], returns success immediately without
+     *    logging into anything or making a single network call. All three types
+     *    that [CarAlerts.evaluate] handles below are checked here, so a
+     *    "running"-only preference configuration still runs the poll.
      * 2. Otherwise, iterates every brand the user is actually logged into (
      *    [SessionStore.loggedInBrands]) -- each brand gets its own repository
      *    instance via [repositoryFor]; if building that repo fails for one
@@ -68,7 +66,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         val prefs = settings.notificationPrefs()
-        if (!prefs.service && !prefs.doorOpen) return Result.success()
+        if (!prefs.service && !prefs.doorOpen && !prefs.running) return Result.success()
 
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue

@@ -24,29 +24,36 @@ object WearCommandRunner {
      */
     suspend fun execute(context: Context, command: WearCommand): WearCommandResult {
         val store = SnapshotStore(context)
-        val snap = store.current().vehicles.firstOrNull { it.vin == command.vin }
-            ?: return WearCommandResult(command.vin, command.action, ok = false, message = "Car not found")
-        val v = snap.toVehicle()
-        val repo = repositoryFor(
-            Brand.fromIndicator(v.brandIndicator),
-            SessionStore(context), CredentialStore(context),
-        )
-        val climate = ClimateRequest(
-            tempF = command.tempF,
-            defrost = command.defrost,
-            durationMinutes = command.durationMinutes,
-            steeringWheelHeat = command.steeringWheelHeat,
-            seatFrontLeft = SeatLevel.fromApi(command.seatFrontLeft),
-            seatFrontRight = SeatLevel.fromApi(command.seatFrontRight),
-            seatRearLeft = SeatLevel.fromApi(command.seatRearLeft),
-            seatRearRight = SeatLevel.fromApi(command.seatRearRight),
-        )
         // Same lock refresh() and the phone UI's own command path already use --
         // BlueLink 502s on overlapping requests for the same account, and this
         // was the one command-executing path that skipped it, so a resent watch
         // command (e.g. after a slow BLE ack) could fire the same command twice
         // concurrently, or race a phone-UI-driven command, with no protection.
         return BlueLinkGate.statusMutex.withLock {
+            // Read the target vehicle's snapshot INSIDE the lock so the toggle
+            // direction is decided from state serialized against every other
+            // command path. If this read happened before acquiring the lock, two
+            // overlapping TOGGLE_* commands would both observe the same pre-toggle
+            // state and the second would invert the first instead of re-applying
+            // it (e.g. car locked -> A unlocks, B still sees locked -> sends
+            // UNLOCK again). See resolveToggle's docstring.
+            val snap = store.current().vehicles.firstOrNull { it.vin == command.vin }
+                ?: return@withLock WearCommandResult(command.vin, command.action, ok = false, message = "Car not found")
+            val v = snap.toVehicle()
+            val repo = repositoryFor(
+                Brand.fromIndicator(v.brandIndicator),
+                SessionStore(context), CredentialStore(context),
+            )
+            val climate = ClimateRequest(
+                tempF = command.tempF,
+                defrost = command.defrost,
+                durationMinutes = command.durationMinutes,
+                steeringWheelHeat = command.steeringWheelHeat,
+                seatFrontLeft = SeatLevel.fromApi(command.seatFrontLeft),
+                seatFrontRight = SeatLevel.fromApi(command.seatFrontRight),
+                seatRearLeft = SeatLevel.fromApi(command.seatRearLeft),
+                seatRearRight = SeatLevel.fromApi(command.seatRearRight),
+            )
             runCatching {
                 val updated = when (command.action) {
                     WearAction.TOGGLE_LOCK ->

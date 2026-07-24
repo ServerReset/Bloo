@@ -222,10 +222,16 @@ class KiaUsaApi {
             )
             .apiHeaders(deviceId).header("sid", interimSid).header("rmtoken", rmtoken)
             .build()
-        val finalSid = raw(finishReq).use { resp ->
-            resp.header("sid") ?: throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code)
+        // The finish exchange can itself rotate the rmtoken; prefer a freshly-
+        // issued one over the verifyOTP token when the server sends it, so a
+        // server-side rotation gets persisted (mirrors authUser's silent
+        // re-auth handling).
+        val (finalSid, finalRmtoken) = raw(finishReq).use { resp ->
+            val sid = resp.header("sid")
+                ?: throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code)
+            sid to (resp.header("rmtoken") ?: rmtoken)
         }
-        KiaSession(finalSid, rmtoken, deviceId, pin)
+        KiaSession(finalSid, finalRmtoken, deviceId, pin)
     }
 
     // --- Vehicles --------------------------------------------------------
@@ -492,7 +498,6 @@ class KiaUsaApi {
         5 -> buildJsonObject { put("heatVentType", 2); put("heatVentLevel", 4); put("heatVentStep", 1) }
         4 -> buildJsonObject { put("heatVentType", 2); put("heatVentLevel", 3); put("heatVentStep", 2) }
         3 -> buildJsonObject { put("heatVentType", 2); put("heatVentLevel", 2); put("heatVentStep", 3) }
-        1 -> buildJsonObject { put("heatVentType", 1); put("heatVentLevel", 4); put("heatVentStep", 1) }
         else -> buildJsonObject { put("heatVentType", 0); put("heatVentLevel", 1); put("heatVentStep", 0) }
     }
 

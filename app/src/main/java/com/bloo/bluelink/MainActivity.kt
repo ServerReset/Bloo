@@ -87,7 +87,17 @@ class MainActivity : FragmentActivity() {
         )
         // Notification permission is requested from the onboarding screen (on a
         // button tap), not silently on first launch.
-        handleShortcutIntent(intent)
+        // Only route the shortcut on a genuine first creation, not on a
+        // config-change/process-death recreation: getIntent() still returns the
+        // original ACTION_SHORTCUT intent across recreation, so an unguarded call
+        // here would re-fire the car command (duplicating/inverting a lock/unlock).
+        // After handling, neutralize the stored intent so a later recreate can't
+        // replay it. (onNewIntent handles the already-running case and setIntents
+        // itself.)
+        if (savedInstanceState == null) {
+            handleShortcutIntent(intent)
+            setIntent(Intent())
+        }
         setContent {
             val appearance by viewModel.appearance.collectAsState()
             val activeCustom = if (!appearance.dynamicColor)

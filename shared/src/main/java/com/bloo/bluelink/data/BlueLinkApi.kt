@@ -141,7 +141,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             .header("includeNonConnectedVehicles", "Y")
             .build()
         val parsed = json.decodeFromString(EnrollmentResponse.serializer(), call(request))
-        parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle() }
+        parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle(brand) }
     }
 
     // --- Commands --------------------------------------------------------
@@ -468,12 +468,14 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
  *  unnamed car falls back to its model name, then to the last 6 VIN
  *  characters; a missing generation defaults to "2" (the most common case
  *  among the reference clients' sample data); isEv is derived from the
- *  single-character evStatus code ("E" specifically, case-insensitively). */
-private fun VehicleDetails.toVehicle(): Vehicle = Vehicle(
+ *  single-character evStatus code ("E" specifically, case-insensitively). A
+ *  blank model falls back to the account's [brand] label (e.g. "Genesis")
+ *  rather than a hardcoded make, since this client can be pointed at either. */
+private fun VehicleDetails.toVehicle(brand: Brand): Vehicle = Vehicle(
     vin = vin,
     regId = regid,
     name = nickName?.takeIf { it.isNotBlank() } ?: modelName ?: vin.takeLast(6),
-    model = listOfNotNull(modelYear, modelName).joinToString(" ").ifBlank { "Hyundai" },
+    model = listOfNotNull(modelYear, modelName).joinToString(" ").ifBlank { brand.label },
     generation = vehicleGeneration ?: "2",
     brandIndicator = brandIndicator ?: "",
     isEv = evStatus.equals("E", ignoreCase = true),

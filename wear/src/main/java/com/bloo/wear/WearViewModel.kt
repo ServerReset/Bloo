@@ -489,6 +489,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                         ))
                     }
                 }
+                // Fresh data just landed for these VINs -- advance their "last
+                // updated" stamps so buildCarView's fetchedAt label tracks it
+                // (covers both the loadGarage and the plain publish path below).
+                markFetched(data.vehicles.map { it.vin })
                 if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage()
                 else publish()
             }
@@ -582,8 +586,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 credentialStore.save(Credentials(email.trim(), password, pin.trim(), brand))
             }.onSuccess {
                 AppLog.log("Watch sign-in: ${maskEmail(email.trim())} (${brand.label})")
+                // Keystore-backed EncryptedSharedPreferences read is disk + crypto IO —
+                // resolve it off the main thread into a val BEFORE update{} so a lost CAS
+                // race can't re-run the blocking read inside the retry lambda (mirrors bootstrap()).
+                val emails = withContext(Dispatchers.IO) {
+                    runCatching { credentialStore.loadAll().map { c -> c.email } }.getOrDefault(emptyList())
+                }
                 _ui.update {
-                    it.copy(busy = false, screen = WearScreen.Ready, accounts = credentialStore.loadAll().map { c -> c.email })
+                    it.copy(busy = false, screen = WearScreen.Ready, accounts = emails)
                 }
                 loadGarage()
             }.onFailure { e ->
@@ -641,7 +651,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // nothing else on the watch ever calls the vehicle-list API.
             if (WearComms.phoneNodeId(ctx) == null) {
                 val fetched = sessionStore.loggedInBrands().flatMap { b ->
-                    runCatching { repoFor(b).vehicles() }.getOrDefault(emptyList())
+                    runCatching { BlueLinkGate.statusMutex.withLock { repoFor(b).vehicles() } }.getOrDefault(emptyList())
                 }
                 if (fetched.isNotEmpty()) {
                     val snaps = fetched.map {
@@ -706,6 +716,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 val requested = runCatching { WearComms.requestSync(ctx, "", refresh = false) }.getOrDefault(false)
                 runCatching { WearComms.pullLatest(ctx) }
                 snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
+                markFetched(snapshots.keys)
                 refreshConnection()
                 if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
                 if (!requested) _ui.update { it.copy(message = "Bring your phone nearby to sync") }
@@ -1640,6 +1651,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                         })
                     }
                 }
+                // The relayed optimistic flip just updated this car's displayed
+                // state, so advance its "last updated" stamp alongside it.
+                markFetched(listOf(vin))
                 publish()
                 if (successMessage != null) _ui.update { it.copy(message = successMessage) }
                 sessionFetched.remove(vin)
@@ -1649,6 +1663,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     BlueLinkGate.statusMutex.withLock { block(v, repoFor(v.brand), statuses[vin]) }
                 }.onSuccess {
                     AppLog.log("Watch: $action ok")
+                    // The standalone block just applied fresh live state (via flip)
+                    // straight from the car API -- stamp it so the "updated X ago"
+                    // label reflects this arrival, not a stale cache seed.
+                    markFetched(listOf(vin))
                     publish()
                     if (successMessage != null) _ui.update { it.copy(message = successMessage) }
                     sessionFetched.remove(vin)
@@ -1712,6 +1730,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private fun flip(vin: String, change: (VehicleStatus) -> VehicleStatus) {
         val cur = statuses[vin] ?: VehicleStatus()
         statuses = statuses + (vin to change(cur))
+    }
+
+    /** Stamp each [vins] entry's "last updated" time to now, so buildCarView's
+     *  [CarView.fetchedAt]-based "updated X ago" label tracks each real data
+     *  arrival (snapshot push, standalone command success, relayed refresh)
+     *  instead of being frozen at whatever the on-disk cache seeded in bootstrap. */
+    private fun markFetched(vins: Collection<String>) {
+        if (vins.isEmpty()) return
+        val now = System.currentTimeMillis()
+        fetchedAt = fetchedAt + vins.associateWith { now }
     }
 
     /** Nudge every pool Tile and the watch-face complications to re-read the

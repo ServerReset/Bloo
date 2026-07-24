@@ -205,10 +205,10 @@ object WearComms {
                     )
                 }.isSuccess
                 if (!sent) WearCommandRunner.refresh(context, vin, force = refresh)
-                sent || refresh
+                sent
             } else {
                 WearCommandRunner.refresh(context, vin, force = refresh)
-                refresh
+                false
             }
         }
 

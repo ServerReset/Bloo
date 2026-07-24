@@ -284,7 +284,7 @@ class WearPhoneService : WearableListenerService() {
             val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
             items?.release()
             val updated = existing.copy(ai = existing.ai + (vin to summary))
-            WearBridge.publishExtras(ctx, updated)
+            WearBridge.publishExtrasNow(ctx, updated)
         }
         AppLog.log("AI summary generated for ${snap.name}")
         return WearAiResult(vin, ok = true)
@@ -311,7 +311,7 @@ class WearPhoneService : WearableListenerService() {
             val items = runCatching { Tasks.await(dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}"))) }.getOrNull()
             val existing = items?.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }?.firstOrNull() ?: WearExtras()
             items?.release()
-            WearBridge.publishExtras(ctx, existing.copy(homeWeather = weather.toWear()))
+            WearBridge.publishExtrasNow(ctx, existing.copy(homeWeather = weather.toWear()))
         }
         AppLog.log("Weather location set from watch request")
     }

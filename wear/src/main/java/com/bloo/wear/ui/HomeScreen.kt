@@ -954,7 +954,7 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     Spacer(Modifier.height(6.dp))
     // 2°F steps, not 1° - the round screen only has room for so many dots before
     // they crowd into an unreadable smear; halving the count (11 vs 21) fixes that.
-    val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
+    val fahrenheit = useFahrenheit(ui)
     SliderRow("Temp", degLabel(d.tempF.toString(), fahrenheit), d.tempF, 62, 82, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
     SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
@@ -995,7 +995,7 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
  */
 @Composable
 private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate", Icons.Filled.Thermostat) {
-    val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
+    val fahrenheit = useFahrenheit(ui)
     val weather: WearWeather? = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
     val ambientF = weather?.let { com.bloo.bluelink.data.ambientFahrenheit(it.tempC) }
     val label = if (ambientF != null) {
@@ -1024,8 +1024,13 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
     val currentWeather = weather
     if (ambientF != null && currentWeather != null) {
         Spacer(Modifier.height(4.dp))
+        // The ±10° swing is a Fahrenheit magnitude (see smartClimateTargetF). It's
+        // a temperature *difference*, so converting to °C uses only the ×5/9 scale
+        // (no +32 offset): 10°F ≈ 6°C. Otherwise a metric label read "±10°C",
+        // nearly double the real swing.
+        val swing = if (fahrenheit) "±10°F" else "±${(10 * 5 / 9.0).roundToInt()}°C"
         Text(
-            "Ambient: ${weatherTemp(currentWeather.tempC, fahrenheit)} · adjusts ±10°${if (fahrenheit) "F" else "C"}",
+            "Ambient: ${weatherTemp(currentWeather.tempC, fahrenheit)} · adjusts $swing",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
@@ -1440,7 +1445,7 @@ private fun WeatherCard(ui: WearUi, car: CarView) {
         )
         return@SectionCard
     }
-    val f = ui.settings?.useFahrenheit != false
+    val f = useFahrenheit(ui)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(weatherIcon(w.code, w.isDay), contentDescription = null,
             tint = com.bloo.uicommon.weatherTint(w.code, w.isDay, MaterialTheme.colorScheme.onSurfaceVariant),
@@ -1466,7 +1471,7 @@ private fun WeatherCard(ui: WearUi, car: CarView) {
 
 @Composable
 private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Filled.DirectionsCar) {
-    val fahrenheit = ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
+    val fahrenheit = useFahrenheit(ui)
     val err = MaterialTheme.colorScheme.error
     // This card is a flat list of ~10 rows with nothing summarizing "is
     // everything closed up" at a glance -- DiagnosticsCard already solved the
@@ -1542,7 +1547,9 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
     // whole card. One roll-up row matches the "summarize, then detail"
     // pattern the rest of the file already uses.
     val issueCount = listOf(
-        anyIndividualTire, car.tireWarning,
+        // A car can report both a per-wheel flag and the aggregate tireWarning
+        // for the same physical problem; count that as one issue, not two.
+        anyIndividualTire || car.tireWarning,
         car.battery12v != null && car.battery12v < 20,
         car.lowFuel, car.washerLow, car.brakeLow, car.keyFobLow,
     ).count { it }
@@ -1835,6 +1842,14 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
 // level set: 0 from the API means "off"/unsupported, so it's treated as "no
 // row" (null) rather than rendering a row that always just says "Off".
 private fun seatLabel(v: Int?): String? = v?.takeIf { it != 0 }?.let { SeatLevel.fromApi(it).label }
+
+// Single source of truth for whether temperature readouts render in Fahrenheit,
+// shared by every card that shows a temperature (Weather, Climate, SmartClimate,
+// Info) so their unit rule can't drift apart. Fahrenheit unless the watch-local
+// unit system is explicitly metric AND the phone hasn't pushed a Fahrenheit
+// preference (`useFahrenheit == false`).
+private fun useFahrenheit(ui: WearUi): Boolean =
+    ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
 
 /**
  * A page indicator whose dots curve along the round screen's edge -- one dot

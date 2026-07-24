@@ -35,8 +35,8 @@ object AppLog {
      * callers from different threads don't interleave and drop each other's lines.
      */
     fun log(message: String) {
-        val line = "${timestamp.format(Date())}  $message"
         synchronized(this) {
+            val line = "${timestamp.format(Date())}  $message"
             val next = (_lines.value + line).takeLast(MAX_LINES)
             _lines.value = next
         }

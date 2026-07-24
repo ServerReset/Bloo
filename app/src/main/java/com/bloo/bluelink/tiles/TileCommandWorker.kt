@@ -2,6 +2,7 @@ package com.bloo.bluelink.tiles
 
 import android.content.Context
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -24,16 +25,32 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val cmd = inputData.getString(KEY_CMD) ?: return Result.failure()
         if (cmd == CMD_REFRESH) {
-            runCatching {
+            val refreshed = runCatching {
                 WearCommandRunner.refresh(applicationContext, vin)
                 AppLog.log("Tile refresh for $vin")
             }.onFailure { AppLog.log("⚠ Tile refresh failed: ${it.message}") }
-        } else {
-            val target = inputData.getString(KEY_TARGET) ?: "default"
-            TileCommandRunner.run(applicationContext, vin, cmd, target)
+            runCatching { BlooTileService.requestUpdates(applicationContext) }
+            // A status refresh is read-only, so a transient network hiccup is safe
+            // to retry a bounded number of times. If it keeps failing we give up
+            // (success) rather than leaving a silent background refresh stuck.
+            return when {
+                refreshed.isSuccess -> Result.success()
+                runAttemptCount < MAX_ATTEMPTS -> Result.retry()
+                else -> Result.success()
+            }
         }
+        val target = inputData.getString(KEY_TARGET) ?: "default"
+        val result = TileCommandRunner.run(applicationContext, vin, cmd, target)
         runCatching { BlooTileService.requestUpdates(applicationContext) }
-        return Result.success()
+        // Don't mask a failed command as success: TileCommandRunner already logs
+        // the ⚠ line, and returning failure() surfaces it to WorkManager instead
+        // of the old always-success behaviour. A mutating car command is not
+        // auto-retried here on purpose -- the runner collapses transient (network)
+        // and terminal (e.g. "can't start climate while driving", "car not found")
+        // outcomes into one message, and blindly re-dispatching a real
+        // lock/climate/charge command that may have already reached the car is
+        // riskier than surfacing the failure and letting the user re-tap.
+        return if (result.ok) Result.success() else Result.failure()
     }
 
     companion object {
@@ -41,12 +58,24 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
         const val KEY_CMD = "cmd"
         const val KEY_TARGET = "target"
         const val CMD_REFRESH = "__refresh"
+        /** Bounded retries for the read-only refresh path (runAttemptCount is 0-based). */
+        private const val MAX_ATTEMPTS = 3
 
         fun enqueue(ctx: Context, vin: String, cmd: String, target: String) {
             val req = OneTimeWorkRequestBuilder<TileCommandWorker>()
                 .setInputData(workDataOf(KEY_VIN to vin, KEY_CMD to cmd, KEY_TARGET to target))
                 .build()
-            WorkManager.getInstance(ctx).enqueue(req)
+            // Serialize same-(vin,cmd) taps rather than running them concurrently:
+            // a double-tap of the same tile used to enqueue two workers that raced,
+            // and because the toggle direction is read from the last-known snapshot,
+            // the second could read the first's optimistic flip and send the OPPOSITE
+            // command (two "lock" taps ending with the car unlocked). APPEND_OR_REPLACE
+            // chains them so they run one after another, each seeing the prior result.
+            WorkManager.getInstance(ctx).enqueueUniqueWork(
+                "tile_cmd_${vin}_$cmd",
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                req,
+            )
         }
 
         /** Enqueue a lightweight status refresh for a tile's car. */

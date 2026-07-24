@@ -302,7 +302,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val statusMutex = com.bloo.bluelink.data.BlueLinkGate.statusMutex
 
-    /** VINs with a status request currently queued or running (de-dupes). */
+    /** Status requests currently queued or running, keyed "vin:refresh"
+     *  (de-dupes; a live refresh=true isn't dropped behind a background
+     *  refresh=false fetch for the same car). */
     private val statusInFlight = mutableSetOf<String>()
 
     /** Subset of [statusInFlight] whose call used surfaceErrors=true (drives the spinner + settle haptic). */
@@ -343,7 +345,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
         alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions) }
-        alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text) } }
+        alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = "error") } }
     }
 
     // Simple notification-preference setters: each just fires a coroutine that
@@ -479,7 +481,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun login(username: String, password: String, pin: String, brand: Brand) {
         if (username.isBlank() || password.isBlank() || (pin.isBlank() && !brand.usesOtpLogin)) {
-            _state.update { it.copy(message = "Email, password and PIN are all required") }
+            _state.update { it.copy(message = "Email, password and PIN are all required", messageType = "error") }
             return
         }
         if (brand == Brand.KIA) {
@@ -539,7 +541,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val otp = _state.value.kiaOtp ?: return
         val creds = kiaPending ?: return
         if (code.isBlank()) {
-            _state.update { it.copy(message = "Enter the code you received") }
+            _state.update { it.copy(message = "Enter the code you received", messageType = "error") }
             return
         }
         launchBusy {
@@ -596,7 +598,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             AppLog.log("Signed out of ${brand.label}")
             val remaining = credentialStore.loadAll()
             if (remaining.isEmpty()) {
-                _state.value = UiState(screen = Screen.Login)
+                // Preserve the on-device AI probe result across the full state
+                // reset -- it's a device capability, not account state, and was
+                // only probed once in init. Dropping it hid the AI UI/toggle on a
+                // capable device after signing back in within the same session.
+                _state.value = UiState(
+                    screen = Screen.Login,
+                    aiSupported = _state.value.aiSupported,
+                    aiEnabled = _state.value.aiEnabled,
+                    aiAuto = _state.value.aiAuto,
+                )
             } else {
                 _state.update { it.copy(accounts = remaining) }
                 loadGarage()
@@ -937,7 +948,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Toggles: do the opposite of the last-known state.
             "doors" -> if (status?.doorLock == true) unlock(v) else lock(v)
             "climate" -> if (status?.airCtrlOn == true) stopClimate(v) else {
-                startClimate(v, ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN))
+                // Gate the start on !isDriving, matching the in-app control (which
+                // goes read-only while driving) -- the car rejects remote climate
+                // while moving, so firing it would only waste a serialized request
+                // slot and surface a spurious "command failed".
+                if (!_state.value.isDriving(v)) {
+                    startClimate(v, ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN))
+                }
             }
             "lock" -> lock(v)
             "unlock" -> unlock(v)
@@ -1015,9 +1032,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Fetches one car's status. All fetches funnel through [statusMutex] so they
-     * run strictly sequentially (Blue Link 502s on overlapping requests), and a
-     * VIN already queued/running is skipped so we never pile up duplicates.
+     * Fetches one car's status. The network call funnels through [statusMutex]
+     * so they run strictly sequentially (Blue Link 502s on overlapping
+     * requests), and a (vin, refresh) already queued/running is skipped so we
+     * never pile up duplicates -- keyed on refresh too so a live pull-to-refresh
+     * isn't dropped behind an in-flight background (refresh=false) fetch.
      */
     private fun loadStatus(
         v: Vehicle,
@@ -1026,8 +1045,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         logSuccess: String? = null,
         surfaceErrors: Boolean = true,
     ) {
+        // Key the in-flight set on (vin, refresh) so a user pull-to-refresh
+        // (refresh=true) is never deduped behind an already-queued background
+        // fetch (refresh=false) for the same car -- otherwise the manual call
+        // returned instantly with no spinner and no live poll.
+        val inFlightKey = "${v.vin}:$refresh"
         synchronized(statusInFlight) {
-            if (!statusInFlight.add(v.vin)) return
+            if (!statusInFlight.add(inFlightKey)) return
             if (surfaceErrors) surfaceInFlight.add(v.vin)
         }
         // Only show the spinner/settle-haptic for user-triggered refreshes; silent
@@ -1036,52 +1060,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (surfaceErrors) _state.update { it.copy(refreshing = true) }
         viewModelScope.launch {
             try {
-                statusMutex.withLock {
-                    repoFor(v).status(v, refresh = refresh)?.let { s ->
-                        // The status payload carries last-known GPS for free — use
-                        // it so the map/location works without the rate-limited
-                        // findMyCar call (this is what the official app does).
-                        val statusLoc = s.vehicleLocation?.coord?.let { c ->
-                            val lat = c.lat
-                            val lon = c.lon
-                            if (lat != null && lon != null) {
-                                GeoLocation(lat, lon, s.vehicleLocation?.speed?.value)
-                            } else null
-                        }
-                        _state.update { st ->
-                            st.copy(
-                                statuses = st.statuses + (v.vin to s),
-                                lastFetched = st.lastFetched + (v.vin to System.currentTimeMillis()),
-                                locations = if (statusLoc != null) {
-                                    st.locations + (v.vin to statusLoc)
-                                } else st.locations,
-                            )
-                        }
-                        persistSnapshots()
-                        persistCache()
-                        checkAlerts(v, s)
-                        // Auto-AI: refresh the summary off the new data if enabled.
-                        autoSummarize(v)
-                        statusLoc?.let { loc ->
-                            reverseGeocode(loc)?.let { place ->
-                                _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
-                            }
+                // Only the network status() call needs the account-wide mutex
+                // (Blue Link 502s on overlapping requests). Capture the result
+                // and EXIT the lock before running the slow, purely-local
+                // follow-up work (checkAlerts' DataStore read, the blocking
+                // Geocoder) so it doesn't stall every other car's fetch and the
+                // background poller behind it.
+                val s = statusMutex.withLock { repoFor(v).status(v, refresh = refresh) }
+                s?.let { status ->
+                    // The status payload carries last-known GPS for free — use
+                    // it so the map/location works without the rate-limited
+                    // findMyCar call (this is what the official app does).
+                    val statusLoc = status.vehicleLocation?.coord?.let { c ->
+                        val lat = c.lat
+                        val lon = c.lon
+                        if (lat != null && lon != null) {
+                            GeoLocation(lat, lon, status.vehicleLocation?.speed?.value)
+                        } else null
+                    }
+                    _state.update { st ->
+                        st.copy(
+                            statuses = st.statuses + (v.vin to status),
+                            lastFetched = st.lastFetched + (v.vin to System.currentTimeMillis()),
+                            locations = if (statusLoc != null) {
+                                st.locations + (v.vin to statusLoc)
+                            } else st.locations,
+                        )
+                    }
+                    persistSnapshots()
+                    persistCache()
+                    checkAlerts(v, status)
+                    // Auto-AI: refresh the summary off the new data if enabled.
+                    autoSummarize(v)
+                    statusLoc?.let { loc ->
+                        reverseGeocode(loc)?.let { place ->
+                            _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
                         }
                     }
+                    // Only mark fetched once a non-null status actually arrived, so
+                    // a car that returned null (e.g. asleep) is retried when viewed.
+                    sessionFetched.add(v.vin)
                 }
-                sessionFetched.add(v.vin)
                 logSuccess?.let { AppLog.log(it) }
             } catch (e: Exception) {
                 val msg = e.message ?: errorMessage
                 AppLog.log("⚠ ${v.name}: $msg")
-                if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg") }
+                if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg", messageType = "error") }
             } finally {
                 // Clear refreshing only when no more user-visible (surfaceErrors) fetches remain.
                 // Background fetches finishing after a user refresh must not prematurely clear
                 // the spinner or trigger the settle haptic.
                 val noMoreSurface = synchronized(statusInFlight) {
-                    statusInFlight.remove(v.vin)
-                    surfaceInFlight.remove(v.vin)
+                    statusInFlight.remove(inFlightKey)
+                    // Only clear this VIN's surface entry if THIS call added it
+                    // (surfaceErrors=true). Otherwise a concurrent background
+                    // (refresh=false) fetch for the same car -- now possible since
+                    // in-flight is keyed on (vin, refresh) -- would clobber a live
+                    // refresh's entry and clear the spinner prematurely.
+                    if (surfaceErrors) surfaceInFlight.remove(v.vin)
                     surfaceInFlight.isEmpty()
                 }
                 if (noMoreSurface) _state.update { it.copy(refreshing = false) }
@@ -1757,7 +1793,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // thing that throws "exceeded the daily remote service request limit".
         val s = repoFor(v).status(v, refresh = true)
         s?.let { st ->
-            _state.update { it.copy(statuses = it.statuses + (v.vin to st)) }
+            // Advance lastFetched too (like loadStatus does) -- otherwise the
+            // card's "updated X ago" stays stuck at the old time and maybeRelock's
+            // stale check can wrongly nudge "pull to refresh" right after a Locate.
+            _state.update {
+                it.copy(
+                    statuses = it.statuses + (v.vin to st),
+                    lastFetched = it.lastFetched + (v.vin to System.currentTimeMillis()),
+                )
+            }
         }
         val statusLoc = s?.vehicleLocation?.coord?.let { c ->
             val lat = c.lat
@@ -1938,7 +1982,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 val msg = e.message ?: "Command failed"
                 AppLog.log("⚠ $msg")
-                _state.update { it.copy(message = msg) }
+                _state.update { it.copy(message = msg, messageType = "error") }
                 // Revert the optimistic state on failure by scheduling a fresh refresh.
                 viewModelScope.launch {
                     _state.value.vehicles.firstOrNull { it.vin == vin }?.let { refreshStatus(it) }
@@ -2084,7 +2128,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // obvious fix in sight -- refuse to enable sync at all instead of
             // silently setting up something that's guaranteed to break later.
             AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-            _state.update { it.copy(message = "Couldn't get lasting access to that file — try picking it again") }
+            _state.update { it.copy(message = "Couldn't get lasting access to that file — try picking it again", messageType = "error") }
             return@launch
         }
         AppLog.log("Drive auto-sync enabled")
@@ -2273,8 +2317,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Wipe the in-memory activity log shown in Settings (not persisted, so
      *  nothing to clear on disk). */
     fun clearLogs() = AppLog.clear()
-    /** Dismiss the current snackbar. */
-    fun clearMessage() = _state.update { it.copy(message = null) }
+    /** Dismiss the current snackbar. Also resets [UiState.messageType] back to
+     *  the "error" default so a prior success/info message can't leave the type
+     *  sticky -- the next raw `message = ...` set (e.g. a command/status/login
+     *  failure that doesn't go through reportError) then renders in the error
+     *  colour rather than inheriting the previous benign colour. */
+    fun clearMessage() = _state.update { it.copy(message = null, messageType = "error") }
 
     /** Surface (and log) an error raised by the UI layer. */
     fun reportError(msg: String) {
@@ -2350,7 +2398,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 val msg = e.message ?: "Something went wrong"
                 AppLog.log("⚠ $msg")
-                _state.update { it.copy(message = msg) }
+                _state.update { it.copy(message = msg, messageType = "error") }
             } finally {
                 _state.update { it.copy(loading = false) }
             }

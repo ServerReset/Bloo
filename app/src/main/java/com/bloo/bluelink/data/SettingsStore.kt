@@ -230,8 +230,6 @@ class SettingsStore(private val context: Context) {
     // back to a hardcoded default rather than throwing — this flow is collected
     // eagerly near app launch, so a decode failure here must never crash startup.
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
-        val palJson = Json { ignoreUnknownKeys = true }
-        val palSer = ListSerializer(CustomPaletteData.serializer())
         Appearance(
             themeMode = prefs[Keys.THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
                 ?: ThemeMode.SYSTEM,
@@ -241,12 +239,12 @@ class SettingsStore(private val context: Context) {
             colorPalette = prefs[Keys.PALETTE]?.let { runCatching { ColorPalette.valueOf(it) }.getOrNull() }
                 ?: ColorPalette.BLUE,
             customPalettes = prefs[Keys.CUSTOM_PALETTES]?.let { json ->
-                runCatching { palJson.decodeFromString(palSer, json) }.getOrElse { emptyList() }
+                runCatching { paletteJson.decodeFromString(paletteListSerializer, json) }.getOrElse { emptyList() }
             } ?: emptyList(),
             activeCustomPaletteId = prefs[Keys.ACTIVE_CUSTOM_PALETTE_ID],
             carCustomPaletteIds = prefs[Keys.CAR_PALETTE_IDS]?.let { json ->
                 runCatching {
-                    palJson.decodeFromString(MapSerializer(String.serializer(), String.serializer()), json)
+                    paletteJson.decodeFromString(MapSerializer(String.serializer(), String.serializer()), json)
                 }.getOrElse { emptyMap() }
             } ?: emptyMap(),
             weatherLat = prefs[Keys.WEATHER_LAT]?.toDoubleOrNull(),
@@ -257,8 +255,11 @@ class SettingsStore(private val context: Context) {
                 ?: LockTiming.IMMEDIATE,
             columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
             linksInApp = prefs[Keys.LINKS_IN_APP]?.toBooleanStrictOrNull() ?: true,
-            uiScale = prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f,
-            vibrancy = prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f,
+            // Clamp on read: a corrupt/hand-edited/foreign backup with e.g.
+            // ui_scale="10" would otherwise scale the whole UI 10x and lock the
+            // user out of Settings, so a bad stored value can never take effect.
+            uiScale = (prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f).coerceIn(0.85f, 1.3f),
+            vibrancy = (prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 1.6f),
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
             auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",
@@ -786,6 +787,15 @@ class SettingsStore(private val context: Context) {
 
     // --- Home-screen widgets -------------------------------------------------
 
+    /** Every per-widget preference suffix, i.e. the set of "widget_<id>_<suffix>"
+     *  keys any widget can write. Defined once here so [clearWidgetConfig] can't
+     *  drift out of sync with the setters as new per-widget settings are added
+     *  (a missed suffix meant a recycled widget id inherited stale config —
+     *  e.g. a near-invisible alpha or the wrong layout). */
+    private val WIDGET_KEY_SUFFIXES = listOf(
+        "vin", "actions", "info", "pending", "auth", "photobg", "loc", "addr", "alpha", "pill", "layout",
+    )
+
     /** Per-widget assignment: (pinned vin, ordered action keys) or null.
      *  [widgetId] is Android's AppWidgetManager-assigned id for that specific
      *  home-screen widget instance, so each placed widget gets its own
@@ -813,7 +823,7 @@ class SettingsStore(private val context: Context) {
     suspend fun clearWidgetConfig(widgetId: Int) {
         editTracked {
             // Remove every per-widget key so a re-used widget id starts clean.
-            listOf("vin", "actions", "info", "pending", "auth", "photobg", "loc", "addr", "lat", "lon").forEach { suffix ->
+            WIDGET_KEY_SUFFIXES.forEach { suffix ->
                 it.remove(stringPreferencesKey("widget_${widgetId}_$suffix"))
                 it.remove(booleanPreferencesKey("widget_${widgetId}_$suffix"))
             }
@@ -1026,6 +1036,13 @@ class SettingsStore(private val context: Context) {
             if (imported) AppLog.log("Drive sync: imported newer settings")
         }
         val now = System.currentTimeMillis()
+        // Snapshot the dirty set that this upload body actually carries, taken
+        // right before the body is built. Only these keys may be cleared on
+        // success -- a key edited AFTER this point (setters don't take
+        // driveSyncMutex, so a local edit can land mid-upload) isn't reflected
+        // in `body`, so it must keep its dirty flag or a later remote import
+        // could silently overwrite the un-uploaded value.
+        val uploadedDirtyKeys = dirtyKeys()
         val body = "$now\n${exportSettingsJson()}"
         var uploadError: String? = null
         val uploaded = runCatching {
@@ -1056,9 +1073,11 @@ class SettingsStore(private val context: Context) {
         // every single attempt, with no way to tell sync had never succeeded.
         if (uploaded) {
             setLastSyncMs(now)
-            // We've now published everything we had pending, so nothing is
-            // "dirty" relative to Drive anymore — but only once it landed.
-            clearDirtyKeys()
+            // Clear ONLY the keys this upload body actually carried, not the
+            // whole set -- an edit made after the body snapshot (setters don't
+            // hold driveSyncMutex) is still pending and must stay dirty so a
+            // later remote import can't overwrite it.
+            clearDirtyKeys(uploadedDirtyKeys)
         }
         val error = uploadError ?: downloadError?.takeIf { remoteContent == null }
         // Persisted (not just returned) so a failure from the background
@@ -1332,8 +1351,17 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.data.first()[stringPreferencesKey("sync_dirty_keys")]
             ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-    private suspend fun clearDirtyKeys() {
-        context.settingsDataStore.edit { it.remove(stringPreferencesKey("sync_dirty_keys")) }
+    /** Clear [keys] from the dirty set via set-difference, leaving any key
+     *  marked dirty after the calling upload's body was snapshotted still
+     *  pending. Done inside a single edit{} so a concurrent [editTracked] can't
+     *  race between our read and write; if nothing dirty remains the key is
+     *  removed entirely. */
+    private suspend fun clearDirtyKeys(keys: Set<String>) {
+        context.settingsDataStore.edit { prefs ->
+            val dirtyKey = stringPreferencesKey("sync_dirty_keys")
+            val remaining = (prefs[dirtyKey]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()) - keys
+            if (remaining.isEmpty()) prefs.remove(dirtyKey) else prefs[dirtyKey] = remaining.joinToString(",")
+        }
     }
 
     /**

@@ -155,28 +155,40 @@ internal fun resolveWidgetAccent(
     appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
     vin: String? = null,
 ): Color {
-    val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-        android.content.res.Configuration.UI_MODE_NIGHT_YES
+    // Derive dark/light exactly the way [BlooTheme] does — honour the user's
+    // themeMode override (LIGHT→false, DARK/AMOLED→true) and only fall back to the
+    // system uiMode for SYSTEM — so the widget accent always matches the app.
+    val isDark = when (appearance.themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
+        ThemeMode.SYSTEM ->
+            (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
     val base = if (isDark) DarkExpressive else LightExpressive
+
+    // Apply the same vibrancy saturation scale [blooColorScheme] applies to the
+    // primary role (no-op when vibrancy == 1f), so the accent's "punch" matches.
+    fun Color.withVibrancy() = saturate(appearance.vibrancy)
 
     // Per-car custom palette takes highest priority.
     val carCustomId = vin?.let { appearance.carCustomPaletteIds[it] }
     carCustomId?.let { id -> appearance.customPalettes.firstOrNull { it.id == id } }
-        ?.let { return base.applyCustomPalette(it).primary }
+        ?.let { return base.applyCustomPalette(it).primary.withVibrancy() }
 
     // Global custom palette.
     appearance.activeCustomPaletteId
         ?.let { id -> appearance.customPalettes.firstOrNull { it.id == id } }
-        ?.let { return base.applyCustomPalette(it).primary }
+        ?.let { return base.applyCustomPalette(it).primary.withVibrancy() }
 
     // Dynamic color (Material You) — API 31+.
     if (appearance.dynamicColor && Build.VERSION.SDK_INT >= 31) {
-        return if (isDark) dynamicDarkColorScheme(context).primary
-               else dynamicLightColorScheme(context).primary
+        return (if (isDark) dynamicDarkColorScheme(context).primary
+                else dynamicLightColorScheme(context).primary).withVibrancy()
     }
 
     // Built-in enum palette.
-    return base.applyPalette(appearance.colorPalette).primary
+    return base.applyPalette(appearance.colorPalette).primary.withVibrancy()
 }
 
 // --- Expressive color palettes -------------------------------------------

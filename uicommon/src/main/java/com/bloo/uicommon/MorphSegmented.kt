@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -398,8 +399,16 @@ fun MorphSegmented(
                                 // selection or theme. Also lighter than the caller's style:
                                 // Medium when selected reads as the active choice; Normal
                                 // for the rest keeps the whole control visually quiet.
-                                style = if (isSelected) textStyle.copy(color = fg, fontWeight = FontWeight.Medium)
-                                        else textStyle.copy(color = fg, fontWeight = FontWeight.Normal, fontSize = textStyle.fontSize * 0.88f),
+                                // Scale the unselected label down slightly, but only when
+                                // the caller's fontSize is actually specified — multiplying an
+                                // unspecified TextUnit throws IllegalArgumentException, so an
+                                // unspecified-size style copies through unchanged instead.
+                                style = if (isSelected) {
+                                    textStyle.copy(color = fg, fontWeight = FontWeight.Medium)
+                                } else {
+                                    val unselected = textStyle.copy(color = fg, fontWeight = FontWeight.Normal)
+                                    if (textStyle.fontSize.isSpecified) unselected.copy(fontSize = textStyle.fontSize * 0.88f) else unselected
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

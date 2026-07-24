@@ -379,8 +379,12 @@ fun BlooApp(vm: AppViewModel) {
     val context = LocalContext.current
 
     // One haptics engine for the whole app; its enabled flag tracks the setting.
+    // Written in a SideEffect{} rather than inline: mutating shared state during
+    // composition is a Compose anti-pattern (the write can be discarded if the
+    // composition is abandoned, and it isn't ordered relative to effects) --
+    // SideEffect runs it after every successful (re)composition.
     val haptics = remember { Haptics(context.applicationContext) }
-    haptics.enabled = appearance.hapticsEnabled
+    SideEffect { haptics.enabled = appearance.hapticsEnabled }
 
     // While a command is in flight (or the garage is loading), loop a soft
     // left-to-right sweep so progress is felt until it completes. The effect is
@@ -2614,7 +2618,6 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             view.rootWindowInsets?.displayCutout?.boundingRects?.isNotEmpty() == true
         else false
     }
-    val likelyCoverScreen = compact && hasCameraCutout
     LaunchedEffect(compact, hasCameraCutout) {
         if (!coverHintShown && hasCameraCutout) {
             coverHintShown = true
@@ -3532,8 +3535,6 @@ private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val img = state.imageUrls[v.vin]
     val scheme = MaterialTheme.colorScheme
-    val carIndex = state.vehicles.indexOf(v).coerceAtLeast(0)
-    val carCount = state.vehicles.size
 
     // Entrance animation: slide up gently + fade in on first composition.
     val alpha = remember { Animatable(0f) }
@@ -3716,9 +3717,14 @@ private fun PagerDots(
                     animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
                 )
                 onRefresh.invoke()
-                holding = false
+                // Linger the full ring briefly, then ease it back to nothing --
+                // this must happen BEFORE flipping `holding` back to false,
+                // because that write re-keys (and thus cancels) this very
+                // LaunchedEffect(holding) coroutine, which used to kill the
+                // delay+collapse before it ever ran (the ring snapped away).
                 delay(300)
                 expandProgress.animateTo(0f, tween(200))
+                holding = false
             } else if (expandProgress.value > 0f) {
                 // Released (or the gesture was cancelled) before the hold
                 // completed -- LaunchedEffect(holding) cancels the coroutine
@@ -4693,6 +4699,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val hotspot = state.hotspotFor(v.vin)
         ?.takeIf {
             it in state.sectionsFor(v) && !state.isPebbleHidden(v.vin, it) &&
+                (it != "trips" || state.hasBattery(v)) &&
                 (it != "update" || state.updateAvailable != null)
         }
     val hotDrag = remember { HotSeatDrag() }
@@ -4858,6 +4865,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         var menu by remember { mutableStateOf(false) }
         val options = state.sectionsFor(v).filter {
             it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it) &&
+                (it != "trips" || state.hasBattery(v)) &&
                 (it != "update" || state.updateAvailable != null)
         }
         val hotDrag = LocalHotSeatDrag.current
@@ -5061,6 +5069,9 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
         it !in exclude &&
             !state.isPebbleHidden(v.vin, it) &&
             (it != "ai" || state.aiEnabled) &&
+            // Trip history rides on the EV-only trip-details endpoint, so a
+            // gas/PHEV/Kia car has nothing to show here -- gate it off battery.
+            (it != "trips" || state.hasBattery(v)) &&
             (it != "update" || state.updateAvailable != null)
     }
     val hotDrag = LocalHotSeatDrag.current
@@ -7059,7 +7070,6 @@ private fun ClimatePebble(
     val startClimate = { vm.startClimate(v, currentReq) }
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val simpleMode = state.settingsMode != "advanced"
-    var showClimateChoice by remember { mutableStateOf(false) }
     // Whether the pebble's own body (the live sliders below) is actually on
     // screen right now -- mirrors Pebble()'s own expanded computation exactly
     // so this and the header's Start button agree on what "expanded" means.
@@ -7206,36 +7216,6 @@ private fun ClimatePebble(
                 Text("Set temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 com.bloo.uicommon.AnimatedValue(degLabel(tempF.toString(), fahrenheit), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
             }
-        }
-
-        // Climate start choice dialog (advanced mode)
-        if (showClimateChoice) {
-            BlooDialog(
-                onDismissRequest = { showClimateChoice = false },
-                title = { Text("Start climate", fontWeight = FontWeight.Bold) },
-                text = {
-                    if (weather != null) {
-                        val ambientF = ambientFahrenheit(weather.tempC)
-                        val smartTarget = smartClimateTargetF(ambientF)
-                        MorphButton(onClick = {
-                            tempF = smartTarget; defrost = false; activePresetId = null
-                            vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                            showClimateChoice = false
-                        }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Smart climate", fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                    presets.forEach { preset ->
-                        MorphButton(onClick = {
-                            applyPreset(preset.request)
-                            vm.startClimate(v, preset.request)
-                            activePresetId = preset.id
-                            showClimateChoice = false
-                        }, modifier = Modifier.fillMaxWidth()) { Text(preset.name, fontWeight = FontWeight.SemiBold) }
-                    }
-                },
-                confirmButton = { MorphTextButton("Cancel", onClick = { showClimateChoice = false }) },
-            )
         }
 
         // Was a hand-rolled version of the same blue->green->warm mapping
@@ -8044,7 +8024,7 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
                 StatusRow("Feels like", w.feelsLikeLabel(fahrenheit))
                 w.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
                 w.humidity?.let { StatusRow("Humidity", "$it%") }
-                StatusRow("Wind", "${w.windKph.toInt()} km/h")
+                StatusRow("Wind", formatSpeed(w.windKph, appearance.unitSystem == "metric"))
             }
         }
     }
@@ -9699,17 +9679,27 @@ private class ParsedVehicleCommand(val cmd: String, val climateTarget: String = 
  *  lock/unlock, start/stop/smart climate, start/stop charging -- rather than
  *  attempting general natural-language command parsing. Order matters:
  *  "unlock" is checked before the bare "lock" pattern so "unlock" doesn't
- *  also match as "lock". */
+ *  also match as "lock".
+ *
+ *  Direction is encoded IN the command itself, never left for the runner to
+ *  re-derive from the last-known snapshot. When the phrasing says start / stop
+ *  / turn on / turn off / begin, we emit the explicit directional token
+ *  (`climate_on`/`climate_off`, `charge_on`/`charge_off`) so the runner forces
+ *  that direction. Before this, both "start climate" and "stop climate"
+ *  collapsed to the bare `"climate"` toggle and the runner flipped against the
+ *  snapshot -- so "stop the climate" while climate was already off would
+ *  *start* it on the real car. The bare toggle tokens ("climate"/"charge") are
+ *  reserved for genuinely ambiguous phrasing (none currently produced here). */
 private fun parseVehicleCommand(query: String): ParsedVehicleCommand? {
     val q = query.lowercase()
     return when {
         Regex("\\bunlock\\b").containsMatchIn(q) -> ParsedVehicleCommand("unlock", label = "Unlocking")
         Regex("\\block\\b").containsMatchIn(q) -> ParsedVehicleCommand("lock", label = "Locking")
-        Regex("smart climate|smart (ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate", "smart", "Starting smart climate for")
-        Regex("stop (the )?(climate|ac|a/c|heat)|turn off (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate", label = "Stopping climate for")
-        Regex("(start|turn on|run) (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate", "default", "Starting climate for")
-        Regex("stop (the )?charg").containsMatchIn(q) -> ParsedVehicleCommand("charge", label = "Stopping charge for")
-        Regex("(start|begin) (the )?charg|charge (it|the car) now").containsMatchIn(q) -> ParsedVehicleCommand("charge", label = "Starting charge for")
+        Regex("smart climate|smart (ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_on", "smart", "Starting smart climate for")
+        Regex("stop (the )?(climate|ac|a/c|heat)|turn off (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
+        Regex("(start|turn on|run) (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_on", "default", "Starting climate for")
+        Regex("stop (the )?charg|turn off (the )?charg").containsMatchIn(q) -> ParsedVehicleCommand("charge_off", label = "Stopping charge for")
+        Regex("(start|begin|turn on) (the )?charg|charge (it|the car) now").containsMatchIn(q) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
         else -> null
     }
 }
@@ -10021,9 +10011,8 @@ private fun SettingsSearchResults(
                 singleLine = true, shape = FieldShape, modifier = Modifier.fillMaxWidth(),
             )
         }
-        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { odo ->
-            val odoInt = odo.replace(",", "").toDoubleOrNull()?.toInt()
-            add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { odoInt?.let { StatusRow("Odometer", formatDistance(it, appearance.unitSystem == "metric")) } }
+        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.replace(",", "")?.toDoubleOrNull()?.toInt()?.let { odoInt ->
+            add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { StatusRow("Odometer", formatDistance(odoInt, appearance.unitSystem == "metric")) }
         }
         add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin}") {
             SelectionContainer { StatusRow("VIN", v.vin) }
@@ -10114,8 +10103,24 @@ private fun SettingsSearchResults(
     val command = remember(submittedQuery) { if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery) }
     if (command != null) {
         val ctx = LocalContext.current
-        val namedVehicle = state.vehicles.firstOrNull { v -> v.name.isNotBlank() && v.name.lowercase() in submittedQuery.lowercase() }
-        val targetVehicle = namedVehicle ?: state.vehicles.singleOrNull()
+        // Whole-word, longest-match car resolution -- NOT a bare substring test.
+        // A plain `name in query` lets "Ioniq" match inside "lock my Ioniq 5",
+        // so a command meant for the "Ioniq 5" would be sent to the "Ioniq"
+        // (list-order-first). Instead require the name to appear as a bounded
+        // token sequence, and when several names match prefer the longest. If
+        // several still match at that longest length the query is genuinely
+        // ambiguous, so refuse to dispatch and ask which car (targetVehicle
+        // stays null → the "Which car?" branch below).
+        val q = submittedQuery.lowercase()
+        val nameMatches = state.vehicles.filter { v ->
+            v.name.isNotBlank() &&
+                Regex("\\b" + Regex.escape(v.name.lowercase()) + "\\b").containsMatchIn(q)
+        }
+        val longestMatchLen = nameMatches.maxOfOrNull { it.name.length }
+        val namedVehicle = nameMatches.filter { it.name.length == longestMatchLen }.singleOrNull()
+        // Only fall back to "the one car" when NO name matched at all; if a name
+        // matched but was ambiguous, do not silently pick a car.
+        val targetVehicle = namedVehicle ?: if (nameMatches.isEmpty()) state.vehicles.singleOrNull() else null
         var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
         var actionRunning by remember(submittedQuery) { mutableStateOf(false) }
         LaunchedEffect(submittedQuery) {

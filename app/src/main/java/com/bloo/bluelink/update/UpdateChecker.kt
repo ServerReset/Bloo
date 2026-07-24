@@ -6,7 +6,6 @@ import com.bloo.bluelink.data.UPDATE_SNOOZE_MS
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.data.WorkflowRun
-import kotlinx.coroutines.flow.first
 
 /** A newer CI build than what's installed. */
 data class UpdateInfo(val run: WorkflowRun)

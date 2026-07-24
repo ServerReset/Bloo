@@ -7,6 +7,22 @@
 
 ---
 
+## ✅ FIX STATUS (updated 2026-07-23)
+
+**All actionable findings below have been fixed and independently verified by re-reading** (the build environment here has no compiler, so "verified" = an independent agent re-read each changed file for correctness, syntax, imports, and cross-file contract adherence; the three highest-stakes changes — the H1/H2 search→command chain and the `AppViewModel.loadStatus` restructure — were additionally hand-checked). A compile (`./gradlew assembleDebug`) is still recommended as a final gate.
+
+**Fixed (29 files):** H1, H2, H3, H4, H5, H6, H7, H9, H10, H11, H12, H13 · M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19 · L1, L2, L3, L4, L5, L6, L7, L8, L9, L11, L12, L13, L14, L15, L16, L18, L19, L20, L21, L22, L23, L28, M20, M21, M22, M23 · plus a MorphSegmented robustness guard.
+
+**Deliberately deferred** (not bugs — pure multi-file refactors that are risky to land without a build; tracked in the "cross-cutting themes" and framework-extraction sections): M24 (extract wear `startClimateStandalone`/CLIMATE_ON builder), M25 (extract `RotaryScalingColumn`/`BusySpinner`), L24 (Kia `location()` double-fetch), L25 (`CarThumbnail` extraction), L26 (`decodeNotificationPrefs` extraction), L27 (consolidate SessionStore/CredentialStore migration), L29/L30 (proguard/`compileSdk` — verify against SDK calendar, don't flip minify blindly). H22's duplicate `core-ktx` (M22) *was* fixed.
+
+**Notes from the fix pass worth a human glance:**
+- **H5:** in-flight de-dupe is now keyed on `(vin, refresh)`. This intentionally allows a background `refresh=false` fetch and a user `refresh=true` fetch for the *same* car to run back-to-back (both still serialized by the mutex, so no 502) — that's required for the manual refresh to actually poll. Two sequential `status()` calls for one car in that window; confirm that's acceptable vs. remote quota.
+- **L17 (tile worker):** mutating commands return `Result.failure()` (no auto-retry) rather than `Result.retry()`, deliberately — re-dispatching an already-delivered lock/climate/charge is riskier than surfacing failure. Read-only refresh does retry (≤3).
+- **M17 (lock complication):** unknown state now renders empty on icon-only faces (no distinct "unknown" glyph was added, since that needs a new drawable resource). If you'd prefer a `?`-style glyph, add a drawable and swap it in.
+- **Docs drift:** `docs/codebase/*.md` still reference a few now-fixed line numbers / the deleted `ventilatedRange`/`heatOnlyRange`. Regenerate or treat line numbers as approximate.
+
+---
+
 ## How this review was run
 
 1. The `:shared` domain core (all 17 files: API clients, models, repositories, session/credential stores, sync, caches) was read line-by-line by hand to build a domain model and a set of invariants.

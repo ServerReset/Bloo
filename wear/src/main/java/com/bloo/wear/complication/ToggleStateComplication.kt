@@ -57,9 +57,20 @@ abstract class ToggleStateComplication : SuspendingComplicationDataSourceService
         // ChargeComplication already renders "—%" for an unknown percentage.
         val known = on != null
         val isOn = on == true
-        val image = MonochromaticImage.Builder(
-            Icon.createWithResource(this, if (known) iconRes(isOn) else iconRes(false)),
-        ).build()
+        // We have no dedicated "unknown" glyph, and iconRes(false) is a *definite*
+        // off-state icon (for the lock complication, the open padlock) -- rendering
+        // it for an unsynced state would be indistinguishable from a confirmed
+        // "Unlocked" reading. SHORT_TEXT still carries the neutral "—" text, so we
+        // simply omit the icon there when unknown; MONOCHROMATIC_IMAGE is icon-only
+        // with no text escape hatch, so we return null (empty slot) rather than a
+        // misleading padlock.
+        val image = if (known) {
+            MonochromaticImage.Builder(
+                Icon.createWithResource(this, iconRes(isOn)),
+            ).build()
+        } else {
+            null
+        }
         val desc = PlainComplicationText.Builder(if (known) description(isOn) else "State unknown").build()
         val tap = vin?.let { ComplicationTapReceiver.pendingIntent(this, it, action) }
         return when (type) {
@@ -69,14 +80,16 @@ abstract class ToggleStateComplication : SuspendingComplicationDataSourceService
                     desc,
                 )
                     .setTitle(PlainComplicationText.Builder(title).build())
-                    .setMonochromaticImage(image)
+                    .apply { image?.let { setMonochromaticImage(it) } }
                     .apply { tap?.let { setTapAction(it) } }
                     .build()
 
             ComplicationType.MONOCHROMATIC_IMAGE ->
-                MonochromaticImageComplicationData.Builder(image, desc)
-                    .apply { tap?.let { setTapAction(it) } }
-                    .build()
+                image?.let {
+                    MonochromaticImageComplicationData.Builder(it, desc)
+                        .apply { tap?.let { t -> setTapAction(t) } }
+                        .build()
+                }
 
             else -> null
         }

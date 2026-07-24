@@ -155,15 +155,23 @@ fun AnimatedSlider(
         onSettle()
         settleJob?.cancel()
         settleJob = scope.launch {
-            if (reduceMotion) {
-                anim.snapTo(target)
-            } else {
-            anim.animateTo(
-                target,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
-            )
+            // finally (not a trailing statement) so `settling` is reset even when a
+            // new drag's snapTo cancels this settle via the shared MutatorMutex --
+            // animateTo/snapTo then throws CancellationException, and without the
+            // finally the control would stay stuck at settling=true (blurred, value
+            // sync blocked) for the whole interrupting drag.
+            try {
+                if (reduceMotion) {
+                    anim.snapTo(target)
+                } else {
+                    anim.animateTo(
+                        target,
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
+                    )
+                }
+            } finally {
+                settling = false
             }
-            settling = false
         }
     }
 

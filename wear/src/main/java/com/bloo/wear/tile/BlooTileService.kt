@@ -37,7 +37,6 @@ import com.bloo.wear.WearLocalStore
 import com.bloo.wear.WearSettingsStore
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -63,20 +62,20 @@ abstract class BlooTileService : TileService() {
     // its own binder thread whenever it wants a fresh layout, and expects a
     // ListenableFuture back rather than a suspend function. `executor` is a
     // single dedicated thread used to run the (blocking, via runBlocking)
-    // buildTile() work off the caller's thread; `tileScope` is a separate
-    // coroutine scope (IO dispatcher) used only for the fire-and-forget network
-    // relay of a tap-triggered command, which must NOT block tile rendering.
+    // buildTile() work off the caller's thread. The fire-and-forget network
+    // relay of a tap-triggered command is deliberately NOT launched on any
+    // service-scoped coroutine: the system can destroy this Service the instant
+    // onTileRequest returns, so the relay runs on the process-lifetime
+    // [TileCommandRelay] scope (see below) that outlives onDestroy.
     private val executor = Executors.newSingleThreadExecutor()
-    private val tileScope = kotlinx.coroutines.CoroutineScope(
-        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
-    )
 
     // The system can destroy/recreate this Service between tile requests (it's
-    // not kept warm), so both the executor and the coroutine scope must be
-    // torn down here to avoid leaking a thread / dangling coroutines each time.
+    // not kept warm), so the executor must be torn down here to avoid leaking a
+    // thread each time. The command relay intentionally outlives the Service
+    // (it runs on [TileCommandRelay]) and is therefore NOT cancelled here --
+    // cancelling it in onDestroy is exactly the bug this scope split avoids.
     override fun onDestroy() {
         super.onDestroy()
-        tileScope.cancel()
         executor.shutdown()
     }
 
@@ -194,7 +193,11 @@ abstract class BlooTileService : TileService() {
                     // slower network half in the background so the tile still
                     // renders immediately.
                     val resolved = WearComms.applyOptimistic(ctx, WearCommand(c.vin, action))
-                    tileScope.launch {
+                    // Relay on the process-lifetime scope, NOT a service scope:
+                    // the Tiles system can tear down this Service the moment
+                    // buildTile returns, which would cancel an in-flight relay
+                    // and silently drop the user's command mid-send.
+                    TileCommandRelay.scope.launch {
                         runCatching { WearComms.relayCommand(ctx, resolved) }
                     }
                 }
@@ -574,6 +577,19 @@ abstract class BlooTileService : TileService() {
             onErrorContainer      = 0xFFFFDAD6.toInt(),
         )
     }
+}
+
+/** Process-lifetime scope for the fire-and-forget tile command relay.
+ *  A BlooTileService instance can be destroyed by the Tiles system the instant
+ *  its buildTile() returns, so relaying the network command on the service's
+ *  own scope let onDestroy().cancel() kill the send mid-flight and silently
+ *  drop the user's tap. This object is tied to the application process instead,
+ *  so the relay always runs to completion (SupervisorJob keeps one failed relay
+ *  from cancelling later ones). IO dispatcher: relayCommand is network-bound. */
+private object TileCommandRelay {
+    val scope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
 }
 
 class BlooTile1 : BlooTileService() { override val poolIndex = 0 }

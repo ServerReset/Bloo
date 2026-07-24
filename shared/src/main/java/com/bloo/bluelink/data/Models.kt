@@ -320,12 +320,6 @@ enum class SeatLevel(val apiValue: Int, val label: String) {
     val isHeat: Boolean get() = apiValue in 6..8
 
     companion object {
-        /** Range offered when the seat can both heat and cool (ventilated). */
-        val ventilatedRange = listOf(HIGH_COOL, MED_COOL, LOW_COOL, OFF, LOW_HEAT, MED_HEAT, HIGH_HEAT)
-
-        /** Range offered when the seat is heat-only. */
-        val heatOnlyRange = listOf(OFF, LOW_HEAT, MED_HEAT, HIGH_HEAT)
-
         /** Build the slider range for a seat given what it supports. */
         fun rangeFor(canCool: Boolean, canHeat: Boolean): List<SeatLevel> = buildList {
             if (canCool) addAll(listOf(HIGH_COOL, MED_COOL, LOW_COOL))

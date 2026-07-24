@@ -39,12 +39,14 @@ fun WiggleText(
     maxLines: Int = 1,
     reduceMotion: Boolean = false,
 ) {
-    // Strips out anything that isn't a digit (units, "°", separators, etc.) and
-    // parses what's left as an integer, so this matches "67", "67°", "67F" and the
-    // like -- but not multi-number strings, since filtering digits from e.g.
-    // "6-7" would also collapse to "67" and falsely trigger. Any non-numeric
-    // leftover (toIntOrNull returning null) simply never equals 67.
-    val isSixSeven = text.filter { it.isDigit() }.toIntOrNull() == 67
+    // Fires only when the trimmed text is exactly "67", optionally followed by a
+    // single trailing unit character ("67", "67°", "67F", "67C"). Matching the
+    // whole string this way -- rather than filtering digits out and parsing what's
+    // left -- means multi-number strings like "6-7", "6 7" or "1670" never collapse
+    // to "67" and falsely trigger the wave.
+    val trimmed = text.trim()
+    val isSixSeven = trimmed == "67" ||
+        (trimmed.length == 3 && trimmed.startsWith("67") && trimmed.last() in charArrayOf('F', 'C', '°'))
     if (!isSixSeven || reduceMotion) {
         // BasicText defaults to TextOverflow.Clip -- a value long enough to
         // exceed maxLines (a long status string routed through AnimatedValue,

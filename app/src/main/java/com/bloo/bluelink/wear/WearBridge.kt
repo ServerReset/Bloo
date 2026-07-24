@@ -271,17 +271,24 @@ object WearBridge {
         }
     }
 
-    /** Mirror weather / car photos / AI summaries to the watch. */
+    /** Fire-and-forget mirror of weather / car photos / AI summaries to the watch. */
     fun publishExtras(context: Context, extras: com.bloo.bluelink.data.WearExtras) {
         val app = context.applicationContext
-        scope.launch {
-            runCatching {
-                val request = PutDataMapRequest.create(WearSync.PATH_EXTRAS).apply {
-                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeExtras(extras))
-                }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(app).putDataItem(request))
-            }
-        }
+        scope.launch { runCatching { publishExtrasNow(app, extras) } }
+    }
+
+    /**
+     * Suspending publish of weather / car photos / AI summaries: writes the
+     * [WearExtras] item and *awaits* the Data Layer putDataItem, so callers that
+     * hold a lock (e.g. WearPhoneService's `extrasMutex`) can guarantee the write
+     * lands before the lock releases — otherwise two concurrent read-modify-write
+     * patches would race last-writer-wins.
+     */
+    suspend fun publishExtrasNow(context: Context, extras: com.bloo.bluelink.data.WearExtras) {
+        val request = PutDataMapRequest.create(WearSync.PATH_EXTRAS).apply {
+            dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeExtras(extras))
+        }.asPutDataRequest().setUrgent()
+        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request)) }
     }
 
     /** Trigger a Drive sync: download settings from Drive, import them, and re-publish

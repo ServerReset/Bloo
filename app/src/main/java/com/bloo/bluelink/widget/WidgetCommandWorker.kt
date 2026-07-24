@@ -13,6 +13,7 @@ import androidx.work.workDataOf
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.WearCommandRunner
 import com.bloo.bluelink.tiles.BlooTileService
@@ -126,8 +127,14 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                         val a = geocode(ctx, lat, lon)
                         val addr = a?.let {
                             buildString {
-                                if (!a.thoroughfare.isNullOrBlank()) append(a.thoroughfare)
-                                if (!a.subThoroughfare.isNullOrBlank()) { if (isNotEmpty()) insert(0, "${a.subThoroughfare} ") }
+                                // Street portion built explicitly from house number
+                                // (subThoroughfare) + street name (thoroughfare) so the
+                                // house number isn't dropped when the street name is blank.
+                                val street = listOfNotNull(
+                                    a.subThoroughfare?.takeIf { it.isNotBlank() },
+                                    a.thoroughfare?.takeIf { it.isNotBlank() },
+                                ).joinToString(" ")
+                                if (street.isNotEmpty()) append(street)
                                 if (!a.locality.isNullOrBlank()) { if (isNotEmpty()) append(", "); append(a.locality) }
                             }.takeIf { it.isNotBlank() } ?: a.getAddressLine(0)
                         }
@@ -219,9 +226,15 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                             conn.setRequestProperty("User-Agent", "Bloo/1.0 (Android; widget location map)")
                             conn.connectTimeout = 5000
                             conn.readTimeout = 5000
-                            conn.connect()
-                            val tile = android.graphics.BitmapFactory.decodeStream(conn.inputStream)
-                            conn.disconnect()
+                            // try/finally so disconnect() and the stream close always run,
+                            // even if decodeStream throws on a corrupt tile (was leaking the
+                            // connection on that path).
+                            val tile = try {
+                                conn.connect()
+                                conn.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
+                            } finally {
+                                conn.disconnect()
+                            }
                             if (tile != null) {
                                 canvas.drawBitmap(tile, (dx * 256).toFloat(), (dy * 256).toFloat(), null)
                                 tile.recycle()
@@ -262,28 +275,47 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         suspend fun dispatch(ctx: Context, widgetId: Int, vin: String, action: WidgetAction) {
             var resolved = action.wearAction
             val wa = action.wearAction
+            // Resolve the toggle direction and compute the flipped snapshot WITHOUT
+            // writing it yet -- we only commit the optimistic flip below once the work
+            // is actually enqueued (see enqueue()'s acceptance return).
+            var store: SnapshotStore? = null
+            var flipped: VehicleSnapshot? = null
             if (wa != null) {
                 runCatching {
-                    val store = SnapshotStore(ctx)
-                    store.current().vehicles.firstOrNull { it.vin == vin }?.let { snap ->
-                        // Resolve TOGGLE_* from the PRE-flip snapshot; the worker re-reads
-                        // this same store, so flipping first and passing the raw toggle
-                        // through made every toggle re-assert the current state.
+                    val s = SnapshotStore(ctx)
+                    s.current().vehicles.firstOrNull { it.vin == vin }?.let { snap ->
+                        // Resolve TOGGLE_* from the PRE-flip snapshot; the worker uses this
+                        // already-resolved verb (KEY_WEAR_ACTION) and never re-resolves from
+                        // the store, so passing the raw toggle through made every toggle
+                        // re-assert the current state.
                         val r = WearCommandRunner.resolveToggle(snap, wa)
                         resolved = r
-                        store.updateVehicle(WearCommandRunner.optimistic(snap, r))
+                        store = s
+                        flipped = WearCommandRunner.optimistic(snap, r)
                     }
                 }
             }
+            // Enqueue first; only commit the optimistic snapshot flip / pending flag when
+            // the work was actually accepted. ExistingWorkPolicy.KEEP drops the new request
+            // when a command for this widget is already in flight (e.g. a double-tap within
+            // ~4s) -- flipping unconditionally left the widget showing a state no command
+            // was sent for until the next refresh corrected it.
+            val accepted = enqueue(ctx, widgetId, vin, action, resolved)
+            if (!accepted) return
+            flipped?.let { snap -> runCatching { store?.updateVehicle(snap) } }
             runCatching { SettingsStore(ctx).setWidgetPendingAction(widgetId, action.key) }
             runCatching { BlooWidget().updateAll(ctx) }
-            enqueue(ctx, widgetId, vin, action, resolved)
         }
 
         /**
          * Builds the WorkManager [Data] payload for a single command and enqueues it as
          * unique work keyed by widget id, so at most one [WidgetCommandWorker] instance
          * ever runs per widget at a time (see policy note below).
+         *
+         * Returns true when the request was actually accepted, false when
+         * [ExistingWorkPolicy.KEEP] dropped it because a command for this widget was
+         * already in flight. Callers use this to avoid applying an optimistic snapshot
+         * flip for a command that will never run (see [dispatch]).
          */
         fun enqueue(
             ctx: Context,
@@ -291,7 +323,7 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             vin: String,
             action: WidgetAction,
             wearAction: String? = action.wearAction,
-        ) {
+        ): Boolean {
             val data = workDataOf(
                 KEY_WIDGET_ID to widgetId,
                 KEY_VIN to vin,
@@ -301,11 +333,20 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             val request = OneTimeWorkRequestBuilder<WidgetCommandWorker>()
                 .setInputData(data)
                 .build()
+            val wm = WorkManager.getInstance(ctx)
+            val name = "widget_cmd_$widgetId"
+            // KEEP drops the new request when work under this name is already pending/running.
+            // Detect that up front so the caller knows whether the command was actually
+            // accepted -- there's an inherent narrow race here, but this is only used to
+            // gate an optimistic UI flip, and the next refresh reconciles either way.
+            val alreadyActive = runCatching {
+                wm.getWorkInfosForUniqueWork(name).get().any { !it.state.isFinished }
+            }.getOrDefault(false)
+            if (alreadyActive) return false
             // One command at a time per widget: the pending spinner covers the whole
             // widget, so a second tap while one is in flight raced the first worker.
-            WorkManager.getInstance(ctx).enqueueUniqueWork(
-                "widget_cmd_$widgetId", androidx.work.ExistingWorkPolicy.KEEP, request,
-            )
+            wm.enqueueUniqueWork(name, androidx.work.ExistingWorkPolicy.KEEP, request)
+            return true
         }
     }
 }

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 /**
  * Current conditions for a single point, normalised from the Open-Meteo response.
@@ -43,12 +44,12 @@ data class Weather(
 
     /** Temperature as a rounded, unit-suffixed string. */
     fun tempLabel(fahrenheit: Boolean): String =
-        if (fahrenheit) "${tempF().toInt()}°F" else "${tempC.toInt()}°C"
+        if (fahrenheit) "${tempF().roundToInt()}°F" else "${tempC.roundToInt()}°C"
 
     // No unit suffix here (just the degree glyph) -- this is meant for compact UI
     // spots that already show the primary temp with its own unit label nearby.
     fun feelsLikeLabel(fahrenheit: Boolean): String =
-        if (fahrenheit) "${feelsLikeF().toInt()}°" else "${feelsLikeC.toInt()}°"
+        if (fahrenheit) "${feelsLikeF().roundToInt()}°" else "${feelsLikeC.roundToInt()}°"
 
     /**
      * "H:hi°  L:lo°" label for the day's high/low, in whichever unit is requested.
@@ -56,8 +57,8 @@ data class Weather(
      * a lone high or lone low isn't a meaningful "high/low" summary.
      */
     fun highLowLabel(fahrenheit: Boolean): String? {
-        val hi = (if (fahrenheit) highF() else highC)?.toInt() ?: return null
-        val lo = (if (fahrenheit) lowF() else lowC)?.toInt() ?: return null
+        val hi = (if (fahrenheit) highF() else highC)?.roundToInt() ?: return null
+        val lo = (if (fahrenheit) lowF() else lowC)?.roundToInt() ?: return null
         return "H:$hi°  L:$lo°"
     }
 

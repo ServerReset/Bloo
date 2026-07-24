@@ -232,7 +232,10 @@ class BlooWidget : GlanceAppWidget() {
                     else -> 28.dp
                 }
                 val pillPad = if (pillEligible) 8.dp else 0.dp
-                val bgAlpha = 1f - bgAlphaLevel / 9f // 1.0 (opaque) -> 0.1 (transparent)
+                // Floor at 0.1 so even the most-transparent level keeps a faint
+                // legibility scrim/tint -- a true 0.0 let bright photo/wallpaper
+                // patches sit directly behind text with no contrast backstop.
+                val bgAlpha = (1f - bgAlphaLevel / 9f).coerceAtLeast(0.1f) // 1.0 (opaque) -> 0.1 (transparent)
                 val themeBg = if (appearance.themeMode.name == "AMOLED") ColorProvider(Color(0xFF000000))
                               else GlanceTheme.colors.widgetBackground
                 Box(GlanceModifier.fillMaxSize().cornerRadius(corner)) {
@@ -293,12 +296,13 @@ class BlooWidget : GlanceAppWidget() {
                         when {
                             w < 70.dp || (w < 80.dp && h < 80.dp) ->
                                 if (layoutMode == "controls") ControlsTile(c, base) else InfoTile(c, base)
-                            h < 70.dp -> ControlsTile(c, base)
+                            h < 70.dp ->
+                                if (layoutMode == "controls") ControlsTile(c, base) else InfoTile(c, base)
                             h < 110.dp -> ShortWideTile(c, base)
                             w < 110.dp -> TallNarrowTile(c, base)
-                            w < 220.dp && h < 130.dp -> SquareTile(c, w, base)
-                            w < 220.dp -> MediumTallTile(c, w, h, base)
-                            h < 190.dp -> WideTile(c, w, h, base)
+                            w < 220.dp && h < 130.dp -> SquareTile(c, base)
+                            w < 220.dp -> MediumTallTile(c, base)
+                            h < 190.dp -> WideTile(c, h, base)
                             else -> LargeTile(c, w, h, base)
                         }
                         if (pending != null) {
@@ -350,7 +354,7 @@ class BlooWidget : GlanceAppWidget() {
         // (see WidgetConfigActivity), this coerce is just defensive.
         val take = c.actions.take(4)
         ButtonGrid(c, take, cols = take.size.coerceAtMost(2), showLabel = false, iconSize = 18.dp,
-            modifier = GlanceModifier.fillMaxSize().padding(4.dp))
+            modifier = base.padding(4.dp))
     }
 
     /** Shown for every tile size when this widget instance has no car assigned yet
@@ -473,7 +477,7 @@ class BlooWidget : GlanceAppWidget() {
 
     /** Tallish but moderately-wide widget: stacked name (2 lines), percent, 2×2 buttons. */
     @Composable
-    private fun MediumTallTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
+    private fun MediumTallTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
         val (firstLine, secondLine) = splitName(c.snap.name)
         Column(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(12.dp),
@@ -499,7 +503,7 @@ class BlooWidget : GlanceAppWidget() {
      *  side by side, a state chip, and optionally a 2-column button block below
      *  filling the remaining vertical space via defaultWeight(). */
     @Composable
-    private fun SquareTile(c: Ctx, w: Dp, base: GlanceModifier) {
+    private fun SquareTile(c: Ctx, base: GlanceModifier) {
         val ctx = LocalContext.current
         Column(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(12.dp)) {
             Text(c.snap.name.take(12), maxLines = 1, style = TextStyle(color = onBg(c), fontSize = 12.sp, fontWeight = FontWeight.Bold))
@@ -531,7 +535,7 @@ class BlooWidget : GlanceAppWidget() {
      *  right that only appears in controls mode -- see the comment on the Column
      *  sizing below for why the info column's width strategy changed. */
     @Composable
-    private fun WideTile(c: Ctx, w: Dp, h: Dp, base: GlanceModifier) {
+    private fun WideTile(c: Ctx, h: Dp, base: GlanceModifier) {
         val ctx = LocalContext.current
         val showButtons = c.actions.isNotEmpty() && c.layoutMode == "controls"
         Row(base.clickable(actionStartActivity(openIntent(ctx, c.snap.vin))).padding(14.dp)) {
@@ -903,7 +907,7 @@ class BlooWidget : GlanceAppWidget() {
     /** One box-blur pass (horizontal then vertical, each an O(width*height)
      *  sliding average via per-row/per-column prefix sums, not a naive
      *  O(width*height*radius) re-sum per pixel) mutating [bmp] in place.
-     *  Three calls with the same radius approximate a Gaussian blur closely
+     *  Two calls with the same radius approximate a Gaussian blur closely
      *  enough for this purpose at a fraction of the cost of one. */
     private fun boxBlurInPlace(bmp: Bitmap, radius: Int) {
         if (radius < 1) return

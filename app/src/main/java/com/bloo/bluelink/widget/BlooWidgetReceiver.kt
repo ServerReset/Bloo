@@ -15,9 +15,23 @@ class BlooWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
+        // Keep the broadcast alive via goAsync() so the DataStore write survives past
+        // return of onDeleted — a bare CoroutineScope(Dispatchers.IO) can be killed on
+        // process death before the write lands. finish() releases the receiver.
+        val pending = goAsync()
         val store = SettingsStore(context)
         CoroutineScope(Dispatchers.IO).launch {
-            appWidgetIds.forEach { runCatching { store.clearWidgetConfig(it) } }
+            try {
+                appWidgetIds.forEach { runCatching { store.clearWidgetConfig(it) } }
+            } finally {
+                pending.finish()
+            }
         }
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        // Last widget removed — stop the periodic refresh worker so it doesn't run forever.
+        WidgetRefreshWorker.cancel(context)
     }
 }
