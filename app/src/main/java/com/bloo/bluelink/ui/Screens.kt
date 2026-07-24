@@ -429,17 +429,6 @@ fun BlooApp(vm: AppViewModel) {
 
     CompositionLocalProvider(
         LocalHaptics provides haptics,
-        LocalAppLiquidGlass provides appearance.liquidGlass,
-    ) {
-    // Opt-in liquid glass: when the toggle is on (and the device supports it),
-    // captures the whole screen stack as a backdrop layer so floating chrome
-    // and cards can refract it; when off, renders content unchanged (see
-    // LiquidGlassRoot). baseColor matches the root gradient's mid surface so
-    // any region the content doesn't paint samples the same colour the app
-    // already shows there.
-    LiquidGlassRoot(
-        enabled = appearance.liquidGlass,
-        baseColor = MaterialTheme.colorScheme.surface,
     ) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
     // status/navigation bars; screen content draws on top of it.
@@ -484,12 +473,6 @@ fun BlooApp(vm: AppViewModel) {
                     else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
                 }
                 val snackShape = RoundedCornerShape(24.dp)
-                // Liquid glass on: layer a refractive edge over the coloured
-                // snackbar so it reads as glass too. Off: no extra modifier, so
-                // the snackbar looks exactly as before.
-                val snackGlass = if (LocalAppLiquidGlass.current)
-                    Modifier.liquidGlass(shape = snackShape, tint = snackColors.first)
-                else Modifier
                 Surface(
                     shape = snackShape,
                     color = snackColors.first,
@@ -498,7 +481,6 @@ fun BlooApp(vm: AppViewModel) {
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .padding(16.dp)
-                        .then(snackGlass)
                         // This is a hand-rolled Surface, not M3's own Snackbar()
                         // composable (which sets live-region semantics
                         // internally) -- without this, a command result / sync
@@ -605,7 +587,6 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-    } // LiquidGlassRoot
     }
 
 }
@@ -2014,10 +1995,8 @@ private fun GlassAlertDialog(
                 }
             }
         }
-        // Inside a separate Dialog window the root backdrop layer can't be
-        // reached, so appGlassRim's glass path degrades to the enhanced
-        // frosted fallback here automatically. Keep a near-opaque fill either
-        // way -- this card sits over the scrim, not a live-refracted backdrop.
+        // Near-opaque fill -- this card sits over the scrim, framed by the
+        // app's frosted edge (appGlassRim).
         Surface(
             shape = shape,
             color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.97f)),
@@ -3709,15 +3688,11 @@ private fun FloatingIcon(
     )
     // Plain semi-transparent fill (see GlassChrome.kt) -- more transparent
     // than the original flat version per feedback that it read as too opaque.
-    // When the liquid-glass toggle is on, the fill instead comes from the
-    // refractive glass edge (appGlassRim), so the Surface itself stays
-    // transparent and the ambient halo/shadow still frame it over car photos.
-    val liquid = LocalAppLiquidGlass.current
+    // The ambient halo/shadow frame it over car photos.
     Surface(
         onClick = { haptics?.click(); onClick() },
         shape = CircleShape,
-        color = if (liquid) Color.Transparent
-        else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         contentColor = MaterialTheme.colorScheme.onSurface,
         interactionSource = interaction,
         modifier = modifier
@@ -4262,34 +4237,15 @@ private val SoftDamping get() = com.bloo.uicommon.SoftDamping
 private const val AdvancedModeStiffness = 130f
 
 /**
- * Whether the opt-in "Liquid glass" appearance toggle is on (mirrors
- * [SettingsStore.Appearance.liquidGlass]). Provided once in [BlooApp] alongside
- * [LocalHaptics] so the deeply-nested floating/card chrome ([FloatingIcon],
- * [GlowySearchBar], the snackbar, [GlassAlertDialog], [PebbleShell]) can route
- * their edge through [appGlassRim] without threading a Boolean through every
- * call site. Default false = today's frosted look, unchanged. It propagates
- * into Dialog/Popup sub-compositions too; the actual refraction there still
- * degrades to the frosted fallback because the root backdrop layer
- * ([LocalLiquidGlassBackdrop]) can't reach a separate window.
- */
-private val LocalAppLiquidGlass = staticCompositionLocalOf { false }
-
-/**
- * The shared floating/card edge: when the liquid-glass toggle is on
- * ([LocalAppLiquidGlass]) draws real refraction via [Modifier.liquidGlass]
- * (auto-falling back to enhanced frosted below API 31 or inside a separate
- * window); otherwise the app's default [frostedRim]. Call sites pair this with
- * a transparent container fill when glass is on (the refraction supplies its
- * own tinted fill) and keep their normal [glassContainerAlpha] frosted fill
- * when it's off, so the default look is byte-for-byte unchanged.
+ * The shared floating/card edge: the app's default frosted rim ([frostedRim]).
+ * Call sites keep their normal [glassContainerAlpha] frosted fill. The [tint]
+ * param is retained for call-site compatibility but is no longer used.
  */
 @Composable
 private fun Modifier.appGlassRim(
     shape: Shape,
-    tint: Color = MaterialTheme.colorScheme.surfaceContainer,
-): Modifier =
-    if (LocalAppLiquidGlass.current) this.liquidGlass(shape = shape, tint = tint)
-    else this.frostedRim(shape)
+    @Suppress("UNUSED_PARAMETER") tint: Color = MaterialTheme.colorScheme.surfaceContainer,
+): Modifier = this.frostedRim(shape)
 
 /**
  * When true (cover-screen tiles), pebbles render permanently open with no
@@ -6275,21 +6231,12 @@ private fun PebbleShell(
     // visual commitment than one more floating button.
     val pebbleAppearance by vm.appearance.collectAsState()
     val pebbleOutline = pebbleAppearance.pebbleOutline
-    // Liquid glass on: the card fill comes from the refractive glass (tinted to
-    // its normal container colour), so the Card container goes transparent and
-    // the glass edge is added to its modifier. Off: unchanged flat container +
-    // optional pebbleOutline border.
-    val liquid = pebbleAppearance.liquidGlass
     Box(Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)) {
         Card(
             Modifier
                 .fillMaxWidth()
                 .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
                 .dropShadow(pebbleShape, blurRadius = 12.dp, offsetY = 4.dp)
-                .then(
-                    if (liquid) Modifier.liquidGlass(shape = pebbleShape, tint = containerColor)
-                    else Modifier,
-                )
                 // frostedRim's alpha (0.10-0.24) is tuned for chrome floating
                 // over an unpredictable car photo, where it only has to beat
                 // that photo's contrast -- against a flat dark pebble
@@ -6304,7 +6251,7 @@ private fun PebbleShell(
                 ),
             shape = pebbleShape,
             colors = CardDefaults.cardColors(
-                containerColor = if (liquid) Color.Transparent else containerColor,
+                containerColor = containerColor,
                 contentColor = contentColorFor(containerColor),
             ),
         ) {
@@ -9252,13 +9199,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                     VibrancySlider(appearance, vm)
                     Spacer(Modifier.height(10.dp))
                     ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
-                    Spacer(Modifier.height(10.dp))
-                    ToggleRow("Liquid glass", appearance.liquidGlass) { vm.setLiquidGlass(it) }
-                    Text(
-                        "Glassy floating controls & cards with a refractive edge.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                   }
                 }
             }
@@ -9892,15 +9832,10 @@ private fun GlowySearchBar(
                     .background(scheme.primary.copy(alpha = (if (expanded) 0.34f else 0.18f) * glowPulse))
                     .blur(8.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
             )
-            // Liquid glass on: the pill's fill comes from the refractive edge
-            // (appGlassRim below), so keep the Surface transparent; off: the
-            // usual frosted tint.
-            val searchLiquid = LocalAppLiquidGlass.current
             Surface(
                 onClick = { if (!expanded) onFocusChange(true) },
                 shape = RoundedCornerShape(50),
-                color = if (searchLiquid) Color.Transparent
-                else scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.80f)),
+                color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.80f)),
                 contentColor = scheme.onSurface,
                 tonalElevation = if (expanded) 10.dp else 6.dp,
                 border = BorderStroke(

@@ -130,16 +130,6 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Haze — real hardware backdrop-blur "liquid glass" for the opt-in Settings
-    // toggle. Chosen over Kyant Backdrop (which hard-crashed): Haze is
-    // AndroidX-native (no Compose-Multiplatform linkage clash) and 1.7.2 is
-    // built against this project's exact Kotlin 2.2.20. It does real RenderEffect
-    // blur on Android 12+ and degrades to a translucent scrim below instead of
-    // crashing. ALL usage is isolated in ui/LiquidGlass.kt behind the toggle,
-    // wrapped so ANY failure falls back to ui/LiquidGlassFallback.kt (frosted,
-    // no dependency). If this ever misbehaves, delete this line + revert
-    // LiquidGlass.kt to the fallback-only version and the toggle still works.
-    implementation("dev.chrisbanes.haze:haze:1.7.2")
 
 
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at

@@ -2304,8 +2304,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
 
-    fun setLiquidGlass(value: Boolean) = viewModelScope.launch { settingsStore.setLiquidGlass(value) }
-
     fun setAuroraMotion(value: String) = viewModelScope.launch { settingsStore.setAuroraMotion(value) }
 
     fun setAuroraColorMode(value: String) = viewModelScope.launch { settingsStore.setAuroraColorMode(value) }
