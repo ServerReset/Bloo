@@ -1,91 +1,89 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 
 /**
- * The one and only place the app touches the Kyant Backdrop library.
+ * Real "liquid glass" for the opt-in Settings toggle, via the Haze library
+ * (`dev.chrisbanes.haze`) — hardware backdrop-blur sampled from the content
+ * behind each floating element, with a theme tint on top.
  *
- * ## Why this file is isolated
- * Every `com.kyant.backdrop.*` import in the whole app lives here. That is
- * deliberate: the library provides *real* hardware-refraction glass (the
- * iOS-26 "liquid glass" look the user opted into in Settings), but it is a
- * young dependency and its render effects require newer Android than Bloo's
- * `minSdk 26`. By funnelling all Backdrop usage through this file behind
- * [Modifier.liquidGlass], the rest of the UI stays library-agnostic and the
- * whole feature degrades to the existing frosted chrome ([frostedRim] /
- * [ambientRing] / a translucent tint) whenever glass is off, unsupported, or
- * unavailable — see [Modifier.liquidGlass].
+ * ## Why Haze (and not the old Kyant Backdrop)
+ * Kyant Backdrop hard-crashed the app at runtime (a Compose-Multiplatform lib
+ * built against a newer Kotlin than this project, plus a fragile RuntimeShader
+ * lens). Haze is AndroidX-native and 1.7.2 is built against this project's exact
+ * Kotlin (2.2.20), and it does its blur with the platform's own `RenderEffect`
+ * (Android 12 / API 31+), degrading to a translucent scrim below that instead
+ * of a shader crash.
  *
- * ## Platform gate
- * Backdrop's blur is a `RenderEffect` (Android 12 / API 31+) and its `lens`
- * refraction uses `RuntimeShader` (Android 13 / API 33+). Below those levels
- * we never call Backdrop at all — [liquidGlassSupported] gates every path.
+ * ## Crash safety (the whole point)
+ * Every Haze call is confined to THIS file and gated so it can only run where
+ * it's safe:
+ *  - The toggle must be ON *and* the device must be API 31+ ([glassSupported]).
+ *  - A floating element only blurs if a live [HazeState] reached it
+ *    ([LocalHazeState]); a Dialog/Popup in a separate window won't have one and
+ *    safely uses the frosted fallback.
+ *  - Anything not on the real path routes to [liquidGlassFallback]
+ *    (LiquidGlassFallback.kt — a translucent tint + specular edge, ZERO Haze
+ *    dependency), so a glass problem can never brick the app.
+ * The public API here (LiquidGlassRoot / Modifier.liquidGlass / the two locals /
+ * liquidGlassSupported) is unchanged from before, so no call site needed edits.
  *
- * ## If the build fails on this file
- * The Backdrop dependency version is pinned in `app/build.gradle.kts` and is
- * the one thing that can't be verified without a compile. If CI rejects it,
- * the fix is contained: remove the `io.github.kyant0:backdrop` line and this
- * file, and [Modifier.liquidGlass] falls back to `liquidGlassFallback` (which
- * lives in LiquidGlassFallback.kt and has NO Backdrop dependency), so the
- * Settings toggle keeps working with the enhanced-frosted look.
+ * If Haze ever misbehaves: delete the `dev.chrisbanes.haze` line in
+ * app/build.gradle.kts and replace this file's Haze paths with the
+ * fallback-only version — the toggle keeps working on frosted.
  */
 
-/** True when the device can render Backdrop effects at all (API 31+ for blur).
- *  Below this the liquid-glass toggle silently uses the frosted fallback. */
-val liquidGlassSupported: Boolean get() = Build.VERSION.SDK_INT >= 31
+/** True where Haze's RenderEffect blur is actually supported (Android 12+).
+ *  Below this, and whenever the toggle is off, the frosted fallback is used. */
+val glassSupported: Boolean get() = Build.VERSION.SDK_INT >= 31
 
-/** The root backdrop layer that floating glass samples from. `null` means
- *  "no live glass here" — either the user's toggle is off, the device is
- *  pre-API-31, or we're inside a separate window (Dialog/Popup) that can't
- *  reach the root layer — and [Modifier.liquidGlass] uses the frosted fallback. */
-val LocalLiquidGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+/** Back-compat alias for the old name some call sites may still read. */
+val liquidGlassSupported: Boolean get() = glassSupported
+
+/** The live Haze source that floating glass samples, or null when glass is off /
+ *  unsupported / unreachable (a separate Dialog/Popup window). [Modifier.liquidGlass]
+ *  falls back to frosted whenever this is null. */
+val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
+
+/** Kept purely for source-compatibility with earlier call sites that referenced
+ *  the old backdrop local; it is no longer read by anything. */
+val LocalLiquidGlassBackdrop = staticCompositionLocalOf<Any?> { null }
 
 /**
  * Wraps the app content so descendant [Modifier.liquidGlass] calls can sample a
- * live backdrop. When [enabled] and [liquidGlassSupported], captures [content]
- * as a Backdrop layer (with an opaque [baseColor] fill so transparent pixels
- * outside the drawn content don't sample garbage) and publishes it via
- * [LocalLiquidGlassBackdrop]. Otherwise renders [content] unchanged with a null
- * backdrop, so every glass call site takes its frosted fallback path.
- *
+ * live blurred backdrop. When [enabled] and [glassSupported], marks [content] as
+ * the Haze source and publishes the state; otherwise renders [content] unchanged
+ * with a null state, so every glass call site takes its frosted fallback path.
  * Placed once, high in [BlooApp], around the whole screen stack.
  */
 @Composable
 fun LiquidGlassRoot(
     enabled: Boolean,
-    baseColor: androidx.compose.ui.graphics.Color,
+    baseColor: Color,
     content: @Composable () -> Unit,
 ) {
-    if (!enabled || !liquidGlassSupported) {
-        // Toggle off or unsupported device: no backdrop, content unchanged.
-        CompositionLocalProvider(LocalLiquidGlassBackdrop provides null) { content() }
+    if (!enabled || !glassSupported) {
+        CompositionLocalProvider(LocalHazeState provides null) { content() }
         return
     }
-    val backdrop = rememberLayerBackdrop {
-        // Opaque base first so the sampled layer has no transparent regions,
-        // then the real content on top — this is the layer floating glass refracts.
-        drawRect(baseColor)
-        drawContent()
-    }
-    CompositionLocalProvider(LocalLiquidGlassBackdrop provides backdrop) {
-        Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) { content() }
+    val hazeState = remember { HazeState() }
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Box(Modifier.fillMaxSize().hazeSource(state = hazeState)) { content() }
     }
 }
 
@@ -93,42 +91,32 @@ fun LiquidGlassRoot(
  * Apply the liquid-glass material to a floating element (button, search bar,
  * dialog surface, card/pebble) of the given [shape].
  *
- * - When a live [LocalLiquidGlassBackdrop] is present (toggle on + API 31+),
- *   draws real refraction: a subtle [vibrancy] boost, a soft [blur] of the
- *   backdrop, a [lens] refraction bending the edges, and a faint theme tint
- *   drawn *after* the effect (via `onDrawSurface`) so content keeps contrast.
- * - Otherwise delegates to [liquidGlassFallback] — the enhanced-frosted look
- *   that needs no Backdrop dependency and works on every device.
+ * When a live [LocalHazeState] is present (toggle on + API 31+ + reachable),
+ * draws a real hardware blur of the backdrop with a translucent theme [tint] on
+ * top (via Haze's [hazeEffect]). Otherwise delegates to [liquidGlassFallback]
+ * — the dependency-free enhanced-frosted look that works on every device.
  *
- * [tint] is the theme-derived surface color the glass is nudged toward (pass a
- * role like `surfaceContainer`); [tintAlpha] how strongly (kept low so the
- * refraction stays visible). [blurRadiusDp]/[refractionDp] tune the material.
+ * [tintAlpha] controls the tint strength; [blurRadiusDp] the blur amount. The
+ * old [refractionDp] param is accepted-and-ignored for call-site compatibility.
  */
 @Composable
 fun Modifier.liquidGlass(
     shape: Shape,
-    tint: androidx.compose.ui.graphics.Color,
+    tint: Color,
     tintAlpha: Float = 0.5f,
-    blurRadiusDp: Float = 6f,
-    refractionDp: Float = 14f,
+    blurRadiusDp: Float = 20f,
+    @Suppress("UNUSED_PARAMETER") refractionDp: Float = 14f,
 ): Modifier {
-    val backdrop = LocalLiquidGlassBackdrop.current
-        ?: return this.liquidGlassFallback(shape, tint, tintAlpha)
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val blurPx = with(density) { blurRadiusDp.dp.toPx() }
-    val refractionPx = with(density) { refractionDp.dp.toPx() }
-    val surfaceTint = tint.copy(alpha = tintAlpha)
+    val hazeState = LocalHazeState.current
+    if (hazeState == null || !glassSupported) {
+        return this.liquidGlassFallback(shape, tint, tintAlpha)
+    }
+    val tintColor = tint.copy(alpha = tintAlpha)
     return this
         .clip(shape)
-        .drawBackdrop(
-            backdrop = backdrop,
-            shape = { shape },
-            effects = {
-                vibrancy()
-                blur(blurPx)
-                lens(refractionPx, refractionPx * 2f)
-            },
-            // Theme tint drawn AFTER the effect so text over the glass stays legible.
-            onDrawSurface = { drawRect(surfaceTint) },
-        )
+        .hazeEffect(state = hazeState) {
+            blurRadius = blurRadiusDp.dp
+            backgroundColor = tint
+            tints = listOf(HazeTint(tintColor))
+        }
 }

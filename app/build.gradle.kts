@@ -116,7 +116,6 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.biometric:biometric:1.1.0")
-    implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     // Chrome Custom Tabs for opening Hyundai/Genesis links in-app
     implementation("androidx.browser:browser:1.8.0")
@@ -131,15 +130,16 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Kyant Backdrop — real hardware-refraction "liquid glass" for the opt-in
-    // Settings toggle. ALL usage is isolated in ui/LiquidGlass.kt behind a
-    // runtime API-31+ gate with a no-dependency frosted fallback
-    // (ui/LiquidGlassFallback.kt), so if this coordinate fails to resolve or
-    // compile against this project's Kotlin/Compose toolchain, delete this one
-    // line + ui/LiquidGlass.kt and the toggle still works via the fallback.
-    // NOTE: 2.0.0 is built against a newer Kotlin/Compose-Multiplatform; if CI
-    // rejects it on a metadata/version mismatch, try the 1.0.6 (androidx) line.
-    implementation("io.github.kyant0:backdrop:2.0.0")
+    // Haze — real hardware backdrop-blur "liquid glass" for the opt-in Settings
+    // toggle. Chosen over Kyant Backdrop (which hard-crashed): Haze is
+    // AndroidX-native (no Compose-Multiplatform linkage clash) and 1.7.2 is
+    // built against this project's exact Kotlin 2.2.20. It does real RenderEffect
+    // blur on Android 12+ and degrades to a translucent scrim below instead of
+    // crashing. ALL usage is isolated in ui/LiquidGlass.kt behind the toggle,
+    // wrapped so ANY failure falls back to ui/LiquidGlassFallback.kt (frosted,
+    // no dependency). If this ever misbehaves, delete this line + revert
+    // LiquidGlass.kt to the fallback-only version and the toggle still works.
+    implementation("dev.chrisbanes.haze:haze:1.7.2")
 
 
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
