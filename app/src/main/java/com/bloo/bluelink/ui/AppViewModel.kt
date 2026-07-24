@@ -2090,6 +2090,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         AppLog.log("Drive auto-sync enabled")
         settingsStore.setSyncUri(uri.toString())
         _state.update { it.copy(syncUri = uri.toString()) }
+        // Push this device's settings to the file right away instead of
+        // waiting for the next unrelated refresh cycle to complete -- see
+        // runDriveSyncNow's doc comment for why that matters.
+        runDriveSyncNow()
     }
 
     /** Disable auto-sync. */
@@ -2155,6 +2159,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // something the restored backup already answered.
         if (imported) refreshLocalCarConfig()
         _state.update { it.copy(syncUri = uri.toString(), message = message) }
+        // Same reasoning as setSyncUri: run a real sync pass now instead of
+        // waiting on the passive refreshing-transition collector, so this
+        // device's merged state actually reaches the file immediately.
+        runDriveSyncNow()
     }
 
     /** Set Wi-Fi only vs any network for auto-sync. */
@@ -2303,11 +2311,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  to retry was pulling to refresh (which also triggers a sync) or waiting
      *  for the next periodic worker tick, up to 2h away for a transient blip. */
     fun retryDriveSync() {
-        viewModelScope.launch {
-            val outcome = withContext(Dispatchers.IO) { settingsStore.performDriveSync() }
-            if (outcome.ran) {
-                _state.update { it.copy(lastSyncMs = outcome.syncedAtMs, syncError = outcome.error) }
-            }
+        viewModelScope.launch { runDriveSyncNow() }
+    }
+
+    /** Runs one [SettingsStore.performDriveSync] pass right now and folds the
+     *  outcome into [UiState]. Both [setSyncUri] and [importSettingsAndSync]
+     *  used to just flip the syncUri pref and wait for the passive
+     *  refreshing-transition collector in [bootstrapDriveSync] to notice --
+     *  which meant "enable sync" didn't actually upload or download anything
+     *  until the next unrelated data refresh happened to complete, sometimes
+     *  never in the session (e.g. backgrounding right after setup). That's
+     *  exactly why a second device picking the same file moments later found
+     *  nothing real there yet. Calling this immediately after either flow
+     *  makes "enable sync" actually push/pull data right away. */
+    private suspend fun runDriveSyncNow() {
+        val outcome = withContext(Dispatchers.IO) { settingsStore.performDriveSync() }
+        if (outcome.ran) {
+            if (outcome.imported) refreshLocalCarConfig()
+            _state.update { it.copy(lastSyncMs = outcome.syncedAtMs, syncError = outcome.error) }
         }
     }
 
