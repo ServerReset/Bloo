@@ -884,18 +884,21 @@ class BlooWidget : GlanceAppWidget() {
         bitmapCache.get(key)?.let { return it }
         return runCatching {
             val mutable = source.copy(Bitmap.Config.ARGB_8888, true)
-            val radius = (maxOf(mutable.width, mutable.height) / BLUR_RADIUS_DIVISOR).coerceIn(4, 14)
-            repeat(3) { boxBlurInPlace(mutable, radius) }
+            val radius = (maxOf(mutable.width, mutable.height) / BLUR_RADIUS_DIVISOR).coerceIn(3, 9)
+            repeat(2) { boxBlurInPlace(mutable, radius) }
             mutable
         }.getOrDefault(source).also { bitmapCache.put(key, it) }
     }
 
     /** Blur radius scales with image size (so a bigger decoded photo doesn't
      *  read as proportionally sharper) but is clamped to a range tuned by
-     *  eye against this widget's own ~400px source: strong enough to erase
-     *  JPEG block edges and read as genuine soft glass, nowhere near strong
-     *  enough to lose the photo's actual shape. */
-    private val BLUR_RADIUS_DIVISOR = 30
+     *  eye against this widget's own ~400px source. Was divisor 30 / clamp
+     *  4-14 / three passes -- still too strong per follow-up feedback (the
+     *  fixed-radius rewrite fixed the low-res/blocky *artifacts*, but the
+     *  actual blur *amount* still needed cutting down in its own right).
+     *  Lighter radius and one fewer pass now; still enough to soften JPEG
+     *  block edges, further from "genuinely blurred" toward "gently soft". */
+    private val BLUR_RADIUS_DIVISOR = 45
 
     /** One box-blur pass (horizontal then vertical, each an O(width*height)
      *  sliding average via per-row/per-column prefix sums, not a naive

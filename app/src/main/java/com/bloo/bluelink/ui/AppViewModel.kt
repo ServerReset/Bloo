@@ -2108,21 +2108,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val json = withContext(Dispatchers.IO) {
             runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
         }
-            // A brand-new/empty file someone just created in Drive (0 bytes)
-            // has nothing to import -- that's the normal, expected case when
-            // setting up sync for the first time against a fresh file, not a
-            // corrupt or wrong one. Treated the same as `json == null` below
-            // (no import attempted, sync still enabled) instead of running it
-            // through importSettingsJson and reporting the scarier "couldn't
-            // import: Invalid settings file", which read as something had
-            // actually gone wrong.
-            ?.takeIf { it.isNotBlank() }
         // importSettingsJson returns null on success, or an error message on a
-        // rejected/corrupt backup (wrong format, newer version) -- surface that
-        // instead of reporting "imported" for a file that was actually rejected.
+        // rejected/corrupt backup (wrong format, newer version, not JSON at
+        // all, ...). Logged for our own diagnostics, but NOT surfaced to the
+        // user as an "Invalid settings file" failure below -- this is the
+        // "join an existing sync" flow, and the single most common file
+        // picked here is a brand-new one the user just created in Drive to
+        // use as the sync target (empty, a Google Docs placeholder, some
+        // other non-Bloo content, whatever) with nothing real to import yet.
+        // That's the normal, expected first-time-setup case, not a corrupt
+        // backup, and it reads as something having gone wrong. Auto-sync
+        // still enables either way, and the very next successful sync push
+        // overwrites this file with this device's real settings regardless,
+        // so a failed import here never loses anything.
         val importError = json?.let { settingsStore.importSettingsJson(it) }
         if (json != null && importError == null) AppLog.log("Settings imported from Drive")
-        else if (importError != null) AppLog.log("⚠ Settings import from Drive: $importError")
+        else if (importError != null) AppLog.log("⚠ Settings import from Drive ($importError) -- treating as nothing to import, not a failure")
+        val imported = json != null && importError == null
         val granted = runCatching {
             getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
                 uri,
@@ -2136,26 +2138,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // succeeded) already landed, so still report that part honestly.
             AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
             _state.update {
-                it.copy(message = when {
-                    json == null -> "Couldn't get lasting access to that file — try picking it again"
-                    importError != null -> "Couldn't import ($importError), and couldn't get lasting access to that file"
-                    else -> "Settings imported, but couldn't set up auto-sync — try picking the file again"
+                it.copy(message = if (imported) {
+                    "Settings imported, but couldn't set up auto-sync — try picking the file again"
+                } else {
+                    "Couldn't get lasting access to that file — try picking it again"
                 })
             }
             return@launch
         }
         settingsStore.setSyncUri(uri.toString())
-        val message = when {
-            json == null -> "Auto-sync enabled"
-            importError != null -> "Auto-sync enabled, but couldn't import: $importError"
-            else -> "Settings imported and auto-sync enabled"
-        }
+        val message = if (imported) "Settings imported and auto-sync enabled" else "Auto-sync enabled"
         // Same reasoning as importSettings: reflect a real import in the
         // already-loaded vehicles' local config right away (seats, powertrain,
         // photo, ...) -- e.g. so onboarding can skip a per-car setup screen for
         // a car this import already configured, instead of asking again for
         // something the restored backup already answered.
-        if (json != null && importError == null) refreshLocalCarConfig()
+        if (imported) refreshLocalCarConfig()
         _state.update { it.copy(syncUri = uri.toString(), message = message) }
     }
 
