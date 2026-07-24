@@ -457,7 +457,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 MorphButton(
-                    label = if (ui.driveSyncBusy) "Syncing…" else "Import from Drive",
+                    label = if (ui.driveSyncBusy) "Syncing…" else "Sync via Drive",
                     icon = Icons.Filled.Bolt,
                     active = false,
                     activeColor = MaterialTheme.colorScheme.tertiary,
@@ -486,7 +486,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             // Every other network-triggered button on this screen (Sync from
-            // phone, Import from Drive, Check now) shows a busy state; this
+            // phone, Sync via Drive, Check now) shows a busy state; this
             // one never did despite kicking off a refresh per car.
             val refreshingAny = ui.cars.any { "${it.vin}:refresh" in ui.pending }
             MorphButton(

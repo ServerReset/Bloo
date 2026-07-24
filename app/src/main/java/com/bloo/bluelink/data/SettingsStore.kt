@@ -1000,9 +1000,16 @@ class SettingsStore(private val context: Context) {
         // bound at all and could hang this coroutine indefinitely while still
         // holding driveSyncMutex, blocking every other sync path (the worker,
         // the refresh collector, a watch-requested sync) until it resolved.
+        // withDriveRetry: one immediate retry so a single transient blip
+        // (momentary network hiccup, Drive app briefly waking up) doesn't
+        // force waiting for the periodic worker's own backoff or the next
+        // unrelated refresh -- this pass is often the ONLY one that runs
+        // right after the user enables sync, so it needs to actually land.
         val remoteContent = runCatching {
-            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+            withDriveRetry {
+                kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                    context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                }
             }
         }.onFailure {
             downloadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
@@ -1022,18 +1029,20 @@ class SettingsStore(private val context: Context) {
         val body = "$now\n${exportSettingsJson()}"
         var uploadError: String? = null
         val uploaded = runCatching {
-            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
-                    ?: error("Couldn't open the Drive file for writing")
-                // Verify the write actually landed instead of trusting that
-                // close() completing without throwing means the bytes are really
-                // there -- some document providers can silently truncate or drop
-                // a buffered write under low storage or an interrupted upload,
-                // which previously would have reported success, advanced
-                // lastSyncMs, and cleared the dirty set for data that was never
-                // actually saved.
-                val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
-                if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
+            withDriveRetry {
+                kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                    context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
+                        ?: error("Couldn't open the Drive file for writing")
+                    // Verify the write actually landed instead of trusting that
+                    // close() completing without throwing means the bytes are really
+                    // there -- some document providers can silently truncate or drop
+                    // a buffered write under low storage or an interrupted upload,
+                    // which previously would have reported success, advanced
+                    // lastSyncMs, and cleared the dirty set for data that was never
+                    // actually saved.
+                    val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                    if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
+                }
             }
             AppLog.log("Drive sync: uploaded settings")
             true
@@ -1065,6 +1074,26 @@ class SettingsStore(private val context: Context) {
             ran = true, imported = imported, uploaded = uploaded, syncedAtMs = if (uploaded) now else lastSyncMs(),
             error = error,
         )
+    }
+
+    /** Runs [block] once, and if it throws, once more after a short delay --
+     *  a single retry absorbs the kind of momentary blip (Drive app still
+     *  waking up, a dropped packet) that would otherwise fail an entire sync
+     *  pass outright. Real cancellation (the coroutine's own job being
+     *  cancelled, NOT our own [DRIVE_IO_TIMEOUT_MS] timeout) is rethrown
+     *  immediately instead of being swallowed into a pointless retry. */
+    private suspend fun <T> withDriveRetry(block: suspend () -> T): T = try {
+        block()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        if (e is kotlinx.coroutines.TimeoutCancellationException) {
+            kotlinx.coroutines.delay(1000)
+            block()
+        } else {
+            throw e
+        }
+    } catch (e: Exception) {
+        kotlinx.coroutines.delay(1000)
+        block()
     }
 
     // The car's last known address + coordinates, refreshed by the Location action
