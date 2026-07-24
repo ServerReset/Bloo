@@ -858,32 +858,99 @@ class BlooWidget : GlanceAppWidget() {
     /** A soft, real blur of [source] (the already-downsampled photo bitmap,
      *  itself capped to ~400px on its longest edge by [decodeCached] before
      *  this ever runs), memoised by [path]'s identity so it's computed once
-     *  per photo, not on every widget refresh tick. No RenderScript/
-     *  RenderEffect available in this context (Glance content is built off
-     *  the main render pipeline, and RenderEffect needs a live View/
-     *  RenderNode) -- downscaling hard and upscaling back with bilinear
-     *  filtering is a well-known cheap approximation of a Gaussian blur,
-     *  using only an allocation-free bitmap scale down and back up, no
-     *  per-pixel loop.
+     *  per photo, not on every widget refresh tick.
      *
-     *  Two earlier tuning passes both overshot: a single steep ~1/12th-size
-     *  jump was blotchy, and splitting that into two smoother passes
-     *  totalling ~1/20th just made the blur itself far too strong. Both
-     *  numbers were also being applied on TOP of a source that's already
-     *  downsampled to ~400px, not the original photo -- shrinking an
-     *  already-small image by another 6-20x leaves almost nothing behind.
-     *  A single, much gentler ~1/3rd reduction on this already-small source
-     *  is enough to read as glass without turning into a low-res mush. */
+     *  Rebuilt from scratch as a real fixed-*pixel-radius* box blur (three
+     *  passes, which approximates a Gaussian closely) operating directly on
+     *  the bitmap's own pixel data, replacing an earlier scale-down/scale-
+     *  back-up approximation. That technique coupled "how blurred it looks"
+     *  to the source's own resolution and JPEG compression in a way that
+     *  was never stable: tuning passes swung between blotchy, an
+     *  over-blurred low-res mush, and (at the gentlest setting) the
+     *  original photo's own 8x8 JPEG block edges showing back through
+     *  almost undisguised. A fixed pixel radius has neither problem --
+     *  it softens by the same real amount regardless of the source photo's
+     *  size or compression, and is directly tunable (see [BLUR_RADIUS_DIVISOR]).
+     *
+     *  Still no RenderScript/RenderEffect (Glance content is built off the
+     *  main render pipeline, and RenderEffect needs a live View/RenderNode)
+     *  -- but unlike the Glance composition path itself, this runs once per
+     *  photo change on a small, already-downsampled bitmap and gets cached,
+     *  so a real per-pixel pass here is cheap in practice (three box-blur
+     *  passes over ~400x400px is well under a millisecond of integer math). */
     private fun blurredCached(source: Bitmap, path: String): Bitmap {
         val file = java.io.File(path)
         val key = "blur:$path:${file.lastModified()}"
         bitmapCache.get(key)?.let { return it }
         return runCatching {
-            val downW = (source.width / 3).coerceAtLeast(60)
-            val downH = (source.height / 3).coerceAtLeast(60)
-            val small = Bitmap.createScaledBitmap(source, downW, downH, true)
-            Bitmap.createScaledBitmap(small, source.width, source.height, true)
+            val mutable = source.copy(Bitmap.Config.ARGB_8888, true)
+            val radius = (maxOf(mutable.width, mutable.height) / BLUR_RADIUS_DIVISOR).coerceIn(4, 14)
+            repeat(3) { boxBlurInPlace(mutable, radius) }
+            mutable
         }.getOrDefault(source).also { bitmapCache.put(key, it) }
+    }
+
+    /** Blur radius scales with image size (so a bigger decoded photo doesn't
+     *  read as proportionally sharper) but is clamped to a range tuned by
+     *  eye against this widget's own ~400px source: strong enough to erase
+     *  JPEG block edges and read as genuine soft glass, nowhere near strong
+     *  enough to lose the photo's actual shape. */
+    private val BLUR_RADIUS_DIVISOR = 30
+
+    /** One box-blur pass (horizontal then vertical, each an O(width*height)
+     *  sliding average via per-row/per-column prefix sums, not a naive
+     *  O(width*height*radius) re-sum per pixel) mutating [bmp] in place.
+     *  Three calls with the same radius approximate a Gaussian blur closely
+     *  enough for this purpose at a fraction of the cost of one. */
+    private fun boxBlurInPlace(bmp: Bitmap, radius: Int) {
+        if (radius < 1) return
+        val w = bmp.width
+        val h = bmp.height
+        val pixels = IntArray(w * h)
+        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+        val horizontal = IntArray(w * h)
+        boxBlurPass(pixels, horizontal, w, h, radius, alongRows = true)
+        boxBlurPass(horizontal, pixels, w, h, radius, alongRows = false)
+        bmp.setPixels(pixels, 0, w, 0, 0, w, h)
+    }
+
+    /** One directional box-blur pass. [alongRows] = true blurs each row
+     *  horizontally (x varies, y fixed); false blurs each column vertically
+     *  (y varies, x fixed). Edge pixels use a shrinking (not wrapped or
+     *  clamped-weight) window -- the average of however many real neighbours
+     *  exist near an edge, which is the standard box-blur edge behaviour and
+     *  avoids darkening/lightening the border. */
+    private fun boxBlurPass(src: IntArray, dst: IntArray, w: Int, h: Int, radius: Int, alongRows: Boolean) {
+        val outer = if (alongRows) h else w
+        val inner = if (alongRows) w else h
+        // Per-channel running-sum prefix arrays, reused across every
+        // row/column of this pass -- index 0 is always the empty-window
+        // sum (0), so no explicit reset is needed between lines.
+        val prefA = IntArray(inner + 1)
+        val prefR = IntArray(inner + 1)
+        val prefG = IntArray(inner + 1)
+        val prefB = IntArray(inner + 1)
+        for (o in 0 until outer) {
+            for (i in 0 until inner) {
+                val idx = if (alongRows) o * w + i else i * w + o
+                val p = src[idx]
+                prefA[i + 1] = prefA[i] + ((p ushr 24) and 0xFF)
+                prefR[i + 1] = prefR[i] + ((p ushr 16) and 0xFF)
+                prefG[i + 1] = prefG[i] + ((p ushr 8) and 0xFF)
+                prefB[i + 1] = prefB[i] + (p and 0xFF)
+            }
+            for (i in 0 until inner) {
+                val start = (i - radius).coerceAtLeast(0)
+                val end = (i + radius).coerceAtMost(inner - 1)
+                val count = end - start + 1
+                val a = (prefA[end + 1] - prefA[start]) / count
+                val r = (prefR[end + 1] - prefR[start]) / count
+                val g = (prefG[end + 1] - prefG[start]) / count
+                val b = (prefB[end + 1] - prefB[start]) / count
+                val idx = if (alongRows) o * w + i else i * w + o
+                dst[idx] = (a shl 24) or (r shl 16) or (g shl 8) or b
+            }
+        }
     }
 
     companion object {

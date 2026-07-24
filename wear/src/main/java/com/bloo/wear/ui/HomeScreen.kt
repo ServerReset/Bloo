@@ -51,7 +51,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
@@ -1408,7 +1408,7 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
     Spacer(Modifier.height(6.dp))
     MorphButton(
         label = "Open on phone",
-        icon = Icons.Filled.OpenInNew,
+        icon = Icons.AutoMirrored.Filled.OpenInNew,
         active = false,
         activeColor = MaterialTheme.colorScheme.primary,
         pending = false,
@@ -1674,7 +1674,7 @@ private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) 
     Spacer(Modifier.height(6.dp))
     MorphButton(
         label = "Owner site",
-        icon = Icons.Filled.OpenInNew,
+        icon = Icons.AutoMirrored.Filled.OpenInNew,
         active = false,
         activeColor = accent,
         pending = false,

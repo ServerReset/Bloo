@@ -2670,45 +2670,32 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         beyondViewportPageCount = 1,
                         pageSize = androidx.compose.foundation.pager.PageSize.Fill,
                     ) { page ->
-                        // Only the discretized "settled" boolean is read here in
-                        // composable scope (via derivedStateOf, so it only
-                        // invalidates on the rare 0.01 threshold crossing) --
-                        // the continuous pager offset used to be read as a plain
-                        // val (pageOff/effectiveOff) right in this scope, which
-                        // subscribed the WHOLE page composable -- CarThemeOverride,
-                        // VehicleDetailContent, every pebble in it -- to recompose
-                        // on literally every drag frame. That, not the since-removed
-                        // blur/tilt, was the real remaining swipe jank: the actual
-                        // continuous offset is now only ever read inside
-                        // graphicsLayer{} below, which is draw-phase only and never
-                        // triggers recomposition.
-                        val settled by remember(page) {
-                            derivedStateOf {
-                                ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) } < 0.01f
-                            }
-                        }
-                        // Spring-bouncy page transition: off-screen pages fade and
-                        // shrink slightly — snapping back with a subtle overshoot.
-                        // Was DampingRatioMediumBouncy/StiffnessMedium -- a
-                        // real overshoot-and-settle on every single page
-                        // change read as jittery rather than fluid for
-                        // something that fires on every car swipe. The app's
-                        // standard "snappy but settled" spring instead.
-                        val snapBounce = animateFloatAsState(
-                            targetValue = if (settled) 0f else 1f,
-                            animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                            label = "pageBounce",
-                        )
+                        // Read the continuous pager offset ONLY inside graphicsLayer{}
+                        // below (draw-phase, never triggers recomposition) -- reading
+                        // it as a plain val in this composable scope used to subscribe
+                        // the WHOLE page composable (CarThemeOverride, VehicleDetailContent,
+                        // every pebble in it) to recompose on literally every drag frame,
+                        // the real remaining cause of swipe jank after the blur/tilt
+                        // removal below. A secondary "snap bounce" spring driven off a
+                        // discretized settled/unsettled boolean used to multiply into
+                        // this too, on the theory that it'd add a subtle overshoot on
+                        // release -- in practice it lagged the scale/alpha response
+                        // behind the actual continuous drag position for the whole
+                        // gesture (the spring has to visibly catch up to "unsettled"
+                        // right as the drag starts), which is what made this pager's
+                        // swipe read as less smooth than the cover screen's equivalent
+                        // (CompactGarage), which never had that extra layer. Matching
+                        // it here: the raw continuous offset drives the transform
+                        // directly, no secondary spring in between.
                         // No blur, no rotationZ tilt -- tried both a position-driven
                         // and later a velocity-driven blur here, and the tilt on top
                         // of the fade/scale, and all of it together read as worse
                         // than the plain fade/scale alone. Just that now.
                         Box(Modifier.fillMaxSize().graphicsLayer {
                             val off = ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
-                            val effectiveOff = off * (1f - snapBounce.value * 0.3f)
-                            alpha = 1f - effectiveOff * 0.2f
-                            scaleX = 1f - effectiveOff * 0.06f
-                            scaleY = 1f - effectiveOff * 0.06f
+                            alpha = 1f - off * 0.2f
+                            scaleX = 1f - off * 0.06f
+                            scaleY = 1f - off * 0.06f
                         }) {
                             val pv = vehicles[exReal(page)]
                             CarThemeOverride(
@@ -2770,44 +2757,25 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                        // Same fade/scale-with-bounce transition the expanded
-                        // single-car pager already uses -- this, the default view
-                        // most people see swiping between cars day to day,
-                        // previously had no per-page transform at all, just a
-                        // plain flat scroll.
-                        // See the expanded pager above for why only the
-                        // discretized "settled" boolean is read in composable
-                        // scope -- the continuous offset used to be baked into a
-                        // plain effectiveOff val here, subscribing this entire
-                        // per-page Row (every VehicleDetailContent, every pebble)
-                        // to recompose on every single drag frame. That was the
-                        // real remaining cause of "still juttery" swiping even
-                        // after the blur/tilt removal.
-                        val settled by remember(page) {
-                            derivedStateOf {
-                                ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) } < 0.01f
-                            }
-                        }
-                        // Was DampingRatioMediumBouncy/StiffnessMedium -- a
-                        // real overshoot-and-settle on every single page
-                        // change read as jittery rather than fluid for
-                        // something that fires on every car swipe. The app's
-                        // standard "snappy but settled" spring instead.
-                        val snapBounce = animateFloatAsState(
-                            targetValue = if (settled) 0f else 1f,
-                            animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                            label = "pageBounce",
-                        )
+                        // Same fade/scale transition the expanded single-car pager
+                        // above uses (see its own comment for why: the continuous
+                        // offset is read only inside graphicsLayer{} below, draw-phase
+                        // only, and the secondary "snap bounce" spring this used to
+                        // multiply in is gone -- it lagged the visual response behind
+                        // the actual drag for the whole gesture, which is what made
+                        // this pager's swipe read as less smooth than the cover
+                        // screen's equivalent). This, the default view most people
+                        // see swiping between cars day to day, previously had no
+                        // per-page transform at all, just a plain flat scroll.
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
                         // No blur, no rotationZ tilt -- see the expanded pager above.
                         Row(
                             Modifier.fillMaxSize().graphicsLayer {
                                 val off = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
-                                val effectiveOff = off * (1f - snapBounce.value * 0.3f)
-                                alpha = 1f - effectiveOff * 0.2f
-                                scaleX = 1f - effectiveOff * 0.06f
-                                scaleY = 1f - effectiveOff * 0.06f
+                                alpha = 1f - off * 0.2f
+                                scaleX = 1f - off * 0.06f
+                                scaleY = 1f - off * 0.06f
                             },
                         ) {
                             for (i in start until end) {
@@ -3288,7 +3256,14 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 // baseline to clear the cutout, never shrinks it.
                 val baseStart = coverScaled(10.dp)
                 val baseTop = coverScaled(10.dp)
-                val baseBottom = coverScaled(24.dp)
+                // Was 24.dp -- on top of navigationBarsPadding() already
+                // reserving the system nav bar's own inset below, and
+                // PebbleShell's fillHeight body padding another 10.dp of its
+                // own at the very bottom, that stacked into a noticeable band
+                // of genuinely empty space at the bottom of every cover-screen
+                // tile. 12.dp is still real breathing room above the nav bar
+                // without compounding into dead space.
+                val baseBottom = coverScaled(12.dp)
                 val baseEnd = if (tiles.size > 1) coverScaled(22.dp) else coverScaled(10.dp)
                 Box(
                     Modifier
@@ -6210,99 +6185,123 @@ private fun PebbleShell(
             Column(
                 if (fillHeight) Modifier.fillMaxHeight() else Modifier,
             ) {
-                // Header: tap anywhere to toggle, long-press to drag-reorder. The
-                // action button and chevron handle their own clicks. Fixed min height
-                // so every collapsed pebble lines up.
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .then(
-                            if (forceExpanded) Modifier
-                            else Modifier.clickable {
-                                if (expanded) haptics?.tick() else haptics?.click()
-                                onToggle()
-                            },
-                        )
-                        .then(dragHandle)
-                        .heightIn(min = PebbleHeaderHeight)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        // Same heading fix as SettingsCard: with 8+ pebbles per
-                        // car and no heading structure, TalkBack users could
-                        // only reach a given section (Climate, Charge, ...) by
-                        // swiping through every row of every pebble above it.
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.semantics { heading() },
-                        )
-                        if (summary != null) {
-                            AnimatedContent(
-                                targetState = summary,
-                                transitionSpec = {
-                                    (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                                    (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                if (fillHeight) {
+                    // No header row on the cover screen -- the full-height icon
+                    // + title + chevron row this tier used to share with every
+                    // other pebble reserved a fixed ~76dp+padding before a
+                    // single line of actual content, a big bite out of an
+                    // already tiny screen, especially for a tile whose body
+                    // needs to scroll. A small floating icon badge over the
+                    // content's top-start corner (drawn in the Box below,
+                    // outside any dedicated row of its own) identifies the
+                    // tile instead -- the tile-scrubber dots on the right edge
+                    // already announce its name too (see VerticalPagerDots),
+                    // so this is a supplementary visual cue, not the only one.
+                    if (expanded) {
+                        val bodyScroll = LocalCoverScrollState.current ?: rememberScrollState()
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            // BoxWithConstraints captures the real available height
+                            // (undisturbed by verticalScroll, which is applied one
+                            // level in) so heightIn(min = ...) below can force the
+                            // scrolling Column to at least that tall. A short tile's
+                            // content then centers within that height via
+                            // spacedBy(..., CenterVertically) instead of collapsing
+                            // to the top with dead space underneath; a tall tile's
+                            // content still exceeds it and scrolls exactly as before.
+                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                val minHeight = maxHeight
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .fadingEdges(bodyScroll)
+                                        .verticalScroll(bodyScroll)
+                                        .heightIn(min = minHeight)
+                                        // Extra top clearance (vs. the 4dp every other
+                                        // pebble uses) so the first content row doesn't
+                                        // sit directly under the floating badge.
+                                        .padding(start = 16.dp, end = 16.dp, bottom = 10.dp, top = 34.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                                    content = content,
+                                )
+                            }
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(8.dp)
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                } else {
+                    // Header: tap anywhere to toggle, long-press to drag-reorder. The
+                    // action button and chevron handle their own clicks. Fixed min height
+                    // so every collapsed pebble lines up.
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (forceExpanded) Modifier
+                                else Modifier.clickable {
+                                    if (expanded) haptics?.tick() else haptics?.click()
+                                    onToggle()
                                 },
-                                label = "pebbleSummary",
-                            ) { s ->
-                                Text(
-                                    s,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                                    maxLines = 1,
+                            )
+                            .then(dragHandle)
+                            .heightIn(min = PebbleHeaderHeight)
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            // Same heading fix as SettingsCard: with 8+ pebbles per
+                            // car and no heading structure, TalkBack users could
+                            // only reach a given section (Climate, Charge, ...) by
+                            // swiping through every row of every pebble above it.
+                            Text(
+                                title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { heading() },
+                            )
+                            if (summary != null) {
+                                AnimatedContent(
+                                    targetState = summary,
+                                    transitionSpec = {
+                                        (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                                        (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                                    },
+                                    label = "pebbleSummary",
+                                ) { s ->
+                                    Text(
+                                        s,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                        if (!forceExpanded) {
+                            if (headerAction != null) {
+                                SplitExpandButton(
+                                    action = headerAction,
+                                    expanded = expanded,
+                                    onToggle = onToggle,
+                                )
+                            } else {
+                                MorphExpandButton(
+                                    expanded = expanded,
+                                    onToggle = onToggle,
                                 )
                             }
                         }
                     }
-                    if (!forceExpanded) {
-                        if (headerAction != null) {
-                            SplitExpandButton(
-                                action = headerAction,
-                                expanded = expanded,
-                                onToggle = onToggle,
-                            )
-                        } else {
-                            MorphExpandButton(
-                                expanded = expanded,
-                                onToggle = onToggle,
-                            )
-                        }
-                    }
-                }
-                if (fillHeight) {
-                    // Cover-screen tiles are always force-expanded and must fill the
-                    // remaining height, so the body is a direct weighted child of the
-                    // Column (no AnimatedVisibility, which would break weight()).
-                    if (expanded) {
-                        val bodyScroll = LocalCoverScrollState.current ?: rememberScrollState()
-                        // BoxWithConstraints captures the real available height
-                        // (undisturbed by verticalScroll, which is applied one
-                        // level in) so heightIn(min = ...) below can force the
-                        // scrolling Column to at least that tall. A short tile's
-                        // content then centers within that height via
-                        // spacedBy(..., CenterVertically) instead of collapsing
-                        // to the top with dead space underneath; a tall tile's
-                        // content still exceeds it and scrolls exactly as before.
-                        BoxWithConstraints(Modifier.weight(1f)) {
-                            val minHeight = maxHeight
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .fadingEdges(bodyScroll)
-                                    .verticalScroll(bodyScroll)
-                                    .heightIn(min = minHeight)
-                                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-                                content = content,
-                            )
-                        }
-                    }
-                } else {
                     // Normal pebbles: animate the body fading + sliding open/closed.
                     AnimatedVisibility(
                         visible = expanded,
