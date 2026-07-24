@@ -131,6 +131,16 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Kyant Backdrop — real hardware-refraction "liquid glass" for the opt-in
+    // Settings toggle. ALL usage is isolated in ui/LiquidGlass.kt behind a
+    // runtime API-31+ gate with a no-dependency frosted fallback
+    // (ui/LiquidGlassFallback.kt), so if this coordinate fails to resolve or
+    // compile against this project's Kotlin/Compose toolchain, delete this one
+    // line + ui/LiquidGlass.kt and the toggle still works via the fallback.
+    // NOTE: 2.0.0 is built against a newer Kotlin/Compose-Multiplatform; if CI
+    // rejects it on a metadata/version mismatch, try the 1.0.6 (androidx) line.
+    implementation("io.github.kyant0:backdrop:2.0.0")
+
 
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.

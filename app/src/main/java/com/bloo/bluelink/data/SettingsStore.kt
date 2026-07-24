@@ -156,6 +156,7 @@ class SettingsStore(private val context: Context) {
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
+        val LIQUID_GLASS = stringPreferencesKey("liquid_glass")
         val AURORA = stringPreferencesKey("aurora_background")
         val AURORA_MOTION = stringPreferencesKey("aurora_motion")
         val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
@@ -223,6 +224,10 @@ class SettingsStore(private val context: Context) {
          *  from the watch. See [SettingsStore.Keys.WATCH_PIN_ENABLED]'s comment. */
         val watchPinLockEnabled: Boolean = false,
         val watchPinLockTiming: String = "immediate",
+        /** Opt-in "liquid glass" appearance. Off by default = current look; when
+         *  on, floating chrome and cards use real backdrop refraction (API 31+)
+         *  or an enhanced-frosted fallback below that. */
+        val liquidGlass: Boolean = false,
     )
 
     // A reactive view of every appearance-related preference at once: each time
@@ -272,6 +277,7 @@ class SettingsStore(private val context: Context) {
             watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
             watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
+            liquidGlass = prefs[Keys.LIQUID_GLASS]?.toBooleanStrictOrNull() ?: false,
         )
     }
 
@@ -291,6 +297,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setPebbleOutline(value: Boolean) {
         editTracked { it[Keys.PEBBLE_OUTLINE] = value.toString() }
+    }
+
+    suspend fun setLiquidGlass(value: Boolean) {
+        editTracked { it[Keys.LIQUID_GLASS] = value.toString() }
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {
