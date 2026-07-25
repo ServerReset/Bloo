@@ -79,7 +79,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -542,17 +548,74 @@ private fun CarColumn(
             cap = 12,
         )
 
+        // Press-and-hold the car-name pill to refresh: a ring sweeps around the
+        // display edge over ~1s; completing it fires a refresh + a confirm buzz,
+        // and letting go early rewinds it with nothing triggered. holdProgress is
+        // hoisted here (0f..1f) so both the pill's gesture and the edge ring below
+        // read/drive the same value.
+        val holdProgress = remember { Animatable(0f) }
+        val haptics = LocalHapticFeedback.current
         // Name the car once you leave its summary tile.
         CarNameOverlay(
             name = car.name,
             visible = centerTile.isNotEmpty() && centerTile != WearTiles.SUMMARY,
             phoneConnected = ui.phoneConnected,
+            holdProgress = holdProgress,
+            onHoldComplete = {
+                haptics.click()
+                vm.refreshStatus(car.vin)
+            },
         )
+
+        // The edge ring itself (drawn above the cards, below the clock scrim). Only
+        // materialises while a hold is in progress, sweeping clockwise from the top.
+        HoldRefreshRing(progress = { holdProgress.value })
 
         // The system clock (Wear's TimeText) draws itself over whatever this
         // app renders at the very top-center -- same gap as the phone's
         // status bar, matched with the same soft blurred scrim treatment.
         TopClockScrim()
+    }
+}
+
+/** The circular progress ring that sweeps around the display edge while the user
+ *  presses and holds the car-name pill (see [CarNameOverlay]). [progress] is read
+ *  as a lambda so the ring redraws each frame the Animatable ticks without
+ *  recomposing the whole car page. Sweeps clockwise from 12 o'clock; fully
+ *  transparent at progress 0 so it costs nothing visually when idle. */
+@Composable
+private fun BoxScope.HoldRefreshRing(progress: () -> Float) {
+    val ringColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    Canvas(Modifier.fillMaxSize()) {
+        val p = progress().coerceIn(0f, 1f)
+        if (p <= 0f) return@Canvas
+        val stroke = 5.dp.toPx()
+        // Inset by half the stroke so the ring hugs the very edge of the round
+        // display without clipping. topLeft/size describe the arc's bounding box.
+        val inset = stroke / 2f
+        val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
+        val topLeft = Offset(inset, inset)
+        // Faint full-circle track so the sweep reads against the bezel, then the
+        // filling arc from 12 o'clock (-90°) clockwise.
+        drawArc(
+            color = trackColor,
+            startAngle = -90f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
+        drawArc(
+            color = ringColor,
+            startAngle = -90f,
+            sweepAngle = 360f * p,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
     }
 }
 
@@ -754,7 +817,14 @@ private fun CurvedDots(
  *  unlike the button. Removed rather than fixed, since the button already
  *  covers the same need with far less code. */
 @Composable
-private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnected: Boolean = true) {
+private fun BoxScope.CarNameOverlay(
+    name: String,
+    visible: Boolean,
+    phoneConnected: Boolean = true,
+    holdProgress: Animatable<Float, *>? = null,
+    onHoldComplete: (() -> Unit)? = null,
+) {
+    val scope = rememberCoroutineScope()
     AnimatedVisibility(
         visible = visible,
         modifier = Modifier.align(Alignment.TopCenter).padding(top = 26.dp),
@@ -769,6 +839,41 @@ private fun BoxScope.CarNameOverlay(name: String, visible: Boolean, phoneConnect
                 .dropShadow(RoundedCornerShape(50))
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
+                // Press-and-hold to refresh: animate the shared holdProgress 0→1
+                // over ~1s while pressed; reaching 1f fires onHoldComplete (refresh
+                // + confirm buzz). Releasing/cancelling before 1f rewinds to 0 and
+                // does nothing (a full hold is required — a stray tap never
+                // refreshes). Guarded on holdProgress != null so the overlay is
+                // still usable without the gesture wired in.
+                .then(
+                    if (holdProgress != null && onHoldComplete != null) {
+                        Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    // Start filling the ring on press. The fill runs
+                                    // in its own job so it keeps animating while we
+                                    // await the release below.
+                                    val fill = scope.launch {
+                                        holdProgress.animateTo(1f, tween(1000, easing = LinearEasing))
+                                        // Reached full 1s hold → fire once, then reset.
+                                        onHoldComplete()
+                                        holdProgress.snapTo(0f)
+                                    }
+                                    // tryAwaitRelease() suspends until the finger lifts
+                                    // (or the gesture is cancelled by a scroll/drag).
+                                    tryAwaitRelease()
+                                    // Released/cancelled: stop the fill. If it hadn't
+                                    // already completed (value back at 0), rewind so a
+                                    // partial hold does nothing.
+                                    fill.cancel()
+                                    if (holdProgress.value > 0f) {
+                                        holdProgress.animateTo(0f, tween(200))
+                                    }
+                                },
+                            )
+                        }
+                    } else Modifier,
+                )
                 .padding(horizontal = 14.dp, vertical = 5.dp),
         ) {
             Row(

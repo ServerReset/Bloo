@@ -63,6 +63,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Re-check phone reachability whenever the watch face returns to Bloo.
         viewModel.refreshConnection()
+        // Also re-check for a newer build (debounced) so an update pushed while
+        // the app was backgrounded surfaces on return, not only on cold relaunch.
+        viewModel.onAppResumed()
     }
 
     override fun onStop() {

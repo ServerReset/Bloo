@@ -52,9 +52,16 @@ import kotlin.coroutines.resume
 enum class WearScreen { Loading, SignedOut, Ready }
 
 // How often runUpdateCheck() is allowed to hit the GitHub Actions API on its
-// own (no manual "check now" exists) -- gates the cold-start check in init so
-// a restart-happy user doesn't hammer the endpoint every launch.
+// own -- gates the cold-start check in init so a restart-happy user doesn't
+// hammer the endpoint every launch.
 private const val UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
+
+// A shorter floor used for the on-resume and periodic re-checks (see
+// onAppResumed / the periodic loop in init): the cold-start-only check meant a
+// build pushed while the watch app was already open never surfaced until the
+// next relaunch. 15 min re-checks catch a fresh build within a glance or two
+// without hammering the endpoint. Snooze is still respected either way.
+private const val UPDATE_RECHECK_INTERVAL_MS = 15L * 60 * 1000L // 15 min
 
 /** See [WearViewModel.submitPin]'s doc comment: consecutive-wrong-PIN lockout. */
 private const val PIN_MAX_ATTEMPTS = 5
@@ -523,7 +530,26 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Cold-start update check -- see runUpdateCheck's own doc comment.
         viewModelScope.launch { runUpdateCheck(force = false) }
+        // Periodic re-check while the app stays open: the cold-start check alone
+        // meant a build pushed mid-session never surfaced until relaunch. Loops on
+        // the shorter recheck floor (runUpdateCheck no-ops until the interval
+        // elapses / stops once an update is found), so a long-lived session picks
+        // up a fresh build within ~15 min. onAppResumed() covers the foreground case.
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(UPDATE_RECHECK_INTERVAL_MS)
+                runUpdateCheck(force = false, minInterval = UPDATE_RECHECK_INTERVAL_MS)
+            }
+        }
         bootstrap()
+    }
+
+    /** Called from [com.bloo.wear.MainActivity.onResume] so a build pushed while the
+     *  watch app was backgrounded surfaces the moment the user returns to Bloo,
+     *  instead of only on a cold relaunch. Uses the short recheck floor (debounced)
+     *  and no-ops if an update was already found this session. */
+    fun onAppResumed() {
+        viewModelScope.launch { runUpdateCheck(force = false, minInterval = UPDATE_RECHECK_INTERVAL_MS) }
     }
 
     private fun bootstrap() {
@@ -1272,11 +1298,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  number, not the phone's. No manual "Check now" any more -- this is the
      *  only check, and its result (updateRun) drives the More tile's banner
      *  automatically. Returns whether a newer build was surfaced. */
-    private suspend fun runUpdateCheck(force: Boolean): Boolean {
+    private suspend fun runUpdateCheck(force: Boolean, minInterval: Long = UPDATE_CHECK_INTERVAL_MS): Boolean {
         if (com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER <= 0) return false
+        // Already found one this session? Don't re-hit the API — the banner is
+        // already showing (or was snoozed), and a resume/tick shouldn't clobber it.
+        if (_ui.value.updateRun != null) return false
         val settings = localStore.flow.first()
         val now = System.currentTimeMillis()
-        if (!force && now - settings.updateLastCheckedAt < UPDATE_CHECK_INTERVAL_MS) return false
+        if (!force && now - settings.updateLastCheckedAt < minInterval) return false
         if (!force && now < settings.updateSnoozeUntil) return false
         // Same-branch comparison + consume the 12h window only on a successful
         // fetch - mirrors UpdateChecker.checkPhone (see there for why).
