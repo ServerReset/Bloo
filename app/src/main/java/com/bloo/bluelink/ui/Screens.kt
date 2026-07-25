@@ -131,6 +131,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.CloudOff
@@ -216,7 +217,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.ui.window.Dialog
@@ -1894,57 +1894,58 @@ private fun LoginScreen(
 @Composable
 private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
     var code by remember(otp.sentTo) { mutableStateOf("") }
-    AlertDialog(
+    // Standardized on the shared GlassAlertDialog shell (frosted card, 28dp
+    // corners, stacked full-width buttons) instead of a raw M3 AlertDialog.
+    GlassAlertDialog(
         onDismissRequest = { if (!loading) vm.kiaCancelOtp() },
-        title = { Text(if (otp.sentTo == null) "Verify it's you" else "Enter your code") },
+        icon = Icons.Filled.Lock,
+        title = if (otp.sentTo == null) "Verify it's you" else "Enter your code",
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (otp.sentTo == null) {
-                    Text("Kia needs to verify this sign-in with a one-time code. Where should it go?")
-                    if (otp.challenge.hasEmail) {
-                        MorphButton(
-                            onClick = { vm.kiaSendOtp("EMAIL") },
-                            enabled = !loading,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: "")) }
-                    }
-                    if (otp.challenge.hasSms) {
-                        MorphButton(
-                            onClick = { vm.kiaSendOtp("SMS") },
-                            enabled = !loading,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: "")) }
-                    }
-                } else {
-                    Text(
-                        if (otp.sentTo == "SMS") "We texted you a one-time code."
-                        else "We emailed you a one-time code.",
-                    )
-                    OutlinedTextField(
-                        value = code,
-                        onValueChange = { code = it },
-                        label = { Text("Code") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            if (otp.sentTo == null) {
+                Text("Kia needs to verify this sign-in with a one-time code. Where should it go?")
+                if (otp.challenge.hasEmail) {
+                    MorphButton(
+                        onClick = { vm.kiaSendOtp("EMAIL") },
+                        enabled = !loading,
                         modifier = Modifier.fillMaxWidth(),
-                    )
+                    ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: "")) }
                 }
+                if (otp.challenge.hasSms) {
+                    MorphButton(
+                        onClick = { vm.kiaSendOtp("SMS") },
+                        enabled = !loading,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: "")) }
+                }
+            } else {
+                Text(
+                    if (otp.sentTo == "SMS") "We texted you a one-time code."
+                    else "We emailed you a one-time code.",
+                )
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it },
+                    label = { Text("Code") },
+                    singleLine = true,
+                    shape = FieldShape,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
-        confirmButton = {
+        buttons = {
+            // Verify shown only once a code's been sent; Cancel always. Stacked
+            // full-width (primary on top) per the shell's convention.
             if (otp.sentTo != null) {
                 MorphButton(
                     onClick = { vm.kiaVerifyOtp(code) },
                     enabled = !loading && code.isNotBlank(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
                 }
             }
-        },
-        dismissButton = {
-            MorphTextButton("Cancel", vm::kiaCancelOtp, enabled = !loading)
+            MorphTextButton("Cancel", vm::kiaCancelOtp, enabled = !loading, modifier = Modifier.fillMaxWidth())
         },
     )
 }
@@ -1967,10 +1968,17 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 @Composable
 private fun GlassAlertDialog(
     onDismissRequest: () -> Unit,
-    icon: ImageVector,
     title: String,
     text: @Composable ColumnScope.() -> Unit,
     buttons: @Composable ColumnScope.() -> Unit,
+    // Optional leading icon: when non-null it renders in the 48dp primaryContainer
+    // circle; when null the circle is skipped entirely (for dialogs like "Save
+    // preset" / "Rename device" that have no natural glyph). Defaulted so existing
+    // callers that pass an icon are unchanged.
+    icon: ImageVector? = null,
+    // Optional trailing action in the title row (e.g. PaletteEditorDialog's delete
+    // button). Sits to the right of the title, vertically centered.
+    titleTrailing: (@Composable () -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(28.dp)
@@ -2010,16 +2018,29 @@ private fun GlassAlertDialog(
                 .appGlassRim(shape),
         ) {
             Column(Modifier.padding(24.dp)) {
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .background(scheme.primaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(icon, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                if (icon != null) {
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .background(scheme.primaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(icon, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
-                Spacer(Modifier.height(16.dp))
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (titleTrailing != null) {
+                        Spacer(Modifier.width(8.dp))
+                        titleTrailing()
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 Column(
                     Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
@@ -5634,34 +5655,27 @@ private fun PaletteEditorDialog(
             confirmDelete = false
         }
     }
-    AlertDialog(
+    // Standardized on the shared GlassAlertDialog shell. No leading icon (the
+    // dialog is title-led); the delete affordance rides the shell's titleTrailing
+    // slot; the shell already scrolls its body (max 360dp), so the inner
+    // verticalScroll is dropped to avoid a nested-scroll conflict.
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (editing == null) "New palette" else "Edit \"${editing.name}\"",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                if (editing != null) {
-                    IconButton(onClick = {
-                        if (confirmDelete) { onDelete(paletteId); onDismiss() } else { confirmDelete = true }
-                    }) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription = if (confirmDelete) "Confirm delete palette" else "Delete palette",
-                            tint = if (confirmDelete) MaterialTheme.colorScheme.error else LocalContentColor.current,
-                        )
-                    }
+        title = if (editing == null) "New palette" else "Edit \"${editing.name}\"",
+        titleTrailing = if (editing != null) {
+            {
+                IconButton(onClick = {
+                    if (confirmDelete) { onDelete(paletteId); onDismiss() } else { confirmDelete = true }
+                }) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = if (confirmDelete) "Confirm delete palette" else "Delete palette",
+                        tint = if (confirmDelete) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    )
                 }
             }
-        },
+        } else null,
         text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -5718,9 +5732,8 @@ private fun PaletteEditorDialog(
                         ColorPickerCanvas(tertiaryColor, { tertiaryColor = it })
                     }
                 }
-            }
         },
-        confirmButton = {
+        buttons = {
             MorphButton(
                 onClick = {
                     onSave(
@@ -5735,10 +5748,9 @@ private fun PaletteEditorDialog(
                     onDismiss()
                 },
                 active = true,
+                modifier = Modifier.fillMaxWidth(),
             ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false, iconSize = 18.dp) }
-        },
-        dismissButton = {
-            MorphTextButton("Cancel", onDismiss)
+            MorphTextButton("Cancel", onDismiss, modifier = Modifier.fillMaxWidth())
         },
     )
 }
@@ -7364,9 +7376,11 @@ private fun ClimatePebble(
         )
 
         if (showAddPreset) {
-            AlertDialog(
+            // Standardized on the shared GlassAlertDialog shell (stacked buttons).
+            GlassAlertDialog(
                 onDismissRequest = { showAddPreset = false },
-                title = { Text("Save preset") },
+                icon = Icons.Filled.Thermostat,
+                title = "Save preset",
                 text = {
                     OutlinedTextField(
                         value = presetName,
@@ -7377,9 +7391,8 @@ private fun ClimatePebble(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 },
-                confirmButton = {
-                    MorphTextButton(
-                        "Save",
+                buttons = {
+                    MorphButton(
                         onClick = {
                             if (presetName.isNotBlank()) {
                                 vm.saveClimatePreset(v, presetName.trim(), currentReq)
@@ -7387,10 +7400,10 @@ private fun ClimatePebble(
                             }
                         },
                         enabled = presetName.isNotBlank(),
-                    )
-                },
-                dismissButton = {
-                    MorphTextButton("Cancel", onClick = { showAddPreset = false })
+                        active = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                    MorphTextButton("Cancel", onClick = { showAddPreset = false }, modifier = Modifier.fillMaxWidth())
                 },
             )
         }
@@ -10933,121 +10946,86 @@ private fun CommandButton(
 }
 
 /**
- * The synced-devices registry shown in the "Backup & sync" card: one row per
- * device sharing this Drive file. Each row shows a device icon, its name (with a
- * "This device" marker for self), a ★ badge for the primary (source of truth),
- * and how long ago it last synced. Tapping a NON-primary row makes it primary
- * (two-tap confirm via [rememberConfirmArm]); this device gets a rename affordance.
- * Renders nothing until the first sync populates the registry.
+ * The synced-devices registry shown in the "Backup & sync" card: a
+ * drag-to-reorder list (same gesture as the car-order list in Settings) where
+ * the TOP device is the primary — the source of truth other devices adopt.
+ * Dragging a device to the top makes it primary. Each row shows a drag handle, a
+ * device icon (★ on the primary), its name (with a "This device" marker for
+ * self + a rename affordance), model, and how long ago it last synced. Renders
+ * nothing until the first sync populates the registry.
  */
 @Composable
 private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     val devices = state.syncDevices
     if (devices.isEmpty()) return
     var renaming by remember { mutableStateOf(false) }
-    val makePrimaryArm = rememberConfirmArm()
-    var armedForId by remember { mutableStateOf<String?>(null) }
 
-    Spacer(Modifier.height(10.dp))
+    // Order the list so the primary is on top (that's the invariant the drag
+    // gesture maintains); everyone else falls in by most-recently-seen. Dragging
+    // a device to the top sets it primary, after which this same sort keeps it
+    // there — so the visual order and the "primary" concept stay in lockstep.
+    val ordered = remember(devices, state.syncPrimaryId) {
+        devices.sortedWith(
+            compareByDescending<com.bloo.bluelink.data.SyncMerge.SyncDevice> { it.id == state.syncPrimaryId }
+                .thenByDescending { it.lastSeenMs },
+        )
+    }
+
+    Spacer(Modifier.height(12.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Filled.Devices,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "Synced devices",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+    Spacer(Modifier.height(2.dp))
     Text(
-        "Synced devices",
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurface,
+        "Drag to reorder — the top device is primary, the source of truth the others follow.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Spacer(Modifier.height(4.dp))
-    // Sort: this device first, then primary, then by most-recently-seen.
-    val ordered = devices.sortedWith(
-        compareByDescending<com.bloo.bluelink.data.SyncMerge.SyncDevice> { it.id == state.thisDeviceId }
-            .thenByDescending { it.id == state.syncPrimaryId }
-            .thenByDescending { it.lastSeenMs },
-    )
-    ordered.forEach { device ->
-        val isSelf = device.id == state.thisDeviceId
-        val isPrimary = device.id == state.syncPrimaryId
-        val armed = makePrimaryArm.armed && armedForId == device.id
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .then(
-                    // Only non-primary devices are tappable (to make primary).
-                    if (!isPrimary) Modifier.clickable {
-                        if (armed) {
-                            vm.setPrimaryDevice(device.id)
-                            armedForId = null
-                        } else {
-                            armedForId = device.id
-                            makePrimaryArm.arm()
-                        }
-                    } else Modifier,
-                )
-                .padding(vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                if (isPrimary) Icons.Filled.Star else Icons.Filled.Smartphone,
-                contentDescription = null,
-                tint = if (isPrimary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        device.name.ifBlank { "Unnamed device" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelf) FontWeight.SemiBold else FontWeight.Normal,
-                    )
-                    if (isSelf) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "This device",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                val seen = com.bloo.bluelink.data.relativeLabel(device.lastSeenMs)
-                Text(
-                    buildString {
-                        if (isPrimary) append("Primary")
-                        if (isPrimary && seen.isNotBlank()) append(" · ")
-                        if (seen.isNotBlank()) append("synced $seen")
-                    }.ifBlank { device.model },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            when {
-                isSelf -> IconButton(onClick = { renaming = true }) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
-                }
-                armed -> Text(
-                    "Tap to confirm",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                else -> Text(
-                    "Make primary",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+    Spacer(Modifier.height(10.dp))
+
+    ReorderColumn(
+        items = ordered,
+        keyOf = { it.id },
+        // Dropped in a new order → the new TOP device becomes primary. setPrimaryDevice
+        // persists it + triggers a sync so every device converges on the choice.
+        onReorder = { reordered -> reordered.firstOrNull()?.let { vm.setPrimaryDevice(it.id) } },
+        spacing = 8.dp,
+    ) { device, dragHandle, dragging ->
+        SyncDeviceRow(
+            device = device,
+            isSelf = device.id == state.thisDeviceId,
+            isPrimary = device.id == state.syncPrimaryId,
+            dragging = dragging,
+            dragHandle = dragHandle,
+            onRename = { renaming = true },
+        )
     }
 
     if (renaming) {
         var draft by remember { mutableStateOf(state.syncDeviceName) }
-        BlooDialog(
+        // Standardized on the shared GlassAlertDialog shell (was the legacy
+        // BlooDialog, now removed). Stacked full-width buttons, no leading icon.
+        GlassAlertDialog(
             onDismissRequest = { renaming = false },
-            title = { Text("Rename this device", fontWeight = FontWeight.Bold) },
+            icon = Icons.Filled.Smartphone,
+            title = "Rename this device",
             text = {
                 Text(
                     "Shown in the devices list on all your synced devices.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = draft,
                     onValueChange = { draft = it },
@@ -11055,14 +11033,104 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
-            confirmButton = {
-                MorphTextButton("Cancel", onClick = { renaming = false })
-                MorphTextButton("Save", onClick = {
-                    if (draft.isNotBlank()) vm.renameThisDevice(draft)
-                    renaming = false
-                })
+            buttons = {
+                MorphButton(
+                    onClick = {
+                        if (draft.isNotBlank()) vm.renameThisDevice(draft)
+                        renaming = false
+                    },
+                    active = true,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                MorphTextButton("Cancel", onClick = { renaming = false }, modifier = Modifier.fillMaxWidth())
             },
         )
+    }
+}
+
+/** One row in the drag-to-reorder [SyncDevicesSection]: a frosted card with a
+ *  drag handle, a device icon (★ when primary), the device name (+ a "This
+ *  device" chip and a rename button for self), model, and last-seen. Styled to
+ *  match the card language of the rest of Settings; lifts slightly while dragged. */
+@Composable
+private fun SyncDeviceRow(
+    device: com.bloo.bluelink.data.SyncMerge.SyncDevice,
+    isSelf: Boolean,
+    isPrimary: Boolean,
+    dragging: Boolean,
+    dragHandle: Modifier,
+    onRename: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    val container =
+        if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.9f))
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(container)
+            .then(if (dragging) Modifier.dropShadow(shape, blurRadius = 14.dp, offsetY = 4.dp) else Modifier)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Drag handle — the grab affordance, same idiom as the car-order list.
+        Icon(
+            Icons.Filled.DragHandle,
+            contentDescription = "Drag to reorder",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = dragHandle.size(20.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Icon(
+            if (isPrimary) Icons.Filled.Star else Icons.Filled.Smartphone,
+            contentDescription = if (isPrimary) "Primary device" else null,
+            tint = if (isPrimary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    device.name.ifBlank { "Unnamed device" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isPrimary || isSelf) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (isSelf) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "This device",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            val seen = com.bloo.bluelink.data.relativeLabel(device.lastSeenMs)
+            val sub = buildString {
+                if (isPrimary) append("Primary")
+                val model = device.model.takeIf { it.isNotBlank() }
+                if (isPrimary && model != null) append(" · ")
+                if (model != null) append(model)
+                if (seen.isNotBlank()) { if (isNotEmpty()) append(" · "); append(seen) }
+            }
+            if (sub.isNotBlank()) {
+                Text(
+                    sub,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (isSelf) {
+            IconButton(onClick = onRename) {
+                Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
+            }
+        }
     }
 }
 
@@ -11133,46 +11201,6 @@ private fun DriveSyncChoiceRow(icon: ImageVector, title: String, subtitle: Strin
     }
 }
 
-/** App-wide dialog style: themed Surface, consistent shape and button layout. */
-@Composable
-private fun BlooDialog(
-    onDismissRequest: () -> Unit,
-    title: @Composable () -> Unit,
-    text: @Composable ColumnScope.() -> Unit,
-    confirmButton: @Composable RowScope.() -> Unit,
-) {
-    val dialogShape = RoundedCornerShape(16.dp)
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        title = { Surface(
-            shape = dialogShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.96f)),
-            modifier = Modifier.dropShadow(dialogShape, blurRadius = 14.dp, offsetY = 5.dp).frostedRim(dialogShape),
-        ) {
-            Row(Modifier.padding(16.dp, 12.dp, 16.dp, 0.dp), verticalAlignment = Alignment.CenterVertically) {
-                title()
-            }
-        } },
-        text = { Surface(
-            shape = dialogShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.96f)),
-            modifier = Modifier.frostedRim(dialogShape),
-        ) {
-            // Scrollable: variable-length content (e.g. the climate-choice
-            // dialog's preset list) can otherwise exceed the dialog's height
-            // with no way to reach entries past the bottom edge.
-            Column(
-                Modifier.padding(16.dp, 8.dp, 16.dp, 12.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                text()
-            }
-        } },
-        confirmButton = {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                confirmButton()
-            }
-        },
-        containerColor = Color.Transparent,
-    )
-}
+// BlooDialog (the legacy second dialog shell) was removed here — every dialog now
+// routes through the single GlassAlertDialog shell above. Its one caller
+// (rename-device) was migrated in the same change.

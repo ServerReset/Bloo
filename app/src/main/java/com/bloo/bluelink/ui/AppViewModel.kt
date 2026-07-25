@@ -61,6 +61,12 @@ import java.util.Locale
 /** How long a cached weather reading is considered fresh (15 minutes). */
 private const val WEATHER_TTL_MS = 15 * 60 * 1000L
 
+// Debounce window for the auto-push-on-change collector: a burst of edits (e.g.
+// dragging pebbles, sliding a value) coalesces into one Drive write this long
+// after the LAST change. Short enough to feel instant, long enough not to write
+// per keystroke.
+private const val AUTO_PUSH_DEBOUNCE_MS = 2000L
+
 sealed interface Screen {
     data object Login : Screen
     /** No vehicles enrolled (or still loading the first time). */
@@ -946,6 +952,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // lastSyncMs/syncError -- same handling as setSyncUri / retryDriveSync.
                 if (!wasRefreshing) runDriveSyncNow()
             }
+        }
+        // Auto-push on ANY tracked change: every editTracked() that touches a
+        // portable pref (a settings toggle, a pebble/section reorder, per-car
+        // config…) appends to the dirty set, so observing it here lets sync feel
+        // automatic and seamless instead of only firing on a data refresh or the
+        // 2h worker. Debounced with a cancel-and-restart job so a burst of edits
+        // (dragging pebbles, nudging a slider) coalesces into ONE Drive write
+        // ~2s after the last change rather than hammering Drive per keystroke.
+        // Only runs when sync is configured; the download-then-upload merge in
+        // performDriveSync stays the single source of truth.
+        viewModelScope.launch {
+            var pushJob: kotlinx.coroutines.Job? = null
+            settingsStore.dirtyKeysFlow
+                .distinctUntilChanged()
+                .collect { dirty ->
+                    // Empty = nothing pending (or a sync just cleared it) — cancel any
+                    // scheduled push and wait for the next real change.
+                    if (dirty.isEmpty() || _state.value.syncUri == null) {
+                        pushJob?.cancel()
+                        return@collect
+                    }
+                    pushJob?.cancel()
+                    // viewModelScope.launch (not a bare `launch`): the collect{}
+                    // lambda's receiver is FlowCollector, not a CoroutineScope, so
+                    // the debounce job is launched on the ViewModel's own scope.
+                    pushJob = viewModelScope.launch {
+                        kotlinx.coroutines.delay(AUTO_PUSH_DEBOUNCE_MS)
+                        runDriveSyncNow()
+                    }
+                }
         }
     }
 

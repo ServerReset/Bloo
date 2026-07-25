@@ -1714,6 +1714,14 @@ class SettingsStore(private val context: Context) {
     private suspend fun dirtyKeys(): Set<String> =
         context.settingsDataStore.data.first().dirtyKeySet()
 
+    /** Reactive view of the dirty set — emits whenever a tracked setting changes
+     *  (every [editTracked] that touches a portable key appends to it). The
+     *  ViewModel observes this to auto-push to Drive shortly after ANY change
+     *  (setting toggle, pebble/section reorder, per-car config…), so sync feels
+     *  automatic instead of only firing on a refresh or the periodic worker.
+     *  Emits the empty set once the last upload clears it. */
+    val dirtyKeysFlow: Flow<Set<String>> = context.settingsDataStore.data.map { it.dirtyKeySet() }
+
     /** Clear [keys] from the dirty set via set-difference, leaving any key
      *  marked dirty after the calling upload's body was snapshotted still
      *  pending. Done inside a single edit{} so a concurrent [editTracked] can't
