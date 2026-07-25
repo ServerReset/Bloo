@@ -193,6 +193,10 @@ data class UiState(
     val thisDeviceId: String? = null,
     /** This device's friendly sync name (editable in Settings). */
     val syncDeviceName: String = "",
+    /** Short fingerprint of the actual Drive file this device syncs to. Two
+     *  devices showing DIFFERENT fingerprints are on different files (the main
+     *  reason sync doesn't converge). Null when sync isn't set up. */
+    val syncFileFingerprint: String? = null,
     /** Set when the garage fetch came back empty because a request actually
      *  failed (network/API error), not because the account genuinely has zero
      *  vehicles. Distinguishes a real failure from "not signed in" / "no
@@ -918,12 +922,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val cachedPrimary = settingsStore.syncPrimaryDeviceId()
             val myDeviceId = settingsStore.syncDeviceId()
             val myDeviceName = settingsStore.syncDeviceName()
+            val fileFingerprint = settingsStore.syncFileFingerprint()
             _state.update {
                 it.copy(
                     syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly,
                     settingsMode = settingsMode, defaultClimatePresets = defaultPresets,
                     syncDevices = cachedDevices, syncPrimaryId = cachedPrimary,
                     thisDeviceId = myDeviceId, syncDeviceName = myDeviceName,
+                    syncFileFingerprint = fileFingerprint,
                 )
             }
         }
@@ -2454,17 +2460,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  makes "enable sync" actually push/pull data right away. */
     private suspend fun runDriveSyncNow() {
         val outcome = withContext(Dispatchers.IO) { settingsStore.performDriveSync() }
+        // Recompute the file fingerprint each pass so it appears the moment sync is
+        // set up / the file is changed (it's derived purely from the persisted URI).
+        val fingerprint = withContext(Dispatchers.IO) { settingsStore.syncFileFingerprint() }
         if (outcome.ran) {
             if (outcome.imported) refreshLocalCarConfig()
             _state.update {
                 it.copy(
                     lastSyncMs = outcome.syncedAtMs,
                     syncError = outcome.error,
-                    syncDevices = outcome.devices,
-                    syncPrimaryId = outcome.primaryDeviceId,
+                    // On a transient download failure the outcome carries an empty
+                    // device list (nothing could be read this pass) — don't blank the
+                    // Settings "Synced devices" list; keep whatever we last showed.
+                    syncDevices = outcome.devices.ifEmpty { it.syncDevices },
+                    syncPrimaryId = outcome.primaryDeviceId ?: it.syncPrimaryId,
                     thisDeviceId = outcome.selfDeviceId ?: it.thisDeviceId,
+                    syncFileFingerprint = fingerprint,
                 )
             }
+        } else {
+            _state.update { it.copy(syncFileFingerprint = fingerprint) }
         }
     }
 

@@ -910,6 +910,24 @@ class SettingsStore(private val context: Context) {
     suspend fun syncUri(): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("sync_uri")]?.takeIf { it.isNotBlank() }
 
+    /** A short, stable fingerprint of the ACTUAL Drive file this device is synced
+     *  to, derived from the persisted document URI's unique id. Shown in Settings
+     *  so two devices can eyeball whether they're on the SAME file: if the two
+     *  fingerprints differ, they picked different files (Google Drive allows two
+     *  files with the same name), which is the #1 reason settings/devices don't
+     *  converge. Null when sync isn't set up. */
+    suspend fun syncFileFingerprint(): String? {
+        val uri = syncUri() ?: return null
+        // A SAF Drive doc URI looks like content://…/document/<docId>. The docId is
+        // the file's stable unique id; hash it to a short, comparable tag so we
+        // never surface the raw (long, sensitive-looking) id.
+        val docId = uri.substringAfterLast("/document/").substringBefore('?').ifBlank { uri }
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(docId.toByteArray())
+        // 6 hex chars = 3 bytes: plenty to tell two files apart at a glance, short
+        // enough to read/compare aloud.
+        return hash.take(3).joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+    }
+
     suspend fun setSyncUri(uri: String?) {
         editTracked {
             val key = stringPreferencesKey("sync_uri")

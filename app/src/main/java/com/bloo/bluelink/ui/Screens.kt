@@ -8707,6 +8707,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    // File-identity fingerprint: two phones that are truly on the
+                    // SAME Drive file show the SAME code here. If they differ, the
+                    // devices picked different files (Drive allows duplicate names) —
+                    // the #1 reason settings/devices don't converge. This makes that
+                    // instantly checkable across phones instead of a mystery.
+                    state.syncFileFingerprint?.let { fp ->
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "File ID: $fp · this code must match on every device",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (state.syncError != null) {
                         Spacer(Modifier.height(2.dp))
                         Text(
