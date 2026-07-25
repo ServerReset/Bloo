@@ -49,7 +49,16 @@ class MainActivity : ComponentActivity() {
                 val density = LocalDensity.current
                 val phoneScale = ui.settings?.uiScale ?: 1f
                 val localScale = ui.localSettings.fontScale
-                val effectiveScale = phoneScale * localScale
+                // Cap the PRODUCT of the two app-convenience sliders at 1.4. Each is
+                // independently clamped (~1.3 and ~1.4), but multiplying them let two
+                // maxed sliders reach ~1.82× — and that then multiplies the OS
+                // accessibility fontScale below, so text could hit ~2.3× and truncate
+                // everywhere ("cut off weirdly"). 1.4 = roughly one maxed slider's
+                // worth; the app's own scale never compounds past that. The OS
+                // accessibility fontScale is still applied in full (density.fontScale
+                // below), so true accessibility scaling is untouched — only the app's
+                // two convenience knobs are prevented from stacking.
+                val effectiveScale = (phoneScale * localScale).coerceIn(0.5f, 1.4f)
                 CompositionLocalProvider(
                     LocalDensity provides Density(density.density, density.fontScale * effectiveScale)
                 ) {

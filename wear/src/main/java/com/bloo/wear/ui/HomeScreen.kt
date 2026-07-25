@@ -1,7 +1,6 @@
 package com.bloo.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -518,16 +517,19 @@ private fun CarColumn(
             state = state,
             // Center-of-face focus: the tile at the vertical center renders full-size
             // and fully opaque; tiles shrink toward ~60% and fade to ~50% alpha as they
-            // move toward the top/bottom bezel. maxElementHeight = 0.5f pulls the scale
-            // ramp closer to center so the IMMEDIATE neighbours visibly shrink (not just
-            // the extreme edges) — that's what makes the centered tile read as "the one
-            // in focus" on a round watch. (An earlier build set edgeScale=1f/edgeAlpha=1f
-            // to disable this entirely; on a real device that flat look meant nothing
-            // ever stood out as focused, so proper scaling is restored here.)
+            // move toward the top/bottom bezel — that's what makes the centered tile
+            // read as "the one in focus" on a round watch. (An earlier build set
+            // edgeScale=1f/edgeAlpha=1f to disable this entirely; on a real device that
+            // flat look meant nothing ever stood out, so proper scaling is restored.)
+            // maxElementHeight = 0.78f (was 0.5f): 0.5 pulled the ramp so far inward
+            // that TALL cards — Info/Diagnostics/Location — had their own top/bottom
+            // rows dimmed and scaled even while the card was centered, which read as
+            // the focused card being half-faded. 0.78 keeps neighbours clearly smaller
+            // for peripheral context without eating into the centered card itself.
             scalingParams = ScalingLazyColumnDefaults.scalingParams(
                 edgeScale = 0.6f,
                 edgeAlpha = 0.5f,
-                maxElementHeight = 0.5f,
+                maxElementHeight = 0.78f,
             ),
             // Horizontal inset keeps card content (headers, right-aligned values)
             // inside the round screen's safe area so nothing clips in the corners.
@@ -543,24 +545,15 @@ private fun CarColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
-                // The virtual slot is keyed by its int index (stable), but the TILE
-                // shown at that slot is tiles[i % tileCount]. On a normal scroll the
-                // tile identity at each fixed slot never changes, so this Crossfade
-                // is inert. But when an incoming SYNC reorders/adds/removes tiles
-                // (pebble reorder, hide/show, a Weather tile arriving), the identity
-                // at each slot swaps — without this the card hard-cut to its new
-                // content; the Crossfade fades old→new so a sync-driven reorder
-                // reads as motion, matching the rest of the screen's animation
-                // language. reduceMotion collapses it to an instant swap.
-                val slotTile = tiles[i % tileCount]
-                val reduceMotion = LocalReduceMotion.current
-                Crossfade(
-                    targetState = slotTile,
-                    animationSpec = tween(if (reduceMotion) 1 else 260),
-                    label = "tileSlot$i",
-                ) { tile ->
-                    TileContent(tile, vm, ui, car, onSettings, onTrips, onReorder)
-                }
+                // NOTE: a per-slot Crossfade was tried here to animate sync-driven
+                // reorders, but slotTile = tiles[i % tileCount] also changes on any
+                // tileCount change (a door opening bumps alertCount, weather arriving
+                // adds a tile), which cross-dissolved every visible card at once on
+                // routine events — a worse glitch than a hard swap. Reverted. True
+                // "glide to new slot" needs a finite identity-keyed list rewrite
+                // (deferred, needs on-device testing); genuine reorders are rare and
+                // sync-driven, so a plain swap is the right trade-off for now.
+                TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
 

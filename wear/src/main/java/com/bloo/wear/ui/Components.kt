@@ -37,6 +37,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
@@ -189,11 +191,12 @@ fun SectionCard(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = EyebrowLetterSpacing,
                         color = MaterialTheme.colorScheme.primary,
-                        // Single line + ellipsis: card titles are short labels
-                        // ("CHARGE", "CHARGE LIMITS"), and with no cap a long one
-                        // wrapped unpredictably mid-word. One clean line reads as a
-                        // header, not a broken paragraph.
-                        maxLines = 1,
+                        // Up to 2 lines: most titles are short ("CHARGE", "CHARGE
+                        // LIMITS") and stay on one line, but a longer one ("AURORA
+                        // BACKGROUND") or an elevated font scale was ellipsizing to
+                        // "AURORA BACKGRO…". Allowing a 2nd line keeps the whole title;
+                        // ellipsis still guards the pathological case.
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false).semantics { heading() },
                     )
@@ -297,8 +300,13 @@ fun ChargeRing(
         // Was a hand-rolled AnimatedContent with the exact same transitionSpec
         // uicommon's shared AnimatedValue already centralizes.
         com.bloo.uicommon.AnimatedValue(
+            // numeralSmall (24sp) — the charge % is THE hero glance number of this
+            // ring, so it uses the dedicated numeral tier instead of titleMedium
+            // (17sp), which read as just another value. Fits comfortably inside the
+            // 88dp ring. (This is the intended use of the numeral type tier, which
+            // was previously defined but wired nowhere.)
             value = percent?.let { "$it%" } ?: "—",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.numeralSmall.copy(fontWeight = FontWeight.Bold),
         )
     }
 }
@@ -362,13 +370,16 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val thumbShape = RoundedCornerShape(18.dp)
     Box(
         modifier
-            // Fill the card width at a 1:1 aspect: the single OSM tile is square
-            // (256px) and the marker below is placed at fractional (mx,my) of the
-            // box size, so a square box keeps the marker projection exact. Filling
-            // the width removes the dead side-margins the old fixed 116dp left on
-            // round faces. (The sole caller passes no `modifier`, so this default
-            // sizing applies as-is.)
+            // A centered square, capped at 140dp wide. The single OSM tile is
+            // square (256px) and the marker is placed at fractional (mx,my) of the
+            // box size, so a square (aspectRatio 1f) keeps the marker projection
+            // exact. widthIn(max=140dp) + wrapContentWidth stops it from going
+            // full-bleed on larger faces (a full-width square is very tall and was
+            // dominating the Location card / dwarfing the place name); on the
+            // narrowest faces it still just fills the available width.
             .fillMaxWidth()
+            .widthIn(max = 140.dp)
+            .wrapContentWidth(Alignment.CenterHorizontally)
             .aspectRatio(1f)
             .clip(thumbShape)
             .background(placeholder)
@@ -427,13 +438,39 @@ fun fmtMinutes(min: Int): String = com.bloo.bluelink.data.fmtMinutes(min)
 /** A label → value row used in the details card. Both sides truncate so a long
  *  value (efficiency, address, kWh) can never collide with the label on a round face. */
 @Composable
-fun StatusRow(label: String, value: String, valueColor: Color? = null, emphasize: Boolean = false) {
+fun StatusRow(label: String, value: String, valueColor: Color? = null, emphasize: Boolean = false, stacked: Boolean = false) {
     // A roll-up "summary" row (InfoCard "Closed up / N items", DiagnosticsCard
     // "Needs attention / N to check") sits above a dozen identical detail rows;
     // `emphasize` lifts it a tier (bodyMedium label / titleSmall value) so it
     // reads as the headline instead of blending into the list beneath it.
     val labelStyle = if (emphasize) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall
     val valueStyle = if (emphasize) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall
+    // `stacked` puts the label on line 1 and the value on line 2, both full-width
+    // and left-aligned, for rows where a single-word label + a long value both
+    // want >50% of a narrow round-face row and BOTH truncate side-by-side
+    // ("Efficiency" + "4.2 mi/kWh"). maxLines can't fix that (a single word can't
+    // wrap), so the two are stacked instead. Only used where the side-by-side
+    // form clips; every other row keeps the default label→value layout.
+    if (stacked) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+            Text(
+                label,
+                style = labelStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                value,
+                style = valueStyle,
+                color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        return
+    }
     Row(
         Modifier.fillMaxWidth().padding(vertical = if (emphasize) 3.dp else 2.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -569,11 +606,13 @@ fun MorphButton(
      *  a toggle role/state would be actively wrong -- null (the default)
      *  leaves those exactly as before, relying on the label text alone. */
     toggled: Boolean? = null,
-    /** Max label lines before ellipsizing. Default 1 (the classic chip look);
-     *  pass 2 for callers whose label shares a narrow weighted row (e.g. a
-     *  preset name next to a delete button, or a car name) so the text wraps
-     *  instead of truncating to "…". */
-    maxLines: Int = 1,
+    /** Max label lines before ellipsizing. Default 2: a multi-word action label
+     *  ("Use my location", "Set up on phone", "Drive sync") on a narrow round
+     *  face was truncating to "Use my loca…"; letting it wrap to a second line
+     *  keeps the whole label. This is a CAP, not a fixed height — single-word /
+     *  short labels still render on one line, so the classic chip look is
+     *  unchanged for them. Pass 1 only where a strict single line is required. */
+    maxLines: Int = 2,
     /** When false the leading icon is dropped, giving the label the full chip
      *  width. Used by side-by-side weighted pairs (hero Lock/Climate, More
      *  Flash/Horn) where the icon + gap was starving the label down to "Fla…". */
@@ -699,6 +738,10 @@ fun MorphSegmented(
     selectedKey: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Forwarded to the shared control: pass false on the row of a two-row
+     *  ("dual stack") split that does NOT hold the current selection, so only the
+     *  row containing selectedKey shows the highlight. Default true. */
+    indicatorVisible: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
@@ -710,13 +753,20 @@ fun MorphSegmented(
         indicatorColor = scheme.primary,
         selectedTextColor = scheme.onPrimary,
         unselectedTextColor = scheme.onSurface.copy(alpha = 0.65f),
-        textStyle = MaterialTheme.typography.labelMedium,
+        // labelSmall (11sp) not labelMedium (13sp): several watch segmented rows
+        // have 3-5 segments on a narrow round face ("Hyundai/Genesis/Kia",
+        // "Off/Now/1m/5m/10m") where 13sp truncated whole-word labels to "Genes…".
+        // 11sp fits them; the component's own selected/unselected sizing rides off
+        // whatever style is passed here, so this is the single point that fixes
+        // every watch segmented control at once.
+        textStyle = MaterialTheme.typography.labelSmall,
         onTick = { haptics.tick() },
         modifier = modifier,
         trackHeight = 48.dp,
         // Every other interactive surface (MorphButton, SectionCard, PinKey)
         // has a hairline rim; this was the one flat, borderless control left.
         borderColor = scheme.outline.copy(alpha = 0.18f),
+        indicatorVisible = indicatorVisible,
     )
 }
 

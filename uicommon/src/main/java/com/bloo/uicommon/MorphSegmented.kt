@@ -101,6 +101,14 @@ fun MorphSegmented(
      *  the one left out. Null-default keeps any caller that hasn't been
      *  updated visually unchanged. */
     borderColor: Color? = null,
+    /** When false, the highlight indicator is hidden and no label reads as
+     *  selected (unless the user is actively dragging within this control).
+     *  Default true = unchanged behavior. Used to split ONE logical choice across
+     *  TWO stacked MorphSegmented rows: each row is passed the same selectedKey,
+     *  but only the row that actually contains it shows the highlight — the other
+     *  passes indicatorVisible=false so it doesn't falsely light its first segment
+     *  (which the index-0 fallback below would otherwise do). */
+    indicatorVisible: Boolean = true,
 ) {
     // Falls back to the first option (index 0) if selectedKey doesn't match any
     // option's key -- e.g. a caller passes a stale/unsupported key -- rather than
@@ -209,7 +217,9 @@ fun MorphSegmented(
             // Which segment reads as "selected" (bold, tinted text) while dragging:
             // the live drag position, not the committed prop (which only changes on
             // release) — otherwise the moving highlight and the bold label disagree.
-            val visualIndex = dragXPx?.let { indexFor(it) } ?: selectedIndex
+            // -1 when this row has no selection to show (indicatorVisible=false and
+            // not dragging), so no label falsely bolds via the index-0 fallback.
+            val visualIndex = dragXPx?.let { indexFor(it) } ?: if (indicatorVisible) selectedIndex else -1
 
             // Motion blur on the indicator: subtle while still, intensifies during drag
             // and fades as the spring settles — gives the sliding highlight a fluid,
@@ -230,11 +240,15 @@ fun MorphSegmented(
             // position comes purely from graphicsLayer's translationX (a draw-phase
             // transform, see the comment on indicatorXPx above), never from layout,
             // so moving it never triggers a relayout of the sibling Row.
+            // Hidden when this row doesn't hold the selection (indicatorVisible=false)
+            // and the user isn't mid-drag on it — so a two-row split highlights only
+            // the row that actually contains the selected key.
+            val indicatorAlpha = if (indicatorVisible || dragXPx != null) 1f else 0f
             Box(
                 Modifier
                     .width(segWidth)
                     .fillMaxHeight()
-                    .graphicsLayer { translationX = indicatorXPx.value }
+                    .graphicsLayer { translationX = indicatorXPx.value; alpha = indicatorAlpha }
                     .then(if (motionBlurX > 0.5f) Modifier.blur(motionBlurX.dp, 0.dp) else Modifier)
                     .background(indicatorColor, RoundedCornerShape(14.dp)),
             )

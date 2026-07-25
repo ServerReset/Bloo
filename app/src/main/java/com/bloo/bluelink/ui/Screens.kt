@@ -80,7 +80,10 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.union
@@ -2543,26 +2546,9 @@ private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
     return base * factor
 }
 
-/** Which screen edge a camera cutout is flush against. Cover-screen code used
- *  to always assume "top" -- wrong for any device whose cover-display cutout
- *  coordinate space reports it against a different edge (bottom, left, or
- *  right, depending on how that device rotates its outer display). */
-private enum class CameraEdge { TOP, BOTTOM, LEFT, RIGHT }
-
-/** Figures out which edge of a [viewWidthPx] x [viewHeightPx] screen the
- *  cutout [rect] sits flush against, by comparing its margin to each edge --
- *  whichever margin is smallest is the edge it's cut into. Returns null for
- *  a null rect (no cutout at all). */
-private fun cameraEdgeOf(rect: android.graphics.Rect?, viewWidthPx: Int, viewHeightPx: Int): CameraEdge? {
-    if (rect == null) return null
-    val margins = mapOf(
-        CameraEdge.TOP to rect.top,
-        CameraEdge.BOTTOM to (viewHeightPx - rect.bottom),
-        CameraEdge.LEFT to rect.left,
-        CameraEdge.RIGHT to (viewWidthPx - rect.right),
-    )
-    return margins.minByOrNull { it.value }?.key
-}
+// (CameraEdge / cameraEdgeOf removed: cover-screen cutout avoidance is now driven
+// by native WindowInsets.displayCutout — corner-safe and recomposition-aware —
+// rather than hand-picking a single edge from a boundingRect margin comparison.)
 
 /**
  * Top-level garage screen: picks between three fundamentally different
@@ -3127,9 +3113,10 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
  * navigated with the same infinite-wrap virtual-page trick as the car
  * pager itself. Also owns three independent, cover-screen-only concerns
  * layered into the same [Box]:
- *  - Camera-cutout avoidance: detects which edge ([cameraEdgeOf]) a punch-hole
- *    camera sits against and pads only that edge enough to clear it, then
- *    draws a decorative ring around the hole so it reads as intentional.
+ *  - Camera-cutout avoidance: content is padded via native
+ *    WindowInsets.displayCutout (corner-safe, recomposition-aware) so it clears
+ *    a punch-hole on whichever edge(s) it touches; a decorative ring is drawn
+ *    around the hole so it reads as intentional.
  *  - The edge-trace refresh gesture: a long-press-and-hold that fills an
  *    animated ring around the screen edge over 1.2s; completing the hold
  *    (without releasing or moving past touch slop) triggers a refresh. Its
@@ -3191,28 +3178,12 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
             view.rootWindowInsets?.displayCutout?.boundingRects?.firstOrNull()
         else null
     }
-    // Was always treated as a top cutout regardless of where it actually sat
-    // -- fine for the common case, wrong for any cover screen whose cutout
-    // coordinate space reports it against a different edge. Figure out which
-    // edge it's really flush against, then clear THAT edge by however much
-    // room the cutout actually needs, leaving the other three at their
-    // normal cover-screen insets instead of blindly padding the top.
-    val cameraEdge = remember(cameraHole, view) { cameraEdgeOf(cameraHole, view.width, view.height) }
-    // The gap from the screen edge, past the cutout, plus a comfortable
-    // margin -- i.e. exactly how much dead space this side needs reserved
-    // so content flows around the camera instead of under it.
-    val cameraClearance: Dp? = cameraHole?.let { r ->
-        with(density) {
-            val clearancePx = when (cameraEdge) {
-                CameraEdge.TOP -> r.bottom
-                CameraEdge.BOTTOM -> view.height - r.top
-                CameraEdge.LEFT -> r.right
-                CameraEdge.RIGHT -> view.width - r.left
-                null -> 0
-            }
-            clearancePx.toDp() + 12.dp
-        }
-    }
+    // NOTE: the per-edge cutout CLEARANCE math that used to live here (cameraEdgeOf
+    // + a when(cameraEdge) clearance) has been removed — content padding is now
+    // driven by native WindowInsets.displayCutout on the tile Box below, which is
+    // corner-safe and recomposition-aware. `cameraHole` is kept ONLY to position
+    // the decorative ring (cosmetic); it is not load-bearing for layout, so its
+    // occasional first-frame staleness no longer lets content run under the bump.
     // Decorative ring color — subtle outline that acknowledges the camera hole.
     val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
 
@@ -3272,6 +3243,19 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                     // gesture -- don't also start timing an edge-trace hold
                     // for it (see dotsBounds' declaration above).
                     if (dotsBounds?.contains(down.position) == true) return@awaitEachGesture
+                    // Only arm the edge-trace when the press starts near a screen
+                    // EDGE — that's the whole metaphor ("trace around the rim"). It
+                    // used to arm on ANY press anywhere, so a slow/stationary press on
+                    // a center control (the DC-limit slider, a climate button) both
+                    // flickered the ring on and, if held >1.2s, fired an unintended
+                    // vm.refreshStatus. Requiring an edge start makes it intentional
+                    // and stops it stealing center interactions.
+                    val edgeMarginPx = with(density) { 40.dp.toPx() }
+                    val nearEdge = down.position.x <= edgeMarginPx ||
+                        down.position.x >= size.width - edgeMarginPx ||
+                        down.position.y <= edgeMarginPx ||
+                        down.position.y >= size.height - edgeMarginPx
+                    if (!nearEdge) return@awaitEachGesture
                     edgeTraceHolding = true
                     val slop = viewConfiguration.touchSlop
                     try {
@@ -3305,29 +3289,36 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 LocalPebbleFillHeight provides true,
                 LocalCoverScrollState provides tileScroll,
             ) {
-                // Baseline insets when that edge isn't the one the camera is
-                // cut into; maxOf below only ever grows a side past its
-                // baseline to clear the cutout, never shrinks it.
+                // Base breathing room; the camera-bump + nav-bar clearance is now
+                // handled by native insets below, not by hand-computed per-edge math.
                 val baseStart = coverScaled(10.dp)
                 val baseTop = coverScaled(10.dp)
-                // Was 24.dp -- on top of navigationBarsPadding() already
-                // reserving the system nav bar's own inset below, and
-                // PebbleShell's fillHeight body padding another 10.dp of its
-                // own at the very bottom, that stacked into a noticeable band
-                // of genuinely empty space at the bottom of every cover-screen
-                // tile. 12.dp is still real breathing room above the nav bar
-                // without compounding into dead space.
                 val baseBottom = coverScaled(12.dp)
                 val baseEnd = if (tiles.size > 1) coverScaled(22.dp) else coverScaled(10.dp)
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .navigationBarsPadding()
+                        // NATIVE cutout + nav-bar avoidance. This replaces the old
+                        // hand-rolled detection (a remember(view) snapshot of
+                        // displayCutout.boundingRects + cameraEdgeOf picking ONE edge
+                        // by smallest margin). That failed three ways on real devices:
+                        // (1) rootWindowInsets is often null on first composition, and
+                        //     remember(view) never re-read it once insets arrived;
+                        // (2) view.width/height could be 0 at that instant, corrupting
+                        //     the edge math; (3) a CORNER bump (e.g. bottom-right on a
+                        //     flip cover) touches TWO edges, but only one was padded, so
+                        //     content still ran under it.
+                        // WindowInsets.displayCutout reports insets on EVERY intruded
+                        // edge (corner-safe) and is recomposition-aware (updates when
+                        // insets dispatch), fixing all three. union(navigationBars)
+                        // also removes the old double-count of the nav bar vs. a
+                        // bottom cutout by taking the per-edge max.
+                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout))
                         .padding(
-                            start = if (cameraEdge == CameraEdge.LEFT) maxOf(baseStart, cameraClearance ?: baseStart) else baseStart,
-                            top = if (cameraEdge == CameraEdge.TOP) maxOf(baseTop, cameraClearance ?: baseTop) else baseTop,
-                            bottom = if (cameraEdge == CameraEdge.BOTTOM) maxOf(baseBottom, cameraClearance ?: baseBottom) else baseBottom,
-                            end = if (cameraEdge == CameraEdge.RIGHT) maxOf(baseEnd, cameraClearance ?: baseEnd) else baseEnd,
+                            start = baseStart,
+                            top = baseTop,
+                            bottom = baseBottom,
+                            end = baseEnd,
                         ),
                 ) {
                     when (val tile = tiles[i]) {
@@ -3379,17 +3370,38 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                     val stroke = with(density) { 3.dp.toPx() }
                     val inset = stroke / 2f
                     val rect = androidx.compose.ui.geometry.Rect(
-                        inset, inset, size.width - stroke, size.height - stroke
+                        inset, inset, size.width - inset, size.height - inset
                     )
-                    // Full perimeter: 2*(w+h). Sweep starts at -90deg (12 o'clock)
-                    // and goes clockwise; -90 to 270deg = 360deg.
-                    drawArc(
+                    // Trace the actual RECTANGULAR (rounded) screen perimeter, not an
+                    // ellipse. The old code called drawArc on this full-screen rect,
+                    // which draws an arc of the ELLIPSE inscribed in it — a huge oval
+                    // bulging far past the visible edges (the "giant blue circle" in
+                    // the screenshots). Instead, build the rounded-rect perimeter as a
+                    // Path and take the first `progress` fraction of its length via
+                    // PathMeasure.getSegment, so a thin stroke grows clockwise hugging
+                    // the real edge.
+                    val corner = with(density) { 28.dp.toPx() }
+                    val perimeter = androidx.compose.ui.graphics.Path().apply {
+                        addRoundRect(
+                            androidx.compose.ui.geometry.RoundRect(
+                                rect,
+                                androidx.compose.ui.geometry.CornerRadius(corner, corner),
+                            )
+                        )
+                    }
+                    val measure = androidx.compose.ui.graphics.PathMeasure().apply {
+                        setPath(perimeter, false)
+                    }
+                    val traced = androidx.compose.ui.graphics.Path()
+                    measure.getSegment(
+                        0f,
+                        measure.length * edgeTraceProgress.value.coerceIn(0f, 1f),
+                        traced,
+                        true,
+                    )
+                    drawPath(
+                        path = traced,
                         color = accent.copy(alpha = edgeTraceProgress.value.coerceIn(0f, 1f) * 0.85f),
-                        startAngle = -90f,
-                        sweepAngle = 360f * edgeTraceProgress.value,
-                        useCenter = false,
-                        topLeft = rect.topLeft,
-                        size = rect.size,
                         style = Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
                     )
                 }
@@ -3410,6 +3422,12 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
+                    // Clear a right-edge / bottom-right-corner camera bump: the
+                    // scrubber sits flush to the physical right edge, so on a device
+                    // whose cutout intrudes from the right it used to sit under the
+                    // bump. Native displayCutout (End side only) floats it inboard;
+                    // it's a no-op when the cutout doesn't touch the right edge.
+                    .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End))
                     .padding(end = 6.dp)
                     .alpha(dotsAlpha)
                     .onGloballyPositioned { dotsBounds = it.boundsInParent() },
@@ -6372,6 +6390,14 @@ private fun PebbleShell(
                                 title,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
+                                // Cap at one line: at a large display/font size the
+                                // header action button (SplitExpandButton, now width-
+                                // bounded below) used to squeeze this weighted Column
+                                // so a title like "Location"/"Weather"/"Diagnostics"
+                                // wrapped and visually collided with the button. One
+                                // line + ellipsis keeps the title on its own line.
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.semantics { heading() },
                             )
                             if (summary != null) {
@@ -6388,6 +6414,9 @@ private fun PebbleShell(
                                         style = MaterialTheme.typography.labelMedium,
                                         color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                                         maxLines = 1,
+                                        // Ellipsize a long summary ("Set a location")
+                                        // instead of hard-clipping it to "Set a…".
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -6581,7 +6610,18 @@ private fun SplitExpandButton(
                     )
                 }
                 if (action.label.isNotEmpty()) {
-                    Text(action.label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Text(
+                        action.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        // Cap the label width so a long action ("Summarize",
+                        // "Downloading…") at a large font size can't grow this button
+                        // unbounded and squeeze the pebble title into wrapping/overlap.
+                        // The label ellipsizes past the cap; the icon still identifies it.
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 110.dp),
+                    )
                 }
             }
         }
@@ -7007,8 +7047,17 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Text(row.value, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        row.value,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
                 }
             } else {
                 StatusRow(row.label, row.value)
@@ -8371,7 +8420,7 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
  * surface" in the app treats back); only once search is already idle does
  * back return to the garage.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SettingsScreen(vm: AppViewModel) {
     val appearance by vm.appearance.collectAsState()
@@ -9291,7 +9340,16 @@ private fun SettingsScreen(vm: AppViewModel) {
                     keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // FlowRow, not a fixed 50/50 Row: at a large display/font size each
+                // half was too narrow for "Set place" / "My location", clipping them
+                // to "Set a…". FlowRow keeps them side-by-side when they fit and wraps
+                // the second button onto its own full-width line when they don't, so
+                // the labels stay whole at any font scale.
+                FlowRow(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     MorphTextButton(
                         "Set place",
                         modifier = Modifier.weight(1f),
@@ -9305,7 +9363,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ) {
                         Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("My location", fontWeight = FontWeight.SemiBold)
+                        Text("My location", fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }
@@ -10710,11 +10768,24 @@ private fun SettingsCard(title: String, content: @Composable () -> Unit) {
 private fun SecretRow(label: String, value: String) {
     var show by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        // maxLines=1 so a one-word label ("Password") can't wrap character-by-
+        // character ("Pass/word") when the shown value + Show/Hide button take the
+        // rest of a large-font row. The label keeps its share; the value ellipsizes.
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(8.dp))
         Text(
             if (show) value else "•".repeat(value.length.coerceIn(4, 10)),
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
         Spacer(Modifier.width(10.dp))
         MorphTextButton(if (show) "Hide" else "Show", onClick = { show = !show })
@@ -10769,27 +10840,58 @@ private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
 
 @Composable
 private fun StatusRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth()) {
+    Row(
+        Modifier.fillMaxWidth(),
+        // Top-align so that if the value wraps to a 2nd line (a long value at a
+        // large display/font size), the label stays anchored to the first line
+        // rather than floating to the vertical center of a now-taller row.
+        verticalAlignment = Alignment.Top,
+    ) {
         Text(
             label,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+            // Without a cap, at a large display size the value cell (below) used to
+            // take its full intrinsic width first, starving this weighted label into
+            // a sliver — and a single-word label ("Coordinates", "Email", "VIN")
+            // with no room to break at a space then wrapped CHARACTER-by-character
+            // ("Coordin/ates"). One line + ellipsis keeps the label intact; giving
+            // the value its own weight (below) stops it from crushing the label in
+            // the first place. Mirrors the correctly-built SyncInfoRow.
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        // Was a hand-rolled AnimatedContent + WiggleText -- uicommon's shared
-        // AnimatedValue already implements this (used elsewhere in this file
-        // and now watch's ChargeRing); this is that same value-cell pattern
-        // duplicated once per pebble-row composable instead of centralized.
-        // Colour pinned to full-strength onSurface rather than inherited --
-        // Pebble's Card sets its content color from containerColor (usually
-        // surfaceVariant), so an uncoloured value here rendered at
-        // onSurfaceVariant strength, barely distinguishable from the dimmed
-        // label right next to it despite being the actually-important half
-        // of the row.
-        com.bloo.uicommon.AnimatedValue(
-            value = value,
-            style = LocalTextStyle.current.copy(fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface),
-        )
+        Spacer(Modifier.width(8.dp))
+        // Right-aligning Box that OWNS half the row (weight(1f), which fills its
+        // allocation) with the value end-aligned inside it. This keeps the classic
+        // label-left / value-right column: a SHORT value ("Off", "90%", "Locked")
+        // sits flush to the row's right edge, while a LONG value (coordinates, VIN,
+        // email) is bounded to this half and wraps to a 2nd line instead of crushing
+        // the label into character-by-character wrapping. (An earlier version put
+        // weight(1f, fill = false) directly on the value; because AnimatedValue's
+        // leaf text hugs its content, fill=false made a short value measure to its
+        // intrinsic width and pack just past row-center — floating in the middle
+        // with dead space to its right, since textAlign=End has no room to act in a
+        // content-width box. The filling Box gives End something to align against.)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            // Was a hand-rolled AnimatedContent + WiggleText -- uicommon's shared
+            // AnimatedValue already implements this (used elsewhere in this file
+            // and now watch's ChargeRing). Colour pinned to full-strength onSurface
+            // rather than inherited -- Pebble's Card sets its content color from
+            // containerColor (usually surfaceVariant), so an uncoloured value here
+            // rendered at onSurfaceVariant strength, barely distinguishable from the
+            // dimmed label right next to it despite being the important half.
+            com.bloo.uicommon.AnimatedValue(
+                value = value,
+                style = LocalTextStyle.current.copy(
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.End,
+                ),
+                maxLines = 2,
+            )
+        }
     }
 }
 
@@ -10807,8 +10909,18 @@ private fun SectionLabel(text: String) {
 
 @Composable
 private fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
-    Row(Modifier.fillMaxWidth()) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        // Cap at 2 lines so a long label ("Text & layout scale") wraps cleanly at
+        // spaces instead of the value (short: "130%") crushing it mid-word at a
+        // large font size.
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(8.dp))
         // Roll the value when it changes (e.g. dragging a slider).
         AnimatedContent(
             targetState = value,
@@ -10816,7 +10928,7 @@ private fun StepRow(label: String, value: String, valueColor: Color = Color.Unsp
                 (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { -it / 2 })
             },
             label = "stepValue",
-        ) { v -> Text(v, fontWeight = FontWeight.Medium, color = valueColor) }
+        ) { v -> Text(v, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
     }
 }
 
@@ -10863,6 +10975,11 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal,
+            // Cap at 2 lines: the toggle track is fixed-width so it can't be pushed
+            // off, but a long setting label at a large font size should wrap at
+            // spaces to two lines rather than growing the row indefinitely.
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(10.dp))
         MorphToggleTrack(checked)
@@ -10931,7 +11048,16 @@ private fun SeatConfigRow(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            // The two chips are fixed-width; cap the label so a long seat name at a
+            // large font size wraps at spaces rather than being crushed mid-word.
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(8.dp))
         MorphChip(selected = heat, onClick = { onHeat(!heat) }, label = "Heat")
         Spacer(Modifier.width(8.dp))
         MorphChip(selected = cool, onClick = { onCool(!cool) }, label = "Cool")

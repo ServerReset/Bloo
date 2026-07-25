@@ -1014,18 +1014,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
         }
-        // One initial pull on launch when sync is configured. The passive
-        // refreshing-transition collector above only fires when _state.refreshing
-        // actually toggles, but cold-start status prefetch (ensureStatus) runs
-        // with surfaceErrors=false and never flips `refreshing`, so a device that
-        // just cold-starts and isn't touched would keep showing its cached
-        // (possibly stale, [self]-only) device registry and never pull a peer's
-        // changes until a manual "Sync now" / pull-to-refresh. This makes launch
-        // itself do one download+merge+upload. Safe no-op when sync is off
-        // (performDriveSync returns ran=false immediately when there's no URI).
-        viewModelScope.launch {
-            if (settingsStore.syncUri() != null) runDriveSyncNow()
-        }
+        // NOTE: no explicit launch-time sync is needed here. The refreshing-transition
+        // collector above collects a StateFlow-derived flow, which emits its CURRENT
+        // value to a new collector immediately; `refreshing` is false at bootstrap, so
+        // that collector already fires runDriveSyncNow() once on launch (distinctUntil-
+        // Changed passes the first emission through). An earlier explicit initial-pull
+        // block here was removed as a redundant second pass on the same driveSyncMutex.
     }
 
     /**

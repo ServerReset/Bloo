@@ -204,21 +204,35 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         Spacer(Modifier.height(8.dp))
                         Text("Lock after", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(4.dp))
-                        // A single segmented row (matching the app's established
-                        // "pick exactly one of a short list" control, e.g. the
-                        // brand picker on LoginScreen) instead of five stacked
-                        // full-width buttons -- much less vertical space on a
-                        // round face and one visual language instead of two.
+                        // Five options split across TWO stacked segmented rows ("dual
+                        // stack"): five segments in one row on a narrow round face made
+                        // each pill ~20dp and cramped even at 11sp. Splitting 3 + 2
+                        // gives every option room. Both rows share the same selectedKey
+                        // and onSelect, so it stays ONE logical choice; indicatorVisible
+                        // lights the highlight only on the row that actually holds the
+                        // current value (the other row would otherwise falsely light its
+                        // first segment via the shared control's index-0 fallback).
+                        val lockRow1 = listOf("off", "immediate", "1min")
+                        val timing = ls.pinLockTiming
                         MorphSegmented(
                             options = listOf(
                                 WearSegmentOption("off", "Off"),
                                 WearSegmentOption("immediate", "Now"),
                                 WearSegmentOption("1min", "1m"),
+                            ),
+                            selectedKey = timing,
+                            onSelect = { key -> vm.setPinLockTiming(key) },
+                            indicatorVisible = timing in lockRow1,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        MorphSegmented(
+                            options = listOf(
                                 WearSegmentOption("5min", "5m"),
                                 WearSegmentOption("10min", "10m"),
                             ),
-                            selectedKey = ls.pinLockTiming,
+                            selectedKey = timing,
                             onSelect = { key -> vm.setPinLockTiming(key) },
+                            indicatorVisible = timing !in lockRow1,
                         )
                     }
                     Spacer(Modifier.height(4.dp))
@@ -485,9 +499,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                             summary,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            // A multi-device summary can be long; cap it so it can't
-                            // balloon and push the Sync button off a small round face.
-                            maxLines = 2,
+                            // Cap so a long multi-device string can't balloon, but 3
+                            // lines (was 2): real device names ("Galaxy Watch6 Classic")
+                            // were ellipsizing the primary's name away at 2. The card is
+                            // a ScalingLazyColumn item so it just grows; nothing clips.
+                            maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(6.dp))

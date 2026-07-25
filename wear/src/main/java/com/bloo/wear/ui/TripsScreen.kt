@@ -133,7 +133,10 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                         t.distance?.let { d ->
                             t.usedKwh?.let { k ->
                                 if (k > 0) {
-                                    StatusRow("Efficiency", formatEfficiency(d, k, metric))
+                                    // Stacked: "Efficiency" (one word, ~65dp) + a value
+                                    // like "4.2 mi/kWh" both want >half a ~124dp row and
+                                    // truncated side-by-side; stacking keeps both whole.
+                                    StatusRow("Efficiency", formatEfficiency(d, k, metric), stacked = true)
                                 }
                             }
                         }

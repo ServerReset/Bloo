@@ -13,6 +13,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -205,6 +207,15 @@ fun PinEntryScreen(
     Column(
         modifier
             .fillMaxSize()
+            // Safety net for the smallest round faces: with an error line AND a
+            // Cancel row present, the title + dots + 4-row pad stack can exceed a
+            // ~192dp face, and Arrangement.Center then splits the overflow so the
+            // title (top) and Cancel (bottom) clip off-screen. verticalScroll lets
+            // that rare tall case scroll instead of clip; when the stack fits (the
+            // common case) it stays centered and scroll never engages. Touch-target
+            // key sizes are intentionally kept full (48/44/40dp) — shrinking a PIN
+            // pad to fit is worse than letting it scroll.
+            .verticalScroll(rememberScrollState())
             .graphicsLayer { alpha = entranceAlpha.value }
             // A small fixed horizontal inset, NOT roundSafeHorizontalPadding:
             // that helper widens the inset to 22dp on round for scrolling LIST
