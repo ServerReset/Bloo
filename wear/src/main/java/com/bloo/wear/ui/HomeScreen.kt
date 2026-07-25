@@ -500,8 +500,19 @@ private fun CarColumn(
                 .focusRequester(focusRequester)
                 .focusable(active),
             state = state,
-            // No built-in per-item shrink/fade - tiles render at a flat, plain scale.
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
+            // Center-of-face focus: the tile at the vertical center renders full-size
+            // and fully opaque; tiles shrink toward ~60% and fade to ~50% alpha as they
+            // move toward the top/bottom bezel. maxElementHeight = 0.5f pulls the scale
+            // ramp closer to center so the IMMEDIATE neighbours visibly shrink (not just
+            // the extreme edges) — that's what makes the centered tile read as "the one
+            // in focus" on a round watch. (An earlier build set edgeScale=1f/edgeAlpha=1f
+            // to disable this entirely; on a real device that flat look meant nothing
+            // ever stood out as focused, so proper scaling is restored here.)
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 0.6f,
+                edgeAlpha = 0.5f,
+                maxElementHeight = 0.5f,
+            ),
             // Horizontal inset keeps card content (headers, right-aligned values)
             // inside the round screen's safe area so nothing clips in the corners.
             // Uses the shared helper (14 flat / 22 round) so this screen stays in
@@ -510,16 +521,12 @@ private fun CarColumn(
                 horizontal = roundSafeHorizontalPadding(),
                 vertical = 60.dp,
             ),
-            // Tighter than the library default (12dp) - tiles are already full-size
-            // now that the shrink-toward-the-edges effect is gone, so the gap
-            // between them is what mostly determines how much fits on screen.
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            // A little more air between tiles now that neighbours shrink again — the
+            // shrink reads as separation on its own, so the gap can breathe without
+            // pushing the centered tile off-center.
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
-                // Plain vertical scroll - tiles render at a fixed scale/alpha regardless
-                // of position. A previous focus-zoom effect (shrink + fade toward the
-                // edges as a tile scrolled off-center) read as tiles receding into the
-                // background with dead space opening up before the next one arrived.
                 TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
             }
         }
@@ -950,6 +957,10 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             onClick = { vm.toggleLock(car.vin) },
             modifier = Modifier.weight(1f),
             toggled = locked,
+            // Half-width weighted pair: the icon + gap starved the label down to
+            // "Lo…"/"Unl…". Drop the icon so "Locked"/"Unlocked" fit in full — the
+            // state is already conveyed by the label text and the active highlight.
+            showIcon = false,
         )
         MorphButton(
             label = "Climate",
@@ -960,6 +971,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             onClick = { vm.toggleClimate(car.vin) },
             modifier = Modifier.weight(1f),
             toggled = car.climateOn == true,
+            showIcon = false,
         )
     }
 }
@@ -1050,7 +1062,7 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
     val ambientF = weather?.let { com.bloo.bluelink.data.ambientFahrenheit(it.tempC) }
     val label = if (ambientF != null) {
         val action = if (smartClimateIsCooling(ambientF)) "Cool" else "Heat"
-        if (car.climateOn == true) "Smart climate on" else "$action to ~${
+        if (car.climateOn == true) "Smart on" else "$action to ~${
             degLabel(com.bloo.bluelink.data.smartClimateTargetF(ambientF).toString(), fahrenheit)
         }"
     } else {
@@ -1224,6 +1236,10 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
                 active = isActive,
                 activeColor = MaterialTheme.colorScheme.tertiary,
                 pending = "${car.vin}:climate" in ui.pending,
+                // User-named presets can be long and this row shares its width with
+                // a delete button, so allow the name to wrap to 2 lines instead of
+                // truncating.
+                maxLines = 2,
                 onClick = {
                     confirmDeleteId = null
                     if (isActive) vm.toggleClimate(car.vin) else vm.applyPreset(car.vin, preset)
@@ -1320,7 +1336,7 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
 private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge", Icons.Filled.Bolt) {
     val metric = ui.localSettings.unitSystem == "metric"
     MorphButton(
-        label = if (car.charging == true) "Charging — stop" else "Start charge",
+        label = if (car.charging == true) "Stop" else "Charge",
         icon = Icons.Filled.Bolt,
         active = car.charging == true,
         activeColor = WearColors.chargeGreen,
@@ -1462,7 +1478,7 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
     )
     Spacer(Modifier.height(6.dp))
     MorphButton(
-        label = "Open on phone",
+        label = "Open",
         icon = Icons.AutoMirrored.Filled.OpenInNew,
         active = false,
         activeColor = MaterialTheme.colorScheme.primary,
@@ -1721,7 +1737,7 @@ private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) 
     )
     Spacer(Modifier.height(6.dp))
     MorphButton(
-        label = "Schedule service",
+        label = "Service",
         icon = Icons.Filled.Build,
         active = false,
         activeColor = accent,
@@ -1797,13 +1813,14 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         val hlPending = "${car.vin}:hornLights" in ui.pending
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             MorphButton(
-                label = "Flash lights",
+                label = "Flash",
                 icon = Icons.Filled.FlashOn,
                 active = false,
                 activeColor = accent,
                 pending = hlPending,
                 onClick = { vm.flashLights(car.vin) },
                 modifier = Modifier.weight(1f),
+                showIcon = false,
             )
             MorphButton(
                 label = "Horn",
@@ -1813,6 +1830,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
                 pending = hlPending,
                 onClick = { vm.hornAndLights(car.vin) },
                 modifier = Modifier.weight(1f),
+                showIcon = false,
             )
         }
     }
@@ -1838,7 +1856,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
     )
     Spacer(Modifier.height(6.dp))
     MorphButton(
-        label = "Reorder tiles",
+        label = "Reorder",
         icon = Icons.Filled.DragHandle,
         active = false,
         activeColor = accent,
@@ -1854,7 +1872,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
     if (ui.updateRun != null) {
         Spacer(Modifier.height(10.dp))
         MorphButton(
-            label = if (ui.updateDownloading) "Downloading…" else "Update available",
+            label = if (ui.updateDownloading) "Downloading…" else "Update",
             icon = Icons.Filled.SystemUpdate,
             active = true,
             activeColor = accent,
@@ -1948,7 +1966,8 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
     // list RotaryScalingColumn scrolls (they must share one state).
     val listState = rememberScalingLazyListState()
-    ScreenScaffold(scrollState = listState) {
+    // Suppress the inherited clock — it overlapped the "Reorder tiles" header.
+    ScreenScaffold(scrollState = listState, timeText = {}) {
     RotaryScalingColumn(
         state = listState,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),

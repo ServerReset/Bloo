@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearViewModel
 
@@ -326,6 +327,14 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
     var firstEntry by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
+    // Wrapped in a ScreenScaffold with timeText = {} so the inherited AppScaffold
+    // clock is suppressed here — this overlay is drawn on top of Settings (inside
+    // AppScaffold), and without this the curved clock painted over the centered
+    // "Confirm PIN" / "Enter current PIN" title. The non-scrolling base overload
+    // (scrollInfoProvider defaults to null → no scroll indicator) is selected by
+    // passing only timeText; its content lambda hands back a PaddingValues we don't
+    // need since the PIN pad is vertically centered.
+    ScreenScaffold(timeText = {}) { _ ->
     Box(
         Modifier
             .fillMaxSize()
@@ -400,5 +409,6 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                 PinFlowStep.DISABLING -> LaunchedEffect(Unit) { vm.setPinLockEnabled(false, onDone) }
             }
         }
+    }
     }
 }

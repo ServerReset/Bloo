@@ -76,7 +76,9 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
     // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
     // list RotaryScalingColumn scrolls (they must share one state).
     val listState = rememberScalingLazyListState()
-    ScreenScaffold(scrollState = listState) {
+    // Suppress the inherited clock on the login screen — it overlapped the
+    // "Sign in to Bloo" header. (timeText = {} renders nothing in its slot.)
+    ScreenScaffold(scrollState = listState, timeText = {}) {
     RotaryScalingColumn(
         state = listState,
         contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 28.dp),

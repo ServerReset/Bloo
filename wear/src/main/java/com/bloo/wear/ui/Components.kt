@@ -180,7 +180,13 @@ fun SectionCard(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.semantics { heading() },
+                        // Single line + ellipsis: card titles are short labels
+                        // ("CHARGE", "CHARGE LIMITS"), and with no cap a long one
+                        // wrapped unpredictably mid-word. One clean line reads as a
+                        // header, not a broken paragraph.
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false).semantics { heading() },
                     )
                 }
                 Spacer(Modifier.height(4.dp))
@@ -535,6 +541,15 @@ fun MorphButton(
      *  a toggle role/state would be actively wrong -- null (the default)
      *  leaves those exactly as before, relying on the label text alone. */
     toggled: Boolean? = null,
+    /** Max label lines before ellipsizing. Default 1 (the classic chip look);
+     *  pass 2 for callers whose label shares a narrow weighted row (e.g. a
+     *  preset name next to a delete button, or a car name) so the text wraps
+     *  instead of truncating to "…". */
+    maxLines: Int = 1,
+    /** When false the leading icon is dropped, giving the label the full chip
+     *  width. Used by side-by-side weighted pairs (hero Lock/Climate, More
+     *  Flash/Horn) where the icon + gap was starving the label down to "Fla…". */
+    showIcon: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -608,18 +623,30 @@ fun MorphButton(
                 (fadeIn(tween(150)) + slideInVertically(tween(150)) { -it / 3 }) togetherWith
                     (fadeOut(tween(100)) + slideOutVertically(tween(100)) { it / 3 })
             }, label = "btnLabel") { lbl ->
-                Text(lbl, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                Text(
+                    lbl,
+                    maxLines = maxLines,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = if (!showIcon) TextAlign.Center else null,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         },
         secondaryLabel = secondaryLabel?.let { s ->
             { Text(s, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         },
-        icon = {
-            if (pending) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp))
-            } else {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        // Icon slot: a spinner while pending; the leading icon otherwise — unless
+        // showIcon is false (weighted pairs that need the label's full width), in
+        // which case only a pending spinner ever appears and the label gets the
+        // whole chip. `icon = null` is a valid Wear M3 Button arg (renders no icon).
+        icon = when {
+            pending -> {
+                { CircularProgressIndicator(modifier = Modifier.size(18.dp)) }
             }
+            showIcon -> {
+                { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
+            }
+            else -> null
         },
     )
 }

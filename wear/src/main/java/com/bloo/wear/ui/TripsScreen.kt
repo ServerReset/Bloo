@@ -57,7 +57,9 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
     // list RotaryScalingColumn scrolls (they must share one state).
     val listState = rememberScalingLazyListState()
-    ScreenScaffold(scrollState = listState) {
+    // Suppress the inherited clock on the trips list — it overlapped the
+    // "Recent trips" header. (timeText = {} renders nothing in its slot.)
+    ScreenScaffold(scrollState = listState, timeText = {}) {
     RotaryScalingColumn(state = listState) {
         item { ListHeader { Text("Recent trips", textAlign = TextAlign.Center) } }
 

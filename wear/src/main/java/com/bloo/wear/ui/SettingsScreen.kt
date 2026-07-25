@@ -92,7 +92,11 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     // list RotaryScalingColumn scrolls (they must share one state).
     val listState = rememberScalingLazyListState()
     Box(Modifier.fillMaxSize()) {
-    ScreenScaffold(scrollState = listState) {
+    // timeText = {} suppresses the inherited AppScaffold clock on this content
+    // screen: the curved clock overlapped section titles ("PIN LOCK", "AURORA…")
+    // at the top of the list. The clock stays on the main garage where the layout
+    // is designed around it.
+    ScreenScaffold(scrollState = listState, timeText = {}) {
     RotaryScalingColumn(state = listState) {
         item { ListHeader { Text("Settings", textAlign = TextAlign.Center) } }
 
@@ -153,7 +157,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 MorphButton(
-                    label = "Use phone's location",
+                    label = "Use my location",
                     icon = Icons.Filled.MyLocation,
                     active = false,
                     activeColor = MaterialTheme.colorScheme.primary,
@@ -307,8 +311,8 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         Spacer(Modifier.height(6.dp))
                         MorphSegmented(
                             options = listOf(
-                                WearSegmentOption("complementary", "Complementary"),
-                                WearSegmentOption("material", "Material You"),
+                                WearSegmentOption("complementary", "Auto"),
+                                WearSegmentOption("material", "Material"),
                             ),
                             selectedKey = (ui.settings?.auroraColorMode ?: "complementary")
                                 .let { if (it == "custom") "complementary" else it },
@@ -354,7 +358,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 val actions = ui.localSettings.tileActions
                 listOf(
-                    Triple("lock", "Lock / unlock", Icons.Filled.Lock),
+                    Triple("lock", "Lock", Icons.Filled.Lock),
                     Triple("climate", "Climate", Icons.Filled.Thermostat),
                     Triple("charge", "Charge", Icons.Filled.Bolt),
                 ).forEach { (key, label, icon) ->
@@ -411,10 +415,13 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                             activeColor = MaterialTheme.colorScheme.primary,
                             pending = false,
                             onClick = { vm.setTileCarVin(index, vin) },
+                            // Car names ("Lanas Whip", …) are user-set and can be long;
+                            // wrap to 2 lines rather than truncating.
+                            maxLines = 2,
                         )
                         Spacer(Modifier.height(4.dp))
                     }
-                    carOption("Follow selected", null)
+                    carOption("Selected car", null)
                     ui.cars.forEach { car -> carOption(car.name, car.vin) }
                 }
             }
@@ -466,7 +473,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         Spacer(Modifier.height(6.dp))
                     }
                     MorphButton(
-                        label = if (ui.resyncBusy) "Syncing…" else "Sync from phone",
+                        label = if (ui.resyncBusy) "Syncing…" else "Sync",
                         icon = Icons.Filled.Sync,
                         active = false,
                         activeColor = MaterialTheme.colorScheme.primary,
@@ -475,7 +482,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     )
                     Spacer(Modifier.height(4.dp))
                     MorphButton(
-                        label = if (ui.driveSyncBusy) "Syncing…" else "Sync via Drive",
+                        label = if (ui.driveSyncBusy) "Syncing…" else "Drive sync",
                         icon = Icons.Filled.Bolt,
                         active = false,
                         activeColor = MaterialTheme.colorScheme.tertiary,
@@ -509,7 +516,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             // one never did despite kicking off a refresh per car.
             val refreshingAny = ui.cars.any { "${it.vin}:refresh" in ui.pending }
             MorphButton(
-                label = "Refresh all cars",
+                label = "Refresh all",
                 icon = Icons.Filled.Refresh,
                 active = false,
                 activeColor = MaterialTheme.colorScheme.primary,
@@ -520,7 +527,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             MorphButton(
-                label = if (confirmSignOut) "Tap again to confirm" else "Sign out",
+                label = if (confirmSignOut) "Tap to confirm" else "Sign out",
                 icon = Icons.AutoMirrored.Filled.Logout,
                 active = confirmSignOut,
                 activeColor = MaterialTheme.colorScheme.error,
