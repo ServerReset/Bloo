@@ -288,6 +288,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
@@ -8661,20 +8662,30 @@ private fun SettingsScreen(vm: AppViewModel) {
                     driveConfigured -> MaterialTheme.colorScheme.tertiary
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
+                // At-a-glance status header: the state icon in a tonal circle
+                // (matching the app's card-header language) + a bold title and a
+                // colour-coded one-line state.
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(driveIcon, contentDescription = null, tint = driveTint, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .background(driveTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(driveIcon, contentDescription = null, tint = driveTint, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Automatic Drive sync", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text("Automatic Drive sync", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         val statusLabel = when {
                             !driveConfigured -> "Not set up"
                             state.syncError != null -> "Sync failed"
-                            else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Set up"
+                            else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
                         }
-                        Text(statusLabel, style = MaterialTheme.typography.labelSmall, color = driveTint)
+                        Text(statusLabel, style = MaterialTheme.typography.labelMedium, color = driveTint, fontWeight = FontWeight.Medium)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 Text(
                     "Keeps a Google Drive file continuously up to date, so every " +
                         "signed-in device converges on the same settings automatically.",
@@ -8704,50 +8715,42 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                 }
                 if (state.syncUri != null) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Settings auto-sync to Drive in the background and on every " +
-                            "refresh. Changes made on another device are merged automatically.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                    val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
-                    if (lastSyncLabel.isNotBlank()) {
-                        Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(10.dp))
+                    // Status facts grouped into one tidy rounded block (label/value
+                    // rows) instead of a loose pile of differently-tinted Text lines.
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
+                        SyncInfoRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "—")
+                        // File-identity fingerprint: two phones truly on the SAME Drive
+                        // file show the SAME code. If they differ, they picked different
+                        // files (Drive allows duplicate names) — the #1 reason sync
+                        // doesn't converge, now checkable at a glance across phones.
+                        state.syncFileFingerprint?.let { fp ->
+                            SyncInfoRow("File ID", fp, valueMono = true)
+                        }
+                        if (state.syncError != null) {
+                            SyncInfoRow("Error", state.syncError!!, valueColor = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    state.syncFileFingerprint?.let {
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            "Last synced $lastSyncLabel",
+                            "The File ID must match on every device — if two devices show different codes, they're syncing to different files.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    // File-identity fingerprint: two phones that are truly on the
-                    // SAME Drive file show the SAME code here. If they differ, the
-                    // devices picked different files (Drive allows duplicate names) —
-                    // the #1 reason settings/devices don't converge. This makes that
-                    // instantly checkable across phones instead of a mystery.
-                    state.syncFileFingerprint?.let { fp ->
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "File ID: $fp · this code must match on every device",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (state.syncError != null) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "Sync failed: ${state.syncError}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    // The synced-devices registry: one row per device on this file,
-                    // with a ★ primary badge, a "This device" marker, and last-seen.
-                    // Tapping a non-primary row makes it primary (source of truth);
-                    // this device can be renamed. Empty until the first sync populates
-                    // the registry.
+                    // The synced-devices registry: a drag-to-reorder list where the
+                    // TOP device is primary (source of truth). See SyncDevicesSection.
                     SyncDevicesSection(state = state, vm = vm)
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(12.dp))
                     // Manual controls: "Sync now" force-pushes/pulls immediately
                     // (available any time, not just after a failure), and "Test
                     // sync" runs a non-destructive round-trip against the real
@@ -10945,6 +10948,36 @@ private fun CommandButton(
     }
 }
 
+/** A label/value row inside the sync status block: muted label on the left,
+ *  emphasised value on the right (monospaced for the File ID so it reads as a
+ *  code to compare across devices). */
+@Composable
+private fun SyncInfoRow(
+    label: String,
+    value: String,
+    valueMono: Boolean = false,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = valueColor,
+            fontFamily = if (valueMono) androidx.compose.ui.text.font.FontFamily.Monospace else null,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /**
  * The synced-devices registry shown in the "Backup & sync" card: a
  * drag-to-reorder list (same gesture as the car-order list in Settings) where
@@ -11014,8 +11047,9 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
 
     if (renaming) {
         var draft by remember { mutableStateOf(state.syncDeviceName) }
+        val scheme = MaterialTheme.colorScheme
         // Standardized on the shared GlassAlertDialog shell (was the legacy
-        // BlooDialog, now removed). Stacked full-width buttons, no leading icon.
+        // BlooDialog, now removed). Stacked full-width buttons.
         GlassAlertDialog(
             onDismissRequest = { renaming = false },
             icon = Icons.Filled.Smartphone,
@@ -11023,13 +11057,26 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             text = {
                 Text(
                     "Shown in the devices list on all your synced devices.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
                 )
+                // Styled to match every other text field in the app (18dp FieldShape,
+                // borderless surface fill) rather than a default outlined box, which
+                // looked generic against the frosted dialog.
                 OutlinedTextField(
                     value = draft,
                     onValueChange = { draft = it },
+                    label = { Text("Device name") },
+                    placeholder = { Text(Build.MODEL ?: "This device") },
                     singleLine = true,
+                    shape = FieldShape,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = scheme.surface,
+                        unfocusedContainerColor = scheme.surface,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                    ),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
@@ -11040,6 +11087,7 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                         renaming = false
                     },
                     active = true,
+                    enabled = draft.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Save", fontWeight = FontWeight.SemiBold) }
                 MorphTextButton("Cancel", onClick = { renaming = false }, modifier = Modifier.fillMaxWidth())
