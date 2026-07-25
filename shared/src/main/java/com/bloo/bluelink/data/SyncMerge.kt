@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -21,20 +22,68 @@ import kotlinx.serialization.json.put
  * Everything here operates only on JSON strings and plain maps/sets. The Android
  * side (reading DataStore into a map, base64-encoding photos from Bitmaps,
  * applying a [MergePlan] to DataStore, dirty-key tracking) stays in SettingsStore.
+ *
+ * ## Two export shapes
+ * - [buildExport] — the **portable** shape (`prefs`/`photos`/`_removed` only). It is
+ *   what the manual "export settings to a file" feature produces (a file the user
+ *   may share/email), and it is also the exact byte-content the change-detection
+ *   [portableContentHash] is computed over. It carries **no device metadata**.
+ * - [buildExportForDrive] — the portable shape **plus** the Drive-sync-only keys
+ *   (`_hash`, `_primaryDeviceId`, `_writerDeviceId`, `devices`). Used only for the
+ *   Drive file, never for the shareable export, so device names/ids never leak.
+ *
+ * ## The `_hash` change gate (why not a timestamp / sequence counter)
+ * The old import gate compared the Drive file's last-modified time against a
+ * locally-stored wall-clock — fragile under cross-device clock skew (and useless
+ * when a provider exposes no modified-time). A monotonic `_seq += 1` per upload
+ * would instead ping-pong forever (each device re-uploads on every clean pass,
+ * climbing the counter and re-importing the other's echo). A **content hash** of
+ * the portable content is skew-immune AND self-detects a no-op sync: identical
+ * content → identical hash → nothing to import and nothing new to write. All new
+ * keys are additive top-level fields, so [BACKUP_VERSION] stays 1 and an older
+ * client (which ignores them on read, and drops them when it rewrites the file)
+ * still interoperates — the new client just falls back to the timestamp gate when
+ * `_hash` is absent.
  */
 object SyncMerge {
 
     /** The settings-backup format version. The format is a flat key-value bag, so
      *  an older client reading a newer backup is normally fine (unknown keys are
      *  ignored); bump this only if a future change stops being purely additive, so
-     *  old clients can detect and refuse a newer format instead of misreading it. */
+     *  old clients can detect and refuse a newer format instead of misreading it.
+     *  The `_hash`/`devices`/`_primaryDeviceId`/`_writerDeviceId` keys are additive
+     *  (ignored by old clients), so they do NOT warrant a version bump. */
     const val BACKUP_VERSION = 1
 
     /** Preference keys that describe THIS device's own Drive-sync wiring (the
      *  content:// URI it was granted, its last-sync bookkeeping, its Wi-Fi-only
-     *  preference, and its local dirty set) — never portable, so never exported,
-     *  imported, or merged. */
-    val DEVICE_LOCAL_KEYS = setOf("sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys")
+     *  preference, its local dirty set, and its sync-identity/registry bookkeeping)
+     *  — never portable, so never exported, imported, or merged. */
+    val DEVICE_LOCAL_KEYS = setOf(
+        "sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys",
+        // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
+        "sync_device_id", "sync_device_name", "sync_last_hash", "sync_synced_ever",
+        "sync_devices_cache", "sync_pull_primary", "sync_primary_cache",
+    )
+
+    /** A device that syncs this Drive file, as recorded in the file's `devices`
+     *  registry. Purely informational (drives the phone's "your devices" list and
+     *  the "primary" designation); never affects the settings merge itself. All
+     *  fields default so a partial/older entry decodes leniently rather than
+     *  throwing — an entry with a blank [id] is dropped on merge. */
+    @Serializable
+    data class SyncDevice(
+        val id: String = "",
+        val name: String = "",
+        val model: String = "",
+        val appVersion: String = "",
+        val lastSeenMs: Long = 0L,
+    )
+
+    /** Registry entries not seen for this long are pruned on merge, so a
+     *  factory-reset/retired device doesn't linger in the list forever. 90 days
+     *  is comfortably longer than any normal "I didn't open that device" gap. */
+    const val DEVICE_RETENTION_MS = 90L * 24 * 60 * 60 * 1000
 
     /**
      * The decoded set of mutations a merge/import should apply, with no DataStore
@@ -48,38 +97,59 @@ object SyncMerge {
         val removes: Set<String>,
     )
 
+    /** The Drive-sync-only metadata parsed out of a file's top-level keys, kept
+     *  separate from the [MergePlan] (which is only the portable prefs/tombstones).
+     *  [hash] is null when the file predates the hash gate (old client, or the
+     *  header/marker case) — the caller then falls back to the timestamp gate. */
+    data class SyncMeta(
+        val hash: String?,
+        val primaryDeviceId: String?,
+        val writerDeviceId: String?,
+        val devices: List<SyncDevice>,
+    )
+
     // Same Json config SettingsStore's backupJson used: pretty-printed output so
     // the exported file is human-readable, unknown keys ignored on decode.
     private val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
-    /**
-     * Pure version of `exportSettingsJson`. [prefs] is a plain snapshot of every
-     * preference (String/Boolean values; anything else is coerced to its
-     * toString()), [dirtyKeys] is the set of keys changed locally since the last
-     * upload, and [photos] is an optional `{vin -> base64 JPEG}` map (the Android
-     * side encodes the Bitmaps; this just embeds the strings).
-     *
-     * Skips [DEVICE_LOCAL_KEYS] and local-file `img_` values (a "/"-prefixed
-     * String path is meaningless on another device — only the photos channel
-     * carries local photos). `_removed` tombstones are the dirty keys that no
-     * longer exist in [prefs] and aren't device-local, so other devices converge
-     * on the deletion instead of resurrecting the key.
-     */
-    fun buildExport(prefs: Map<String, Any>, dirtyKeys: Set<String>, photos: Map<String, String> = emptyMap()): String {
-        val entries = buildJsonObject {
-            prefs.forEach { (name, value) ->
-                if (name in DEVICE_LOCAL_KEYS) return@forEach
-                if (name.startsWith("img_") && value is String && value.startsWith("/")) return@forEach
-                when (value) {
-                    is Boolean -> put(name, JsonPrimitive(value))
-                    is String -> put(name, JsonPrimitive(value))
-                    else -> put(name, JsonPrimitive(value.toString()))
-                }
+    // --- Portable export (prefs/photos/_removed only — safe to share) ----------
+
+    /** The `prefs` object shared by [buildExport] and [buildExportForDrive]:
+     *  skips [DEVICE_LOCAL_KEYS] and local-file `img_` paths (a "/"-prefixed String
+     *  path is meaningless on another device — only the photos channel carries
+     *  local photos), and types each value as a JSON boolean/string (anything else
+     *  coerced via toString()). */
+    private fun portablePrefsObject(prefs: Map<String, Any>): JsonObject = buildJsonObject {
+        prefs.forEach { (name, value) ->
+            if (name in DEVICE_LOCAL_KEYS) return@forEach
+            if (name.startsWith("img_") && value is String && value.startsWith("/")) return@forEach
+            when (value) {
+                is Boolean -> put(name, JsonPrimitive(value))
+                is String -> put(name, JsonPrimitive(value))
+                else -> put(name, JsonPrimitive(value.toString()))
             }
         }
-        val presentNames = prefs.keys.toSet()
-        val removed = (dirtyKeys - presentNames - DEVICE_LOCAL_KEYS)
-        val root = buildJsonObject {
+    }
+
+    /** `_removed` tombstones: dirty keys that no longer exist in [prefs] and aren't
+     *  device-local, so other devices converge on the deletion instead of
+     *  resurrecting the key. */
+    private fun tombstones(prefs: Map<String, Any>, dirtyKeys: Set<String>): Set<String> =
+        (dirtyKeys - prefs.keys.toSet() - DEVICE_LOCAL_KEYS)
+
+    /** Builds the base backup root (`_format`/`_version`/`prefs`/`photos`/`_removed`),
+     *  then lets [extra] add any additional top-level keys (the Drive-only metadata).
+     *  [buildExport] passes an empty [extra] so its output is exactly the historical
+     *  portable shape. */
+    private inline fun buildRoot(
+        prefs: Map<String, Any>,
+        dirtyKeys: Set<String>,
+        photos: Map<String, String>,
+        extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit,
+    ): JsonObject {
+        val entries = portablePrefsObject(prefs)
+        val removed = tombstones(prefs, dirtyKeys)
+        return buildJsonObject {
             put("_format", JsonPrimitive("bloo-settings"))
             put("_version", JsonPrimitive(BACKUP_VERSION))
             put("prefs", entries)
@@ -87,8 +157,134 @@ object SyncMerge {
                 put("photos", buildJsonObject { photos.forEach { (vin, b64) -> put(vin, JsonPrimitive(b64)) } })
             }
             if (removed.isNotEmpty()) put("_removed", buildJsonArray { removed.forEach { add(JsonPrimitive(it)) } })
+            extra()
+        }
+    }
+
+    /**
+     * The **portable** export (identical output to the historical `buildExport`):
+     * `prefs`/`photos`/`_removed` only, no device metadata. Used by the manual
+     * share-to-file feature and as the content [portableContentHash] hashes.
+     */
+    fun buildExport(prefs: Map<String, Any>, dirtyKeys: Set<String>, photos: Map<String, String> = emptyMap()): String =
+        backupJson.encodeToString(JsonObject.serializer(), buildRoot(prefs, dirtyKeys, photos) {})
+
+    /**
+     * The **Drive** export: the portable content plus the Drive-sync-only metadata.
+     * [hash] should be [portableContentHash] of the same prefs/dirtyKeys/photos.
+     * The `devices` registry is [mergeDevices]`(knownDevices, selfDevice, nowMs)` so
+     * this device's own entry is upserted and stale peers pruned; peers are
+     * otherwise preserved. [primaryDeviceId] is omitted when null.
+     */
+    fun buildExportForDrive(
+        prefs: Map<String, Any>,
+        dirtyKeys: Set<String>,
+        photos: Map<String, String>,
+        hash: String,
+        primaryDeviceId: String?,
+        selfDevice: SyncDevice,
+        knownDevices: List<SyncDevice>,
+        nowMs: Long,
+    ): String {
+        val devices = mergeDevices(knownDevices, selfDevice, nowMs)
+        val root = buildRoot(prefs, dirtyKeys, photos) {
+            put("_hash", JsonPrimitive(hash))
+            if (primaryDeviceId != null) put("_primaryDeviceId", JsonPrimitive(primaryDeviceId))
+            put("_writerDeviceId", JsonPrimitive(selfDevice.id))
+            put("devices", buildJsonArray {
+                devices.forEach { d ->
+                    add(buildJsonObject {
+                        put("id", JsonPrimitive(d.id))
+                        put("name", JsonPrimitive(d.name))
+                        put("model", JsonPrimitive(d.model))
+                        put("appVersion", JsonPrimitive(d.appVersion))
+                        put("lastSeenMs", JsonPrimitive(d.lastSeenMs))
+                    })
+                }
+            })
         }
         return backupJson.encodeToString(JsonObject.serializer(), root)
+    }
+
+    /**
+     * A **canonical, order-independent** SHA-256 of the portable content
+     * (prefs + tombstones + photos), so two devices with identical logical settings
+     * produce the identical hash regardless of DataStore map iteration order (which
+     * is NOT guaranteed stable across devices). This is the change-detection signal:
+     * remote `_hash` != our last-seen hash ⇒ import; our new hash == remote ⇒ no-op
+     * (write only a registry heartbeat, don't churn the file).
+     *
+     * Entries are sorted by key and joined with ASCII control separators — a
+     * unit-separator (0x1F) between a key and its value, a record-separator (0x1E)
+     * between entries, and a group-separator (0x1D) between the prefs / tombstones /
+     * photos sections. None can appear in a key name or a stored value, so
+     * "a"->"bc" and "ab"->"c" can't collide.
+     */
+    fun portableContentHash(
+        prefs: Map<String, Any>,
+        dirtyKeys: Set<String>,
+        photos: Map<String, String> = emptyMap(),
+    ): String {
+        val us = Char(31) // unit separator: between a key and its value
+        val rs = Char(30) // record separator: between entries
+        val gs = Char(29) // group separator: between sections
+        val sb = StringBuilder()
+        prefs.entries
+            .asSequence()
+            .filter { it.key !in DEVICE_LOCAL_KEYS }
+            .filterNot { it.key.startsWith("img_") && it.value is String && (it.value as String).startsWith("/") }
+            .sortedBy { it.key }
+            .forEach { sb.append(it.key).append(us).append(it.value.toString()).append(rs) }
+        sb.append(gs)
+        tombstones(prefs, dirtyKeys).sorted().forEach { sb.append(it).append(rs) }
+        sb.append(gs)
+        photos.entries.sortedBy { it.key }.forEach { sb.append(it.key).append(us).append(it.value).append(rs) }
+        return sha256Hex(sb.toString())
+    }
+
+    private fun sha256Hex(s: String): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        return md.digest(s.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+    }
+
+    // --- Device registry -------------------------------------------------------
+
+    /** Union [remote] with [self] by device id (self's entry replaces its own prior
+     *  copy; other devices are preserved), then prune entries whose [SyncDevice.lastSeenMs]
+     *  is older than [retentionMs] before [nowMs] — except [self], which is always
+     *  kept. Blank-id entries are dropped. */
+    fun mergeDevices(
+        remote: List<SyncDevice>,
+        self: SyncDevice,
+        nowMs: Long,
+        retentionMs: Long = DEVICE_RETENTION_MS,
+    ): List<SyncDevice> {
+        val byId = LinkedHashMap<String, SyncDevice>()
+        remote.forEach { if (it.id.isNotBlank()) byId[it.id] = it }
+        if (self.id.isNotBlank()) byId[self.id] = self
+        val cutoff = nowMs - retentionMs
+        return byId.values.filter { it.id == self.id || it.lastSeenMs >= cutoff }
+    }
+
+    // --- Decode ----------------------------------------------------------------
+
+    /**
+     * Parse the Drive-only metadata out of a file's top-level keys. Returns null
+     * only when [json] isn't a valid JSON object at all; otherwise every field is
+     * best-effort ([hash] null when absent/blank so the caller uses the timestamp
+     * fallback; malformed `devices` entries dropped; a bad `_primaryDeviceId`/
+     * `_writerDeviceId` → null). Never throws on a hand-edited or version-skewed file.
+     */
+    fun parseMeta(json: String): SyncMeta? {
+        val root = runCatching { backupJson.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
+        val hash = (root["_hash"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        val primary = (root["_primaryDeviceId"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        val writer = (root["_writerDeviceId"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        val devices = (root["devices"] as? JsonArray)?.mapNotNull { el ->
+            runCatching { backupJson.decodeFromJsonElement(SyncDevice.serializer(), el) }.getOrNull()
+                ?.takeIf { it.id.isNotBlank() }
+        } ?: emptyList()
+        return SyncMeta(hash = hash, primaryDeviceId = primary, writerDeviceId = writer, devices = devices)
     }
 
     /**

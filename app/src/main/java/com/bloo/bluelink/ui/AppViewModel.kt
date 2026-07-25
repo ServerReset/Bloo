@@ -183,6 +183,16 @@ data class UiState(
     /** Reason the last Drive sync attempt didn't fully succeed, or null if it did
      *  (or hasn't run yet). Cleared by the next attempt that succeeds. */
     val syncError: String? = null,
+    /** Devices sharing this sync file (name/model/last-seen), for the Settings
+     *  "your devices" list. From the last sync's merged registry / cache. */
+    val syncDevices: List<com.bloo.bluelink.data.SyncMerge.SyncDevice> = emptyList(),
+    /** The device id designated primary (source of truth), or null if none. */
+    val syncPrimaryId: String? = null,
+    /** This device's own sync id, so the UI can mark "This device" and hide
+     *  "Make primary" on self. */
+    val thisDeviceId: String? = null,
+    /** This device's friendly sync name (editable in Settings). */
+    val syncDeviceName: String = "",
     /** Set when the garage fetch came back empty because a request actually
      *  failed (network/API error), not because the account genuinely has zero
      *  vehicles. Distinguishes a real failure from "not signed in" / "no
@@ -494,6 +504,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
             AppLog.log("Signed in as ${maskEmail(username.trim())} (${brand.label})")
             _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
+            // Push the session to the watch IMMEDIATELY on login success (not only
+            // via the eventual post-garage-fetch publish) so a watch waiting on a
+            // "Set up on phone" handoff advances past its login screen right away.
+            runCatching { com.bloo.bluelink.wear.WearBridge.publishAuth(getApplication()) }
             loadGarageInternal()
         }
     }
@@ -568,6 +582,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         credentialStore.save(creds)
         AppLog.log("Signed in as ${maskEmail(creds.email)} (Kia)")
         _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
+        // Push the Kia session to the watch immediately (Kia can't sign in on-watch,
+        // so the watch relies entirely on this push) — same reasoning as login().
+        runCatching { com.bloo.bluelink.wear.WearBridge.publishAuth(getApplication()) }
         loadGarageInternal()
     }
 
@@ -894,7 +911,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val defaultPresets = vehicles.associate { v ->
                 v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
             }
-            _state.update { it.copy(syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly, settingsMode = settingsMode, defaultClimatePresets = defaultPresets) }
+            // Restore the cached device registry + primary + this-device identity so
+            // Settings shows "your devices" immediately on launch, before (and even
+            // without) the first live sync of the session.
+            val cachedDevices = settingsStore.syncedDevices()
+            val cachedPrimary = settingsStore.syncPrimaryDeviceId()
+            val myDeviceId = settingsStore.syncDeviceId()
+            val myDeviceName = settingsStore.syncDeviceName()
+            _state.update {
+                it.copy(
+                    syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly,
+                    settingsMode = settingsMode, defaultClimatePresets = defaultPresets,
+                    syncDevices = cachedDevices, syncPrimaryId = cachedPrimary,
+                    thisDeviceId = myDeviceId, syncDeviceName = myDeviceName,
+                )
+            }
         }
         // Bidirectional auto-sync on refresh: download newer settings from Drive,
         // then upload our current settings (merge loop for cross-device sync).
@@ -2131,6 +2162,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
         AppLog.log("Drive auto-sync enabled")
+        // Reset per-file sync gate state BEFORE pointing at the (possibly new) file:
+        // stale hash/synced-ever/lastSync/dirty from a previous file would block
+        // adoption of and convergence with this one. This also re-arms join-adopt
+        // (synced_ever=false), so if the picked file already has content (e.g. the
+        // user pointed "Save to Drive" at an existing Bloo file) this device adopts
+        // it; a brand-new empty file has nothing to adopt and just receives our
+        // upload — either way correct.
+        settingsStore.resetSyncStateForNewFile()
         settingsStore.setSyncUri(uri.toString())
         _state.update { it.copy(syncUri = uri.toString()) }
         // Push this device's settings to the file right away instead of
@@ -2150,28 +2189,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         AppLog.log("Drive auto-sync disabled")
     }
 
-    /** Import settings from a Drive file and set up auto-sync to that file. */
+    /** Join an existing Drive sync file and set up auto-sync to it.
+     *
+     * Adoption now happens through [SettingsStore.performDriveSync]'s **join-adopt**
+     * path (a device that has never synced THIS file fully adopts it as the source
+     * of truth), NOT a separate up-front `importSettingsJson`. That's the actual bug
+     * fix: the old explicit import routed through `editTracked`, which marked every
+     * imported key dirty, so the very first sync pass then "protected" all of them
+     * and the device never converged with the primary. We only need to (1) confirm
+     * the file is readable, (2) take a persisted grant, (3) reset per-file gate state
+     * so join-adopt arms, then (4) run one pass. */
     fun importSettingsAndSync(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
-        val json = withContext(Dispatchers.IO) {
-            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
+        // Read once purely to confirm the file is reachable; do NOT import it here.
+        val readable = withContext(Dispatchers.IO) {
+            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.isSuccess
         }
-        // importSettingsJson returns null on success, or an error message on a
-        // rejected/corrupt backup (wrong format, newer version, not JSON at
-        // all, ...). Logged for our own diagnostics, but NOT surfaced to the
-        // user as an "Invalid settings file" failure below -- this is the
-        // "join an existing sync" flow, and the single most common file
-        // picked here is a brand-new one the user just created in Drive to
-        // use as the sync target (empty, a Google Docs placeholder, some
-        // other non-Bloo content, whatever) with nothing real to import yet.
-        // That's the normal, expected first-time-setup case, not a corrupt
-        // backup, and it reads as something having gone wrong. Auto-sync
-        // still enables either way, and the very next successful sync push
-        // overwrites this file with this device's real settings regardless,
-        // so a failed import here never loses anything.
-        val importError = json?.let { settingsStore.importSettingsJson(it) }
-        if (json != null && importError == null) AppLog.log("Settings imported from Drive")
-        else if (importError != null) AppLog.log("⚠ Settings import from Drive ($importError) -- treating as nothing to import, not a failure")
-        val imported = json != null && importError == null
+        if (!readable) AppLog.log("⚠ Drive sync: couldn't read the picked file (will still try to enable sync)")
         val granted = runCatching {
             getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
                 uri,
@@ -2179,33 +2212,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }.isSuccess
         if (!granted) {
-            // Same reasoning as setSyncUri: without a persisted grant, sync is
-            // guaranteed to start failing the moment this process dies, so
-            // don't claim auto-sync is enabled -- but the import itself (if it
-            // succeeded) already landed, so still report that part honestly.
+            // Without a persisted grant, sync is guaranteed to start failing the
+            // moment this process dies, so don't claim auto-sync is enabled.
             AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
             _state.update {
-                it.copy(message = if (imported) {
-                    "Settings imported, but couldn't set up auto-sync — try picking the file again"
-                } else {
-                    "Couldn't get lasting access to that file — try picking it again"
-                })
+                it.copy(message = "Couldn't get lasting access to that file — try picking it again", messageType = "error")
             }
             return@launch
         }
+        // Reset per-file gate state so join-adopt arms for this file (synced_ever
+        // cleared), then point sync at it.
+        settingsStore.resetSyncStateForNewFile()
         settingsStore.setSyncUri(uri.toString())
-        val message = if (imported) "Settings imported and auto-sync enabled" else "Auto-sync enabled"
-        // Same reasoning as importSettings: reflect a real import in the
-        // already-loaded vehicles' local config right away (seats, powertrain,
-        // photo, ...) -- e.g. so onboarding can skip a per-car setup screen for
-        // a car this import already configured, instead of asking again for
-        // something the restored backup already answered.
-        if (imported) refreshLocalCarConfig()
-        _state.update { it.copy(syncUri = uri.toString(), message = message) }
-        // Same reasoning as setSyncUri: run a real sync pass now instead of
-        // waiting on the passive refreshing-transition collector, so this
-        // device's merged state actually reaches the file immediately.
+        _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled") }
+        // One real pass now: performDriveSync join-adopts the file's settings (if it
+        // has any) and uploads. refreshLocalCarConfig() below reflects an adopted
+        // import into the already-loaded vehicles (seats/powertrain/photo) right away.
         runDriveSyncNow()
+        if (_state.value.syncError == null) refreshLocalCarConfig()
     }
 
     /** Set Wi-Fi only vs any network for auto-sync. */
@@ -2373,6 +2397,39 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { runDriveSyncNow() }
     }
 
+    /** Designate [id] as the primary device (source of truth + tiebreaker). Persists
+     *  locally and writes it into the Drive file on the sync pass that follows, so
+     *  the choice propagates to every other device. */
+    fun setPrimaryDevice(id: String) {
+        viewModelScope.launch {
+            settingsStore.setPrimaryDevice(id)
+            _state.update { it.copy(syncPrimaryId = id) }
+            runDriveSyncNow()
+        }
+    }
+
+    /** "Pull from primary now": force this device to fully adopt the file's settings
+     *  on the next pass (the primary is the source of truth), then run it. */
+    fun pullFromPrimary() {
+        if (_state.value.syncUri == null) return
+        viewModelScope.launch {
+            settingsStore.requestPullFromPrimary()
+            runDriveSyncNow()
+            val err = _state.value.syncError
+            if (err == null) reportInfo("Pulled the latest settings") else reportError("Couldn't pull: $err")
+        }
+    }
+
+    /** Rename THIS device in the sync registry. Persists locally and republishes on
+     *  the next sync pass (name changes ride the registry heartbeat). */
+    fun renameThisDevice(name: String) {
+        viewModelScope.launch {
+            settingsStore.setSyncDeviceName(name)
+            _state.update { it.copy(syncDeviceName = name.trim()) }
+            runDriveSyncNow()
+        }
+    }
+
     /** Settings "Test sync" diagnostic: runs a non-destructive end-to-end
      *  round-trip against the real Drive file (permission → read → write →
      *  verify) and reports pass/fail as a snackbar, so the user can confirm
@@ -2399,7 +2456,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val outcome = withContext(Dispatchers.IO) { settingsStore.performDriveSync() }
         if (outcome.ran) {
             if (outcome.imported) refreshLocalCarConfig()
-            _state.update { it.copy(lastSyncMs = outcome.syncedAtMs, syncError = outcome.error) }
+            _state.update {
+                it.copy(
+                    lastSyncMs = outcome.syncedAtMs,
+                    syncError = outcome.error,
+                    syncDevices = outcome.devices,
+                    syncPrimaryId = outcome.primaryDeviceId,
+                    thisDeviceId = outcome.selfDeviceId ?: it.thisDeviceId,
+                )
+            }
         }
     }
 

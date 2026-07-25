@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -140,6 +141,24 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                     onClick = { vm.login(brand, email, password, pin) },
                 )
             }
+        }
+
+        // "Set up on phone" handoff -- offered for EVERY brand (and for Kia it's
+        // the only practical option, since its one-time-code flow can't be typed
+        // here). Sends a credential-free request to the phone; the phone either
+        // pushes its existing session down immediately or prompts the user to sign
+        // in there, and this watch auto-advances the moment the session lands (see
+        // WearViewModel.requestSetupOnPhone / the WearAuthEvents collector). It's
+        // additive -- the on-watch fields above stay fully usable with no phone.
+        item {
+            MorphButton(
+                label = if (ui.setupBusy) "Continue on phone…" else "Set up on phone",
+                icon = Icons.Filled.PhoneAndroid,
+                active = false,
+                activeColor = MaterialTheme.colorScheme.tertiary,
+                pending = ui.setupBusy,
+                onClick = { vm.requestSetupOnPhone() },
+            )
         }
 
         // Error message -- item is always present so it fades/expands in and

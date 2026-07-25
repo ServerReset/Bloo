@@ -3,6 +3,7 @@ package com.bloo.bluelink.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.util.Base64
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
@@ -945,6 +946,143 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("sync_wifi")] = value.toString() }
     }
 
+    // --- Device sync identity + registry (all device-local: see SyncMerge.DEVICE_LOCAL_KEYS) ---
+    //
+    // These describe THIS install's participation in the shared Drive file. They
+    // never travel in the portable backup (they're in DEVICE_LOCAL_KEYS, so
+    // editTracked never marks them dirty and buildExport never emits them). They're
+    // written with the RAW DataStore (context.settingsDataStore.edit), NOT
+    // editTracked, precisely so touching them can't pollute the dirty set or trip a
+    // content-hash change.
+
+    private val devicesJson = Json { ignoreUnknownKeys = true }
+    private val deviceListSerializer = ListSerializer(SyncMerge.SyncDevice.serializer())
+
+    /** A stable per-install id for this device in the sync registry, created once
+     *  (lazily) and persisted. Not derived from any hardware id (privacy + it must
+     *  survive a factory-reset-style reinstall as a NEW device, which a random UUID
+     *  gives us for free). */
+    suspend fun syncDeviceId(): String {
+        val existing = context.settingsDataStore.data.first()[stringPreferencesKey("sync_device_id")]
+        if (!existing.isNullOrBlank()) return existing
+        val fresh = java.util.UUID.randomUUID().toString()
+        context.settingsDataStore.edit { it[stringPreferencesKey("sync_device_id")] = fresh }
+        return fresh
+    }
+
+    /** Friendly name shown in the "your devices" list. Defaults to the hardware
+     *  model until the user renames it. */
+    suspend fun syncDeviceName(): String =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_device_name")]?.takeIf { it.isNotBlank() }
+            ?: Build.MODEL ?: "This device"
+
+    suspend fun setSyncDeviceName(name: String) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("sync_device_name")
+            if (name.isBlank()) it.remove(k) else it[k] = name.trim()
+        }
+    }
+
+    /** Hash of the portable content this device last saw or wrote (the change gate). */
+    suspend fun syncLastHash(): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_last_hash")]?.takeIf { it.isNotBlank() }
+
+    suspend fun setSyncLastHash(hash: String?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("sync_last_hash")
+            if (hash.isNullOrBlank()) it.remove(k) else it[k] = hash
+        }
+    }
+
+    /** Whether this device has ever completed a sync of the CURRENT file. False →
+     *  the next pass full-adopts (join-adopt). Reset to false on a file switch. */
+    suspend fun syncSyncedEver(): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("sync_synced_ever")] ?: false
+
+    suspend fun setSyncSyncedEver(value: Boolean) {
+        context.settingsDataStore.edit {
+            if (value) it[booleanPreferencesKey("sync_synced_ever")] = true
+            else it.remove(booleanPreferencesKey("sync_synced_ever"))
+        }
+    }
+
+    /** One-shot flag: the next sync pass force-adopts the file (used by
+     *  "Pull from primary now"). Cleared by the pass that consumes it. */
+    suspend fun syncPullPrimary(): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("sync_pull_primary")] ?: false
+
+    suspend fun setSyncPullPrimary(value: Boolean) {
+        context.settingsDataStore.edit {
+            if (value) it[booleanPreferencesKey("sync_pull_primary")] = true
+            else it.remove(booleanPreferencesKey("sync_pull_primary"))
+        }
+    }
+
+    /** Cached copy of the last-merged `devices` registry, for offline display in
+     *  Settings (the file may not be reachable when Settings opens). */
+    suspend fun syncedDevices(): List<SyncMerge.SyncDevice> {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("sync_devices_cache")] ?: return emptyList()
+        return runCatching { devicesJson.decodeFromString(deviceListSerializer, raw) }.getOrElse { emptyList() }
+    }
+
+    private suspend fun setSyncedDevicesCache(devices: List<SyncMerge.SyncDevice>) {
+        context.settingsDataStore.edit {
+            it[stringPreferencesKey("sync_devices_cache")] = devicesJson.encodeToString(deviceListSerializer, devices)
+        }
+    }
+
+    /** The primary device id (source of truth), cached device-local for display and
+     *  written into the file on the next upload. Null = no primary chosen. */
+    suspend fun syncPrimaryDeviceId(): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_primary_cache")]?.takeIf { it.isNotBlank() }
+
+    private suspend fun setSyncPrimaryCache(id: String?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("sync_primary_cache")
+            if (id.isNullOrBlank()) it.remove(k) else it[k] = id
+        }
+    }
+
+    /** Designate the primary device (source of truth). Persists locally; the value
+     *  is written into the Drive file on the next [performDriveSync] upload. */
+    suspend fun setPrimaryDevice(id: String) {
+        setSyncPrimaryCache(id)
+    }
+
+    /** Arm a one-shot force-adopt from the file (the "Pull from primary now" lever). */
+    suspend fun requestPullFromPrimary() {
+        setSyncPullPrimary(true)
+    }
+
+    /** Reset all per-file sync gate state — MUST be called when the sync target URI
+     *  changes, or stale hash/synced-ever/lastSync/dirty from the OLD file would
+     *  block adoption of and convergence with the NEW file. */
+    suspend fun resetSyncStateForNewFile() {
+        context.settingsDataStore.edit {
+            it.remove(stringPreferencesKey("sync_last_hash"))
+            it.remove(booleanPreferencesKey("sync_synced_ever"))
+            it.remove(stringPreferencesKey("sync_last_ms"))
+            it.remove(stringPreferencesKey("sync_dirty_keys"))
+            it.remove(booleanPreferencesKey("sync_pull_primary"))
+            it.remove(stringPreferencesKey("sync_devices_cache"))
+            it.remove(stringPreferencesKey("sync_primary_cache"))
+        }
+    }
+
+    /** This device's own registry entry, freshly stamped. [appVersion] is best-effort. */
+    private suspend fun selfSyncDevice(nowMs: Long): SyncMerge.SyncDevice {
+        val appVersion = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+        }.getOrDefault("")
+        return SyncMerge.SyncDevice(
+            id = syncDeviceId(),
+            name = syncDeviceName(),
+            model = Build.MODEL ?: "",
+            appVersion = appVersion,
+            lastSeenMs = nowMs,
+        )
+    }
+
     /** Outcome of one [performDriveSync] pass. */
     data class DriveSyncOutcome(
         /** False when sync isn't configured, or was skipped (Wi-Fi-only, not on Wi-Fi). */
@@ -958,6 +1096,13 @@ class SettingsStore(private val context: Context) {
         /** A user-facing reason the pass didn't fully succeed, or null if it did
          *  (or wasn't configured — that's not a failure). */
         val error: String? = null,
+        /** The merged device registry after this pass (for the ViewModel/Settings). */
+        val devices: List<SyncMerge.SyncDevice> = emptyList(),
+        /** The primary device id recorded in the file, or null if none. */
+        val primaryDeviceId: String? = null,
+        /** This device's own sync id (so the UI can mark "this device" / hide "make
+         *  primary" on self without a second read). */
+        val selfDeviceId: String? = null,
     )
 
     /**
@@ -988,6 +1133,14 @@ class SettingsStore(private val context: Context) {
             }
         }
         val parsed = android.net.Uri.parse(uri)
+        // Installed-base migration seed: `sync_synced_ever` is a brand-new key, so
+        // it's false on every device that ALREADY synced this file under the old
+        // (mtime-only) scheme. Without this, that device's first post-update pass
+        // would see !syncedEver and full-adopt its OWN file, discarding any
+        // not-yet-uploaded local edits. A device that has ever recorded a lastSyncMs
+        // for this file is NOT a fresh joiner — mark it synced so it takes the normal
+        // protected-merge path, not join-adopt.
+        if (!syncSyncedEver() && lastSyncMs() > 0L) setSyncSyncedEver(true)
         // Check the file's actual last-modified time from Drive.
         val fileModifiedMs = runCatching {
             if (android.provider.DocumentsContract.isDocumentUri(context, parsed)) {
@@ -1022,20 +1175,58 @@ class SettingsStore(private val context: Context) {
         }.onFailure {
             downloadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
         }.getOrNull()
-        val remoteJson = remoteContent?.substringAfter('\n', "")
+        val remoteJson = remoteContent?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }
         val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
+        // The Drive-only metadata (content hash, primary, device registry). Absent
+        // fields → null/empty (an old-client file, or the header/marker case).
+        val remoteMeta = remoteJson?.let { SyncMerge.parseMeta(it) }
+        val remoteHash = remoteMeta?.hash
+        val remoteHasContent = remoteJson != null && SyncMerge.parseBackup(remoteJson) != null
+
+        // Adopt-mode + import-gate decision.
+        val pullPrimary = syncPullPrimary()
+        val syncedEver = syncSyncedEver()
+        // Change gate: prefer the content HASH (skew-immune, and it self-detects a
+        // no-op so two devices don't ping-pong re-imports); fall back to the file's
+        // modified-time only when the file predates the hash (an un-updated client
+        // last wrote it and dropped our additive keys).
+        val gatePassed = if (remoteHash != null) remoteHash != syncLastHash() else remoteTs > lastSyncMs()
+        // A device that has never synced THIS file, or an explicit "pull from
+        // primary", FULLY adopts the file as source of truth (this is the fix for
+        // "my other phone won't pull the primary's settings" — the old protected
+        // merge kept a joining device's huge dirty set and adopted almost nothing).
+        // Every other pass is a normal field-level protected merge.
+        val fullAdopt = pullPrimary || !syncedEver
+        val shouldImport = remoteHasContent && (pullPrimary || !syncedEver || gatePassed)
         var imported = false
-        if (remoteTs > lastSyncMs() && remoteJson != null) {
-            // Protect anything WE'VE changed locally but haven't uploaded yet —
-            // read the dirty set before this pass touches anything, so a merge
-            // import can't accidentally protect keys it's about to import itself.
-            val protectedKeys = dirtyKeys()
-            imported = mergeSettingsJson(remoteJson, protect = protectedKeys)
-            if (imported) AppLog.log("Drive sync: imported newer settings")
+        if (shouldImport && remoteJson != null) {
+            imported = if (fullAdopt) {
+                adoptSettingsJson(remoteJson)
+            } else {
+                // Protect anything WE'VE changed locally but haven't uploaded yet —
+                // read the dirty set before this pass touches anything, so a merge
+                // import can't accidentally protect keys it's about to import itself.
+                mergeSettingsJson(remoteJson, protect = dirtyKeys())
+            }
+            if (imported) {
+                AppLog.log(if (fullAdopt) "Drive sync: adopted settings from file" else "Drive sync: imported newer settings")
+                // Record the content we just took, so this pass's own state matches
+                // the file and the next pass's gate is a no-op (no self-reimport).
+                if (remoteHash != null) setSyncLastHash(remoteHash)
+                setSyncSyncedEver(true)
+            }
         }
+        // The pull-from-primary lever is one-shot: consume it whether or not there
+        // was anything to adopt, so a later normal merge doesn't keep re-adopting.
+        if (pullPrimary) setSyncPullPrimary(false)
+
         val now = System.currentTimeMillis()
         var uploadError: String? = null
         val uploaded: Boolean
+        // Best-available registry/primary for the outcome even if the upload half
+        // doesn't run (failed download) — the UI still updates from what we read.
+        var outcomeDevices: List<SyncMerge.SyncDevice> = remoteMeta?.devices ?: emptyList()
+        val primaryToWrite: String? = syncPrimaryDeviceId() ?: remoteMeta?.primaryDeviceId
         // Never write on a failed read: a download error means we couldn't see
         // the remote file's real contents this pass, so uploading now would
         // truncate-overwrite whatever is actually there with our local state --
@@ -1055,7 +1246,28 @@ class SettingsStore(private val context: Context) {
             // in `body`, so it must keep its dirty flag or a later remote import
             // could silently overwrite the un-uploaded value.
             val uploadedDirtyKeys = dirtyKeys()
-            val body = "$now\n${exportSettingsJson()}"
+            // Snapshot the portable content ONCE (post-import): its SHA-256 is both
+            // the change gate written into the file AND, being computed over the
+            // exact prefs/photos we upload, guarantees the file's `_hash` matches
+            // its own content. Encoding the photos once here (not twice) keeps this
+            // cheap despite the base64 work.
+            val prefsSnapshot = context.settingsDataStore.data.first()
+            val prefsMap: Map<String, Any> = prefsSnapshot.asMap().entries.associate { it.key.name to it.value }
+            val photos = encodeSyncPhotos(prefsSnapshot).mapValues { it.value.content }
+            val localHash = SyncMerge.portableContentHash(prefsMap, uploadedDirtyKeys, photos)
+            val self = selfSyncDevice(now)
+            outcomeDevices = SyncMerge.mergeDevices(remoteMeta?.devices ?: emptyList(), self, now)
+            val driveBody = SyncMerge.buildExportForDrive(
+                prefs = prefsMap,
+                dirtyKeys = uploadedDirtyKeys,
+                photos = photos,
+                hash = localHash,
+                primaryDeviceId = primaryToWrite,
+                selfDevice = self,
+                knownDevices = remoteMeta?.devices ?: emptyList(),
+                nowMs = now,
+            )
+            val body = "$now\n$driveBody"
             uploaded = runCatching {
                 withDriveRetry {
                     kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
@@ -1083,14 +1295,12 @@ class SettingsStore(private val context: Context) {
             // just now" right next to "Sync failed", with no way to tell sync
             // had never succeeded.
             if (uploaded) {
-                // Store lastSyncMs in the SAME clock domain as remoteTs (the
-                // provider's COLUMN_LAST_MODIFIED), NOT this device's wall clock:
-                // re-read the file's last-modified after the verified write so the
-                // import guard (remoteTs > lastSyncMs()) is false for our OWN write
-                // (no self-reimport next pass) and stays correct across devices
-                // regardless of wall-clock skew. Fall back to the embedded `now`
-                // header we just wrote when the provider exposes no
-                // COLUMN_LAST_MODIFIED.
+                // Keep the wall-clock lastSyncMs advancing IN PARALLEL with the hash
+                // gate: it's the fallback gate for a file an un-updated client
+                // overwrote (dropping `_hash`), so it must stay current or the
+                // fallback breaks exactly when it's needed. Re-read the file's
+                // last-modified so the fallback compares in the provider's clock
+                // domain (no self-reimport, skew-safe), same as before.
                 val uploadedModifiedMs = runCatching {
                     if (android.provider.DocumentsContract.isDocumentUri(context, parsed)) {
                         val cursor = context.contentResolver.query(
@@ -1109,6 +1319,13 @@ class SettingsStore(private val context: Context) {
                 // hold driveSyncMutex) is still pending and must stay dirty so a
                 // later remote import can't overwrite it.
                 clearDirtyKeys(uploadedDirtyKeys)
+                // The content-hash self-write guard: next pass reads this exact hash
+                // back and the gate is a no-op (mirrors the lastSyncMs self-guard).
+                setSyncLastHash(localHash)
+                setSyncSyncedEver(true)
+                // Cache the registry + primary for offline Settings display.
+                setSyncedDevicesCache(outcomeDevices)
+                setSyncPrimaryCache(primaryToWrite)
             }
         }
         val error = uploadError ?: downloadError?.takeIf { remoteContent == null }
@@ -1124,6 +1341,9 @@ class SettingsStore(private val context: Context) {
             // just now" next to a sync-failed error.
             ran = true, imported = imported, uploaded = uploaded, syncedAtMs = if (uploaded) now else lastSyncMs(),
             error = error,
+            devices = outcomeDevices,
+            primaryDeviceId = primaryToWrite,
+            selfDeviceId = syncDeviceId(),
         )
     }
 
@@ -1688,6 +1908,53 @@ class SettingsStore(private val context: Context) {
                 mut.remove(stringPreferencesKey(name))
                 mut.remove(booleanPreferencesKey(name))
             }
+        }
+        return true
+    }
+
+    /**
+     * Full-adopt the file as the source of truth: apply EVERY portable key
+     * unguarded (ignoring even the local dirty set) and clear the dirty set, so a
+     * device joining an existing sync — or an explicit "pull from primary" — takes
+     * the file's settings wholesale instead of protecting its own pre-join values.
+     * This is the fix for the reported bug: the old code only ever ran the
+     * protected [mergeSettingsJson], and a previously-used joining device's dirty
+     * set covered ~every key, so it adopted almost nothing.
+     *
+     * Distinct from [mergeSettingsJson] on two points: (1) it does NOT re-add
+     * live-dirty to a guarded set (there is no guarding — the file wins); (2) photos
+     * are still PROTECTED (`protect = all local img_ keys`) so a join doesn't
+     * silently replace the user's own car photos with the primary's, while every
+     * other pref fully adopts. Clears the dirty set at the end so the adopted values
+     * aren't immediately re-uploaded as "local changes".
+     */
+    private suspend fun adoptSettingsJson(json: String): Boolean {
+        val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return false
+        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") return false
+        val version = root["_version"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1
+        if (version > BACKUP_VERSION) {
+            AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping adopt")
+            return false
+        }
+        if (root["prefs"]?.jsonObject == null) return false
+        // Protect the user's own local car photos across a join-adopt (only these).
+        val localImgKeys = context.settingsDataStore.data.first().asMap().keys
+            .map { it.name }.filter { it.startsWith("img_") }.toSet()
+        val photoPaths = applySyncPhotos(root["photos"]?.jsonObject, protect = localImgKeys)
+        // Unguarded plan: the file wins for every portable pref/tombstone.
+        val plan = SyncMerge.parseBackup(json) ?: return false
+        context.settingsDataStore.edit { mut ->
+            plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
+            plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
+            photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
+            plan.removes.forEach { name ->
+                mut.remove(stringPreferencesKey(name))
+                mut.remove(booleanPreferencesKey(name))
+            }
+            // Clear the dirty set in the SAME transaction: the adopted values are
+            // the file's, not pending local changes, so they must not be re-uploaded
+            // as edits (and must not protect themselves on the next merge).
+            mut.remove(stringPreferencesKey("sync_dirty_keys"))
         }
         return true
     }

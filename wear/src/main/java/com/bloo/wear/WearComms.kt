@@ -188,6 +188,23 @@ object WearComms {
             }.isSuccess
         }
 
+    /** Ask the phone to finish setting up sign-in — the "Set up on phone" handoff.
+     *  Sends an EMPTY, credential-free trigger on [WearSync.PATH_SETUP_REQUEST];
+     *  the phone decides what to do (push auth if signed in, else prompt on the
+     *  phone). Returns false when no phone node is reachable (the caller then keeps
+     *  the on-watch credential fields available). */
+    suspend fun requestSetupOnPhone(context: Context): Boolean =
+        withContext(Dispatchers.IO) {
+            val node = phoneNodeId(context) ?: return@withContext false
+            runCatching {
+                Tasks.await(
+                    Wearable.getMessageClient(context).sendMessage(
+                        node, WearSync.PATH_SETUP_REQUEST, ByteArray(0),
+                    ), 10, TimeUnit.SECONDS,
+                )
+            }.isSuccess
+        }
+
     /**
      * Ask for fresh data: relay a refresh request to the phone (which has the
      * already-authenticated session), falling back to the watch's own

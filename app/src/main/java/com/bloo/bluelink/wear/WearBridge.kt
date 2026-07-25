@@ -186,6 +186,21 @@ object WearBridge {
             )
         }
 
+        // Read-only "your devices" summary for the watch's Sync settings (the watch
+        // has no primary-setting UI — that's a phone action — so it just displays
+        // this). Blank when sync isn't configured / no devices recorded yet.
+        val syncDeviceSummary = runCatching {
+            if (store.syncUri() == null) "" else {
+                val devices = store.syncedDevices()
+                if (devices.isEmpty()) "" else {
+                    val primaryId = store.syncPrimaryDeviceId()
+                    val primaryName = devices.firstOrNull { it.id == primaryId }?.name
+                    val count = "${devices.size} device${if (devices.size == 1) "" else "s"}"
+                    if (primaryName != null) "$count · primary: $primaryName" else count
+                }
+            }
+        }.getOrDefault("")
+
         val payload = WearSettingsPayload(
             dark = dark,
             useFahrenheit = appearance.useFahrenheit,
@@ -202,6 +217,7 @@ object WearBridge {
             auroraCustomColor = appearance.auroraCustomColor,
             hapticsEnabled = appearance.hapticsEnabled,
             settingsMode = store.settingsMode(),
+            syncDeviceSummary = syncDeviceSummary,
         )
         val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))

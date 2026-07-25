@@ -3,6 +3,8 @@ package com.bloo.bluelink.wear
 import com.bloo.bluelink.data.Ai
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.ClimateSyncStore
+import com.bloo.bluelink.data.Notifications
+import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WearAction
@@ -142,7 +144,11 @@ class WearPhoneService : WearableListenerService() {
                             val result = if (outcome == null) {
                                 WearSyncResult(ok = false, message = "Drive sync isn't set up on this phone")
                             } else {
-                                WearSyncResult(ok = outcome.uploaded, message = outcome.error)
+                                // Success = the pass ran without error, NOT "we wrote
+                                // bytes": with the content-hash gate a no-op sync
+                                // (nothing changed) legitimately may not re-upload, and
+                                // that must not read as "Drive sync failed" on the watch.
+                                WearSyncResult(ok = outcome.error == null, message = outcome.error)
                             }
                             runCatching {
                                 Tasks.await(
@@ -156,6 +162,33 @@ class WearPhoneService : WearableListenerService() {
                             }
                         }
                         else -> WearBridge.refreshAllSurfaces(ctx)
+                    }
+                }
+            }
+
+            WearSync.PATH_SETUP_REQUEST -> {
+                // The watch asked us to finish setting up its sign-in (the "Set up on
+                // phone" handoff). Two cases, both credential-free — auth only ever
+                // flows phone→watch:
+                //  - Already signed in → push the session down NOW so the watch's
+                //    PATH_AUTH listener advances it past its login screen.
+                //  - Not signed in → post a notification opening the app's login, so
+                //    the user completes sign-in here; login-success then pushes auth
+                //    down automatically (see AppViewModel.login / finishKiaLogin).
+                scope.launch {
+                    val ctx = applicationContext
+                    val signedIn = runCatching { SessionStore(ctx).loggedInBrands().isNotEmpty() }.getOrDefault(false)
+                    if (signedIn) {
+                        AppLog.log("Watch setup request: already signed in, pushing auth")
+                        runCatching { WearBridge.publishAuth(ctx) }
+                    } else {
+                        AppLog.log("Watch setup request: not signed in, prompting on phone")
+                        Notifications.post(
+                            ctx,
+                            "watch_setup".hashCode(),
+                            "Finish setting up Bloo",
+                            "Sign in on your phone so your watch can control your car.",
+                        )
                     }
                 }
             }

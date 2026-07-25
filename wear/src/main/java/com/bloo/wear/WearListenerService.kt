@@ -73,7 +73,14 @@ class WearListenerService : WearableListenerService() {
                             WearStateWriter.persistState(applicationContext, raw)
                             tileNeedsRefresh = true
                         }
-                        WearSync.PATH_AUTH -> WearStateWriter.persistAuth(applicationContext, raw)
+                        WearSync.PATH_AUTH -> {
+                            WearStateWriter.persistAuth(applicationContext, raw)
+                            // Signal a live WearViewModel so a watch sitting on its
+                            // login screen (having asked the phone to "set up on
+                            // phone") advances the moment the session arrives, instead
+                            // of only noticing on next launch.
+                            WearAuthEvents.emit()
+                        }
                         WearSync.PATH_SETTINGS -> {
                             // Settings carry the phone-synced theme colors the
                             // Tile reads (resolveRoles() in BlooTileService),

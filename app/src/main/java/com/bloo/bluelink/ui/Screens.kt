@@ -147,6 +147,10 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Power
@@ -8711,6 +8715,12 @@ private fun SettingsScreen(vm: AppViewModel) {
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
+                    // The synced-devices registry: one row per device on this file,
+                    // with a ★ primary badge, a "This device" marker, and last-seen.
+                    // Tapping a non-primary row makes it primary (source of truth);
+                    // this device can be renamed. Empty until the first sync populates
+                    // the registry.
+                    SyncDevicesSection(state = state, vm = vm)
                     Spacer(Modifier.height(6.dp))
                     // Manual controls: "Sync now" force-pushes/pulls immediately
                     // (available any time, not just after a failure), and "Test
@@ -8726,6 +8736,17 @@ private fun SettingsScreen(vm: AppViewModel) {
                             "Test sync",
                             modifier = Modifier.weight(1f),
                             onClick = { vm.testSync() },
+                        )
+                    }
+                    // "Pull from primary now": force this device to adopt the primary's
+                    // full settings. Shown only when a primary exists AND it isn't this
+                    // device (pulling from yourself is a no-op).
+                    if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
+                        Spacer(Modifier.height(4.dp))
+                        MorphTextButton(
+                            "Pull from primary now",
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { vm.pullFromPrimary() },
                         )
                     }
                     Spacer(Modifier.height(4.dp))
@@ -10895,6 +10916,140 @@ private fun CommandButton(
         Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(8.dp))
         Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * The synced-devices registry shown in the "Backup & sync" card: one row per
+ * device sharing this Drive file. Each row shows a device icon, its name (with a
+ * "This device" marker for self), a ★ badge for the primary (source of truth),
+ * and how long ago it last synced. Tapping a NON-primary row makes it primary
+ * (two-tap confirm via [rememberConfirmArm]); this device gets a rename affordance.
+ * Renders nothing until the first sync populates the registry.
+ */
+@Composable
+private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
+    val devices = state.syncDevices
+    if (devices.isEmpty()) return
+    var renaming by remember { mutableStateOf(false) }
+    val makePrimaryArm = rememberConfirmArm()
+    var armedForId by remember { mutableStateOf<String?>(null) }
+
+    Spacer(Modifier.height(10.dp))
+    Text(
+        "Synced devices",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    Spacer(Modifier.height(4.dp))
+    // Sort: this device first, then primary, then by most-recently-seen.
+    val ordered = devices.sortedWith(
+        compareByDescending<com.bloo.bluelink.data.SyncMerge.SyncDevice> { it.id == state.thisDeviceId }
+            .thenByDescending { it.id == state.syncPrimaryId }
+            .thenByDescending { it.lastSeenMs },
+    )
+    ordered.forEach { device ->
+        val isSelf = device.id == state.thisDeviceId
+        val isPrimary = device.id == state.syncPrimaryId
+        val armed = makePrimaryArm.armed && armedForId == device.id
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    // Only non-primary devices are tappable (to make primary).
+                    if (!isPrimary) Modifier.clickable {
+                        if (armed) {
+                            vm.setPrimaryDevice(device.id)
+                            armedForId = null
+                        } else {
+                            armedForId = device.id
+                            makePrimaryArm.arm()
+                        }
+                    } else Modifier,
+                )
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (isPrimary) Icons.Filled.Star else Icons.Filled.Smartphone,
+                contentDescription = null,
+                tint = if (isPrimary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        device.name.ifBlank { "Unnamed device" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelf) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                    if (isSelf) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "This device",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                val seen = com.bloo.bluelink.data.relativeLabel(device.lastSeenMs)
+                Text(
+                    buildString {
+                        if (isPrimary) append("Primary")
+                        if (isPrimary && seen.isNotBlank()) append(" · ")
+                        if (seen.isNotBlank()) append("synced $seen")
+                    }.ifBlank { device.model },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            when {
+                isSelf -> IconButton(onClick = { renaming = true }) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
+                }
+                armed -> Text(
+                    "Tap to confirm",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                else -> Text(
+                    "Make primary",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
+    if (renaming) {
+        var draft by remember { mutableStateOf(state.syncDeviceName) }
+        BlooDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text("Rename this device", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Shown in the devices list on all your synced devices.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                MorphTextButton("Cancel", onClick = { renaming = false })
+                MorphTextButton("Save", onClick = {
+                    if (draft.isNotBlank()) vm.renameThisDevice(draft)
+                    renaming = false
+                })
+            },
+        )
     }
 }
 

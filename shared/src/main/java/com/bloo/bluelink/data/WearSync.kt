@@ -62,6 +62,14 @@ object WearSync {
     /** Message path: watch → phone, "push me fresh state" (optionally refreshing). */
     const val PATH_SYNC_REQUEST = "/bloo/sync_request"
 
+    /** Message path: watch → phone, "finish setting up my sign-in for me". The watch
+     *  sends this from its login screen instead of typing credentials on the tiny
+     *  face. The phone, on receipt: if it's already signed in, pushes the session
+     *  down immediately ([PATH_AUTH]); otherwise it posts a notification prompting
+     *  the user to sign in on the phone. Carries NO credentials — it's a trigger
+     *  only; auth always flows phone→watch (never the reverse). */
+    const val PATH_SETUP_REQUEST = "/bloo/setup_request"
+
     /** Message path: phone → watch, "I just executed a command, here's the result". */
     const val PATH_COMMAND_RESULT = "/bloo/command_result"
 
@@ -438,6 +446,11 @@ data class WearSettingsPayload(
      *  the phone hides it. One-way (phone -> watch): the watch has no UI of
      *  its own to change this, unlike aiEnabled/auroraEnabled above. */
     val settingsMode: String = "simple",
+    /** A short, human-readable summary of the Drive sync device registry (e.g.
+     *  "2 devices · primary: Adi's S24"), for a READ-ONLY line in the watch's Sync
+     *  settings. The watch has no primary-setting UI — that's a phone action — so
+     *  this is display-only, published by the phone. Blank when sync isn't set up. */
+    val syncDeviceSummary: String = "",
 )
 
 /** Watch-local display preferences synced back to the phone (watch → phone). */

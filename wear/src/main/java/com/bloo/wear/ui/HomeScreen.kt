@@ -312,9 +312,18 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
             WearTiles.PRESETS -> true
             WearTiles.CHARGE, WearTiles.LIMITS -> car.hasBattery
             WearTiles.LOCATION -> car.lat != null && car.lon != null
-            WearTiles.WEATHER, WearTiles.SMART_CLIMATE -> ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null
+            // Weather + Smart Climate: shown when we HAVE weather (phone-pushed or
+            // watch-fetched), OR when standalone and the car has a known location so
+            // the watch can fetch it itself (see WearViewModel.fetchWeatherStandalone)
+            // — the card renders its own "loading/no data" state until the fetch lands.
+            WearTiles.WEATHER, WearTiles.SMART_CLIMATE ->
+                ui.extras.carWeather[car.vin] != null || ui.extras.homeWeather != null ||
+                    (!ui.phoneConnected && car.lat != null && car.lon != null)
             WearTiles.DIAGNOSTICS -> car.hasLiveStatus
-            WearTiles.AI -> ui.settings?.aiEnabled == true
+            // AI runs on the phone's on-device model and can't run on the watch, so
+            // it's a phone-only feature: shown only when enabled AND a phone is
+            // connected. Standalone, it's hidden entirely (no dead "Summarize" button).
+            WearTiles.AI -> ui.settings?.aiEnabled == true && ui.phoneConnected
             else -> true // summary, lock, climate, comfort, info, assist, more
         }
         if (show) out.add(key)

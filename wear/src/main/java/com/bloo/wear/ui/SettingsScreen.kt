@@ -72,7 +72,13 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     // WearSettingsPayload.settingsMode) -- the watch had no such concept at
     // all before, showing every power-user row unconditionally even when the
     // phone hides the same rows in simple mode.
-    val advanced = ui.settings?.settingsMode == "advanced"
+    //
+    // Standalone (no phone reachable) the watch has no synced `settings` to read a
+    // mode from, and there's no phone to defer these controls to — so surface them
+    // here against the watch's own local values rather than hiding them. Paired, the
+    // phone's mode still governs.
+    val standalone = !ui.phoneConnected
+    val advanced = ui.settings?.settingsMode == "advanced" || standalone
     var confirmSignOut by remember { mutableStateOf(false) }
     // Auto-reset the destructive confirm so a stale "tap again" can't sign you out later.
     LaunchedEffect(confirmSignOut) {
@@ -241,21 +247,32 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         item {
             SettingSection("AI Summaries") {
                 val enabled = ui.settings?.aiEnabled == true
-                Text(
-                    "On-device summaries of a car's status, generated on your phone.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(6.dp))
-                MorphButton(
-                    label = if (enabled) "On" else "Off",
-                    icon = Icons.Filled.AutoAwesome,
-                    active = enabled,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    pending = false,
-                    onClick = { vm.setAiEnabled(!enabled) },
-                    toggled = enabled,
-                )
+                if (standalone) {
+                    // AI runs on the phone's on-device model — the watch hardware
+                    // can't run it, so there's nothing to toggle standalone. Explain
+                    // rather than show a dead switch.
+                    Text(
+                        "AI summaries run on your phone. Connect your phone to turn them on and generate one.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        "On-device summaries of a car's status, generated on your phone.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    MorphButton(
+                        label = if (enabled) "On" else "Off",
+                        icon = Icons.Filled.AutoAwesome,
+                        active = enabled,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        pending = false,
+                        onClick = { vm.setAiEnabled(!enabled) },
+                        toggled = enabled,
+                    )
+                }
             }
         }
 
@@ -403,11 +420,16 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
-        item {
+        // "Tile order" is a phone-mirror: paired, the order syncs FROM the phone and
+        // you reorder there, so this note is just clutter on the small screen and is
+        // hidden (the user asked companion-mode to drop settings that only mirror the
+        // phone). Standalone there's no phone to sync from, so surface a short note
+        // that tiles follow the on-watch default order.
+        if (standalone) item {
             SettingSection("Tile order") {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Reorder a car's tiles from its More tile → Reorder tiles. The order stays in sync with that car on your phone.",
+                    "Tiles follow the default order on the watch. Connect your phone to customize a car's tile order.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -421,23 +443,46 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             SettingSection("Sync") {
-                MorphButton(
-                    label = if (ui.resyncBusy) "Syncing…" else "Sync from phone",
-                    icon = Icons.Filled.Sync,
-                    active = false,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    pending = ui.resyncBusy,
-                    onClick = { vm.resync() },
-                )
-                Spacer(Modifier.height(4.dp))
-                MorphButton(
-                    label = if (ui.driveSyncBusy) "Syncing…" else "Sync via Drive",
-                    icon = Icons.Filled.Bolt,
-                    active = false,
-                    activeColor = MaterialTheme.colorScheme.tertiary,
-                    pending = ui.driveSyncBusy,
-                    onClick = { vm.syncDrive() },
-                )
+                if (standalone) {
+                    // Both sync actions need the phone: "Sync from phone" pulls the
+                    // phone's state, and Drive backup is stored through the phone's
+                    // Google account (the watch has no Drive file of its own). Explain
+                    // rather than show buttons that can only say "bring your phone near".
+                    Text(
+                        "Sync needs your phone. Your watch keeps working on its own — connect your phone to sync settings and Drive backup.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    // Read-only "your devices" summary, published by the phone (it owns
+                    // the Drive registry). Watch can't set a primary — that's a phone
+                    // action — so this is display-only.
+                    ui.settings?.syncDeviceSummary?.takeIf { it.isNotBlank() }?.let { summary ->
+                        Text(
+                            summary,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    MorphButton(
+                        label = if (ui.resyncBusy) "Syncing…" else "Sync from phone",
+                        icon = Icons.Filled.Sync,
+                        active = false,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        pending = ui.resyncBusy,
+                        onClick = { vm.resync() },
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    MorphButton(
+                        label = if (ui.driveSyncBusy) "Syncing…" else "Sync via Drive",
+                        icon = Icons.Filled.Bolt,
+                        active = false,
+                        activeColor = MaterialTheme.colorScheme.tertiary,
+                        pending = ui.driveSyncBusy,
+                        onClick = { vm.syncDrive() },
+                    )
+                }
             }
         }
 

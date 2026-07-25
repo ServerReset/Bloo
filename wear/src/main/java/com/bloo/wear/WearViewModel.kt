@@ -158,6 +158,10 @@ data class WearUi(
     val aiBusy: String? = null,
     /** True while a "Sync now" (Drive) request is waiting on the phone's reply. */
     val driveSyncBusy: Boolean = false,
+    /** True while a "Set up on phone" handoff is waiting for the phone to sign in
+     *  and push a session back (see [WearViewModel.requestSetupOnPhone]). Cleared
+     *  when auth arrives, or by the request's own timeout. */
+    val setupBusy: Boolean = false,
     val accounts: List<String> = emptyList(),
     val phoneConnected: Boolean = false,
     /** Per-car climate draft (sliders/toggles), so each car remembers its own. */
@@ -434,6 +438,24 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.update { if (it.aiBusy == r.vin) it.copy(aiBusy = null, message = r.message) else it }
             }
         }
+        // Auth-arrival (the "Set up on phone" handoff): WearListenerService persists
+        // a phone-pushed session into SessionStore and emits here. If the watch is
+        // sitting on its login screen and a session has now landed, advance straight
+        // into the app instead of waiting for the next launch. Guarded on the
+        // SignedOut screen so a routine auth refresh while already in-app is a no-op.
+        viewModelScope.launch {
+            WearAuthEvents.arrivals.collect {
+                if (_ui.value.screen != WearScreen.SignedOut && _ui.value.screen != WearScreen.Loading) return@collect
+                val brands = runCatching { sessionStore.loggedInBrands() }.getOrDefault(emptyList())
+                if (brands.isNotEmpty()) {
+                    val emails = withContext(Dispatchers.IO) {
+                        runCatching { credentialStore.loadAll().map { c -> c.email } }.getOrDefault(emptyList())
+                    }
+                    _ui.update { it.copy(accounts = emails, setupBusy = false, message = "Signed in from your phone") }
+                    loadGarage()
+                }
+            }
+        }
         viewModelScope.launch {
             WearCommandEvents.results.collect { r ->
                 // command()'s relay branch has no ack channel of its own -- it
@@ -688,6 +710,33 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (vehicles.none { it.vin == vin }) return
         sessionFetched.add(vin)
         refreshStatus(vin, surface = false)
+        fetchWeatherStandalone(vin)
+    }
+
+    /** Standalone weather: when NO phone is reachable, the watch fetches current
+     *  conditions for the car's own location itself (WeatherApi lives in :shared now)
+     *  and writes them into the SAME extras.carWeather slot the phone would push to,
+     *  so the Weather + Smart-Climate tiles light up with zero UI change. A no-op
+     *  when a phone is connected (the phone remains the weather source), when the
+     *  car has no known location, or when we already have a recent reading. AI is
+     *  deliberately NOT part of this — it stays phone-only. */
+    private fun fetchWeatherStandalone(vin: String) {
+        viewModelScope.launch {
+            // Only self-fetch when there's no phone to provide it.
+            if (WearComms.phoneNodeId(ctx) != null) return@launch
+            val car = _ui.value.cars.firstOrNull { it.vin == vin } ?: return@launch
+            val lat = car.lat ?: return@launch
+            val lon = car.lon ?: return@launch
+            // Fetch once per session per car (onCarShown already guards re-entry via
+            // sessionFetched, so this only runs on first view of each car).
+            val weather = runCatching { com.bloo.bluelink.data.WeatherApi.fetch(lat, lon) }.getOrNull() ?: return@launch
+            // Merge into the persisted extras so both this VM (via its extras
+            // collector) and the tile/complication surfaces pick it up uniformly.
+            val store = WearExtrasStore(ctx)
+            val current = runCatching { store.flow.first() }.getOrDefault(com.bloo.bluelink.data.WearExtras())
+            val merged = current.copy(carWeather = current.carWeather + (vin to weather.toWear()))
+            store.save(com.bloo.bluelink.data.WearSync.encodeExtras(merged))
+        }
     }
 
     /** Force a fresh status fetch for every car in the garage (Settings'
@@ -758,6 +807,29 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             delay(15_000)
             _ui.update { if (it.driveSyncBusy) it.copy(driveSyncBusy = false, message = "Sync timed out") else it }
             runCatching { com.bloo.wear.WearComms.pullLatest(ctx) }
+        }
+    }
+
+    /** "Set up on phone": ask the phone to finish sign-in instead of typing
+     *  credentials on the watch. The phone pushes its session back over PATH_AUTH
+     *  (if already signed in) or prompts the user to sign in on the phone; either
+     *  way the [WearAuthEvents] collector above advances this watch past the login
+     *  screen the moment a session lands. Degrades gracefully with no phone nearby:
+     *  the on-watch credential fields stay available. */
+    fun requestSetupOnPhone() {
+        viewModelScope.launch {
+            _ui.update { it.copy(setupBusy = true, message = null) }
+            val sent = runCatching { com.bloo.wear.WearComms.requestSetupOnPhone(ctx) }.getOrDefault(false)
+            if (!sent) {
+                _ui.update { it.copy(setupBusy = false, message = "Open Bloo on your phone to sign in") }
+                return@launch
+            }
+            _ui.update { it.copy(message = "Continue on your phone…") }
+            // Safety net: if no session ever arrives (user didn't finish on the
+            // phone), clear the busy state so the watch's own login stays usable.
+            // If auth arrived, the WearAuthEvents collector already cleared setupBusy.
+            delay(60_000)
+            _ui.update { if (it.setupBusy) it.copy(setupBusy = false) else it }
         }
     }
 
