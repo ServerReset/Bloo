@@ -277,9 +277,16 @@ object SyncMerge {
      */
     fun parseMeta(json: String): SyncMeta? {
         val root = runCatching { backupJson.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
-        val hash = (root["_hash"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
-        val primary = (root["_primaryDeviceId"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
-        val writer = (root["_writerDeviceId"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        // The hash (SHA-256 hex) and the device ids (UUID strings) are ALWAYS JSON
+        // strings when we write them. Require an actual JSON string primitive: a bare
+        // number like `123` is still a JsonPrimitive whose `content` is "123", so
+        // without the isString guard a hand-edited/foreign `"_writerDeviceId": 123`
+        // would be wrongly accepted as an id rather than treated as malformed → null.
+        fun stringField(name: String): String? =
+            (root[name] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
+        val hash = stringField("_hash")
+        val primary = stringField("_primaryDeviceId")
+        val writer = stringField("_writerDeviceId")
         val devices = (root["devices"] as? JsonArray)?.mapNotNull { el ->
             runCatching { backupJson.decodeFromJsonElement(SyncDevice.serializer(), el) }.getOrNull()
                 ?.takeIf { it.id.isNotBlank() }
