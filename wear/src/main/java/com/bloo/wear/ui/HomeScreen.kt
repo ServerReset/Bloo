@@ -572,14 +572,17 @@ internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
         it.contains("couldn't", ignoreCase = true) || it.contains("can't", ignoreCase = true) ||
         it.contains("denied", ignoreCase = true)
     } == true
+    // BottomCenter is the narrowest chord of a round face, so the pill needs a
+    // round-safe horizontal inset (else its rounded corners slide under the
+    // bezel) AND a width cap (else a long message balloons into the corners).
+    // Note: padding() has no (horizontal, bottom) overload — use the explicit
+    // start/end/bottom form.
+    val sideInset = roundSafeHorizontalPadding()
     AnimatedVisibility(
-        // BottomCenter is the narrowest chord of a round face, so the pill needs
-        // a round-safe horizontal inset (else its rounded corners slide under the
-        // bezel) AND a width cap (else a long message balloons into the corners).
         visible = message != null,
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(horizontal = roundSafeHorizontalPadding(), bottom = 24.dp),
+            .padding(start = sideInset, end = sideInset, bottom = 24.dp),
         enter = slideInVertically { it } + fadeIn(),
         exit = slideOutVertically { it } + fadeOut(),
     ) {
