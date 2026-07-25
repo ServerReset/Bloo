@@ -2546,6 +2546,47 @@ private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
     return base * factor
 }
 
+/**
+ * Per-edge camera-bump clearance for the cover screen, in dp, computed from the
+ * display cutout's bounding rects. Returns how much each edge must be reserved so
+ * content flows AROUND the punch-hole/bump instead of under it.
+ *
+ * Why this exists alongside the native WindowInsets.displayCutout padding: on
+ * Samsung flip COVER displays the OS frequently reports the front camera via
+ * displayCutout.boundingRects (which is why the decorative ring positions
+ * correctly) but exposes ZERO safeInset/displayCutout WINDOW insets for it — so
+ * windowInsetsPadding(displayCutout) alone reserves nothing and content sits under
+ * the bump (observed on the user's device). This reads the rects directly and, for
+ * a CORNER bump, reserves BOTH edges it touches (the old code padded only the
+ * single nearest edge). Read on each call (not a remember(view) snapshot) so it
+ * reflects insets once they've been dispatched. Only a bump within [edgeBandPx] of
+ * an edge counts — a rect floating in the middle isn't an edge cutout.
+ */
+@Composable
+private fun cameraBumpPadding(): PaddingValues {
+    val view = LocalView.current
+    val density = LocalDensity.current
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return PaddingValues(0.dp)
+    val cutout = view.rootWindowInsets?.displayCutout ?: return PaddingValues(0.dp)
+    val vw = view.width
+    val vh = view.height
+    if (vw <= 0 || vh <= 0) return PaddingValues(0.dp)
+    // A bump counts as hugging an edge if its far side is within this band of it.
+    val edgeBandPx = with(density) { 24.dp.toPx() }
+    val margin = with(density) { 8.dp.toPx() } // extra breathing room past the bump
+    var left = 0f; var top = 0f; var right = 0f; var bottom = 0f
+    for (r in cutout.boundingRects) {
+        // For each edge the rect is flush against, reserve past the rect + margin.
+        if (r.left <= edgeBandPx) left = maxOf(left, r.right + margin)
+        if (r.top <= edgeBandPx) top = maxOf(top, r.bottom + margin)
+        if (vw - r.right <= edgeBandPx) right = maxOf(right, (vw - r.left) + margin)
+        if (vh - r.bottom <= edgeBandPx) bottom = maxOf(bottom, (vh - r.top) + margin)
+    }
+    return with(density) {
+        PaddingValues(start = left.toDp(), top = top.toDp(), end = right.toDp(), bottom = bottom.toDp())
+    }
+}
+
 // (CameraEdge / cameraEdgeOf removed: cover-screen cutout avoidance is now driven
 // by native WindowInsets.displayCutout — corner-safe and recomposition-aware —
 // rather than hand-picking a single edge from a boundingRect margin comparison.)
@@ -2796,7 +2837,22 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
                 val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
-                    HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                    HorizontalPager(
+                        state = pager,
+                        modifier = Modifier.fillMaxSize(),
+                        // beyondViewportPageCount = 1 (was unset → default 0): the
+                        // default meant the (heavy) neighbour car page only started
+                        // composing the instant it peeked in — i.e. on the FIRST frames
+                        // of the drag — so swiping between cars hitched right as it
+                        // began. Pre-composing one neighbour while idle moves that work
+                        // off the drag critical path. This matches the expanded pager
+                        // (which already sets 1 with the same VehicleDetailContent
+                        // pages) and the cover-screen pager, so it's consistent with
+                        // proven-safe siblings. (The remaining ceiling is that each
+                        // page composes a whole car's pebble list; making that lazy is
+                        // a bigger, reorder-model-sensitive change left for a device.)
+                        beyondViewportPageCount = 1,
+                    ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous
                         // offset is read only inside graphicsLayer{} below, draw-phase
@@ -3289,8 +3345,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 LocalPebbleFillHeight provides true,
                 LocalCoverScrollState provides tileScroll,
             ) {
-                // Base breathing room; the camera-bump + nav-bar clearance is now
-                // handled by native insets below, not by hand-computed per-edge math.
+                // Base breathing room.
                 val baseStart = coverScaled(10.dp)
                 val baseTop = coverScaled(10.dp)
                 val baseBottom = coverScaled(12.dp)
@@ -3298,22 +3353,20 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 Box(
                     Modifier
                         .fillMaxSize()
-                        // NATIVE cutout + nav-bar avoidance. This replaces the old
-                        // hand-rolled detection (a remember(view) snapshot of
-                        // displayCutout.boundingRects + cameraEdgeOf picking ONE edge
-                        // by smallest margin). That failed three ways on real devices:
-                        // (1) rootWindowInsets is often null on first composition, and
-                        //     remember(view) never re-read it once insets arrived;
-                        // (2) view.width/height could be 0 at that instant, corrupting
-                        //     the edge math; (3) a CORNER bump (e.g. bottom-right on a
-                        //     flip cover) touches TWO edges, but only one was padded, so
-                        //     content still ran under it.
-                        // WindowInsets.displayCutout reports insets on EVERY intruded
-                        // edge (corner-safe) and is recomposition-aware (updates when
-                        // insets dispatch), fixing all three. union(navigationBars)
-                        // also removes the old double-count of the nav bar vs. a
-                        // bottom cutout by taking the per-edge max.
+                        // Nav-bar + native cutout insets. On phones/foldables that DO
+                        // report the camera as a window inset this alone clears it and
+                        // is recomposition-aware.
                         .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout))
+                        // BELT-AND-SUSPENDERS for Samsung flip covers: those report the
+                        // camera via displayCutout.boundingRects (the decorative ring
+                        // positions off it) but expose ZERO cutout WINDOW insets, so the
+                        // windowInsetsPadding above reserves nothing and content sat
+                        // under the bottom-right bump (see the user's photo). This second
+                        // layer reads the rects directly and reserves EVERY edge the bump
+                        // hugs — corner-safe, unlike the old single-edge clearance. It's
+                        // a near-no-op where the native insets already covered it (the
+                        // content is already inboard, so this just adds a little margin).
+                        .padding(cameraBumpPadding())
                         .padding(
                             start = baseStart,
                             top = baseTop,
@@ -3478,11 +3531,15 @@ private fun VerticalPagerDots(
         else -> t.replaceFirstChar { it.uppercase() }
     }
 
-    val hPad by animateDpAsState(if (scrubbing) 18.dp else 6.dp,
+    // Resting paddings/spacing bumped up (was 6/10/6) so the rail is a more
+    // comfortable thumb target on the cover — the previous ~19dp-wide sliver was a
+    // fifth of the app's 48dp min target. The invisible gesture Box already spans
+    // 48dp wide (below); this widens the VISIBLE rail so it reads as tappable too.
+    val hPad by animateDpAsState(if (scrubbing) 18.dp else 9.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubHPad")
-    val vPad by animateDpAsState(if (scrubbing) 18.dp else 10.dp,
+    val vPad by animateDpAsState(if (scrubbing) 18.dp else 12.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubVPad")
-    val itemSpacing by animateDpAsState(if (scrubbing) 14.dp else 6.dp,
+    val itemSpacing by animateDpAsState(if (scrubbing) 14.dp else 8.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubSpacing")
     val cornerRadius by animateDpAsState(if (scrubbing) 20.dp else 100.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubCorner")
@@ -3561,12 +3618,12 @@ private fun VerticalPagerDots(
                     val scrubSelected = scrubbing && i == scrubTargetPage
                     val highlight = selected || scrubSelected
                     val dotH by animateDpAsState(
-                        if (highlight) 28.dp else 7.dp,
+                        if (highlight) 28.dp else 9.dp,
                         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                         label = "vdotH",
                     )
                     val dotW by animateDpAsState(
-                        if (scrubbing) 10.dp else 7.dp,
+                        if (scrubbing) 10.dp else 9.dp,
                         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                         label = "vdotW",
                     )
@@ -3912,9 +3969,20 @@ private fun HeroHeader(
     metric: Boolean = false,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
-    val heroAlpha = remember { Animatable(0f) }
-    val heroOffset = remember { Animatable(16f) }
-    LaunchedEffect(Unit) {
+    // Play the fade/slide-up entrance only ONCE per car per session, gated on the
+    // same coldStartIntroPlayed set the pebble stagger uses. Previously this was an
+    // unconditional LaunchedEffect(Unit) that replayed on EVERY (re)composition of
+    // this hero — including when a swiped-away page is disposed and later recomposed
+    // (or, now that the car pager pre-composes a neighbour via
+    // beyondViewportPageCount=1, when that neighbour composes off-screen). Replaying
+    // the fade on each enter added animation frames on top of the page's compose
+    // burst mid-swipe. Once-per-VIN means a page that re-enters snaps straight to
+    // rest instead of re-animating.
+    val playIntro = remember(v.vin) { coldStartIntroPlayed.add("hero:${v.vin}") }
+    val heroAlpha = remember { Animatable(if (playIntro) 0f else 1f) }
+    val heroOffset = remember { Animatable(if (playIntro) 16f else 0f) }
+    LaunchedEffect(v.vin) {
+        if (!playIntro) return@LaunchedEffect
         launch { heroAlpha.animateTo(1f, tween(400)) }
         launch { heroOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
@@ -6161,6 +6229,12 @@ private fun StateControl(
         // the outer Row's 12dp spacedBy piled on top) instead of a separate
         // icon cluster sitting next to an unrelated pill.
         val segmentCount = groupActions.size + 1
+        // Bigger, thumb-friendly hit targets on the cover screen (operated by a
+        // thumb on a ~1-inch square) than on the phone (mouse-precise finger taps in
+        // a full pebble). LocalForceExpanded is true only on the cover.
+        val coverTargets = LocalForceExpanded.current
+        val groupBtnSize = if (coverTargets) 58.dp else 50.dp
+        val actionIconSize = if (coverTargets) 26.dp else 22.dp
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
             groupActions.forEachIndexed { i, action ->
                 MorphButton(
@@ -6168,8 +6242,8 @@ private fun StateControl(
                     enabled = action.enabled,
                     contentPadding = PaddingValues(0.dp),
                     shapeForCorner = { cp -> connectedGroupShape(i, segmentCount, cp) },
-                    modifier = Modifier.size(50.dp),
-                ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(22.dp)) }
+                    modifier = Modifier.size(groupBtnSize),
+                ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
             }
             // Pill when off, rounded rectangle + highlight colour when on - same
             // as the climate/charge controls -- except when it's part of a
@@ -6188,11 +6262,12 @@ private fun StateControl(
                     null
                 },
                 // Same pill height as the pebble header actions (the row stays
-                // ControlHeight tall, so the button is vertically centred in it).
-                modifier = Modifier.heightIn(min = 50.dp),
+                // ControlHeight tall, so the button is vertically centred in it);
+                // taller on the cover for a thumb.
+                modifier = Modifier.heightIn(min = groupBtnSize),
             ) {
                 val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-                MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = 22.dp)
+                MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
             }
         }
     }
@@ -6357,6 +6432,29 @@ private fun PebbleShell(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                        // Restore the pebble's primary action on the cover screen. The
+                        // fillHeight branch drops the whole header row (above), which on
+                        // the phone is where headerAction lives (the else branch at the
+                        // bottom) -- so Charge Start/Stop, Location "Locate", and AI
+                        // "Summarize" were UNREACHABLE on the cover: the tile showed
+                        // info but its one control couldn't be tapped. Pin the action as
+                        // a full-width button BELOW the scrolling body (not inside it),
+                        // so it's always reachable regardless of scroll. Skip empty-label
+                        // actions (e.g. the Diagnostics warning icon) -- those were
+                        // expand-only toggles with no cover value; the tile is already
+                        // expanded here so there's nothing to toggle.
+                        headerAction?.takeIf { it.label.isNotEmpty() }?.let { act ->
+                            Spacer(Modifier.height(8.dp))
+                            MorphButton(
+                                onClick = act.onClick,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                enabled = act.enabled && !act.pending,
+                                active = act.active,
+                                activeContainerColor = act.activeContainer ?: MaterialTheme.colorScheme.primary,
+                            ) {
+                                MorphButtonLabel(icon = act.icon, label = act.label, pending = act.pending, spinning = act.spinning)
                             }
                         }
                     }
@@ -6779,7 +6877,30 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val plugged = ev?.isPluggedIn == true || ev?.batteryCharge == true
 
     val infoSummary = if (status?.doorLock == true) "Locked" else "Unlocked"
+    val coverGlance = LocalForceExpanded.current
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary) {
+        // COVER SCREEN only: lead with a big lock-state hero. On the cover the info
+        // tile drops its header (so the "Locked/Unlocked" summary is otherwise
+        // buried as one row among ~15). A large icon + word makes it the glance
+        // value. Phone is untouched (coverGlance = LocalForceExpanded, false there).
+        if (coverGlance && status != null) {
+            val locked = status.doorLock == true
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    contentDescription = null,
+                    tint = if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(30.dp),
+                )
+                Text(
+                    if (locked) "Locked" else "Unlocked",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (locked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+        }
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet.")
@@ -6819,27 +6940,36 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
             }
         }
 
-        SectionLabel("Service & identity")
-        SelectionContainer { StatusRow("VIN", v.vin) }
-        if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
-        odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
-        lastSvc?.let { StatusRow("Last service at", formatDistance(it, metric)) }
-        nextDue?.let {
-            val note = remaining?.let { r ->
-                if (r >= 0) " · ${formatDistance(r, metric)} to go" else " · overdue ${formatDistance(-r, metric)}"
-            } ?: ""
-            StatusRow("Next service due", "${formatDistance(it, metric)}$note")
-        }
-        if (lastSvc == null || interval == null) {
-            Text(
-                "Set last-service mileage and a service interval in Settings to track service.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        // "Service & identity" (VIN/plate/odometer/service) and the owner-links block
+        // are lookup/management surfaces with no at-a-glance value on a ~1-inch cover
+        // tile, and they're what overflows it into a long scroll. Show them only on
+        // the phone (not coverGlance). Odometer stays visible on the cover as one
+        // quick row since it's genuinely glanceable.
+        if (coverGlance) {
+            odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
+        } else {
+            SectionLabel("Service & identity")
+            SelectionContainer { StatusRow("VIN", v.vin) }
+            if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
+            odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
+            lastSvc?.let { StatusRow("Last service at", formatDistance(it, metric)) }
+            nextDue?.let {
+                val note = remaining?.let { r ->
+                    if (r >= 0) " · ${formatDistance(r, metric)} to go" else " · overdue ${formatDistance(-r, metric)}"
+                } ?: ""
+                StatusRow("Next service due", "${formatDistance(it, metric)}$note")
+            }
+            if (lastSvc == null || interval == null) {
+                Text(
+                    "Set last-service mileage and a service interval in Settings to track service.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
-        SectionLabel("${v.brand.label} owners")
-        OwnerLinks(v, context, inApp)
+            SectionLabel("${v.brand.label} owners")
+            OwnerLinks(v, context, inApp)
+        }
     }
 }
 
@@ -7886,6 +8016,21 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             activeContent = Color.White,
         ),
     ) {
+        // COVER SCREEN only: lead with the big charge %/range/charging-state hero
+        // (the same ChargeFuelBar the cover "main" tile uses), so the charge tile
+        // opens on the number that matters instead of just two limit sliders. On the
+        // phone this pebble sits directly under the car's HeroHeader (which already
+        // shows ChargeFuelBar), so we DON'T duplicate it there — gated on forceExpanded.
+        if (LocalForceExpanded.current) {
+            ChargeFuelBar(
+                status,
+                state.hasBattery(v),
+                state.hasFuel(v),
+                state.drivingLabel(v),
+                metric = vm.appearance.collectAsState().value.unitSystem == "metric",
+            )
+            Spacer(Modifier.height(6.dp))
+        }
         if (plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
