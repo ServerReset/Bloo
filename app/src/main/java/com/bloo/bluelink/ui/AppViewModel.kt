@@ -2447,6 +2447,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             settingsStore.setPrimaryDevice(id)
             _state.update { it.copy(syncPrimaryId = id) }
             runDriveSyncNow()
+            // Push settings to the watch so its read-only devices summary reflects
+            // the new primary immediately — same as pebble/AI/aurora changes do.
+            // (setPrimaryDevice writes via the raw DataStore, so it doesn't trip the
+            // dirty-key auto-push, and neither performDriveSync nor runDriveSyncNow
+            // republishes to the watch — without this the watch shows the old primary
+            // until some unrelated publish.)
+            runCatching { com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value) }
         }
     }
 
@@ -2469,6 +2476,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             settingsStore.setSyncDeviceName(name)
             _state.update { it.copy(syncDeviceName = name.trim()) }
             runDriveSyncNow()
+            // Republish so the watch's devices summary shows the new name at once
+            // (same gap/fix as setPrimaryDevice — device name isn't dirty-tracked).
+            runCatching { com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), appearance.value) }
         }
     }
 

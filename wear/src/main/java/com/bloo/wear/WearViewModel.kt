@@ -829,8 +829,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // Safety net: if the phone never replies (dropped connection mid-
             // request), don't leave the busy spinner stuck forever. If the reply
             // already arrived, the WearSyncEvents collector already cleared
-            // driveSyncBusy, so this no-ops.
-            delay(15_000)
+            // driveSyncBusy, so this no-ops. 35s comfortably exceeds the phone's
+            // worst case (performDriveSync's Drive I/O is capped at 20s + a 1s
+            // retry and can queue behind driveSyncMutex), so a slow-but-successful
+            // sync no longer flashes "Sync timed out" before its real reply lands.
+            delay(35_000)
             _ui.update { if (it.driveSyncBusy) it.copy(driveSyncBusy = false, message = "Sync timed out") else it }
             runCatching { com.bloo.wear.WearComms.pullLatest(ctx) }
         }

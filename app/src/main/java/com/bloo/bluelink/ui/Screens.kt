@@ -1647,6 +1647,12 @@ private fun FireworksOverlay(modifier: Modifier = Modifier) {
 
 private val FieldShape = RoundedCornerShape(18.dp)
 
+// A synced device not seen this long is flagged as possibly on a different Drive
+// file (the two-files trap) in the sync settings. 2 days is well past any normal
+// gap for a device in active use, so it doesn't false-alarm on a phone you simply
+// didn't open yesterday.
+private const val STALE_DEVICE_MS = 2L * 24 * 60 * 60 * 1000
+
 /**
  * Sign-in form supporting all three brands from one screen. All fields
  * (email/password/pin/brand) are local `mutableStateOf` -- nothing is
@@ -8698,6 +8704,10 @@ private fun SettingsScreen(vm: AppViewModel) {
                         onDismissRequest = { showDriveDialog = false },
                         onSaveToDrive = { showDriveDialog = false; driveSaveLauncher.launch("bloo_settings.json") },
                         onOpenFromDrive = { showDriveDialog = false; driveOpenLauncher.launch(arrayOf("application/json")) },
+                        // Already syncing, or aware of another device → creating a new
+                        // file here would split the fleet across two files. Warn + steer
+                        // to "Open from Drive".
+                        hasExistingSync = state.syncUri != null || state.syncDevices.size > 1,
                     )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -11045,6 +11055,29 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         )
     }
 
+    // Advisory: if a peer hasn't checked in for a while but this device just
+    // synced, it likely drifted onto a DIFFERENT Drive file (a device can't see
+    // another's file directly — the File ID at the top is the real cross-check).
+    val now = System.currentTimeMillis()
+    val stalePeer = devices.any { it.id != state.thisDeviceId && it.lastSeenMs > 0 && now - it.lastSeenMs > STALE_DEVICE_MS }
+    if (stalePeer) {
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                Icons.Filled.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(16.dp).padding(top = 2.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "A device hasn't synced in a while. If it's still in use, check its File ID matches the one above — otherwise it's on a different file. Reconnect it via Change Drive file → Open from Drive.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
     if (renaming) {
         var draft by remember { mutableStateOf(state.syncDeviceName) }
         val scheme = MaterialTheme.colorScheme
@@ -11196,11 +11229,18 @@ private fun DriveSyncSetupDialog(
     onDismissRequest: () -> Unit,
     onSaveToDrive: () -> Unit,
     onOpenFromDrive: () -> Unit,
+    // True when this device has synced before / knows about other devices. In
+    // that case "Save to Drive" would create a SEPARATE new file (Google Drive
+    // allows duplicate names) — the exact trap that leaves two devices on two
+    // files that never converge — so it's gated behind a warning + confirm, and
+    // "Open from Drive" (join the existing file) is emphasized as the right path.
+    hasExistingSync: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // Routed through the same GlassAlertDialog shell used elsewhere (icon+bold
-    // title, informative content, stacked full-width buttons) rather than a
-    // one-off hand-rolled AlertDialog.
+    // Local warning step: first tap of "Save to Drive" while already synced flips
+    // this on and swaps the row for a warning + explicit "Create anyway"; the
+    // recommended action is to join the existing file instead.
+    var warnNewFile by remember { mutableStateOf(false) }
     GlassAlertDialog(
         onDismissRequest = onDismissRequest,
         icon = Icons.Filled.Cloud,
@@ -11211,18 +11251,45 @@ private fun DriveSyncSetupDialog(
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurfaceVariant,
             )
-            DriveSyncChoiceRow(
-                icon = Icons.Filled.CreateNewFolder,
-                title = "Save to Drive",
-                subtitle = "Start fresh — create a new file with this device's settings.",
-                onClick = onSaveToDrive,
-            )
+            // Join first — it's the correct choice when another device already set
+            // sync up, and making it the emphasized (active) card steers people away
+            // from accidentally creating a second file.
             DriveSyncChoiceRow(
                 icon = Icons.Filled.FileOpen,
                 title = "Open from Drive",
-                subtitle = "Join an existing sync file set up on another device.",
+                subtitle = "Join the file another device already set up — they'll share settings.",
+                emphasized = hasExistingSync,
                 onClick = onOpenFromDrive,
             )
+            if (warnNewFile) {
+                // The trap, spelled out, with the safe alternative one tap away.
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(scheme.errorContainer.copy(alpha = 0.5f))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        "This creates a NEW, separate file — your devices would end up on different files and stop sharing settings. Only do this to start over.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onErrorContainer,
+                    )
+                    MorphButton(
+                        onClick = onSaveToDrive,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(12.dp),
+                    ) { Text("Create a new file anyway", color = scheme.error) }
+                }
+            } else {
+                DriveSyncChoiceRow(
+                    icon = Icons.Filled.CreateNewFolder,
+                    title = "Save to Drive",
+                    subtitle = "Start fresh — create a new file with this device's settings.",
+                    onClick = { if (hasExistingSync) warnNewFile = true else onSaveToDrive() },
+                )
+            }
         },
         buttons = {
             MorphTextButton("Cancel", onClick = onDismissRequest, modifier = Modifier.fillMaxWidth())
@@ -11231,12 +11298,20 @@ private fun DriveSyncSetupDialog(
 }
 
 @Composable
-private fun DriveSyncChoiceRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+private fun DriveSyncChoiceRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    // Highlights this choice as the recommended one (filled/active MorphButton).
+    emphasized: Boolean = false,
+) {
     // The app's standard button component (MorphButton), not a bespoke
     // Surface row -- so this dialog's actions look and feel like every other
     // button in the app instead of a one-off.
     MorphButton(
         onClick = onClick,
+        active = emphasized,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(14.dp),
     ) {
