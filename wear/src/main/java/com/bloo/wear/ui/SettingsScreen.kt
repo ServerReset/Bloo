@@ -41,9 +41,11 @@ import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
@@ -80,8 +82,12 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         }
     }
 
+    // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
+    // list RotaryScalingColumn scrolls (they must share one state).
+    val listState = rememberScalingLazyListState()
     Box(Modifier.fillMaxSize()) {
-    RotaryScalingColumn {
+    ScreenScaffold(scrollState = listState) {
+    RotaryScalingColumn(state = listState) {
         item { ListHeader { Text("Settings", textAlign = TextAlign.Center) } }
 
         item {
@@ -486,6 +492,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
         }
+    }
     }
         // Surfaces "Check now" results (and any other message) while in Settings -
         // the home snackbar isn't on screen here.

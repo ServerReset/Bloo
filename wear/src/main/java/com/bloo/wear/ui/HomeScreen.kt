@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -113,10 +114,12 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.SeatLevel
@@ -203,7 +206,7 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier.padding(horizontal = roundSafeHorizontalPadding(flat = 20.dp, round = 22.dp)),
             ) {
                 Icon(
                     Icons.Filled.DirectionsCar,
@@ -492,8 +495,10 @@ private fun CarColumn(
             scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
             // Horizontal inset keeps card content (headers, right-aligned values)
             // inside the round screen's safe area so nothing clips in the corners.
+            // Uses the shared helper (14 flat / 22 round) so this screen stays in
+            // lockstep with the rest of the app rather than a local 12/22 copy.
             contentPadding = PaddingValues(
-                horizontal = if (round) 22.dp else 12.dp,
+                horizontal = roundSafeHorizontalPadding(),
                 vertical = 60.dp,
             ),
             // Tighter than the library default (12dp) - tiles are already full-size
@@ -568,14 +573,24 @@ internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
         it.contains("denied", ignoreCase = true)
     } == true
     AnimatedVisibility(
+        // BottomCenter is the narrowest chord of a round face, so the pill needs
+        // a round-safe horizontal inset (else its rounded corners slide under the
+        // bezel) AND a width cap (else a long message balloons into the corners).
         visible = message != null,
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = roundSafeHorizontalPadding(), bottom = 24.dp),
         enter = slideInVertically { it } + fadeIn(),
         exit = slideOutVertically { it } + fadeOut(),
     ) {
         val snackbarShape = RoundedCornerShape(16.dp)
         Box(
             Modifier
+                // Cap width so a long message wraps instead of ballooning into
+                // the round corners, but let a short one stay compact (not a
+                // forced full-width bar). The AnimatedVisibility inset above
+                // already keeps it clear of the bezel.
+                .widthIn(max = 200.dp)
                 .clip(snackbarShape)
                 .background(if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer)
                 // Real floating chrome (see CarNameOverlay above) gets a real
@@ -1918,7 +1933,12 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     // Rotary/focus scaffolding (crown+bezel scroll, focus-on-appear) lives in
     // RotaryScalingColumn now; this screen keeps its own edge-scale-off params,
     // padding and spacing.
+    // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
+    // list RotaryScalingColumn scrolls (they must share one state).
+    val listState = rememberScalingLazyListState()
+    ScreenScaffold(scrollState = listState) {
     RotaryScalingColumn(
+        state = listState,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
         contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(flat = 8.dp, round = 18.dp), vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -2067,5 +2087,6 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                 }
             }
         }
+    }
     }
 }

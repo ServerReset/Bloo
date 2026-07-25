@@ -17,9 +17,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.formatEfficiency
 import com.bloo.bluelink.data.formatTripDistance
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
@@ -52,7 +54,11 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         return
     }
 
-    RotaryScalingColumn {
+    // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
+    // list RotaryScalingColumn scrolls (they must share one state).
+    val listState = rememberScalingLazyListState()
+    ScreenScaffold(scrollState = listState) {
+    RotaryScalingColumn(state = listState) {
         item { ListHeader { Text("Recent trips", textAlign = TextAlign.Center) } }
 
         if (trips.isNullOrEmpty()) {
@@ -133,5 +139,6 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                 }
             }
         }
+    }
     }
 }

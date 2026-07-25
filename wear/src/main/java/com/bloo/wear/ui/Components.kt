@@ -21,8 +21,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -46,17 +44,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -75,12 +69,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.ScalingParams
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
@@ -96,7 +93,6 @@ import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.math.tan
-import kotlinx.coroutines.launch
 
 /**
  * Horizontal ScalingLazyColumn inset that actually widens on a round screen.
@@ -744,15 +740,15 @@ fun BusySpinner(caption: String, modifier: Modifier = Modifier) {
 
 /**
  * The rotary-scrollable ScalingLazyColumn scaffold every list screen (Login,
- * Settings, Trips, Home) hand-rolled identically: a remembered coroutine scope
- * + FocusRequester, a LaunchedEffect(Unit) that requests focus (guarded with
- * runCatching so a not-yet-attached requester can't crash), and the
- * .onRotaryScrollEvent { scope.launch { state.scrollBy(...) }; true }
- * .focusRequester(fr).focusable() modifier chain that routes the crown/bezel
- * into the list. Centralised so the focus + rotary wiring lives in one place;
- * callers keep their own wrapping Box/siblings and just supply the [content].
+ * Settings, Trips, Home) hand-rolled identically: a FocusRequester + a
+ * LaunchedEffect(Unit) that requests focus (guarded with runCatching so a
+ * not-yet-attached requester can't crash), plus the crown/bezel wiring itself.
+ * Uses the native foundation [rotaryScrollable] (stable in wear.compose 1.4+),
+ * which routes the crown/bezel into [state] with real fling + snap + haptic
+ * detents and claims focus via the supplied [focusRequester] (so no separate
+ * .focusable() is needed). Centralised so the focus + rotary wiring lives in one
+ * place; callers keep their own wrapping Box/siblings and just supply [content].
  */
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun RotaryScalingColumn(
     modifier: Modifier = Modifier,
@@ -762,22 +758,22 @@ fun RotaryScalingColumn(
     scalingParams: ScalingParams = ScalingLazyColumnDefaults.scalingParams(),
     content: ScalingLazyListScope.() -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     ScalingLazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .onRotaryScrollEvent { e ->
-                scope.launch { state.scrollBy(e.verticalScrollPixels) }
-                true
-            }
-            .focusRequester(focusRequester)
-            .focusable(),
+            .rotaryScrollable(
+                RotaryScrollableDefaults.behavior(scrollableState = state),
+                focusRequester = focusRequester,
+            ),
         state = state,
         contentPadding = contentPadding,
         verticalArrangement = verticalArrangement,
         scalingParams = scalingParams,
+        // First/last items can scroll to screen center on a round face
+        // (the enabled default; stated explicitly for clarity).
+        autoCentering = AutoCenteringParams(),
         content = content,
     )
 }

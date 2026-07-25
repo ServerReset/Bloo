@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -81,7 +82,7 @@ private fun PinDots(filled: Int, showError: Boolean) {
  *  flat Material ripple -- consistent with the app's other custom-animated
  *  controls (MorphButton et al.) rather than a stock clickable. */
 @Composable
-private fun PinKey(label: String, onClick: () -> Unit) {
+private fun PinKey(label: String, keySize: Dp, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -102,7 +103,7 @@ private fun PinKey(label: String, onClick: () -> Unit) {
     )
     Box(
         Modifier
-            .size(48.dp)
+            .size(keySize)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape)
             .background(bg)
@@ -137,14 +138,26 @@ private fun PinKeypad(onDigit: (String) -> Unit, onBackspace: () -> Unit) {
         listOf("7", "8", "9"),
         listOf("", "0", "⌫"),
     )
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    // Size the keys to the screen so the whole 4-row pad + the title/dots stack
+    // above it always fits inside a round face without the outer rows being
+    // pushed under the bezel. 48dp (Wear's recommended touch target) is kept on
+    // normal/large round watches (>=225dp tall); the smallest ~192dp faces
+    // shrink toward 40dp, which is the only way the pad fits there at all.
+    val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+    val gap = 4.dp
+    val keySize = when {
+        screenH >= 225 -> 48.dp
+        screenH >= 205 -> 44.dp
+        else -> 40.dp
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
         rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                 row.forEach { key ->
                     if (key.isEmpty()) {
-                        Spacer(Modifier.size(48.dp))
+                        Spacer(Modifier.size(keySize))
                     } else {
-                        PinKey(key, onClick = { if (key == "⌫") onBackspace() else onDigit(key) })
+                        PinKey(key, keySize, onClick = { if (key == "⌫") onBackspace() else onDigit(key) })
                     }
                 }
             }
@@ -192,11 +205,14 @@ fun PinEntryScreen(
         modifier
             .fillMaxSize()
             .graphicsLayer { alpha = entranceAlpha.value }
-            // The one screen this round-safe-padding sweep missed earlier
-            // this session -- arguably the first screen a round-watch user
-            // with the lock enabled ever sees, and its title/error text sat
-            // closer to the curved bezel than every other screen's.
-            .padding(horizontal = roundSafeHorizontalPadding(flat = 12.dp), vertical = 6.dp),
+            // A small fixed horizontal inset, NOT roundSafeHorizontalPadding:
+            // that helper widens the inset to 22dp on round for scrolling LIST
+            // content (whose corners are cut along the vertical span), but the
+            // PIN pad is vertically centered at the circle's WIDEST point where
+            // no corner cut applies -- a 22dp inset there only steals width and
+            // pushes the outer 1/4/7 & 3/9/⌫ columns toward the bezel. 8dp keeps
+            // the pad centered with room to spare on every round size.
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -219,11 +235,11 @@ fun PinEntryScreen(
                 textAlign = TextAlign.Center,
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         Box(Modifier.offset(x = shakeX.value.dp)) {
             PinDots(buffer.length, showErrorTint)
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         PinKeypad(
             onDigit = { d ->
                 if (buffer.length < PIN_LENGTH) {

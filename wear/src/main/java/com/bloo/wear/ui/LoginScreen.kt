@@ -30,8 +30,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.Brand
 import com.bloo.wear.WearUi
@@ -70,7 +72,12 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
         return
     }
 
+    // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
+    // list RotaryScalingColumn scrolls (they must share one state).
+    val listState = rememberScalingLazyListState()
+    ScreenScaffold(scrollState = listState) {
     RotaryScalingColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -164,6 +171,7 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                 textAlign = TextAlign.Center,
             )
         }
+    }
     }
 }
 

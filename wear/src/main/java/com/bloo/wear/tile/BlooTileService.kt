@@ -419,14 +419,22 @@ abstract class BlooTileService : TileService() {
 
         return EdgeContentLayout.Builder(device)
             .setEdgeContent(arc)
-            .setPrimaryLabelTextContent(
-                Text.Builder(ctx, rngText.ifBlank { snap.name })
-                    .setTypography(Typography.TYPOGRAPHY_CAPTION1)
-                    .setColor(argb(CLR_DIM))
-                    .setMaxLines(1)
-                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
-                    .build()
-            )
+            .apply {
+                // The centre column's first line already shows snap.name
+                // unconditionally, so only add the primary label when there's a
+                // distinct range to show -- otherwise the name rendered twice.
+                // The primary-label slot is optional on EdgeContentLayout.
+                if (rngText.isNotBlank()) {
+                    setPrimaryLabelTextContent(
+                        Text.Builder(ctx, rngText)
+                            .setTypography(Typography.TYPOGRAPHY_CAPTION1)
+                            .setColor(argb(CLR_DIM))
+                            .setMaxLines(1)
+                            .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
+                            .build()
+                    )
+                }
+            }
             .setContent(content)
             .setSecondaryLabelTextContent(
                 Text.Builder(ctx, secondaryLabel)
