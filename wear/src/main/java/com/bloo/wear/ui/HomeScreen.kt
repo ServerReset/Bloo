@@ -104,6 +104,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -368,6 +369,12 @@ private fun CarColumn(
     val hasCarWeather = ui.extras.carWeather[car.vin] != null
     val hasHomeWeather = ui.extras.homeWeather != null
     val aiEnabled = ui.settings?.aiEnabled
+    // phoneConnected MUST be a key: visibleTiles() reads it (standalone Weather/
+    // Smart-Climate gate + the AI tile is phone-only). Without it, when the phone
+    // connects/disconnects mid-session none of the other keys change, so the cached
+    // tile list is returned and a dead AI tile lingers / a standalone Weather tile
+    // never appears — the exact bug the gate was written to avoid.
+    val phoneConnected = ui.phoneConnected
     val tiles = remember(
         car.vin,
         car.alertCount,
@@ -380,6 +387,7 @@ private fun CarColumn(
         hasHomeWeather,
         car.hasLiveStatus,
         aiEnabled,
+        phoneConnected,
     ) { visibleTiles(ui, car) }
     val tileCount = tiles.size
     val infinite = tileCount > 1
@@ -809,13 +817,12 @@ private fun CurvedDots(
  *  system clock (Wear's TimeText owns the very top center) so the two don't
  *  overlap.
  *
- *  This used to also be a long-press-to-refresh control (an escalating-
- *  haptic hold gesture with its own expanding progress-ring animation), but
- *  that duplicated the plain "Refresh" button already in the More tile --
- *  same action, and this path had no accessible alternative for TalkBack/
- *  switch-access users (a raw pointerInput gesture with no semantics),
- *  unlike the button. Removed rather than fixed, since the button already
- *  covers the same need with far less code. */
+ *  Press-and-hold the pill to refresh: a ring ([HoldRefreshRing]) sweeps the
+ *  display edge over ~1s and, on completion, fires a confirm buzz + status
+ *  refresh (a full hold is required, so a stray tap never triggers it). For
+ *  TalkBack / switch-access users — who can't perform a timed hold — a
+ *  semantics custom action ("Refresh") invokes the same [onHoldComplete], so
+ *  the gesture isn't the only path to it. */
 @Composable
 private fun BoxScope.CarNameOverlay(
     name: String,
@@ -847,31 +854,44 @@ private fun BoxScope.CarNameOverlay(
                 // still usable without the gesture wired in.
                 .then(
                     if (holdProgress != null && onHoldComplete != null) {
-                        Modifier.pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    // Start filling the ring on press. The fill runs
-                                    // in its own job so it keeps animating while we
-                                    // await the release below.
-                                    val fill = scope.launch {
-                                        holdProgress.animateTo(1f, tween(1000, easing = LinearEasing))
-                                        // Reached full 1s hold → fire once, then reset.
-                                        onHoldComplete()
-                                        holdProgress.snapTo(0f)
-                                    }
-                                    // tryAwaitRelease() suspends until the finger lifts
-                                    // (or the gesture is cancelled by a scroll/drag).
-                                    tryAwaitRelease()
-                                    // Released/cancelled: stop the fill. If it hadn't
-                                    // already completed (value back at 0), rewind so a
-                                    // partial hold does nothing.
-                                    fill.cancel()
-                                    if (holdProgress.value > 0f) {
-                                        holdProgress.animateTo(0f, tween(200))
-                                    }
-                                },
-                            )
-                        }
+                        Modifier
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = {
+                                        // Start filling the ring on press. The fill runs
+                                        // in its own job so it keeps animating while we
+                                        // await the release below.
+                                        val fill = scope.launch {
+                                            holdProgress.animateTo(1f, tween(1000, easing = LinearEasing))
+                                            // Reached full 1s hold → fire once, hold the
+                                            // ring full for a beat as a "done" flourish,
+                                            // then rewind so the completion registers
+                                            // visually instead of snapping away.
+                                            onHoldComplete()
+                                            kotlinx.coroutines.delay(280)
+                                            holdProgress.animateTo(0f, tween(240))
+                                        }
+                                        // tryAwaitRelease() suspends until the finger lifts
+                                        // (or the gesture is cancelled by a scroll/drag).
+                                        tryAwaitRelease()
+                                        // Released/cancelled: stop the fill. If it hadn't
+                                        // already completed (value back at 0), rewind so a
+                                        // partial hold does nothing.
+                                        fill.cancel()
+                                        if (holdProgress.value > 0f) {
+                                            holdProgress.animateTo(0f, tween(200))
+                                        }
+                                    },
+                                )
+                            }
+                            // Accessible equivalent of the timed hold: TalkBack / switch
+                            // users can't perform a 1s press, so expose the same refresh
+                            // as a custom action on the pill.
+                            .semantics {
+                                customActions = listOf(
+                                    CustomAccessibilityAction("Refresh") { onHoldComplete(); true },
+                                )
+                            }
                     } else Modifier,
                 )
                 .padding(horizontal = 14.dp, vertical = 5.dp),
@@ -939,18 +959,27 @@ private fun AlertsCard(car: CarView) {
     }
     if (warnings.isEmpty()) return
     val errColor = MaterialTheme.colorScheme.error
-    AnimatedVisibility(visible = true, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 4 }) {
-        SectionCard(null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(15.dp), tint = errColor)
-                Text("ALERTS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = errColor)
-            }
-            Spacer(Modifier.height(5.dp))
-            warnings.forEach { (label, value) -> StatusRow(label, value, valueColor = errColor) }
+    // (Dropped a no-op AnimatedVisibility(visible = true) wrapper — it never
+    // animated anything since this composable already early-returns when there are
+    // no warnings.) The header keeps the error tint (SectionCard's shared header is
+    // primary-tinted), but its label now carries heading() semantics so TalkBack's
+    // heading navigation lands on it like every other card header.
+    SectionCard(null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(15.dp), tint = errColor)
+            Text(
+                "ALERTS",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = errColor,
+                modifier = Modifier.semantics { heading() },
+            )
         }
+        Spacer(Modifier.height(5.dp))
+        warnings.forEach { (label, value) -> StatusRow(label, value, valueColor = errColor) }
     }
 }
 
@@ -1377,12 +1406,13 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
                 ),
                 label = "presetDeleteScale",
             )
+            // 48dp clickable touch target (Wear's minimum) wrapping the 36dp visual
+            // nub — the click used to sit on the 36dp circle itself, below the
+            // ergonomic minimum for a fingertip on a small round face.
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .graphicsLayer { scaleX = delScale; scaleY = delScale }
+                    .size(48.dp)
                     .clip(CircleShape)
-                    .background(delBg)
                     .clickable(interactionSource = delInteraction, indication = null) {
                         if (confirming) {
                             vm.deletePreset(car.vin, preset.id)
@@ -1393,17 +1423,17 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                if (confirming) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .graphicsLayer { scaleX = delScale; scaleY = delScale }
+                        .clip(CircleShape)
+                        .background(delBg),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
-                        Icons.Filled.Check,
-                        contentDescription = "Confirm delete",
-                        modifier = Modifier.size(16.dp),
-                        tint = delFg,
-                    )
-                } else {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = "Delete preset",
+                        if (confirming) Icons.Filled.Check else Icons.Filled.Close,
+                        contentDescription = if (confirming) "Confirm delete" else "Delete preset",
                         modifier = Modifier.size(16.dp),
                         tint = delFg,
                     )
@@ -1573,23 +1603,31 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
         )
     }
     Spacer(Modifier.height(6.dp))
-    MorphButton(
-        label = "Locate",
-        icon = Icons.Filled.LocationOn,
-        active = false,
-        activeColor = MaterialTheme.colorScheme.primary,
-        pending = "${car.vin}:refresh" in ui.pending,
-        onClick = { vm.refreshStatus(car.vin) },
-    )
-    Spacer(Modifier.height(6.dp))
-    MorphButton(
-        label = "Open",
-        icon = Icons.AutoMirrored.Filled.OpenInNew,
-        active = false,
-        activeColor = MaterialTheme.colorScheme.primary,
-        pending = false,
-        onClick = { WearRemote.openOnPhone(context, "https://www.google.com/maps/search/?api=1&query=$lat,$lon") },
-    )
+    // Locate + Open side-by-side (was two full-width stacked buttons) — halves the
+    // card's height so its edge rows don't ride the curved bezel when centered.
+    // Icons dropped so both labels fit cleanly in a half-width chip.
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        MorphButton(
+            label = "Locate",
+            icon = Icons.Filled.LocationOn,
+            active = false,
+            activeColor = MaterialTheme.colorScheme.primary,
+            pending = "${car.vin}:refresh" in ui.pending,
+            onClick = { vm.refreshStatus(car.vin) },
+            modifier = Modifier.weight(1f),
+            showIcon = false,
+        )
+        MorphButton(
+            label = "Open",
+            icon = Icons.AutoMirrored.Filled.OpenInNew,
+            active = false,
+            activeColor = MaterialTheme.colorScheme.primary,
+            pending = false,
+            onClick = { WearRemote.openOnPhone(context, "https://www.google.com/maps/search/?api=1&query=$lat,$lon") },
+            modifier = Modifier.weight(1f),
+            showIcon = false,
+        )
+    }
 }
 
 @Composable

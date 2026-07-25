@@ -35,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -121,6 +123,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             )
         }
 
+        item { SettingGroupLabel("APPEARANCE") }
         item {
             SettingSection("Appearance") {
                 Text(
@@ -167,6 +170,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
+        item { SettingGroupLabel("SECURITY") }
         item {
             SettingSection("PIN lock") {
                 val ls = ui.localSettings
@@ -348,6 +352,10 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
             }
         }
 
+        // TILES group — only meaningful in advanced mode, where the tile-config
+        // sections live; gate the label on the same condition so it never heads an
+        // empty group in simple mode.
+        if (advanced) item { SettingGroupLabel("TILES") }
         if (advanced) item {
             SettingSection("Tile chips") {
                 Text(
@@ -448,6 +456,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
         // present themselves via the More tile's banner (see HomeScreen's
         // MoreCard), no settings/manual controls needed any more.
 
+        item { SettingGroupLabel("SYNC & ACCOUNT") }
         item {
             SettingSection("Sync") {
                 if (standalone) {
@@ -560,4 +569,19 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 @Composable
 private fun SettingSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     SectionCard(title, content = content)
+}
+
+/** A small, centered uppercase group divider that chunks the long Settings list
+ *  into scannable sections (Appearance / Security / Tiles / Sync & account)
+ *  instead of one undifferentiated scroll of ~14 cards. Primary-tinted + tracked
+ *  so it reads as a section break, not another card. */
+@Composable
+private fun SettingGroupLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp).semantics { heading() },
+    )
 }

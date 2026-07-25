@@ -136,7 +136,11 @@ fun SectionCard(
         Modifier
             .fillMaxWidth()
             .clip(cardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            // surfaceContainer (was surfaceContainerLow): on a near-black OLED face
+            // the Low tone + faint rim barely read as a surface, flattening the whole
+            // UI. One step up gives cards a real presence and separates them from the
+            // snackbar that overlays them.
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             // Buttons inside these cards already have a visible outline
             // (see MorphButton), so without one here the card containing
             // them read as flatter/less "material" than its own contents --
@@ -155,7 +159,10 @@ fun SectionCard(
             .animateContentSize(spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMediumLow)),
     ) {
         Column(
-            Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+            // 12dp horizontal (was 6dp): gives card content real breathing room
+            // instead of relying on the round-screen list inset alone, so text/rows
+            // don't sit right against the card edge.
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             if (title != null) {
                 Row(
@@ -263,14 +270,17 @@ fun ChargeRing(
         (percent ?: 100) < 15 -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
+    // Spring, not tween: ChargeRing was the one hero element animating linearly in
+    // an otherwise spring-driven app, so its fill felt mechanical next to every
+    // springy button/dot. A settled (SoftDamping) spring makes it join the physics.
     val animatedProgress by animateFloatAsState(
         targetValue = (percent ?: 0).coerceIn(0, 100) / 100f,
-        animationSpec = tween(800),
+        animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessLow),
         label = "chargeProgress",
     )
     val animatedColor by animateColorAsState(
         targetValue = ringColor,
-        animationSpec = tween(400),
+        animationSpec = spring(dampingRatio = com.bloo.uicommon.GentleDamping, stiffness = Spring.StiffnessLow),
         label = "chargeColor",
     )
     Box(
@@ -584,7 +594,11 @@ fun MorphButton(
     val resolvedContent = if (active) scheme.onPrimary else scheme.onSurface
 
     Button(
-        onClick = { haptics.click(); onClick() },
+        // A toggle turning ON, or a highlighted (active/primary) action, is a real
+        // commit → the heavier Confirm feel; every other button (navigation,
+        // pickers, plain actions) gets the lighter tap so opening a submenu no
+        // longer feels as weighty as committing a state change.
+        onClick = { if (toggled == true || (active && toggled == null)) haptics.click() else haptics.tap(); onClick() },
         enabled = enabled && !pending,
         interactionSource = interaction,
         modifier = modifier.fillMaxWidth()

@@ -917,15 +917,29 @@ class SettingsStore(private val context: Context) {
      *  files with the same name), which is the #1 reason settings/devices don't
      *  converge. Null when sync isn't set up. */
     suspend fun syncFileFingerprint(): String? {
-        val uri = syncUri() ?: return null
-        // A SAF Drive doc URI looks like content://…/document/<docId>. The docId is
-        // the file's stable unique id; hash it to a short, comparable tag so we
-        // never surface the raw (long, sensitive-looking) id.
-        val docId = uri.substringAfterLast("/document/").substringBefore('?').ifBlank { uri }
-        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(docId.toByteArray())
-        // 6 hex chars = 3 bytes: plenty to tell two files apart at a glance, short
-        // enough to read/compare aloud.
+        if (syncUri() == null) return null
+        // The CONTENT-based file id (stored inside the Drive file as `_fileId`,
+        // cached here device-local). Every device on the same file reads the same
+        // value → the same short code. This replaces the old URI hash, which was
+        // WRONG: a SAF content:// URI is assigned PER DEVICE by the OS, so the same
+        // Drive file had different URIs (and different hashes) on two phones — the
+        // exact "I picked the same file but the codes differ" bug. Null until the
+        // first successful sync has read/minted the id.
+        val id = context.settingsDataStore.data.first()[stringPreferencesKey("sync_file_id")] ?: return null
+        // Short, human-comparable tag (first 6 hex of a SHA-256 of the full id) so
+        // we never surface the raw UUID but two devices still match at a glance.
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(id.toByteArray())
         return hash.take(3).joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+    }
+
+    /** The full content-based file id this device currently has cached, or null.
+     *  Used by [performDriveSync] to decide whether to preserve the remote file's
+     *  id or mint a new one. */
+    private suspend fun syncFileId(): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_file_id")]?.takeIf { it.isNotBlank() }
+
+    private suspend fun setSyncFileId(id: String) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("sync_file_id")] = id }
     }
 
     suspend fun setSyncUri(uri: String?) {
@@ -1084,6 +1098,9 @@ class SettingsStore(private val context: Context) {
             it.remove(booleanPreferencesKey("sync_pull_primary"))
             it.remove(stringPreferencesKey("sync_devices_cache"))
             it.remove(stringPreferencesKey("sync_primary_cache"))
+            // Drop the cached file id too — the new file has its own (or will mint
+            // one). Keeping the old id would show a stale/mismatched File ID.
+            it.remove(stringPreferencesKey("sync_file_id"))
         }
     }
 
@@ -1200,6 +1217,12 @@ class SettingsStore(private val context: Context) {
         val remoteMeta = remoteJson?.let { SyncMerge.parseMeta(it) }
         val remoteHash = remoteMeta?.hash
         val remoteHasContent = remoteJson != null && SyncMerge.parseBackup(remoteJson) != null
+        // Resolve the file's content-based id: the remote file's own id wins (so
+        // every device converges on it), else what we've cached, else mint a fresh
+        // one (this device is the first to stamp the file). Cache it so the File ID
+        // shown in Settings is stable + identical across devices on this file.
+        val resolvedFileId = remoteMeta?.fileId ?: syncFileId() ?: java.util.UUID.randomUUID().toString()
+        if (resolvedFileId != syncFileId()) setSyncFileId(resolvedFileId)
 
         // Adopt-mode + import-gate decision.
         val pullPrimary = syncPullPrimary()
@@ -1284,6 +1307,7 @@ class SettingsStore(private val context: Context) {
                 selfDevice = self,
                 knownDevices = remoteMeta?.devices ?: emptyList(),
                 nowMs = now,
+                fileId = resolvedFileId,
             )
             val body = "$now\n$driveBody"
             uploaded = runCatching {

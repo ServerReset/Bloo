@@ -137,7 +137,10 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                 MorphButton(
                     label = "Sign in",
                     icon = Icons.AutoMirrored.Filled.Login,
-                    active = false,
+                    // Filled-primary at rest: this is the screen's one true CTA, so it
+                    // should read as the emphasized action rather than sit visually
+                    // level with the field rows above it.
+                    active = true,
                     activeColor = MaterialTheme.colorScheme.primary,
                     pending = false,
                     onClick = { vm.login(brand, email, password, pin) },

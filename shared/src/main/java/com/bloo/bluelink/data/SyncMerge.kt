@@ -63,7 +63,7 @@ object SyncMerge {
         "sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys",
         // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
         "sync_device_id", "sync_device_name", "sync_last_hash", "sync_synced_ever",
-        "sync_devices_cache", "sync_pull_primary", "sync_primary_cache",
+        "sync_devices_cache", "sync_pull_primary", "sync_primary_cache", "sync_file_id",
     )
 
     /** A device that syncs this Drive file, as recorded in the file's `devices`
@@ -106,6 +106,13 @@ object SyncMerge {
         val primaryDeviceId: String?,
         val writerDeviceId: String?,
         val devices: List<SyncDevice>,
+        /** A stable id for the FILE ITSELF, written into the content so every device
+         *  reads the SAME value — unlike a SAF content:// URI, which the OS assigns
+         *  differently per device for the same Drive file (the reason a URI hash
+         *  showed mismatched codes on two phones that ARE on one file). Minted once
+         *  by whichever device first writes it, then preserved by all. Null on a
+         *  file that predates this field. */
+        val fileId: String?,
     )
 
     // Same Json config SettingsStore's backupJson used: pretty-printed output so
@@ -185,10 +192,15 @@ object SyncMerge {
         selfDevice: SyncDevice,
         knownDevices: List<SyncDevice>,
         nowMs: Long,
+        // The file's own stable id, written into the content so every device shows
+        // the SAME File ID for one Drive file (a per-device SAF URI can't). The
+        // caller passes the remote file's id if present, else a freshly-minted one.
+        fileId: String,
     ): String {
         val devices = mergeDevices(knownDevices, selfDevice, nowMs)
         val root = buildRoot(prefs, dirtyKeys, photos) {
             put("_hash", JsonPrimitive(hash))
+            put("_fileId", JsonPrimitive(fileId))
             if (primaryDeviceId != null) put("_primaryDeviceId", JsonPrimitive(primaryDeviceId))
             put("_writerDeviceId", JsonPrimitive(selfDevice.id))
             put("devices", buildJsonArray {
@@ -287,11 +299,12 @@ object SyncMerge {
         val hash = stringField("_hash")
         val primary = stringField("_primaryDeviceId")
         val writer = stringField("_writerDeviceId")
+        val fileId = stringField("_fileId")
         val devices = (root["devices"] as? JsonArray)?.mapNotNull { el ->
             runCatching { backupJson.decodeFromJsonElement(SyncDevice.serializer(), el) }.getOrNull()
                 ?.takeIf { it.id.isNotBlank() }
         } ?: emptyList()
-        return SyncMeta(hash = hash, primaryDeviceId = primary, writerDeviceId = writer, devices = devices)
+        return SyncMeta(hash = hash, primaryDeviceId = primary, writerDeviceId = writer, devices = devices, fileId = fileId)
     }
 
     /**

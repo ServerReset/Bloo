@@ -15,6 +15,13 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
  * everything (plain button taps AND toggles alike) used the same
  * HapticFeedbackType.TextHandleMove, so nothing actually felt distinct.
  */
+/** A light, ordinary "I pressed a button" feel — navigation, pickers, plain
+ *  actions. Distinct from (and lighter than) [click], which was previously fired
+ *  on EVERY button tap, so opening a submenu felt as heavy as committing a state
+ *  change. Use this for the everyday tap. */
+fun HapticFeedback.tap() = performHapticFeedback(HapticFeedbackType.VirtualKey)
 fun HapticFeedback.tick() = performHapticFeedback(HapticFeedbackType.SegmentTick)
+/** A heavier confirming feel — reserve for committed state changes / toggles
+ *  landing "on" (lock engaged, charge started), not routine taps. */
 fun HapticFeedback.click() = performHapticFeedback(HapticFeedbackType.Confirm)
 fun HapticFeedback.reject() = performHapticFeedback(HapticFeedbackType.Reject)

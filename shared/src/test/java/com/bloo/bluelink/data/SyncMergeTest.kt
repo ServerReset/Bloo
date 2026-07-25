@@ -208,16 +208,19 @@ class SyncMergeTest {
             prefs = prefs, dirtyKeys = emptySet(), photos = emptyMap(),
             hash = SyncMerge.portableContentHash(prefs, emptySet()),
             primaryDeviceId = "uuid-A", selfDevice = dev, knownDevices = emptyList(), nowMs = 5000L,
+            fileId = "file-xyz",
         )
         assertEquals(SyncMerge.parseBackup(portable), SyncMerge.parseBackup(drive))
         // Drive-only keys are NOT present in the portable share export.
         assertFalse(portable.contains("_hash"))
         assertFalse(portable.contains("_primaryDeviceId"))
+        assertFalse(portable.contains("_fileId"))
         assertFalse(portable.contains("uuid-A"))
         assertFalse(portable.contains("SM-S921"))
-        // ...but ARE present in the Drive export.
+        // ...but ARE present in the Drive export, and the file id round-trips.
         assertTrue(drive.contains("_hash"))
         assertTrue(drive.contains("uuid-A"))
+        assertEquals("file-xyz", SyncMerge.parseMeta(drive)?.fileId)
     }
 
     // 9. Old-client / hashless file: parseMeta returns null hash → caller falls back

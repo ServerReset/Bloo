@@ -7,8 +7,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.Typography
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearSettingsPayload
@@ -53,6 +56,39 @@ fun schemeFrom(c: WearColorRoles): ColorScheme = ColorScheme(
 )
 
 /**
+ * A deliberate type scale (the app previously shipped stock Wear defaults, which
+ * left almost everything at ~2 effective sizes, so hierarchy rested on colour and
+ * position alone — headers read as "bold footnotes"). Each style is `.copy()`d
+ * from the framework default so it KEEPS Wear's tuned font family + tabular
+ * numeral features, and only size/weight/letter-spacing change. Encoding
+ * hierarchy in SIZE re-tiers every screen at once, since the app already routes
+ * through these tokens (titleMedium/titleSmall/bodySmall/labelSmall/label*).
+ *
+ * Built once from a default [Typography] instance (all params default), then a
+ * handful overridden. Numerals get the biggest lift — glanceable readouts
+ * (range, battery %, temp, setpoint) are what should dominate a watch face.
+ */
+private fun blooWearTypography(): Typography {
+    val d = Typography() // framework defaults — the source of each style's font/features
+    return d.copy(
+        // Hero glance numbers — big and tight so a value dominates its card.
+        numeralMedium = d.numeralMedium.copy(fontSize = 34.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold),
+        numeralSmall = d.numeralSmall.copy(fontSize = 24.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
+        // Card VALUES (StatusRow right-hand side) — a real step above the label.
+        titleMedium = d.titleMedium.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
+        titleSmall = d.titleSmall.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+        // Detail/body — comfortable reading size.
+        bodyMedium = d.bodyMedium.copy(fontSize = 14.sp),
+        bodySmall = d.bodySmall.copy(fontSize = 13.sp),
+        // Captions/helper text — clearly the quietest tier.
+        labelMedium = d.labelMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+        // The uppercase card "eyebrow" (SectionCard title): small + wide-tracked so
+        // it reads as a header label, not a shrunken caption competing with body.
+        labelSmall = d.labelSmall.copy(fontSize = 11.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.Bold),
+    )
+}
+
+/**
  * Wear OS Material 3 (Expressive) theme. When the phone has synced its resolved
  * colours, we paint with those so the watch matches the phone exactly; otherwise
  * we fall back to the framework's default expressive watch scheme.
@@ -66,11 +102,12 @@ fun BlooWearTheme(settings: WearSettingsPayload?, content: @Composable () -> Uni
     }
     // Rebuild the 25-colour scheme only when the synced roles actually change.
     val scheme = colors?.let { c -> remember(c) { schemeFrom(c) } }
+    val typography = remember { blooWearTypography() }
     CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
         if (scheme != null) {
-            MaterialTheme(colorScheme = scheme, content = content)
+            MaterialTheme(colorScheme = scheme, typography = typography, content = content)
         } else {
-            MaterialTheme(content = content)
+            MaterialTheme(typography = typography, content = content)
         }
     }
 }

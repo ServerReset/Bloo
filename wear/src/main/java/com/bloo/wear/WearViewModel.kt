@@ -343,6 +343,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // Cars whose status we've already fetched this session, so paging back and
     // forth doesn't re-hit the (rate-limited, battery-hungry) network each time.
     private val sessionFetched = mutableSetOf<String>()
+    // VINs for which a standalone weather fetch has SUCCEEDED this session. Separate
+    // from sessionFetched so a car whose coordinates weren't known on first view
+    // (status hadn't landed yet) is re-attempted on later views instead of being
+    // permanently gated out — a VIN lands here only after weather actually resolves.
+    private val weatherFetched = mutableSetOf<String>()
+    // Coalesces concurrent loadGarage() calls (e.g. bootstrap() and the auth-arrival
+    // collector both firing during a startup PATH_AUTH refresh) into one — a second
+    // invocation while one is in flight is a no-op, avoiding a redundant vehicle-list
+    // fetch. Touched only on the Main dispatcher (viewModelScope), so no lock needed.
+    private var garageLoading = false
     private val tripsFetched = mutableSetOf<String>()
     // Coords we've already attempted to reverse-geocode (per session), keyed by vin.
     private val geocoded = mutableSetOf<String>()
@@ -452,13 +462,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // SignedOut screen so a routine auth refresh while already in-app is a no-op.
         viewModelScope.launch {
             WearAuthEvents.arrivals.collect {
-                if (_ui.value.screen != WearScreen.SignedOut && _ui.value.screen != WearScreen.Loading) return@collect
+                val screen = _ui.value.screen
+                if (screen != WearScreen.SignedOut && screen != WearScreen.Loading) return@collect
                 val brands = runCatching { sessionStore.loggedInBrands() }.getOrDefault(emptyList())
                 if (brands.isNotEmpty()) {
                     val emails = withContext(Dispatchers.IO) {
                         runCatching { credentialStore.loadAll().map { c -> c.email } }.getOrDefault(emptyList())
                     }
-                    _ui.update { it.copy(accounts = emails, setupBusy = false, message = "Signed in from your phone") }
+                    // Only announce "Signed in from your phone" when we were actually on
+                    // the login screen (a genuine handoff). A PATH_AUTH emit that lands
+                    // during Loading is a routine startup auth refresh — advancing is
+                    // fine but the message would be misleading, so suppress it there.
+                    val wasSignedOut = screen == WearScreen.SignedOut
+                    _ui.update {
+                        it.copy(
+                            accounts = emails,
+                            setupBusy = false,
+                            message = if (wasSignedOut) "Signed in from your phone" else it.message,
+                        )
+                    }
                     loadGarage()
                 }
             }
@@ -690,35 +712,45 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      * fetched here -- that happens lazily per car via [onCarShown].
      */
     private suspend fun loadGarage() {
-        // Companion mode: rely on phone-synced snapshots. Request a push if we have nothing.
-        vehicles = if (snapshots.isNotEmpty()) {
-            snapshots.values.map { it.toVehicle() }
-        } else {
-            runCatching { WearComms.requestSync(ctx, "", refresh = false) }
-            // Standalone (no phone to push snapshots): fetch the vehicle list over
-            // the watch's own connection and seed the snapshot store - otherwise a
-            // watch-only sign-in landed on a permanently empty garage, since
-            // nothing else on the watch ever calls the vehicle-list API.
-            if (WearComms.phoneNodeId(ctx) == null) {
-                val fetched = sessionStore.loggedInBrands().flatMap { b ->
-                    runCatching { BlueLinkGate.statusMutex.withLock { repoFor(b).vehicles() } }.getOrDefault(emptyList())
-                }
-                if (fetched.isNotEmpty()) {
-                    val snaps = fetched.map {
-                        com.bloo.bluelink.data.VehicleSnapshot(
-                            vin = it.vin, name = it.name, model = it.model, isEv = it.isEv,
-                            regId = it.regId, generation = it.generation,
-                            brandIndicator = it.brandIndicator,
-                        )
+        // Re-entry guard: bootstrap() and the auth-arrival collector can both call
+        // this during a startup PATH_AUTH refresh — coalesce into one so we don't run
+        // the (standalone) vehicle-list fetch twice. viewModelScope is Main.immediate,
+        // so this flag is only ever read/written on the main thread → no lock needed.
+        if (garageLoading) return
+        garageLoading = true
+        try {
+            // Companion mode: rely on phone-synced snapshots. Request a push if we have nothing.
+            vehicles = if (snapshots.isNotEmpty()) {
+                snapshots.values.map { it.toVehicle() }
+            } else {
+                runCatching { WearComms.requestSync(ctx, "", refresh = false) }
+                // Standalone (no phone to push snapshots): fetch the vehicle list over
+                // the watch's own connection and seed the snapshot store - otherwise a
+                // watch-only sign-in landed on a permanently empty garage, since
+                // nothing else on the watch ever calls the vehicle-list API.
+                if (WearComms.phoneNodeId(ctx) == null) {
+                    val fetched = sessionStore.loggedInBrands().flatMap { b ->
+                        runCatching { BlueLinkGate.statusMutex.withLock { repoFor(b).vehicles() } }.getOrDefault(emptyList())
                     }
-                    runCatching { snapshotStore.saveVehicles(snaps) }
-                    snapshots = snaps.associateBy { s -> s.vin }
-                }
-                fetched
-            } else emptyList()
+                    if (fetched.isNotEmpty()) {
+                        val snaps = fetched.map {
+                            com.bloo.bluelink.data.VehicleSnapshot(
+                                vin = it.vin, name = it.name, model = it.model, isEv = it.isEv,
+                                regId = it.regId, generation = it.generation,
+                                brandIndicator = it.brandIndicator,
+                            )
+                        }
+                        runCatching { snapshotStore.saveVehicles(snaps) }
+                        snapshots = snaps.associateBy { s -> s.vin }
+                    }
+                    fetched
+                } else emptyList()
+            }
+            publish(WearScreen.Ready)
+            // Status is fetched lazily, per car, as pages are shown (see onCarShown).
+        } finally {
+            garageLoading = false
         }
-        publish(WearScreen.Ready)
-        // Status is fetched lazily, per car, as pages are shown (see onCarShown).
     }
 
     /** Called when a car page becomes visible — fetch its status once per session. */
@@ -732,11 +764,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { snapshotStore.setSelected(vin) }
             requestWidgetUpdates()
         }
-        if (vin in sessionFetched) return
         if (vehicles.none { it.vin == vin }) return
+        // Weather is attempted on EVERY view (its own guard is success-based), before
+        // the status-fetch gate — so a car whose coordinates only arrive later in the
+        // session still gets its standalone weather once the coords exist, instead of
+        // being locked out by the one-shot sessionFetched gate.
+        fetchWeatherStandalone(vin)
+        if (vin in sessionFetched) return
         sessionFetched.add(vin)
         refreshStatus(vin, surface = false)
-        fetchWeatherStandalone(vin)
     }
 
     /** Standalone weather: when NO phone is reachable, the watch fetches current
@@ -747,15 +783,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  car has no known location, or when we already have a recent reading. AI is
      *  deliberately NOT part of this — it stays phone-only. */
     private fun fetchWeatherStandalone(vin: String) {
+        // Already have this session's standalone reading → nothing to do.
+        if (vin in weatherFetched) return
         viewModelScope.launch {
             // Only self-fetch when there's no phone to provide it.
             if (WearComms.phoneNodeId(ctx) != null) return@launch
             val car = _ui.value.cars.firstOrNull { it.vin == vin } ?: return@launch
+            // Coords may not be known yet on an early view (status hasn't landed) —
+            // just bail WITHOUT marking weatherFetched, so a later view retries once
+            // the car's location exists.
             val lat = car.lat ?: return@launch
             val lon = car.lon ?: return@launch
-            // Fetch once per session per car (onCarShown already guards re-entry via
-            // sessionFetched, so this only runs on first view of each car).
             val weather = runCatching { com.bloo.bluelink.data.WeatherApi.fetch(lat, lon) }.getOrNull() ?: return@launch
+            // Only now is it truly fetched — mark so we don't re-hit the API on every
+            // subsequent page view this session.
+            weatherFetched.add(vin)
             // Merge into the persisted extras so both this VM (via its extras
             // collector) and the tile/complication surfaces pick it up uniformly.
             val store = WearExtrasStore(ctx)
