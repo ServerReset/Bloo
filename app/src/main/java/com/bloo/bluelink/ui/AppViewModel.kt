@@ -861,6 +861,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
         val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
+        // These fields used to be omitted here (only loadGarageInner read them),
+        // so an imported change to pebble visibility, collapse state, hotspots,
+        // Quick-tile config, or the shortcut set wrote DataStore but never reached
+        // the running UiState -- the garage kept rendering the pre-sync layout
+        // until a full cold-start reload. That was the "hid a pebble / moved a
+        // Quick-tile, synced, nothing changed" bug. Read them here too, mirroring
+        // loadGarageInner exactly (incl. its firstRun empty-collapsed rule).
+        val firstRun = !settingsStore.onboardingSeen()
+        val collapsed = if (firstRun) emptySet()
+        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
+        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
+        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
+        val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
+        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it) }
+        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it) }
+        val tileBackground = settingsStore.tileBackground()
+        val tileLiveRefresh = settingsStore.tileLiveRefresh()
+        val shortcutSet = settingsStore.enabledShortcuts()
         _state.update {
             it.copy(
                 seatConfigs = seatConfigs,
@@ -871,8 +889,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 lastServiceMiles = lastSvc,
                 serviceIntervalMiles = svcInterval,
                 climatePresets = climatePresets,
+                collapsedPebbles = collapsed,
+                hiddenPebbles = hidden,
+                hotspotSections = hotspots,
+                tileConfigs = tileConfigs,
+                tileLabels = tileLabels,
+                tileClimateTargets = tileClimateTargets,
+                tileBackground = tileBackground,
+                tileLiveRefresh = tileLiveRefresh,
+                shortcutSet = shortcutSet,
             )
         }
+        // Quick-tile / shortcut changes must also re-push the launcher shortcuts,
+        // exactly as loadGarageInner does, so an imported shortcut-set change is
+        // reflected in the app-icon long-press menu and not just in-app.
+        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet)
     }
 
     /**
@@ -982,6 +1013,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         runDriveSyncNow()
                     }
                 }
+        }
+        // One initial pull on launch when sync is configured. The passive
+        // refreshing-transition collector above only fires when _state.refreshing
+        // actually toggles, but cold-start status prefetch (ensureStatus) runs
+        // with surfaceErrors=false and never flips `refreshing`, so a device that
+        // just cold-starts and isn't touched would keep showing its cached
+        // (possibly stale, [self]-only) device registry and never pull a peer's
+        // changes until a manual "Sync now" / pull-to-refresh. This makes launch
+        // itself do one download+merge+upload. Safe no-op when sync is off
+        // (performDriveSync returns ran=false immediately when there's no URI).
+        viewModelScope.launch {
+            if (settingsStore.syncUri() != null) runDriveSyncNow()
         }
     }
 

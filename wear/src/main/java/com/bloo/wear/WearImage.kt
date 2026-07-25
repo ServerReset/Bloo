@@ -36,6 +36,10 @@ object WearImage {
             .build()
         return ImageLoader.Builder(context)
             .okHttpClient(client)
+            // Fade the map tile in when it finishes loading instead of popping
+            // from the placeholder icon to the image. Applies to every request
+            // through this loader (only the OSM map thumbnail uses it today).
+            .crossfade(true)
             .memoryCache {
                 MemoryCache.Builder(context)
                     .maxSizePercent(0.01)

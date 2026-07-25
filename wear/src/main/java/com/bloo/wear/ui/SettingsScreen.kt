@@ -475,9 +475,20 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     // action — so this is display-only.
                     ui.settings?.syncDeviceSummary?.takeIf { it.isNotBlank() }?.let { summary ->
                         Text(
-                            summary,
+                            "Devices".uppercase(),
                             style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = EyebrowLetterSpacing,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            summary,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            // A multi-device summary can be long; cap it so it can't
+                            // balloon and push the Sync button off a small round face.
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(6.dp))
                     }
@@ -580,6 +591,8 @@ private fun SettingGroupLabel(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = EyebrowLetterSpacing,
         color = MaterialTheme.colorScheme.primary,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp).semantics { heading() },

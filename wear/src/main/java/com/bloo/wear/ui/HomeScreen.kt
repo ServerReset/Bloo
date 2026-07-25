@@ -1,6 +1,7 @@
 package com.bloo.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -294,10 +295,11 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                     MaterialTheme(colorScheme = carScheme) { body() }
                 } else body()
             }
-            // One dot per car page, hugging the bottom arc (anchor 90°).
-            // Driven by currentPage (live, mid-drag) so it tracks the swipe
-            // immediately; rendered plainly (no per-dot size/color animation).
-            CurvedDots(count = count, activeIndex = carPager.currentPage, anchor = 90f, animate = false)
+            // One dot per car page, hugging the bottom arc (anchor 90°). Driven by
+            // currentPage (settles on the landed page, a discrete index), so the
+            // active dot animates its size/color on landing -- matching the tile
+            // dots on the right bezel instead of popping while those glide.
+            CurvedDots(count = count, activeIndex = carPager.currentPage, anchor = 90f, animate = true)
             // Shown once for the whole screen, above all pages.
             MessageSnackbar(ui.message, onDismiss = { vm.dismissMessage() })
         }
@@ -541,7 +543,24 @@ private fun CarColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(items = virtualList, key = { it }) { i ->
-                TileContent(tiles[i % tileCount], vm, ui, car, onSettings, onTrips, onReorder)
+                // The virtual slot is keyed by its int index (stable), but the TILE
+                // shown at that slot is tiles[i % tileCount]. On a normal scroll the
+                // tile identity at each fixed slot never changes, so this Crossfade
+                // is inert. But when an incoming SYNC reorders/adds/removes tiles
+                // (pebble reorder, hide/show, a Weather tile arriving), the identity
+                // at each slot swaps — without this the card hard-cut to its new
+                // content; the Crossfade fades old→new so a sync-driven reorder
+                // reads as motion, matching the rest of the screen's animation
+                // language. reduceMotion collapses it to an instant swap.
+                val slotTile = tiles[i % tileCount]
+                val reduceMotion = LocalReduceMotion.current
+                Crossfade(
+                    targetState = slotTile,
+                    animationSpec = tween(if (reduceMotion) 1 else 260),
+                    label = "tileSlot$i",
+                ) { tile ->
+                    TileContent(tile, vm, ui, car, onSettings, onTrips, onReorder)
+                }
             }
         }
 
@@ -1573,15 +1592,32 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
         if (car.lat != null && car.lon != null) vm.ensurePlaceName(car.vin, car.lat, car.lon)
     }
     MapThumbnail(lat, lon)
-    Spacer(Modifier.height(4.dp))
-    Text(
-        car.locationName ?: "%.4f, %.4f".format(lat, lon),
-        style = MaterialTheme.typography.bodySmall,
-        fontWeight = FontWeight.Medium,
-        textAlign = TextAlign.Center,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-    )
+    Spacer(Modifier.height(6.dp))
+    // The resolved place name is the headline of this card (matching how every
+    // sibling card leads with a titleMedium/titleSmall value); the raw-coordinate
+    // fallback, shown only until geocoding resolves, stays a quiet caption so it
+    // never competes with a real place name at the same weight.
+    val placeName = car.locationName
+    if (placeName != null) {
+        Text(
+            placeName,
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    } else {
+        Text(
+            "%.4f, %.4f".format(lat, lon),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
     if (car.engineOn) {
         Spacer(Modifier.height(2.dp))
         Text(
@@ -1691,8 +1727,9 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
         if (openCount > 0) "Open" else "Closed up",
         if (openCount > 0) "$openCount item${if (openCount == 1) "" else "s"}" else "All secure",
         valueColor = if (openCount > 0) err else null,
+        emphasize = true,
     )
-    Spacer(Modifier.height(2.dp))
+    Spacer(Modifier.height(6.dp))
     StatusRow("Engine", if (car.engineOn) "On" else "Off")
     car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
     StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
@@ -1766,8 +1803,9 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
         if (issueCount > 0) "Needs attention" else "Status",
         if (issueCount > 0) "$issueCount to check" else "All normal",
         valueColor = if (issueCount > 0) err else null,
+        emphasize = true,
     )
-    Spacer(Modifier.height(2.dp))
+    Spacer(Modifier.height(6.dp))
     if (car.tireAll != null) {
         StatusRow("Tire avg", "${car.tireAll} psi")
     }

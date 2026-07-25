@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -186,6 +187,7 @@ fun SectionCard(
                         title.uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = EyebrowLetterSpacing,
                         color = MaterialTheme.colorScheme.primary,
                         // Single line + ellipsis: card titles are short labels
                         // ("CHARGE", "CHARGE LIMITS"), and with no cap a long one
@@ -360,7 +362,14 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     val thumbShape = RoundedCornerShape(18.dp)
     Box(
         modifier
-            .size(116.dp)
+            // Fill the card width at a 1:1 aspect: the single OSM tile is square
+            // (256px) and the marker below is placed at fractional (mx,my) of the
+            // box size, so a square box keeps the marker projection exact. Filling
+            // the width removes the dead side-margins the old fixed 116dp left on
+            // round faces. (The sole caller passes no `modifier`, so this default
+            // sizing applies as-is.)
+            .fillMaxWidth()
+            .aspectRatio(1f)
             .clip(thumbShape)
             .background(placeholder)
             // Same flat surfaceContainerHigh tone as the SectionCard it sits
@@ -418,17 +427,24 @@ fun fmtMinutes(min: Int): String = com.bloo.bluelink.data.fmtMinutes(min)
 /** A label → value row used in the details card. Both sides truncate so a long
  *  value (efficiency, address, kWh) can never collide with the label on a round face. */
 @Composable
-fun StatusRow(label: String, value: String, valueColor: Color? = null) {
+fun StatusRow(label: String, value: String, valueColor: Color? = null, emphasize: Boolean = false) {
+    // A roll-up "summary" row (InfoCard "Closed up / N items", DiagnosticsCard
+    // "Needs attention / N to check") sits above a dozen identical detail rows;
+    // `emphasize` lifts it a tier (bodyMedium label / titleSmall value) so it
+    // reads as the headline instead of blending into the list beneath it.
+    val labelStyle = if (emphasize) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall
+    val valueStyle = if (emphasize) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(vertical = if (emphasize) 3.dp else 2.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             label,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = labelStyle,
+            color = if (emphasize) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (emphasize) FontWeight.Medium else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -438,9 +454,11 @@ fun StatusRow(label: String, value: String, valueColor: Color? = null) {
         // diagnostics roll-up count, ...) still popped instead of crossfading.
         AnimatedValue(
             value = value,
-            style = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.End),
+            style = valueStyle.copy(textAlign = TextAlign.End),
             color = valueColor ?: MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Medium,
+            // Emphasized rows keep titleSmall's own SemiBold (pass null so the
+            // style weight wins); plain rows stay Medium as before.
+            fontWeight = if (emphasize) null else FontWeight.Medium,
             modifier = Modifier.weight(1f, fill = false),
         )
     }

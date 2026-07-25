@@ -523,6 +523,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                         vehicles = emptyList()
                         statuses = emptyMap()
                         trips = emptyMap()
+                        // Match signOutAll(): clear the VIN-keyed weather/geocode
+                        // caches so a re-added car re-fetches instead of showing
+                        // the removed car's stale reading.
+                        weatherFetched.clear(); geocoded.clear(); placeNames = emptyMap()
                         publish()
                     }
                     return@collect
@@ -686,6 +690,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             }
             repos.clear()
             sessionFetched.clear(); tripsFetched.clear()
+            // Standalone weather/geocode caches are keyed by VIN and gated by a
+            // "fetched once" guard; if not cleared here, signing back into the
+            // SAME account (same VIN) without a process restart keeps showing the
+            // pre-sign-out weather reading and never re-resolves the place name.
+            weatherFetched.clear(); geocoded.clear(); placeNames = emptyMap()
             vehicles = emptyList(); statuses = emptyMap(); trips = emptyMap()
             // Also drop the snapshots (in-memory AND on disk): loadGarage builds
             // the garage from them, so leaving the old account's cars here made a

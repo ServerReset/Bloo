@@ -80,13 +80,21 @@ private fun blooWearTypography(): Typography {
         // Detail/body — comfortable reading size.
         bodyMedium = d.bodyMedium.copy(fontSize = 14.sp),
         bodySmall = d.bodySmall.copy(fontSize = 13.sp),
-        // Captions/helper text — clearly the quietest tier.
+        // Captions/helper text — clearly the quietest tier. Plain weight: this is
+        // the token for ordinary lowercase helper text all over the app ("Pick your
+        // own temperature", Settings descriptions), NOT just the card eyebrow. The
+        // eyebrow's Bold + wide tracking now lives at its two call sites
+        // (SectionCard title, SettingGroupLabel) via [EyebrowLetterSpacing] so this
+        // caption tier stays quiet instead of rendering every helper line bold.
         labelMedium = d.labelMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
-        // The uppercase card "eyebrow" (SectionCard title): small + wide-tracked so
-        // it reads as a header label, not a shrunken caption competing with body.
-        labelSmall = d.labelSmall.copy(fontSize = 11.sp, letterSpacing = 0.8.sp, fontWeight = FontWeight.Bold),
+        labelSmall = d.labelSmall.copy(fontSize = 11.sp),
     )
 }
+
+/** Letter-spacing for the uppercase card/section "eyebrow" labels (SectionCard
+ *  title, SettingGroupLabel). Shared so both eyebrows track identically without
+ *  the value leaking into the plain [Typography.labelSmall] caption tier. */
+val EyebrowLetterSpacing = 0.8.sp
 
 /**
  * Wear OS Material 3 (Expressive) theme. When the phone has synced its resolved
