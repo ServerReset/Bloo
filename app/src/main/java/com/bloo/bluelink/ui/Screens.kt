@@ -6821,7 +6821,12 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
             trips.isEmpty() -> Text("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val tMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
-                trips.take(8).forEach { TripRow(it, metric = tMetric) }
+                // COVER SCREEN: a small "Recent trips" header + only the 3 most recent,
+                // so the tile fits the small square without scrolling and you land at
+                // the top. Phone keeps up to 8 with no header. Gated on forceExpanded.
+                val coverGlance = LocalForceExpanded.current
+                if (coverGlance) SectionLabel("Recent trips")
+                trips.take(if (coverGlance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
             }
         }
     }
@@ -7140,6 +7145,17 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         status?.breakOilStatus == true || status?.smartKeyBatteryWarning == true
     }
     val diagSummary = remember(rows) { if (rows.isEmpty()) "No data" else "${rows.count { !it.indent }} checks" }
+    // Count of actual problems (same five predicates as hasWarning) for the cover
+    // health-verdict hero below. diagSummary is a *checks* count, not an issue count.
+    val issueCount = remember(status) {
+        listOf(
+            status?.tirePressureLamp?.hasWarning == true,
+            status?.lowFuelLight == true,
+            status?.washerFluidStatus == true,
+            status?.breakOilStatus == true,
+            status?.smartKeyBatteryWarning == true,
+        ).count { it }
+    }
     Pebble(
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
         summary = diagSummary,
@@ -7152,6 +7168,26 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             contentDescription = "Diagnostics warning",
         ) else null,
     ) {
+        // COVER SCREEN only: a health-verdict hero — green check + "All systems OK",
+        // or an error warning + "N issues" — so the tile reads at a glance instead of
+        // as a flat list of ~12 rows. Gated on LocalForceExpanded (phone untouched).
+        if (LocalForceExpanded.current && status != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    if (hasWarning) Icons.Filled.Warning else Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = if (hasWarning) MaterialTheme.colorScheme.error else ChargeGreen,
+                    modifier = Modifier.size(30.dp),
+                )
+                Text(
+                    if (hasWarning) (if (issueCount == 1) "1 issue" else "$issueCount issues") else "All systems OK",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (hasWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+        }
         if (rows.isEmpty()) {
             Text(
                 "No diagnostics yet.",
@@ -7396,6 +7432,30 @@ private fun ClimatePebble(
             spinning = climateOn,
         ),
     ) {
+        // COVER SCREEN only: lead with a big on/off + setpoint hero so the climate
+        // tile reads at a glance instead of opening on a wall of sliders. Gated on
+        // LocalForceExpanded (phone untouched); shown even while driving.
+        if (LocalForceExpanded.current) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    Icons.Filled.AcUnit,
+                    contentDescription = null,
+                    tint = if (climateOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(30.dp),
+                )
+                Text(
+                    if (climateOn) "On" else "Off",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (climateOn) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                status?.airTemp?.value?.let {
+                    Text(degLabel(it, fahrenheit), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+        }
         if (driving) {
             if (climateOn) {
                 Text(
@@ -8282,17 +8342,31 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
             }
             else -> {
                 val tint = weatherTint(w.condition, w.isDay)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // COVER SCREEN: center the icon+temp and make the temp bigger so the
+                // tile reads as a weather face; the phone keeps the left-aligned
+                // icon+column layout. Gated on LocalForceExpanded.
+                val coverGlance = LocalForceExpanded.current
+                // Only up-size the temp when the user's font scale is modest — at a
+                // large display/font size (the mom's setup) displayMedium + the fixed
+                // 64dp icon can exceed the narrow cover width and ellipsize the temp
+                // to "72…". Above ~1.15x, keep displaySmall so the value stays whole.
+                val bigTemp = coverGlance && LocalDensity.current.fontScale <= 1.15f
+                Row(
+                    modifier = if (coverGlance) Modifier.fillMaxWidth() else Modifier,
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = if (coverGlance) Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
+                                            else Arrangement.spacedBy(16.dp),
+                ) {
                     Icon(
                         weatherIcon(w.condition, w.isDay),
                         contentDescription = w.condition.label,
                         tint = tint,
                         modifier = Modifier.size(64.dp),
                     )
-                    Column(Modifier.weight(1f)) {
+                    Column(if (coverGlance) Modifier else Modifier.weight(1f)) {
                         RollingNumber(
                             text = w.tempLabel(fahrenheit),
-                            style = MaterialTheme.typography.displaySmall,
+                            style = if (bigTemp) MaterialTheme.typography.displayMedium else MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(w.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -8304,8 +8378,12 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
                 Spacer(Modifier.height(10.dp))
                 StatusRow("Feels like", w.feelsLikeLabel(fahrenheit))
                 w.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
-                w.humidity?.let { StatusRow("Humidity", "$it%") }
-                StatusRow("Wind", formatSpeed(w.windKph, appearance.unitSystem == "metric"))
+                // Humidity + wind are secondary; hide them on the cover so it reads as
+                // a clean weather face (feels-like + high/low stay).
+                if (!coverGlance) {
+                    w.humidity?.let { StatusRow("Humidity", "$it%") }
+                    StatusRow("Wind", formatSpeed(w.windKph, appearance.unitSystem == "metric"))
+                }
             }
         }
     }
