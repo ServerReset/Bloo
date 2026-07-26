@@ -76,14 +76,20 @@ object UpdateChecker {
     }
 
     /**
-     * "Remind me in a few days": suppress even a still-due check until then.
-     * Simply stamps a future timestamp ([UPDATE_SNOOZE_MS] from now) into
-     * [UpdateStore]; [checkPhone] compares `now < snoozeUntil()` on every
-     * non-forced call, so this doesn't cancel or reschedule anything by itself
-     * -- it just makes future non-forced checks short-circuit to up-to-date
-     * until the stamped time passes.
+     * "Remind me": suppress even a still-due check until [durationMs] from now.
+     * Stamps a future timestamp into [UpdateStore]; [checkPhone] compares
+     * `now < snoozeUntil()` on every non-forced call, so this doesn't cancel or
+     * reschedule anything by itself -- it just makes future non-forced checks
+     * short-circuit to up-to-date until the stamped time passes.
+     *
+     * [durationMs] defaults to [UPDATE_SNOOZE_MS] for any existing caller, but the
+     * update-tile "Remind me" passes 1 day so the snooze window MATCHES its 1-day
+     * reminder worker (UpdateReminderWorker). Keeping them aligned means that even
+     * if the worker is delayed by Doze, a normal refresh revives the tile at ~1 day
+     * too -- rather than the tile staying suppressed for the full default window
+     * while only the (possibly-late) worker could bring it back.
      */
-    suspend fun snooze(context: Context) {
-        UpdateStore(context).setSnoozeUntil(System.currentTimeMillis() + UPDATE_SNOOZE_MS)
+    suspend fun snooze(context: Context, durationMs: Long = UPDATE_SNOOZE_MS) {
+        UpdateStore(context).setSnoozeUntil(System.currentTimeMillis() + durationMs)
     }
 }

@@ -67,6 +67,14 @@ private const val WEATHER_TTL_MS = 15 * 60 * 1000L
 // per keystroke.
 private const val AUTO_PUSH_DEBOUNCE_MS = 2000L
 
+// How long the update tile lingers with an "Undo" strip after "Not now" before
+// the dismiss commits — the call-back window.
+private const val UPDATE_DISMISS_UNDO_MS = 4500L
+
+// "Remind me": both the reminder-notification worker delay and the matching
+// snooze window. Kept as one value so the two stay aligned (see snoozeUpdate).
+private const val UPDATE_REMINDER_DELAY_MS = 24L * 60 * 60 * 1000L
+
 sealed interface Screen {
     data object Login : Screen
     /** No vehicles enrolled (or still loading the first time). */
@@ -162,10 +170,14 @@ data class UiState(
      *  one. Drives the standalone update tile that's pinned right below the
      *  hero tile -- null means no tile, regardless of [updateTileDismissed]. */
     val updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
-    /** "Remind me"/"Not now" on the update tile: hides it for this build
-     *  without forgetting [updateAvailable] -- a later check that finds a
-     *  *different* build clears this so the tile can come back. */
+    /** "Not now" on the update tile: hides it until the NEXT update check (any
+     *  Available result clears it — see checkForUpdate). "Remind me" also sets
+     *  this but pairs it with a snooze + a 1-day reminder worker. */
     val updateTileDismissed: Boolean = false,
+    /** True during the brief undo/call-back window after the user dismisses the
+     *  update tile: the tile stays visible with an "Undo" strip; a short timer
+     *  then commits [updateTileDismissed] unless the user calls it back. */
+    val updatePendingDismiss: Boolean = false,
     /** True while the update APK is being downloaded in-app (see
      *  AppViewModel.downloadUpdateInBackground). */
     val updateDownloading: Boolean = false,
@@ -1132,15 +1144,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update {
                         // A previously-downloaded APK is only still good if it's
                         // for this same build -- a newer one showing up means the
-                        // cached file is stale. Same test for the dismissed flag:
-                        // a *different* build re-surfaces the tile even if the
-                        // last one was dismissed, but re-finding the same build
-                        // on a later refresh doesn't un-dismiss it.
+                        // cached file is stale.
                         val sameBuild = it.updateAvailable?.run?.runNumber == result.info.run.runNumber
                         it.copy(
                             updateAvailable = result.info,
                             updateApkReady = it.updateApkReady && sameBuild,
-                            updateTileDismissed = it.updateTileDismissed && sameBuild,
+                            // "Not now" only hides the tile until the NEXT check: any
+                            // Available result (even the same build re-found on a
+                            // refresh) clears the dismissed flag so the tile comes
+                            // back. ("Remind me" is the one that stays hidden longer —
+                            // it sets a snooze so checkPhone short-circuits to UpToDate
+                            // until the reminder worker clears it, so we never reach
+                            // this branch while snoozed.) A pending (undo-window)
+                            // dismiss is also cleared so a refresh mid-countdown just
+                            // keeps the tile.
+                            updateTileDismissed = false,
+                            updatePendingDismiss = false,
                         )
                     }
                 is com.bloo.bluelink.update.UpdateCheckResult.Failed -> Unit // silent -- next refresh tries again
@@ -1456,18 +1475,45 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
 
-    /** "Not now" on the update tile: the checker only ever runs once per cold
-     *  start anyway (its own debounce), so just hiding the tile in memory is
-     *  enough - no persisted state needed. updateAvailable is left alone so a
-     *  later refresh finding the same build doesn't re-show it, but a genuinely
-     *  different build still will (see checkForUpdate's sameBuild check). */
-    fun dismissUpdate() = _state.update { it.copy(updateTileDismissed = true) }
+    /** "Not now" on the update tile — but with a brief call-back window: instead
+     *  of hiding the tile instantly, this starts an undo countdown ([updatePending-
+     *  Dismiss]) during which the tile stays visible with an "Undo" strip. After
+     *  [UPDATE_DISMISS_UNDO_MS] the dismiss commits (tile hides until the next
+     *  update check re-surfaces it — see checkForUpdate, which clears the flag on
+     *  any Available result). The job is cancel-and-restart so tapping dismiss
+     *  again just restarts the window; [undoDismissUpdate] cancels it. */
+    private var updateDismissJob: kotlinx.coroutines.Job? = null
+    fun dismissUpdate() {
+        updateDismissJob?.cancel()
+        _state.update { it.copy(updatePendingDismiss = true) }
+        updateDismissJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(UPDATE_DISMISS_UNDO_MS)
+            _state.update { it.copy(updateTileDismissed = true, updatePendingDismiss = false) }
+        }
+    }
 
-    /** "Remind me in a few days": persists a snooze that outlasts the checker's
-     *  normal debounce window too. */
+    /** "Undo" during the call-back window: cancel the pending dismiss so the tile
+     *  stays. No-op if the window already elapsed (the tile is gone by then, but
+     *  the next refresh brings it back anyway). */
+    fun undoDismissUpdate() {
+        updateDismissJob?.cancel()
+        _state.update { it.copy(updatePendingDismiss = false, updateTileDismissed = false) }
+    }
+
+    /** "Remind me": hide the tile now, snooze checks so it doesn't re-surface on
+     *  every refresh in the meantime, and schedule a one-time worker that in ~1 day
+     *  posts a reminder notification AND clears the snooze so the tile comes back.
+     *  Skips the undo window — "Remind me" is already an explicit deferral. */
     fun snoozeUpdate() {
-        _state.update { it.copy(updateTileDismissed = true) }
-        viewModelScope.launch { com.bloo.bluelink.update.UpdateChecker.snooze(getApplication()) }
+        updateDismissJob?.cancel()
+        _state.update { it.copy(updateTileDismissed = true, updatePendingDismiss = false) }
+        viewModelScope.launch {
+            // Snooze for 1 day to match the reminder worker's 1-day delay: if the
+            // worker is delayed by Doze, a normal refresh still revives the tile at
+            // ~1 day rather than it staying hidden for the longer default window.
+            com.bloo.bluelink.update.UpdateChecker.snooze(getApplication(), UPDATE_REMINDER_DELAY_MS)
+            com.bloo.bluelink.work.UpdateReminderWorker.schedule(getApplication())
+        }
     }
 
     /** Fixed on-disk location for the downloaded update APK, inside the app's

@@ -245,6 +245,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -4040,6 +4041,8 @@ private fun HeroHeader(
 @Composable
 private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Modifier = Modifier) {
     val info = state.updateAvailable
+    // Stays visible during the pending-dismiss (undo) window — only the committed
+    // updateTileDismissed truly hides it.
     AnimatedVisibility(
         visible = info != null && !state.updateTileDismissed,
         enter = fadeIn(tween(220)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
@@ -4125,9 +4128,28 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
-                MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
+            if (state.updatePendingDismiss) {
+                // Call-back window: the tile is on its way out (a timer in the VM will
+                // commit the dismiss shortly). Offer a single prominent "Keep it" so
+                // the user can pull it back before it truly goes.
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Dismissing…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MorphTextButton("Keep it", onClick = vm::undoDismissUpdate, enabled = !state.updateDownloading)
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
+                    MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
+                }
             }
         }
     }
@@ -5264,6 +5286,22 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
             (it != "update" || state.updateAvailable != null)
     }
     val hotDrag = LocalHotSeatDrag.current
+    // PERF: each car-pager page composes this whole pebble stack. Composing all
+    // 8-10 pebbles eagerly (incl. ClimatePebble/ChargePebble's top-level effects,
+    // which run BEFORE their Pebble() call regardless of collapsed state) on the
+    // fling-settle frame is the biggest remaining car-swipe cost. So: compose the
+    // hero + first EAGER_PEBBLES sections immediately (they're the only ones
+    // above the fold), stub the rest with a collapsed-height placeholder for ONE
+    // frame, then fill them in once idle (`filled` flips after the first frame).
+    // Keyed on VIN so a disposed→recomposed page re-defers cheaply; a page kept
+    // warm by beyondViewportPageCount=1 fills before the user ever swipes to it.
+    // CRITICAL: `items` stays the FULL section list, so ReorderColumn's per-item
+    // Box/key/animatePlacement/onSizeChanged/drag/semantics all exist from frame
+    // one — only the body inside the content lambda is deferred, so the reorder
+    // model is 100% intact and the off-screen stub→real swap is never visible.
+    var filled by remember(v.vin) { mutableStateOf(false) }
+    LaunchedEffect(v.vin) { withFrameNanos { }; filled = true }
+    val eager = remember(sections) { sections.take(EAGER_PEBBLES).toSet() }
     ReorderColumn(
         items = sections,
         keyOf = { it },
@@ -5293,9 +5331,22 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
         staggerInOnColdStart = true,
         introKey = v.vin,
     ) { section, dragHandle, _ ->
-        SinglePebble(section, v, state, vm, dragHandle)
+        if (filled || section in eager) {
+            SinglePebble(section, v, state, vm, dragHandle)
+        } else {
+            // One-frame off-screen placeholder: reserves ~collapsed pebble height so
+            // the list doesn't visibly jump when the real body fills in, and carries
+            // the dragHandle so ReorderColumn's item is fully formed. Below the fold,
+            // so this transient state is never seen or interacted with.
+            Box(Modifier.fillMaxWidth().height(PebbleHeaderHeight).then(dragHandle))
+        }
     }
 }
+
+/** How many pebbles (from the top, incl. the hero summary) the per-car stack
+ *  composes eagerly; the rest fill in one frame later, off the swipe. 3 comfortably
+ *  covers everything above the fold on a phone so the visible region never stubs. */
+private const val EAGER_PEBBLES = 3
 
 /** Renders one pebble by section name (used by the list and the hot spot). */
 @Composable
