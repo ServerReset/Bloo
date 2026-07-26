@@ -70,6 +70,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -284,6 +287,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.verticalDrag
@@ -583,7 +588,15 @@ fun BlooApp(vm: AppViewModel) {
                         GarageScreen(state, vm)
                     }
                 }
-                Screen.Settings -> SettingsScreen(vm)
+                // The full phone Settings (search + keyboard, photo pickers, crop,
+                // drag-reorder lists, sign-out) is unusable crammed onto a ~1-inch
+                // flip cover — it used to render there verbatim. On the cover, show a
+                // compact "manage on your phone" card instead; the real settings are
+                // one unfold away. (The cover's gear button is also removed, so this
+                // is a belt-and-suspenders fallback for the back-stack landing here.)
+                Screen.Settings ->
+                    if (isCompactCoverScreen()) CoverManageOnPhoneCard(vm)
+                    else SettingsScreen(vm)
             }
         }
     }
@@ -2557,11 +2570,18 @@ private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
  * displayCutout.boundingRects (which is why the decorative ring positions
  * correctly) but exposes ZERO safeInset/displayCutout WINDOW insets for it — so
  * windowInsetsPadding(displayCutout) alone reserves nothing and content sits under
- * the bump (observed on the user's device). This reads the rects directly and, for
- * a CORNER bump, reserves BOTH edges it touches (the old code padded only the
- * single nearest edge). Read on each call (not a remember(view) snapshot) so it
- * reflects insets once they've been dispatched. Only a bump within [edgeBandPx] of
- * an edge counts — a rect floating in the middle isn't an edge cutout.
+ * the bump (observed on the user's device). This reads the rects directly (each
+ * call, not a remember(view) snapshot, so it reflects insets once dispatched).
+ *
+ * CRITICAL for a CORNER bump: PaddingValues insets a WHOLE edge, so reserving both
+ * edges a corner bump touches removes an L-shaped chunk from two full sides — for a
+ * bottom-right bump that's a full-HEIGHT right strip ~45% of the width, which
+ * crushed every tile's content into the left half (observed: values wrapping
+ * "Locke/d"/"Runnin/g", range clipped to "26…"). A corner bump only occludes its
+ * corner, so we reserve only the edge with the SMALLER intrusion — for a bottom-
+ * right bump that's the bump's HEIGHT (small), pushing content up just enough to
+ * clear it while reclaiming the full width. A true single-edge cutout still pads
+ * that one edge. Only a bump within [edgeBandPx] of an edge counts.
  */
 @Composable
 private fun cameraBumpPadding(): PaddingValues {
@@ -2577,11 +2597,27 @@ private fun cameraBumpPadding(): PaddingValues {
     val margin = with(density) { 8.dp.toPx() } // extra breathing room past the bump
     var left = 0f; var top = 0f; var right = 0f; var bottom = 0f
     for (r in cutout.boundingRects) {
-        // For each edge the rect is flush against, reserve past the rect + margin.
-        if (r.left <= edgeBandPx) left = maxOf(left, r.right + margin)
-        if (r.top <= edgeBandPx) top = maxOf(top, r.bottom + margin)
-        if (vw - r.right <= edgeBandPx) right = maxOf(right, (vw - r.left) + margin)
-        if (vh - r.bottom <= edgeBandPx) bottom = maxOf(bottom, (vh - r.top) + margin)
+        // Which horizontal / vertical edge (if any) this rect hugs, and how far it
+        // intrudes from that edge (rect extent + margin).
+        val hIntr: Float? = when {
+            r.left <= edgeBandPx -> r.right + margin          // hugs LEFT
+            vw - r.right <= edgeBandPx -> (vw - r.left) + margin // hugs RIGHT
+            else -> null
+        }
+        val vIntr: Float? = when {
+            r.top <= edgeBandPx -> r.bottom + margin          // hugs TOP
+            vh - r.bottom <= edgeBandPx -> (vh - r.top) + margin // hugs BOTTOM
+            else -> null
+        }
+        // Corner bump (hugs one horizontal AND one vertical edge): reserve ONLY the
+        // smaller intrusion so we don't remove a full strip from both sides. Edge
+        // bump: reserve just that edge. `hOnly`/`vOnly` pick which axis wins.
+        val hOnly = hIntr != null && (vIntr == null || hIntr <= vIntr)
+        val vOnly = vIntr != null && (hIntr == null || vIntr < hIntr)
+        if (hOnly && r.left <= edgeBandPx) left = maxOf(left, hIntr!!)
+        if (hOnly && vw - r.right <= edgeBandPx) right = maxOf(right, hIntr!!)
+        if (vOnly && r.top <= edgeBandPx) top = maxOf(top, vIntr!!)
+        if (vOnly && vh - r.bottom <= edgeBandPx) bottom = maxOf(bottom, vIntr!!)
     }
     return with(density) {
         PaddingValues(start = left.toDp(), top = top.toDp(), end = right.toDp(), bottom = bottom.toDp())
@@ -3043,6 +3079,683 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
 }
 
 /**
+ * Measured, adaptive metrics for the cover-screen content region, provided by
+ * [CoverScaffold] via [LocalCoverMetrics]. Tiles read this instead of guessing:
+ * everything is derived from the REAL available space, so the cover adapts to any
+ * cover size, aspect, camera-bump position, and font scale rather than cramming
+ * against fixed assumptions.
+ *
+ * @property widthDp / heightDp measured size of the content region (post-inset).
+ * @property isTiny true when the shorter usable side is below [COVER_TINY_DP] —
+ *   tiles show fewer secondary rows / a tighter type step when tiny.
+ * @property contentPadding the single merged inset (nav bar ∪ display cutout ∪
+ *   camera-bump clearance ∪ base gutter), applied ONCE by the tile region.
+ */
+@androidx.compose.runtime.Immutable
+data class CoverMetrics(
+    val widthDp: Float,
+    val heightDp: Float,
+    val isTiny: Boolean,
+    val contentPadding: PaddingValues,
+)
+
+private val LocalCoverMetrics = staticCompositionLocalOf<CoverMetrics?> { null }
+
+/** Below this (shorter usable side, dp) the cover is "tiny" — trim to essentials. */
+private const val COVER_TINY_DP = 300f
+
+/**
+ * Per-edge camera-bump clearance in dp, computed from the display cutout rects for
+ * ANY bump position. This is the generalized, corner-safe successor to the old
+ * cameraBumpPadding: for a CORNER bump (rect hugging one horizontal AND one
+ * vertical edge) it reserves ONLY the shallower-intruding axis — so a bottom-right
+ * bump pushes content up by its (small) height instead of carving a full-height
+ * strip off the width. A true single-edge notch pads just that edge. Returns
+ * (start, top, end, bottom) in dp; zeros pre-API-28 or with no cutout.
+ */
+private data class EdgeDp(val start: Float, val top: Float, val end: Float, val bottom: Float)
+
+@Composable
+private fun cutoutClearanceDp(): EdgeDp {
+    val view = LocalView.current
+    val density = LocalDensity.current
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return EdgeDp(0f, 0f, 0f, 0f)
+    val cutout = view.rootWindowInsets?.displayCutout ?: return EdgeDp(0f, 0f, 0f, 0f)
+    val vw = view.width
+    val vh = view.height
+    if (vw <= 0 || vh <= 0) return EdgeDp(0f, 0f, 0f, 0f)
+    val edgeBandPx = with(density) { 24.dp.toPx() }
+    val margin = with(density) { 8.dp.toPx() }
+    var left = 0f; var top = 0f; var right = 0f; var bottom = 0f
+    for (r in cutout.boundingRects) {
+        val hIntr: Float? = when {
+            r.left <= edgeBandPx -> r.right + margin
+            vw - r.right <= edgeBandPx -> (vw - r.left) + margin
+            else -> null
+        }
+        val vIntr: Float? = when {
+            r.top <= edgeBandPx -> r.bottom + margin
+            vh - r.bottom <= edgeBandPx -> (vh - r.top) + margin
+            else -> null
+        }
+        // Corner bump: reserve only the smaller intrusion so the opposite full
+        // dimension is reclaimed. Edge notch: reserve that one edge.
+        val hOnly = hIntr != null && (vIntr == null || hIntr <= vIntr)
+        val vOnly = vIntr != null && (hIntr == null || vIntr < hIntr)
+        if (hOnly && r.left <= edgeBandPx) left = maxOf(left, hIntr!!)
+        if (hOnly && vw - r.right <= edgeBandPx) right = maxOf(right, hIntr!!)
+        if (vOnly && r.top <= edgeBandPx) top = maxOf(top, vIntr!!)
+        if (vOnly && vh - r.bottom <= edgeBandPx) bottom = maxOf(bottom, vIntr!!)
+    }
+    return with(density) { EdgeDp(left.toDp().value, top.toDp().value, right.toDp().value, bottom.toDp().value) }
+}
+
+/**
+ * The adaptive cover-screen scaffold. Measures the REAL available space with
+ * BoxWithConstraints and merges every inset source (nav bar, display cutout,
+ * corner-safe camera-bump clearance, a small base gutter) into ONE contentPadding
+ * per edge via max() — never additively — so a device that reports the bump both
+ * as a window inset AND a boundingRect reserves it exactly once (this was the
+ * "crammed into the left half" bug). Exposes [CoverMetrics] via [LocalCoverMetrics]
+ * and clamps the subtree font scale so a huge system font can't overflow the tiny
+ * face. The scaffold itself does NOT apply the padding — the tile region reads
+ * metrics.contentPadding — so full-bleed siblings (rings, rail) stay full-bleed.
+ */
+@Composable
+private fun CoverScaffold(
+    reserveRailGutter: Boolean,
+    content: @Composable BoxWithConstraintsScope.(CoverMetrics) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val layoutDir = LocalLayoutDirection.current
+        val wDp = maxWidth.value
+        val hDp = maxHeight.value
+        // Gentle base gutter off the shorter side so a small cover doesn't lose a
+        // fixed chunk; extra end gutter when the tile-scrubber rail is shown.
+        val gutterScale = (minOf(wDp, hDp) / 300f).coerceIn(0.8f, 1.2f)
+        val baseSide = 10f * gutterScale
+        val baseEnd = (if (reserveRailGutter) 22f else 10f) * gutterScale
+        val cut = cutoutClearanceDp()
+        val sys = WindowInsets.navigationBars.union(WindowInsets.displayCutout).asPaddingValues()
+        val sysStart = sys.calculateStartPadding(layoutDir).value
+        val sysTop = sys.calculateTopPadding().value
+        val sysEnd = sys.calculateEndPadding(layoutDir).value
+        val sysBottom = sys.calculateBottomPadding().value
+        // Single merged inset per edge — the whole point: max(), not sum.
+        val padStart = maxOf(baseSide, cut.start, sysStart)
+        val padTop = maxOf(baseSide, cut.top, sysTop)
+        val padEnd = maxOf(baseEnd, cut.end, sysEnd)
+        val padBottom = maxOf(12f * gutterScale, cut.bottom, sysBottom)
+        val usableW = (wDp - padStart - padEnd).coerceAtLeast(0f)
+        val usableH = (hDp - padTop - padBottom).coerceAtLeast(0f)
+        val isTiny = minOf(usableW, usableH) < COVER_TINY_DP
+        val metrics = CoverMetrics(
+            widthDp = usableW,
+            heightDp = usableH,
+            isTiny = isTiny,
+            contentPadding = PaddingValues(start = padStart.dp, top = padTop.dp, end = padEnd.dp, bottom = padBottom.dp),
+        )
+        // Coarse font-scale clamp for the whole cover subtree so a large system font
+        // can't blow past the measured region (FittedText is the fine guard on top).
+        val cappedFont = density.fontScale.coerceAtMost(if (isTiny) 1.15f else 1.3f)
+        CompositionLocalProvider(
+            LocalCoverMetrics provides metrics,
+            LocalDensity provides Density(density.density, cappedFont),
+        ) {
+            content(metrics)
+        }
+    }
+}
+
+// ===================================================================================
+// Cover tile toolkit — a small, flexible, modular interface for the flip cover.
+//
+// Every cover tile is one CoverTile(...) { body }: a frosted card with a fixed
+// header (icon + title), an auto-fit body that fills the measured space, and an
+// optional pinned bottom action. Bodies are built from CoverHero / CoverStat /
+// CoverAction, all of which read LocalCoverMetrics and use FittedText so nothing
+// crams, clips, or wraps mid-word at any cover size or font scale. Tiles are
+// registered in COVER_TILES (id -> composable); the pager dispatch is a registry
+// lookup, so adding/reordering/removing a cover tile is a one-line change and can
+// never fall through to a dense phone pebble.
+// ===================================================================================
+
+/**
+ * The shared frame for a cover tile. [action], when non-null, is pinned to the
+ * bottom (always reachable regardless of body content) — this bakes in the
+ * "cover action must stay tappable" fix. The body gets a weight(1f) region and
+ * the current [CoverMetrics] (never null under [CoverScaffold]; a Regular default
+ * is substituted defensively so a tile is still previewable off the cover).
+ */
+@Composable
+private fun CoverTile(
+    icon: ImageVector,
+    title: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
+    body: @Composable ColumnScope.(CoverMetrics) -> Unit,
+) {
+    val metrics = LocalCoverMetrics.current
+        ?: CoverMetrics(widthDp = 300f, heightDp = 300f, isTiny = false, contentPadding = PaddingValues(0.dp))
+    val tiny = metrics.isTiny
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(PebbleCornerExpanded),
+        color = scheme.surfaceContainer,
+        contentColor = scheme.onSurface,
+        modifier = modifier.fillMaxSize(),
+    ) {
+        Column(Modifier.fillMaxSize().padding(if (tiny) 12.dp else 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(if (tiny) 16.dp else 18.dp))
+                Text(
+                    title.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
+                    color = scheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
+            Spacer(Modifier.height(if (tiny) 6.dp else 10.dp))
+            // The body owns the remaining height and centres its content so short
+            // tiles read as a balanced glance rather than top-clustered.
+            Column(
+                Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(if (tiny) 4.dp else 8.dp, Alignment.CenterVertically),
+            ) {
+                body(metrics)
+            }
+            if (action != null) {
+                Spacer(Modifier.height(if (tiny) 6.dp else 10.dp))
+                action()
+            }
+        }
+    }
+}
+
+/**
+ * The one big glanceable value of a tile — shrinks to fit its width via
+ * [FittedText] and NEVER wraps mid-word. Optional leading [icon]. Colour is baked
+ * into the text style because [FittedText]/BasicText ignore LocalContentColor.
+ */
+@Composable
+private fun CoverHero(
+    value: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    val tiny = LocalCoverMetrics.current?.isTiny == true
+    val ceiling = if (tiny) 34.sp else 46.sp
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        icon?.let {
+            Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(if (tiny) 26.dp else 32.dp))
+        }
+        com.bloo.uicommon.FittedText(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = ceiling, fontWeight = FontWeight.Bold, color = color),
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/** A compact label → value stat row for a cover tile. Both sides truncate (never
+ *  wrap mid-word); the value is emphasised. */
+@Composable
+private fun CoverStat(label: String, value: String, valueColor: Color = Color.Unspecified) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = scheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = if (valueColor == Color.Unspecified) scheme.onSurface else valueColor,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+    }
+}
+
+/** A full-width, pinned cover-tile action button (reuses the app's MorphButton). */
+@Composable
+private fun CoverAction(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    active: Boolean = false,
+    pending: Boolean = false,
+    activeContainerColor: Color = MaterialTheme.colorScheme.primary,
+) {
+    MorphButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled && !pending,
+        active = active,
+        activeContainerColor = activeContainerColor,
+    ) {
+        MorphButtonLabel(icon, label, pending)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Adaptive cover tiles. Each renders one section's essence into the CoverTile
+//  frame (CoverHero + CoverStat + one pinned CoverAction), reading the same
+//  UiState the phone pebbles read. Uniform (v, state, vm) signature so
+//  CoverTileFor can dispatch by id. m.isTiny collapses to hero-only on the
+//  smallest cover windows. These REPLACE the old pebble-reuse on the cover.
+// ─────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val scheme = MaterialTheme.colorScheme
+    val hasBattery = state.hasBattery(v)
+    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
+
+    val pct = status?.percentFor(hasBattery)
+    val charging = hasBattery && status?.evStatus?.batteryCharge == true
+    val range = status?.rangeMiFor(hasBattery)
+    val locked = status?.doorLock == true
+
+    CoverTile(
+        icon = Icons.Filled.DirectionsCar,
+        title = v.name,
+        action = {
+            CoverAction(
+                label = if (locked) "Unlock" else "Lock",
+                icon = if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                onClick = { if (locked) vm.unlock(v) else vm.lock(v) },
+                pending = state.isPending(v.vin, "doors"),
+                active = locked,
+            )
+        },
+    ) { m ->
+        CoverHero(
+            value = pct?.let { "$it%" } ?: "--",
+            color = if (charging) ChargeGreen else scheme.onSurface,
+        )
+        CoverStat("Range", range?.let { formatDistance(it, metric) } ?: "--")
+        if (!m.isTiny) {
+            CoverStat(
+                label = "Doors",
+                value = if (locked) "Locked" else "Unlocked",
+                valueColor = if (locked) Color.Unspecified else scheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoverChargeTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val ev = status?.evStatus
+    val charging = ev?.batteryCharge == true
+    val plugged = ev?.isPluggedIn == true || charging
+    val pending = state.isPending(v.vin, "charge")
+    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
+
+    val pct = status?.percentFor(state.hasBattery(v))
+    val range = status?.rangeMiFor(state.hasBattery(v))
+    val minutesToFull = ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+    val target = ev?.targetForCurrentPlug()
+
+    CoverTile(
+        icon = Icons.Filled.Bolt,
+        title = "Charge",
+        action = {
+            CoverAction(
+                label = if (charging) "Stop" else "Start",
+                icon = Icons.Filled.Bolt,
+                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
+                enabled = plugged,
+                active = charging,
+                pending = pending,
+                activeContainerColor = ChargeGreen,
+            )
+        },
+    ) { m ->
+        CoverHero(
+            value = pct?.let { "$it%" } ?: "--",
+            color = if (charging) ChargeGreen else MaterialTheme.colorScheme.onSurface,
+        )
+        if (!m.isTiny) {
+            CoverStat("Range", range?.let { formatDistance(it, metric) } ?: "--")
+            if (plugged) {
+                minutesToFull?.let { CoverStat("Time to full", fmtMinutes(it)) }
+                target?.let { CoverStat("Target", "$it%") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverClimateTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
+    val climateOn = status?.airCtrlOn == true
+    val driving = state.isDriving(v)
+    val pending = state.isPending(v.vin, "climate")
+    val scheme = MaterialTheme.colorScheme
+
+    val setpoint = status?.airTemp?.value?.let { degLabel(it, fahrenheit) }
+    val hero = if (climateOn) (setpoint ?: "On") else "Off"
+
+    // Same one-tap request ClimatePebble's collapsed header builds: smart target
+    // off the car's local weather when present, else the app default setpoint.
+    val weather = state.carWeather[v.vin] ?: state.homeWeather
+    val startReq = if (weather != null) {
+        ClimateRequest(
+            tempF = smartClimateTargetF(ambientFahrenheit(weather.tempC)),
+            defrost = false,
+            durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
+        )
+    } else {
+        ClimateRequest(
+            tempF = DEFAULT_CLIMATE_TEMP_F,
+            defrost = false,
+            durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
+        )
+    }
+
+    CoverTile(
+        icon = Icons.Filled.AcUnit,
+        title = "Climate",
+        action = {
+            CoverAction(
+                label = when {
+                    climateOn && driving -> "On"
+                    climateOn -> "Stop"
+                    else -> "Start"
+                },
+                icon = Icons.Filled.AcUnit,
+                onClick = { if (climateOn) vm.stopClimate(v) else vm.startClimate(v, startReq) },
+                enabled = !driving,
+                active = climateOn,
+                pending = pending,
+            )
+        },
+    ) { m ->
+        CoverHero(
+            value = hero,
+            icon = Icons.Filled.AcUnit,
+            color = if (climateOn) scheme.primary else scheme.onSurfaceVariant,
+        )
+        if (!m.isTiny) {
+            status?.defrost?.let { CoverStat("Defrost", if (it) "On" else "Off") }
+            if (driving) CoverStat("Driving", "Read-only", scheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun CoverLocationTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val context = LocalContext.current
+    val loc = state.locations[v.vin]
+    val place = state.placeNames[v.vin]
+    val locating = state.isPending(v.vin, "locate")
+    val hero = place ?: loc?.coordString() ?: "Not located"
+
+    CoverTile(
+        icon = Icons.Filled.LocationOn,
+        title = "Location",
+        action = {
+            if (loc != null) {
+                CoverAction(
+                    label = "Open in maps",
+                    icon = Icons.Filled.Map,
+                    onClick = {
+                        val uri = Uri.parse(
+                            "geo:${loc.latitude},${loc.longitude}" +
+                                "?q=${loc.latitude},${loc.longitude}(My car)",
+                        )
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                            )
+                        }
+                    },
+                )
+            } else {
+                CoverAction(
+                    label = "Locate",
+                    icon = Icons.Filled.LocationOn,
+                    onClick = { vm.locate(v) },
+                    enabled = !locating,
+                    pending = locating,
+                )
+            }
+        },
+    ) { m ->
+        CoverHero(hero, icon = Icons.Filled.LocationOn)
+        if (!m.isTiny && loc != null) {
+            CarMap(
+                loc,
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.4f)
+                    .clip(RoundedCornerShape(18.dp)),
+            )
+        }
+    }
+}
+
+/**
+ * Global home-location weather (identical on every car); [v] is unused but kept
+ * for the uniform tile signature. Em-dash hero + hint when no location / not yet
+ * loaded, rather than an empty face.
+ */
+@Composable
+private fun CoverWeatherTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val appearance by vm.appearance.collectAsState()
+    val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
+    val fahrenheit = appearance.useFahrenheit
+    val w = state.homeWeather
+    LaunchedEffect(appearance.weatherLat, appearance.weatherLon) {
+        if (hasLocation) vm.loadHomeWeather()
+    }
+    CoverTile(
+        icon = Icons.Filled.WbSunny,
+        title = "Weather",
+        action = {
+            CoverAction(
+                label = "Refresh",
+                icon = Icons.Filled.Refresh,
+                onClick = { vm.loadHomeWeather(force = true) },
+                enabled = hasLocation,
+            )
+        },
+    ) { metrics ->
+        if (w == null) {
+            CoverHero("—", icon = Icons.Filled.WbSunny)
+            if (!hasLocation) CoverStat("Location", "Set in Settings")
+            else CoverStat("Weather", "Loading…")
+        } else {
+            CoverHero(w.tempLabel(fahrenheit), icon = weatherIcon(w.condition, w.isDay))
+            CoverStat("Condition", w.condition.label)
+            if (!metrics.isTiny) {
+                CoverStat("Feels like", w.feelsLikeLabel(fahrenheit))
+                w.highLowLabel(fahrenheit)?.let { CoverStat("High / low", it) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverInfoTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val appearance by vm.appearance.collectAsState()
+    val metric = appearance.unitSystem == "metric"
+    val scheme = MaterialTheme.colorScheme
+    val status = state.statusFor(v)
+    val locked = status?.doorLock == true
+    val odo = parseOdometerMiles(v.odometer)
+    val range = status?.rangeMiFor(state.hasBattery(v))
+    val lastRefreshed = rememberRelativeTime(state.fetchedAt(v))
+
+    CoverTile(icon = Icons.Filled.Info, title = "Car info") { m ->
+        CoverHero(
+            value = if (locked) "Locked" else "Unlocked",
+            icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+            color = if (locked) scheme.onSurface else scheme.error,
+        )
+        if (!m.isTiny) {
+            odo?.let { CoverStat("Odometer", formatDistance(it, metric)) }
+            range?.let { CoverStat("Range", formatDistance(it, metric)) }
+            lastRefreshed?.let { CoverStat("Last refreshed", it) }
+        }
+    }
+}
+
+@Composable
+private fun CoverDiagnosticsTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val scheme = MaterialTheme.colorScheme
+    // The same five predicates DiagnosticsPebble folds into hasWarning.
+    val issues = remember(status) {
+        buildList {
+            if (status?.tirePressureLamp?.hasWarning == true) add("Tire pressure" to "Warning")
+            if (status?.lowFuelLight == true) add("Low fuel" to "Yes")
+            if (status?.washerFluidStatus == true) add("Washer fluid" to "Low")
+            if (status?.breakOilStatus == true) add("Brake fluid" to "Check")
+            if (status?.smartKeyBatteryWarning == true) add("Key fob battery" to "Low")
+        }
+    }
+    val hasWarning = issues.isNotEmpty()
+    CoverTile(icon = Icons.Filled.ErrorOutline, title = "Diagnostics") { m ->
+        if (hasWarning) {
+            CoverHero(
+                value = if (issues.size == 1) "1 issue" else "${issues.size} issues",
+                icon = Icons.Filled.Warning,
+                color = scheme.error,
+            )
+            val shown = if (m.isTiny) 1 else 3
+            issues.take(shown).forEach { (label, value) ->
+                CoverStat(label, value, valueColor = scheme.error)
+            }
+        } else {
+            CoverHero(value = "All systems OK", icon = Icons.Filled.CheckCircle, color = ChargeGreen)
+        }
+    }
+}
+
+@Composable
+private fun CoverTripsTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val trips = state.trips[v.vin]
+    val loading = state.isPending(v.vin, "trips")
+    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
+    LaunchedEffect(v.vin) { vm.loadTrips(v) }
+    CoverTile(icon = Icons.Filled.Route, title = "Trips") { m ->
+        when {
+            trips == null -> CoverHero(if (loading) "…" else "No trips")
+            trips.isEmpty() -> CoverHero("No trips")
+            else -> {
+                val first = trips.first()
+                CoverHero(first.distance?.let { formatTripDistance(it, metric) } ?: "—")
+                Text(
+                    tripDate(first.startdate),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!m.isTiny) {
+                    trips.drop(1).take(2).forEach { t ->
+                        CoverStat(tripDate(t.startdate), t.distance?.let { formatTripDistance(it, metric) } ?: "—")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Registry dispatch: render the cover tile for a section id. "controls"/"ai" and
+ *  any unknown id fall back to the always-present main tile — the cover must never
+ *  draw an empty page. (The cover tile list filters "ai" out before this, so the
+ *  fallback is only a safety net.) */
+@Composable
+private fun CoverTileFor(tile: String, v: Vehicle, state: UiState, vm: AppViewModel) {
+    when (tile) {
+        "main" -> CoverMainTile(v, state, vm)
+        "charge" -> CoverChargeTile(v, state, vm)
+        "climate" -> CoverClimateTile(v, state, vm)
+        "location" -> CoverLocationTile(v, state, vm)
+        "weather" -> CoverWeatherTile(v, state, vm)
+        "info" -> CoverInfoTile(v, state, vm)
+        "diagnostics" -> CoverDiagnosticsTile(v, state, vm)
+        "trips" -> CoverTripsTile(v, state, vm)
+        else -> CoverMainTile(v, state, vm)
+    }
+}
+
+/**
+ * Cover-screen stand-in for the full phone Settings screen. The real Settings
+ * (search + keyboard, photo pickers/crop, drag-reorder lists, sign-out) is
+ * unusable on a ~1-inch flip cover, so on the cover we route here instead (see
+ * BlooApp) — a single centered card telling the user to unfold / open Bloo on the
+ * phone, with one Back button. Corner-safe via [cameraBumpPadding] + nav insets.
+ */
+@Composable
+private fun CoverManageOnPhoneCard(vm: AppViewModel) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout))
+            .padding(cameraBumpPadding())
+            .padding(coverScaled(16.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(PebbleCornerExpanded),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Smartphone,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(34.dp),
+                )
+                Text(
+                    "Open Bloo on your phone to change settings.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+                MorphTextButton("Back", onClick = vm::closeSettings, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+/**
  * Cover-screen layout: swipe left/right for cars, up/down for section tiles.
  *
  * Owns one [HorizontalPager] (`pager`) for switching between cars, using the
@@ -3334,6 +4047,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
         // edge. The car-switching HorizontalPager is orthogonal, so left/right
         // swipes go to it and up/down swipes go here without any custom gesture
         // arbitration. Paging is suspended while the right-rail scrubber is active.
+      CoverScaffold(reserveRailGutter = tiles.size > 1) { metrics ->
         VerticalPager(
             state = vPager,
             modifier = Modifier.fillMaxSize(),
@@ -3346,49 +4060,26 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 LocalPebbleFillHeight provides true,
                 LocalCoverScrollState provides tileScroll,
             ) {
-                // Base breathing room.
-                val baseStart = coverScaled(10.dp)
-                val baseTop = coverScaled(10.dp)
-                val baseBottom = coverScaled(12.dp)
-                val baseEnd = if (tiles.size > 1) coverScaled(22.dp) else coverScaled(10.dp)
+                // ONE merged inset from the scaffold (nav bar ∪ cutout ∪ corner-safe
+                // camera-bump ∪ base gutter, max()'d per edge) — replaces the old
+                // three-layer additive stack that double-reserved the bump and
+                // crammed content into the left half.
                 Box(
                     Modifier
                         .fillMaxSize()
-                        // Nav-bar + native cutout insets. On phones/foldables that DO
-                        // report the camera as a window inset this alone clears it and
-                        // is recomposition-aware.
-                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout))
-                        // BELT-AND-SUSPENDERS for Samsung flip covers: those report the
-                        // camera via displayCutout.boundingRects (the decorative ring
-                        // positions off it) but expose ZERO cutout WINDOW insets, so the
-                        // windowInsetsPadding above reserves nothing and content sat
-                        // under the bottom-right bump (see the user's photo). This second
-                        // layer reads the rects directly and reserves EVERY edge the bump
-                        // hugs — corner-safe, unlike the old single-edge clearance. It's
-                        // a near-no-op where the native insets already covered it (the
-                        // content is already inboard, so this just adds a little margin).
-                        .padding(cameraBumpPadding())
-                        .padding(
-                            start = baseStart,
-                            top = baseTop,
-                            bottom = baseBottom,
-                            end = baseEnd,
-                        ),
+                        .padding(metrics.contentPadding),
                 ) {
+                    // Dedicated adaptive cover tiles via the registry (CoverTileFor).
+                    // "ai" is the one section with no cover face — it still uses its
+                    // phone pebble under the LocalForceExpanded/fillHeight providers.
                     when (val tile = tiles[i]) {
-                        "main" -> CompactMainTile(v, state, vm)
-                        "climate" -> ClimatePebble(v, status, state.seatConfigFor(v), state, vm, Modifier)
-                        "charge" -> ChargePebble(v, status, !state.loading, state, vm, Modifier)
-                        "location" -> LocationPebble(v, state, vm, Modifier)
-                        "weather" -> WeatherPebble(v, state, vm, Modifier)
-                        "trips" -> TripsPebble(v, state, vm, Modifier)
-                        "info" -> InfoPebble(v, status, state, vm, Modifier)
-                        "diagnostics" -> DiagnosticsPebble(v, status, state, vm, Modifier)
                         "ai" -> AiPebble(v, state, vm, Modifier)
+                        else -> CoverTileFor(tile, v, state, vm)
                     }
                 }
             }
         }
+      }
         // Decorative camera ring — drawn over the tile content so it's always
         // visible regardless of which tile is showing. Only rendered when a
         // display cutout was detected (flip-phone cover screen with punch-hole).
@@ -3656,98 +4347,8 @@ private fun VerticalPagerDots(
     }
 }
 
-/** The dense main tile: faded car photo behind name, gauge and key controls. */
-@Composable
-private fun CompactMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val status = state.statusFor(v)
-    val img = state.imageUrls[v.vin]
-    val scheme = MaterialTheme.colorScheme
-
-    // Entrance animation: slide up gently + fade in on first composition.
-    val alpha = remember { Animatable(0f) }
-    val offsetY = remember { Animatable(24f) }
-    LaunchedEffect(Unit) {
-        launch { alpha.animateTo(1f, tween(350)) }
-        launch { offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) }
-    }
-
-    // A themed Surface establishes the correct content colour for ALL text inside
-    // (otherwise text on the cover screen falls back to the default black).
-    Surface(
-        // Lambda graphicsLayer: the non-lambda overload read alpha/offsetY in
-        // composition, recomposing this full-screen Surface every frame of the
-        // entrance animation; the lambda form re-reads them in the draw phase only.
-        modifier = Modifier.fillMaxSize().graphicsLayer {
-            this.alpha = alpha.value
-            translationY = offsetY.value
-        },
-        // Matches PebbleCornerExpanded so the "main" tile's corners agree with the
-        // other (Pebble-wrapped) tiles it shares the same VerticalPager with.
-        shape = RoundedCornerShape(PebbleCornerExpanded),
-        color = scheme.surfaceContainer,
-        contentColor = scheme.onSurface,
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            if (!img.isNullOrBlank()) {
-                AsyncImage(
-                    model = rememberPhotoModel(img),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    // Was 0.22f -- on a cover screen's already-dark surfaceContainer
-                    // this read as barely-there rather than a photo background. A
-                    // top/bottom gradient scrim (below) keeps the title row and
-                    // bottom actions legible now that the photo itself is much more
-                    // visible, instead of dimming the whole tile uniformly to get there.
-                    modifier = Modifier.fillMaxSize().alpha(0.5f),
-                )
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            0f to scheme.surfaceContainer.copy(alpha = 0.6f),
-                            0.3f to Color.Transparent,
-                            0.7f to Color.Transparent,
-                            1f to scheme.surfaceContainer.copy(alpha = 0.6f),
-                        ),
-                    ),
-                )
-            } else {
-                Box(
-                    Modifier.fillMaxSize().alpha(0.18f)
-                        .background(carTonalBrush(scheme)),
-                )
-            }
-            Column(Modifier.fillMaxSize().padding(coverScaled(14.dp)), verticalArrangement = Arrangement.spacedBy(coverScaled(10.dp))) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // The car-switching dots live at top-center of the screen
-                    // (see CompactCar), not here.
-                    Text(
-                        v.name,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = scheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    FloatingIcon(Icons.Filled.Refresh, "Refresh", { vm.refreshStatus(v) }, outerPadding = 2.dp)
-                    FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() }, outerPadding = 2.dp)
-                }
-                // Centre the live-status + lock group so the tile reads as one
-                // balanced block instead of top-clustered with a big gap below.
-                Spacer(Modifier.weight(1f))
-                LastUpdatedLabel(v, state)
-                ChargeFuelBar(status, state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v),
-                    metric = vm.appearance.collectAsState().value.unitSystem == "metric")
-                Spacer(Modifier.height(6.dp))
-                // Flush with the 14 dp tile padding already on this Column, unlike
-                // the dual-column/pebble callers' extra 26 dp start inset - cover
-                // screens are narrow enough that the label text needs the width.
-                PrimaryActions(v, state, vm, contentPadding = PaddingValues(0.dp))
-                Spacer(Modifier.weight(1f))
-            }
-        }
-    }
-}
+// (CompactMainTile removed — the cover "main" section is now CoverMainTile via the
+// CoverTileFor registry, built on the adaptive CoverTile toolkit.)
 
 /**
  * A soft blurred scrim behind the status bar so scrolling content underneath
