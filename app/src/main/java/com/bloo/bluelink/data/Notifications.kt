@@ -159,15 +159,8 @@ object CarAlerts {
      * `out` accumulates whichever alerts actually fired on this pass and is
      * returned to the caller for posting/toasting.
      */
-    suspend fun evaluate(
-        settings: SettingsStore,
-        v: Vehicle,
-        status: VehicleStatus?,
-        // The account-global notification prefs. Defaults to reading them, but the
-        // per-car loop callers (AlertWorker, checkAlerts) already hold this value —
-        // passing it avoids re-reading the same DataStore snapshot once per vehicle.
-        prefs: SettingsStore.NotificationPrefs = settings.notificationPrefs(),
-    ): List<Alert> {
+    suspend fun evaluate(settings: SettingsStore, v: Vehicle, status: VehicleStatus?): List<Alert> {
+        val prefs = settings.notificationPrefs()
         val out = mutableListOf<Alert>()
 
         if (prefs.service) {

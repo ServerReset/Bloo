@@ -79,7 +79,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
                 }.getOrNull()
                 runCatching {
-                    CarAlerts.evaluate(settings, v, status, prefs).forEach {
+                    CarAlerts.evaluate(settings, v, status).forEach {
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
                     }
                 }
