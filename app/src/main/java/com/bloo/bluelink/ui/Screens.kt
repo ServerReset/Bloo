@@ -107,6 +107,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
@@ -232,6 +233,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -2533,6 +2535,71 @@ private fun EmptyScreen(vm: AppViewModel) {
 /** Minimum comfortable width for one car column before we add another. */
 private const val MIN_CARD_DP = 320
 
+/**
+ * The four car/tile pagers in this file (expanded, collapsed grid, cover
+ * car-switch, cover tile-switch) all use the same infinite-wrap scheme: a huge
+ * virtual page range (realCount * [WRAP_MULTIPLIER]) started at its midpoint,
+ * with each virtual page mapped back onto a real index by modulo. These
+ * primitives factor that out so the wrap math lives in exactly one place.
+ */
+private const val WRAP_MULTIPLIER = 1000
+/** Max per-page alpha fade at full off-screen offset (floor 0.8). */
+private const val PAGER_FADE = 0.2f
+/** Max per-page scale shrink at full off-screen offset (floor 0.94). */
+private const val PAGER_SHRINK = 0.06f
+
+/**
+ * Wraps a [PagerState] whose page space is a big virtual range, exposing the
+ * real (modulo) index and a delta-jump that moves to a real index without an
+ * animated fly-through across the virtual range. [realCount] is the number of
+ * real items the pages cycle through (cars, car-blocks, or tiles depending on
+ * the site); when it is <= 1 there is no wrap and [real] is always 0.
+ */
+@Stable
+private class WrapPagerState(val pager: PagerState, val realCount: Int) {
+    fun real(page: Int): Int = if (realCount <= 1) 0 else ((page % realCount) + realCount) % realCount
+    val currentReal: Int get() = real(pager.currentPage)
+    val settledReal: Int get() = real(pager.settledPage)
+    /** Jump so the currently-shown page maps to [target], picking the nearest
+     *  virtual page in the current direction (no long fly-through). */
+    suspend fun snapToReal(target: Int) {
+        if (realCount <= 1) return
+        val t = target.coerceIn(0, realCount - 1)
+        val delta = t - currentReal
+        if (delta != 0) pager.scrollToPage((pager.currentPage + delta).coerceIn(0, pager.pageCount - 1))
+    }
+}
+
+/**
+ * Creates a [WrapPagerState] seeded at the middle of the virtual range plus
+ * [initialRealIndex], so the pager opens on that real item and can wrap in
+ * both directions. Falls back to a plain single-page state when [realCount]
+ * <= 1. The underlying [PagerState] survives recomposition; the wrapper is
+ * re-created only when [realCount] changes (it holds no scroll state itself).
+ */
+@Composable
+private fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPagerState {
+    val loop = realCount > 1
+    val virtualCount = if (loop) realCount * WRAP_MULTIPLIER else realCount.coerceAtLeast(1)
+    val start = (if (loop) virtualCount / 2 else 0) + initialRealIndex.coerceIn(0, (realCount - 1).coerceAtLeast(0))
+    val pager = rememberPagerState(initialPage = start) { virtualCount }
+    return remember(pager, realCount) { WrapPagerState(pager, realCount) }
+}
+
+/**
+ * The shared per-page depth transform for the horizontal car pagers: a subtle
+ * fade + shrink proportional to how far this [page] is from the settled one,
+ * read ONLY in the draw phase (via [graphicsLayer]) so a drag never triggers
+ * recomposition of the page content. NOT applied to the vertical tile pager,
+ * which stays flat by design.
+ */
+private fun Modifier.pagerDepth(pager: PagerState, page: Int): Modifier = graphicsLayer {
+    val off = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+    alpha = 1f - off * PAGER_FADE
+    scaleX = 1f - off * PAGER_SHRINK
+    scaleY = 1f - off * PAGER_SHRINK
+}
+
 /** Screen height (dp) below which the phone gets the compact cover-screen
  *  layout -- a folding phone's small outer display (Galaxy Z Flip's ~260-280dp
  *  square cover, for instance), not a full unfolded/candybar phone screen.
@@ -2778,13 +2845,10 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // wrap-around: start in the middle of a huge virtual range and
                 // map each virtual page back onto a real car with modulo --
                 // same technique the cover screen's tile pager already uses.
-                val exLoop = count > 1
-                val exVirtualCount = if (exLoop) count * 1000 else count
-                val exStart = (if (exLoop) exVirtualCount / 2 else 0) + (expandedIdx ?: 0).coerceIn(0, count - 1)
-                val exPager = rememberPagerState(initialPage = exStart) { exVirtualCount }
-                fun exReal(virtualPage: Int) = ((virtualPage % count) + count) % count
+                val exWrap = rememberWrapPager(count, (expandedIdx ?: 0).coerceIn(0, count - 1))
+                val exPager = exWrap.pager
                 LaunchedEffect(exPager) {
-                    snapshotFlow { exPager.settledPage }.collect { vm.expand(exReal(it)) }
+                    snapshotFlow { exPager.settledPage }.collect { vm.expand(exWrap.real(it)) }
                 }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
@@ -2814,13 +2878,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // and later a velocity-driven blur here, and the tilt on top
                         // of the fade/scale, and all of it together read as worse
                         // than the plain fade/scale alone. Just that now.
-                        Box(Modifier.fillMaxSize().graphicsLayer {
-                            val off = ((page - exPager.currentPage).toFloat() + exPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
-                            alpha = 1f - off * 0.2f
-                            scaleX = 1f - off * 0.06f
-                            scaleY = 1f - off * 0.06f
-                        }) {
-                            val pv = vehicles[exReal(page)]
+                        Box(Modifier.fillMaxSize().pagerDepth(exPager, page)) {
+                            val pv = vehicles[exWrap.real(page)]
                             CarThemeOverride(
                                 paletteId = appearance.carCustomPaletteIds[pv.vin],
                                 customPalettes = appearance.customPalettes,
@@ -2834,26 +2893,22 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     StatusBarScrim()
                     if (count > 1) {
                         PagerDots(
-                            current = exReal(exPager.currentPage),
+                            current = exWrap.currentReal,
                             count = count,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha),
-                            onRefresh = { vm.refreshStatus(vehicles[exReal(exPager.settledPage)]) },
+                            onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
                         )
                     }
                 }
             } else {
                 val pageCount = (count + perPage - 1) / perPage
-                // Infinite wrap-around, same technique as the expanded pager
-                // and the cover screen's tile pager: start in the middle of a
-                // huge virtual range and map each virtual page back onto a
-                // real block of cars with modulo.
-                val loopMulti = pageCount > 1
-                val virtualPageCount = if (loopMulti) pageCount * 1000 else pageCount
                 val initialBlock = (state.currentIndex.coerceIn(0, count - 1)) / perPage
-                val pager = rememberPagerState(
-                    initialPage = (if (loopMulti) virtualPageCount / 2 else 0) + initialBlock,
-                ) { virtualPageCount }
-                fun realBlock(virtualPage: Int) = ((virtualPage % pageCount) + pageCount) % pageCount
+                // Infinite wrap-around: WrapPagerState.realCount is the BLOCK count
+                // here (ceil(count / perPage)), and the real vehicle index for a page
+                // is realBlock(page) * perPage.
+                val wrap = rememberWrapPager(pageCount, initialBlock)
+                val pager = wrap.pager
+                fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
                 LaunchedEffect(pager, perPage) {
                     snapshotFlow { pager.settledPage }.collect { page ->
                         vm.selectIndex((realBlock(page) * perPage).coerceIn(0, count - 1))
@@ -2871,8 +2926,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // currentIndex moves out from under the page actually shown.
                 LaunchedEffect(state.currentIndex) {
                     val targetBlock = state.currentIndex.coerceIn(0, count - 1) / perPage
-                    val delta = targetBlock - realBlock(pager.currentPage)
-                    if (delta != 0) pager.scrollToPage(pager.currentPage + delta)
+                    wrap.snapToReal(targetBlock)
                 }
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
                 var carNameVisible by remember { mutableStateOf(false) }
@@ -2909,12 +2963,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val end = minOf(start + perPage, count)
                         // No blur, no rotationZ tilt -- see the expanded pager above.
                         Row(
-                            Modifier.fillMaxSize().graphicsLayer {
-                                val off = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
-                                alpha = 1f - off * 0.2f
-                                scaleX = 1f - off * 0.06f
-                                scaleY = 1f - off * 0.06f
-                            },
+                            Modifier.fillMaxSize().pagerDepth(pager, page),
                         ) {
                             for (i in start until end) {
                                 val gv = vehicles[i]
@@ -3790,12 +3839,9 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     // Infinite wrap-around, matching every other car-switching pager in the
     // app (the expanded pager, the default grid) and the cover screen's own
     // tile pager, which already looped.
-    val loopCars = count > 1
-    val virtualCarCount = if (loopCars) count * 1000 else count
-    val pager = rememberPagerState(
-        initialPage = (if (loopCars) virtualCarCount / 2 else 0) + state.currentIndex.coerceIn(0, count - 1),
-    ) { virtualCarCount }
-    fun realCar(virtualPage: Int) = ((virtualPage % count) + count) % count
+    val wrap = rememberWrapPager(count, state.currentIndex.coerceIn(0, count - 1))
+    val pager = wrap.pager
+    fun realCar(virtualPage: Int) = wrap.real(virtualPage)
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.collect { vm.selectIndex(realCar(it)) }
     }
@@ -3805,9 +3851,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     // different one) by snapping to it, instead of only ever pushing this
     // pager's own settles into currentIndex one-way.
     LaunchedEffect(state.currentIndex) {
-        val target = state.currentIndex.coerceIn(0, count - 1)
-        val delta = target - realCar(pager.currentPage)
-        if (delta != 0) pager.scrollToPage(pager.currentPage + delta)
+        wrap.snapToReal(state.currentIndex.coerceIn(0, count - 1))
     }
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
@@ -3829,23 +3873,13 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             beyondViewportPageCount = 1,
         ) { page ->
             val v = vehicles[realCar(page)]
-            val pageOff by remember(page) {
-                derivedStateOf {
-                    val delta = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction)
-                    abs(delta).coerceIn(0f, 1f)
-                }
-            }
             // No blur -- see the other two car pagers' history for why: a plain
             // Modifier.blur(x.dp) reconstructs and re-lays-out its own modifier
             // node on every drag frame (the jitter this exact pattern caused
             // elsewhere), and this cover-screen pager had never actually been
             // updated when that got fixed there. Just the cheap graphicsLayer
             // fade/scale transforms now, consistent with the other pagers.
-            Box(Modifier.fillMaxSize().graphicsLayer {
-                alpha = 1f - pageOff * 0.2f
-                scaleX = 1f - pageOff * 0.06f
-                scaleY = 1f - pageOff * 0.06f
-            }) {
+            Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
                 CarThemeOverride(
                     paletteId = appearance.carCustomPaletteIds[v.vin],
                     customPalettes = appearance.customPalettes,
@@ -3927,12 +3961,12 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
         }
     }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
     // Infinite wrap-around: start in the middle of a huge virtual range and map
-    // each virtual page back onto a real tile with modulo.
-    val loop = tiles.size > 1
-    val virtualCount = if (loop) tiles.size * 1000 else tiles.size
-    val start = if (loop) virtualCount / 2 else 0
-    val vPager = rememberPagerState(initialPage = start) { virtualCount }
-    val current = ((vPager.currentPage % tiles.size) + tiles.size) % tiles.size
+    // each virtual page back onto a real tile with modulo. FLAT tiles -- unlike
+    // the three horizontal car pagers this VerticalPager gets NO pagerDepth and
+    // NO beyondViewportPageCount.
+    val vWrap = rememberWrapPager(tiles.size)
+    val vPager = vWrap.pager
+    val current = vWrap.currentReal
     // Per-tile scroll states, keyed by tile name so position persists across
     // pager recycling AND reordering. Tall tiles scroll their own content; the
     // VerticalPager then nested-scrolls to the next/previous tile once a tile is
@@ -4058,7 +4092,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
             modifier = Modifier.fillMaxSize(),
             userScrollEnabled = coverScrubbing?.value != true,
         ) { page ->
-            val i = ((page % tiles.size) + tiles.size) % tiles.size
+            val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }
             CompositionLocalProvider(
                 LocalForceExpanded provides true,
@@ -4165,10 +4199,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                 count = tiles.size,
                 tiles = tiles,
                 onPageJump = { targetTile ->
-                    val currPage = vPager.currentPage
-                    val currTile = ((currPage % tiles.size) + tiles.size) % tiles.size
-                    val delta = targetTile - currTile
-                    vPager.scrollToPage((currPage + delta).coerceIn(0, virtualCount - 1))
+                    vWrap.snapToReal(targetTile)
                 },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
