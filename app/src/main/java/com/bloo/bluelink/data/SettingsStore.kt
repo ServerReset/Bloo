@@ -1221,8 +1221,11 @@ class SettingsStore(private val context: Context) {
         // every device converges on it), else what we've cached, else mint a fresh
         // one (this device is the first to stamp the file). Cache it so the File ID
         // shown in Settings is stable + identical across devices on this file.
-        val resolvedFileId = remoteMeta?.fileId ?: syncFileId() ?: java.util.UUID.randomUUID().toString()
-        if (resolvedFileId != syncFileId()) setSyncFileId(resolvedFileId)
+        // Read the cached file id ONCE (was read twice back-to-back with nothing
+        // writing between — each read is a full DataStore snapshot collect).
+        val cachedFileId = syncFileId()
+        val resolvedFileId = remoteMeta?.fileId ?: cachedFileId ?: java.util.UUID.randomUUID().toString()
+        if (resolvedFileId != cachedFileId) setSyncFileId(resolvedFileId)
 
         // Adopt-mode + import-gate decision.
         val pullPrimary = syncPullPrimary()
@@ -1717,7 +1720,12 @@ class SettingsStore(private val context: Context) {
             val after = prefs.asMap()
             val touched = mutableSetOf<String>()
             after.forEach { (k, v) -> if (before[k] != v) touched += k.name }
-            before.keys.forEach { k -> if (k.name !in after.keys.map { it.name }) touched += k.name }
+            // Build the after-key-name set ONCE (was rebuilt via after.keys.map{}
+            // inside this loop → O(n²) + n list allocations on every settings write,
+            // which now fires the auto-push path). Value-identical.
+            val afterNames = HashSet<String>(after.size)
+            after.keys.forEach { afterNames += it.name }
+            before.keys.forEach { k -> if (k.name !in afterNames) touched += k.name }
             touched.removeAll(DEVICE_LOCAL_KEYS)
             if (touched.isNotEmpty()) {
                 val dirtyKey = stringPreferencesKey("sync_dirty_keys")
@@ -1784,7 +1792,9 @@ class SettingsStore(private val context: Context) {
         // needs android.graphics.Bitmap — see [encodeSyncPhotos]).
         val prefsMap: Map<String, Any> = prefs.asMap().entries.associate { it.key.name to it.value }
         val photos = encodeSyncPhotos(prefs).mapValues { it.value.content }
-        return SyncMerge.buildExport(prefsMap, dirtyKeys(), photos)
+        // Read the dirty set from the snapshot we already hold (was a second
+        // .data.first() via dirtyKeys()) — same value, one fewer collect.
+        return SyncMerge.buildExport(prefsMap, prefs.dirtyKeySet(), photos)
     }
 
     /**
