@@ -444,6 +444,10 @@ fun BlooApp(vm: AppViewModel) {
 
     CompositionLocalProvider(
         LocalHaptics provides haptics,
+        // Provided once here (the app root already collects `appearance` above) so
+        // every pebble/tile reads LocalAppearance.current instead of opening its own
+        // collectAsState() collector — see LocalAppearance.
+        LocalAppearance provides appearance,
     ) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
     // status/navigation bars; screen content draws on top of it.
@@ -2663,7 +2667,7 @@ private fun cameraBumpPadding(): PaddingValues {
 private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val vehicles = state.vehicles
     if (vehicles.isEmpty()) return
-    val appearance by vm.appearance.collectAsState()
+    val appearance = LocalAppearance.current
 
     val currentVehicle = vehicles.getOrNull(state.currentIndex.coerceIn(0, vehicles.lastIndex))
     val currentFetchedAt = currentVehicle?.let { state.fetchedAt(it) }
@@ -3375,7 +3379,7 @@ private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val scheme = MaterialTheme.colorScheme
     val hasBattery = state.hasBattery(v)
-    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
+    val metric = LocalAppearance.current.unitSystem == "metric"
 
     val pct = status?.percentFor(hasBattery)
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
@@ -3417,7 +3421,7 @@ private fun CoverChargeTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val charging = ev?.batteryCharge == true
     val plugged = ev?.isPluggedIn == true || charging
     val pending = state.isPending(v.vin, "charge")
-    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
+    val metric = LocalAppearance.current.unitSystem == "metric"
 
     val pct = status?.percentFor(state.hasBattery(v))
     val range = status?.rangeMiFor(state.hasBattery(v))
@@ -3456,7 +3460,7 @@ private fun CoverChargeTile(v: Vehicle, state: UiState, vm: AppViewModel) {
 @Composable
 private fun CoverClimateTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
+    val fahrenheit = LocalAppearance.current.useFahrenheit
     val climateOn = status?.airCtrlOn == true
     val driving = state.isDriving(v)
     val pending = state.isPending(v.vin, "climate")
@@ -3571,7 +3575,7 @@ private fun CoverLocationTile(v: Vehicle, state: UiState, vm: AppViewModel) {
  */
 @Composable
 private fun CoverWeatherTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val appearance by vm.appearance.collectAsState()
+    val appearance = LocalAppearance.current
     val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
     val fahrenheit = appearance.useFahrenheit
     val w = state.homeWeather
@@ -3607,7 +3611,7 @@ private fun CoverWeatherTile(v: Vehicle, state: UiState, vm: AppViewModel) {
 
 @Composable
 private fun CoverInfoTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val appearance by vm.appearance.collectAsState()
+    val appearance = LocalAppearance.current
     val metric = appearance.unitSystem == "metric"
     val scheme = MaterialTheme.colorScheme
     val status = state.statusFor(v)
@@ -3666,7 +3670,7 @@ private fun CoverDiagnosticsTile(v: Vehicle, state: UiState, vm: AppViewModel) {
 private fun CoverTripsTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val trips = state.trips[v.vin]
     val loading = state.isPending(v.vin, "trips")
-    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
+    val metric = LocalAppearance.current.unitSystem == "metric"
     LaunchedEffect(v.vin) { vm.loadTrips(v) }
     CoverTile(icon = Icons.Filled.Route, title = "Trips") { m ->
         when {
@@ -4598,7 +4602,7 @@ private fun HeroHeader(
         label = "heroCorner",
     )
     val heroShape = RoundedCornerShape(corner)
-    val heroOutline by vm.appearance.collectAsState()
+    val heroOutline = LocalAppearance.current
     Card(
         modifier = Modifier.fillMaxWidth().then(dragHandle).graphicsLayer {
             alpha = heroAlpha.value
@@ -4993,6 +4997,16 @@ private fun Modifier.appGlassRim(
  * When true (cover-screen tiles), pebbles render permanently open with no
  * collapse chevron or drag handle - collapsing a full-screen tile makes no sense.
  */
+/**
+ * The current [SettingsStore.Appearance], provided once at the app root (see
+ * BlooApp) so pebbles/tiles read it via LocalAppearance.current instead of each
+ * opening its own vm.appearance.collectAsState() coroutine collector. ~20 hot
+ * per-pebble/per-tile collectors collapse to one. Default is a fresh Appearance()
+ * (all defaults) so a reader outside the provider degrades gracefully rather than
+ * crashing — but every real screen is inside the provider.
+ */
+private val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearance() }
+
 private val LocalForceExpanded = staticCompositionLocalOf { false }
 
 /**
@@ -5812,7 +5826,7 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
 @Composable
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
-    val hMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
+    val hMetric = LocalAppearance.current.unitSystem == "metric"
     HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm, state.drivingLabel(v), metric = hMetric)
     // Update tile lives in the "pebbles" column's PebbleList as its own
     // reorderable/pinnable "update" section now, not hardcoded into this
@@ -5846,7 +5860,7 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     // invisible against a flat pebble background either way. This pebble
     // rolls its own Surface instead of going through Pebble(), so it had been
     // missed -- the setting simply did nothing here.
-    val pebbleOutline = vm.appearance.collectAsState().value.pebbleOutline
+    val pebbleOutline = LocalAppearance.current.pebbleOutline
     Surface(
         modifier = Modifier.fillMaxWidth().height(ControlHeight).then(dragHandle)
             .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
@@ -5956,7 +5970,7 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
     val status = state.statusFor(v)
     val seats = state.seatConfigFor(v)
     val enabled = !state.loading
-    val mSingle = vm.appearance.collectAsState().value.unitSystem == "metric"
+    val mSingle = LocalAppearance.current.unitSystem == "metric"
     when (section) {
         "summary" -> HeroHeader(
             v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
@@ -6998,7 +7012,7 @@ private fun PebbleShell(
     // floating chrome always has a rim, but pebbles are the majority of
     // on-screen surface area, so a rim on every single one is a much bigger
     // visual commitment than one more floating button.
-    val pebbleAppearance by vm.appearance.collectAsState()
+    val pebbleAppearance = LocalAppearance.current
     val pebbleOutline = pebbleAppearance.pebbleOutline
     Box(Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)) {
         Card(
@@ -7473,7 +7487,7 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
             trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
             trips.isEmpty() -> Text("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val tMetric = vm.appearance.collectAsState().value.unitSystem == "metric"
+                val tMetric = LocalAppearance.current.unitSystem == "metric"
                 // COVER SCREEN: a small "Recent trips" header + only the 3 most recent,
                 // so the tile fits the small square without scrolling and you land at
                 // the top. Phone keeps up to 8 with no header. Gated on forceExpanded.
@@ -7520,7 +7534,7 @@ private fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw
 @Composable
 private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val context = LocalContext.current
-    val appearance by vm.appearance.collectAsState()
+    val appearance = LocalAppearance.current
     val inApp = appearance.linksInApp
     val metric = appearance.unitSystem == "metric"
     val location = state.locations[v.vin]
@@ -7746,7 +7760,7 @@ private data class DiagRow(val label: String, val value: String, val indent: Boo
 
 @Composable
 private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val a = vm.appearance.collectAsState().value
+    val a = LocalAppearance.current
     val fahrenheit = a.useFahrenheit
     val metric = a.unitSystem == "metric"
     val rows = remember(status, fahrenheit, metric) { buildList {
@@ -7934,7 +7948,7 @@ private fun ClimatePebble(
     dragHandle: Modifier,
 ) {
     val pending = state.isPending(v.vin, "climate")
-    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
+    val fahrenheit = LocalAppearance.current.useFahrenheit
     var tempF by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_TEMP_F) }
     var duration by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_DURATION_MIN) }
     var defrost by remember(v.vin) { mutableStateOf(false) }
@@ -8740,7 +8754,7 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
                 state.hasBattery(v),
                 state.hasFuel(v),
                 state.drivingLabel(v),
-                metric = vm.appearance.collectAsState().value.unitSystem == "metric",
+                metric = LocalAppearance.current.unitSystem == "metric",
             )
             Spacer(Modifier.height(6.dp))
         }
@@ -8775,7 +8789,7 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
  */
 @Composable
 private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val metric = vm.appearance.collectAsState().value.unitSystem == "metric"
+    val metric = LocalAppearance.current.unitSystem == "metric"
     val fuelPct = status?.fuelLevel
     val range = status?.dte?.value?.toInt()
     val summary = when {
@@ -8847,7 +8861,7 @@ private fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewMode
 @Composable
 private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val context = LocalContext.current
-    val fahrenheit = vm.appearance.collectAsState().value.useFahrenheit
+    val fahrenheit = LocalAppearance.current.useFahrenheit
     val location = state.locations[v.vin]
     val place = state.placeNames[v.vin]
     val locating = state.isPending(v.vin, "locate")
@@ -8943,7 +8957,7 @@ private fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String
  */
 @Composable
 private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val appearance by vm.appearance.collectAsState()
+    val appearance = LocalAppearance.current
     val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
     val fahrenheit = appearance.useFahrenheit
     val w = state.homeWeather
@@ -9299,7 +9313,7 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SettingsScreen(vm: AppViewModel) {
-    val appearance by vm.appearance.collectAsState()
+    val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
     val state by vm.state.collectAsState()
     val logs by vm.logs.collectAsState()
@@ -10555,7 +10569,7 @@ private fun CarSettingsCard(
                     // Per-car palette override: existed in SettingsStore/AppViewModel
                     // (setCarPaletteId) with no UI entry point anywhere -- only shown
                     // once there's at least one custom palette to actually choose.
-                    val appearance by vm.appearance.collectAsState()
+                    val appearance = LocalAppearance.current
                     if (state.settingsMode == "advanced" && appearance.customPalettes.isNotEmpty()) {
                         SettingsGroup("Palette override") {
                             Text(
