@@ -2942,13 +2942,16 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     HorizontalPager(
                         state = pager,
                         modifier = Modifier.fillMaxSize(),
-                        // Finger swipe between cars/blocks is disabled per user request
-                        // (the page-to-page swipe felt bad). Car switching still happens
-                        // programmatically — a widget/shortcut tap moves currentIndex and
-                        // the LaunchedEffect(state.currentIndex) above snaps this pager to
-                        // it. When perPage > 1 all cars share one page anyway, so no
-                        // switching gesture is needed there.
-                        userScrollEnabled = false,
+                        // Finger swipe between cars is ON. It felt bad before because every
+                        // page eagerly composed a whole ~8-10 pebble column (plus a
+                        // pre-composed neighbour), so the fling fought a heavy compose. Now
+                        // only the SETTLED car renders its full PebbleList; any non-settled
+                        // page (the one sliding in, and the beyondViewportPageCount=1
+                        // neighbour) renders just a lightweight hero skeleton, and the rest
+                        // fills in one frame after the page settles (see `settled` below).
+                        // This ports the cover screen's "one light thing per in-transit
+                        // page" smoothness while keeping the phone's scrolling pebble list.
+                        userScrollEnabled = true,
                         // beyondViewportPageCount = 1 (was unset → default 0): the
                         // default meant the (heavy) neighbour car page only started
                         // composing the instant it peeked in — i.e. on the FIRST frames
@@ -2974,6 +2977,15 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // per-page transform at all, just a plain flat scroll.
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
+                        // Only the settled car composes its full pebble column; a page
+                        // that's sliding in (or the pre-composed neighbour) renders a
+                        // hero-only skeleton so the swipe stays light. `page ==
+                        // pager.settledPage` is a DISCRETE snapshot read — it recomposes
+                        // this page only when the pager settles, never per drag frame, so
+                        // it doesn't reintroduce the per-frame-recompose jank that was
+                        // removed. The multi-car grid (perPage != 1) shows every car at
+                        // once with no switching swipe, so it always renders in full.
+                        val settled = perPage != 1 || page == pager.settledPage
                         // No blur, no rotationZ tilt -- see the expanded pager above.
                         Row(
                             Modifier.fillMaxSize().pagerDepth(pager, page),
@@ -3001,6 +3013,10 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // unconditionally, silently killing the single-
                                             // car view's refresh feedback too.
                                             hideIndicator = perPage > 1,
+                                            // Defer the heavy pebble column on in-transit /
+                                            // pre-composed pages; the settled car gets the
+                                            // full list (with reorder, hot-seat, refresh).
+                                            renderPebbles = settled,
                                         )
                                     }
                                 }
@@ -4147,8 +4163,14 @@ private fun HeroHeader(
     )
     val heroShape = RoundedCornerShape(corner)
     val heroOutline = LocalAppearance.current
+    // On the flip cover this hero is one full-screen tile. Unlike every other
+    // pebble it rolls its own Card and never went through PebbleShell, so it never
+    // got the cover's fill-height treatment — it wrapped its content and left a
+    // dead gradient box (no photo) plus a black void below. When on the cover, fill
+    // the tile height, centre the content, and drop the empty photo box entirely.
+    val cover = LocalForceExpanded.current
     Card(
-        modifier = Modifier.fillMaxWidth().then(dragHandle).graphicsLayer {
+        modifier = Modifier.fillMaxWidth().then(if (cover) Modifier.fillMaxHeight() else Modifier).then(dragHandle).graphicsLayer {
             alpha = heroAlpha.value
             translationY = heroOffset.value
         }
@@ -4166,9 +4188,17 @@ private fun HeroHeader(
             ),
         shape = heroShape,
     ) {
-        Column(Modifier.padding(16.dp)) {
-            HeroVisual(v, imageUrl, height)
-            Spacer(Modifier.height(16.dp))
+        Column(
+            Modifier.padding(16.dp).then(if (cover) Modifier.fillMaxHeight() else Modifier),
+            verticalArrangement = if (cover) Arrangement.Center else Arrangement.Top,
+        ) {
+            // Skip the fixed-height photo box on the cover when there's no photo — it
+            // was just a dead gradient rectangle. With it gone, ChargeFuelBar (the
+            // actual glance content: %, range, charging state) centres as the hero.
+            if (!(cover && imageUrl.isNullOrBlank())) {
+                HeroVisual(v, imageUrl, height)
+                Spacer(Modifier.height(16.dp))
+            }
             ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
     }
@@ -4990,6 +5020,11 @@ private fun VehicleDetailContent(
     reserveHeaderEnd: Boolean = false,
     onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
     hideIndicator: Boolean = false,
+    // When false (a car page that isn't the settled one in the swipe pager), render
+    // only the summary hero as a lightweight skeleton instead of the full pebble
+    // column, so swiping between cars stays smooth. Defaults true so every other
+    // caller (and the settled page) is unchanged.
+    renderPebbles: Boolean = true,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -5018,7 +5053,19 @@ private fun VehicleDetailContent(
             Spacer(Modifier.height(topInset + 8.dp))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
             // summary (image+gauge) and controls are reorderable pebbles too.
-            PebbleList(v, state, vm)
+            if (renderPebbles) {
+                PebbleList(v, state, vm)
+            } else {
+                // Skeleton for an in-transit / pre-composed swipe page: just the
+                // summary hero (which is also PebbleList's first item), so when this
+                // page settles and renderPebbles flips true, the hero stays put and the
+                // rest of the column fills in below it with no visible jump.
+                HeroHeader(
+                    v, state.statusFor(v), state.imageUrls[v.vin], state.hasBattery(v),
+                    state.hasFuel(v), vm, state.drivingLabel(v),
+                    metric = LocalAppearance.current.unitSystem == "metric",
+                )
+            }
             Spacer(Modifier.height(bottomInset + 16.dp))
         }
         // Only show the inline pill when no parent is managing it.
@@ -5560,6 +5607,28 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
             pending = busy,
         ),
     ) {
+        // On the flip cover this tile fills the screen; two short text lines centred
+        // in it read as a big empty purple void. Lead with a proper glance hero (big
+        // icon + heading + status line) like the other cover tiles, then the copy.
+        if (LocalForceExpanded.current) {
+            Icon(
+                Icons.Filled.AutoAwesome,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text("AI summary", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                when {
+                    busy -> "Summarizing on-device…"
+                    summary != null -> "On-device Gemini Nano · updated"
+                    else -> "On-device Gemini Nano"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+            )
+            Spacer(Modifier.height(6.dp))
+        }
         if (summary != null) {
             Text(summary, style = MaterialTheme.typography.bodyMedium)
         } else {
@@ -9038,6 +9107,25 @@ private fun SettingsScreen(vm: AppViewModel) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+            }
+
+            // Seamless updates via Shizuku — only shown when Shizuku is installed +
+            // running (an optional power-user path). Off by default; when on, the
+            // update tile's Install button installs silently over local ADB instead
+            // of the tap-through system installer.
+            if (state.shizukuAvailable) {
+                SettingsCard("Updates") {
+                    ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
+                        vm.setSeamlessInstallShizuku(it)
+                    }
+                    Text(
+                        "Uses Shizuku (local ADB) to install downloaded updates silently — no " +
+                            "system installer prompt. You'll be asked to grant Shizuku access the " +
+                            "first time. If Shizuku isn't running, updates use the normal installer.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
