@@ -2854,6 +2854,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     HorizontalPager(
                         state = exPager,
                         modifier = Modifier.fillMaxSize(),
+                        // Finger swipe between cars is disabled per user request (the
+                        // page-to-page swipe felt bad). To view a different car
+                        // full-screen the user collapses back to the grid (the "Back to
+                        // all cars" button / system back) and expands another car, which
+                        // re-seeds this pager on that car via rememberWrapPager above.
+                        userScrollEnabled = false,
                         beyondViewportPageCount = 1,
                         pageSize = androidx.compose.foundation.pager.PageSize.Fill,
                     ) { page ->
@@ -2936,6 +2942,13 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     HorizontalPager(
                         state = pager,
                         modifier = Modifier.fillMaxSize(),
+                        // Finger swipe between cars/blocks is disabled per user request
+                        // (the page-to-page swipe felt bad). Car switching still happens
+                        // programmatically — a widget/shortcut tap moves currentIndex and
+                        // the LaunchedEffect(state.currentIndex) above snaps this pager to
+                        // it. When perPage > 1 all cars share one page anyway, so no
+                        // switching gesture is needed there.
+                        userScrollEnabled = false,
                         // beyondViewportPageCount = 1 (was unset → default 0): the
                         // default meant the (heavy) neighbour car page only started
                         // composing the instant it peeked in — i.e. on the FIRST frames
@@ -3259,508 +3272,6 @@ private fun CoverScaffold(
         ) {
             content(metrics)
         }
-    }
-}
-
-// ===================================================================================
-// Cover tile toolkit — a small, flexible, modular interface for the flip cover.
-//
-// Every cover tile is one CoverTile(...) { body }: a frosted card with a fixed
-// header (icon + title), an auto-fit body that fills the measured space, and an
-// optional pinned bottom action. Bodies are built from CoverHero / CoverStat /
-// CoverAction, all of which read LocalCoverMetrics and use FittedText so nothing
-// crams, clips, or wraps mid-word at any cover size or font scale. Tiles are
-// registered in COVER_TILES (id -> composable); the pager dispatch is a registry
-// lookup, so adding/reordering/removing a cover tile is a one-line change and can
-// never fall through to a dense phone pebble.
-// ===================================================================================
-
-/**
- * The shared frame for a cover tile. [action], when non-null, is pinned to the
- * bottom (always reachable regardless of body content) — this bakes in the
- * "cover action must stay tappable" fix. The body gets a weight(1f) region and
- * the current [CoverMetrics] (never null under [CoverScaffold]; a Regular default
- * is substituted defensively so a tile is still previewable off the cover).
- */
-@Composable
-private fun CoverTile(
-    icon: ImageVector,
-    title: String,
-    modifier: Modifier = Modifier,
-    action: (@Composable () -> Unit)? = null,
-    body: @Composable ColumnScope.(CoverMetrics) -> Unit,
-) {
-    val metrics = LocalCoverMetrics.current
-        ?: CoverMetrics(widthDp = 300f, heightDp = 300f, isTiny = false, contentPadding = PaddingValues(0.dp))
-    val tiny = metrics.isTiny
-    val scheme = MaterialTheme.colorScheme
-    Surface(
-        shape = RoundedCornerShape(PebbleCornerExpanded),
-        color = scheme.surfaceContainer,
-        contentColor = scheme.onSurface,
-        modifier = modifier.fillMaxSize(),
-    ) {
-        Column(Modifier.fillMaxSize().padding(if (tiny) 12.dp else 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(if (tiny) 16.dp else 18.dp))
-                Text(
-                    title.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.6.sp,
-                    color = scheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.semantics { heading() },
-                )
-            }
-            Spacer(Modifier.height(if (tiny) 6.dp else 10.dp))
-            // The body owns the remaining height and centres its content so short
-            // tiles read as a balanced glance rather than top-clustered.
-            Column(
-                Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(if (tiny) 4.dp else 8.dp, Alignment.CenterVertically),
-            ) {
-                body(metrics)
-            }
-            if (action != null) {
-                Spacer(Modifier.height(if (tiny) 6.dp else 10.dp))
-                action()
-            }
-        }
-    }
-}
-
-/**
- * The one big glanceable value of a tile — shrinks to fit its width via
- * [FittedText] and NEVER wraps mid-word. Optional leading [icon]. Colour is baked
- * into the text style because [FittedText]/BasicText ignore LocalContentColor.
- */
-@Composable
-private fun CoverHero(
-    value: String,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    color: Color = MaterialTheme.colorScheme.onSurface,
-) {
-    val tiny = LocalCoverMetrics.current?.isTiny == true
-    val ceiling = if (tiny) 34.sp else 46.sp
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        icon?.let {
-            Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(if (tiny) 26.dp else 32.dp))
-        }
-        com.bloo.uicommon.FittedText(
-            text = value,
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = ceiling, fontWeight = FontWeight.Bold, color = color),
-            maxLines = 1,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-/** A compact label → value stat row for a cover tile. Both sides truncate (never
- *  wrap mid-word); the value is emphasised. */
-@Composable
-private fun CoverStat(label: String, value: String, valueColor: Color = Color.Unspecified) {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            label,
-            Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = scheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = if (valueColor == Color.Unspecified) scheme.onSurface else valueColor,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-    }
-}
-
-/** A full-width, pinned cover-tile action button (reuses the app's MorphButton). */
-@Composable
-private fun CoverAction(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    active: Boolean = false,
-    pending: Boolean = false,
-    activeContainerColor: Color = MaterialTheme.colorScheme.primary,
-) {
-    MorphButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = enabled && !pending,
-        active = active,
-        activeContainerColor = activeContainerColor,
-    ) {
-        MorphButtonLabel(icon, label, pending)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-//  Adaptive cover tiles. Each renders one section's essence into the CoverTile
-//  frame (CoverHero + CoverStat + one pinned CoverAction), reading the same
-//  UiState the phone pebbles read. Uniform (v, state, vm) signature so
-//  CoverTileFor can dispatch by id. m.isTiny collapses to hero-only on the
-//  smallest cover windows. These REPLACE the old pebble-reuse on the cover.
-// ─────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val status = state.statusFor(v)
-    val scheme = MaterialTheme.colorScheme
-    val hasBattery = state.hasBattery(v)
-    val metric = LocalAppearance.current.unitSystem == "metric"
-
-    val pct = status?.percentFor(hasBattery)
-    val charging = hasBattery && status?.evStatus?.batteryCharge == true
-    val range = status?.rangeMiFor(hasBattery)
-    val locked = status?.doorLock == true
-
-    CoverTile(
-        icon = Icons.Filled.DirectionsCar,
-        title = v.name,
-        action = {
-            CoverAction(
-                label = if (locked) "Unlock" else "Lock",
-                icon = if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
-                onClick = { if (locked) vm.unlock(v) else vm.lock(v) },
-                pending = state.isPending(v.vin, "doors"),
-                active = locked,
-            )
-        },
-    ) { m ->
-        CoverHero(
-            value = pct?.let { "$it%" } ?: "--",
-            color = if (charging) ChargeGreen else scheme.onSurface,
-        )
-        CoverStat("Range", range?.let { formatDistance(it, metric) } ?: "--")
-        if (!m.isTiny) {
-            CoverStat(
-                label = "Doors",
-                value = if (locked) "Locked" else "Unlocked",
-                valueColor = if (locked) Color.Unspecified else scheme.error,
-            )
-        }
-    }
-}
-
-@Composable
-private fun CoverChargeTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val status = state.statusFor(v)
-    val ev = status?.evStatus
-    val charging = ev?.batteryCharge == true
-    val plugged = ev?.isPluggedIn == true || charging
-    val pending = state.isPending(v.vin, "charge")
-    val metric = LocalAppearance.current.unitSystem == "metric"
-
-    val pct = status?.percentFor(state.hasBattery(v))
-    val range = status?.rangeMiFor(state.hasBattery(v))
-    val minutesToFull = ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
-    val target = ev?.targetForCurrentPlug()
-
-    CoverTile(
-        icon = Icons.Filled.Bolt,
-        title = "Charge",
-        action = {
-            CoverAction(
-                label = if (charging) "Stop" else "Start",
-                icon = Icons.Filled.Bolt,
-                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
-                enabled = plugged,
-                active = charging,
-                pending = pending,
-                activeContainerColor = ChargeGreen,
-            )
-        },
-    ) { m ->
-        CoverHero(
-            value = pct?.let { "$it%" } ?: "--",
-            color = if (charging) ChargeGreen else MaterialTheme.colorScheme.onSurface,
-        )
-        if (!m.isTiny) {
-            CoverStat("Range", range?.let { formatDistance(it, metric) } ?: "--")
-            if (plugged) {
-                minutesToFull?.let { CoverStat("Time to full", fmtMinutes(it)) }
-                target?.let { CoverStat("Target", "$it%") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CoverClimateTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val status = state.statusFor(v)
-    val fahrenheit = LocalAppearance.current.useFahrenheit
-    val climateOn = status?.airCtrlOn == true
-    val driving = state.isDriving(v)
-    val pending = state.isPending(v.vin, "climate")
-    val scheme = MaterialTheme.colorScheme
-
-    val setpoint = status?.airTemp?.value?.let { degLabel(it, fahrenheit) }
-    val hero = if (climateOn) (setpoint ?: "On") else "Off"
-
-    // Same one-tap request ClimatePebble's collapsed header builds: smart target
-    // off the car's local weather when present, else the app default setpoint.
-    val weather = state.carWeather[v.vin] ?: state.homeWeather
-    val startReq = if (weather != null) {
-        ClimateRequest(
-            tempF = smartClimateTargetF(ambientFahrenheit(weather.tempC)),
-            defrost = false,
-            durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
-        )
-    } else {
-        ClimateRequest(
-            tempF = DEFAULT_CLIMATE_TEMP_F,
-            defrost = false,
-            durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
-        )
-    }
-
-    CoverTile(
-        icon = Icons.Filled.AcUnit,
-        title = "Climate",
-        action = {
-            CoverAction(
-                label = when {
-                    climateOn && driving -> "On"
-                    climateOn -> "Stop"
-                    else -> "Start"
-                },
-                icon = Icons.Filled.AcUnit,
-                onClick = { if (climateOn) vm.stopClimate(v) else vm.startClimate(v, startReq) },
-                enabled = !driving,
-                active = climateOn,
-                pending = pending,
-            )
-        },
-    ) { m ->
-        CoverHero(
-            value = hero,
-            icon = Icons.Filled.AcUnit,
-            color = if (climateOn) scheme.primary else scheme.onSurfaceVariant,
-        )
-        if (!m.isTiny) {
-            status?.defrost?.let { CoverStat("Defrost", if (it) "On" else "Off") }
-            if (driving) CoverStat("Driving", "Read-only", scheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun CoverLocationTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val context = LocalContext.current
-    val loc = state.locations[v.vin]
-    val place = state.placeNames[v.vin]
-    val locating = state.isPending(v.vin, "locate")
-    val hero = place ?: loc?.coordString() ?: "Not located"
-
-    CoverTile(
-        icon = Icons.Filled.LocationOn,
-        title = "Location",
-        action = {
-            if (loc != null) {
-                CoverAction(
-                    label = "Open in maps",
-                    icon = Icons.Filled.Map,
-                    onClick = {
-                        val uri = Uri.parse(
-                            "geo:${loc.latitude},${loc.longitude}" +
-                                "?q=${loc.latitude},${loc.longitude}(My car)",
-                        )
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                            )
-                        }
-                    },
-                )
-            } else {
-                CoverAction(
-                    label = "Locate",
-                    icon = Icons.Filled.LocationOn,
-                    onClick = { vm.locate(v) },
-                    enabled = !locating,
-                    pending = locating,
-                )
-            }
-        },
-    ) { m ->
-        CoverHero(hero, icon = Icons.Filled.LocationOn)
-        if (!m.isTiny && loc != null) {
-            CarMap(
-                loc,
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.4f)
-                    .clip(RoundedCornerShape(18.dp)),
-            )
-        }
-    }
-}
-
-/**
- * Global home-location weather (identical on every car); [v] is unused but kept
- * for the uniform tile signature. Em-dash hero + hint when no location / not yet
- * loaded, rather than an empty face.
- */
-@Composable
-private fun CoverWeatherTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val appearance = LocalAppearance.current
-    val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
-    val fahrenheit = appearance.useFahrenheit
-    val w = state.homeWeather
-    LaunchedEffect(appearance.weatherLat, appearance.weatherLon) {
-        if (hasLocation) vm.loadHomeWeather()
-    }
-    CoverTile(
-        icon = Icons.Filled.WbSunny,
-        title = "Weather",
-        action = {
-            CoverAction(
-                label = "Refresh",
-                icon = Icons.Filled.Refresh,
-                onClick = { vm.loadHomeWeather(force = true) },
-                enabled = hasLocation,
-            )
-        },
-    ) { metrics ->
-        if (w == null) {
-            CoverHero("—", icon = Icons.Filled.WbSunny)
-            if (!hasLocation) CoverStat("Location", "Set in Settings")
-            else CoverStat("Weather", "Loading…")
-        } else {
-            CoverHero(w.tempLabel(fahrenheit), icon = weatherIcon(w.condition, w.isDay))
-            CoverStat("Condition", w.condition.label)
-            if (!metrics.isTiny) {
-                CoverStat("Feels like", w.feelsLikeLabel(fahrenheit))
-                w.highLowLabel(fahrenheit)?.let { CoverStat("High / low", it) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CoverInfoTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val appearance = LocalAppearance.current
-    val metric = appearance.unitSystem == "metric"
-    val scheme = MaterialTheme.colorScheme
-    val status = state.statusFor(v)
-    val locked = status?.doorLock == true
-    val odo = parseOdometerMiles(v.odometer)
-    val range = status?.rangeMiFor(state.hasBattery(v))
-    val lastRefreshed = rememberRelativeTime(state.fetchedAt(v))
-
-    CoverTile(icon = Icons.Filled.Info, title = "Car info") { m ->
-        CoverHero(
-            value = if (locked) "Locked" else "Unlocked",
-            icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-            color = if (locked) scheme.onSurface else scheme.error,
-        )
-        if (!m.isTiny) {
-            odo?.let { CoverStat("Odometer", formatDistance(it, metric)) }
-            range?.let { CoverStat("Range", formatDistance(it, metric)) }
-            lastRefreshed?.let { CoverStat("Last refreshed", it) }
-        }
-    }
-}
-
-@Composable
-private fun CoverDiagnosticsTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val status = state.statusFor(v)
-    val scheme = MaterialTheme.colorScheme
-    // The same five predicates DiagnosticsPebble folds into hasWarning.
-    val issues = remember(status) {
-        buildList {
-            if (status?.tirePressureLamp?.hasWarning == true) add("Tire pressure" to "Warning")
-            if (status?.lowFuelLight == true) add("Low fuel" to "Yes")
-            if (status?.washerFluidStatus == true) add("Washer fluid" to "Low")
-            if (status?.breakOilStatus == true) add("Brake fluid" to "Check")
-            if (status?.smartKeyBatteryWarning == true) add("Key fob battery" to "Low")
-        }
-    }
-    val hasWarning = issues.isNotEmpty()
-    CoverTile(icon = Icons.Filled.ErrorOutline, title = "Diagnostics") { m ->
-        if (hasWarning) {
-            CoverHero(
-                value = if (issues.size == 1) "1 issue" else "${issues.size} issues",
-                icon = Icons.Filled.Warning,
-                color = scheme.error,
-            )
-            val shown = if (m.isTiny) 1 else 3
-            issues.take(shown).forEach { (label, value) ->
-                CoverStat(label, value, valueColor = scheme.error)
-            }
-        } else {
-            CoverHero(value = "All systems OK", icon = Icons.Filled.CheckCircle, color = ChargeGreen)
-        }
-    }
-}
-
-@Composable
-private fun CoverTripsTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val trips = state.trips[v.vin]
-    val loading = state.isPending(v.vin, "trips")
-    val metric = LocalAppearance.current.unitSystem == "metric"
-    LaunchedEffect(v.vin) { vm.loadTrips(v) }
-    CoverTile(icon = Icons.Filled.Route, title = "Trips") { m ->
-        when {
-            trips == null -> CoverHero(if (loading) "…" else "No trips")
-            trips.isEmpty() -> CoverHero("No trips")
-            else -> {
-                val first = trips.first()
-                CoverHero(first.distance?.let { formatTripDistance(it, metric) } ?: "—")
-                Text(
-                    tripDate(first.startdate),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!m.isTiny) {
-                    trips.drop(1).take(2).forEach { t ->
-                        CoverStat(tripDate(t.startdate), t.distance?.let { formatTripDistance(it, metric) } ?: "—")
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Registry dispatch: render the cover tile for a section id. "controls"/"ai" and
- *  any unknown id fall back to the always-present main tile — the cover must never
- *  draw an empty page. (The cover tile list filters "ai" out before this, so the
- *  fallback is only a safety net.) */
-@Composable
-private fun CoverTileFor(tile: String, v: Vehicle, state: UiState, vm: AppViewModel) {
-    when (tile) {
-        "main" -> CoverMainTile(v, state, vm)
-        "charge" -> CoverChargeTile(v, state, vm)
-        "climate" -> CoverClimateTile(v, state, vm)
-        "location" -> CoverLocationTile(v, state, vm)
-        "weather" -> CoverWeatherTile(v, state, vm)
-        "info" -> CoverInfoTile(v, state, vm)
-        "diagnostics" -> CoverDiagnosticsTile(v, state, vm)
-        "trips" -> CoverTripsTile(v, state, vm)
-        else -> CoverMainTile(v, state, vm)
     }
 }
 
@@ -4108,13 +3619,12 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                         .fillMaxSize()
                         .padding(metrics.contentPadding),
                 ) {
-                    // Dedicated adaptive cover tiles via the registry (CoverTileFor).
-                    // "ai" is the one section with no cover face — it still uses its
-                    // phone pebble under the LocalForceExpanded/fillHeight providers.
-                    when (val tile = tiles[i]) {
-                        "ai" -> AiPebble(v, state, vm, Modifier)
-                        else -> CoverTileFor(tile, v, state, vm)
-                    }
+                    // The cover reuses the phone's pebble CARDS, rendered under the
+                    // LocalForceExpanded/PebbleFillHeight/CoverScrollState providers so
+                    // each pebble draws as an always-expanded, header-less, height-
+                    // filling scrolling card (its cover glance-hero branch). The tile
+                    // list renames "summary" -> "main", so map it back for SinglePebble.
+                    SinglePebble(if (tiles[i] == "main") "summary" else tiles[i], v, state, vm, Modifier)
                 }
             }
         }
@@ -4383,8 +3893,11 @@ private fun VerticalPagerDots(
     }
 }
 
-// (CompactMainTile removed — the cover "main" section is now CoverMainTile via the
-// CoverTileFor registry, built on the adaptive CoverTile toolkit.)
+// The cover reuses the phone's pebble CARDS: CompactCar's vertical tile pager
+// renders SinglePebble(section) under LocalForceExpanded/PebbleFillHeight/
+// CoverScrollState, so each pebble draws as an always-expanded, height-filling
+// card. (The bespoke CoverTile toolkit + Cover*Tile faces were removed — they
+// looked off-brand; the cover is back to the polished pebble-card design.)
 
 /**
  * A soft blurred scrim behind the status bar so scrolling content underneath
