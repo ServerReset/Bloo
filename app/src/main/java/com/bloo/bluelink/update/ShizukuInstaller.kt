@@ -19,6 +19,7 @@ import rikka.shizuku.SystemServiceHelper
 import java.io.File
 import java.io.FileInputStream
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Optional silent APK install via Shizuku (local ADB / root), used by the self-update
@@ -86,16 +87,22 @@ object ShizukuInstaller {
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         // INSTALL_REPLACE_EXISTING (0x2) + INSTALL_ALLOW_TEST (0x4), the demo's flags —
         // replace-existing is what makes "update over the installed build" work.
-        val flags = getInstallFlags(params) or 0x00000002 or 0x00000004
-        setInstallFlags(params, flags)
+        orInstallFlags(params, 0x00000002 or 0x00000004)
 
+        // Allocate the system-side session up front; everything after (openSession,
+        // write, commit) is inside a try that ABANDONS the session on any failure —
+        // Session.close() alone does NOT abandon, so failed attempts would otherwise
+        // accumulate orphaned sessions against the per-uid cap and eventually break
+        // silent install until reboot. session is nullable so the finally only closes
+        // if the wrapper was actually built (openSession/reflection can throw first).
         val sessionId = pi.createSession(params)
-        val rawSession = IPackageInstallerSession.Stub.asInterface(
-            ShizukuBinderWrapper(installer.openSession(sessionId).asBinder()),
-        )
-        val session = createSession(rawSession)
-
+        var session: PackageInstaller.Session? = null
         try {
+            val rawSession = IPackageInstallerSession.Stub.asInterface(
+                ShizukuBinderWrapper(installer.openSession(sessionId).asBinder()),
+            )
+            session = createSession(rawSession)
+
             FileInputStream(apk).use { input ->
                 session.openWrite("base.apk", 0, apk.length()).use { output ->
                     val buf = ByteArray(8192)
@@ -132,7 +139,13 @@ object ShizukuInstaller {
                 .getConstructor(IIntentSender::class.java)
                 .newInstance(adaptor)
             session.commit(intentSender)
-            latch.await()
+            // Bounded wait: commit() returns immediately and the result is delivered
+            // asynchronously into our IIntentSender. If the Shizuku/system server dies
+            // after commit (or the install stalls), send() never fires — an unbounded
+            // await() would hang this IO thread forever AND starve the caller's
+            // fallback. Time out → throw → Result.failure → system-installer fallback.
+            val delivered = latch.await(120, TimeUnit.SECONDS)
+            if (!delivered) throw IllegalStateException("Shizuku install timed out awaiting commit result")
 
             val committed = result[0]
             val status = committed?.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
@@ -141,8 +154,12 @@ object ShizukuInstaller {
                 val msg = committed?.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
                 throw IllegalStateException("Shizuku install failed: status=$status ${msg ?: ""}")
             }
+        } catch (t: Throwable) {
+            // Abandon the system-side session so a failed attempt doesn't dangle.
+            runCatching { installer.abandonSession(sessionId) }
+            throw t
         } finally {
-            runCatching { session.close() }
+            runCatching { session?.close() }
         }
     }
 
@@ -171,13 +188,10 @@ object ShizukuInstaller {
             .newInstance(session) as PackageInstaller.Session
     }
 
-    private fun getInstallFlags(params: PackageInstaller.SessionParams): Int {
+    /** OR [extra] into the SessionParams' hidden installFlags field, resolving the
+     *  reflected Field once for the read-modify-write. */
+    private fun orInstallFlags(params: PackageInstaller.SessionParams, extra: Int) {
         val field = PackageInstaller.SessionParams::class.java.getDeclaredField("installFlags")
-        return field.getInt(params)
-    }
-
-    private fun setInstallFlags(params: PackageInstaller.SessionParams, value: Int) {
-        val field = PackageInstaller.SessionParams::class.java.getDeclaredField("installFlags")
-        field.setInt(params, value)
+        field.setInt(params, field.getInt(params) or extra)
     }
 }

@@ -193,6 +193,9 @@ data class UiState(
      *  button do "tap to download, tap again to install". Reset by a fresh
      *  update check finding a different/no build available. */
     val updateApkReady: Boolean = false,
+    /** True while a Shizuku seamless install is running, so a second Install tap (or a
+     *  permission-grant retry) can't spawn a concurrent PackageInstaller session. */
+    val updateInstalling: Boolean = false,
     /** Settings mode: "simple" (essential settings) or "advanced" (all settings). */
     val settingsMode: String = "simple",
     /** Per-VIN default preset ID for the one-tap climate Start button. */
@@ -467,9 +470,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-        // Probe Shizuku once; the "seamless install" toggle only appears if it's
-        // installed + running. Cheap binder ping, safe when Shizuku is absent.
-        _state.update { it.copy(shizukuAvailable = com.bloo.bluelink.update.ShizukuInstaller.isAvailable()) }
+        // Probe Shizuku; the "seamless install" toggle only appears if it's installed
+        // + running. pingBinder() is a cross-process binder call, so keep it off the
+        // main thread (like the AI probe above). Re-probed on resume via
+        // refreshShizukuAvailable() so starting Shizuku after launch reveals the toggle.
+        refreshShizukuAvailable()
         // Bloo isn't on the Play Store, so check its own build channel once
         // per cold start (debounced internally — see UpdateChecker). Also
         // re-run on every user-triggered refresh, see refreshStatus below.
@@ -1582,6 +1587,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  (or on any Shizuku failure) hand it to the system installer as before. */
     fun installDownloadedUpdate() {
         if (!_state.value.updateApkReady) return
+        // Guard against a second tap (or a permission-grant retry) re-entering while a
+        // seamless install is already running — otherwise two concurrent installer
+        // sessions write/commit the same APK.
+        if (_state.value.updateInstalling) return
         val dest = apkCacheFile()
         if (!dest.exists()) {
             _state.update { it.copy(updateApkReady = false, message = "The downloaded update is gone — tap Update to fetch it again.") }
@@ -1606,15 +1615,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Runs the Shizuku silent install off the main thread, falling back to the
      *  system installer on any failure. */
     private fun seamlessInstall(dest: java.io.File) {
+        if (_state.value.updateInstalling) return
         val ctx = getApplication<Application>()
-        _state.update { it.copy(message = "Installing update…") }
+        _state.update { it.copy(updateInstalling = true, message = "Installing update…") }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val result = com.bloo.bluelink.update.ShizukuInstaller.installApk(dest, ctx.packageName)
             if (result.isFailure) {
-                // Silent path failed (Shizuku died, OEM restriction, etc.) — fall back.
-                launch(kotlinx.coroutines.Dispatchers.Main) { fallbackInstall(dest) }
+                // Silent path failed (Shizuku died, OEM restriction, timed out, etc.) —
+                // clear the in-flight flag and fall back to the system installer.
+                launch(kotlinx.coroutines.Dispatchers.Main) {
+                    _state.update { it.copy(updateInstalling = false) }
+                    fallbackInstall(dest)
+                }
             }
-            // On success the OS swaps the app; nothing else to do here.
+            // On success the OS swaps the app; the process is replaced, so we
+            // intentionally leave updateInstalling set (nothing to reset).
         }
     }
 
@@ -2510,6 +2525,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore). */
     fun setSeamlessInstallShizuku(value: Boolean) =
         viewModelScope.launch { settingsStore.setSeamlessInstallShizuku(value) }
+
+    /** Re-probe Shizuku availability off the main thread (binder ping). Called from
+     *  init and on warm resume, so starting Shizuku while the app is open reveals the
+     *  "Updates" toggle without needing a cold restart. */
+    fun refreshShizukuAvailable() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val avail = com.bloo.bluelink.update.ShizukuInstaller.isAvailable()
+            _state.update { it.copy(shizukuAvailable = avail) }
+        }
+    }
 
     fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
 

@@ -3003,7 +3003,13 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             gv, state, vm,
                                             onExpand = if (canExpand) ({ vm.expand(i) }) else null,
                                             reserveHeaderEnd = canExpand && i == end - 1,
-                                            onNameHiddenChanged = if (perPage == 1) { hidden, scrollFn ->
+                                            // Only the SETTLED page drives the hoisted
+                                            // name-pill state. Without the `settled` gate,
+                                            // a beyondViewportPageCount=1 pre-composed
+                                            // neighbor (fresh scroll → nameHidden=false)
+                                            // would clobber carNameVisible/scrollToTopFn
+                                            // and wrongly hide the current car's pill.
+                                            onNameHiddenChanged = if (perPage == 1 && settled) { hidden, scrollFn ->
                                                 carNameVisible = hidden
                                                 scrollToTopFn = scrollFn
                                             } else null,
@@ -5060,6 +5066,13 @@ private fun VehicleDetailContent(
                 // summary hero (which is also PebbleList's first item), so when this
                 // page settles and renderPebbles flips true, the hero stays put and the
                 // rest of the column fills in below it with no visible jump.
+                // Reserve PebbleList's ReorderColumn cold-start stagger token (keyed on
+                // the bare VIN, see PebbleList's introKey) so that when the full list
+                // mounts on settle it does NOT re-play the alpha-0→1 + slide-in stagger
+                // on the already-visible hero. (HeroHeader reserves only its own
+                // "hero:$vin" token, a different key, so without this the hero would
+                // blink out and slide back in exactly at the settle.)
+                remember(v.vin) { coldStartIntroPlayed.add(v.vin) }
                 HeroHeader(
                     v, state.statusFor(v), state.imageUrls[v.vin], state.hasBattery(v),
                     state.hasFuel(v), vm, state.drivingLabel(v),

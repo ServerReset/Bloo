@@ -18,7 +18,6 @@ import androidx.fragment.app.FragmentActivity
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
-import com.bloo.bluelink.update.ShizukuInstaller
 import com.bloo.bluelink.widget.WidgetRefreshWorker
 import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.DriveSyncWorker
@@ -101,9 +100,10 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
         }
-        if (ShizukuInstaller.isAvailable()) {
-            runCatching { Shizuku.addRequestPermissionResultListener(shizukuPermissionListener) }
-        }
+        // Register unconditionally (binder-independent, cheap): if Shizuku is started
+        // AFTER launch and the user later grants permission, the result still routes to
+        // onShizukuPermissionResult. Removed in onDestroy under runCatching.
+        runCatching { Shizuku.addRequestPermissionResultListener(shizukuPermissionListener) }
         // Notification permission is requested from the onboarding screen (on a
         // button tap), not silently on first launch.
         // Only route the shortcut on a genuine first creation, not on a
@@ -156,6 +156,9 @@ class MainActivity : FragmentActivity() {
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
             viewModel.maybeRelock(backgroundedAt, screenOffWhileAway)
+            // The user may have started Shizuku while away (its own app / ADB); re-probe
+            // so the "Updates" toggle appears without a cold restart. Off-main-thread.
+            viewModel.refreshShizukuAvailable()
         }
         firstStart = false
         screenOffWhileAway = false
