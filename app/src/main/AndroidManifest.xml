@@ -12,6 +12,10 @@
          the new APK itself and launches the system package installer;
          needs this to be allowed to request an install at all on API 26+. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Runtime permission Shizuku grants the app to call through its privileged
+         service (used for the optional silent-install update path). Harmless if the
+         Shizuku manager app isn't installed — the whole path is gated on pingBinder(). -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
 
     <!-- So we can detect the official apps and open web/dial/custom-tab links.
          Android 11+ hides other packages unless declared here; without these the
@@ -71,6 +75,18 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Shizuku entry point. Present so the app can "support Shizuku"; the
+             INTERACT_ACROSS_USERS_FULL permission just protects the provider from
+             other apps. Not exported. Only actually used when Shizuku is running
+             and the user has opted into seamless install. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <!-- Wear OS Data Layer: receives the watch's remote commands and sync
              requests. Bound on-demand by Play Services when a /bloo message

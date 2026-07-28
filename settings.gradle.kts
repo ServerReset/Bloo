@@ -24,3 +24,6 @@ include(":app")
 include(":shared")
 include(":uicommon")
 include(":wear")
+// compileOnly framework-API stubs so :app can compile against hidden PackageInstaller
+// AIDL interfaces for the Shizuku silent-install path (never shipped in the APK).
+include(":hidden-api-stub")

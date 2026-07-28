@@ -18,10 +18,13 @@ import androidx.fragment.app.FragmentActivity
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
+import com.bloo.bluelink.update.ShizukuInstaller
 import com.bloo.bluelink.widget.WidgetRefreshWorker
 import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.DriveSyncWorker
 import com.bloo.bluelink.work.UpdateCheckWorker
+import org.lsposed.hiddenapibypass.HiddenApiBypass
+import rikka.shizuku.Shizuku
 
 /**
  * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the
@@ -45,6 +48,12 @@ class MainActivity : FragmentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == Intent.ACTION_SCREEN_OFF) screenOffWhileAway = true
         }
+    }
+
+    // Shizuku runtime-permission result → forward to the ViewModel so the update flow
+    // can proceed once the user grants it. Registered only while Shizuku is present.
+    private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+        viewModel.onShizukuPermissionResult(requestCode, grantResult)
     }
 
     /**
@@ -85,6 +94,16 @@ class MainActivity : FragmentActivity() {
             IntentFilter(Intent.ACTION_SCREEN_OFF),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
+        // Shizuku (optional silent-install path): lift the runtime non-SDK block once
+        // so the reflected PackageInstaller/IntentSender constructors are callable, and
+        // listen for the permission-grant result. Both are guarded — no-ops (and no
+        // Shizuku classes touched beyond a cheap ping) when Shizuku isn't installed.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
+        }
+        if (ShizukuInstaller.isAvailable()) {
+            runCatching { Shizuku.addRequestPermissionResultListener(shizukuPermissionListener) }
+        }
         // Notification permission is requested from the onboarding screen (on a
         // button tap), not silently on first launch.
         // Only route the shortcut on a genuine first creation, not on a
@@ -142,9 +161,11 @@ class MainActivity : FragmentActivity() {
         screenOffWhileAway = false
     }
 
-    /** Unregister the screen-off receiver so it doesn't leak past this Activity instance. */
+    /** Unregister the screen-off receiver + Shizuku listener so they don't leak past
+     *  this Activity instance. */
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenReceiver) }
+        runCatching { Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener) }
         super.onDestroy()
     }
 

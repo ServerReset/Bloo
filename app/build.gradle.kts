@@ -140,4 +140,13 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Shizuku (optional): silent APK install for the self-update flow via local ADB.
+    // `api`/`provider` ship; `:hidden-api-stub` is compileOnly (framework PackageInstaller
+    // AIDL stubs, never in the APK); hiddenapibypass lifts the runtime non-SDK block on
+    // the reflected hidden constructors. All gated at runtime by Shizuku.pingBinder().
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    compileOnly(project(":hidden-api-stub"))
 }

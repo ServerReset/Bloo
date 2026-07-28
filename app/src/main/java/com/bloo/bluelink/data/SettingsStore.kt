@@ -152,6 +152,7 @@ class SettingsStore(private val context: Context) {
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
+        val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
         val AURORA = stringPreferencesKey("aurora_background")
         val AURORA_MOTION = stringPreferencesKey("aurora_motion")
         val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
@@ -215,6 +216,11 @@ class SettingsStore(private val context: Context) {
          *  but pebbles are the majority of on-screen surface area, and a rim on
          *  every single one read as busier than most people want as the default. */
         val pebbleOutline: Boolean = false,
+        /** When on, this device installs downloaded updates silently via Shizuku
+         *  (local ADB) instead of the tap-through system installer. Off by default;
+         *  device-local capability (Shizuku may not be present on other devices), so
+         *  it never roams via Drive sync (see SyncMerge.DEVICE_LOCAL_KEYS). */
+        val seamlessInstallShizuku: Boolean = false,
         /** Watch's own PIN lock enabled/timing -- a backup record only, mirrored
          *  from the watch. See [SettingsStore.Keys.WATCH_PIN_ENABLED]'s comment. */
         val watchPinLockEnabled: Boolean = false,
@@ -271,6 +277,7 @@ class SettingsStore(private val context: Context) {
             watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
             watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
+            seamlessInstallShizuku = prefs[Keys.SEAMLESS_INSTALL_SHIZUKU]?.toBooleanStrictOrNull() ?: false,
         )
     }
 
@@ -290,6 +297,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setPebbleOutline(value: Boolean) {
         editTracked { it[Keys.PEBBLE_OUTLINE] = value.toString() }
+    }
+
+    suspend fun setSeamlessInstallShizuku(value: Boolean) {
+        editTracked { it[Keys.SEAMLESS_INSTALL_SHIZUKU] = value.toString() }
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {

@@ -74,6 +74,8 @@ private const val UPDATE_DISMISS_UNDO_MS = 4500L
 // "Remind me": both the reminder-notification worker delay and the matching
 // snooze window. Kept as one value so the two stay aligned (see snoozeUpdate).
 private const val UPDATE_REMINDER_DELAY_MS = 24L * 60 * 60 * 1000L
+/** Request code for the Shizuku runtime-permission prompt (seamless install). */
+private const val SHIZUKU_INSTALL_REQUEST_CODE = 4711
 
 sealed interface Screen {
     data object Login : Screen
@@ -140,6 +142,9 @@ data class UiState(
     val tileLiveRefresh: Boolean = false,
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
     val shortcutSet: Set<String>? = null,
+    /** Whether Shizuku is installed + running, so the "seamless install" toggle is
+     *  worth showing. The toggle itself lives on Appearance (seamlessInstallShizuku). */
+    val shizukuAvailable: Boolean = false,
     /** On-device Gemini Nano availability + opt-in, and produced summaries. */
     val aiSupported: Boolean = false,
     val aiEnabled: Boolean = false,
@@ -462,6 +467,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        // Probe Shizuku once; the "seamless install" toggle only appears if it's
+        // installed + running. Cheap binder ping, safe when Shizuku is absent.
+        _state.update { it.copy(shizukuAvailable = com.bloo.bluelink.update.ShizukuInstaller.isAvailable()) }
         // Bloo isn't on the Play Store, so check its own build channel once
         // per cold start (debounced internally — see UpdateChecker). Also
         // re-run on every user-triggered refresh, see refreshStatus below.
@@ -638,15 +646,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             AppLog.log("Signed out of ${brand.label}")
             val remaining = credentialStore.loadAll()
             if (remaining.isEmpty()) {
-                // Preserve the on-device AI probe result across the full state
-                // reset -- it's a device capability, not account state, and was
-                // only probed once in init. Dropping it hid the AI UI/toggle on a
+                // Preserve device-capability probe results across the full state
+                // reset -- they're device capabilities, not account state, and were
+                // only probed once in init. Dropping them hid the AI/Shizuku UI on a
                 // capable device after signing back in within the same session.
                 _state.value = UiState(
                     screen = Screen.Login,
                     aiSupported = _state.value.aiSupported,
                     aiEnabled = _state.value.aiEnabled,
                     aiAuto = _state.value.aiAuto,
+                    shizukuAvailable = _state.value.shizukuAvailable,
                 )
             } else {
                 _state.update { it.copy(accounts = remaining) }
@@ -1568,8 +1577,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** The update tile's second tap, once [downloadUpdateInBackground] has
-     *  finished: the APK is already sitting in cache, so this just hands it
-     *  to the system installer. */
+     *  finished: the APK is already sitting in cache. If the user opted into
+     *  seamless install AND Shizuku is running, install silently via ADB; otherwise
+     *  (or on any Shizuku failure) hand it to the system installer as before. */
     fun installDownloadedUpdate() {
         if (!_state.value.updateApkReady) return
         val dest = apkCacheFile()
@@ -1577,9 +1587,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(updateApkReady = false, message = "The downloaded update is gone — tap Update to fetch it again.") }
             return
         }
+        val installer = com.bloo.bluelink.update.ShizukuInstaller
+        val wantSeamless = appearance.value.seamlessInstallShizuku && installer.isAvailable()
+        if (!wantSeamless) {
+            fallbackInstall(dest)
+            return
+        }
+        if (!installer.hasPermission()) {
+            // Ask; the grant arrives on onShizukuPermissionResult, which retries. Until
+            // then leave the APK ready so a second tap (or the grant) completes it.
+            _state.update { it.copy(message = "Grant Shizuku access to install updates silently.") }
+            installer.requestPermission(SHIZUKU_INSTALL_REQUEST_CODE)
+            return
+        }
+        seamlessInstall(dest)
+    }
+
+    /** Runs the Shizuku silent install off the main thread, falling back to the
+     *  system installer on any failure. */
+    private fun seamlessInstall(dest: java.io.File) {
+        val ctx = getApplication<Application>()
+        _state.update { it.copy(message = "Installing update…") }
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = com.bloo.bluelink.update.ShizukuInstaller.installApk(dest, ctx.packageName)
+            if (result.isFailure) {
+                // Silent path failed (Shizuku died, OEM restriction, etc.) — fall back.
+                launch(kotlinx.coroutines.Dispatchers.Main) { fallbackInstall(dest) }
+            }
+            // On success the OS swaps the app; nothing else to do here.
+        }
+    }
+
+    /** The classic tap-through system installer (also the fallback for the seamless
+     *  path). Reports only if even this can't be launched. */
+    private fun fallbackInstall(dest: java.io.File) {
         if (!launchApkInstaller(dest)) {
             _state.update { it.copy(message = "Couldn't open the installer — find Bloo.apk in your downloads.") }
         }
+    }
+
+    /** Shizuku permission result forwarded from MainActivity. If the user just
+     *  granted it and an update is still staged, complete the seamless install. */
+    fun onShizukuPermissionResult(requestCode: Int, grantResult: Int) {
+        if (requestCode != SHIZUKU_INSTALL_REQUEST_CODE) return
+        if (grantResult != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            _state.update { it.copy(message = "Shizuku access denied — updates will use the normal installer.") }
+            return
+        }
+        val dest = apkCacheFile()
+        if (_state.value.updateApkReady && dest.exists()) seamlessInstall(dest)
     }
 
     /** The GitHub Actions build number this app was compiled from (0 = local build). */
@@ -2450,6 +2506,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // (theme-derived vs. a fixed custom one); setAuroraCustomColor supplies
     // that fixed color (or null to fall back to theme-derived).
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
+
+    /** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore). */
+    fun setSeamlessInstallShizuku(value: Boolean) =
+        viewModelScope.launch { settingsStore.setSeamlessInstallShizuku(value) }
 
     fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
 

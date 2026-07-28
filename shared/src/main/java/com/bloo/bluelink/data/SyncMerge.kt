@@ -64,6 +64,9 @@ object SyncMerge {
         // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
         "sync_device_id", "sync_device_name", "sync_last_hash", "sync_synced_ever",
         "sync_devices_cache", "sync_pull_primary", "sync_primary_cache", "sync_file_id",
+        // Whether THIS device installs updates silently via Shizuku — a device-local
+        // capability (Shizuku may not be present elsewhere), so it must not roam.
+        "seamless_install_shizuku",
     )
 
     /** A device that syncs this Drive file, as recorded in the file's `devices`
