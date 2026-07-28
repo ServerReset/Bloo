@@ -2028,7 +2028,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             timeToFullMin = ev?.remainTime2?.atc?.value?.toInt(),
             acLimit = ev?.reservChargeInfos?.level(1),
             dcLimit = ev?.reservChargeInfos?.level(0),
-            fetchedAt = fetchedAt[v.vin],
+            // "Updated X ago" should reflect when the DATA was actually fetched. The
+            // watch's own fetchedAt[vin] is set only when the watch fetches live status
+            // itself; a paired watch showing a phone snapshot had no such stamp, so it
+            // fell back to nothing and the label read "just now" forever (and staleness
+            // never triggered). Fall back to the snapshot's phone-side fetch time.
+            fetchedAt = fetchedAt[v.vin] ?: snap?.fetchedAt?.takeIf { it > 0 },
             doorsOpen = (s?.doorOpen ?: DoorOpen()).openLabels(),
             windowsOpen = (s?.windowOpen ?: WindowOpen()).openLabels(),
             trunkOpen = s?.trunkOpen == true,
@@ -2040,8 +2045,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             brakeLow = s?.breakOilStatus == true,
             keyFobLow = s?.smartKeyBatteryWarning == true,
             odometer = v.odometer,
-            lat = coord?.lat,
-            lon = coord?.lon,
+            // Fall back to the phone-synced snapshot's coordinates when there's no
+            // live status yet (paired watch before its own fetch). Without this the
+            // Location tile, standalone weather, and smart-climate-by-location were
+            // effectively dead whenever only the snapshot was present.
+            lat = coord?.lat ?: snap?.lat,
+            lon = coord?.lon ?: snap?.lon,
             locationName = placeNames[v.vin],
             tripsSupported = !gen5w,
             engineOn = s?.engine == true,

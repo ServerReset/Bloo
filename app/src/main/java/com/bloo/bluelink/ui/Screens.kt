@@ -3157,6 +3157,10 @@ private val LocalCoverMetrics = staticCompositionLocalOf<CoverMetrics?> { null }
 /** Below this (shorter usable side, dp) the cover is "tiny" — trim to essentials. */
 private const val COVER_TINY_DP = 300f
 
+/** Horizontal content inset for cover pebbles — one value shared by the scrolling body
+ *  and the pinned action button in [PebbleShell]'s fillHeight branch, so they can't drift. */
+private val CoverContentInset = 16.dp
+
 /**
  * Per-edge camera-bump clearance in dp, computed from the display cutout rects for
  * ANY bump position. This is the generalized, corner-safe successor to the old
@@ -3443,20 +3447,26 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
     // (state.sectionsFor). "summary" maps to the always-present "main" tile;
     // "controls" has no cover tile so it falls away. If summary was somehow
     // dropped, "main" is prepended so the cover screen always has a home tile.
-    val tiles = state.sectionsFor(v).mapNotNull { section ->
-        when (section) {
-            "summary" -> "main"
-            else -> section.takeIf {
-                it in CompactKnownTiles &&
-                    (it != "charge" || state.hasBattery(v)) &&
-                    (it != "ai" || state.aiEnabled) &&
-                    // Trips: EV-only feed AND not served by Gen5W head units --
-                    // gate on both so a gas car or a Gen5W car shows no empty tile.
-                    (it != "trips" || (state.hasBattery(v) && !isGen5W)) &&
-                    !state.isPebbleHidden(v.vin, it)
+    // Memoized on exactly the state slices the predicate reads, so this mapNotNull +
+    // list concat doesn't re-run on every unrelated state emission (CompactCar takes
+    // the whole UiState, so it recomposes on any change — refresh/pending/message/etc).
+    val hasBattery = state.hasBattery(v)
+    val tiles = remember(state.sectionOrders[v.vin], hasBattery, state.aiEnabled, isGen5W, state.hiddenPebbles) {
+        state.sectionsFor(v).mapNotNull { section ->
+            when (section) {
+                "summary" -> "main"
+                else -> section.takeIf {
+                    it in CompactKnownTiles &&
+                        (it != "charge" || hasBattery) &&
+                        (it != "ai" || state.aiEnabled) &&
+                        // Trips: EV-only feed AND not served by Gen5W head units --
+                        // gate on both so a gas car or a Gen5W car shows no empty tile.
+                        (it != "trips" || (hasBattery && !isGen5W)) &&
+                        !state.isPebbleHidden(v.vin, it)
+                }
             }
-        }
-    }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
+        }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
+    }
     // Infinite wrap-around: start in the middle of a huge virtual range and map
     // each virtual page back onto a real tile with modulo. FLAT tiles -- unlike
     // the three horizontal car pagers this VerticalPager gets NO pagerDepth and
@@ -5478,18 +5488,25 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 @Composable
 private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Set<String> = emptySet()) {
     val allSections = state.sectionsFor(v)
-    val sections = allSections.filter {
-        it !in exclude &&
-            !state.isPebbleHidden(v.vin, it) &&
-            (it != "ai" || state.aiEnabled) &&
-            // Trip history rides on the EV-only trip-details endpoint, so a
-            // gas/PHEV/Kia car has nothing to show here -- gate it off battery.
-            // Also gate off Gen5W: those head units don't serve the feed, so
-            // TripsPebble renders nothing -- if it still entered the list it
-            // would leave a phantom slot with a spacedBy gap on both sides
-            // (the empty-space-between-pebbles bug).
-            (it != "trips" || (state.hasBattery(v) && !v.isGen5W)) &&
-            (it != "update" || state.updateAvailable != null)
+    // Memoized on the exact slices the predicate reads (the `eager` set below was
+    // already remembered; this sibling filter was missed). PebbleList takes the whole
+    // UiState so it recomposes on every emission — without this the filter re-allocated
+    // the visible-section list on every refresh/command tick for the visible car.
+    val hasBattery = state.hasBattery(v)
+    val sections = remember(allSections, exclude, state.hiddenPebbles, state.aiEnabled, hasBattery, v.isGen5W, state.updateAvailable) {
+        allSections.filter {
+            it !in exclude &&
+                !state.isPebbleHidden(v.vin, it) &&
+                (it != "ai" || state.aiEnabled) &&
+                // Trip history rides on the EV-only trip-details endpoint, so a
+                // gas/PHEV/Kia car has nothing to show here -- gate it off battery.
+                // Also gate off Gen5W: those head units don't serve the feed, so
+                // TripsPebble renders nothing -- if it still entered the list it
+                // would leave a phantom slot with a spacedBy gap on both sides
+                // (the empty-space-between-pebbles bug).
+                (it != "trips" || (hasBattery && !v.isGen5W)) &&
+                (it != "update" || state.updateAvailable != null)
+        }
     }
     val hotDrag = LocalHotSeatDrag.current
     // PERF: each car-pager page composes this whole pebble stack. Composing all
@@ -5626,7 +5643,8 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
                 style = MaterialTheme.typography.bodyMedium,
                 color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
             )
-            Spacer(Modifier.height(6.dp))
+            // No trailing Spacer: the cover shell's Column spacedBy owns the gap to the
+            // next child, so every cover tile spaces its hero identically.
         }
         if (summary != null) {
             Text(summary, style = MaterialTheme.typography.bodyMedium)
@@ -6693,11 +6711,14 @@ private fun PebbleShell(
                                         .fadingEdges(bodyScroll)
                                         .verticalScroll(bodyScroll)
                                         .heightIn(min = minHeight)
-                                        // Extra top clearance (vs. the 4dp every other
-                                        // pebble uses) so the first content row doesn't
-                                        // sit directly under the floating badge.
-                                        .padding(start = 16.dp, end = 16.dp, bottom = 10.dp, top = 34.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                                        // Near-symmetric vertical padding so the
+                                        // spacedBy(CenterVertically) below actually
+                                        // optically centers a short tile's content. Top
+                                        // is slightly larger only to clear the top-start
+                                        // badge; the old 34/10 split pushed every short
+                                        // tile's content visibly below true center.
+                                        .padding(start = CoverContentInset, end = CoverContentInset, top = 22.dp, bottom = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
                                     content = content,
                                 )
                             }
@@ -6705,12 +6726,14 @@ private fun PebbleShell(
                                 Modifier
                                     .align(Alignment.TopStart)
                                     .padding(8.dp)
-                                    .size(26.dp)
+                                    .size(30.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)),
+                                    // Higher-contrast so it reads as a clear tile
+                                    // identifier rather than a faint speck.
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             }
                         }
                         // Restore the pebble's primary action on the cover screen. The
@@ -6728,7 +6751,7 @@ private fun PebbleShell(
                             Spacer(Modifier.height(8.dp))
                             MorphButton(
                                 onClick = act.onClick,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = CoverContentInset, vertical = 4.dp),
                                 enabled = act.enabled && !act.pending,
                                 active = act.active,
                                 activeContainerColor = act.activeContainer ?: MaterialTheme.colorScheme.primary,
@@ -7183,7 +7206,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                     color = if (locked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
                 )
             }
-            Spacer(Modifier.height(4.dp))
+            // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
         }
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
@@ -7465,7 +7488,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
                     color = if (hasWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 )
             }
-            Spacer(Modifier.height(6.dp))
+            // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
         }
         if (rows.isEmpty()) {
             Text(
@@ -7733,7 +7756,7 @@ private fun ClimatePebble(
                     Text(degLabel(it, fahrenheit), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 }
             }
-            Spacer(Modifier.height(6.dp))
+            // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
         }
         if (driving) {
             if (climateOn) {
@@ -8654,7 +8677,7 @@ private fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHand
                         }
                     }
                 }
-                Spacer(Modifier.height(10.dp))
+                // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
                 StatusRow("Feels like", w.feelsLikeLabel(fahrenheit))
                 w.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
                 // Humidity + wind are secondary; hide them on the cover so it reads as

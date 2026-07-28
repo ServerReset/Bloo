@@ -491,18 +491,25 @@ internal fun CarThemeOverride(
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
-    val base = if (dark) DarkExpressive.applyCustomPalette(palette)
-        else LightExpressive.applyCustomPalette(palette)
-    val scheme = if (vibrancy == 1f) base else {
-        fun Color.v() = saturate(vibrancy)
-        base.copy(
-            primary = base.primary.v(), onPrimary = base.onPrimary.v(),
-            primaryContainer = base.primaryContainer.v(), onPrimaryContainer = base.onPrimaryContainer.v(),
-            secondary = base.secondary.v(), onSecondary = base.onSecondary.v(),
-            secondaryContainer = base.secondaryContainer.v(), onSecondaryContainer = base.onSecondaryContainer.v(),
-            tertiary = base.tertiary.v(), onTertiary = base.onTertiary.v(),
-            tertiaryContainer = base.tertiaryContainer.v(), onTertiaryContainer = base.onTertiaryContainer.v(),
-        )
+    // Memoize the whole palette derivation: applyCustomPalette does ~12 hue-rotate
+    // HSV round-trips and (when vibrancy != 1f) ~12 more saturate round-trips + a
+    // 14-field ColorScheme.copy(). CarThemeOverride wraps every pager page and its
+    // `content` lambda captures state (new instance per parent frame), so without this
+    // the whole conversion re-ran on every state emission for custom-palette cars.
+    val scheme = remember(palette, dark, vibrancy) {
+        val base = if (dark) DarkExpressive.applyCustomPalette(palette)
+            else LightExpressive.applyCustomPalette(palette)
+        if (vibrancy == 1f) base else {
+            fun Color.v() = saturate(vibrancy)
+            base.copy(
+                primary = base.primary.v(), onPrimary = base.onPrimary.v(),
+                primaryContainer = base.primaryContainer.v(), onPrimaryContainer = base.onPrimaryContainer.v(),
+                secondary = base.secondary.v(), onSecondary = base.onSecondary.v(),
+                secondaryContainer = base.secondaryContainer.v(), onSecondaryContainer = base.onSecondaryContainer.v(),
+                tertiary = base.tertiary.v(), onTertiary = base.onTertiary.v(),
+                tertiaryContainer = base.tertiaryContainer.v(), onTertiaryContainer = base.onTertiaryContainer.v(),
+            )
+        }
     }
     MaterialTheme(colorScheme = scheme, content = content)
 }
