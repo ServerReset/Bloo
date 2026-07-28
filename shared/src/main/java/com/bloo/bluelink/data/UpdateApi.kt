@@ -29,6 +29,20 @@ data class WorkflowRun(
 )
 
 /**
+ * The one canonical user-facing build label, so every surface (phone Settings,
+ * watch About, update tile, widget) shows the version the same way — based on the
+ * GitHub Actions run number baked in at CI build time (BuildConfig.BUILD_RUN_NUMBER).
+ * A local/dev build has run number 0 (nothing to compare against) → "dev build".
+ * When a non-blank [branch] is supplied and isn't the mainline, it's appended so a
+ * side-branch build is distinguishable (e.g. "build 828 · feature-x").
+ */
+fun buildLabel(runNumber: Int, branch: String = ""): String {
+    val base = if (runNumber <= 0) "dev build" else "build $runNumber"
+    val b = branch.trim()
+    return if (b.isEmpty() || b == "main" || b == "master") base else "$base · $b"
+}
+
+/**
  * Checks GitHub for the latest build. Bloo isn't on the Play Store, so this
  * is the app's real update channel: every ordinary push publishes a rolling
  * pre-release (see android.yml's "Publish build as a GitHub Release" step)

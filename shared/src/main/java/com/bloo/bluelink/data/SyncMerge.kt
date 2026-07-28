@@ -69,6 +69,28 @@ object SyncMerge {
         "seamless_install_shizuku",
     )
 
+    /** Per-VIN keys whose NAMES carry a dynamic suffix (the VIN), so they can't be
+     *  listed exactly in [DEVICE_LOCAL_KEYS] but are just as device-local and must
+     *  never travel. All are transient per-device RUNTIME state, not settings:
+     *   - `alert_*`      : CarAlerts "already fired this episode" flags — importing a
+     *                      peer's true flag would suppress THIS device's own
+     *                      independent door/engine/service notification.
+     *   - `door_since_*` / `engine_since_*` : the wall-clock timestamp an open/running
+     *                      episode began — comparing it against another device's clock
+     *                      domain makes the elapsed-time threshold fire early/late.
+     *   - `tile_refreshed_*` : the per-car tile live-refresh throttle stamp — a peer's
+     *                      stamp would wrongly suppress this device's own refresh.
+     *  Excluding them also keeps the portable content hash stable across alert/refresh
+     *  ticks (otherwise every 30-min alert poll churned the hash and forced a re-upload). */
+    private val DEVICE_LOCAL_PREFIXES = listOf(
+        "alert_", "door_since_", "engine_since_", "tile_refreshed_",
+    )
+
+    /** Whether [name] is device-local (exact key or dynamic per-VIN prefix) and so must
+     *  never be exported, imported, merged, or folded into the content hash. */
+    fun isDeviceLocal(name: String): Boolean =
+        name in DEVICE_LOCAL_KEYS || DEVICE_LOCAL_PREFIXES.any { name.startsWith(it) }
+
     /** A device that syncs this Drive file, as recorded in the file's `devices`
      *  registry. Purely informational (drives the phone's "your devices" list and
      *  the "primary" designation); never affects the settings merge itself. All
@@ -131,7 +153,7 @@ object SyncMerge {
      *  coerced via toString()). */
     private fun portablePrefsObject(prefs: Map<String, Any>): JsonObject = buildJsonObject {
         prefs.forEach { (name, value) ->
-            if (name in DEVICE_LOCAL_KEYS) return@forEach
+            if (isDeviceLocal(name)) return@forEach
             if (name.startsWith("img_") && value is String && value.startsWith("/")) return@forEach
             when (value) {
                 is Boolean -> put(name, JsonPrimitive(value))
@@ -145,7 +167,7 @@ object SyncMerge {
      *  device-local, so other devices converge on the deletion instead of
      *  resurrecting the key. */
     private fun tombstones(prefs: Map<String, Any>, dirtyKeys: Set<String>): Set<String> =
-        (dirtyKeys - prefs.keys.toSet() - DEVICE_LOCAL_KEYS)
+        (dirtyKeys - prefs.keys.toSet()).filterNotTo(LinkedHashSet()) { isDeviceLocal(it) }
 
     /** Builds the base backup root (`_format`/`_version`/`prefs`/`photos`/`_removed`),
      *  then lets [extra] add any additional top-level keys (the Drive-only metadata).
@@ -246,7 +268,7 @@ object SyncMerge {
         val sb = StringBuilder()
         prefs.entries
             .asSequence()
-            .filter { it.key !in DEVICE_LOCAL_KEYS }
+            .filterNot { isDeviceLocal(it.key) }
             .filterNot { it.key.startsWith("img_") && it.value is String && (it.value as String).startsWith("/") }
             .sortedBy { it.key }
             .forEach { sb.append(it.key).append(us).append(it.value.toString()).append(rs) }
@@ -332,7 +354,7 @@ object SyncMerge {
         val stringPuts = LinkedHashMap<String, String>()
         val boolPuts = LinkedHashMap<String, Boolean>()
         prefs.forEach { (name, element) ->
-            if (name in DEVICE_LOCAL_KEYS) return@forEach
+            if (isDeviceLocal(name)) return@forEach
             val prim = element as? JsonPrimitive ?: return@forEach
             when {
                 // A real JSON string (e.g. "DARK", "true") → keep as a string pref.
@@ -344,7 +366,7 @@ object SyncMerge {
                 else -> stringPuts[name] = prim.content
             }
         }
-        val removes = removed.filterTo(LinkedHashSet()) { it !in DEVICE_LOCAL_KEYS }
+        val removes = removed.filterNotTo(LinkedHashSet()) { isDeviceLocal(it) }
         return MergePlan(stringPuts, boolPuts, removes)
     }
 

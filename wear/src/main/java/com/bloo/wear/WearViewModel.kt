@@ -535,15 +535,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 // buildCarView prefers a cached in-memory status over the snapshot,
                 // so fold the snapshot's core fields into any status we hold -
                 // otherwise the fresh push stays masked for lock/climate/charge.
-                data.vehicles.forEach { snap ->
-                    statuses[snap.vin]?.let { s ->
-                        statuses = statuses + (snap.vin to s.copy(
-                            doorLock = snap.locked ?: s.doorLock,
-                            airCtrlOn = snap.climateOn ?: s.airCtrlOn,
-                            evStatus = s.evStatus?.let { ev ->
-                                ev.copy(batteryCharge = snap.charging ?: ev.batteryCharge)
-                            },
-                        ))
+                // Fold the snapshot's core fields into any status we hold, building the
+                // updated map ONCE rather than reassigning `statuses` per vehicle (the
+                // old `statuses = statuses + (..)` inside forEach rebuilt the whole map N
+                // times for N vehicles). Single-threaded on the Main dispatcher, so this
+                // is purely an allocation cleanup, not a race fix.
+                statuses = statuses.toMutableMap().apply {
+                    data.vehicles.forEach { snap ->
+                        this[snap.vin]?.let { s ->
+                            this[snap.vin] = s.copy(
+                                doorLock = snap.locked ?: s.doorLock,
+                                airCtrlOn = snap.climateOn ?: s.airCtrlOn,
+                                evStatus = s.evStatus?.let { ev ->
+                                    ev.copy(batteryCharge = snap.charging ?: ev.batteryCharge)
+                                },
+                            )
+                        }
                     }
                 }
                 // Fresh data just landed for these VINs -- advance their "last
@@ -564,7 +571,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             while (true) {
                 kotlinx.coroutines.delay(UPDATE_RECHECK_INTERVAL_MS)
-                runUpdateCheck(force = false, minInterval = UPDATE_RECHECK_INTERVAL_MS)
+                // Stop looping once an update is found — runUpdateCheck returns true then,
+                // and it early-returns thereafter anyway, so keep the coroutine from
+                // spinning a no-op every interval for the rest of the session.
+                if (runUpdateCheck(force = false, minInterval = UPDATE_RECHECK_INTERVAL_MS)) break
             }
         }
         bootstrap()

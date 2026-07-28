@@ -203,6 +203,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedCard
@@ -2657,43 +2658,12 @@ private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
  */
 @Composable
 private fun cameraBumpPadding(): PaddingValues {
-    val view = LocalView.current
-    val density = LocalDensity.current
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return PaddingValues(0.dp)
-    val cutout = view.rootWindowInsets?.displayCutout ?: return PaddingValues(0.dp)
-    val vw = view.width
-    val vh = view.height
-    if (vw <= 0 || vh <= 0) return PaddingValues(0.dp)
-    // A bump counts as hugging an edge if its far side is within this band of it.
-    val edgeBandPx = with(density) { 24.dp.toPx() }
-    val margin = with(density) { 8.dp.toPx() } // extra breathing room past the bump
-    var left = 0f; var top = 0f; var right = 0f; var bottom = 0f
-    for (r in cutout.boundingRects) {
-        // Which horizontal / vertical edge (if any) this rect hugs, and how far it
-        // intrudes from that edge (rect extent + margin).
-        val hIntr: Float? = when {
-            r.left <= edgeBandPx -> r.right + margin          // hugs LEFT
-            vw - r.right <= edgeBandPx -> (vw - r.left) + margin // hugs RIGHT
-            else -> null
-        }
-        val vIntr: Float? = when {
-            r.top <= edgeBandPx -> r.bottom + margin          // hugs TOP
-            vh - r.bottom <= edgeBandPx -> (vh - r.top) + margin // hugs BOTTOM
-            else -> null
-        }
-        // Corner bump (hugs one horizontal AND one vertical edge): reserve ONLY the
-        // smaller intrusion so we don't remove a full strip from both sides. Edge
-        // bump: reserve just that edge. `hOnly`/`vOnly` pick which axis wins.
-        val hOnly = hIntr != null && (vIntr == null || hIntr <= vIntr)
-        val vOnly = vIntr != null && (hIntr == null || vIntr < hIntr)
-        if (hOnly && r.left <= edgeBandPx) left = maxOf(left, hIntr!!)
-        if (hOnly && vw - r.right <= edgeBandPx) right = maxOf(right, hIntr!!)
-        if (vOnly && r.top <= edgeBandPx) top = maxOf(top, vIntr!!)
-        if (vOnly && vh - r.bottom <= edgeBandPx) bottom = maxOf(bottom, vIntr!!)
-    }
-    return with(density) {
-        PaddingValues(start = left.toDp(), top = top.toDp(), end = right.toDp(), bottom = bottom.toDp())
-    }
+    // Delegates to cutoutClearanceDp() (the generalized, corner-safe implementation)
+    // and just rewraps its per-edge EdgeDp into PaddingValues — the two used to carry
+    // byte-identical cutout math, which meant any fix to the corner-bump rule had to be
+    // made in both. One source of truth now.
+    val e = cutoutClearanceDp()
+    return PaddingValues(start = e.start.dp, top = e.top.dp, end = e.end.dp, bottom = e.bottom.dp)
 }
 
 // (CameraEdge / cameraEdgeOf removed: cover-screen cutout avoidance is now driven
@@ -2942,15 +2912,13 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     HorizontalPager(
                         state = pager,
                         modifier = Modifier.fillMaxSize(),
-                        // Finger swipe between cars is ON. It felt bad before because every
-                        // page eagerly composed a whole ~8-10 pebble column (plus a
-                        // pre-composed neighbour), so the fling fought a heavy compose. Now
-                        // only the SETTLED car renders its full PebbleList; any non-settled
-                        // page (the one sliding in, and the beyondViewportPageCount=1
-                        // neighbour) renders just a lightweight hero skeleton, and the rest
-                        // fills in one frame after the page settles (see `settled` below).
-                        // This ports the cover screen's "one light thing per in-transit
-                        // page" smoothness while keeping the phone's scrolling pebble list.
+                        // Finger swipe between cars is ON. Every page renders its FULL
+                        // pebble column (VehicleDetailContent → PebbleList) — there is no
+                        // in-transit skeleton. Swipe smoothness comes from two places:
+                        // PebbleList's own one-frame lazy-fill (only the first EAGER_PEBBLES
+                        // sections compose their bodies immediately; the rest fill one frame
+                        // later) and beyondViewportPageCount=1 pre-composing the neighbour
+                        // while idle, off the drag critical path.
                         userScrollEnabled = true,
                         // beyondViewportPageCount = 1 (was unset → default 0): the
                         // default meant the (heavy) neighbour car page only started
@@ -2977,14 +2945,14 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // per-page transform at all, just a plain flat scroll.
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
-                        // Only the settled car composes its full pebble column; a page
-                        // that's sliding in (or the pre-composed neighbour) renders a
-                        // hero-only skeleton so the swipe stays light. `page ==
-                        // pager.settledPage` is a DISCRETE snapshot read — it recomposes
-                        // this page only when the pager settles, never per drag frame, so
-                        // it doesn't reintroduce the per-frame-recompose jank that was
-                        // removed. The multi-car grid (perPage != 1) shows every car at
-                        // once with no switching swipe, so it always renders in full.
+                        // Whether this page is the one the pager has settled on. NOT used
+                        // to gate pebble rendering any more (every page renders its full
+                        // column — see the pager comment above); it exists ONLY to gate the
+                        // hoisted name-pill callback below, so a beyondViewportPageCount=1
+                        // pre-composed neighbour can't clobber the visible car's pill state.
+                        // `page == pager.settledPage` is a DISCRETE snapshot read — recomposes
+                        // this page only on settle, never per drag frame. The multi-car grid
+                        // (perPage != 1) shows every car at once, so it's always "settled".
                         val settled = perPage != 1 || page == pager.settledPage
                         // No blur, no rotationZ tilt -- see the expanded pager above.
                         Row(
@@ -3019,10 +2987,6 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // unconditionally, silently killing the single-
                                             // car view's refresh feedback too.
                                             hideIndicator = perPage > 1,
-                                            // Defer the heavy pebble column on in-transit /
-                                            // pre-composed pages; the settled car gets the
-                                            // full list (with reorder, hot-seat, refresh).
-                                            renderPebbles = settled,
                                         )
                                     }
                                 }
@@ -4237,6 +4201,16 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
         if (info == null) return@AnimatedVisibility
         val context = LocalContext.current
         val hasDirectDownload = info.run.phoneApkUrl != null
+        val current = vm.currentBuildNumber
+        // Build delta: "build 812 → build 828" when we know the installed build,
+        // else just the target. buildLabel is the one canonical version formatter.
+        val newLabel = com.bloo.bluelink.data.buildLabel(info.run.runNumber)
+        val deltaLabel = if (current > 0) {
+            "${com.bloo.bluelink.data.buildLabel(current)} → $newLabel"
+        } else {
+            newLabel
+        }
+        val seamless = LocalAppearance.current.seamlessInstallShizuku && state.shizukuAvailable
         // Keyed on the build number so a genuinely different build (see
         // checkForUpdate's sameBuild check) starts collapsed again rather
         // than inheriting whatever expand state an earlier build was left in.
@@ -4248,7 +4222,7 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
             icon = Icons.Filled.SystemUpdate,
             title = "Update available",
             vm = vm,
-            summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${info.run.runNumber}",
+            summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: deltaLabel,
             // No containerColor override -- PebbleShell's own default
             // (surfaceVariant) is what every ordinary pebble uses too
             // (Climate, Charge, Info, ...); this used primaryContainer,
@@ -4258,13 +4232,15 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
             // wasn't meant to be another one.
             headerAction = PebbleHeaderAction(
                 label = when {
+                    state.updateInstalling -> "Installing…"
                     state.updateDownloading -> state.updateDownloadProgress?.let { "${(it * 100).roundToInt()}%" } ?: "Downloading…"
-                    state.updateApkReady -> "Install"
+                    state.updateApkReady -> if (seamless) "Install now" else "Install"
                     hasDirectDownload -> "Update"
                     else -> "Open"
                 },
                 icon = if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
-                pending = state.updateDownloading,
+                pending = state.updateDownloading || state.updateInstalling,
+                enabled = !state.updateInstalling,
                 onClick = {
                     when {
                         state.updateApkReady -> vm.installDownloadedUpdate()
@@ -4278,30 +4254,61 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
             ),
         ) {
             val scheme = MaterialTheme.colorScheme
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = scheme.surfaceContainerHighest,
-                contentColor = scheme.onSurface,
-            ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
-                    Text(
-                        if (hasDirectDownload) "1. Tap \"Update\" above" else "1. Download the APK above",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Text(
-                        if (hasDirectDownload) "2. Tap \"Install\" once it's downloaded" else "2. Open the downloaded file",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    // Android's Play Protect flags any APK that didn't come
-                    // from the Play Store, unsigned-by-Google or not --
-                    // without this tip, "Blocked by Play Protect" reads
-                    // like the install genuinely failed rather than one
-                    // more tap.
-                    Text(
-                        "3. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+            // Build delta chip: what you're on → what you'd get. Always shown so the
+            // update is concrete ("build 812 → build 828") rather than an opaque prompt.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
+                Text(deltaLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            }
+            // Live download progress as a real bar (not just the % on the button).
+            if (state.updateDownloading) {
+                val p = state.updateDownloadProgress
+                if (p != null) {
+                    LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+            // Seamless-install affordance: tell the user this installs silently via
+            // Shizuku, or reflect the in-flight silent install.
+            if (state.updateInstalling) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Filled.Bolt, contentDescription = null, tint = ChargeGreen, modifier = Modifier.size(16.dp))
+                    Text("Installing silently via Shizuku…", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+            } else if (seamless && !state.updateDownloading) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Filled.Bolt, contentDescription = null, tint = ChargeGreen, modifier = Modifier.size(16.dp))
+                    Text("Installs silently via Shizuku — no prompts.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+            }
+            // The tap-through install steps only matter when NOT installing seamlessly.
+            if (!seamless) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = scheme.surfaceContainerHighest,
+                    contentColor = scheme.onSurface,
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
+                        Text(
+                            if (hasDirectDownload) "1. Tap \"Update\" above" else "1. Download the APK above",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            if (hasDirectDownload) "2. Tap \"Install\" once it's downloaded" else "2. Open the downloaded file",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        // Android's Play Protect flags any APK that didn't come
+                        // from the Play Store, unsigned-by-Google or not --
+                        // without this tip, "Blocked by Play Protect" reads
+                        // like the install genuinely failed rather than one
+                        // more tap.
+                        Text(
+                            "3. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             }
             info.run.releaseNotes?.let { notes ->
@@ -5026,11 +5033,6 @@ private fun VehicleDetailContent(
     reserveHeaderEnd: Boolean = false,
     onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
     hideIndicator: Boolean = false,
-    // When false (a car page that isn't the settled one in the swipe pager), render
-    // only the summary hero as a lightweight skeleton instead of the full pebble
-    // column, so swiping between cars stays smooth. Defaults true so every other
-    // caller (and the settled page) is unchanged.
-    renderPebbles: Boolean = true,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -5058,27 +5060,11 @@ private fun VehicleDetailContent(
             // Inset spacers (not padding) so content scrolls *behind* the bars.
             Spacer(Modifier.height(topInset + 8.dp))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
-            // summary (image+gauge) and controls are reorderable pebbles too.
-            if (renderPebbles) {
-                PebbleList(v, state, vm)
-            } else {
-                // Skeleton for an in-transit / pre-composed swipe page: just the
-                // summary hero (which is also PebbleList's first item), so when this
-                // page settles and renderPebbles flips true, the hero stays put and the
-                // rest of the column fills in below it with no visible jump.
-                // Reserve PebbleList's ReorderColumn cold-start stagger token (keyed on
-                // the bare VIN, see PebbleList's introKey) so that when the full list
-                // mounts on settle it does NOT re-play the alpha-0→1 + slide-in stagger
-                // on the already-visible hero. (HeroHeader reserves only its own
-                // "hero:$vin" token, a different key, so without this the hero would
-                // blink out and slide back in exactly at the settle.)
-                remember(v.vin) { coldStartIntroPlayed.add(v.vin) }
-                HeroHeader(
-                    v, state.statusFor(v), state.imageUrls[v.vin], state.hasBattery(v),
-                    state.hasFuel(v), vm, state.drivingLabel(v),
-                    metric = LocalAppearance.current.unitSystem == "metric",
-                )
-            }
+            // summary (image+gauge) and controls are reorderable pebbles too. The full
+            // pebble column always renders while swiping; smoothness comes from
+            // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
+            // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
+            PebbleList(v, state, vm)
             Spacer(Modifier.height(bottomInset + 16.dp))
         }
         // Only show the inline pill when no parent is managing it.
@@ -9904,6 +9890,19 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
           }
         }
+          // About / installed build — the one place the phone shows which build it's
+          // running (the update tile shows the AVAILABLE build; this shows the current
+          // one). Based on the GitHub Actions run number baked in at CI build time;
+          // "dev build" for a local build. buildLabel is the canonical formatter shared
+          // with the watch About footer and the update tile's delta.
+          Spacer(Modifier.height(8.dp))
+          Text(
+              "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              textAlign = TextAlign.Center,
+              modifier = Modifier.fillMaxWidth(),
+          )
           // The search bar itself now floats fixed to the screen's bottom
           // edge (see below, outside this scrolling column) -- reserve space
           // here so scrolled content never sits behind it.

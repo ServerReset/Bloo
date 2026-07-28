@@ -13,6 +13,17 @@ class BlooWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override val glanceAppWidget: GlanceAppWidget = BlooWidget()
 
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        // First widget added — start the periodic refresh worker. Without this, a user
+        // who adds a widget without ever foregrounding the app (where MainActivity also
+        // schedules it) would get no background refresh; and after the last widget is
+        // removed (onDisabled cancels) then a new one added, refresh would stay dead
+        // until the next app open. ExistingPeriodicWorkPolicy.KEEP makes it idempotent
+        // with the MainActivity call.
+        WidgetRefreshWorker.schedule(context)
+    }
+
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         // Keep the broadcast alive via goAsync() so the DataStore write survives past
@@ -22,7 +33,14 @@ class BlooWidgetReceiver : GlanceAppWidgetReceiver() {
         val store = SettingsStore(context)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                appWidgetIds.forEach { runCatching { store.clearWidgetConfig(it) } }
+                appWidgetIds.forEach { id ->
+                    runCatching { store.clearWidgetConfig(id) }
+                    // Also delete this widget's cached map tile. Android reuses widget
+                    // ids, so a new widget at a reused id with location enabled would
+                    // otherwise decode the PREVIOUS widget's stale map until its own
+                    // Location action runs. (clearWidgetConfig only clears prefs keys.)
+                    runCatching { java.io.File(context.cacheDir, "widget_map_$id.png").delete() }
+                }
             } finally {
                 pending.finish()
             }

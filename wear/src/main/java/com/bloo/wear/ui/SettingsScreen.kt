@@ -574,7 +574,10 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
 
         item {
             Text(
-                "Bloo for Wear OS · 0.1",
+                "Bloo for Wear OS · " + com.bloo.bluelink.data.buildLabel(
+                    vm.currentBuildNumber,
+                    com.bloo.wear.BuildConfig.BUILD_BRANCH,
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

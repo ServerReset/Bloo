@@ -2522,9 +2522,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // that fixed color (or null to fall back to theme-derived).
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
 
-    /** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore). */
-    fun setSeamlessInstallShizuku(value: Boolean) =
+    /** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore).
+     *  Turning it ON prompts for the Shizuku permission immediately — that request is
+     *  also what makes Bloo appear in the Shizuku manager's app list (declaring the
+     *  provider alone isn't enough). If Shizuku isn't running, guide the user. */
+    fun setSeamlessInstallShizuku(value: Boolean) {
         viewModelScope.launch { settingsStore.setSeamlessInstallShizuku(value) }
+        if (value) {
+            val installer = com.bloo.bluelink.update.ShizukuInstaller
+            if (installer.hasPermission()) return
+            val queued = installer.requestPermissionOnEnable(SHIZUKU_INSTALL_REQUEST_CODE)
+            if (!queued && !installer.isAvailable()) {
+                _state.update {
+                    it.copy(message = "Start Shizuku, then Bloo can install updates silently.")
+                }
+            }
+        }
+    }
 
     /** Re-probe Shizuku availability off the main thread (binder ping). Called from
      *  init and on warm resume, so starting Shizuku while the app is open reveals the

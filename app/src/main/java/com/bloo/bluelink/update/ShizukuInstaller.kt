@@ -47,16 +47,51 @@ object ShizukuInstaller {
         Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
     }.getOrDefault(false)
 
-    /** Whether the manager showed "deny & don't ask again" (so we shouldn't re-prompt). */
-    fun shouldShowRationale(): Boolean = runCatching {
-        Shizuku.shouldShowRequestPermissionRationale()
-    }.getOrDefault(false)
-
     /** Ask for the Shizuku runtime permission; the result arrives on the listener
      *  MainActivity registers. No-op if the binder is dead. */
     fun requestPermission(requestCode: Int) {
         runCatching { Shizuku.requestPermission(requestCode) }
     }
+
+    /**
+     * Called when the user opts INTO seamless install: prompt for the Shizuku
+     * permission now (unless already granted). This is also what makes Bloo appear in
+     * the Shizuku manager's authorized-apps list — an app only shows up there once it
+     * has actually requested permission while the binder was alive; merely declaring
+     * the provider isn't enough.
+     *
+     * If the binder isn't received yet (Shizuku installed but service just started, or
+     * not started), a request now would throw, so we register a STICKY binder-received
+     * listener that fires immediately if the binder is already up, else once it arrives
+     * — then requests once and removes itself. Returns true if Shizuku is installed
+     * enough to have requested/queued a request; false if not installed at all (so the
+     * caller can tell the user to install/start Shizuku). Fully guarded — never throws.
+     */
+    fun requestPermissionOnEnable(requestCode: Int): Boolean = runCatching {
+        if (hasPermission()) return@runCatching true
+        if (isAvailable()) {
+            // Binder alive → prompt immediately.
+            Shizuku.requestPermission(requestCode)
+            return@runCatching true
+        }
+        // Binder not received yet. If the provider class is present at all, queue a
+        // one-shot sticky listener so the prompt fires the moment the binder arrives.
+        val listener = object : Shizuku.OnBinderReceivedListener {
+            override fun onBinderReceived() {
+                runCatching {
+                    if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+                        Shizuku.requestPermission(requestCode)
+                    }
+                }
+                runCatching { Shizuku.removeBinderReceivedListener(this) }
+            }
+        }
+        Shizuku.addBinderReceivedListenerSticky(listener)
+        // We can't know synchronously whether Shizuku is installed-but-stopped vs
+        // absent; the sticky listener simply never fires if it's absent. Report false
+        // so the caller nudges the user to start Shizuku.
+        false
+    }.getOrDefault(false)
 
     /**
      * Install [apk] silently. Blocking (awaits the commit result on a latch) — call
