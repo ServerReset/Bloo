@@ -80,12 +80,17 @@
              INTERACT_ACROSS_USERS_FULL permission just protects the provider from
              other apps. Not exported. Only actually used when Shizuku is running
              and the user has opted into seamless install. -->
+        <!-- ShizukuProvider REQUIRES android:exported="true" — it throws
+             IllegalStateException("android:exported must be true") in attachInfo() at
+             process start otherwise (crash on launch). Exporting is safe here: access
+             is gated by the INTERACT_ACROSS_USERS_FULL signature|privileged permission,
+             which normal apps can't hold. This is the canonical Shizuku declaration. -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:multiprocess="false"
             android:enabled="true"
-            android:exported="false"
+            android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <!-- Wear OS Data Layer: receives the watch's remote commands and sync
