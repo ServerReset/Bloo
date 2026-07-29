@@ -29,7 +29,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -832,10 +834,15 @@ private fun OnboardingScreen(vm: AppViewModel) {
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (pageIndex > 0) {
+                AnimatedVisibility(
+                    visible = pageIndex > 0,
+                    modifier = Modifier.weight(1f),
+                    enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
+                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(120)),
+                ) {
                     OutlinedCard(
                         onClick = ::goBack,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                     ) {
                         Box(Modifier.fillMaxWidth().padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
@@ -1342,10 +1349,15 @@ private fun CarFeatureWizard(
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (pageIndex > 0) {
+                AnimatedVisibility(
+                    visible = pageIndex > 0,
+                    modifier = Modifier.weight(1f),
+                    enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
+                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(120)),
+                ) {
                     OutlinedCard(
                         onClick = ::goBack,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                     ) {
                         Box(Modifier.fillMaxWidth().padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
@@ -8059,7 +8071,16 @@ private fun ClimatePebble(
         if (fahrenheit) {
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                com.bloo.uicommon.AnimatedValue(degLabel(tempF.toString(), true), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
+                // RollingNumber (used for the hero's %/range) rather than the
+                // plain AnimatedValue this had: it rolls the DIRECTION the value
+                // actually moved (up when dragged warmer, down when cooler)
+                // instead of always sliding the same way regardless.
+                RollingNumber(
+                    text = degLabel(tempF.toString(), true),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = tempColor,
+                )
             }
             AnimatedSlider(
                 value = tempF.toFloat(),
@@ -8074,7 +8095,12 @@ private fun ClimatePebble(
             val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                com.bloo.uicommon.AnimatedValue(degLabel(tempF.toString(), false), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = tempColor))
+                RollingNumber(
+                    text = degLabel(tempF.toString(), false),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = tempColor,
+                )
             }
             AnimatedSlider(
                 value = tempC.toFloat(),
@@ -8085,12 +8111,31 @@ private fun ClimatePebble(
             )
         }
 
-        StepRow("Run time", "$duration min")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Text(
+                "Run time",
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.width(8.dp))
+            // RollingNumber, not StepRow's built-in roll: StepRow's AnimatedContent
+            // always slides the same direction regardless of which way the value
+            // moved, which reads oddly on a slider you're actively dragging both
+            // ways. RollingNumber rolls up when the minutes increase, down when
+            // they decrease, matching every other draggable number in the app.
+            RollingNumber(
+                text = "$duration min",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
+        }
         AnimatedSlider(
             value = duration.toFloat(),
-            // Extended range (up to 30 min): the car itself has no single
-            // command past CLIMATE_DURATION_RANGE's 10-minute cap -- a request
-            // beyond that is auto-chained into follow-up commands instead (see
+            // Extended range: the car itself has no single command past
+            // CLIMATE_DURATION_RANGE's 10-minute cap -- a request beyond that
+            // is auto-chained into follow-up commands instead (see
             // AppViewModel.startClimate / ClimateExtendWorker), so the slider
             // can go further than any one command actually could.
             onValueChange = { duration = it.roundToInt() },

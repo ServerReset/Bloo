@@ -86,11 +86,11 @@ val CLIMATE_DURATION_RANGE: IntRange = 1..10
  *  ClimateExtendWorker on the phone) -- the first chunk fires immediately and
  *  each following chunk is scheduled to fire the moment the previous one's
  *  duration elapses, so the car's climate never actually turns off in
- *  between. 30 min is a practical ceiling, not an API limit: a real remote
+ *  between. 20 min is a practical ceiling, not an API limit: a real remote
  *  climate run this long is already unusual, and each extra chunk is another
  *  scheduled background command that can fail/drift, so this doesn't try to
  *  support arbitrarily long runs. */
-val CLIMATE_EXTENDED_DURATION_RANGE: IntRange = 1..30
+val CLIMATE_EXTENDED_DURATION_RANGE: IntRange = 1..20
 
 /**
  * Splits a requested total climate-run [minutes] into the sequence of
