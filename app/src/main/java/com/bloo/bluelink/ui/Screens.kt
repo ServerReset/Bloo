@@ -4263,7 +4263,7 @@ private fun HeroHeader(
                 // On the flip cover the hero is a full-screen centred tile with room to
                 // spare, so show the car photo bigger there; phone/normal keeps `height`.
                 HeroVisual(v, imageUrl, if (cover) 210.dp else height)
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
             }
             ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
@@ -4368,8 +4368,8 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
                 else -> Triple(Icons.Filled.SystemUpdate, deltaLabel, scheme.primary)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(statusIcon, contentDescription = null, tint = statusTint, modifier = Modifier.size(18.dp))
-                Text(statusText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Icon(statusIcon, contentDescription = null, tint = statusTint, modifier = Modifier.size(20.dp))
+                Text(statusText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             }
             // Live download progress bar.
             if (state.updateDownloading) {
@@ -4383,17 +4383,28 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
             // Release notes ("What's new"), capped, with a "Full notes" link to the
             // release page when there's more than we show.
             info.run.releaseNotes?.let { notes ->
-                Text("What's new", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
+                // "Full notes" rides in the section header rather than taking a
+                // whole row of its own below the excerpt — one less stacked block
+                // in a tile that already carries status, notes and two dismissals.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "What's new",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = scheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MorphTextButton("Full notes", onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                    })
+                }
                 Text(
                     notes.trim(),
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
-                    maxLines = 8,
+                    maxLines = 5,
                     overflow = TextOverflow.Ellipsis,
                 )
-                MorphTextButton("Full notes", onClick = {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                })
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and
             // only as an opt-in disclosure — the Play-Protect steps are scaffolding, not
@@ -4572,9 +4583,12 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
             // Roll the headline number when it changes.
+            // The charge/fuel percentage is the single most-glanced number in the
+            // app, so it carries the hero at display scale; range and state read
+            // as its supporting column rather than competing with it.
             RollingNumber(
                 text = pct?.let { "$it%" } ?: "--",
-                style = MaterialTheme.typography.displaySmall,
+                style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.weight(1f))
@@ -4582,7 +4596,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 RollingNumber(
                     text = range?.let { formatDistance(it, metric) } ?: "--",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                 )
                 val animatedStatusColor by androidx.compose.animation.animateColorAsState(
                     statusColor, animationSpec = tween(300), label = "statusLineColor",
@@ -4597,9 +4611,9 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 ) { line ->
                     Text(
                         line,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         color = animatedStatusColor,
-                        fontWeight = if (charging || drivingLabel == "Driving") FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = if (charging || drivingLabel == "Driving") FontWeight.Bold else FontWeight.Medium,
                     )
                 }
             }
@@ -4622,7 +4636,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
                 )
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         // Expressive motion: the fill springs in with a gentle overshoot.
         val animatedFrac by animateFloatAsState(
             targetValue = frac,
@@ -9355,14 +9369,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Text(statusLabel, style = MaterialTheme.typography.labelMedium, color = driveTint, fontWeight = FontWeight.Medium)
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "Keeps a Google Drive file continuously up to date, so every " +
-                        "signed-in device converges on the same settings automatically.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
                 if (showDriveDialog) {
                     DriveSyncSetupDialog(
                         onDismissRequest = { showDriveDialog = false },
@@ -9374,70 +9381,55 @@ private fun SettingsScreen(vm: AppViewModel) {
                         hasExistingSync = state.syncUri != null || state.syncDevices.size > 1,
                     )
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphTextButton(
-                        if (state.syncUri != null) "Change Drive file" else "Set up auto-sync",
-                        modifier = Modifier.weight(1f),
+                if (state.syncUri == null) {
+                    // Not configured: one unmissable primary CTA, nothing else to
+                    // read past. The old layout led with a paragraph explaining
+                    // Drive sync and put setup in a quiet text button beside it.
+                    MorphButton(
                         onClick = { showDriveDialog = true },
-                    )
-                    if (state.syncUri != null) {
-                        MorphTextButton(
-                            "Disable",
-                            modifier = Modifier.weight(1f),
-                            onClick = { vm.clearSyncUri() },
-                        )
-                    }
-                }
-                if (state.syncUri != null) {
-                    Spacer(Modifier.height(10.dp))
-                    // Status facts grouped into one tidy rounded block (label/value
-                    // rows) instead of a loose pile of differently-tinted Text lines.
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
-                        SyncInfoRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "—")
-                        // File-identity fingerprint: two phones truly on the SAME Drive
-                        // file show the SAME code. If they differ, they picked different
-                        // files (Drive allows duplicate names) — the #1 reason sync
-                        // doesn't converge, now checkable at a glance across phones.
-                        state.syncFileFingerprint?.let { fp ->
-                            SyncInfoRow("File ID", fp, valueMono = true)
-                        }
-                        if (state.syncError != null) {
-                            SyncInfoRow("Error", state.syncError!!, valueColor = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                    // (The "File ID must match across devices" guidance is carried by the
-                    // stale-peer advisory inside SyncDevicesSection — not repeated here.)
-                    // The synced-devices registry: a drag-to-reorder list where the
-                    // TOP device is primary (source of truth). See SyncDevicesSection.
-                    SyncDevicesSection(state = state, vm = vm)
-                    Spacer(Modifier.height(12.dp))
-                    // Manual controls, with hierarchy instead of a wall of equal pills:
-                    // "Sync now" is the emphasized primary action; the rest are quieter.
+                        modifier = Modifier.fillMaxWidth(),
+                        active = true,
+                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
+                } else {
+                    // Configured: "Sync now" is THE daily control, so it leads —
+                    // ahead of the device registry and the setup/teardown pair,
+                    // which are both occasional by comparison.
                     MorphButton(
                         onClick = { vm.syncNow() },
                         modifier = Modifier.fillMaxWidth(),
                         active = true,
                     ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Non-destructive real-provider round-trip so the user can confirm
-                        // sync actually works.
-                        MorphTextButton("Test sync", modifier = Modifier.weight(1f), onClick = { vm.testSync() })
-                        // "Pull from primary now": force this device to adopt the
-                        // primary's full settings — only when a primary exists AND it
-                        // isn't this device (pulling from yourself is a no-op). When not
-                        // shown, Test sync spans the row on its own.
-                        if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
-                            MorphTextButton("Pull from primary", modifier = Modifier.weight(1f), onClick = { vm.pullFromPrimary() })
+                    // A live failure is the one fact that never hides behind the
+                    // diagnostics disclosure below — if sync is broken, say so here.
+                    state.syncError?.let { err ->
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.CloudOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                err,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
+                    // The synced-devices registry: a drag-to-reorder list where the
+                    // TOP device is primary (source of truth). See SyncDevicesSection.
+                    SyncDevicesSection(state = state, vm = vm)
+                    Spacer(Modifier.height(12.dp))
                     MorphSegmented(
                         options = listOf(
                             SegmentOption("wifi", "Wi-Fi only", null),
@@ -9446,6 +9438,66 @@ private fun SettingsScreen(vm: AppViewModel) {
                         selectedKey = if (state.syncWifiOnly) "wifi" else "any",
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MorphTextButton(
+                            "Change Drive file",
+                            modifier = Modifier.weight(1f),
+                            onClick = { showDriveDialog = true },
+                        )
+                        MorphTextButton(
+                            "Disable",
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.clearSyncUri() },
+                        )
+                    }
+                    // Troubleshooting tools, not daily controls: the last-synced
+                    // stamp (already summarised in the header above), the file
+                    // fingerprint, and the two repair actions all fold away by
+                    // default so the card stops reading as a wall of equal pills.
+                    Spacer(Modifier.height(8.dp))
+                    var showSyncDiagnostics by rememberSaveable { mutableStateOf(false) }
+                    MorphTextButton(
+                        if (showSyncDiagnostics) "Hide diagnostics" else "Diagnostics",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showSyncDiagnostics = !showSyncDiagnostics },
+                    )
+                    AnimatedVisibility(visible = showSyncDiagnostics) {
+                        Column {
+                            Spacer(Modifier.height(8.dp))
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
+                                SyncInfoRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "—")
+                                // File-identity fingerprint: two phones truly on the SAME Drive
+                                // file show the SAME code. If they differ, they picked different
+                                // files (Drive allows duplicate names) — the #1 reason sync
+                                // doesn't converge, now checkable at a glance across phones.
+                                state.syncFileFingerprint?.let { fp ->
+                                    SyncInfoRow("File ID", fp, valueMono = true)
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // Non-destructive real-provider round-trip so the user can confirm
+                                // sync actually works.
+                                MorphTextButton("Test sync", modifier = Modifier.weight(1f), onClick = { vm.testSync() })
+                                // "Pull from primary now": force this device to adopt the
+                                // primary's full settings — only when a primary exists AND it
+                                // isn't this device (pulling from yourself is a no-op). When not
+                                // shown, Test sync spans the row on its own.
+                                if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
+                                    MorphTextButton("Pull from primary", modifier = Modifier.weight(1f), onClick = { vm.pullFromPrimary() })
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Advanced-only: a one-shot export/import file is a power-user
@@ -9464,9 +9516,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "A one-time snapshot of your theme, palettes, tile order and " +
-                            "preferences as a file — share it anywhere, or restore it later. " +
-                            "Sign-in credentials are never included.",
+                        "A one-time snapshot file. Credentials are never included.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -9655,87 +9705,93 @@ private fun SettingsScreen(vm: AppViewModel) {
             // a browser fallback source, and the optional Shizuku silent-install toggle
             // gated to just its row so the card itself never vanishes).
             SettingsCard("Updates") {
-                // At-a-glance status header: the state icon in a tonal circle + a bold
-                // title and a colour-coded one-line state — the same card-header language
-                // Backup & sync (and Quick tiles / AI) use, so Updates reads consistently.
                 val updateTint = when {
                     state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
+                // The installed build number carries the card as a hero stat, the
+                // same big-number language the garage hero uses for %/range —
+                // instead of a label/value row buried under a paragraph. The state
+                // rides alongside as a tonal chip rather than a second text line.
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .background(updateTint.copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(22.dp))
+                    Column(Modifier.weight(1f)) {
+                        RollingNumber(
+                            text = if (vm.currentBuildNumber > 0) "${vm.currentBuildNumber}" else "dev",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        // Branch only when it isn't the mainline the app normally
+                        // builds from — buildLabel already encodes that rule, so
+                        // reuse it rather than re-deriving "is this main?" here.
+                        val branchSuffix = com.bloo.bluelink.data
+                            .buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
+                            .substringAfter(" · ", "")
+                        Text(
+                            if (branchSuffix.isNotBlank()) "this build · $branchSuffix" else "this build",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("App updates", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        val statusLabel = when {
-                            state.updateChecking -> "Checking…"
-                            state.updateAvailable != null ->
-                                "Update available · ${com.bloo.bluelink.data.buildLabel(state.updateAvailable!!.run.runNumber)}"
-                            else -> "Up to date"
-                        }
-                        Text(statusLabel, style = MaterialTheme.typography.labelMedium, color = updateTint, fontWeight = FontWeight.Medium)
+                    Row(
+                        Modifier
+                            .clip(CircleShape)
+                            .background(updateTint.copy(alpha = 0.15f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            when {
+                                state.updateChecking -> "Checking…"
+                                state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
+                                else -> "Up to date"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = updateTint,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                // Current installed build (the canonical build-number label).
-                StatusRow(
-                    "This build",
-                    com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
-                )
-                Text(
-                    "Bloo isn't on the Play Store — it checks its own GitHub builds " +
-                        "automatically (on open and periodically) and shows an update tile " +
-                        "when a newer one is out.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                MorphButton(
-                    onClick = { vm.checkForUpdateManually() },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.updateChecking,
-                    active = true,
-                ) {
-                    MorphButtonLabel(
-                        icon = Icons.Filled.Refresh,
-                        label = if (state.updateChecking) "Checking…" else "Check for updates",
-                        pending = state.updateChecking,
+                Spacer(Modifier.height(14.dp))
+                // Both update sources share one row instead of two stacked
+                // full-width pills: the in-app checker (primary) and the GitHub
+                // Releases page (a second source that still works when the
+                // checker says up-to-date or GitHub's API is flaky).
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphButton(
+                        onClick = { vm.checkForUpdateManually() },
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.updateChecking,
+                        active = true,
+                    ) {
+                        MorphButtonLabel(
+                            icon = Icons.Filled.Refresh,
+                            label = if (state.updateChecking) "Checking…" else "Check",
+                            pending = state.updateChecking,
+                        )
+                    }
+                    MorphTextButton(
+                        "GitHub",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(com.bloo.bluelink.data.UpdateApi.RELEASES_URL))
+                                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
                     )
                 }
-                // Second source: open the GitHub Releases page to grab an APK directly,
-                // independent of the in-app checker (works even when it's up to date or
-                // GitHub's API is flaky).
-                MorphTextButton(
-                    "Get updates on GitHub",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(com.bloo.bluelink.data.UpdateApi.RELEASES_URL))
-                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 // Shizuku silent-install: the ROW is gated on Shizuku being present, but
                 // the card is not — so the update controls above always show.
                 if (state.shizukuAvailable) {
+                    Spacer(Modifier.height(4.dp))
                     ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                         vm.setSeamlessInstallShizuku(it)
                     }
-                    Text(
-                        "Uses Shizuku (local ADB) to install downloaded updates silently — no " +
-                            "system installer prompt. You'll be asked to grant Shizuku access the " +
-                            "first time. If Shizuku isn't running, updates use the normal installer.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
 
@@ -11893,7 +11949,7 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "A device hasn't synced in a while. If it's still in use, check its File ID matches the one above — otherwise it's on a different file. Reconnect it via Change Drive file → Open from Drive.",
+                "A device hasn't synced in a while. If it's still in use, check its File ID matches the one under Diagnostics — otherwise it's on a different file. Reconnect it via Change Drive file → Open from Drive.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
