@@ -163,11 +163,16 @@ object CarAlerts {
         settings: SettingsStore,
         v: Vehicle,
         status: VehicleStatus?,
-        // Defaulted so existing callers are unchanged, but AlertWorker already
-        // loads this once per tick and now passes it in — it was being re-read
-        // from DataStore once per VEHICLE, per tick, for an identical value.
-        prefs: SettingsStore.NotificationPrefs = settings.notificationPrefs(),
+        // Kotlin doesn't allow a suspend call as a default parameter value, so
+        // the "reuse an already-loaded prefs" default has to be null + a
+        // fallback load inside the body instead of in the signature. AlertWorker
+        // already loads this once per tick and passes it in — it was being
+        // re-read from DataStore once per VEHICLE, per tick, for an identical
+        // value; other callers (AppViewModel) are unchanged, they just don't
+        // pass one and this loads it itself, same as before.
+        prefs: SettingsStore.NotificationPrefs? = null,
     ): List<Alert> {
+        val prefs = prefs ?: settings.notificationPrefs()
         val out = mutableListOf<Alert>()
 
         if (prefs.service) {
