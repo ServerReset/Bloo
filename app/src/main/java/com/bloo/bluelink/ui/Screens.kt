@@ -2830,7 +2830,21 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // all cars" button / system back) and expands another car, which
                         // re-seeds this pager on that car via rememberWrapPager above.
                         userScrollEnabled = false,
-                        beyondViewportPageCount = 1,
+                        // Paired with userScrollEnabled=false above: the expanded pager
+                        // has NO finger swipe, so its neighbour pages can never be shown
+                        // or scrolled to — pre-warming them is pure dead weight. Worse,
+                        // ExpandedCar is heavier than a collapsed page (dual column, two
+                        // scrolls, force-expanded hotspot) and UiState is unstable, so
+                        // every state emission (poll/refresh tick/command) recomposes
+                        // EVERY in-composition page. beyondViewportPageCount=1 keeps 3
+                        // ExpandedCars in composition (current + 2 unreachable neighbours);
+                        // 0 keeps just the visible one → the per-emission recompose cost
+                        // (and the expand-entry burst under the fade/scale) drops ~3x.
+                        // Dots/settle read pure PagerState, so nothing visible changes.
+                        // If finger-swipe is ever re-enabled here, restore this to 1 — a
+                        // live swipe needs the neighbour pre-warmed (see collapsed pager
+                        // below for why).
+                        beyondViewportPageCount = 0,
                         pageSize = androidx.compose.foundation.pager.PageSize.Fill,
                     ) { page ->
                         // Read the continuous pager offset ONLY inside graphicsLayer{}
@@ -4207,11 +4221,11 @@ private fun HeroHeader(
         ),
         label = "heroCorner",
     )
-    // On the PHONE, match the collapsed pebble stack (PebbleCornerCollapsed = 38dp) so
-    // the hero doesn't read rounder than its neighbours — the old hardcoded charging
-    // 40dp / idle 24dp both mismatched the stack (40 too round on a charging EV). The
-    // COVER keeps its own animated corner (it's a full-height tile, not part of a stack).
-    val heroShape = RoundedCornerShape(if (LocalForceExpanded.current) corner else PebbleCornerCollapsed)
+    // On the PHONE, match the EXPANDED pebble corner (PebbleCornerExpanded = 20dp) —
+    // the hero reads as an always-expanded card, so it should share the tighter
+    // expanded radius, not the rounder collapsed one. The old hardcoded charging 40dp /
+    // idle 24dp both mismatched. The COVER keeps its own animated corner (full-height tile).
+    val heroShape = RoundedCornerShape(if (LocalForceExpanded.current) corner else PebbleCornerExpanded)
     val heroOutline = LocalAppearance.current
     // On the flip cover this hero is one full-screen tile. Unlike every other
     // pebble it rolls its own Card and never went through PebbleShell, so it never
@@ -4246,7 +4260,9 @@ private fun HeroHeader(
             // was just a dead gradient rectangle. With it gone, ChargeFuelBar (the
             // actual glance content: %, range, charging state) centres as the hero.
             if (!(cover && imageUrl.isNullOrBlank())) {
-                HeroVisual(v, imageUrl, height)
+                // On the flip cover the hero is a full-screen centred tile with room to
+                // spare, so show the car photo bigger there; phone/normal keeps `height`.
+                HeroVisual(v, imageUrl, if (cover) 210.dp else height)
                 Spacer(Modifier.height(16.dp))
             }
             ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
@@ -9639,6 +9655,35 @@ private fun SettingsScreen(vm: AppViewModel) {
             // a browser fallback source, and the optional Shizuku silent-install toggle
             // gated to just its row so the card itself never vanishes).
             SettingsCard("Updates") {
+                // At-a-glance status header: the state icon in a tonal circle + a bold
+                // title and a colour-coded one-line state — the same card-header language
+                // Backup & sync (and Quick tiles / AI) use, so Updates reads consistently.
+                val updateTint = when {
+                    state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .background(updateTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("App updates", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        val statusLabel = when {
+                            state.updateChecking -> "Checking…"
+                            state.updateAvailable != null ->
+                                "Update available · ${com.bloo.bluelink.data.buildLabel(state.updateAvailable!!.run.runNumber)}"
+                            else -> "Up to date"
+                        }
+                        Text(statusLabel, style = MaterialTheme.typography.labelMedium, color = updateTint, fontWeight = FontWeight.Medium)
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 // Current installed build (the canonical build-number label).
                 StatusRow(
                     "This build",
