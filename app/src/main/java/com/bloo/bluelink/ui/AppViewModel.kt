@@ -422,6 +422,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDoorOpenMinutes(m: Int) = viewModelScope.launch { settingsStore.setDoorOpenMinutes(m) }
     fun setNotifyRunning(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyRunning(v) }
     fun setRunningMinutes(m: Int) = viewModelScope.launch { settingsStore.setRunningMinutes(m) }
+    fun setNotifyUnlocked(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyUnlocked(v) }
+    fun setUnlockedMinutes(m: Int) = viewModelScope.launch { settingsStore.setUnlockedMinutes(m) }
 
     /** Write the current live status/location maps to disk (survives restart). */
     private fun persistCache() {
@@ -2204,16 +2206,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun hornAndLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Horn & lights", null) { repoFor(v).hornAndLights(v) }
 
     /** Turn climate off; optimistically flips [VehicleStatus.airCtrlOn] to
-     *  false so the climate toggle in the UI responds immediately. */
+     *  false so the climate toggle in the UI responds immediately. Also cancels
+     *  any pending [ClimateExtendWorker] chain for this car -- otherwise a
+     *  scheduled follow-up command from an earlier, longer request could fire
+     *  minutes later and silently turn climate back on after the user just
+     *  turned it off. */
     fun stopClimate(v: Vehicle) =
-        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) { repoFor(v).stopClimate(v) }
+        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) {
+            com.bloo.bluelink.work.ClimateExtendWorker.cancel(getApplication(), v.vin)
+            repoFor(v).stopClimate(v)
+        }
 
-    /** Start climate with the given [req] (temp/duration/defrost/seat
-     *  heating/etc). Shares the "climate" action key with [stopClimate] so
-     *  starting and stopping can't race each other on the same car. */
+    /**
+     * Start climate with the given [req] (temp/duration/defrost/seat
+     * heating/etc). Shares the "climate" action key with [stopClimate] so
+     * starting and stopping can't race each other on the same car.
+     *
+     * The vendor API caps a single remote-start command's duration at
+     * [com.bloo.bluelink.data.CLIMATE_DURATION_RANGE]'s upper bound (10
+     * minutes) -- there's no such thing as a car-side "run for 25 minutes"
+     * command. A longer [req.durationMinutes] (the "Run time" slider now goes
+     * up to [com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE]'s 30) is
+     * chained instead: [com.bloo.bluelink.data.climateChunks] splits it into
+     * chunks the car CAN run one at a time, this sends the first chunk right
+     * now same as ever, and schedules [ClimateExtendWorker] to send each
+     * following chunk the moment the one before it elapses -- so from the
+     * car's perspective climate just keeps running past what any single
+     * command could hold it at.
+     */
     fun startClimate(v: Vehicle, req: ClimateRequest) =
         runCommand(v.vin, "climate", "Climate on (${req.tempF}°F)", { it.copy(airCtrlOn = true) }) {
-            repoFor(v).startClimate(v, req)
+            val chunks = com.bloo.bluelink.data.climateChunks(req.durationMinutes)
+            // Unchanged behavior for every request already within the single-
+            // command cap: chunks is just [req.durationMinutes] and this is
+            // the same call it always was.
+            repoFor(v).startClimate(v, req.copy(durationMinutes = chunks.first()))
+            val remaining = chunks.drop(1).sum()
+            val ctx = getApplication<android.app.Application>()
+            if (remaining > 0) {
+                com.bloo.bluelink.work.ClimateExtendWorker.schedule(
+                    context = ctx,
+                    vin = v.vin,
+                    remainingMinutes = remaining,
+                    tempF = req.tempF,
+                    defrost = req.defrost,
+                    steeringWheelHeat = req.steeringWheelHeat,
+                    seatFrontLeft = req.seatFrontLeft.apiValue,
+                    seatFrontRight = req.seatFrontRight.apiValue,
+                    seatRearLeft = req.seatRearLeft.apiValue,
+                    seatRearRight = req.seatRearRight.apiValue,
+                    delayMinutes = chunks.first(),
+                )
+            } else {
+                // This request alone covers everything -- clear any chain a
+                // PRIOR, longer-running request might still have pending, so
+                // it can't extend climate past what this shorter run intends.
+                com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin)
+            }
         }
 
     // startCharge/stopCharge/setChargeLimits all route the vehicle through

@@ -356,6 +356,8 @@ import com.bloo.bluelink.data.serviceDue
 import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
+import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
+import com.bloo.bluelink.data.climateChunks
 import com.bloo.bluelink.data.isPluggedIn
 import com.bloo.uicommon.topFadeScrim
 import com.bloo.uicommon.rememberConfirmArm
@@ -7378,6 +7380,14 @@ private fun TripRow(trip: EvTrip, metric: Boolean = false) {
 
 private fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw)
 
+/** "10 + 3 min" for a 13-minute request -- the per-command chunks
+ *  [climateChunks] splits an auto-extended climate run into, shown on the
+ *  Climate pebble's Run time slider so it's clear a request past the car's
+ *  single-command cap becomes more than one command rather than one longer
+ *  one. */
+private fun climateChunksLabel(totalMinutes: Int): String =
+    climateChunks(totalMinutes).joinToString(" + ") + " min"
+
 // --- Car info (status + service + links combined) -------------------------
 
 @Composable
@@ -8078,10 +8088,23 @@ private fun ClimatePebble(
         StepRow("Run time", "$duration min")
         AnimatedSlider(
             value = duration.toFloat(),
+            // Extended range (up to 30 min): the car itself has no single
+            // command past CLIMATE_DURATION_RANGE's 10-minute cap -- a request
+            // beyond that is auto-chained into follow-up commands instead (see
+            // AppViewModel.startClimate / ClimateExtendWorker), so the slider
+            // can go further than any one command actually could.
             onValueChange = { duration = it.roundToInt() },
-            valueRange = CLIMATE_DURATION_RANGE.first.toFloat()..CLIMATE_DURATION_RANGE.last.toFloat(),
-            steps = 8,
+            valueRange = CLIMATE_EXTENDED_DURATION_RANGE.first.toFloat()..CLIMATE_EXTENDED_DURATION_RANGE.last.toFloat(),
+            steps = CLIMATE_EXTENDED_DURATION_RANGE.last - CLIMATE_EXTENDED_DURATION_RANGE.first - 1,
         )
+        if (duration > CLIMATE_DURATION_RANGE.last) {
+            Text(
+                "Sent as ${climateChunksLabel(duration)} — the car can't run a single command " +
+                    "this long, so a follow-up is scheduled automatically.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         ToggleRow("Defrost", defrost) { defrost = it }
         if (seats.steeringWheel) {
@@ -9799,6 +9822,22 @@ private fun SettingsScreen(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
                 }
+                ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
+                if (notif.unlocked) {
+                    var unlockedMin by remember(notif.unlockedMinutes) { mutableStateOf(notif.unlockedMinutes.toString()) }
+                    OutlinedTextField(
+                        value = unlockedMin,
+                        onValueChange = {
+                            unlockedMin = it.filter(Char::isDigit)
+                            unlockedMin.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setUnlockedMinutes)
+                        },
+                        label = { Text("Unlocked minutes") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
                 Text(
                     "Background checks run roughly every 30 minutes, so alerts may " +
                         "arrive a little after your set time. Door and running alerts " +
@@ -11027,6 +11066,9 @@ private fun SettingsSearchResults(
     }
     add("Car-running alerts", "notification engine climate running left on") {
         ToggleRow("Car-running alerts", notif.running) { vm.setNotifyRunning(it) }
+    }
+    add("Left-unlocked alerts", "notification unlocked lock left open") {
+        ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
     }
 
     // --- Per-car ---

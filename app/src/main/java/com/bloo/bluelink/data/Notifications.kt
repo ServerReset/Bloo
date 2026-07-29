@@ -240,6 +240,38 @@ object CarAlerts {
             }
         }
 
+        // Distinct from the door-open check above: a car can be fully closed up
+        // and still sitting unlocked (doorLock == false is the car's own lock
+        // state, independent of whether any door/trunk/hood happens to be
+        // open right now) -- same null-status skip reasoning as doorOpen.
+        if (prefs.unlocked && status != null) {
+            val unlocked = status.doorLock == false
+            val key = "unlocked_${v.vin}"
+            val now = System.currentTimeMillis()
+            if (unlocked) {
+                // Same "start the clock on first observation, don't reset it
+                // while still true" pattern as the door-open/running checks.
+                val since = settings.unlockedSince(v.vin)
+                if (since == null) {
+                    settings.setUnlockedSince(v.vin, now)
+                } else if (now - since > prefs.unlockedMinutes * 60_000L && !settings.alertFired(key)) {
+                    out += Alert(
+                        unlockedId(v),
+                        "${v.name} is unlocked",
+                        "It's been left unlocked for over ${prefs.unlockedMinutes} min.",
+                        actions = listOf(Notifications.Action("Lock", v.vin, WearAction.LOCK)),
+                    )
+                    settings.setAlertFired(key, true)
+                }
+            } else {
+                // Locked again (and status was actually fetched) -- reset both
+                // the unlocked-since clock and the fired flag so the next
+                // unlocked spell starts its own fresh timer/alert.
+                if (settings.unlockedSince(v.vin) != null) settings.setUnlockedSince(v.vin, null)
+                if (settings.alertFired(key)) settings.setAlertFired(key, false)
+            }
+        }
+
         if (prefs.running && status != null) {
             // Remote start / climate (and on supported cars, the engine) report as "on".
             val on = status.engine == true || status.airCtrlOn == true
@@ -276,4 +308,5 @@ object CarAlerts {
     private fun serviceId(v: Vehicle) = ("svc" + v.vin).hashCode()
     private fun doorId(v: Vehicle) = ("door" + v.vin).hashCode()
     private fun runningId(v: Vehicle) = ("run" + v.vin).hashCode()
+    private fun unlockedId(v: Vehicle) = ("unlocked" + v.vin).hashCode()
 }

@@ -331,20 +331,23 @@ class SettingsStore(private val context: Context) {
     // --- Notifications --------------------------------------------------
 
     /** App-wide (not per-car) notification toggles and thresholds. [service]
-     *  gates the persistent foreground-service notification; [doorOpen] and
-     *  [running] gate the "door left open" / "engine left running" alerts,
-     *  each firing once the condition has held continuously for its paired
-     *  *Minutes threshold (see [doorOpenSince]/[engineOnSince] below, which
-     *  track how long the condition has been true per car). */
+     *  gates the persistent foreground-service notification; [doorOpen],
+     *  [running] and [unlocked] gate the "door left open" / "engine left
+     *  running" / "left unlocked" alerts, each firing once the condition has
+     *  held continuously for its paired *Minutes threshold (see
+     *  [doorOpenSince]/[engineOnSince]/[unlockedSince] below, which track how
+     *  long the condition has been true per car). */
     data class NotificationPrefs(
         val service: Boolean = true,
         val doorOpen: Boolean = true,
         val doorOpenMinutes: Int = 5,
         val running: Boolean = true,
         val runningMinutes: Int = 10,
+        val unlocked: Boolean = true,
+        val unlockedMinutes: Int = 10,
     )
 
-    /** The single 5-field [NotificationPrefs] decode, shared by both the one-shot
+    /** The single [NotificationPrefs] decode, shared by both the one-shot
      *  [notificationPrefs] read and the reactive [notifications] Flow so the two
      *  can't drift apart (they previously inlined the identical block twice). */
     private fun decodeNotificationPrefs(p: Preferences): NotificationPrefs =
@@ -354,6 +357,8 @@ class SettingsStore(private val context: Context) {
             doorOpenMinutes = p[stringPreferencesKey("notify_door_min")]?.toIntOrNull() ?: 5,
             running = p[booleanPreferencesKey("notify_running")] ?: true,
             runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
+            unlocked = p[booleanPreferencesKey("notify_unlocked")] ?: true,
+            unlockedMinutes = p[stringPreferencesKey("notify_unlocked_min")]?.toIntOrNull() ?: 10,
         )
 
     /** One-shot read of [NotificationPrefs] (vs. the [notifications] Flow below,
@@ -386,6 +391,12 @@ class SettingsStore(private val context: Context) {
     suspend fun setRunningMinutes(v: Int) =
         editTracked { it[stringPreferencesKey("notify_running_min")] = v.toString() }.let {}
 
+    suspend fun setNotifyUnlocked(v: Boolean) =
+        editTracked { it[booleanPreferencesKey("notify_unlocked")] = v }.let {}
+
+    suspend fun setUnlockedMinutes(v: Int) =
+        editTracked { it[stringPreferencesKey("notify_unlocked_min")] = v.toString() }.let {}
+
     // Transient alert bookkeeping (per car), used to fire each alert only once.
     // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a
     // door open (or engine running), it stamps "door_since_$vin"/"engine_since_$vin"
@@ -412,6 +423,16 @@ class SettingsStore(private val context: Context) {
     suspend fun setEngineOnSince(vin: String, value: Long?) {
         editTracked {
             val k = stringPreferencesKey("engine_since_$vin")
+            if (value == null) it.remove(k) else it[k] = value.toString()
+        }
+    }
+
+    suspend fun unlockedSince(vin: String): Long? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("unlocked_since_$vin")]?.toLongOrNull()
+
+    suspend fun setUnlockedSince(vin: String, value: Long?) {
+        editTracked {
+            val k = stringPreferencesKey("unlocked_since_$vin")
             if (value == null) it.remove(k) else it[k] = value.toString()
         }
     }

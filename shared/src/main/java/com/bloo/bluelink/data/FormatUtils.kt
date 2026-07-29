@@ -74,9 +74,45 @@ fun smartClimateTargetF(ambientF: Int): Int {
  *  [smartClimateTargetF]: 70F and up is cooling, below is heating. */
 fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
 
-/** The valid range (in minutes) for a remote-start climate run's duration. The
- *  default within this range stays its own constant, [DEFAULT_CLIMATE_DURATION_MIN]. */
+/** The valid range (in minutes) for a SINGLE remote-start climate command's
+ *  duration -- the vendor API itself rejects/clamps anything past 10 minutes
+ *  per command. The default within this range stays its own constant,
+ *  [DEFAULT_CLIMATE_DURATION_MIN]. */
 val CLIMATE_DURATION_RANGE: IntRange = 1..10
+
+/** The UI-facing range for the "Run time" picker. Wider than
+ *  [CLIMATE_DURATION_RANGE] on purpose: a request past the single-command cap
+ *  is auto-chained into multiple commands (see [climateChunks] and
+ *  ClimateExtendWorker on the phone) -- the first chunk fires immediately and
+ *  each following chunk is scheduled to fire the moment the previous one's
+ *  duration elapses, so the car's climate never actually turns off in
+ *  between. 30 min is a practical ceiling, not an API limit: a real remote
+ *  climate run this long is already unusual, and each extra chunk is another
+ *  scheduled background command that can fail/drift, so this doesn't try to
+ *  support arbitrarily long runs. */
+val CLIMATE_EXTENDED_DURATION_RANGE: IntRange = 1..30
+
+/**
+ * Splits a requested total climate-run [minutes] into the sequence of
+ * per-command durations needed to cover it, each within
+ * [CLIMATE_DURATION_RANGE] -- e.g. 13 -> [10, 3], 25 -> [10, 10, 5],
+ * 7 -> [7]. The first element is the chunk to send immediately; every
+ * element after it is a follow-up to schedule once the chunk before it
+ * elapses. [minutes] is clamped to at least 1 (a 0- or negative-minute
+ * request would otherwise produce an empty list with nothing to send at
+ * all).
+ */
+fun climateChunks(minutes: Int): List<Int> {
+    val max = CLIMATE_DURATION_RANGE.last
+    var remaining = minutes.coerceAtLeast(1)
+    val chunks = mutableListOf<Int>()
+    while (remaining > 0) {
+        val chunk = remaining.coerceAtMost(max)
+        chunks += chunk
+        remaining -= chunk
+    }
+    return chunks
+}
 
 /** The valid range for a car's AC/DC charge-limit percentage sliders. Was
  *  duplicated as a literal `50..100` at 5 call sites (phone's ChargePebble
