@@ -8798,7 +8798,16 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
             // where the place summary otherwise shows), and shrink the map so hero +
             // map + coords + weather + button fit without overflowing the ~1-inch tile.
             if (coverGlance) {
-                CoverHero(icon = Icons.Filled.LocationOn, value = place ?: "Located", subline = loc.coordString())
+                // The subline used to always be the raw coordinate string, even
+                // once `place` had resolved into the headline right next to it --
+                // showing an address and its own coordinates in the same glance.
+                // Only fall back to coordinates here while nothing better exists
+                // yet; once an address resolves, it's the only thing shown.
+                CoverHero(
+                    icon = Icons.Filled.LocationOn,
+                    value = place ?: "Located",
+                    subline = if (place == null) "Resolving address…" else null,
+                )
             }
             CarMap(
                 loc,
@@ -8807,8 +8816,12 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
                     .height(if (coverGlance) 130.dp else 220.dp)
                     .clip(RoundedCornerShape(18.dp)),
             )
-            // Coordinates already shown in the cover hero's subline; keep the row on phone.
-            if (!coverGlance) StatusRow("Coordinates", loc.coordString())
+            // Same reasoning as the cover hero above: a resolved address is
+            // already the pebble's header/summary, so a permanent raw-coordinate
+            // row here was redundant with it every single time -- exactly what
+            // "should be an address, not coordinates" was pointing at. Only shown
+            // as a fallback while geocoding hasn't (yet, or ever) resolved a name.
+            if (!coverGlance && place == null) StatusRow("Location", loc.coordString())
             // Weather where the car is parked. Fetched lazily once we have a fix.
             LaunchedEffect(loc.latitude, loc.longitude) { vm.loadCarWeather(v) }
             state.carWeather[v.vin]?.let { w ->

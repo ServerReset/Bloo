@@ -2155,13 +2155,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  on Dispatchers.IO since Geocoder does blocking network/disk lookups.
      *  Wrapped in runCatching -- geocoding can fail (no network, unsupported
      *  locale, no result for the coordinates) and callers treat a null result
-     *  as "just don't show a place name," not an error worth surfacing. */
+     *  as "just don't show a place name," not an error worth surfacing.
+     *
+     *  withTimeoutOrNull, not just runCatching: this uses the LEGACY blocking
+     *  Geocoder overload (the async listener API needs API 33+, and this needs
+     *  to work below that), and that overload has no bound of its own -- a
+     *  flaky network can hang it indefinitely. The watch's own reverseGeocode
+     *  already guards this exact call the same way; this one didn't, so a hang
+     *  here silently meant the address never resolved and every location
+     *  display was stuck on its raw-coordinate fallback forever, not just
+     *  until the lookup finished. */
     private suspend fun reverseGeocode(loc: GeoLocation): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            val results = Geocoder(getApplication(), Locale.getDefault())
-                .getFromLocation(loc.latitude, loc.longitude, 1)
-            results?.firstOrNull()?.let { a -> formatPlaceName(a) }
-        }.getOrNull()
+        kotlinx.coroutines.withTimeoutOrNull(6000) {
+            runCatching {
+                val results = Geocoder(getApplication(), Locale.getDefault())
+                    .getFromLocation(loc.latitude, loc.longitude, 1)
+                results?.firstOrNull()?.let { a -> formatPlaceName(a) }
+            }.getOrNull()
+        }
     }
 
     // --- Commands (per-action pending + optimistic state flip) -----------
