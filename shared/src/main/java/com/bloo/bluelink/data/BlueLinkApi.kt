@@ -37,31 +37,44 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         // observed the real app sending to each).
         const val UA_OKHTTP = "okhttp/3.12.0"
         const val UA_POSTMAN = "PostmanRuntime/7.26.10"
+
+        // PROCESS-WIDE, not per-instance. Nothing about either object is
+        // brand-specific (base URL, host and credentials all travel per-request),
+        // and this class is constructed per call on the hot out-of-app paths —
+        // every Quick Settings tile tap, every widget button, every watch command,
+        // every alert-worker tick. A per-call OkHttpClient carries its own
+        // Dispatcher/ExecutorService, ConnectionPool and route database, so those
+        // paths got ZERO TLS or connection reuse: a full TCP + TLS handshake for
+        // every single command. OkHttpClient is explicitly designed to be shared
+        // and is thread-safe; so is Json.
+        private val sharedJson = Json {
+            // The real API's payloads evolve (new fields, generation-specific
+            // quirks) faster than this client's models are updated, so unknown
+            // keys are ignored instead of throwing.
+            ignoreUnknownKeys = true
+            // Some fields the API sometimes sends as a type our model doesn't
+            // expect (numbers where a string is modeled, etc.) get coerced to a
+            // best-effort value instead of failing the whole decode.
+            coerceInputValues = true
+            isLenient = true
+        }
+
+        private val sharedClient: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .addInterceptor(
+                // BASIC level logs the request line + response line only (no bodies),
+                // so the password in the auth body is never written to the log.
+                HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
+                    level = HttpLoggingInterceptor.Level.BASIC
+                }
+            )
+            .build()
     }
 
-    private val json = Json {
-        // The real API's payloads evolve (new fields, generation-specific
-        // quirks) faster than this client's models are updated, so unknown
-        // keys are ignored instead of throwing.
-        ignoreUnknownKeys = true
-        // Some fields the API sometimes sends as a type our model doesn't
-        // expect (numbers where a string is modeled, etc.) get coerced to a
-        // best-effort value instead of failing the whole decode.
-        coerceInputValues = true
-        isLenient = true
-    }
+    private val json get() = sharedJson
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .addInterceptor(
-            // BASIC level logs the request line + response line only (no bodies),
-            // so the password in the auth body is never written to the log.
-            HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            }
-        )
-        .build()
+    private val client: OkHttpClient get() = sharedClient
 
     // The two request-body content types this API's endpoints expect: plain
     // JSON for most commands, and form-urlencoded specifically for

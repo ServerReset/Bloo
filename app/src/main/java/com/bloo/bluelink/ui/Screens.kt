@@ -2782,16 +2782,31 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     // GarageScreen and, through it, every live pager page. Held as State and read
     // inside graphicsLayer{} at the use sites instead, so the fade is draw-phase
     // only and never invalidates composition.
+    // Narrowed to the boolean flip rather than reading the continuous fraction
+    // directly: pullFractionState changes on every pixel of a pull gesture, and a
+    // composition-scope read of it here would recompose GarageScreen (the car
+    // pager's parent -- see PagerDotsFor's doc comment for why that's expensive)
+    // on every one of those pixels, for a target value that's already saturated
+    // the moment the pull passes 1%.
+    val pulling by remember { derivedStateOf { pullFractionState.value > 0.01f } }
     val dotsAlphaState = animateFloatAsState(
-        targetValue = if (state.refreshing || pullFraction > 0.01f) 0f else 1f,
+        targetValue = if (state.refreshing || pulling) 0f else 1f,
         animationSpec = tween(durationMillis = 200),
         label = "dotsFade",
     )
     // Slide the floating overlays (dots, settings, back/flip) down: in real time as
     // the user pulls, then settle/spring back up once the refresh completes.
+    // overlayShiftTarget genuinely needs the continuous fraction (the shift is
+    // proportional to how far the user has pulled, not just on/off), so this read
+    // can't be narrowed the same way -- it recomposes GarageScreen during an
+    // active pull, same as before. What CAN be (and is, below) fixed is the
+    // spring's OWN settling frames: `refreshShift` used to be read via `by`,
+    // which meant every one of the ~12 frames it takes to spring back up also
+    // recomposed GarageScreen, for a value only ever consumed inside an
+    // offset { } at its two use sites.
     val overlayShiftTarget = if (state.refreshing) RefreshPullShift
         else (RefreshPullShift * pullFraction).coerceIn(0.dp, RefreshPullShift)
-    val refreshShift by animateDpAsState(
+    val refreshShiftState = animateDpAsState(
         targetValue = overlayShiftTarget,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
@@ -2922,8 +2937,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     StatusBarScrim()
                     if (count > 1) {
-                        PagerDots(
-                            current = exWrap.currentReal,
+                        PagerDotsFor(
+                            pager = exPager,
+                            real = { exWrap.real(it) },
                             count = count,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
@@ -3061,8 +3077,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     StatusBarScrim()
                     // Floating animated page indicator (no thin top bar).
                     if (pageCount > 1) {
-                        PagerDots(
-                            current = realBlock(pager.currentPage),
+                        PagerDotsFor(
+                            pager = pager,
+                            real = { realBlock(it) },
                             count = pageCount,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
@@ -3175,7 +3192,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.ArrowBack,
                 description = "Back to all cars",
                 onClick = { vm.collapse() },
-                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().offset(y = refreshShift),
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding()
+                    .offset { IntOffset(0, refreshShiftState.value.roundToPx()) },
             )
         }
         if (expandedIdx != null) {
@@ -3183,7 +3201,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 icon = Icons.Filled.SwapHoriz,
                 description = "Flip columns",
                 onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp).offset(y = refreshShift),
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp)
+                    .offset { IntOffset(0, refreshShiftState.value.roundToPx()) },
             )
         }
         FloatingIcon(
@@ -3525,8 +3544,9 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         // like every other car pager's PagerDots already stays put outside
         // the per-page transform.
         if (count > 1) {
-            PagerDots(
-                current = realCar(pager.currentPage),
+            PagerDotsFor(
+                pager = pager,
+                real = { realCar(it) },
                 count = count,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -4104,6 +4124,31 @@ private fun FloatingIcon(
  *  quick tap-through on the dots (e.g. brushing them mid-swipe) started that
  *  ring filling for a frame, which read as a spurious "refresh" flicker on
  *  every plain press. */
+/**
+ * Reads `pager.currentPage` INSIDE its own restartable composable scope.
+ *
+ * This exists for one reason, and it was the single worst frame-stall in the
+ * app. Every call site put `PagerDots(current = real(pager.currentPage))` in a
+ * `Box` — and `Box` is an INLINE composable, so it is not its own recomposition
+ * scope. The nearest restartable scope was the one that also contains the
+ * sibling `HorizontalPager` call. `currentPage` flips the instant a drag crosses
+ * the halfway point — i.e. at peak finger velocity — so that flip invalidated
+ * the whole scope, re-invoked HorizontalPager with a freshly allocated content
+ * lambda, and recomposed EVERY live page: three cars' full pebble columns, ~30
+ * pebbles, in one frame, in the middle of every single swipe.
+ *
+ * Reading it one level down confines the invalidation to the dots. Keep the read
+ * in here — hoisting it back to the call site silently restores the stall.
+ */
+@Composable
+private fun PagerDotsFor(
+    pager: PagerState,
+    count: Int,
+    real: (Int) -> Int,
+    modifier: Modifier = Modifier,
+    onRefresh: (() -> Unit)? = null,
+) = PagerDots(current = real(pager.currentPage), count = count, modifier = modifier, onRefresh = onRefresh)
+
 @Composable
 private fun PagerDots(
     current: Int,

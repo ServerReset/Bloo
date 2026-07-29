@@ -49,18 +49,47 @@ fun Modifier.dropShadow(
         }
     }
     val outline = shape.createOutline(size, layoutDirection, this)
-    val path = when (outline) {
-        is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
-        is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
-        is Outline.Generic -> outline.path
-    }.asAndroidPath()
+    // Prefer drawRoundRect/drawRect over drawPath wherever the outline allows it.
+    // Skia has an ANALYTIC blurred-round-rect routine that computes the blur in
+    // closed form -- no mask texture, no mask cache, matrix-independent. Handing
+    // it an SkPath instead forces the general path: rasterize a mask, blur it,
+    // then cache it keyed by the CURRENT MATRIX. The car pager scales each page a
+    // fraction every frame (see pagerDepth), so that cache missed on every shadow
+    // on every frame -- ~30 full blur rasterizations per frame across the live
+    // pages. Same geometry and same paint either way, so this is pixel-identical.
+    val rr = (outline as? Outline.Rounded)?.roundRect?.takeIf {
+        it.topLeftCornerRadius == it.topRightCornerRadius &&
+            it.topLeftCornerRadius == it.bottomLeftCornerRadius &&
+            it.topLeftCornerRadius == it.bottomRightCornerRadius &&
+            it.topLeftCornerRadius.x == it.topLeftCornerRadius.y
+    }
+    val rect = (outline as? Outline.Rectangle)?.rect
+    // Only built for the shapes the fast paths can't express (non-uniform corners,
+    // Generic paths) -- everything the app actually uses hits one of the two above.
+    val path = if (rr != null || rect != null) {
+        null
+    } else {
+        when (outline) {
+            is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
+            is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
+            is Outline.Generic -> outline.path
+        }.asAndroidPath()
+    }
     val offXPx = offsetX.toPx()
     val offYPx = offsetY.toPx()
     onDrawBehind {
         drawIntoCanvas { canvas ->
             canvas.save()
             canvas.translate(offXPx, offYPx)
-            canvas.nativeCanvas.drawPath(path, paint)
+            val native = canvas.nativeCanvas
+            when {
+                rr != null -> native.drawRoundRect(
+                    rr.left, rr.top, rr.right, rr.bottom,
+                    rr.topLeftCornerRadius.x, rr.topLeftCornerRadius.y, paint,
+                )
+                rect != null -> native.drawRect(rect.left, rect.top, rect.right, rect.bottom, paint)
+                else -> native.drawPath(path!!, paint)
+            }
             canvas.restore()
         }
     }

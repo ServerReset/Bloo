@@ -79,7 +79,9 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
                 }.getOrNull()
                 runCatching {
-                    CarAlerts.evaluate(settings, v, status).forEach {
+                    // `prefs` is already loaded above; pass it so evaluate() doesn't
+                    // re-read the same DataStore value once per vehicle per tick.
+                    CarAlerts.evaluate(settings, v, status, prefs).forEach {
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
                     }
                 }

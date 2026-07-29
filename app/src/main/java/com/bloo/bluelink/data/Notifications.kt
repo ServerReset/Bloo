@@ -159,8 +159,15 @@ object CarAlerts {
      * `out` accumulates whichever alerts actually fired on this pass and is
      * returned to the caller for posting/toasting.
      */
-    suspend fun evaluate(settings: SettingsStore, v: Vehicle, status: VehicleStatus?): List<Alert> {
-        val prefs = settings.notificationPrefs()
+    suspend fun evaluate(
+        settings: SettingsStore,
+        v: Vehicle,
+        status: VehicleStatus?,
+        // Defaulted so existing callers are unchanged, but AlertWorker already
+        // loads this once per tick and now passes it in — it was being re-read
+        // from DataStore once per VEHICLE, per tick, for an identical value.
+        prefs: SettingsStore.NotificationPrefs = settings.notificationPrefs(),
+    ): List<Alert> {
         val out = mutableListOf<Alert>()
 
         if (prefs.service) {
@@ -185,8 +192,10 @@ object CarAlerts {
                 }
             } else {
                 // Not due (or not knowable) -- reset the flag so a future crossing
-                // of the threshold is free to alert again.
-                settings.setAlertFired(key, false)
+                // of the threshold is free to alert again. Guarded: an unconditional
+                // write still costs editTracked a full copy+diff of every preference
+                // and the store's write mutex, even when the value is already false.
+                if (settings.alertFired(key)) settings.setAlertFired(key, false)
             }
         }
 
@@ -221,8 +230,8 @@ object CarAlerts {
                 // Door closed (and status was actually fetched, per the note above)
                 // -- reset both the open-since clock and the fired flag so the next
                 // open episode starts its own fresh timer/alert.
-                settings.setDoorOpenSince(v.vin, null)
-                settings.setAlertFired(key, false)
+                if (settings.doorOpenSince(v.vin) != null) settings.setDoorOpenSince(v.vin, null)
+                if (settings.alertFired(key)) settings.setAlertFired(key, false)
             }
         }
 
@@ -249,8 +258,8 @@ object CarAlerts {
             } else {
                 // Engine/climate off -- reset the clock and the fired flag so the
                 // next running episode gets its own fresh timer/alert.
-                settings.setEngineOnSince(v.vin, null)
-                settings.setAlertFired(key, false)
+                if (settings.engineOnSince(v.vin) != null) settings.setEngineOnSince(v.vin, null)
+                if (settings.alertFired(key)) settings.setAlertFired(key, false)
             }
         }
         return out

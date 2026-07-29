@@ -81,20 +81,37 @@ class KiaUsaApi {
 
         /** A fresh, stable device id (persist it; the rmtoken is bound to it). */
         fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
+
+        // Process-wide — same reasoning as BlueLinkApi's shared pair: this class
+        // is constructed per call on every tile tap / widget button / watch
+        // command, and a per-call OkHttpClient means a fresh TCP + TLS handshake
+        // every time. Both types are thread-safe and meant to be shared.
+        private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+
+        private val sharedClient: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .addInterceptor(
+                HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
+                    level = HttpLoggingInterceptor.Level.BASIC
+                },
+            )
+            .build()
+
+        /** Shared because SimpleDateFormat construction parses the pattern and
+         *  loads locale DateFormatSymbols, and this runs on EVERY Kia request.
+         *  ThreadLocal because SimpleDateFormat is not thread-safe. GMT is pinned
+         *  explicitly, so caching it can't pick up a stale default time zone. */
+        private val rfc1123Format = ThreadLocal.withInitial {
+            SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+                .apply { timeZone = TimeZone.getTimeZone("GMT") }
+        }
     }
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+    private val json get() = sharedJson
     private val jsonMedia = "application/json;charset=utf-8".toMediaType()
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .addInterceptor(
-            HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            },
-        )
-        .build()
+    private val client: OkHttpClient get() = sharedClient
 
     // --- Headers ---------------------------------------------------------
 
@@ -102,9 +119,7 @@ class KiaUsaApi {
      *  format HTTP's own Date header uses, which the Kia API expects as its
      *  own `date` header on every request (see [apiHeaders]). */
     private fun rfc1123Date(): String =
-        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
-            .apply { timeZone = TimeZone.getTimeZone("GMT") }
-            .format(System.currentTimeMillis())
+        rfc1123Format.get()!!.format(System.currentTimeMillis())
 
     /** The full set of headers every Kia API call needs regardless of
      *  endpoint (client/device identification, locale, a fresh timestamp) —
