@@ -1656,7 +1656,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!installer.hasPermission()) {
             // Ask; the grant arrives on onShizukuPermissionResult, which retries. Until
             // then leave the APK ready so a second tap (or the grant) completes it.
-            _state.update { it.copy(message = "Grant Shizuku access to install updates silently.") }
+            _state.update { it.copy(message = "Grant Shizuku access to install updates silently.", messageType = "info") }
             installer.requestPermission(SHIZUKU_INSTALL_REQUEST_CODE)
             return
         }
@@ -1668,7 +1668,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun seamlessInstall(dest: java.io.File) {
         if (_state.value.updateInstalling) return
         val ctx = getApplication<Application>()
-        _state.update { it.copy(updateInstalling = true, message = "Installing update…") }
+        // messageType is REQUIRED here: it defaults to "error" (and clearMessage()
+        // resets it to "error"), and the snackbar's colour `when` falls through to
+        // the red errorContainer branch for anything it doesn't recognise. Without
+        // it this progress message rendered as a red error toast mid-install.
+        _state.update { it.copy(updateInstalling = true, message = "Installing update…", messageType = "info") }
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val result = com.bloo.bluelink.update.ShizukuInstaller.installApk(dest, ctx.packageName)
             if (result.isFailure) {
@@ -1713,7 +1717,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun onShizukuPermissionResult(requestCode: Int, grantResult: Int) {
         if (requestCode != SHIZUKU_INSTALL_REQUEST_CODE) return
         if (grantResult != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            _state.update { it.copy(message = "Shizuku access denied — updates will use the normal installer.") }
+            // Info, not error: the user made a choice and the normal installer still
+            // works, so nothing is actually broken to report in red.
+            _state.update { it.copy(message = "Shizuku access denied — updates will use the normal installer.", messageType = "info") }
             return
         }
         val dest = apkCacheFile()
@@ -2601,7 +2607,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val queued = installer.requestPermissionOnEnable(SHIZUKU_INSTALL_REQUEST_CODE)
             if (!queued && !installer.isAvailable()) {
                 _state.update {
-                    it.copy(message = "Start Shizuku, then Bloo can install updates silently.")
+                    it.copy(message = "Start Shizuku, then Bloo can install updates silently.", messageType = "info")
                 }
             }
         }
