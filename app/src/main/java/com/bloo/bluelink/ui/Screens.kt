@@ -2931,6 +2931,15 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // proven-safe siblings. (The remaining ceiling is that each
                         // page composes a whole car's pebble list; making that lazy is
                         // a bigger, reorder-model-sensitive change left for a device.)
+                        //
+                        // KEEP THIS AT 1 — do NOT raise it. Because UiState is unstable
+                        // and threaded into every pebble, EVERY in-composition page
+                        // recomposes on every state emission; 1→2 would turn the
+                        // car-switch settle emission's ~3-page recompose into ~5 pages
+                        // (and hold 2 more live compositions). The real switch-cost fix
+                        // is making pebbles skippable (narrow their params off UiState),
+                        // which first needs ReorderColumn's dragHandle made equals-stable
+                        // — a measure-first, device-verified refactor, not a blind edit.
                         beyondViewportPageCount = 1,
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
@@ -3160,6 +3169,63 @@ private const val COVER_TINY_DP = 300f
 /** Horizontal content inset for cover pebbles — one value shared by the scrolling body
  *  and the pinned action button in [PebbleShell]'s fillHeight branch, so they can't drift. */
 private val CoverContentInset = 16.dp
+
+/** The one converged cover-hero icon size. Was drifting 30/48/64 across tiles; a single
+ *  scale is what makes the cover read as one system. Device-verify the exact value
+ *  (32–36 is the safe window at ~1.15x font scale); 34 is one nudge up from the old majority. */
+private val CoverHeroIcon = 34.dp
+
+/**
+ * The one shared glance-hero every cover tile opens with: a converged-size [icon] + a
+ * shrink-to-fit headline [value] (via [com.bloo.uicommon.FittedText], so it can never
+ * clip/wrap), optionally a [trailing] value pushed to the row end (e.g. Climate setpoint)
+ * and a [subline] below (e.g. AI status, Location coordinates). Left-aligned, full-width,
+ * and — critically — emits NO trailing Spacer: the cover shell's `spacedBy(CenterVertically)`
+ * owns the gap to the next child, so Climate/Info/Diagnostics/AI/Fuel/Trips/Location all
+ * share the exact same rhythm. Color must be baked into the FittedText style (it ignores
+ * LocalContentColor).
+ */
+@Composable
+private fun CoverHero(
+    icon: ImageVector,
+    value: String,
+    modifier: Modifier = Modifier,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    trailing: String? = null,
+    trailingColor: Color = MaterialTheme.colorScheme.onSurface,
+    subline: String? = null,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(CoverHeroIcon))
+            com.bloo.uicommon.FittedText(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = valueColor),
+                modifier = Modifier.weight(1f),
+            )
+            if (trailing != null) {
+                com.bloo.uicommon.FittedText(
+                    text = trailing,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = trailingColor),
+                    modifier = Modifier.widthIn(max = 120.dp),
+                )
+            }
+        }
+        if (subline != null) {
+            Text(
+                subline,
+                style = MaterialTheme.typography.bodyMedium,
+                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 /**
  * Per-edge camera-bump clearance in dp, computed from the display cutout rects for
@@ -4141,7 +4207,11 @@ private fun HeroHeader(
         ),
         label = "heroCorner",
     )
-    val heroShape = RoundedCornerShape(corner)
+    // On the PHONE, match the collapsed pebble stack (PebbleCornerCollapsed = 38dp) so
+    // the hero doesn't read rounder than its neighbours — the old hardcoded charging
+    // 40dp / idle 24dp both mismatched the stack (40 too round on a charging EV). The
+    // COVER keeps its own animated corner (it's a full-height tile, not part of a stack).
+    val heroShape = RoundedCornerShape(if (LocalForceExpanded.current) corner else PebbleCornerCollapsed)
     val heroOutline = LocalAppearance.current
     // On the flip cover this hero is one full-screen tile. Unlike every other
     // pebble it rolls its own Card and never went through PebbleShell, so it never
@@ -4264,13 +4334,28 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
             ),
         ) {
             val scheme = MaterialTheme.colorScheme
-            // Build delta chip: what you're on → what you'd get. Always shown so the
-            // update is concrete ("build 812 → build 828") rather than an opaque prompt.
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
-                Text(deltaLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            // ONE state-driven status line (icon + text), replacing the old duplicated
+            // delta row + scattered downloading/seamless/installing rows. The build
+            // delta already lives in the header summary; here we say what's happening
+            // NOW. Ready uses ChargeGreen as a success tick; everything else stays
+            // neutral (no charging-green Bolt cross-metaphor).
+            val (statusIcon, statusText, statusTint) = when {
+                state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "Installing silently via Shizuku…", scheme.onSurfaceVariant)
+                state.updateDownloading -> Triple(
+                    Icons.Filled.Download,
+                    state.updateDownloadProgress?.let { "Downloading ${(it * 100).roundToInt()}%" } ?: "Downloading…",
+                    scheme.onSurfaceVariant,
+                )
+                state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "Downloaded · installs silently via Shizuku", ChargeGreen)
+                state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "Downloaded · tap Install", ChargeGreen)
+                seamless -> Triple(Icons.Filled.Bolt, "Installs silently via Shizuku — no prompts", scheme.onSurfaceVariant)
+                else -> Triple(Icons.Filled.SystemUpdate, deltaLabel, scheme.primary)
             }
-            // Live download progress as a real bar (not just the % on the button).
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(statusIcon, contentDescription = null, tint = statusTint, modifier = Modifier.size(18.dp))
+                Text(statusText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            }
+            // Live download progress bar.
             if (state.updateDownloading) {
                 val p = state.updateDownloadProgress
                 if (p != null) {
@@ -4279,62 +4364,52 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
-            // Seamless-install affordance: tell the user this installs silently via
-            // Shizuku, or reflect the in-flight silent install.
-            if (state.updateInstalling) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Filled.Bolt, contentDescription = null, tint = ChargeGreen, modifier = Modifier.size(16.dp))
-                    Text("Installing silently via Shizuku…", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                }
-            } else if (seamless && !state.updateDownloading) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Filled.Bolt, contentDescription = null, tint = ChargeGreen, modifier = Modifier.size(16.dp))
-                    Text("Installs silently via Shizuku — no prompts.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                }
-            }
-            // The tap-through install steps only matter when NOT installing seamlessly.
-            if (!seamless) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = scheme.surfaceContainerHighest,
-                    contentColor = scheme.onSurface,
-                ) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("To install:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
-                        Text(
-                            if (hasDirectDownload) "1. Tap \"Update\" above" else "1. Download the APK above",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            if (hasDirectDownload) "2. Tap \"Install\" once it's downloaded" else "2. Open the downloaded file",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        // Android's Play Protect flags any APK that didn't come
-                        // from the Play Store, unsigned-by-Google or not --
-                        // without this tip, "Blocked by Play Protect" reads
-                        // like the install genuinely failed rather than one
-                        // more tap.
-                        Text(
-                            "3. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
+            // Release notes ("What's new"), capped, with a "Full notes" link to the
+            // release page when there's more than we show.
             info.run.releaseNotes?.let { notes ->
                 Text("What's new", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
                 Text(
-                    notes,
+                    notes.trim(),
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
-                    maxLines = 12,
+                    maxLines = 8,
                     overflow = TextOverflow.Ellipsis,
                 )
+                MorphTextButton("Full notes", onClick = {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                })
             }
+            // Progressive install help: only in the tap-through (non-seamless) path, and
+            // only as an opt-in disclosure — the Play-Protect steps are scaffolding, not
+            // something to shout before the user has even tapped Update.
+            if (!seamless) {
+                var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
+                MorphTextButton(if (showHelp) "Hide install help" else "Trouble installing?", onClick = { showHelp = !showHelp })
+                AnimatedVisibility(visible = showHelp) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = scheme.surfaceContainerHighest,
+                        contentColor = scheme.onSurface,
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                if (hasDirectDownload) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            // Play Protect flags any non-Play-Store APK; without this tip,
+                            // "Blocked by Play Protect" reads like a real failure.
+                            Text(
+                                "2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                }
+            }
+            // Dismiss / undo / remind — hierarchy: during the undo window "Keep it" is
+            // the recoverable emphasis; otherwise "Remind me" (deferral) is emphasized
+            // over the plainer "Not now".
             if (state.updatePendingDismiss) {
-                // Call-back window: the tile is on its way out (a timer in the VM will
-                // commit the dismiss shortly). Offer a single prominent "Keep it" so
-                // the user can pull it back before it truly goes.
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -4346,11 +4421,19 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    MorphTextButton("Keep it", onClick = vm::undoDismissUpdate, enabled = !state.updateDownloading)
+                    MorphButton(
+                        onClick = { vm.undoDismissUpdate() },
+                        enabled = !state.updateDownloading,
+                        active = true,
+                    ) { Text("Keep it", fontWeight = FontWeight.SemiBold) }
                 }
             } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphTextButton("Remind me", onClick = vm::snoozeUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
+                    MorphButton(
+                        onClick = { vm.snoozeUpdate() },
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.updateDownloading,
+                    ) { Text("Remind me") }
                     MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
                 }
             }
@@ -5627,24 +5710,18 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
         // in it read as a big empty purple void. Lead with a proper glance hero (big
         // icon + heading + status line) like the other cover tiles, then the copy.
         if (LocalForceExpanded.current) {
-            Icon(
-                Icons.Filled.AutoAwesome,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Text("AI summary", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                when {
+            // Shared CoverHero rhythm (converged 34dp icon + headline + status subline),
+            // so the AI tile matches Climate/Info/Diagnostics/etc instead of its old
+            // ad-hoc 48dp centered column.
+            CoverHero(
+                icon = Icons.Filled.AutoAwesome,
+                value = "AI summary",
+                subline = when {
                     busy -> "Summarizing on-device…"
                     summary != null -> "On-device Gemini Nano · updated"
                     else -> "On-device Gemini Nano"
                 },
-                style = MaterialTheme.typography.bodyMedium,
-                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
             )
-            // No trailing Spacer: the cover shell's Column spacedBy owns the gap to the
-            // next child, so every cover tile spaces its hero identically.
         }
         if (summary != null) {
             Text(summary, style = MaterialTheme.typography.bodyMedium)
@@ -6751,7 +6828,9 @@ private fun PebbleShell(
                             Spacer(Modifier.height(8.dp))
                             MorphButton(
                                 onClick = act.onClick,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = CoverContentInset, vertical = 4.dp),
+                                // Balance the pinned action against the scroll body's
+                                // 16dp bottom inset (was a lopsided 4dp, bottom-heavy).
+                                modifier = Modifier.fillMaxWidth().padding(start = CoverContentInset, end = CoverContentInset, top = 4.dp, bottom = 12.dp),
                                 enabled = act.enabled && !act.pending,
                                 active = act.active,
                                 activeContainerColor = act.activeContainer ?: MaterialTheme.colorScheme.primary,
@@ -7127,7 +7206,9 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
                 // so the tile fits the small square without scrolling and you land at
                 // the top. Phone keeps up to 8 with no header. Gated on forceExpanded.
                 val coverGlance = LocalForceExpanded.current
-                if (coverGlance) SectionLabel("Recent trips")
+                if (coverGlance) {
+                    CoverHero(icon = Icons.Filled.Route, value = if (trips.size == 1) "1 trip" else "${trips.size} trips")
+                }
                 trips.take(if (coverGlance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
             }
         }
@@ -7192,21 +7273,12 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         // value. Phone is untouched (coverGlance = LocalForceExpanded, false there).
         if (coverGlance && status != null) {
             val locked = status.doorLock == true
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(
-                    if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                    contentDescription = null,
-                    tint = if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(30.dp),
-                )
-                Text(
-                    if (locked) "Locked" else "Unlocked",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = if (locked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-                )
-            }
-            // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
+            CoverHero(
+                icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                value = if (locked) "Locked" else "Unlocked",
+                iconTint = if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                valueColor = if (locked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+            )
         }
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
@@ -7474,21 +7546,12 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         // or an error warning + "N issues" — so the tile reads at a glance instead of
         // as a flat list of ~12 rows. Gated on LocalForceExpanded (phone untouched).
         if (LocalForceExpanded.current && status != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(
-                    if (hasWarning) Icons.Filled.Warning else Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    tint = if (hasWarning) MaterialTheme.colorScheme.error else ChargeGreen,
-                    modifier = Modifier.size(30.dp),
-                )
-                Text(
-                    if (hasWarning) (if (issueCount == 1) "1 issue" else "$issueCount issues") else "All systems OK",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = if (hasWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
+            CoverHero(
+                icon = if (hasWarning) Icons.Filled.Warning else Icons.Filled.CheckCircle,
+                value = if (hasWarning) (if (issueCount == 1) "1 issue" else "$issueCount issues") else "All systems OK",
+                iconTint = if (hasWarning) MaterialTheme.colorScheme.error else ChargeGreen,
+                valueColor = if (hasWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            )
         }
         if (rows.isEmpty()) {
             Text(
@@ -7738,25 +7801,13 @@ private fun ClimatePebble(
         // tile reads at a glance instead of opening on a wall of sliders. Gated on
         // LocalForceExpanded (phone untouched); shown even while driving.
         if (LocalForceExpanded.current) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(
-                    Icons.Filled.AcUnit,
-                    contentDescription = null,
-                    tint = if (climateOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(30.dp),
-                )
-                Text(
-                    if (climateOn) "On" else "Off",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = if (climateOn) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.weight(1f))
-                status?.airTemp?.value?.let {
-                    Text(degLabel(it, fahrenheit), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                }
-            }
-            // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
+            CoverHero(
+                icon = Icons.Filled.AcUnit,
+                value = if (climateOn) "On" else "Off",
+                iconTint = if (climateOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                valueColor = if (climateOn) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                trailing = status?.airTemp?.value?.let { degLabel(it, fahrenheit) },
+            )
         }
         if (driving) {
             if (climateOn) {
@@ -8391,7 +8442,8 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
                 state.drivingLabel(v),
                 metric = LocalAppearance.current.unitSystem == "metric",
             )
-            Spacer(Modifier.height(6.dp))
+            // No trailing Spacer — the cover shell's spacedBy(10.dp) owns the gap, so
+            // the hero-to-content rhythm matches every CoverHero tile (was 26dp here).
         }
         if (plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
@@ -8437,6 +8489,17 @@ private fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         v, "charge", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
         summary = summary,
     ) {
+        // COVER SCREEN only: lead with a big fuel-% hero so the gas tile gets the same
+        // glance treatment the EV Charge tile gets from ChargeFuelBar (it previously
+        // fell straight to two dim StatusRows). Gated on LocalForceExpanded → phone
+        // untouched.
+        if (LocalForceExpanded.current && status != null) {
+            CoverHero(
+                icon = Icons.Filled.LocalGasStation,
+                value = fuelPct?.let { "$it%" } ?: "--",
+                subline = range?.let { "${formatDistance(it, metric)} to empty" },
+            )
+        }
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet.")
@@ -8513,18 +8576,26 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
             bounceIcon = true,
         ),
     ) {
+        val coverGlance = LocalForceExpanded.current
         if (location == null) {
             Text("Tap Locate to query the car's current position.")
         }
         location?.let { loc ->
+            // COVER SCREEN: lead with the place-name hero (the cover drops the header
+            // where the place summary otherwise shows), and shrink the map so hero +
+            // map + coords + weather + button fit without overflowing the ~1-inch tile.
+            if (coverGlance) {
+                CoverHero(icon = Icons.Filled.LocationOn, value = place ?: "Located", subline = loc.coordString())
+            }
             CarMap(
                 loc,
                 Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
+                    .height(if (coverGlance) 130.dp else 220.dp)
                     .clip(RoundedCornerShape(18.dp)),
             )
-            StatusRow("Coordinates", loc.coordString())
+            // Coordinates already shown in the cover hero's subline; keep the row on phone.
+            if (!coverGlance) StatusRow("Coordinates", loc.coordString())
             // Weather where the car is parked. Fetched lazily once we have a fix.
             LaunchedEffect(loc.latitude, loc.longitude) { vm.loadCarWeather(v) }
             state.carWeather[v.vin]?.let { w ->
@@ -9132,24 +9203,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
-            // Seamless updates via Shizuku — only shown when Shizuku is installed +
-            // running (an optional power-user path). Off by default; when on, the
-            // update tile's Install button installs silently over local ADB instead
-            // of the tap-through system installer.
-            if (state.shizukuAvailable) {
-                SettingsCard("Updates") {
-                    ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
-                        vm.setSeamlessInstallShizuku(it)
-                    }
-                    Text(
-                        "Uses Shizuku (local ADB) to install downloaded updates silently — no " +
-                            "system installer prompt. You'll be asked to grant Shizuku access the " +
-                            "first time. If Shizuku isn't running, updates use the normal installer.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            // (The "Updates" card now lives after Notifications — its natural home —
+            // ungated so its controls show with or without Shizuku. See below.)
 
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
@@ -9342,46 +9397,31 @@ private fun SettingsScreen(vm: AppViewModel) {
                             SyncInfoRow("Error", state.syncError!!, valueColor = MaterialTheme.colorScheme.error)
                         }
                     }
-                    state.syncFileFingerprint?.let {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "The File ID must match on every device — if two devices show different codes, they're syncing to different files.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    // (The "File ID must match across devices" guidance is carried by the
+                    // stale-peer advisory inside SyncDevicesSection — not repeated here.)
                     // The synced-devices registry: a drag-to-reorder list where the
                     // TOP device is primary (source of truth). See SyncDevicesSection.
                     SyncDevicesSection(state = state, vm = vm)
                     Spacer(Modifier.height(12.dp))
-                    // Manual controls: "Sync now" force-pushes/pulls immediately
-                    // (available any time, not just after a failure), and "Test
-                    // sync" runs a non-destructive round-trip against the real
-                    // Drive file so the user can confirm it actually works.
+                    // Manual controls, with hierarchy instead of a wall of equal pills:
+                    // "Sync now" is the emphasized primary action; the rest are quieter.
+                    MorphButton(
+                        onClick = { vm.syncNow() },
+                        modifier = Modifier.fillMaxWidth(),
+                        active = true,
+                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MorphTextButton(
-                            "Sync now",
-                            modifier = Modifier.weight(1f),
-                            onClick = { vm.syncNow() },
-                        )
-                        MorphTextButton(
-                            "Test sync",
-                            modifier = Modifier.weight(1f),
-                            onClick = { vm.testSync() },
-                        )
+                        // Non-destructive real-provider round-trip so the user can confirm
+                        // sync actually works.
+                        MorphTextButton("Test sync", modifier = Modifier.weight(1f), onClick = { vm.testSync() })
+                        // "Pull from primary now": force this device to adopt the
+                        // primary's full settings — only when a primary exists AND it
+                        // isn't this device (pulling from yourself is a no-op). When not
+                        // shown, Test sync spans the row on its own.
+                        if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
+                            MorphTextButton("Pull from primary", modifier = Modifier.weight(1f), onClick = { vm.pullFromPrimary() })
+                        }
                     }
-                    // "Pull from primary now": force this device to adopt the primary's
-                    // full settings. Shown only when a primary exists AND it isn't this
-                    // device (pulling from yourself is a no-op).
-                    if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
-                        Spacer(Modifier.height(4.dp))
-                        MorphTextButton(
-                            "Pull from primary now",
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { vm.pullFromPrimary() },
-                        )
-                    }
-                    Spacer(Modifier.height(4.dp))
                     MorphSegmented(
                         options = listOf(
                             SegmentOption("wifi", "Wi-Fi only", null),
@@ -9594,11 +9634,65 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
-            // The Updates card (CI build number, manual "Check now", auto-check
-            // toggle) used to live here -- removed. Updates check automatically
-            // now (cold start + every refresh, plus a periodic background
-            // worker) and present themselves via the update tile pinned under
-            // the hero tile; no settings/manual controls needed any more.
+            // Updates — always shown (the update tile still auto-appears under the
+            // hero, but this is the manual home: which build you're on, a force-check,
+            // a browser fallback source, and the optional Shizuku silent-install toggle
+            // gated to just its row so the card itself never vanishes).
+            SettingsCard("Updates") {
+                // Current installed build (the canonical build-number label).
+                StatusRow(
+                    "This build",
+                    com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
+                )
+                Text(
+                    "Bloo isn't on the Play Store — it checks its own GitHub builds " +
+                        "automatically (on open and periodically) and shows an update tile " +
+                        "when a newer one is out.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                MorphButton(
+                    onClick = { vm.checkForUpdateManually() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.updateChecking,
+                    active = true,
+                ) {
+                    MorphButtonLabel(
+                        icon = Icons.Filled.Refresh,
+                        label = if (state.updateChecking) "Checking…" else "Check for updates",
+                        pending = state.updateChecking,
+                    )
+                }
+                // Second source: open the GitHub Releases page to grab an APK directly,
+                // independent of the in-app checker (works even when it's up to date or
+                // GitHub's API is flaky).
+                MorphTextButton(
+                    "Get updates on GitHub",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(com.bloo.bluelink.data.UpdateApi.RELEASES_URL))
+                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                // Shizuku silent-install: the ROW is gated on Shizuku being present, but
+                // the card is not — so the update controls above always show.
+                if (state.shizukuAvailable) {
+                    ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
+                        vm.setSeamlessInstallShizuku(it)
+                    }
+                    Text(
+                        "Uses Shizuku (local ADB) to install downloaded updates silently — no " +
+                            "system installer prompt. You'll be asked to grant Shizuku access the " +
+                            "first time. If Shizuku isn't running, updates use the normal installer.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.

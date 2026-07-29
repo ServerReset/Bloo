@@ -1737,7 +1737,13 @@ class SettingsStore(private val context: Context) {
             val afterNames = HashSet<String>(after.size)
             after.keys.forEach { afterNames += it.name }
             before.keys.forEach { k -> if (k.name !in afterNames) touched += k.name }
-            touched.removeAll(DEVICE_LOCAL_KEYS)
+            // Strip BOTH the exact device-local keys AND the per-VIN device-local
+            // prefixes (alert_/door_since_/engine_since_/tile_refreshed_), matching what
+            // the export/hash already exclude via isDeviceLocal — otherwise those
+            // transient runtime stamps land in the dirty set and every alert/tile tick
+            // fires a redundant full Drive round-trip (the hash is unchanged, so no data
+            // corrupts, but it's needless background I/O the prefix design meant to stop).
+            touched.removeAll { com.bloo.bluelink.data.SyncMerge.isDeviceLocal(it) }
             if (touched.isNotEmpty()) {
                 val dirtyKey = stringPreferencesKey("sync_dirty_keys")
                 val existing = prefs.dirtyKeySet()

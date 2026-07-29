@@ -39,7 +39,11 @@ data class WorkflowRun(
 fun buildLabel(runNumber: Int, branch: String = ""): String {
     val base = if (runNumber <= 0) "dev build" else "build $runNumber"
     val b = branch.trim()
-    return if (b.isEmpty() || b == "main" || b == "master") base else "$base · $b"
+    // Suppress the "· branch" suffix for the mainline the app actually builds from
+    // (DEFAULT_BRANCH), not just literal main/master — otherwise every ordinary CI
+    // build shows its internal branch name as the user-facing version, and disagrees
+    // with the update tile (which passes no branch).
+    return if (b.isEmpty() || b == "main" || b == "master" || b == UpdateApi.DEFAULT_BRANCH) base else "$base · $b"
 }
 
 /**
@@ -62,6 +66,10 @@ object UpdateApi {
 
     /** The branch new builds land on — see UpdateChecker/WearViewModel. */
     const val DEFAULT_BRANCH = "claude/great-faraday-QuX3x"
+
+    /** The GitHub Releases page — a manual "second source" the user can open in a
+     *  browser to grab an APK directly, independent of the in-app checker. */
+    const val RELEASES_URL = "https://github.com/$OWNER/$REPO/releases"
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 

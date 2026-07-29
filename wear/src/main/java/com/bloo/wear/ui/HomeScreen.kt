@@ -2209,7 +2209,7 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                         // lookup and silently falling back to an implicit
                         // ambient color instead of onSurface.
                         colors = CardDefaults.cardColors(containerColor = cardTint, contentColor = MaterialTheme.colorScheme.onSurface),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(WearCardCorner),
                         modifier = Modifier
                             .fillMaxWidth()
                             // The drag gesture below has no TalkBack equivalent

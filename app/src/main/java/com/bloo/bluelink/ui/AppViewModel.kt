@@ -196,6 +196,9 @@ data class UiState(
     /** True while a Shizuku seamless install is running, so a second Install tap (or a
      *  permission-grant retry) can't spawn a concurrent PackageInstaller session. */
     val updateInstalling: Boolean = false,
+    /** True while a manual "Check for updates" is in flight (drives the Settings
+     *  button's spinner + disables it). Auto/background checks don't set this. */
+    val updateChecking: Boolean = false,
     /** Settings mode: "simple" (essential settings) or "advanced" (all settings). */
     val settingsMode: String = "simple",
     /** Per-VIN default preset ID for the one-tap climate Start button. */
@@ -1149,39 +1152,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Shared by the cold-start check and every refreshStatus() call. Debounced/
-     *  snoozed internally (see UpdateChecker) -- safe to call as often as this is. */
-    private fun checkForUpdate() {
+     *  snoozed internally (see UpdateChecker) -- safe to call as often as this is.
+     *  [force] bypasses the debounce/snooze (for a user-initiated "Check now");
+     *  [surfaceResult] reports UpToDate/Failed to the snackbar (auto checks stay silent). */
+    private fun checkForUpdate(force: Boolean = false, surfaceResult: Boolean = false) {
         viewModelScope.launch {
-            val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication())
-            when (result) {
-                is com.bloo.bluelink.update.UpdateCheckResult.Available ->
-                    _state.update {
-                        // A previously-downloaded APK is only still good if it's
-                        // for this same build -- a newer one showing up means the
-                        // cached file is stale.
-                        val sameBuild = it.updateAvailable?.run?.runNumber == result.info.run.runNumber
-                        it.copy(
-                            updateAvailable = result.info,
-                            updateApkReady = it.updateApkReady && sameBuild,
-                            // "Not now" only hides the tile until the NEXT check: any
-                            // Available result (even the same build re-found on a
-                            // refresh) clears the dismissed flag so the tile comes
-                            // back. ("Remind me" is the one that stays hidden longer —
-                            // it sets a snooze so checkPhone short-circuits to UpToDate
-                            // until the reminder worker clears it, so we never reach
-                            // this branch while snoozed.) A pending (undo-window)
-                            // dismiss is also cleared so a refresh mid-countdown just
-                            // keeps the tile.
-                            updateTileDismissed = false,
-                            updatePendingDismiss = false,
-                        )
+            if (surfaceResult) _state.update { it.copy(updateChecking = true) }
+            try {
+                val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = force)
+                when (result) {
+                    is com.bloo.bluelink.update.UpdateCheckResult.Available -> {
+                        _state.update {
+                            // A previously-downloaded APK is only still good if it's
+                            // for this same build -- a newer one showing up means the
+                            // cached file is stale.
+                            val sameBuild = it.updateAvailable?.run?.runNumber == result.info.run.runNumber
+                            it.copy(
+                                updateAvailable = result.info,
+                                updateApkReady = it.updateApkReady && sameBuild,
+                                // "Not now" only hides the tile until the NEXT check: any
+                                // Available result (even the same build re-found on a
+                                // refresh) clears the dismissed flag so the tile comes
+                                // back. ("Remind me" is the one that stays hidden longer —
+                                // it sets a snooze so checkPhone short-circuits to UpToDate
+                                // until the reminder worker clears it, so we never reach
+                                // this branch while snoozed.) A pending (undo-window)
+                                // dismiss is also cleared so a refresh mid-countdown just
+                                // keeps the tile.
+                                updateTileDismissed = false,
+                                updatePendingDismiss = false,
+                            )
+                        }
+                        // A manual check found a newer build — the update tile appears on
+                        // the garage screen, which isn't visible from Settings, so also
+                        // confirm via the snackbar (else the button looks like a no-op).
+                        if (surfaceResult) _state.update {
+                            it.copy(message = "Update available — ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = "info")
+                        }
                     }
-                is com.bloo.bluelink.update.UpdateCheckResult.Failed -> Unit // silent -- next refresh tries again
-                is com.bloo.bluelink.update.UpdateCheckResult.UpToDate ->
-                    _state.update { it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false) }
+                    is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
+                        if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = "error") }
+                    // else: silent -- next refresh tries again
+                    is com.bloo.bluelink.update.UpdateCheckResult.UpToDate -> {
+                        _state.update { it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false) }
+                        if (surfaceResult) _state.update { it.copy(message = "You're on the latest build.", messageType = "info") }
+                    }
+                }
+            } finally {
+                if (surfaceResult) _state.update { it.copy(updateChecking = false) }
             }
         }
     }
+
+    /** User-initiated "Check for updates" from Settings: forces past the debounce/
+     *  snooze and surfaces the result (up-to-date / can't-reach) to the snackbar. If a
+     *  newer build is found it just appears as the usual update tile. */
+    fun checkForUpdateManually() = checkForUpdate(force = true, surfaceResult = true)
 
     /**
      * Fetches one car's status. The network call funnels through [statusMutex]
@@ -1568,7 +1594,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (_state.value.updateDownloading || _state.value.updateApkReady) return
-        _state.update { it.copy(updateDownloading = true, updateDownloadProgress = 0f) }
+        // Starting a download is an explicit "keep this update" signal: abort any
+        // in-flight dismiss (undo-window) timer and un-hide the tile, so the pending
+        // dismiss can't fire mid-download and strand the finished APK behind a hidden tile.
+        updateDismissJob?.cancel()
+        updateDismissJob = null
+        _state.update { it.copy(updateDownloading = true, updateDownloadProgress = 0f, updatePendingDismiss = false, updateTileDismissed = false) }
         viewModelScope.launch {
             val dest = apkCacheFile()
             val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
@@ -1627,9 +1658,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update { it.copy(updateInstalling = false) }
                     fallbackInstall(dest)
                 }
+            } else {
+                // Success. Usually the OS force-stops us as it swaps the APK, so this
+                // never renders — BUT a replace-install commit reports STATUS_SUCCESS as
+                // soon as it's staged and some OEMs defer the process kill. Give a
+                // terminal state so the tile can't stay locked on "Installing…" forever:
+                // clear the flags + prompt to reopen. (The running process still reports
+                // the old build number, so a later auto-check may re-surface the same
+                // update — acceptable, and far better than a permanent lock.)
+                launch(kotlinx.coroutines.Dispatchers.Main) {
+                    _state.update {
+                        it.copy(
+                            updateInstalling = false,
+                            updateApkReady = false,
+                            message = "Update installed — reopen Bloo to finish.",
+                            messageType = "info",
+                        )
+                    }
+                }
             }
-            // On success the OS swaps the app; the process is replaced, so we
-            // intentionally leave updateInstalling set (nothing to reset).
         }
     }
 

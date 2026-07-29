@@ -97,6 +97,10 @@ import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.math.tan
 
+/** The one card corner radius for the watch, so SectionCard, the reorder cards, and
+ *  any nested element (map thumbnail) share it and can't drift apart. */
+internal val WearCardCorner = 12.dp
+
 /**
  * Horizontal ScalingLazyColumn inset that actually widens on a round screen.
  * Only HomeScreen accounted for `isScreenRound` before this; Settings, Login,
@@ -134,7 +138,7 @@ fun SectionCard(
     // Box with the same clip+background reproduces the identical flat-tonal
     // look (this call only ever set containerColor, no border/elevation/
     // interaction-dependent styling that a real Card would otherwise add).
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = RoundedCornerShape(WearCardCorner)
     Box(
         Modifier
             .fillMaxWidth()
