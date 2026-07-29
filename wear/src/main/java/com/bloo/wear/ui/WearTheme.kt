@@ -1,7 +1,6 @@
 package com.bloo.wear.ui
 
 import android.provider.Settings
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -11,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.ColorScheme
+import androidx.wear.compose.material3.LocalContentColor
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Typography
 import com.bloo.bluelink.data.BlooColors
@@ -112,20 +112,21 @@ fun BlooWearTheme(settings: WearSettingsPayload?, content: @Composable () -> Uni
     // Rebuild the 25-colour scheme only when the synced roles actually change.
     val scheme = colors?.let { c -> remember(c) { schemeFrom(c) } }
     val typography = remember { blooWearTypography() }
-    // Wear Compose Material3's own MaterialTheme does NOT provide LocalContentColor
-    // (verified against its source -- it sets LocalColorScheme/Shapes/Typography/
-    // MotionScheme and a couple of swipe-dismiss scrim colors, but never content
-    // color). Its Text() falls back to androidx.compose.material3.LocalContentColor
-    // when nothing sets it, and THAT CompositionLocal's own undocumented default is
-    // Color.Black. AppScaffold makes this land hard: WatchApp.kt sets its
-    // containerColor to Color.Transparent whenever Aurora is on (so the animated
-    // background shows through), and contentColorFor(Color.Transparent) resolves to
-    // Color.Unspecified since Transparent isn't one of the theme's ~15 known roles --
-    // which leaves LocalContentColor sitting at that Black default for every bare
-    // Text() in the whole app that doesn't explicitly pass its own color (section
-    // labels, descriptions, list headers, ...). Providing it explicitly here, once,
-    // at the true theme root fixes every screen regardless of which scaffold/card
-    // wraps it, and is a no-op wherever something downstream already sets its own.
+    // Wear Compose Material3's own MaterialTheme does NOT provide
+    // androidx.wear.compose.material3.LocalContentColor (verified against its
+    // source -- it sets LocalColorScheme/Shapes/Typography/MotionScheme and a
+    // couple of swipe-dismiss scrim colors, but never content color), and that
+    // CompositionLocal's own undocumented default is Color.Black. AppScaffold
+    // makes this land hard: WatchApp.kt sets its containerColor to
+    // Color.Transparent whenever Aurora is on (so the animated background
+    // shows through), and contentColorFor(Color.Transparent) resolves to
+    // Color.Unspecified since Transparent isn't one of the theme's ~15 known
+    // roles -- which leaves LocalContentColor sitting at that Black default
+    // for every bare Text() in the whole app that doesn't explicitly pass its
+    // own color (section labels, descriptions, list headers, ...). Providing
+    // it explicitly here, once, at the true theme root fixes every screen
+    // regardless of which scaffold/card wraps it, and is a no-op wherever
+    // something downstream already sets its own.
     val onBackground = scheme?.onBackground ?: MaterialTheme.colorScheme.onBackground
     CompositionLocalProvider(LocalReduceMotion provides reduceMotion, LocalContentColor provides onBackground) {
         if (scheme != null) {
