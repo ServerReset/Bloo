@@ -50,6 +50,23 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
         // outcomes into one message, and blindly re-dispatching a real
         // lock/climate/charge command that may have already reached the car is
         // riskier than surfacing the failure and letting the user re-tap.
+        //
+        // ...but "surfacing" it to WorkManager isn't surfacing it to the USER: the
+        // tile already showed an optimistic ack toast on tap, and the runner only
+        // writes the optimistic snapshot on success, so a failure just silently
+        // reverted the tile. That's indistinguishable from a render glitch, and it
+        // threw away deliberately-written, user-actionable text (the climate
+        // driving-gate message exists purely to be read). Toast it, exactly as
+        // WidgetCommandWorker already does for the same reason.
+        if (!result.ok) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                android.widget.Toast.makeText(
+                    applicationContext,
+                    result.message ?: "Tile command failed",
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
         return if (result.ok) Result.success() else Result.failure()
     }
 

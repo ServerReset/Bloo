@@ -221,8 +221,10 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Switch
@@ -433,14 +435,20 @@ fun BlooApp(vm: AppViewModel) {
 
     // The snackbar's colour is driven by the message TYPE, but clearMessage()
     // (called right after showing) resets messageType back to "error" for the
-    // next message. The SnackbarHost reads this at render time — after the
-    // reset — so reading state.messageType live would always paint red. Capture
-    // the type WITH the message here and let the host read the captured value.
-    var shownMessageType by remember { mutableStateOf("error") }
+    // next message, so the host can't read state.messageType at render time —
+    // it would always paint red.
+    //
+    // A single captured `shownMessageType` variable didn't work either:
+    // showSnackbar serialises on an internal mutex, so a second message queues
+    // behind the first for up to ~4s while a shared variable is overwritten the
+    // moment it's queued — the first snackbar recomposed into the SECOND one's
+    // colour while still on screen (a failed refresh turning blue mid-display as
+    // the update check's info message queued behind it). The type has to travel
+    // WITH its own message, so it rides in custom visuals the host reads back.
     LaunchedEffect(state.message) {
-        state.message?.let {
-            shownMessageType = state.messageType
-            scope.launch { snackbar.showSnackbar(it) }
+        state.message?.let { msg ->
+            val visuals = BlooSnackbarVisuals(msg, state.messageType)
+            scope.launch { snackbar.showSnackbar(visuals) }
             vm.clearMessage()
         }
     }
@@ -489,7 +497,9 @@ fun BlooApp(vm: AppViewModel) {
                 val offsetX = remember(data) { Animatable(0f) }
                 val swipeScope = rememberCoroutineScope()
                 val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
-                val snackColors = when (shownMessageType) {
+                // Read off THIS snackbar's own visuals, so a message queued behind
+                // it can't repaint it — see the LaunchedEffect that shows them.
+                val snackColors = when ((data.visuals as? BlooSnackbarVisuals)?.type) {
                     "success" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
                     "info" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
                     else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
@@ -2543,6 +2553,21 @@ private const val MIN_CARD_DP = 320
  * with each virtual page mapped back onto a real index by modulo. These
  * primitives factor that out so the wrap math lives in exactly one place.
  */
+/**
+ * Snackbar payload that carries its own severity, so the host colours each
+ * message from ITS OWN type rather than from a shared variable that the next
+ * queued message may already have overwritten. [type] matches
+ * `UiState.messageType`: "success", "info", or anything else (treated as error).
+ */
+private class BlooSnackbarVisuals(
+    override val message: String,
+    val type: String,
+) : SnackbarVisuals {
+    override val actionLabel: String? = null
+    override val duration: SnackbarDuration = SnackbarDuration.Short
+    override val withDismissAction: Boolean = false
+}
+
 private const val WRAP_MULTIPLIER = 1000
 /** Max per-page scale shrink at full off-screen offset (floor 0.94). */
 private const val PAGER_SHRINK = 0.06f
@@ -2727,7 +2752,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             // data, currentFetchedAt changes → this effect restarts → delay is
             // cancelled → user never sees a spurious "stale" toast.
             delay(25_000)
-            vm.reportError("Data is over 15 min old. Pull down to refresh")
+            vm.reportInfo("Data is over 15 min old. Pull down to refresh")
         }
     }
 
@@ -4370,8 +4395,13 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
                         state.updateApkReady -> vm.installDownloadedUpdate()
                         hasDirectDownload -> vm.downloadUpdateInBackground()
                         else -> {
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                            vm.dismissUpdate()
+                            // Dismiss ONLY if the page really opened. Swallowing an
+                            // ActivityNotFoundException and dismissing anyway meant a
+                            // tap did visibly nothing AND cost the user the tile.
+                            val opened = runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
+                            }.isSuccess
+                            if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
                         }
                     }
                 },

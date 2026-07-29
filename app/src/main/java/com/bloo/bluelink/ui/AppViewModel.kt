@@ -703,7 +703,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             store.updatePin(brand, pin.trim())
             credentialStore.updatePin(brand, pin.trim())
-            _state.update { it.copy(accounts = credentialStore.loadAll(), message = "PIN updated for ${brand.label}") }
+            _state.update { it.copy(accounts = credentialStore.loadAll(), message = "PIN updated for ${brand.label}", messageType = "success") }
             AppLog.log("Updated PIN for ${brand.label}")
         }
     }
@@ -1790,7 +1790,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun summarizeCar(v: Vehicle) {
         if (v.vin in _state.value.aiBusy) return
         val status = _state.value.statusFor(v) ?: run {
-            _state.update { it.copy(message = "Refresh ${v.name} first, then summarize.") }
+            _state.update { it.copy(message = "Refresh ${v.name} first, then summarize.", messageType = "info") }
             return
         }
         _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
@@ -1804,8 +1804,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         st.copy(aiBusy = st.aiBusy - v.vin, aiSummaries = st.aiSummaries + (v.vin to s))
                     },
                     onFailure = { e ->
+                        // The exception text is AICore/Gemini-Nano implementation
+                        // detail ("Feature not available: ...", binder/ExecutionException
+                        // strings). Log it for diagnostics; show the user a sentence.
                         AppLog.log("⚠ AI summary: ${e.message}")
-                        st.copy(aiBusy = st.aiBusy - v.vin, message = "AI summary failed: ${e.message ?: "unknown error"}")
+                        st.copy(aiBusy = st.aiBusy - v.vin, message = "Couldn't summarize ${v.name} right now.")
                     },
                 )
             }
@@ -1822,8 +1825,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             val reply = runCatching {
                 ai.summarize("Answer this question using only the data below.\nQuestion: $query\n\nData:\n$data")
-            }.getOrNull()
-            _state.update { it.copy(aiBusy = it.aiBusy - "search", aiSearchReply = reply) }
+            }.onFailure { AppLog.log("⚠ AI search: ${it.message}") }.getOrNull()
+            // On failure both `thinking` and `reply` go false/null, and the answer
+            // card renders on `thinking || reply != null` — so without a message the
+            // whole card just silently vanished after "Thinking…", with no log line
+            // either. Say something, like the per-car summary path already does.
+            _state.update {
+                it.copy(
+                    aiBusy = it.aiBusy - "search",
+                    aiSearchReply = reply,
+                    message = if (reply == null) "Couldn't answer that — try again." else it.message,
+                )
+            }
         }
     }
 
@@ -2126,7 +2139,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 persistCache()
             }
             hadCached -> _state.update {
-                it.copy(message = "Showing last-known location — a live locate is over today's limit. Try again later.")
+                it.copy(message = "Showing last-known location — a live locate is over today's limit. Try again later.", messageType = "info")
             }
             else -> throw BlueLinkException(
                 "Couldn't get the car's location — it may be asleep, out of coverage, or over " +
@@ -2493,7 +2506,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // cleared), then point sync at it.
         settingsStore.resetSyncStateForNewFile()
         settingsStore.setSyncUri(uri.toString())
-        _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled") }
+        _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled", messageType = "success") }
         // One real pass now: performDriveSync join-adopts the file's settings (if it
         // has any) and uploads. refreshLocalCarConfig() below reflects an adopted
         // import into the already-loaded vehicles (seats/powertrain/photo) right away.
