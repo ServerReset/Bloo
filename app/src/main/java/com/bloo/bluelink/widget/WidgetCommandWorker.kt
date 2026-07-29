@@ -124,20 +124,13 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 val lon = snap?.lon
                 if (lat != null && lon != null && !(lat == 0.0 && lon == 0.0)) {
                     runCatching {
-                        val a = geocode(ctx, lat, lon)
-                        val addr = a?.let {
-                            buildString {
-                                // Street portion built explicitly from house number
-                                // (subThoroughfare) + street name (thoroughfare) so the
-                                // house number isn't dropped when the street name is blank.
-                                val street = listOfNotNull(
-                                    a.subThoroughfare?.takeIf { it.isNotBlank() },
-                                    a.thoroughfare?.takeIf { it.isNotBlank() },
-                                ).joinToString(" ")
-                                if (street.isNotEmpty()) append(street)
-                                if (!a.locality.isNullOrBlank()) { if (isNotEmpty()) append(", "); append(a.locality) }
-                            }.takeIf { it.isNotBlank() } ?: a.getAddressLine(0)
-                        }
+                        // Shared with the phone's Location/Info pebbles and the
+                        // watch's Location card -- this used to build its own
+                        // separate street-address string inline (the same logic,
+                        // just not shared), which is exactly how the OTHER two
+                        // surfaces ended up on the coarser "city, state"-only
+                        // formatPlaceName instead of this one's real address.
+                        val addr = geocode(ctx, lat, lon)?.let { com.bloo.bluelink.data.formatPlaceName(it) }
                         if (!addr.isNullOrBlank()) runCatching { SettingsStore(ctx).setWidgetLocationAddress(widgetId, addr) }
                     }
                     downloadAndCacheMapTile(ctx, widgetId, lat, lon)

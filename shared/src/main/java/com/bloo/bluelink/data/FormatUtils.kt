@@ -3,16 +3,33 @@ package com.bloo.bluelink.data
 import java.util.TimeZone
 import kotlin.math.roundToInt
 
-/** "Springfield, IL" (locality/subAdminArea + adminArea) from a reverse-
- *  geocode result, falling back to the raw first address line. Was defined
- *  separately on phone and watch; the watch's copy was missing the
- *  `.distinct()` phone's had, so it could render "Springfield, Springfield"
- *  when locality == adminArea. */
-fun formatPlaceName(a: android.location.Address): String? =
-    listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea)
-        .distinct()
-        .joinToString(", ")
-        .ifBlank { a.getAddressLine(0) }
+/** "123 Main St, San Jose" -- a real street address, not just the city --
+ *  built from a reverse-geocode result's house number + street name
+ *  (subThoroughfare + thoroughfare) plus locality, falling back to
+ *  "Springfield, IL" (locality/subAdminArea + adminArea) when the geocoder
+ *  didn't return street-level detail for this fix, and to the raw first
+ *  address line if even that's blank.
+ *
+ *  Was "Springfield, IL"-only for every caller (this is what the phone's
+ *  Location/Info pebbles and the watch's Location card showed even when a
+ *  full street address was available), while the widget separately built
+ *  its own street-address string inline instead of sharing this function --
+ *  the same "identical logic drifts when duplicated" trap this file's other
+ *  helpers already got extracted to fix elsewhere. One implementation now,
+ *  and it's the more useful of the two.
+ *
+ *  Was also separately defined on phone and watch before that; the watch's
+ *  copy was missing the `.distinct()` the phone's had, so it could render
+ *  "Springfield, Springfield" when locality == adminArea. */
+fun formatPlaceName(a: android.location.Address): String? {
+    val street = listOfNotNull(
+        a.subThoroughfare?.takeIf { it.isNotBlank() },
+        a.thoroughfare?.takeIf { it.isNotBlank() },
+    ).joinToString(" ").takeIf { it.isNotBlank() }
+    val locality = a.locality ?: a.subAdminArea
+    val parts = if (street != null) listOfNotNull(street, locality) else listOfNotNull(locality, a.adminArea)
+    return parts.distinct().joinToString(", ").ifBlank { a.getAddressLine(0) }
+}
 
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch.
  *  Mechanism: integer-divides by 60 to get whole hours and takes the
