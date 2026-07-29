@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
@@ -456,9 +457,19 @@ fun BlooTheme(
         typography = expressiveTypography(fontChoice),
         shapes = ExpressiveShapes,
     ) {
+        // Defensive, matching the fix required on the watch (see BlooWearTheme):
+        // this app's root Scaffold passes containerColor = Color.Transparent so the
+        // edge-to-edge gradient/aurora Box behind it shows through, and
+        // contentColorFor(Color.Transparent) resolves to Color.Unspecified since
+        // Transparent isn't one of the theme's known roles -- which means ANY bare
+        // Text() reached before something else (a Card, a themed Surface) sets its
+        // own content color falls through to whatever's ambient. Explicit here so
+        // that's always this theme's onBackground, never an unthemed framework
+        // default, regardless of which screen or dialog it is.
         CompositionLocalProvider(
             LocalDensity provides scaledDensity,
             LocalReduceMotion provides reduceMotion,
+            LocalContentColor provides scheme.onBackground,
             content = content,
         )
     }

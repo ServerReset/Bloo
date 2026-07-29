@@ -7439,7 +7439,12 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
                 status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }
                 status.sideBackWindowHeat?.takeIf { it != 0 }?.let { StatusRow("Rear defroster", "On") }
-                location?.let { StatusRow("Coordinates", it.coordString()) }
+                // Resolved place name when geocoding's landed (same source the
+                // Location pebble and the AI summary both use); raw coordinates
+                // ONLY as the fallback until it does, never as the steady state --
+                // this row used to show coordString() unconditionally, the one
+                // place in the app that never even tried to resolve an address.
+                location?.let { StatusRow("Location", state.placeNames[v.vin] ?: it.coordString()) }
                 rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
 
                 if (plugged) {
