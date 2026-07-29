@@ -27,10 +27,10 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      * WorkManager's entry point, invoked on each ~30-minute periodic tick.
      *
      * Mechanism, in order:
-     * 1. Cheap early exit: if none of the service-due, door-open, or "running"
-     *    (engine-left-on) alert types are enabled in the user's
+     * 1. Cheap early exit: if none of the service-due, door-open, "running"
+     *    (engine-left-on), or "unlocked" alert types are enabled in the user's
      *    [SettingsStore.notificationPrefs], returns success immediately without
-     *    logging into anything or making a single network call. All three types
+     *    logging into anything or making a single network call. All four types
      *    that [CarAlerts.evaluate] handles below are checked here, so a
      *    "running"-only preference configuration still runs the poll.
      * 2. Otherwise, iterates every brand the user is actually logged into (
@@ -66,7 +66,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         val prefs = settings.notificationPrefs()
-        if (!prefs.service && !prefs.doorOpen && !prefs.running) return Result.success()
+        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked) return Result.success()
 
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue
