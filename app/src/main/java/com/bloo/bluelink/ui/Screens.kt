@@ -10122,6 +10122,10 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Theme
             SettingsCard("Theme") {
                 // Short segment labels; AMOLED is "pure black" for OLED screens.
+                // "Auto AMOLED" follows the system light/dark switch exactly like
+                // System does, but swaps in AMOLED's true-black surfaces for its
+                // dark half instead of the normal dark palette -- system-driven
+                // day/night, with OLED-friendly black once it's dark.
                 SettingsSegmentedRow(
                     label = "Appearance",
                     options = listOf(
@@ -10129,6 +10133,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         SegmentOption(ThemeMode.LIGHT.name, "Light", null),
                         SegmentOption(ThemeMode.DARK.name, "Dark", null),
                         SegmentOption(ThemeMode.AMOLED.name, "AMOLED", null),
+                        SegmentOption(ThemeMode.SYSTEM_AMOLED.name, "Auto AMOLED", null),
                     ),
                     selectedKey = appearance.themeMode.name,
                     onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },

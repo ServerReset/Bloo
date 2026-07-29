@@ -36,7 +36,7 @@ import com.bloo.bluelink.R
 import kotlinx.serialization.Serializable
 
 /** User-selectable appearance. */
-enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED }
+enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED, SYSTEM_AMOLED }
 
 /**
  * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex — Google's
@@ -158,11 +158,11 @@ internal fun resolveWidgetAccent(
 ): Color {
     // Derive dark/light exactly the way [BlooTheme] does — honour the user's
     // themeMode override (LIGHT→false, DARK/AMOLED→true) and only fall back to the
-    // system uiMode for SYSTEM — so the widget accent always matches the app.
+    // system uiMode for SYSTEM/SYSTEM_AMOLED — so the widget accent always matches the app.
     val isDark = when (appearance.themeMode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM ->
+        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED ->
             (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
     }
@@ -359,7 +359,10 @@ fun blooColorScheme(
     // AMOLED mode overrides just the background/surface tiers to true (or near-true) black
     // to actually turn off OLED pixels for the big flat areas, while leaving every other
     // role (text, accents, containers) exactly as the resolved base scheme already has them.
-    val amoled = if (themeMode == ThemeMode.AMOLED) {
+    // SYSTEM_AMOLED only applies this override in its dark half -- it's meant to look like
+    // ordinary SYSTEM in light mode, and only swap in true-black surfaces once the system
+    // (or the day/night boundary) actually flips to dark, per [dark].
+    val amoled = if (themeMode == ThemeMode.AMOLED || (themeMode == ThemeMode.SYSTEM_AMOLED && dark)) {
         val black = Color(0xFF000000)
         base.copy(
             background = black,
@@ -431,7 +434,7 @@ fun BlooTheme(
     val dark = when (themeMode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
     }
 
     val context = LocalContext.current
@@ -500,7 +503,7 @@ internal fun CarThemeOverride(
     val dark = when (themeMode) {
         ThemeMode.DARK, ThemeMode.AMOLED -> true
         ThemeMode.LIGHT -> false
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
     }
     // Memoize the whole palette derivation: applyCustomPalette does ~12 hue-rotate
     // HSV round-trips and (when vibrancy != 1f) ~12 more saturate round-trips + a

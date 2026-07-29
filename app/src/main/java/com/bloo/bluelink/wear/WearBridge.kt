@@ -139,7 +139,7 @@ object WearBridge {
         val dark = when (appearance.themeMode) {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK, ThemeMode.AMOLED -> true
-            ThemeMode.SYSTEM -> isSystemDark(context)
+            ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemDark(context)
         }
         val custom = if (!appearance.dynamicColor) {
             appearance.customPalettes.find { it.id == appearance.activeCustomPaletteId }
