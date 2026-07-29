@@ -752,7 +752,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Prompt to refresh if data is stale after returning from background.
         if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > STALE_STATUS_MS) {
             val anyStale = _state.value.lastFetched.values.any { System.currentTimeMillis() - it > STALE_STATUS_MS }
-            if (anyStale) reportInfo("Data may be stale — pull down to refresh")
+            if (anyStale) reportInfo("Data may be stale, pull down to refresh")
         }
     }
 
@@ -993,7 +993,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }.getOrDefault(true) // Assume fine if the check itself fails; performDriveSync will report the real error.
                 if (!stillGranted) {
-                    lastError = "Lost access to the Drive file — set up sync again"
+                    lastError = "Lost access to the Drive file. Set up sync again"
                     settingsStore.setLastSyncError(lastError)
                 }
             }
@@ -1209,7 +1209,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         // the garage screen, which isn't visible from Settings, so also
                         // confirm via the snackbar (else the button looks like a no-op).
                         if (surfaceResult) _state.update {
-                            it.copy(message = "Update available — ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = "info")
+                            it.copy(message = "Update available: ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = "info")
                         }
                     }
                     is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
@@ -1612,7 +1612,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun downloadUpdateInBackground() {
         val url = _state.value.updateAvailable?.run?.phoneApkUrl
         if (url == null) {
-            _state.update { it.copy(message = "No direct download for this build — use the browser link instead.") }
+            _state.update { it.copy(message = "No direct download for this build. Use the browser link instead.") }
             return
         }
         if (_state.value.updateDownloading || _state.value.updateApkReady) return
@@ -1629,7 +1629,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             _state.update { it.copy(updateDownloading = false, updateDownloadProgress = null, updateApkReady = ok) }
             if (!ok) {
-                _state.update { it.copy(message = "Download failed — check your connection and try again.") }
+                _state.update { it.copy(message = "Download failed. Check your connection and try again.") }
             }
         }
     }
@@ -1646,7 +1646,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.updateInstalling) return
         val dest = apkCacheFile()
         if (!dest.exists()) {
-            _state.update { it.copy(updateApkReady = false, message = "The downloaded update is gone — tap Update to fetch it again.") }
+            _state.update { it.copy(updateApkReady = false, message = "The downloaded update is gone. Tap Update to fetch it again.") }
             return
         }
         val installer = com.bloo.bluelink.update.ShizukuInstaller
@@ -1697,7 +1697,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         it.copy(
                             updateInstalling = false,
                             updateApkReady = false,
-                            message = "Update installed — reopen Bloo to finish.",
+                            message = "Update installed. Reopen Bloo to finish.",
                             messageType = "info",
                         )
                     }
@@ -1710,7 +1710,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  path). Reports only if even this can't be launched. */
     private fun fallbackInstall(dest: java.io.File) {
         if (!launchApkInstaller(dest)) {
-            _state.update { it.copy(message = "Couldn't open the installer — find Bloo.apk in your downloads.") }
+            _state.update { it.copy(message = "Couldn't open the installer. Find Bloo.apk in your downloads.") }
         }
     }
 
@@ -1721,7 +1721,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (grantResult != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             // Info, not error: the user made a choice and the normal installer still
             // works, so nothing is actually broken to report in red.
-            _state.update { it.copy(message = "Shizuku access denied — updates will use the normal installer.", messageType = "info") }
+            _state.update { it.copy(message = "Shizuku access denied. Updates will use the normal installer.", messageType = "info") }
             return
         }
         val dest = apkCacheFile()
@@ -1836,7 +1836,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     aiBusy = it.aiBusy - "search",
                     aiSearchReply = reply,
-                    message = if (reply == null) "Couldn't answer that — try again." else it.message,
+                    message = if (reply == null) "Couldn't answer that. Try again." else it.message,
                 )
             }
         }
@@ -2141,10 +2141,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 persistCache()
             }
             hadCached -> _state.update {
-                it.copy(message = "Showing last-known location — a live locate is over today's limit. Try again later.", messageType = "info")
+                it.copy(message = "Showing last-known location. A live locate is over today's limit. Try again later.", messageType = "info")
             }
             else -> throw BlueLinkException(
-                "Couldn't get the car's location — it may be asleep, out of coverage, or over " +
+                "Couldn't get the car's location. It may be asleep, out of coverage, or over " +
                     "the daily location-lookup limit. Try again later.",
             )
         }
@@ -2489,7 +2489,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // obvious fix in sight -- refuse to enable sync at all instead of
             // silently setting up something that's guaranteed to break later.
             AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-            _state.update { it.copy(message = "Couldn't get lasting access to that file — try picking it again", messageType = "error") }
+            _state.update { it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error") }
             return@launch
         }
         AppLog.log("Drive auto-sync enabled")
@@ -2547,7 +2547,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // moment this process dies, so don't claim auto-sync is enabled.
             AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
             _state.update {
-                it.copy(message = "Couldn't get lasting access to that file — try picking it again", messageType = "error")
+                it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error")
             }
             return@launch
         }
@@ -2602,7 +2602,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun useDeviceLocationForWeather() = viewModelScope.launch {
         val ok = withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation() }
         if (!ok) {
-            _state.update { it.copy(message = "No device location available — try setting a place instead") }
+            _state.update { it.copy(message = "No device location available. Try setting a place instead") }
             return@launch
         }
         loadHomeWeather(force = true)

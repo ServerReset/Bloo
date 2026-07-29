@@ -1406,7 +1406,7 @@ private fun WizardPowertrainPage(
         fontWeight = FontWeight.Black,
     )
     Text(
-        "Bloo uses this to show the right status tiles — battery percentage for EVs, " +
+        "Bloo uses this to show the right status tiles: battery percentage for EVs, " +
             "fuel level for gas, or both for plug-in hybrids.",
         style = MaterialTheme.typography.bodyMedium,
         color = scheme.onSurfaceVariant,
@@ -4469,7 +4469,7 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
                 )
                 state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "Downloaded · installs silently via Shizuku", ChargeGreen)
                 state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "Downloaded · tap Install", ChargeGreen)
-                seamless -> Triple(Icons.Filled.Bolt, "Installs silently via Shizuku — no prompts", scheme.onSurfaceVariant)
+                seamless -> Triple(Icons.Filled.Bolt, "Installs silently via Shizuku, no prompts", scheme.onSurfaceVariant)
                 else -> Triple(Icons.Filled.SystemUpdate, deltaLabel, scheme.primary)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -8031,7 +8031,7 @@ private fun ClimatePebble(
                 Text(smartLabel, fontWeight = FontWeight.SemiBold)
             }
             Text(
-                "It's $ambientLabel where your car is — Smart climate is targeting $targetLabel.",
+                "It's $ambientLabel where your car is. Smart climate is targeting $targetLabel.",
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
             )
@@ -8097,10 +8097,13 @@ private fun ClimatePebble(
             valueRange = CLIMATE_EXTENDED_DURATION_RANGE.first.toFloat()..CLIMATE_EXTENDED_DURATION_RANGE.last.toFloat(),
             steps = CLIMATE_EXTENDED_DURATION_RANGE.last - CLIMATE_EXTENDED_DURATION_RANGE.first - 1,
         )
-        if (duration > CLIMATE_DURATION_RANGE.last) {
+        AnimatedVisibility(
+            visible = duration > CLIMATE_DURATION_RANGE.last,
+            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(120)),
+        ) {
             Text(
-                "Sent as ${climateChunksLabel(duration)} — the car can't run a single command " +
-                    "this long, so a follow-up is scheduled automatically.",
+                "Sent as ${climateChunksLabel(duration)}, continued automatically",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -8738,7 +8741,11 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
         ),
     ) {
         val coverGlance = LocalForceExpanded.current
-        if (location == null) {
+        AnimatedVisibility(
+            visible = location == null,
+            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(120)),
+        ) {
             Text("Tap Locate to query the car's current position.")
         }
         location?.let { loc ->
@@ -9777,7 +9784,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         Spacer(Modifier.height(4.dp))
                         if (lineCount > 0) {
                             Text(
-                                "Earliest entries at the top — the newest $lineCount lines are shown.",
+                                "Earliest entries at the top. The newest $lineCount lines are shown.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
@@ -10081,39 +10088,47 @@ private fun SettingsScreen(vm: AppViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (appearance.auroraBackground) {
-                        Spacer(Modifier.height(8.dp))
-                        Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(6.dp))
-                        MorphSegmented(
-                            options = listOf(
-                                SegmentOption("static", "Static", null),
-                                SegmentOption("motion", "Motion", null),
-                            ),
-                            selectedKey = appearance.auroraMotion,
-                            onSelect = { vm.setAuroraMotion(it) },
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text("Colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(6.dp))
-                        MorphSegmented(
-                            options = listOf(
-                                SegmentOption("complementary", "Complementary", null),
-                                SegmentOption("material", "Material You", null),
-                                SegmentOption("custom", "Custom", null),
-                            ),
-                            selectedKey = appearance.auroraColorMode,
-                            onSelect = { vm.setAuroraColorMode(it) },
-                        )
-                        if (appearance.auroraColorMode == "custom") {
+                    // Same AnimatedVisibility-wraps-a-Column idiom as the dynamic-
+                    // color section below, instead of a bare `if` -- this whole
+                    // Motion/Colour block otherwise just materialized the instant
+                    // the toggle above flipped on.
+                    AnimatedVisibility(visible = appearance.auroraBackground) {
+                        Column {
                             Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = appearance.auroraCustomColor ?: "",
-                                onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
-                                label = { Text("Hex colour") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
+                            Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(6.dp))
+                            MorphSegmented(
+                                options = listOf(
+                                    SegmentOption("static", "Static", null),
+                                    SegmentOption("motion", "Motion", null),
+                                ),
+                                selectedKey = appearance.auroraMotion,
+                                onSelect = { vm.setAuroraMotion(it) },
                             )
+                            Spacer(Modifier.height(10.dp))
+                            Text("Colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(6.dp))
+                            MorphSegmented(
+                                options = listOf(
+                                    SegmentOption("complementary", "Complementary", null),
+                                    SegmentOption("material", "Material You", null),
+                                    SegmentOption("custom", "Custom", null),
+                                ),
+                                selectedKey = appearance.auroraColorMode,
+                                onSelect = { vm.setAuroraColorMode(it) },
+                            )
+                            AnimatedVisibility(visible = appearance.auroraColorMode == "custom") {
+                                Column {
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(
+                                        value = appearance.auroraCustomColor ?: "",
+                                        onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
+                                        label = { Text("Hex colour") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                            }
                         }
                     }
                   }
@@ -10205,7 +10220,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                     ActivityResultContracts.RequestPermission(),
                 ) { granted ->
                     if (granted) vm.useDeviceLocationForWeather()
-                    else vm.reportError("Location permission denied — type a place instead")
+                    else vm.reportError("Location permission denied. Type a place instead")
                 }
                 appearance.weatherLabel?.let { label ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -11249,7 +11264,11 @@ private fun SettingsSearchResults(
         }
         val thinking = "search" in state.aiBusy
         val reply = state.aiSearchReply
-        if (thinking || reply != null) {
+        AnimatedVisibility(
+            visible = thinking || reply != null,
+            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(120)),
+        ) {
             Card(
                 resultCardModifier,
                 shape = resultCardShape,
@@ -11468,7 +11487,7 @@ private fun QuickTilesManager(state: UiState, vm: AppViewModel) {
                             label = if (assigned.isEmpty()) "Add a quick tile" else "Add another",
                             onClick = { vm.setTileAssignment(free, car.vin, if (assigned.isEmpty()) "doors" else "climate") },
                         )
-                        assigned.isEmpty() -> TileEmptyHint("All $count tiles are in use — remove one to add another.")
+                        assigned.isEmpty() -> TileEmptyHint("All $count tiles are in use. Remove one to add another.")
                     }
                 }
             }
@@ -12059,7 +12078,7 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     }
     Spacer(Modifier.height(2.dp))
     Text(
-        "Drag to reorder — the top device is primary, the source of truth the others follow.",
+        "Drag to reorder. The top device is primary, the source of truth the others follow.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -12099,7 +12118,7 @@ private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "A device hasn't synced in a while. If it's still in use, check its File ID matches the one under Diagnostics — otherwise it's on a different file. Reconnect it via Change Drive file → Open from Drive.",
+                "A device hasn't synced in a while. If it's still in use, check its File ID matches the one under Diagnostics. Otherwise it's on a different file. Reconnect it via Change Drive file → Open from Drive.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -12285,7 +12304,7 @@ private fun DriveSyncSetupDialog(
             DriveSyncChoiceRow(
                 icon = Icons.Filled.FileOpen,
                 title = "Open from Drive",
-                subtitle = "Join the file another device already set up — they'll share settings.",
+                subtitle = "Join the file another device already set up, they'll share settings.",
                 emphasized = hasExistingSync,
                 onClick = onOpenFromDrive,
             )
@@ -12300,7 +12319,7 @@ private fun DriveSyncSetupDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        "This creates a NEW, separate file — your devices would end up on different files and stop sharing settings. Only do this to start over.",
+                        "This creates a NEW, separate file: your devices would end up on different files and stop sharing settings. Only do this to start over.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onErrorContainer,
                     )
@@ -12314,7 +12333,7 @@ private fun DriveSyncSetupDialog(
                 DriveSyncChoiceRow(
                     icon = Icons.Filled.CreateNewFolder,
                     title = "Save to Drive",
-                    subtitle = "Start fresh — create a new file with this device's settings.",
+                    subtitle = "Start fresh: create a new file with this device's settings.",
                     onClick = { if (hasExistingSync) warnNewFile = true else onSaveToDrive() },
                 )
             }

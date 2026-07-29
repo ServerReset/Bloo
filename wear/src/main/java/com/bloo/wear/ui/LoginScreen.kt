@@ -118,7 +118,7 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
         if (brand == Brand.KIA) {
             item {
                 InfoCallout(
-                    "Kia sign-in uses a one-time code — sign in on your phone and it syncs to the watch.",
+                    "Kia sign-in uses a one-time code. Sign in on your phone and it syncs to the watch.",
                 )
             }
         } else {

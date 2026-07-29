@@ -479,7 +479,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     // Google account (the watch has no Drive file of its own). Explain
                     // rather than show buttons that can only say "bring your phone near".
                     Text(
-                        "Sync needs your phone. Your watch keeps working on its own — connect your phone to sync settings and Drive backup.",
+                        "Sync needs your phone. Your watch keeps working on its own. Connect your phone to sync settings and Drive backup.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

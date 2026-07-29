@@ -1407,7 +1407,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { }
             _ui.update { it.copy(updateDownloading = false) }
             if (!ok) {
-                _ui.update { it.copy(message = "Download failed — check your connection and try again.") }
+                _ui.update { it.copy(message = "Download failed. Check your connection and try again.") }
                 return@launch
             }
             runCatching {
@@ -1660,7 +1660,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun smartClimate(vin: String) {
         val extras = _ui.value.extras
         val weather = extras.carWeather[vin] ?: extras.homeWeather ?: run {
-            _ui.update { it.copy(message = "No weather data — can't run smart climate") }
+            _ui.update { it.copy(message = "No weather data available for smart climate") }
             return
         }
         val ambientF = com.bloo.bluelink.data.ambientFahrenheit(weather.tempC)
