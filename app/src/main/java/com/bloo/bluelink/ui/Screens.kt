@@ -2544,8 +2544,6 @@ private const val MIN_CARD_DP = 320
  * primitives factor that out so the wrap math lives in exactly one place.
  */
 private const val WRAP_MULTIPLIER = 1000
-/** Max per-page alpha fade at full off-screen offset (floor 0.8). */
-private const val PAGER_FADE = 0.2f
 /** Max per-page scale shrink at full off-screen offset (floor 0.94). */
 private const val PAGER_SHRINK = 0.06f
 
@@ -2589,14 +2587,26 @@ private fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPa
 
 /**
  * The shared per-page depth transform for the horizontal car pagers: a subtle
- * fade + shrink proportional to how far this [page] is from the settled one,
- * read ONLY in the draw phase (via [graphicsLayer]) so a drag never triggers
- * recomposition of the page content. NOT applied to the vertical tile pager,
- * which stays flat by design.
+ * shrink proportional to how far this [page] is from the settled one, read ONLY
+ * in the draw phase (via [graphicsLayer]) so a drag never triggers recomposition
+ * of the page content. NOT applied to the vertical tile pager, which stays flat
+ * by design.
+ *
+ * Scale only — the matching alpha fade this used to apply was removed for a real
+ * frame-rate reason, not a taste one. A graphicsLayer with alpha < 1 over content
+ * that overlaps (a full car page: cards, their drop shadows, the aurora behind
+ * them) makes Compose's default compositing strategy allocate a FULL-SCREEN
+ * offscreen buffer and composite through it every frame. During a drag two pages
+ * are live, so that's two full-screen buffers per frame purely to tint pages 20%
+ * darker in transit. Transforms need no such buffer: scale is applied by the
+ * RenderNode directly. Dropping the fade keeps the depth read and removes the
+ * per-frame allocation entirely. (CompositingStrategy.ModulateAlpha would also
+ * avoid the buffer, but it applies alpha per drawing op, so each pebble's own
+ * drop shadow would show THROUGH the semi-transparent card above it — a grey
+ * wash under every card mid-swipe. Not worth it for a 0.2 fade.)
  */
 private fun Modifier.pagerDepth(pager: PagerState, page: Int): Modifier = graphicsLayer {
     val off = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
-    alpha = 1f - off * PAGER_FADE
     scaleX = 1f - off * PAGER_SHRINK
     scaleY = 1f - off * PAGER_SHRINK
 }
@@ -2685,7 +2695,7 @@ private fun cameraBumpPadding(): PaddingValues {
  *  - Otherwise, the default single-column swipe-between-cars view.
  *
  * State plumbing specific to this screen:
- *  - `pullFractionState`/`dotsAlpha`/`refreshShift` together drive how the
+ *  - `pullFractionState`/`dotsAlphaState`/`refreshShift` together drive how the
  *    floating page-indicator dots and other overlays react live as the user
  *    pulls to refresh -- fading/sliding out of the way during the pull and
  *    springing back once it resolves -- rather than only reacting once
@@ -2742,7 +2752,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     val pullFraction by pullFractionState
     // Hide the page indicator as soon as the pull begins (and through the refresh),
     // so the squiggly indicator has the stage to itself; fade it back in when done.
-    val dotsAlpha by animateFloatAsState(
+    // NOT read via `by` here: this is GarageScreen scope, the car pager's parent.
+    // A composition-scope read meant all ~12 frames of this 200ms fade recomposed
+    // GarageScreen and, through it, every live pager page. Held as State and read
+    // inside graphicsLayer{} at the use sites instead, so the fade is draw-phase
+    // only and never invalidates composition.
+    val dotsAlphaState = animateFloatAsState(
         targetValue = if (state.refreshing || pullFraction > 0.01f) 0f else 1f,
         animationSpec = tween(durationMillis = 200),
         label = "dotsFade",
@@ -2885,7 +2900,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         PagerDots(
                             current = exWrap.currentReal,
                             count = count,
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha),
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
+                                .graphicsLayer { alpha = dotsAlphaState.value },
                             onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
                         )
                     }
@@ -3023,7 +3039,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         PagerDots(
                             current = realBlock(pager.currentPage),
                             count = pageCount,
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp).alpha(dotsAlpha),
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
+                                .graphicsLayer { alpha = dotsAlphaState.value },
                             onRefresh = { vm.refreshStatus(vehicles[state.currentIndex]) },
                         )
                     }
@@ -3441,7 +3458,10 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     // manual refresh) so the loading indicator owns the screen. Shared by both
     // dot rows below (car-switch AND per-car tile) instead of each keeping its
     // own separate Animatable of the exact same value.
-    val dotsAlpha by animateFloatAsState(
+    // Held as State, not read via `by` — see the same treatment in GarageScreen.
+    // Read in composition scope this fade recomposed the whole cover pager (and,
+    // as a plain Float parameter, every CompactCar page) once per animation frame.
+    val dotsAlphaState = animateFloatAsState(
         targetValue = if (state.refreshing) 0f else 1f,
         animationSpec = tween(durationMillis = 250),
         label = "coverDotsFade",
@@ -3468,7 +3488,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                     vibrancy = appearance.vibrancy,
                 ) {
                     CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
-                        CompactCar(v, state, vm, dotsAlpha)
+                        CompactCar(v, state, vm, dotsAlphaState)
                     }
                 }
             }
@@ -3487,7 +3507,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
                     .padding(top = 10.dp)
-                    .alpha(dotsAlpha),
+                    .graphicsLayer { alpha = dotsAlphaState.value },
                 // No hold-to-refresh here -- the cover screen's own edge-trace
                 // gesture (drag down from the top edge) is already the refresh
                 // affordance in this mode; the dots are display-only.
@@ -3520,7 +3540,15 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: Float) {
+private fun CompactCar(
+    v: Vehicle,
+    state: UiState,
+    vm: AppViewModel,
+    // State, not Float: a plain Float parameter changes on every frame of the
+    // dots fade, which made this whole page recompose ~15 times per fade. As
+    // State the value is read draw-phase only (see its graphicsLayer use below).
+    dotsAlphaState: androidx.compose.runtime.State<Float>,
+) {
     val status = state.statusFor(v)
     val isGen5W = remember(v.brand, v.generation) { v.isGen5W }
     // Cover-screen tiles follow the same order the user arranged the pebbles in
@@ -3796,7 +3824,7 @@ private fun CompactCar(v: Vehicle, state: UiState, vm: AppViewModel, dotsAlpha: 
                     // it's a no-op when the cutout doesn't touch the right edge.
                     .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End))
                     .padding(end = 6.dp)
-                    .alpha(dotsAlpha)
+                    .graphicsLayer { alpha = dotsAlphaState.value }
                     .onGloballyPositioned { dotsBounds = it.boundsInParent() },
             )
         }

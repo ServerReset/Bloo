@@ -90,6 +90,26 @@ sealed interface Screen {
     data object Settings : Screen
 }
 
+/**
+ * PERF, and it matters more than it looks: every pebble on every live car-pager
+ * page takes this whole object as a parameter. Kotlin's `List`/`Map`/`Set` are
+ * interfaces, so without this annotation the Compose compiler infers UiState as
+ * UNSTABLE, which makes every one of those composables NON-SKIPPABLE — they
+ * re-execute whenever their parent recomposes, even when the state instance is
+ * bit-for-bit the same one.
+ *
+ * That was the car-swipe lag. GarageScreen (the pager's parent) reads several
+ * per-frame animation values in composition scope (the dots fade, the pull
+ * shift), so a single 200ms fade recomposed GarageScreen ~12 times, and each of
+ * those recomposed all ~30 pebbles across the three pages
+ * beyondViewportPageCount=1 keeps live — for a state object that never changed.
+ *
+ * The promise this annotation makes is real here: every property is a `val`, and
+ * every collection is rebuilt by `copy()` (`_state.update { it.copy(...) }`)
+ * rather than mutated in place, so `equals` is a sound recomposition signal.
+ * Keep it that way — never put a MutableList/mutableStateListOf field here.
+ */
+@androidx.compose.runtime.Immutable
 data class UiState(
     val screen: Screen = Screen.Login,
     /** Biometric app-lock overlay: the real app renders (blurred) behind it. */
