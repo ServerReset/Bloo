@@ -596,6 +596,7 @@ fun BlooApp(vm: AppViewModel) {
                         onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
                     )
                     state.kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = state.loading, vm = vm) }
+                    state.canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = state.loading, vm = vm) }
                 }
                 // Lock is an overlay (see LockOverlay), not a full screen.
                 Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
@@ -1703,7 +1704,8 @@ private val FieldShape = RoundedCornerShape(18.dp)
 private const val STALE_DEVICE_MS = 2L * 24 * 60 * 60 * 1000
 
 /**
- * Sign-in form supporting all three brands from one screen. All fields
+ * Sign-in form supporting every brand (US Hyundai/Genesis/Kia plus the three
+ * Canada brands) from one screen. All fields
  * (email/password/pin/brand) are local `mutableStateOf` -- nothing is
  * persisted until [onLogin] fires, so switching brands mid-entry doesn't
  * lose the typed email/password. Selecting a brand via [MorphSegmented]
@@ -1711,9 +1713,12 @@ private const val STALE_DEVICE_MS = 2L * 24 * 60 * 60 * 1000
  * strings (subtitle, email label, forgot-password URL, sign-in button
  * label) are recomputed from `brand` on every recomposition and each swap
  * cross-fades via [AnimatedContent] rather than snapping instantly.
- * The PIN field is only shown for brands that don't use OTP login
- * (`!brand.usesOtpLogin`); Kia instead gets a one-time-passcode dialog
- * elsewhere ([KiaOtpDialog]) after submitting. `formVisible` flips true one
+ * The PIN field is only shown for brands that need one (`brand.requiresPin`
+ * -- every brand except Kia US); Kia and Canada instead get a one-time-
+ * passcode dialog elsewhere ([KiaOtpDialog]/[CanadaOtpDialog]) after
+ * submitting -- Canada still shows the PIN field first since its commands
+ * are PIN-gated even though sign-in itself goes through OTP. `formVisible`
+ * flips true one
  * frame after first composition purely to trigger the initial slide-up-and-
  * fade-in entrance animation.
  */
@@ -1726,6 +1731,12 @@ private fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    // Region gates which 3 brands the segmented picker below offers, rather
+    // than cramming all 6 US+Canada entries into one row -- Hyundai/Genesis/
+    // Kia Canada run on a completely different backend (see CanadaApi) with
+    // its own sign-in shape, so switching region also resets `brand` to that
+    // region's first entry.
+    var region by remember { mutableStateOf("US") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
     val cfg = LocalConfiguration.current
@@ -1738,11 +1749,14 @@ private fun LoginScreen(
         Brand.HYUNDAI -> "A better Bluelink · US"
         Brand.GENESIS -> "A better Genesis · US"
         Brand.KIA     -> "A better Kia Connect · US"
+        Brand.HYUNDAI_CA -> "A better Bluelink · Canada"
+        Brand.GENESIS_CA -> "A better Genesis Connect · Canada"
+        Brand.KIA_CA -> "A better Kia Connect · Canada"
     }
     val emailLabel = when (brand) {
-        Brand.HYUNDAI -> "Bluelink email"
-        Brand.GENESIS -> "Genesis account email"
-        Brand.KIA     -> "Kia Connect email"
+        Brand.HYUNDAI, Brand.HYUNDAI_CA -> "Bluelink email"
+        Brand.GENESIS, Brand.GENESIS_CA -> "Genesis account email"
+        Brand.KIA, Brand.KIA_CA -> "Kia Connect email"
     }
 
     // Animate the form in from below on first composition.
@@ -1813,12 +1827,31 @@ private fun LoginScreen(
                     )
 
                     Text(
-                        "Sign in with",
+                        "Region",
                         style = MaterialTheme.typography.labelLarge,
                         color = scheme.onSurface,
                     )
                     MorphSegmented(
-                        options = Brand.entries.map { b -> SegmentOption(b.name, b.label, null) },
+                        options = listOf(SegmentOption("US", "United States", null), SegmentOption("CA", "Canada", null)),
+                        selectedKey = region,
+                        onSelect = { key ->
+                            region = key
+                            brand = if (key == "CA") Brand.HYUNDAI_CA else Brand.HYUNDAI
+                        },
+                    )
+
+                    Text(
+                        "Sign in with",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = scheme.onSurface,
+                    )
+                    val brandOptions = if (region == "CA") {
+                        listOf(Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA)
+                    } else {
+                        listOf(Brand.HYUNDAI, Brand.GENESIS, Brand.KIA)
+                    }
+                    MorphSegmented(
+                        options = brandOptions.map { b -> SegmentOption(b.name, b.label.removeSuffix(" (Canada)"), null) },
                         selectedKey = brand.name,
                         onSelect = { key -> brand = Brand.valueOf(key) },
                     )
@@ -1857,9 +1890,11 @@ private fun LoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    // PIN — only for Hyundai/Genesis (Kia uses OTP).
+                    // PIN — every brand except Kia US (Kia's own commands need
+                    // no PIN at all; Canada still needs one for CanadaApi.pinAuth
+                    // even though its sign-in also goes through OTP).
                     AnimatedVisibility(
-                        visible = !brand.usesOtpLogin,
+                        visible = brand.requiresPin,
                         enter = expandVertically(tween(280)) + fadeIn(tween(280)),
                         exit = shrinkVertically(tween(220)) + fadeOut(tween(180)),
                     ) {
@@ -1918,6 +1953,9 @@ private fun LoginScreen(
                                     Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
                                     Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
                                     Brand.KIA     -> "https://owners.kia.com/us/en/kia-owner-portal.html"
+                                    Brand.HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
+                                    Brand.GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
+                                    Brand.KIA_CA -> "https://www.kia.ca/en/owners"
                                 }
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(forgotUrl)))
                             },
@@ -2002,6 +2040,46 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                 }
             }
             MorphTextButton("Cancel", vm::kiaCancelOtp, enabled = !loading, modifier = Modifier.fillMaxWidth())
+        },
+    )
+}
+
+/**
+ * Canada sign-in verification: unlike [KiaOtpDialog] there's no destination to
+ * pick (email only), and the code is already sent by the time this shows
+ * (see AppViewModel.loginCanada), so it goes straight to code entry.
+ */
+@Composable
+private fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewModel) {
+    var code by remember(otp.challenge) { mutableStateOf("") }
+    GlassAlertDialog(
+        onDismissRequest = { if (!loading) vm.canadaCancelOtp() },
+        icon = Icons.Filled.Lock,
+        title = "Enter your code",
+        text = {
+            Text(
+                "We emailed a one-time code" +
+                    (otp.challenge.email?.let { " to $it" } ?: "") + " to verify this sign-in.",
+            )
+            OutlinedTextField(
+                value = code,
+                onValueChange = { code = it },
+                label = { Text("Code") },
+                singleLine = true,
+                shape = FieldShape,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        buttons = {
+            MorphButton(
+                onClick = { vm.canadaVerifyOtp(code) },
+                enabled = !loading && code.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
+            }
+            MorphTextButton("Cancel", vm::canadaCancelOtp, enabled = !loading, modifier = Modifier.fillMaxWidth())
         },
     )
 }
@@ -7582,7 +7660,7 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
                             inApp,
                         )
                     }
-                    Brand.KIA -> Unit
+                    Brand.KIA, Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA -> Unit
                 }
             } else {
                 if (isSamsung) {
@@ -9355,7 +9433,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                         StatusRow("Email", creds.email)
                         SecretRow("Password", creds.password)
                         // Kia US has no service PIN; commands are session-keyed.
-                        if (!creds.brand.usesOtpLogin) {
+                        if (creds.brand.requiresPin) {
                             OutlinedTextField(
                                 value = pin,
                                 onValueChange = { pin = it },
@@ -9368,7 +9446,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (!creds.brand.usesOtpLogin) {
+                            if (creds.brand.requiresPin) {
                                 MorphTextButton(
                                     "Update PIN",
                                     onClick = { vm.updatePin(creds.brand, pin) },

@@ -18,6 +18,8 @@ import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
+import com.bloo.bluelink.data.CanadaAuth
+import com.bloo.bluelink.data.CanadaRepository
 import com.bloo.bluelink.data.KiaAuth
 import com.bloo.bluelink.data.KiaRepository
 import com.bloo.bluelink.data.VehicleRepository
@@ -188,6 +190,8 @@ data class UiState(
     val lockedToLogin: Boolean = false,
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
+    /** Canada sign-in only (Hyundai/Genesis/Kia): a pending one-time-code challenge. */
+    val canadaOtp: CanadaOtpUi? = null,
     val message: String? = null,
     /** "error" (default), "success", or "info" — controls snackbar colour. */
     val messageType: String = "error",
@@ -325,6 +329,14 @@ data class KiaOtpUi(
     val sentTo: String? = null,
 )
 
+/** A pending Canada one-time-code challenge shown over the login form. Unlike
+ *  [KiaOtpUi] there's no destination to choose (Canada is email-only), so the
+ *  code is already sent by the time this appears — see [AppViewModel.loginCanada]. */
+data class CanadaOtpUi(
+    val challenge: CanadaAuth.OtpRequired,
+    val brand: Brand,
+)
+
 /** Minimum time a command control stays locked after firing, to block double-taps. */
 private const val MIN_COMMAND_LOCK_MS = 3000L
 
@@ -343,6 +355,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         repos.getOrPut(brand) { com.bloo.bluelink.data.repositoryFor(brand, store, credentialStore) }
 
     private fun kiaRepo(): KiaRepository = repoFor(Brand.KIA) as KiaRepository
+
+    private fun canadaRepo(brand: Brand): CanadaRepository = repoFor(brand) as CanadaRepository
 
     private fun brandOf(v: Vehicle): Brand =
         Brand.fromIndicator(v.brandIndicator)
@@ -551,12 +565,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * and the garage is (re)loaded to pull in the newly-added account's cars.
      */
     fun login(username: String, password: String, pin: String, brand: Brand) {
-        if (username.isBlank() || password.isBlank() || (pin.isBlank() && !brand.usesOtpLogin)) {
+        if (username.isBlank() || password.isBlank() || (pin.isBlank() && brand.requiresPin)) {
             _state.update { it.copy(message = "Email, password and PIN are all required", messageType = "error") }
             return
         }
         if (brand == Brand.KIA) {
             loginKia(username.trim(), password, pin.trim())
+            return
+        }
+        if (brand.isCanada) {
+            loginCanada(username.trim(), password, pin.trim(), brand)
             return
         }
         launchBusy {
@@ -644,6 +662,71 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
         // Push the Kia session to the watch immediately (Kia can't sign in on-watch,
         // so the watch relies entirely on this push) — same reasoning as login().
+        runCatching { com.bloo.bluelink.wear.WearBridge.publishAuth(getApplication()) }
+        loadGarageInternal()
+    }
+
+    // Canada sign-in (Hyundai/Genesis/Kia) is also a two-step dance, but unlike
+    // Kia US there's no destination choice (email only) and the account's PIN
+    // IS required (every command needs it, see CanadaApi.pinAuth) -- so the PIN
+    // typed into the login form travels straight through the OTP challenge.
+    private var canadaPending: Credentials? = null
+
+    /**
+     * Step 1 of Canada login: attempt sign-in with username/password. Returns
+     * straight in ([CanadaAuth.LoggedIn]) if this device is still within a
+     * prior login's 90-day remembered-device grant, otherwise an email code
+     * challenge ([CanadaAuth.OtpRequired]) -- which is sent immediately (no
+     * destination to pick, unlike Kia), so the UI goes straight to a
+     * code-entry dialog; [canadaVerifyOtp] completes the flow.
+     */
+    private fun loginCanada(username: String, password: String, pin: String, brand: Brand) {
+        launchBusy {
+            when (val auth = canadaRepo(brand).startLogin(username, password, pin)) {
+                is CanadaAuth.LoggedIn -> {
+                    canadaPending = null
+                    finishCanadaLogin(Credentials(username, password, pin, brand))
+                }
+                is CanadaAuth.OtpRequired -> {
+                    canadaPending = Credentials(username, password, pin, brand)
+                    canadaRepo(brand).sendOtp(auth)
+                    AppLog.log("${brand.label} requires a one-time code (email)")
+                    _state.update { it.copy(canadaOtp = CanadaOtpUi(auth, brand)) }
+                }
+            }
+        }
+    }
+
+    /** Verify the Canada one-time code and finish signing in. */
+    fun canadaVerifyOtp(code: String) {
+        val otp = _state.value.canadaOtp ?: return
+        val creds = canadaPending ?: return
+        if (code.isBlank()) {
+            _state.update { it.copy(message = "Enter the code you received", messageType = "error") }
+            return
+        }
+        launchBusy {
+            canadaRepo(otp.brand).verifyOtp(creds.email, creds.pin, code.trim(), otp.challenge)
+            canadaPending = null
+            _state.update { it.copy(canadaOtp = null) }
+            finishCanadaLogin(creds)
+        }
+    }
+
+    /** Back out of the Canada OTP challenge screen: drops the stashed
+     *  credentials (they were never persisted) and clears the challenge UI. */
+    fun canadaCancelOtp() {
+        canadaPending = null
+        _state.update { it.copy(canadaOtp = null) }
+    }
+
+    /** Finish a fully-authenticated Canada login (reached from either the
+     *  direct [CanadaAuth.LoggedIn] branch or after [canadaVerifyOtp]
+     *  succeeds) -- same shape as [finishKiaLogin]. */
+    private suspend fun finishCanadaLogin(creds: Credentials) {
+        credentialStore.save(creds)
+        AppLog.log("Signed in as ${maskEmail(creds.email)} (${creds.brand.label})")
+        _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
         runCatching { com.bloo.bluelink.wear.WearBridge.publishAuth(getApplication()) }
         loadGarageInternal()
     }

@@ -33,9 +33,11 @@ interface VehicleRepository {
  * Build the right repository for a brand. Kia US rides a different backend
  * ([KiaRepository]); Hyundai/Genesis share the Hyundai-shaped [BlueLinkApi].
  */
-fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository =
-    if (brand == Brand.KIA) KiaRepository(KiaUsaApi(), store, credentials)
-    else BlueLinkRepository(BlueLinkApi(brand), store, brand)
+fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository = when {
+    brand == Brand.KIA -> KiaRepository(KiaUsaApi(), store, credentials)
+    brand.isCanada -> CanadaRepository(CanadaApi(brand), store, brand)
+    else -> BlueLinkRepository(BlueLinkApi(brand), store, brand)
+}
 
 /**
  * Coordinates one brand's API client with its persisted session, retrying once
