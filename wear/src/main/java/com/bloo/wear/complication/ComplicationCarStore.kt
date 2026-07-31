@@ -14,19 +14,19 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-// A corruption handler so a file damaged by an interrupted write/power loss
-// resets to empty prefs instead of rethrowing an uncaught exception out of
-// every read — this is read on every complication render ("must not throw").
+// Read on every complication render, so it "must not throw": a file damaged by an
+// interrupted write / power loss resets to empty prefs instead of rethrowing out
+// of every read.
 private val Context.complicationCarStore by preferencesDataStore(
     name = "bloo_complication_cars",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
 /**
- * Maps a watch-face complication INSTANCE (a specific slot on a specific watch
- * face, identified by ComplicationRequest.complicationInstanceId) to the VIN of
- * the car it should display. Keyed by "<dataSource>:<instanceId>" so the three
- * Bloo complications never collide even if a face reuses a numeric slot id.
+ * Maps a watch-face complication INSTANCE (one slot on one watch face, identified
+ * by [androidx.wear.watchface.complications.datasource.ComplicationRequest.complicationInstanceId])
+ * to the VIN of the car it should display. Keyed by "<dataSource>:<instanceId>" so
+ * the three Bloo complications never collide even if a face reuses a numeric slot id.
  */
 class ComplicationCarStore(private val context: Context) {
 
@@ -47,10 +47,12 @@ class ComplicationCarStore(private val context: Context) {
 
 private val complicationCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-/** Drop a complication instance's per-slot car pin. Called from
- *  onComplicationDeactivated so a removed complication doesn't leave a stale
- *  pin that a future slot reusing the same id would inherit. Fire-and-forget on
- *  an IO scope - the DataStore write completes independently of the service. */
+/**
+ * Drop a complication instance's per-slot car pin. Called from
+ * onComplicationDeactivated so a removed complication doesn't leave a stale pin
+ * that a future slot reusing the same id would inherit. Fire-and-forget on an IO
+ * scope — the DataStore write completes independently of the (short-lived) service.
+ */
 fun clearComplicationConfig(context: Context, dataSource: String, instanceId: Int) {
     complicationCleanupScope.launch {
         runCatching { ComplicationCarStore(context.applicationContext).clear(dataSource, instanceId) }
@@ -59,16 +61,16 @@ fun clearComplicationConfig(context: Context, dataSource: String, instanceId: In
 
 /**
  * Resolve the car a complication request should show: the per-instance configured
- * car if set (and still present), else the globally-selected car as a default.
+ * car if set (and still present in the synced snapshot), else the globally-selected
+ * car as a default. Both reads are runCatching-guarded — an uncaught exception out
+ * of onComplicationRequest would crash the data-source process, so a corrupt /
+ * unreadable store degrades to "no data" (null) rather than a crash.
  */
 suspend fun resolveComplicationCar(
     context: Context,
     dataSource: String,
     instanceId: Int,
 ): VehicleSnapshot? {
-    // The DataStore read itself can throw (corrupt/unreadable prefs) — an uncaught
-    // exception out of onComplicationRequest crashes the data-source process, so
-    // degrade to "no data" instead.
     val data = runCatching { SnapshotStore(context).current() }.getOrNull() ?: return null
     val vin = runCatching { ComplicationCarStore(context).vinFor(dataSource, instanceId) }.getOrNull()
     return vin?.let { v -> data.vehicles.firstOrNull { it.vin == v } } ?: data.selected

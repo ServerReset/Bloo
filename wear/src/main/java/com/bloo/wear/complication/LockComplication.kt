@@ -5,8 +5,10 @@ import com.bloo.bluelink.data.WearAction
 import com.bloo.wear.R
 
 /**
- * Watch-face complication for the selected car's lock state. Shows a closed or
- * open padlock reflecting the live state, and toggles lock/unlock on tap.
+ * Watch-face complication for the selected car's lock state. Renders a closed or
+ * open padlock reflecting the live state (SHORT_TEXT or MONOCHROMATIC_IMAGE) and
+ * toggles lock/unlock on tap. All shared behaviour lives in [ToggleStateComplication];
+ * this only supplies what differs.
  */
 class LockComplication : ToggleStateComplication() {
     override val dataSourceName = "LockComplication"

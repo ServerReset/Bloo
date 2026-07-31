@@ -16,15 +16,33 @@ import com.bloo.bluelink.data.WearSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// DataStore requires exactly ONE instance per file for the whole process, so the
-// delegates must live at top level. Holding them inside WearSyncedStore instances
-// crashes with "There are multiple DataStores active for the same file" as soon as
-// a ViewModel collector and a listener-service writer coexist.
+// ─────────────────────────────────────────────────────────────────────────────
+//  Phone-synced mirror
 //
-// Each also gets a corruption handler so a file damaged by an interrupted
-// write/power loss resets to empty prefs instead of rethrowing an uncaught
-// exception out of every read (these back live tiles/complications, which must
-// not throw).
+//  The watch's local, durable copy of the four state blobs the phone pushes over
+//  the Wearable Data Layer: settings, presets, climate and extras. Each is a
+//  single JSON string decoded through the FROZEN :shared WearSync codecs, so the
+//  on-disk representation and the decode/default semantics stay identical to
+//  whatever the phone produced.
+//
+//  Ownership of the two halves of the round-trip:
+//    - WearListenerService.onDataChanged → WearStateWriter.persist*  → save(raw)
+//    - WearViewModel collectors                                      → flow
+//  (WearViewModel also writes presets back via save() after a local edit so the
+//  optimistic change survives a process death before the phone re-pushes.)
+//
+//  DataStore requires exactly ONE delegate per file for the whole process, so
+//  the four delegates live at top level. Holding them inside WearSyncedStore
+//  instances crashes with "There are multiple DataStores active for the same
+//  file" the moment a ViewModel collector and a listener-service writer coexist.
+//
+//  Each delegate gets a corruption handler so a file damaged by an interrupted
+//  write / power loss resets to empty prefs instead of rethrowing an uncaught
+//  exception out of every read — these back live tiles/complications, which must
+//  never throw. A missing/empty payload decodes to the codec's own default
+//  (WearSettingsPayload → null; the rest → their no-arg data class).
+// ─────────────────────────────────────────────────────────────────────────────
+
 private val corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
 private val Context.wearSettingsStore by preferencesDataStore(name = "bloo_wear_settings", corruptionHandler = corruptionHandler)
 private val Context.wearClimateStore by preferencesDataStore(name = "bloo_wear_climate", corruptionHandler = corruptionHandler)
@@ -32,10 +50,15 @@ private val Context.wearPresetsStore by preferencesDataStore(name = "bloo_wear_p
 private val Context.wearExtrasStore by preferencesDataStore(name = "bloo_wear_extras", corruptionHandler = corruptionHandler)
 
 /**
- * Generic single-key DataStore wrapper that replaces the structurally identical
- * WearSettingsStore/WearClimateStore/WearPresetsStore/WearExtrasStore.
+ * Generic single-key DataStore wrapper for one phone-synced blob of type [T].
  *
- * Usage — old call sites continue to compile unchanged:
+ * A single raw JSON string is stored under the "payload" key and decoded on read
+ * via the [decode] function (one of the frozen [WearSync] codecs). This collapses
+ * four structurally identical stores into one type; the [Companion] factories and
+ * the backward-compatible top-level `Wear*Store(ctx)` functions below give each
+ * blob its correctly-typed handle.
+ *
+ * Call sites are unchanged from the original per-class stores:
  *   val store = WearSettingsStore(ctx)
  *   store.flow.collect { ... }
  *   store.save(rawJson)
@@ -46,8 +69,10 @@ class WearSyncedStore<T> private constructor(
 ) {
     private val key = stringPreferencesKey("payload")
 
+    /** Reactive decoded view; emits a fresh [T] on every [save] to this store. */
     val flow: Flow<T> = store.data.map { decode(it[key]) }
 
+    /** Persist the raw JSON [raw] as produced by the phone / a WearSync encoder. */
     suspend fun save(raw: String) {
         store.edit { it[key] = raw }
     }
@@ -60,7 +85,9 @@ class WearSyncedStore<T> private constructor(
     }
 }
 
-/** Backward-compatible factory functions — same signatures as the old classes. */
+// Backward-compatible factory functions — same names and signatures as the old
+// standalone store classes, so every call site keeps compiling unchanged.
+
 @Suppress("FunctionName")
 fun WearSettingsStore(context: Context): WearSyncedStore<WearSettingsPayload?> =
     WearSyncedStore.settings(context)

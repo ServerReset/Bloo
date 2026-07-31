@@ -15,9 +15,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Handles a tap on the Lock / Climate complication: relays the toggle command to
- * the phone (or runs it standalone) via [WearComms], which applies an optimistic
- * snapshot update, then asks the complications to re-read so the icon/label flips
- * to the new state immediately.
+ * the phone (or runs it standalone) via [WearComms.send], which applies an
+ * optimistic snapshot update, then asks the complications to re-read so the
+ * icon/label flips to the new state immediately.
  */
 class ComplicationTapReceiver : BroadcastReceiver() {
 
@@ -31,17 +31,15 @@ class ComplicationTapReceiver : BroadcastReceiver() {
         val pending = goAsync()
         scope.launch {
             try {
-                // goAsync()'s extended process lifetime is roughly 10s and not
-                // guaranteed beyond that. WearComms.send can itself chain up to
-                // 10s on a phone-relay attempt and then, on failure, an
-                // unbounded standalone network call to the car API -- easily
-                // exceeding that budget on a slow/degraded connection, which
-                // used to risk the process being reclaimed before finish() ever
-                // ran (no complication refresh, tap silently appears to do
-                // nothing). Capping the whole attempt keeps this receiver
-                // predictable: finish() always runs within budget, and the
-                // complications still get a best-effort refresh request even
-                // if the underlying command didn't finish in time.
+                // goAsync()'s extended process lifetime is ~10s and not guaranteed
+                // beyond that. WearComms.send can chain up to 10s on a phone-relay
+                // attempt and then, on failure, an unbounded standalone network call
+                // to the car API — easily exceeding that budget on a degraded
+                // connection, which risks the process being reclaimed before
+                // finish() runs (no refresh, tap silently does nothing). Capping the
+                // whole attempt keeps this receiver predictable: finish() always runs
+                // within budget and the complications still get a best-effort refresh
+                // request even if the underlying command didn't finish in time.
                 withTimeoutOrNull(9_000) {
                     runCatching { WearComms.send(ctx, WearCommand(vin, action)) }
                 }
@@ -60,7 +58,7 @@ class ComplicationTapReceiver : BroadcastReceiver() {
         fun pendingIntent(context: Context, vin: String, action: String): PendingIntent {
             val intent = Intent(context, ComplicationTapReceiver::class.java).apply {
                 this.action = ACTION_TAP
-                // Unique per (vin, action) so PendingIntents don't collapse.
+                // Unique per (vin, action) so PendingIntents don't collapse into one.
                 data = Uri.parse("bloo://comp/$vin/$action")
                 putExtra(EXTRA_VIN, vin)
                 putExtra(EXTRA_ACTION, action)

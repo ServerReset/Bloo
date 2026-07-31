@@ -5,9 +5,11 @@ import android.content.Context
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 
 /**
- * Small helper to nudge the watch-face complication to re-read the latest
- * snapshot after a command or sync, so the charge/fuel arc stays fresh without
- * waiting for its periodic update window.
+ * Nudges every Bloo watch-face complication to re-read the latest snapshot after a
+ * command or sync, so the charge arc / lock / climate icon stays fresh without
+ * waiting for its next periodic update window. Each requester call is
+ * runCatching-guarded so an unregistered or unavailable data source never breaks
+ * the others.
  */
 object ComplicationLink {
     fun requestUpdate(context: Context) {

@@ -5,8 +5,10 @@ import com.bloo.bluelink.data.WearAction
 import com.bloo.wear.R
 
 /**
- * Watch-face complication for the selected car's climate state. Shows a snowflake
- * with on/off text reflecting the live state, and starts/stops climate on tap.
+ * Watch-face complication for the selected car's climate state. Renders a snowflake
+ * with on/off text reflecting the live state (SHORT_TEXT or MONOCHROMATIC_IMAGE)
+ * and starts/stops climate on tap. All shared behaviour lives in
+ * [ToggleStateComplication]; this only supplies what differs.
  */
 class ClimateComplication : ToggleStateComplication() {
     override val dataSourceName = "ClimateComplication"

@@ -20,7 +20,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -43,8 +42,9 @@ import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.wear.WearScreen
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
+import kotlinx.coroutines.delay
 
-/** Rotates a hex/ARGB colour's hue by the given degrees; falls back to the colour itself on parse failure. */
+/** Rotate this colour's hue by [degrees]; on any parse failure returns the colour unchanged. */
 private fun Color.hueShifted(degrees: Float): Color {
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(this.toArgb(), hsv)
@@ -53,15 +53,15 @@ private fun Color.hueShifted(degrees: Float): Color {
 }
 
 /**
- * A simplified, watch-scaled counterpart to the phone's aurora background: a
- * diagonal primary→tertiary gradient over the base surface, its blend slowly
- * breathing between the two, instead of the phone's full multi-blob
- * simulation -- cheap enough for the watch's smaller GPU budget while still
- * reading as a living gradient rather than a flat fill.
+ * A watch-scaled counterpart to the phone's aurora background: a diagonal
+ * primary->transparent->tertiary gradient over the base surface, its intensity
+ * slowly breathing, instead of the phone's full multi-blob simulation -- cheap
+ * enough for the watch's smaller GPU/thermal budget while still reading as a
+ * living gradient rather than a flat fill.
  *
- * [colorMode] and [customHex] mirror the phone's three aurora colour sources
- * (complementary / material / custom) so the watch doesn't always look like
- * "material" mode regardless of what's chosen on the phone.
+ * [colorMode] + [customHex] mirror the phone's three aurora colour sources
+ * (complementary / material / custom) so the watch reflects what's chosen on the
+ * phone rather than always looking like "material" mode.
  */
 @Composable
 private fun WearAuroraBackground(
@@ -73,7 +73,9 @@ private fun WearAuroraBackground(
     val themePrimary = colors?.primary?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     val themeTertiary = colors?.tertiary?.let { Color(it) } ?: MaterialTheme.colorScheme.tertiary
     val base = colors?.background?.let { Color(it) } ?: MaterialTheme.colorScheme.background
-    val customColor = customHex?.let { hx -> runCatching { Color(android.graphics.Color.parseColor(hx)) }.getOrNull() }
+    val customColor = customHex?.let { hx ->
+        runCatching { Color(android.graphics.Color.parseColor(hx)) }.getOrNull()
+    }
     val primary = when (colorMode) {
         "custom" -> customColor ?: themePrimary
         "complementary" -> base.hueShifted(180f)
@@ -81,14 +83,16 @@ private fun WearAuroraBackground(
     }
     val tertiary = when (colorMode) {
         "custom" -> customColor?.hueShifted(180f) ?: themeTertiary
-        else -> themeTertiary // complementary only recolours the primary blob, same as the phone
+        // "complementary" only recolours the primary blob, matching the phone.
+        else -> themeTertiary
     }
-    // Hand-ticked at ~12fps instead of Compose's animation clock (which
-    // redraws this full-screen gradient on every display frame, up to
-    // 120x/sec) -- this is the watch's near-always-visible home screen
-    // backdrop, so an unthrottled 60fps+ redraw loop for a slow multi-second
-    // breathing effect is a real, sustained battery/heat cost on hardware
-    // with a much smaller thermal and power budget than the phone's.
+
+    // Hand-ticked at ~12fps instead of riding Compose's animation clock (which
+    // would redraw this full-screen gradient on every display frame, up to
+    // 120x/sec). This is the watch's near-always-visible backdrop, so an
+    // unthrottled 60fps+ redraw loop for a slow multi-second breathe is a real
+    // sustained battery/heat cost on hardware with a far smaller power budget
+    // than the phone's.
     var breathe by remember { mutableFloatStateOf(0.55f) }
     LaunchedEffect(Unit) {
         val start = System.currentTimeMillis()
@@ -100,6 +104,7 @@ private fun WearAuroraBackground(
             delay(80)
         }
     }
+
     Box(
         modifier
             .background(base)
@@ -117,24 +122,25 @@ private fun WearAuroraBackground(
     )
 }
 
-/** A [HapticFeedback] that drops every call -- used to honor the phone's
- *  haptics-off setting without touching the dozens of existing
- *  `LocalHapticFeedback.current` call sites across the watch app. */
+/**
+ * A [HapticFeedback] that drops every call -- honours the phone's haptics-off
+ * setting app-wide without touching the dozens of existing
+ * `LocalHapticFeedback.current` call sites.
+ */
 private object NoOpHapticFeedback : HapticFeedback {
     override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {}
 }
 
 /**
- * The watch app's true root composable. Collects [WearViewModel.ui] as
- * Compose state (so every downstream screen recomposes reactively off a
- * single state holder) and does two cross-cutting things before handing off
- * to the rest of the tree: swaps in a [NoOpHapticFeedback] app-wide when the
- * phone-synced haptics setting is off (see that object's own doc comment for
- * why this is done via [CompositionLocalProvider] rather than per-call-site),
- * and gates the entire app behind [PinLockScreen] whenever
- * `ui.pinLocked` is true -- the lock screen fully replaces
- * [WatchAppContent] rather than overlaying it, so no other screen's
- * composition (and its state) even exists underneath while locked.
+ * The watch app's true root composable. Collects [WearViewModel.ui] as Compose
+ * state (so every downstream screen recomposes reactively off one state holder)
+ * and does two cross-cutting things before handing off:
+ *  1. swaps in [NoOpHapticFeedback] app-wide when the phone-synced haptics
+ *     setting is off (via [CompositionLocalProvider] rather than per-call-site);
+ *  2. gates the entire app behind [PinLockScreen] whenever `ui.pinLocked` is
+ *     true -- the lock screen fully REPLACES [WatchAppContent] rather than
+ *     overlaying it, so no other screen's composition (and state) exists
+ *     underneath while locked.
  */
 @Composable
 fun WatchApp(vm: WearViewModel) {
@@ -155,95 +161,101 @@ fun WatchApp(vm: WearViewModel) {
 
 /**
  * The unlocked app: an optional [WearAuroraBackground] behind a transparent
- * [AppScaffold], which in turn hosts a [SwipeDismissableNavHost] switching on
- * [ui].screen for the top-level Loading/SignedOut/Ready states, plus (once
- * Ready) a nested nav graph between home/settings/login/trips/reorder
- * destinations. The Box wrapping everything is what actually lets the aurora
- * gradient show through: AppScaffold's own background is forced transparent
- * whenever aurora is on so it doesn't paint over the gradient sitting behind
- * it in the same Box.
+ * [AppScaffold], which hosts a [SwipeDismissableNavHost] switching on [ui].screen
+ * for the top-level Loading / SignedOut / Ready states, plus (once Ready) a nested
+ * nav graph across home/settings/login/trips/reorder.
+ *
+ * The Box wrapping everything is what lets the aurora show through: AppScaffold's
+ * own background is forced transparent whenever aurora is on, so it doesn't paint
+ * over the gradient sitting behind it in the same Box.
  */
 @Composable
 private fun WatchAppContent(vm: WearViewModel, ui: WearUi) {
     val auroraOn = ui.settings?.auroraEnabled == true
     Box(Modifier.fillMaxSize()) {
-    if (auroraOn) {
-        WearAuroraBackground(
-            ui.settings?.colors,
-            ui.settings?.auroraColorMode ?: "complementary",
-            ui.settings?.auroraCustomColor,
-            Modifier.fillMaxSize(),
-        )
-    }
-    // Transparent container so the aurora Box behind shows through instead of
-    // AppScaffold's own opaque background fill covering it.
-    AppScaffold(containerColor = if (auroraOn) Color.Transparent else MaterialTheme.colorScheme.background) {
-        when (ui.screen) {
-            WearScreen.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = roundSafeHorizontalPadding(flat = 24.dp, round = 32.dp)),
+        if (auroraOn) {
+            WearAuroraBackground(
+                colors = ui.settings?.colors,
+                colorMode = ui.settings?.auroraColorMode ?: "complementary",
+                customHex = ui.settings?.auroraCustomColor,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        // Transparent container so the aurora Box behind shows through instead of
+        // AppScaffold's opaque background fill covering it.
+        AppScaffold(
+            containerColor = if (auroraOn) Color.Transparent else MaterialTheme.colorScheme.background,
+        ) {
+            when (ui.screen) {
+                WearScreen.Loading -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        // Matches the spinner-caption style Login/Trips use for
-                        // the same "busy" role (was bodySmall here, the one
-                        // mismatch in an otherwise-shared spec).
-                        "Loading…",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Open Bloo on your phone if this takes a while",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    MorphButton(
-                        label = "Sync from phone",
-                        icon = Icons.Filled.Sync,
-                        active = false,
-                        activeColor = MaterialTheme.colorScheme.primary,
-                        pending = false,
-                        onClick = { vm.resync() },
-                        modifier = Modifier.fillMaxWidth(0.8f),
-                    )
-                }
-            }
-
-            WearScreen.SignedOut -> key(ui.accounts.size) { LoginScreen(vm, ui) }
-
-            WearScreen.Ready -> {
-                val nav = rememberSwipeDismissableNavController()
-                SwipeDismissableNavHost(navController = nav, startDestination = "home") {
-                    composable("home") {
-                        HomeScreen(
-                            vm, ui,
-                            onSettings = { nav.navigate("settings") },
-                            onTrips = { vin -> nav.navigate("trips/$vin") },
-                            onReorder = { vin -> nav.navigate("reorder/$vin") },
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = roundSafeHorizontalPadding(flat = 24.dp, round = 32.dp)),
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            // Matches the spinner-caption style Login/Trips use for
+                            // the same "busy" role.
+                            "Loading…",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Open Bloo on your phone if this takes a while",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        MorphButton(
+                            label = "Sync from phone",
+                            icon = Icons.Filled.Sync,
+                            active = false,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            pending = false,
+                            onClick = { vm.resync() },
+                            modifier = Modifier.fillMaxWidth(0.8f),
                         )
                     }
-                    composable("settings") {
-                        SettingsScreen(vm, ui, onAddAccount = { nav.navigate("login") })
-                    }
-                    composable("login") {
-                        LoginScreen(vm, ui)
-                    }
-                    composable("trips/{vin}") { entry ->
-                        TripsScreen(vm, ui, entry.arguments?.getString("vin") ?: "")
-                    }
-                    composable("reorder/{vin}") { entry ->
-                        TileReorderScreen(vm, ui, entry.arguments?.getString("vin") ?: "")
+                }
+
+                WearScreen.SignedOut -> key(ui.accounts.size) { LoginScreen(vm, ui) }
+
+                WearScreen.Ready -> {
+                    val nav = rememberSwipeDismissableNavController()
+                    SwipeDismissableNavHost(navController = nav, startDestination = "home") {
+                        composable("home") {
+                            HomeScreen(
+                                vm, ui,
+                                onSettings = { nav.navigate("settings") },
+                                onTrips = { vin -> nav.navigate("trips/$vin") },
+                                onReorder = { vin -> nav.navigate("reorder/$vin") },
+                            )
+                        }
+                        composable("settings") {
+                            SettingsScreen(vm, ui, onAddAccount = { nav.navigate("login") })
+                        }
+                        composable("login") {
+                            LoginScreen(vm, ui)
+                        }
+                        composable("trips/{vin}") { entry ->
+                            TripsScreen(vm, ui, entry.arguments?.getString("vin") ?: "")
+                        }
+                        composable("reorder/{vin}") { entry ->
+                            TileReorderScreen(vm, ui, entry.arguments?.getString("vin") ?: "")
+                        }
                     }
                 }
             }
         }
-    }
     }
 }
