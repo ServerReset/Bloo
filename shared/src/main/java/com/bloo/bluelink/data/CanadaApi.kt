@@ -272,7 +272,7 @@ class CanadaApi(private val brand: Brand) {
             val req = Request.Builder().url(apiUrl + path)
                 .post(ByteArray(0).toRequestBody(null)).vehicleHeaders(session, v.id).build()
             val statusObj = call(req).path("result", "status") as? JsonObject ?: return@withContext null
-            parseStatus(statusObj)
+            parseStatus(statusObj, v.year)
         }
 
     /** Last-known GPS fix, gated behind the account's service PIN like every
@@ -296,7 +296,7 @@ class CanadaApi(private val brand: Brand) {
      * the same defensive per-field null handling as [KiaUsaApi.parseStatus]
      * for the fields whose shape does differ (evStatus.drvDistance/remainTime2).
      */
-    private fun parseStatus(vs: JsonObject): VehicleStatus {
+    private fun parseStatus(vs: JsonObject, modelYear: Int?): VehicleStatus {
         val ev = vs["evStatus"] as? JsonObject
         val evStatus = if (ev == null) null else EvStatus(
             batteryCharge = ev["batteryCharge"].flag(),
@@ -347,7 +347,16 @@ class CanadaApi(private val brand: Brand) {
             // of an already-km number (reported by a user: Bluelink said 263 km,
             // Bloo showed 423 km -- 263 * 1.609 ≈ 423).
             dte = (vs["dte"] as? JsonObject)?.let { Dte(it["value"].dbl()?.kmToMi(), it["unit"].int()) },
-            airTemp = (vs["airTemp"] as? JsonObject)?.let { TempValue(it["value"]?.str(), it["unit"].int()) },
+            airTemp = (vs["airTemp"] as? JsonObject)?.let {
+                val unit = it["unit"].int()
+                // The CA backend reports the climate setpoint the same hex-"H"
+                // Celsius-index way it ENCODES it (tempToHex, e.g. "0AH"). Decode
+                // it back to a °F numeric string here — every consumer feeds
+                // airTemp.value straight into degLabel(), which treats its input
+                // as °F, so an undecoded "0AH" rendered as garbage "0AH°". Sibling
+                // of the 868 km→mi fix on dte just above.
+                TempValue(hexTempToF(it["value"]?.str(), unit, modelYear), unit)
+            },
             battery = (vs["battery"] as? JsonObject)?.let { Battery12V(batSoc = it["batSoc"].int()) },
             evStatus = evStatus,
             dateTime = vs.path("lastStatusDate").str(),
@@ -458,6 +467,21 @@ class CanadaApi(private val brand: Brand) {
         val clamped = rounded.coerceIn(table.first(), table.last())
         val index = table.indices.minByOrNull { kotlin.math.abs(table[it] - clamped) } ?: 0
         return Integer.toHexString(index).padStart(2, '0').uppercase(Locale.US) + "H"
+    }
+
+    /** Inverse of [tempToHex]: decode the API's hex-"H" Celsius-index setpoint
+     *  (e.g. "0AH") back to a °F numeric string for display. Mirrors KiaUvoApiCA's
+     *  get_hex_temp_into_index guard — only `unit == 0` hex-"H" values are the
+     *  encoded setpoint; anything else (a plain number, "OFF", unit != 0) is
+     *  passed through untouched so [degLabel] handles it. Round-trips with
+     *  tempToHex to within the table's half-degree resolution. */
+    private fun hexTempToF(raw: String?, unit: Int?, modelYear: Int?): String? {
+        if (raw == null) return null
+        if (unit != 0 || !raw.endsWith("H")) return raw
+        val index = raw.dropLast(1).toIntOrNull(16) ?: return raw
+        val table = if ((modelYear ?: TEMP_RANGE_MODEL_YEAR) >= TEMP_RANGE_MODEL_YEAR) TEMP_RANGE_NEW else TEMP_RANGE_OLD
+        val celsius = table.getOrNull(index) ?: return raw
+        return (celsius * 9.0 / 5.0 + 32.0).toString()
     }
 
     /** Shared shape for the no-extra-body PIN-gated commands (lock/unlock/

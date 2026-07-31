@@ -84,4 +84,15 @@ class StatusCache(private val context: Context) {
             )
         }
     }
+
+    /**
+     * Wipes the cache entirely. Called on full sign-out: the last-known car GPS,
+     * lock/charge state, and reverse-geocoded place names are account-derived
+     * telemetry that must not survive logout (they persist as plaintext JSON and
+     * are re-loaded into the UI on the next cold start otherwise). Removing the key
+     * makes the next [load] fall back to an all-empty [CachePayload].
+     */
+    suspend fun clear() {
+        context.statusCacheStore.edit { it.remove(key) }
+    }
 }

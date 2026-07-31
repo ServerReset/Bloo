@@ -1236,7 +1236,10 @@ class SettingsStore(private val context: Context) {
         val remoteContent = runCatching {
             withDriveRetry {
                 kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                    context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                    // .use{} closes the InputStream (and its ParcelFileDescriptor);
+                    // readText() alone does NOT close, leaking an FD to the Drive
+                    // SAF provider on every sync pass. Still evaluates to String?.
+                    context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
                 }
             }
         }.onFailure {
@@ -1357,7 +1360,7 @@ class SettingsStore(private val context: Context) {
                         // which previously would have reported success, advanced
                         // lastSyncMs, and cleared the dirty set for data that was never
                         // actually saved.
-                        val verify = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                        val verify = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
                         if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
                     }
                 }
@@ -1465,7 +1468,7 @@ class SettingsStore(private val context: Context) {
             val current = runCatching {
                 withDriveRetry {
                     kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                        context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                        context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
                     }
                 }
             }.getOrElse { e ->
@@ -1482,7 +1485,7 @@ class SettingsStore(private val context: Context) {
                     kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
                         context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(payload.toByteArray()) }
                             ?: error("couldn't open for writing")
-                        val readBack = context.contentResolver.openInputStream(parsed)?.bufferedReader()?.readText()
+                        val readBack = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
                         readBack == payload
                     }
                 }

@@ -759,6 +759,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             AppLog.log("Signed out of ${brand.label}")
             val remaining = credentialStore.loadAll()
             if (remaining.isEmpty()) {
+                // Wipe account-derived telemetry from disk on full sign-out: the
+                // last-known car GPS/lock/charge state and reverse-geocoded place
+                // names persist as plaintext JSON and would otherwise re-load into
+                // the UI (and keep the widget/tiles rendering the last location) on
+                // the next cold start. Session tokens + credentials are already
+                // cleared above; this closes the derived-location leak. Mirrors the
+                // watch's own signOutAll (snapshotStore.saveVehicles(emptyList())).
+                runCatching { statusCache.clear() }
+                runCatching { snapshotStore.saveVehicles(emptyList()) }
+                // Push the emptied snapshot to the home-screen widget so it stops
+                // showing the stale car/location instead of waiting for its next
+                // scheduled update.
+                runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
+                runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication()) }
                 // Preserve device-capability probe results across the full state
                 // reset -- they're device capabilities, not account state, and were
                 // only probed once in init. Dropping them hid the AI/Shizuku UI on a
@@ -2098,7 +2112,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // and since the vin's presence in the map is what gates a re-fetch
             // above, one bad network blip permanently stuck this car at "no
             // trips" for the rest of the session with no way to retry.
-            val fetched = runCatching { repoFor(v).trips(v) }
+            // Serialize with every other repo call via the account-wide statusMutex:
+            // Blue Link rejects overlapping requests ("a previous request is pending"),
+            // and an unlocked trips() call could also race a concurrent 401 refresh
+            // using the same stale refresh token. Every other repo.* path takes this
+            // lock (loadStatus/runCommand/loadGarage + the watch's own loadTrips); this
+            // was the lone gap. Only the network call is inside the lock — the filter
+            // and result handling stay outside, matching loadStatus's minimal scope.
+            val fetched = runCatching { statusMutex.withLock { repoFor(v).trips(v) } }
                 .onFailure { e -> AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}") }
                 .getOrNull()
                 ?.filter { it.distance != null && it.distance!! > 0 }
@@ -2405,6 +2426,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val startedAt = System.currentTimeMillis()
             _state.update { it.copy(pending = it.pending + key, message = null) }
+            // Snapshot the pre-command status so a failed command can be reverted
+            // LOCALLY (no network) — see the catch block. Without this, a command
+            // that fails offline left the optimistic value ("Locked") persisted to
+            // the widget/QS-tile/watch with no way back except a successful poll.
+            val prior = _state.value.statuses[vin]
             // Apply the optimistic state and persist it immediately so the widget
             // reflects the expected outcome before the network round-trip completes.
             if (optimistic != null) {
@@ -2438,7 +2464,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val msg = e.message ?: "Command failed"
                 AppLog.log("⚠ $msg")
                 _state.update { it.copy(message = msg, messageType = "error") }
-                // Revert the optimistic state on failure by scheduling a fresh refresh.
+                // Revert the optimistic flip LOCALLY first, then re-persist, so every
+                // surface (app + widget + QS tile + watch) returns to last-known-good
+                // immediately — without depending on a network refresh that will
+                // usually fail for the same reason the command did. Guarded on
+                // `prior != null` (a null prior means nothing was flipped, since the
+                // optimistic patch only applies when statuses[vin] != null; leave state
+                // untouched rather than dropping a status a concurrent poll just added).
+                if (optimistic != null && prior != null) {
+                    _state.update { st -> st.copy(statuses = st.statuses + (vin to prior)) }
+                    persistSnapshots()
+                }
+                // Still schedule a refresh as follow-up reconciliation: `prior` may be
+                // slightly stale vs live data, but if the refresh also fails/returns
+                // null every surface now sits at last-known-good, not the wrong value.
                 viewModelScope.launch {
                     _state.value.vehicles.firstOrNull { it.vin == vin }?.let { refreshStatus(it) }
                 }
