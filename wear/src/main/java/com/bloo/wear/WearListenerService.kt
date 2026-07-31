@@ -18,8 +18,8 @@ import kotlinx.coroutines.launch
  *
  * FROZEN: the class name `WearListenerService` and its package are referenced by
  * name from AndroidManifest.xml (the `<service>` bound to DATA_CHANGED +
- * MESSAGE_RECEIVED on `wear://* /bloo`). Renaming it silently breaks every
- * phone-to-watch push. Do not rename.
+ * MESSAGE_RECEIVED for scheme `wear`, host `*`, pathPrefix `/bloo`). Renaming it
+ * silently breaks every phone-to-watch push. Do not rename.
  *
  * ## What it does
  * Android instantiates (or wakes) this service whenever the phone-side app
