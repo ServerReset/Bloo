@@ -305,7 +305,7 @@ class CanadaApi(private val brand: Brand) {
             drvDistance = run {
                 val range = vs.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
                     ?: vs.path("drvDistance", "0", "rangeByFuel", "evModeRange")
-                range?.path("value").dbl()
+                range?.path("value").dbl()?.kmToMi()
                     ?.let { listOf(DrvDistance(RangeByFuel(Dte(it, range.path("unit").int())))) }
                     ?: emptyList()
             },
@@ -338,7 +338,15 @@ class CanadaApi(private val brand: Brand) {
                     tirePressureLampRR = it["tirePressureLampRR"].int(),
                 )
             },
-            dte = (vs["dte"] as? JsonObject)?.let { Dte(it["value"].dbl(), it["unit"].int()) },
+            // Canada reports distance in km (the CA app has no imperial option),
+            // but the rest of Bloo treats every Dte/RangeByFuel value as miles
+            // internally, converting to km only at display time based on the
+            // user's own unit preference (see formatDistance) -- so this needs
+            // to be normalized to miles right here at the parse boundary, or a
+            // metric-mode user sees the km figure re-multiplied by 1.609 on top
+            // of an already-km number (reported by a user: Bluelink said 263 km,
+            // Bloo showed 423 km -- 263 * 1.609 ≈ 423).
+            dte = (vs["dte"] as? JsonObject)?.let { Dte(it["value"].dbl()?.kmToMi(), it["unit"].int()) },
             airTemp = (vs["airTemp"] as? JsonObject)?.let { TempValue(it["value"]?.str(), it["unit"].int()) },
             battery = (vs["battery"] as? JsonObject)?.let { Battery12V(batSoc = it["batSoc"].int()) },
             evStatus = evStatus,
@@ -511,6 +519,13 @@ class CanadaApi(private val brand: Brand) {
     private fun JsonElement?.dbl(): Double? = (this as? JsonPrimitive)?.doubleOrNull
     private fun JsonElement?.flag(): Boolean? =
         (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
+
+    /** Canada's status payload reports distance in km; Bloo's shared models
+     *  (Dte/RangeByFuel) store distance as miles everywhere else, converting
+     *  to km only at display time per the user's own unit setting (see
+     *  FormatUtils.formatDistance) -- so every raw distance value coming out
+     *  of this API needs to be normalized to miles right here. */
+    private fun Double.kmToMi(): Double = this * 0.621371
 
     private fun JsonElement?.path(vararg keys: String): JsonElement? {
         var cur: JsonElement? = this
