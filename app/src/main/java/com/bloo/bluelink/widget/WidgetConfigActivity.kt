@@ -9,7 +9,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,12 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,7 +26,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +35,8 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.ui.BlooTheme
+import com.bloo.bluelink.ui.MorphButton
+import com.bloo.bluelink.ui.MorphChip
 import kotlinx.coroutines.launch
 
 /**
@@ -200,7 +197,7 @@ private fun ConfigScreen(
             }
 
             Spacer(Modifier.height(28.dp))
-            Button(
+            MorphButton(
                 onClick = {
                     onSave(
                         WidgetConfig(
@@ -215,7 +212,8 @@ private fun ConfigScreen(
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Add widget") }
+            ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
@@ -230,22 +228,27 @@ private fun ConfigScreen(
     Spacer(Modifier.height(6.dp))
 }
 
+// The app's own selectable-pill idiom (MorphChip, same as every other picker in
+// Settings/onboarding/login) laid out in a wrapping flow -- was plain Material3
+// FilterChip, which reads as generic stock Android chrome next to the rest of
+// the app's morphing-corner, spring-animated controls.
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable private fun ChipFlow(content: @Composable () -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) { content() }
 }
 
 @Composable private fun SelectChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(selected = selected, onClick = onClick, label = { Text(label) })
+    MorphChip(selected = selected, onClick = onClick, label = label)
 }
 
 @Composable private fun ToggleChip(label: String, selected: Boolean, onChange: (Boolean) -> Unit) {
-    FilterChip(selected = selected, onClick = { onChange(!selected) }, label = { Text(label) })
+    MorphChip(selected = selected, onClick = { onChange(!selected) }, label = label)
 }
 
+/** A boolean setting as a full-width [MorphChip] toggle -- the same idiom the
+ *  app already uses for every other on/off setting (see e.g. Settings'
+ *  "Require unlock for actions" row), rather than a bespoke label+Switch row
+ *  that would be the one boolean control in the app not built this way. */
 @Composable private fun ToggleLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
+    MorphChip(selected = checked, onClick = { onChange(!checked) }, label = label, modifier = Modifier.fillMaxWidth())
 }

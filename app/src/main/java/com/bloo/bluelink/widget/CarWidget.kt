@@ -415,8 +415,17 @@ class CarWidget : GlanceAppWidget() {
     /** The configured action buttons, capped to [max] for the current size. */
     @Composable
     private fun ActionButtons(car: VehicleSnapshot, render: Render, max: Int) {
+        // Kia's US API (and the Canada backend) has no flash/horn endpoint --
+        // com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator) is the
+        // same lookup Vehicle.supportsHornLights uses on the phone. Without this,
+        // a Kia user who'd configured Flash/Horn got a button that silently did
+        // nothing on every tap (WearCommandRunner routes it to KiaRepository's
+        // default no-op flashLights/hornAndLights).
+        val hornLightsSupported = com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator)
+            .let { it != com.bloo.bluelink.data.Brand.KIA && !it.isCanada }
         val actions = render.config.actions.mapNotNull { WidgetAction.fromKey(it) }
             .filter { it != WidgetAction.CHARGE || car.hasBattery } // hide Charge on non-EV
+            .filter { (it != WidgetAction.FLASH && it != WidgetAction.HORN) || hornLightsSupported }
             .take(max)
         if (actions.isEmpty()) return
         Row(modifier = GlanceModifier.fillMaxWidth()) {
@@ -575,7 +584,7 @@ class CarWidget : GlanceAppWidget() {
         WidgetAction.CLIMATE -> R.drawable.ic_shortcut_climate
         WidgetAction.CHARGE -> R.drawable.ic_widget_charge
         WidgetAction.FLASH -> R.drawable.ic_widget_flash
-        WidgetAction.HORN -> R.drawable.ic_widget_flash
+        WidgetAction.HORN -> R.drawable.ic_widget_horn
         WidgetAction.REFRESH -> R.drawable.ic_widget_refresh
         WidgetAction.OPEN -> R.drawable.ic_shortcut_car
     }
