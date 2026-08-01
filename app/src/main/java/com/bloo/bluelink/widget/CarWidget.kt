@@ -209,13 +209,13 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun MicroLayout(car: VehicleSnapshot, render: Render) {
-        // A single glance: the ring if this car has a battery + ring is on, else a
-        // lock glyph. Whole tile opens the app.
+        // A single glance: the fuel/charge ring if there's a percent to show and
+        // the ring is on, else a lock glyph. Whole tile opens the app.
         Box(
             modifier = GlanceModifier.fillMaxSize().clickable(openAction(LocalContext.current)),
             contentAlignment = Alignment.Center,
         ) {
-            if (car.hasBattery && render.config.showRing && car.percent != null) {
+            if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = 64)
             } else {
                 StatusGlyph(car, render.theme, sizeDp = 40)
@@ -226,7 +226,7 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun CompactWideLayout(car: VehicleSnapshot, render: Render) {
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (car.hasBattery && render.config.showRing && car.percent != null) {
+            if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = 56)
                 Spacer(GlanceModifier.width(10.dp))
             }
@@ -244,7 +244,7 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(car.name, style = titleStyle(render.theme), maxLines = 1)
             Spacer(GlanceModifier.height(6.dp))
-            if (car.hasBattery && render.config.showRing && car.percent != null) {
+            if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = 72)
                 Spacer(GlanceModifier.height(6.dp))
             }
@@ -260,7 +260,7 @@ class CarWidget : GlanceAppWidget() {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
             Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                if (car.hasBattery && render.config.showRing && car.percent != null) {
+                if (render.config.showRing && car.percent != null) {
                     RingImage(car, render, edgeDp = 76)
                     Spacer(GlanceModifier.width(12.dp))
                 }
@@ -284,7 +284,7 @@ class CarWidget : GlanceAppWidget() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (car.hasBattery && render.config.showRing && car.percent != null) {
+                    if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = 96)
                     } else {
                         StatusGlyph(car, render.theme, sizeDp = 56)
@@ -313,7 +313,7 @@ class CarWidget : GlanceAppWidget() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (car.hasBattery && render.config.showRing && car.percent != null) {
+                    if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = 140)
                     } else {
                         StatusGlyph(car, render.theme, sizeDp = 88)
@@ -555,7 +555,7 @@ class CarWidget : GlanceAppWidget() {
         // Kotlin won't smart-cast across a module boundary — a local copy is smart-castable.
         val range = car.rangeMi
         return when {
-            car.hasBattery && car.percent != null -> "${car.percent}%" +
+            car.percent != null -> "${car.percent}%" +
                 (range?.let { " · ${formatDistance(it.toDouble(), render.metric)}" } ?: "")
             range != null -> formatDistance(range.toDouble(), render.metric)
             else -> car.model
