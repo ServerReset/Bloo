@@ -202,8 +202,13 @@ private fun ConfigScreen(
                     onSave(
                         WidgetConfig(
                             vin = vin,
-                            actions = actions.toList(),
-                            infoFields = infoFields.toList(),
+                            // Sorted to the chips' own canonical order (the order they're
+                            // laid out above), not the order they happened to be toggled
+                            // on in -- otherwise the widget's actual button/stat order
+                            // depended on click history instead of matching what this
+                            // screen visually showed while picking them.
+                            actions = actions.sortedBy { key -> WidgetAction.fromKey(key)?.ordinal ?: Int.MAX_VALUE },
+                            infoFields = infoFields.sortedBy { key -> WidgetInfoField.fromKey(key)?.ordinal ?: Int.MAX_VALUE },
                             showRing = showRing,
                             showMap = showMap,
                             accent = accent,
