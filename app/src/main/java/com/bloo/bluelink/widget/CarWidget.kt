@@ -520,7 +520,11 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = size.width * 0.32f, modifier = GlanceModifier.defaultWeight(),
             )
             Spacer(GlanceModifier.width(6.dp))
-            ActionButtons(car, render, max = 2, modifier = GlanceModifier.defaultWeight())
+            // This row splits its remaining width ~evenly between the name
+            // and the buttons -- an explicit estimate here (rather than the
+            // default "whole tile width") so the auto-vertical-stack check
+            // isn't fooled into thinking there's twice the room there is.
+            ActionButtons(car, render, max = 2, modifier = GlanceModifier.defaultWeight(), availableWidth = size.width * 0.32f)
         }
     }
 
@@ -562,7 +566,7 @@ class CarWidget : GlanceAppWidget() {
                 PrimaryInfoLine(car, render)
             }
             Spacer(GlanceModifier.width(8.dp))
-            ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight())
+            ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight(), availableWidth = size.width * 0.32f)
         }
     }
 
@@ -638,12 +642,18 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                if (render.config.showRing && car.percent != null) {
-                    RingImage(car, render, edgeDp = ringEdge.value.toInt())
-                    Spacer(GlanceModifier.width(12.dp))
-                }
-                Column(modifier = GlanceModifier.defaultWeight()) {
+            if (render.config.showRing && car.percent != null) {
+                // RingWithContent auto-stacks vertically instead of
+                // squeezing ring+info into a cramped row if the tile's
+                // actual measured width can't fit them side by side.
+                RingWithContent(
+                    modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                    minRowWidth = 140.dp,
+                    ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
+                    content = { InfoStack(car, render, max = 3) },
+                )
+            } else {
+                Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
                     InfoStack(car, render, max = 3)
                 }
             }
@@ -656,21 +666,27 @@ class CarWidget : GlanceAppWidget() {
     private fun MediumWideLayout(car: VehicleSnapshot, render: Render) {
         // Wide MEDIUM: put the ring beside the header/info/buttons stack
         // instead of above it, so a wide-but-short tile spends its extra
-        // width on layout instead of leaving it empty beside a centered ring.
+        // width on layout instead of leaving it empty beside a centered
+        // ring -- RingWithContent falls back to stacking if that width
+        // doesn't actually pan out.
         val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.height * 0.7f).coerceAtLeast(36.dp))
-        Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
-                Spacer(GlanceModifier.width(12.dp))
-            }
-            Column(modifier = GlanceModifier.defaultWeight()) {
-                HeaderRow(car, render)
-                Spacer(GlanceModifier.height(6.dp))
-                InfoStack(car, render, max = 3)
-                Spacer(GlanceModifier.height(6.dp))
-                ActionButtons(car, render, max = 4)
-            }
+        val content: @Composable () -> Unit = {
+            HeaderRow(car, render)
+            Spacer(GlanceModifier.height(6.dp))
+            InfoStack(car, render, max = 3)
+            Spacer(GlanceModifier.height(6.dp))
+            ActionButtons(car, render, max = 4)
+        }
+        if (render.config.showRing && car.percent != null) {
+            RingWithContent(
+                modifier = GlanceModifier.fillMaxSize(),
+                minRowWidth = 170.dp,
+                ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
+                content = content,
+            )
+        } else {
+            Column(modifier = GlanceModifier.fillMaxSize()) { content() }
         }
     }
 
@@ -708,24 +724,21 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                Column(
-                    modifier = GlanceModifier.defaultWeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            RingWithContent(
+                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                minRowWidth = 220.dp,
+                ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     } else {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
-                }
-                Spacer(GlanceModifier.width(12.dp))
-                Column(modifier = GlanceModifier.defaultWeight()) {
+                },
+                content = {
                     InfoStack(car, render, max = Scale.infoCap(size, 4))
                     MapModule(render)
-                }
-            }
+                },
+            )
             Spacer(GlanceModifier.height(10.dp))
             ActionButtons(car, render, max = 5)
             FooterRow(car, render)
@@ -744,19 +757,18 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+            RingWithContent(
+                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                minRowWidth = 220.dp,
+                ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     } else {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
-                }
-                Spacer(GlanceModifier.width(12.dp))
-                Column(modifier = GlanceModifier.defaultWeight()) {
-                    InfoStack(car, render, max = Scale.infoCap(size, 4))
-                }
-            }
+                },
+                content = { InfoStack(car, render, max = Scale.infoCap(size, 4)) },
+            )
             MapModule(render)
             Spacer(GlanceModifier.height(10.dp))
             ActionButtons(car, render, max = 5)
@@ -796,26 +808,23 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                Column(
-                    modifier = GlanceModifier.defaultWeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            RingWithContent(
+                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                minRowWidth = 260.dp,
+                ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     } else {
-                        StatusGlyph(car, render.theme, sizeDp = 88)
+                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                     Spacer(GlanceModifier.height(8.dp))
                     FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = size.width * 0.4f, horizontalAlignment = Alignment.CenterHorizontally)
-                }
-                Spacer(GlanceModifier.width(16.dp))
-                Column(modifier = GlanceModifier.defaultWeight()) {
+                },
+                content = {
                     InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size))
                     MapModule(render)
-                }
-            }
+                },
+            )
             Spacer(GlanceModifier.height(14.dp))
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
@@ -862,19 +871,18 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(12.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+            RingWithContent(
+                modifier = GlanceModifier.fillMaxWidth(),
+                minRowWidth = 260.dp,
+                ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     } else {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
-                }
-                Spacer(GlanceModifier.width(14.dp))
-                Column(modifier = GlanceModifier.defaultWeight()) {
-                    InfoStack(car, render, max = Scale.infoCap(size, 4))
-                }
-            }
+                },
+                content = { InfoStack(car, render, max = Scale.infoCap(size, 4)) },
+            )
             Spacer(GlanceModifier.height(12.dp))
             MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
@@ -1101,10 +1109,23 @@ class CarWidget : GlanceAppWidget() {
     private fun ActionButtons(
         car: VehicleSnapshot, render: Render, max: Int,
         vertical: Boolean = false, modifier: GlanceModifier = GlanceModifier.fillMaxWidth(),
+        // How much width this row actually has to work with -- defaults to
+        // the whole tile, but a caller where ActionButtons is a weighted
+        // sibling (sharing a Row with a ring/text column) knows its own
+        // slice is narrower than that and should say so.
+        availableWidth: Dp = LocalSize.current.width,
     ) {
         val actions = resolvedActions(car, render, max)
         if (actions.isEmpty()) return
-        if (vertical) {
+        // Auto-escalate to a vertical stack once a horizontal row genuinely
+        // wouldn't leave each button a legible tap target -- a caller can
+        // still ask for vertical outright for its own layout reasons (the
+        // tall compact tiers), but this catches the case a caller asked for
+        // a row and the actual measured width can't support it, instead of
+        // silently squeezing buttons illegibly thin.
+        val minButtonWidth = 40.dp
+        val stack = vertical || (availableWidth / actions.size) < minButtonWidth
+        if (stack) {
             Column(modifier = modifier) {
                 actions.forEachIndexed { i, action ->
                     if (i > 0) Spacer(GlanceModifier.height(6.dp))
@@ -1117,6 +1138,39 @@ class CarWidget : GlanceAppWidget() {
                     if (i > 0) Spacer(GlanceModifier.width(6.dp))
                     ActionButton(action, car, render, modifier = GlanceModifier.defaultWeight())
                 }
+            }
+        }
+    }
+
+    /**
+     * A status ring/glyph beside a block of other content when there's
+     * width to spare, or the ring stacked on top of that content when
+     * there isn't -- the shared "should this go vertical instead" decision
+     * for every tier that pairs the ring with something else (an info
+     * stack, a header + buttons column, ...), so it's one reusable building
+     * block instead of a hand-picked Row hard-coded per tier. [minRowWidth]
+     * is how much width THIS specific pairing needs to read comfortably
+     * side by side; below it, a vertical stack keeps both pieces legible
+     * instead of squeezing them into a cramped row.
+     */
+    @Composable
+    private fun RingWithContent(
+        modifier: GlanceModifier,
+        minRowWidth: Dp,
+        ring: @Composable () -> Unit,
+        content: @Composable () -> Unit,
+    ) {
+        if (LocalSize.current.width >= minRowWidth) {
+            Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) { ring() }
+                Spacer(GlanceModifier.width(12.dp))
+                Column(modifier = GlanceModifier.defaultWeight()) { content() }
+            }
+        } else {
+            Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+                ring()
+                Spacer(GlanceModifier.height(8.dp))
+                content()
             }
         }
     }
