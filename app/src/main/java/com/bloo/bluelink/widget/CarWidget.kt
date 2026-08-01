@@ -161,17 +161,18 @@ class CarWidget : GlanceAppWidget() {
 
     /**
      * The layout tiers, smallest to largest, each with its own composable --
-     * 14 in total, most of them (the 6 below MEDIUM) further doubled by
+     * 15 in total, most of them (the 7 below MEDIUM) further doubled by
      * [WidgetConfig.priority] into a genuinely distinct info-vs-controls
      * layout, so a widget dropped small has real variety to grow into rather
      * than one shape stretched to fit every size. Every tier reuses the same
      * shared modules (HeaderRow, RingImage, InfoStack, ActionButtons, ...) --
      * what changes tier to tier is composition and proportion, not
-     * reinvented logic, which is what keeps 14 layouts maintainable as one
-     * set of building blocks instead of 14 independent implementations.
+     * reinvented logic, which is what keeps 15 layouts maintainable as one
+     * set of building blocks instead of 15 independent implementations.
      */
     private enum class Tier {
         MICRO_TINY, MICRO,
+        COMPACT_SQUARE,
         COMPACT_WIDE_NARROW, COMPACT_WIDE,
         COMPACT_TALL_NARROW, COMPACT_TALL,
         MEDIUM_SQUARE, MEDIUM_WIDE, MEDIUM_TALL,
@@ -229,6 +230,17 @@ class CarWidget : GlanceAppWidget() {
 
         fun buttonHeight(size: DpSize): Dp = lerp(progress(size), 32f, 48f).dp
         fun buttonIcon(size: DpSize): Dp = lerp(progress(size), 16f, 26f).dp
+
+        /** The car-switcher [IconPill]'s own size -- was a fixed 36dp/20dp
+         *  regardless of tile size, which looked oversized pinned in a small
+         *  HeaderRow and undersized in a big one. */
+        fun pillSize(size: DpSize): Dp = lerp(progress(size), 26f, 40f).dp
+        fun pillIcon(size: DpSize): Dp = lerp(progress(size), 14f, 22f).dp
+
+        /** [MapModule]'s thumbnail height -- was a fixed per-tier constant
+         *  (72/80/88/96dp) chosen ad hoc per layout; one continuous curve
+         *  keeps it proportioned the same way everything else here is. */
+        fun mapHeight(size: DpSize): Dp = lerp(progress(size), 56f, 110f).dp
     }
 
     private fun tierFor(size: DpSize): Tier {
@@ -257,6 +269,12 @@ class CarWidget : GlanceAppWidget() {
             }
             w >= 150f && h < 150f && w >= h * 1.6f -> if (w >= 220f) Tier.COMPACT_WIDE else Tier.COMPACT_WIDE_NARROW
             h >= 150f && w < 150f && h >= w * 1.4f -> if (h >= 220f) Tier.COMPACT_TALL else Tier.COMPACT_TALL_NARROW
+            // Fills the real gap between MICRO (glyph-only, no name -- meant
+            // for tiles with barely more than the 40dp manifest floor) and
+            // MEDIUM's own 150dp floor: a near-square widget already roomier
+            // than that (90dp+) has space for a proper mini layout, not just
+            // an icon.
+            short >= 90f && aspect in 0.8f..1.25f -> Tier.COMPACT_SQUARE
             else -> if (short < 60f) Tier.MICRO_TINY else Tier.MICRO
         }
     }
@@ -307,6 +325,7 @@ class CarWidget : GlanceAppWidget() {
                 when (tierFor(size)) {
                     Tier.MICRO_TINY -> MicroTinyLayout(car, effective)
                     Tier.MICRO -> MicroLayout(car, effective)
+                    Tier.COMPACT_SQUARE -> CompactSquareLayout(car, effective)
                     Tier.COMPACT_WIDE_NARROW -> CompactWideNarrowLayout(car, effective)
                     Tier.COMPACT_WIDE -> CompactWideLayout(car, effective)
                     Tier.COMPACT_TALL_NARROW -> CompactTallNarrowLayout(car, effective)
@@ -408,6 +427,47 @@ class CarWidget : GlanceAppWidget() {
                     maxWidth = (size.width - 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun CompactSquareLayout(car: VehicleSnapshot, render: Render) {
+        // Controls priority here gets a real 2x2 grid instead of a single
+        // row/column -- there's enough room on a near-square 90dp+ tile for
+        // four properly-sized buttons arranged like a mini keypad, a shape
+        // none of the other controls-priority layouts use.
+        if (controlsPriority(render)) {
+            val actions = resolvedActions(car, render, max = 4)
+            if (actions.isNotEmpty()) {
+                Column(modifier = GlanceModifier.fillMaxSize().padding(4.dp)) {
+                    actions.chunked(2).forEachIndexed { i, row ->
+                        if (i > 0) Spacer(GlanceModifier.height(4.dp))
+                        Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+                            row.forEachIndexed { j, action ->
+                                if (j > 0) Spacer(GlanceModifier.width(4.dp))
+                                ActionButton(action, car, render, modifier = GlanceModifier.defaultWeight())
+                            }
+                        }
+                    }
+                }
+                return
+            }
+        }
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height * 0.55f).coerceAtLeast(28.dp))
+        Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            FitText(
+                car.name, titleStyle(render.theme),
+                maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
+            )
+            Spacer(GlanceModifier.height(4.dp))
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+            } else {
+                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+            }
+            Spacer(GlanceModifier.height(4.dp))
+            InfoStack(car, render, max = 1)
         }
     }
 
@@ -638,7 +698,7 @@ class CarWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.width(12.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
                     InfoStack(car, render, max = 4)
-                    MapModule(render, heightDp = 72)
+                    MapModule(render)
                 }
             }
             Spacer(GlanceModifier.height(10.dp))
@@ -664,7 +724,7 @@ class CarWidget : GlanceAppWidget() {
             }
             Spacer(GlanceModifier.height(10.dp))
             InfoStack(car, render, max = 4)
-            MapModule(render, heightDp = 80)
+            MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 5)
             FooterRow(car, render)
@@ -696,7 +756,7 @@ class CarWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.width(16.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
                     InfoStack(car, render, max = WidgetInfoField.ALL.size)
-                    MapModule(render, heightDp = 96)
+                    MapModule(render)
                 }
             }
             Spacer(GlanceModifier.height(14.dp))
@@ -728,7 +788,7 @@ class CarWidget : GlanceAppWidget() {
             )
             Spacer(GlanceModifier.height(14.dp))
             InfoStack(car, render, max = WidgetInfoField.ALL.size)
-            MapModule(render, heightDp = 96)
+            MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
@@ -759,7 +819,7 @@ class CarWidget : GlanceAppWidget() {
                 }
             }
             Spacer(GlanceModifier.height(12.dp))
-            MapModule(render, heightDp = 88)
+            MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
@@ -818,14 +878,14 @@ class CarWidget : GlanceAppWidget() {
      *  (config.showMap on + car has coords + tile fetched OK). Rounded corners to
      *  match the widget's card language. */
     @Composable
-    private fun MapModule(render: Render, heightDp: Int) {
+    private fun MapModule(render: Render) {
         val bmp = render.mapBitmap ?: return
         Spacer(GlanceModifier.height(8.dp))
         Image(
             provider = ImageProvider(bmp),
             contentDescription = "Car location",
             contentScale = ContentScale.Crop,
-            modifier = GlanceModifier.fillMaxWidth().height(heightDp.dp).cornerRadius(14.dp),
+            modifier = GlanceModifier.fillMaxWidth().height(Scale.mapHeight(LocalSize.current)).cornerRadius(14.dp),
         )
     }
 
@@ -1002,10 +1062,14 @@ class CarWidget : GlanceAppWidget() {
                 actionParametersOf(WidgetKeys.VIN to car.vin, WidgetKeys.ACTION to action.key),
             )
         }
+        // Pill-shaped widgets get pill-shaped buttons too -- otherwise a
+        // stadium-shaped widget with square-cornered buttons inside read as
+        // two mismatched shape languages fighting each other.
+        val buttonCorner = if (render.config.pillShape) 999.dp else 14.dp
         Box(
             modifier = (if (fixedHeight) modifier.height(Scale.buttonHeight(size)) else modifier)
                 .background(bg)
-                .cornerRadius(14.dp)
+                .cornerRadius(buttonCorner)
                 .clickable(click),
             contentAlignment = Alignment.Center,
         ) {
@@ -1057,8 +1121,13 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun IconPill(iconRes: Int, onClick: androidx.glance.action.Action, theme: WidgetTheme) {
+        val size = LocalSize.current
+        val pillSize = Scale.pillSize(size)
         Box(
-            modifier = GlanceModifier.size(36.dp).cornerRadius(12.dp)
+            // Always a true circle (half its own size), not a fixed corner
+            // radius -- a fixed radius reads as "barely rounded square" once
+            // the pill itself scales up on larger tiles.
+            modifier = GlanceModifier.size(pillSize).cornerRadius(pillSize / 2)
                 .background(theme.surfaceVariant).clickable(onClick),
             contentAlignment = Alignment.Center,
         ) {
@@ -1066,7 +1135,7 @@ class CarWidget : GlanceAppWidget() {
                 provider = ImageProvider(iconRes),
                 contentDescription = "Switch car",
                 colorFilter = ColorFilter.tint(theme.onSurfaceVariant),
-                modifier = GlanceModifier.size(20.dp),
+                modifier = GlanceModifier.size(Scale.pillIcon(size)),
             )
         }
     }
