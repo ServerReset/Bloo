@@ -151,21 +151,39 @@ internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
  * Reads system dark-mode state from the [context] configuration; also handles dynamic
  * color, per-car palette overrides, and the global custom palette.
  */
-internal fun resolveWidgetAccent(
+/**
+ * The dark/light call [resolveWidgetAccent] itself uses — split out so callers
+ * that need BOTH the accent color AND whether the surface should be dark
+ * (background/text roles) share exactly one computation instead of
+ * re-deriving it. [forceDark] lets a caller override the app's own theme
+ * setting (e.g. a per-widget "Light"/"Dark" config override); null defers to
+ * the app's real setting, same as before this parameter existed.
+ */
+internal fun resolveWidgetIsDark(
     context: Context,
     appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
-    vin: String? = null,
-): Color {
-    // Derive dark/light exactly the way [BlooTheme] does — honour the user's
-    // themeMode override (LIGHT→false, DARK/AMOLED→true) and only fall back to the
-    // system uiMode for SYSTEM/SYSTEM_AMOLED — so the widget accent always matches the app.
-    val isDark = when (appearance.themeMode) {
+    forceDark: Boolean? = null,
+): Boolean {
+    if (forceDark != null) return forceDark
+    // Honour the user's themeMode override (LIGHT→false, DARK/AMOLED→true) and
+    // only fall back to the system uiMode for SYSTEM/SYSTEM_AMOLED — so the
+    // widget accent always matches the app.
+    return when (appearance.themeMode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK, ThemeMode.AMOLED -> true
         ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED ->
             (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
     }
+}
+
+internal fun resolveWidgetAccent(
+    context: Context,
+    appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
+    vin: String? = null,
+    forceDark: Boolean? = null,
+): Color {
+    val isDark = resolveWidgetIsDark(context, appearance, forceDark)
     val base = if (isDark) DarkExpressive else LightExpressive
 
     // Apply the same vibrancy saturation scale [blooColorScheme] applies to the

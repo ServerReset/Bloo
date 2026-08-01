@@ -38,6 +38,8 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +51,9 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.relativeLabel
+import com.bloo.bluelink.ui.ThemeMode
+import com.bloo.bluelink.ui.resolveWidgetAccent
+import com.bloo.bluelink.ui.resolveWidgetIsDark
 import kotlinx.coroutines.flow.first
 
 /**
@@ -61,6 +66,13 @@ import kotlinx.coroutines.flow.first
  * intersection of "what fits" (size tier) and "what the user asked for"
  * ([WidgetConfig], edited in [WidgetConfigActivity], whose option set adapts to the
  * app's simple/advanced mode).
+ *
+ * Colors are resolved once in [provideGlance] via [WidgetTheme] — the exact accent
+ * (per-car palette / dynamic color / vibrancy), semantic charge/unlock/climate
+ * colors, and dark/light surfaces the rest of the app uses (see [resolveWidgetAccent]
+ * / [resolveWidgetIsDark]) — rather than the vanilla [GlanceTheme] default, which
+ * resolves to Android's generic wallpaper-derived widget palette and has no
+ * relationship to Bloo's own branding or the user's in-app theme choices.
  *
  * All data is read once in [provideGlance] (suspend) and handed to the content as a
  * plain [Render] holder; the composables themselves do no I/O.
@@ -84,7 +96,9 @@ class CarWidget : GlanceAppWidget() {
             data.selected
         }
         val appearance = runCatching { SettingsStore(context).appearance.first() }.getOrNull()
-        val metric = appearance?.unitSystem == "metric"
+            ?: SettingsStore.Appearance()
+        val metric = appearance.unitSystem == "metric"
+        val theme = WidgetTheme.resolve(context, appearance, config, car?.vin)
         val stale = car?.fetchedAt?.takeIf { it > 0 }?.let {
             System.currentTimeMillis() - it > com.bloo.bluelink.data.STALE_STATUS_MS
         } ?: false
@@ -94,12 +108,12 @@ class CarWidget : GlanceAppWidget() {
         val mapBitmap = if (config.showMap && car?.lat != null && car.lon != null) {
             val density = context.resources.displayMetrics.density
             val edge = (150 * density).toInt()
-            val accent = config.accent?.let { WidgetAccent.fromKey(it)?.argb } ?: BlooColors.cool
-            runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, accent) }.getOrNull()
+            runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb) }.getOrNull()
         } else null
         val render = Render(
             car = car,
             config = config,
+            theme = theme,
             metric = metric,
             multiCar = data.vehicles.size > 1,
             stale = stale,
@@ -115,6 +129,7 @@ class CarWidget : GlanceAppWidget() {
     private data class Render(
         val car: VehicleSnapshot?,
         val config: WidgetConfig,
+        val theme: WidgetTheme,
         val metric: Boolean,
         val multiCar: Boolean,
         /** True when the car data is older than the staleness window — surfaces so
@@ -151,11 +166,11 @@ class CarWidget : GlanceAppWidget() {
         val car = render.car
         val root = GlanceModifier
             .fillMaxSize()
-            .background(GlanceTheme.colors.widgetBackground)
+            .background(render.theme.background)
             .cornerRadius(20.dp)
             .padding(12.dp)
         if (car == null) {
-            EmptyState(root)
+            EmptyState(root, render.theme)
             return
         }
         val size = LocalSize.current
@@ -174,17 +189,17 @@ class CarWidget : GlanceAppWidget() {
     // ---- Empty / signed-out --------------------------------------------------
 
     @Composable
-    private fun EmptyState(root: GlanceModifier) {
+    private fun EmptyState(root: GlanceModifier, theme: WidgetTheme) {
         Box(modifier = root.clickable(openAction(LocalContext.current)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     "Bloo",
-                    style = TextStyle(color = GlanceTheme.colors.primary, fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(color = theme.accentProvider, fontSize = 18.sp, fontWeight = FontWeight.Bold),
                 )
                 Spacer(GlanceModifier.height(4.dp))
                 Text(
                     "Open to sign in",
-                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+                    style = TextStyle(color = theme.onSurfaceVariant, fontSize = 12.sp),
                 )
             }
         }
@@ -203,7 +218,7 @@ class CarWidget : GlanceAppWidget() {
             if (car.hasBattery && render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = 64)
             } else {
-                StatusGlyph(car, sizeDp = 40)
+                StatusGlyph(car, render.theme, sizeDp = 40)
             }
         }
     }
@@ -216,7 +231,7 @@ class CarWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.width(10.dp))
             }
             Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(car.name, style = titleStyle(), maxLines = 1)
+                Text(car.name, style = titleStyle(render.theme), maxLines = 1)
                 PrimaryInfoLine(car, render)
             }
             Spacer(GlanceModifier.width(8.dp))
@@ -227,7 +242,7 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun CompactTallLayout(car: VehicleSnapshot, render: Render) {
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(car.name, style = titleStyle(), maxLines = 1)
+            Text(car.name, style = titleStyle(render.theme), maxLines = 1)
             Spacer(GlanceModifier.height(6.dp))
             if (car.hasBattery && render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = 72)
@@ -272,7 +287,7 @@ class CarWidget : GlanceAppWidget() {
                     if (car.hasBattery && render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = 96)
                     } else {
-                        StatusGlyph(car, sizeDp = 56)
+                        StatusGlyph(car, render.theme, sizeDp = 56)
                     }
                 }
                 Spacer(GlanceModifier.width(12.dp))
@@ -301,10 +316,10 @@ class CarWidget : GlanceAppWidget() {
                     if (car.hasBattery && render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = 140)
                     } else {
-                        StatusGlyph(car, sizeDp = 88)
+                        StatusGlyph(car, render.theme, sizeDp = 88)
                     }
                     Spacer(GlanceModifier.height(8.dp))
-                    Text(primaryValue(car, render), style = titleStyle(), maxLines = 1)
+                    Text(primaryValue(car, render), style = titleStyle(render.theme), maxLines = 1)
                 }
                 Spacer(GlanceModifier.width(16.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
@@ -324,15 +339,15 @@ class CarWidget : GlanceAppWidget() {
     private fun HeaderRow(car: VehicleSnapshot, render: Render) {
         Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(LocalContext.current)), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(car.name, style = titleStyle(), maxLines = 1)
-                Text(statusSubtitle(car), style = subtitleStyle(), maxLines = 1)
+                Text(car.name, style = titleStyle(render.theme), maxLines = 1)
+                Text(statusSubtitle(car), style = subtitleStyle(render.theme), maxLines = 1)
             }
             if (render.multiCar && render.config.vin == null) {
                 // Follow-selected widgets get a car switcher chevron.
                 IconPill(
                     iconRes = R.drawable.ic_shortcut_car,
                     onClick = actionRunCallback<WidgetSwitchCarAction>(),
-                    tint = GlanceTheme.colors.onSurfaceVariant,
+                    theme = render.theme,
                 )
             }
         }
@@ -347,7 +362,7 @@ class CarWidget : GlanceAppWidget() {
             // lock/charge state can't masquerade as live. Tap the footer to refresh.
             val style = if (render.stale)
                 TextStyle(color = ColorProvider(Color(BlooColors.warn)), fontSize = 11.sp)
-            else subtitleStyle()
+            else subtitleStyle(render.theme)
             val text = if (render.stale) "Updated $updated · may be stale" else "Updated $updated"
             Text(
                 text,
@@ -377,7 +392,7 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun PrimaryInfoLine(car: VehicleSnapshot, render: Render) {
-        Text(primaryValue(car, render), style = subtitleStyle(), maxLines = 1)
+        Text(primaryValue(car, render), style = subtitleStyle(render.theme), maxLines = 1)
     }
 
     /** The stacked read-only stats, honoring the user's chosen fields + order,
@@ -389,8 +404,8 @@ class CarWidget : GlanceAppWidget() {
             fields.forEach { field ->
                 val value = infoValue(field, car, render) ?: return@forEach
                 Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    Text(field.label, style = subtitleStyle(), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                    Text(value, style = valueStyle(), maxLines = 1)
+                    Text(field.label, style = subtitleStyle(render.theme), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+                    Text(value, style = valueStyle(render.theme), maxLines = 1)
                 }
                 Spacer(GlanceModifier.height(2.dp))
             }
@@ -414,14 +429,19 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun ActionButton(action: WidgetAction, car: VehicleSnapshot, render: Render, modifier: GlanceModifier) {
-        val active = when (action) {
-            WidgetAction.LOCK -> car.locked == true
-            WidgetAction.CLIMATE -> car.climateOn == true
-            WidgetAction.CHARGE -> car.charging == true
-            else -> false
+        val theme = render.theme
+        // Every button defaults to the branded accent fill -- the "chunky, colored
+        // action button" look is Bloo's own established visual language (phone,
+        // watch, and the old widget all share it). It only swaps to a semantic
+        // color while that specific state is actually true: red while unlocked
+        // (a "you left this open" cue, matching every other unlocked indicator in
+        // the app), teal while climate is running, green while charging.
+        val bg = when {
+            action == WidgetAction.LOCK && car.locked == false -> theme.unlocked
+            action == WidgetAction.CLIMATE && car.climateOn == true -> theme.climate
+            action == WidgetAction.CHARGE && car.charging == true -> theme.charge
+            else -> theme.accentProvider
         }
-        val bg = if (active) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
-        val fg = if (active) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
         val click = when (action.kind) {
             WidgetAction.Kind.NAV -> openAction(LocalContext.current)
             WidgetAction.Kind.REFRESH -> actionRunCallback<WidgetRefreshAction>(
@@ -442,7 +462,7 @@ class CarWidget : GlanceAppWidget() {
             Image(
                 provider = ImageProvider(iconFor(action)),
                 contentDescription = action.label,
-                colorFilter = ColorFilter.tint(fg),
+                colorFilter = ColorFilter.tint(theme.onAccent),
                 modifier = GlanceModifier.size(22.dp),
             )
         }
@@ -456,14 +476,12 @@ class CarWidget : GlanceAppWidget() {
         val density = ctx.resources.displayMetrics.density
         val px = (edgeDp * density).toInt().coerceAtLeast(24)
         val frac = (car.percent ?: 0) / 100f
-        val accent = render.config.accent?.let { WidgetAccent.fromKey(it)?.argb } ?: DEFAULT_ACCENT
-        val arc = ChargeRing.arcColorFor(frac, car.charging == true, accent)
-        val track = TRACK_COLOR
+        val arc = ChargeRing.arcColorFor(frac, car.charging == true, render.theme.accentArgb)
         val bmp = ChargeRing.render(
             sizePx = px,
             fraction = frac,
             arcColor = arc,
-            trackColor = track,
+            trackColor = render.theme.trackArgb,
             centerText = car.percent?.let { "$it%" },
             centerColor = arc,
         )
@@ -475,10 +493,10 @@ class CarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun StatusGlyph(car: VehicleSnapshot, sizeDp: Int) {
+    private fun StatusGlyph(car: VehicleSnapshot, theme: WidgetTheme, sizeDp: Int) {
         val locked = car.locked == true
         val res = if (locked) R.drawable.ic_shortcut_lock else R.drawable.ic_shortcut_unlock
-        val tint = if (locked) GlanceTheme.colors.primary else GlanceTheme.colors.error
+        val tint = if (locked) theme.accentProvider else theme.unlocked
         Image(
             provider = ImageProvider(res),
             contentDescription = if (locked) "Locked" else "Unlocked",
@@ -488,16 +506,16 @@ class CarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun IconPill(iconRes: Int, onClick: androidx.glance.action.Action, tint: ColorProvider) {
+    private fun IconPill(iconRes: Int, onClick: androidx.glance.action.Action, theme: WidgetTheme) {
         Box(
             modifier = GlanceModifier.size(36.dp).cornerRadius(12.dp)
-                .background(GlanceTheme.colors.secondaryContainer).clickable(onClick),
+                .background(theme.surfaceVariant).clickable(onClick),
             contentAlignment = Alignment.Center,
         ) {
             Image(
                 provider = ImageProvider(iconRes),
                 contentDescription = "Switch car",
-                colorFilter = ColorFilter.tint(tint),
+                colorFilter = ColorFilter.tint(theme.onSurfaceVariant),
                 modifier = GlanceModifier.size(20.dp),
             )
         }
@@ -505,12 +523,12 @@ class CarWidget : GlanceAppWidget() {
 
     // ---- Text styles ---------------------------------------------------------
 
-    @Composable private fun titleStyle() =
-        TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-    @Composable private fun subtitleStyle() =
-        TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp)
-    @Composable private fun valueStyle() =
-        TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    private fun titleStyle(theme: WidgetTheme) =
+        TextStyle(color = theme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+    private fun subtitleStyle(theme: WidgetTheme) =
+        TextStyle(color = theme.onSurfaceVariant, fontSize = 12.sp)
+    private fun valueStyle(theme: WidgetTheme) =
+        TextStyle(color = theme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium)
 
     // ---- Value helpers -------------------------------------------------------
 
@@ -566,12 +584,80 @@ class CarWidget : GlanceAppWidget() {
     // build the Intent explicitly (the (Intent, …) overload is the stable one).
     private fun openAction(context: Context) =
         actionStartActivity(Intent(context, MainActivity::class.java))
+}
 
-    private companion object {
-        // Deterministic ring colours (the widget process can't easily resolve a
-        // theme ColorProvider to an int for the Canvas). Accent defaults to Bloo's
-        // brand blue; charging/low states override in ChargeRing.arcColorFor.
-        val DEFAULT_ACCENT = BlooColors.cool
-        val TRACK_COLOR = 0x33888888
+/**
+ * The widget's fully-resolved color set for one render, built once in
+ * [CarWidget.provideGlance] instead of leaning on the vanilla [GlanceTheme]
+ * default (which resolves to Android's generic wallpaper-derived Material You
+ * palette on API 31+, with no relationship to Bloo's own branding or the
+ * user's actual in-app theme settings). [accent] mirrors exactly what the rest
+ * of the app shows for this car (per-car custom palette → global custom
+ * palette → dynamic color → the built-in Expressive palette, all vibrancy-
+ * scaled — see [resolveWidgetAccent]), unless the widget's own config picked
+ * an explicit [WidgetAccent] override. [isDark] similarly follows the app's
+ * real theme setting unless this widget's [WidgetConfig.theme] overrides it.
+ */
+private data class WidgetTheme(
+    val isDark: Boolean,
+    val accent: Color,
+    val accentArgb: Int,
+    val accentProvider: ColorProvider,
+    val onAccent: ColorProvider,
+    val background: ColorProvider,
+    val onSurface: ColorProvider,
+    val onSurfaceVariant: ColorProvider,
+    val surfaceVariant: ColorProvider,
+    val trackArgb: Int,
+    val charge: ColorProvider,
+    val unlocked: ColorProvider,
+    val climate: ColorProvider,
+) {
+    companion object {
+        fun resolve(
+            context: Context,
+            appearance: SettingsStore.Appearance,
+            config: WidgetConfig,
+            vin: String?,
+        ): WidgetTheme {
+            val forceDark = when (config.theme) {
+                WidgetConfig.THEME_LIGHT -> false
+                WidgetConfig.THEME_DARK -> true
+                else -> null
+            }
+            val isDark = resolveWidgetIsDark(context, appearance, forceDark)
+            val accent = config.accent?.let { WidgetAccent.fromKey(it) }?.let { Color(it.argb) }
+                ?: resolveWidgetAccent(context, appearance, vin, forceDark)
+            val onAccent = if (accent.luminance() > 0.5f) Color(0xFF16171B) else Color.White
+            // True black only when actually following the app's own AMOLED setting
+            // (config.theme == "auto") -- a per-widget Light/Dark override is asking
+            // for a deliberately different look than the app, not a void background.
+            val amoled = config.theme == WidgetConfig.THEME_AUTO &&
+                (appearance.themeMode == ThemeMode.AMOLED ||
+                    (appearance.themeMode == ThemeMode.SYSTEM_AMOLED && isDark))
+            val background = when {
+                amoled -> Color.Black
+                isDark -> Color(0xFF1C1D22)
+                else -> Color(0xFFF4F4F7)
+            }
+            val onSurface = if (isDark) Color(0xFFF2F2F5) else Color(0xFF1B1C20)
+            val onSurfaceVariant = if (isDark) Color(0xFFC6C6CC) else Color(0xFF5C5E66)
+            val surfaceVariant = if (isDark) Color(0xFF2A2C32) else Color(0xFFE7E7EC)
+            return WidgetTheme(
+                isDark = isDark,
+                accent = accent,
+                accentArgb = accent.toArgb(),
+                accentProvider = ColorProvider(accent),
+                onAccent = ColorProvider(onAccent),
+                background = ColorProvider(background),
+                onSurface = ColorProvider(onSurface),
+                onSurfaceVariant = ColorProvider(onSurfaceVariant),
+                surfaceVariant = ColorProvider(surfaceVariant),
+                trackArgb = if (isDark) 0x33FFFFFF else 0x26000000,
+                charge = ColorProvider(Color(BlooColors.chargeGreen)),
+                unlocked = ColorProvider(Color(BlooColors.heat)),
+                climate = ColorProvider(Color(BlooColors.climateTeal)),
+            )
+        }
     }
 }
