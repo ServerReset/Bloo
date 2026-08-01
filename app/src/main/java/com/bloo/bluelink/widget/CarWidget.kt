@@ -76,7 +76,13 @@ class CarWidget : GlanceAppWidget() {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         val config = WidgetConfigStore(context).get(appWidgetId)
         val data = SnapshotStore(context).current()
-        val car = config.vin?.let { vin -> data.vehicles.firstOrNull { it.vin == vin } } ?: data.selected
+        // A pinned widget shows ITS car or nothing — never silently swap to another.
+        // Only a "follow" widget (null vin) tracks the app's currently-selected car.
+        val car = if (config.vin != null) {
+            data.vehicles.firstOrNull { it.vin == config.vin }
+        } else {
+            data.selected
+        }
         val appearance = runCatching { SettingsStore(context).appearance.first() }.getOrNull()
         val metric = appearance?.unitSystem == "metric"
         val stale = car?.fetchedAt?.takeIf { it > 0 }?.let {
