@@ -166,7 +166,18 @@ enum class WidgetInfoField(val key: String, val label: String) {
     // FooterRow's own wording for the same value elsewhere in the widget.
     PLATE("plate", "Plate"),
     SERVICE("service", "Service"),
-    UPDATED("updated", "Updated");
+    UPDATED("updated", "Updated"),
+    // Appended rather than slotted in beside the other status-ish fields on
+    // purpose: saved configs are sorted by ordinal, so inserting mid-enum
+    // would reshuffle the row order of any widget the user later re-saves.
+    //
+    // Lock and climate state already appear in the header subtitle, but that
+    // header is now optional (WidgetConfig.showHeader) and on several tiers
+    // there is no room for one at all -- as selectable rows they can be shown
+    // wherever the user actually wants them.
+    LOCK("lock", "Lock"),
+    CLIMATE("climate", "Climate"),
+    MODEL("model", "Model");
 
     companion object {
         val DEFAULTS = listOf(RANGE.key, UPDATED.key)

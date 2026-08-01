@@ -1562,6 +1562,12 @@ class CarWidget : GlanceAppWidget() {
         WidgetInfoField.PLATE -> car.licensePlate?.takeIf { it.isNotBlank() }
         WidgetInfoField.SERVICE -> serviceDueLabel(car, render.metric)
         WidgetInfoField.UPDATED -> relativeLabel(car.fetchedAt.takeIf { it > 0 }).takeIf { it.isNotBlank() }
+        // null (rather than a placeholder) when the car hasn't reported the
+        // state, so InfoStack skips the row entirely instead of showing a
+        // confident-looking "Unlocked" for something simply unknown.
+        WidgetInfoField.LOCK -> car.locked?.let { if (it) "Locked" else "Unlocked" }
+        WidgetInfoField.CLIMATE -> car.climateOn?.let { if (it) "On" else "Off" }
+        WidgetInfoField.MODEL -> car.model.takeIf { it.isNotBlank() }
     }
 
     private fun serviceDueLabel(car: VehicleSnapshot, metric: Boolean): String? {
