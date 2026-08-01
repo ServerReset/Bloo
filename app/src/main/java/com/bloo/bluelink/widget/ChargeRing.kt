@@ -75,6 +75,17 @@ object ChargeRing {
                 textSize = edge * 0.30f
                 isFakeBoldText = true
             }
+            // Shrink-to-fit: at this default size a 3-4 character label
+            // ("100%") can measure wider than the inner circle on the
+            // smallest rings. Measure and scale the font down proportionally
+            // rather than ever letting it draw past the ring/get clipped --
+            // this is a raw Canvas draw, not a TextView, so nothing else
+            // would catch an overflow for us.
+            val maxTextWidth = (edge - stroke * 2.4f).coerceAtLeast(edge * 0.4f)
+            val measured = textPaint.measureText(centerText)
+            if (measured > maxTextWidth) {
+                textPaint.textSize *= maxTextWidth / measured
+            }
             val cx = edge / 2f
             // Vertically centre using the font metrics baseline.
             val fm = textPaint.fontMetrics

@@ -161,6 +161,11 @@ class CarWidget : GlanceAppWidget() {
     /** The layout tiers, smallest to largest. Chosen from the measured size. */
     private enum class Tier { MICRO, COMPACT_WIDE, COMPACT_TALL, MEDIUM, LARGE, XL }
 
+    /** Below this width, [InfoStack] stops putting a value beside its label
+     *  and starts stacking instead -- the same "give up on one line" width
+     *  the original widget used for its own narrow-text fallback. */
+    private val NARROW_WIDTH = 90.dp
+
     private fun tierFor(size: DpSize): Tier {
         val w = size.width.value
         val h = size.height.value
@@ -462,19 +467,54 @@ class CarWidget : GlanceAppWidget() {
     }
 
     /** The stacked read-only stats, honoring the user's chosen fields + order,
-     *  capped to what fits ([max]). */
+     *  capped to what fits ([max]). Glance has no overflow-detection callback
+     *  the way real Compose Text does (RemoteViews just silently ellipsizes),
+     *  so "might not fit" is decided ahead of time from the measured tile
+     *  width instead of reactively -- below [NARROW_WIDTH] every row drops
+     *  the label beside its value in favour of stacking the value on its own
+     *  full-width line underneath, and [WidgetInfoField.PERCENT] specifically
+     *  falls back further to one digit per line (see [VerticalDigits]) if
+     *  even that's tight, so a reading like "82%" degrades to
+     *
+     *  8
+     *  2
+     *  %
+     *
+     *  rather than ever being cut off. */
     @Composable
     private fun InfoStack(car: VehicleSnapshot, render: Render, max: Int) {
         val fields = render.config.infoFields.mapNotNull { WidgetInfoField.fromKey(it) }.take(max)
+        val narrow = LocalSize.current.width < NARROW_WIDTH
         Column {
             fields.forEach { field ->
                 val value = infoValue(field, car, render) ?: return@forEach
-                Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    Text(field.label, style = subtitleStyle(render.theme), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                    Text(value, style = valueStyle(render.theme), maxLines = 1)
+                if (narrow) {
+                    Column(modifier = GlanceModifier.fillMaxWidth()) {
+                        Text(field.label, style = subtitleStyle(render.theme), maxLines = 1)
+                        if (field == WidgetInfoField.PERCENT && value.length > 3) {
+                            VerticalDigits(value, valueStyle(render.theme))
+                        } else {
+                            Text(value, style = valueStyle(render.theme), maxLines = 1)
+                        }
+                    }
+                } else {
+                    Row(modifier = GlanceModifier.fillMaxWidth()) {
+                        Text(field.label, style = subtitleStyle(render.theme), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+                        Text(value, style = valueStyle(render.theme), maxLines = 1)
+                    }
                 }
                 Spacer(GlanceModifier.height(2.dp))
             }
+        }
+    }
+
+    /** Renders [text] one character per line, centered -- the fallback for a
+     *  short but wide readout (a percent, mainly) that still wouldn't fit on
+     *  its own full-width line at the narrowest tiers. */
+    @Composable
+    private fun VerticalDigits(text: String, style: TextStyle) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = GlanceModifier.fillMaxWidth()) {
+            text.forEach { ch -> Text(ch.toString(), maxLines = 1, style = style) }
         }
     }
 
