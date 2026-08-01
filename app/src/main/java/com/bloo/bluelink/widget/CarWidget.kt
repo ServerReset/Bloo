@@ -1,6 +1,7 @@
 package com.bloo.bluelink.widget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -27,7 +28,6 @@ import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.defaultWeight
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -168,7 +168,7 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun EmptyState(root: GlanceModifier) {
-        Box(modifier = root.clickable(actionStartActivity<MainActivity>()), contentAlignment = Alignment.Center) {
+        Box(modifier = root.clickable(openAction(LocalContext.current)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     "Bloo",
@@ -190,7 +190,7 @@ class CarWidget : GlanceAppWidget() {
         // A single glance: the ring if this car has a battery + ring is on, else a
         // lock glyph. Whole tile opens the app.
         Box(
-            modifier = GlanceModifier.fillMaxSize().clickable(openAction(car)),
+            modifier = GlanceModifier.fillMaxSize().clickable(openAction(LocalContext.current)),
             contentAlignment = Alignment.Center,
         ) {
             if (car.hasBattery && render.config.showRing && car.percent != null) {
@@ -208,7 +208,7 @@ class CarWidget : GlanceAppWidget() {
                 RingImage(car, render, edgeDp = 56)
                 Spacer(GlanceModifier.width(10.dp))
             }
-            Column(modifier = GlanceModifier.defaultWeightSafe()) {
+            Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(car.name, style = titleStyle(), maxLines = 1)
                 PrimaryInfoLine(car, render)
             }
@@ -237,12 +237,12 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeightSafe(), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
                 if (car.hasBattery && render.config.showRing && car.percent != null) {
                     RingImage(car, render, edgeDp = 76)
                     Spacer(GlanceModifier.width(12.dp))
                 }
-                Column(modifier = GlanceModifier.defaultWeightSafe()) {
+                Column(modifier = GlanceModifier.defaultWeight()) {
                     InfoStack(car, render, max = 3)
                 }
             }
@@ -256,9 +256,9 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeightSafe()) {
+            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
                 Column(
-                    modifier = GlanceModifier.defaultWeightSafe(),
+                    modifier = GlanceModifier.defaultWeight(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -269,7 +269,7 @@ class CarWidget : GlanceAppWidget() {
                     }
                 }
                 Spacer(GlanceModifier.width(12.dp))
-                Column(modifier = GlanceModifier.defaultWeightSafe()) {
+                Column(modifier = GlanceModifier.defaultWeight()) {
                     InfoStack(car, render, max = 4)
                     MapModule(render, heightDp = 72)
                 }
@@ -285,9 +285,9 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeightSafe()) {
+            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
                 Column(
-                    modifier = GlanceModifier.defaultWeightSafe(),
+                    modifier = GlanceModifier.defaultWeight(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -300,7 +300,7 @@ class CarWidget : GlanceAppWidget() {
                     Text(primaryValue(car, render), style = titleStyle(), maxLines = 1)
                 }
                 Spacer(GlanceModifier.width(16.dp))
-                Column(modifier = GlanceModifier.defaultWeightSafe()) {
+                Column(modifier = GlanceModifier.defaultWeight()) {
                     InfoStack(car, render, max = WidgetInfoField.ALL.size)
                     MapModule(render, heightDp = 96)
                 }
@@ -315,8 +315,8 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun HeaderRow(car: VehicleSnapshot, render: Render) {
-        Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(car)), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = GlanceModifier.defaultWeightSafe()) {
+        Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(LocalContext.current)), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(car.name, style = titleStyle(), maxLines = 1)
                 Text(statusSubtitle(car), style = subtitleStyle(), maxLines = 1)
             }
@@ -382,7 +382,7 @@ class CarWidget : GlanceAppWidget() {
             fields.forEach { field ->
                 val value = infoValue(field, car, render) ?: return@forEach
                 Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    Text(field.label, style = subtitleStyle(), maxLines = 1, modifier = GlanceModifier.defaultWeightSafe())
+                    Text(field.label, style = subtitleStyle(), maxLines = 1, modifier = GlanceModifier.defaultWeight())
                     Text(value, style = valueStyle(), maxLines = 1)
                 }
                 Spacer(GlanceModifier.height(2.dp))
@@ -400,7 +400,7 @@ class CarWidget : GlanceAppWidget() {
         Row(modifier = GlanceModifier.fillMaxWidth()) {
             actions.forEachIndexed { i, action ->
                 if (i > 0) Spacer(GlanceModifier.width(6.dp))
-                ActionButton(action, car, render, modifier = GlanceModifier.defaultWeightSafe())
+                ActionButton(action, car, render, modifier = GlanceModifier.defaultWeight())
             }
         }
     }
@@ -416,7 +416,7 @@ class CarWidget : GlanceAppWidget() {
         val bg = if (active) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
         val fg = if (active) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
         val click = when (action.kind) {
-            WidgetAction.Kind.NAV -> openAction(car)
+            WidgetAction.Kind.NAV -> openAction(LocalContext.current)
             WidgetAction.Kind.REFRESH -> actionRunCallback<WidgetRefreshAction>(
                 actionParametersOf(WidgetKeys.VIN to car.vin),
             )
@@ -550,7 +550,10 @@ class CarWidget : GlanceAppWidget() {
         WidgetAction.OPEN -> R.drawable.ic_shortcut_car
     }
 
-    private fun openAction(car: VehicleSnapshot) = actionStartActivity<MainActivity>()
+    // Glance's reified actionStartActivity<T>() overload isn't available here, so
+    // build the Intent explicitly (the (Intent, …) overload is the stable one).
+    private fun openAction(context: Context) =
+        actionStartActivity(Intent(context, MainActivity::class.java))
 
     private companion object {
         // Deterministic ring colours (the widget process can't easily resolve a
@@ -560,6 +563,3 @@ class CarWidget : GlanceAppWidget() {
         val TRACK_COLOR = 0x33888888
     }
 }
-
-/** Alias for readability; defaultWeight is the Glance equivalent of Compose's weight(1f). */
-private fun GlanceModifier.defaultWeightSafe(): GlanceModifier = this.defaultWeight()
