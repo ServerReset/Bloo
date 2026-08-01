@@ -100,11 +100,17 @@ enum class WidgetAction(
  */
 enum class WidgetInfoField(val key: String, val label: String) {
     RANGE("range", "Range"),
-    PERCENT("percent", "Battery %"),
+    // Was "Battery %" -- the value itself already reads "82%", so the label
+    // repeating the % sign was both redundant and the single longest label
+    // in the set, worst-case for InfoStack's narrow-width row.
+    PERCENT("percent", "Battery"),
     ODOMETER("odometer", "Odometer"),
-    PLATE("plate", "License plate"),
-    SERVICE("service", "Service due"),
-    UPDATED("updated", "Last updated");
+    // Was "License plate" (13 chars, the longest label here) and "Service
+    // due" -- shortened both; "Last updated" -> "Updated" also now matches
+    // FooterRow's own wording for the same value elsewhere in the widget.
+    PLATE("plate", "Plate"),
+    SERVICE("service", "Service"),
+    UPDATED("updated", "Updated");
 
     companion object {
         val DEFAULTS = listOf(RANGE.key, UPDATED.key)

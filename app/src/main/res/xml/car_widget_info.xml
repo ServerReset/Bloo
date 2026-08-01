@@ -5,6 +5,10 @@
   widget can be dropped tiny and grown all the way to a 7x7 dashboard, with the
   Glance content choosing a layout tier for whatever size it ends up.
   targetCellWidth/Height (Android 12+) give a sensible 3x2 default drop size.
+  widgetFeatures="reconfigurable" (API 31+) is what actually makes launchers
+  show a long-press "Widget settings" entry point for android:configure;
+  without it, most stock/Pixel launchers silently omit that affordance even
+  though the configure activity is declared.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="40dp"
@@ -18,6 +22,7 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:configure="com.bloo.bluelink.widget.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
     android:initialLayout="@layout/car_widget_loading"
     android:previewImage="@drawable/ic_car_hero"
     android:description="@string/widget_description" />

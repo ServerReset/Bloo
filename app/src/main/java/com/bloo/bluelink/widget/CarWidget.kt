@@ -316,12 +316,23 @@ class CarWidget : GlanceAppWidget() {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(10.dp))
             }
+            // BUG this fixes: ActionButtons' own default modifier is
+            // fillMaxWidth(), which is correct when it's the sole/last child
+            // of a Column (every other call site) but wrong here -- as a
+            // plain, unweighted sibling of this Row's own weighted text
+            // column, "fill max width" meant "claim the width of the WHOLE
+            // row", not "whatever's left after the ring and text", pushing
+            // the button row past the tile's right edge entirely (clipped
+            // only by the outer corner's rounding, which is what made it
+            // look like a button was cut in half rather than missing outright).
+            // Giving it a weight too makes it share the remaining space
+            // fairly with the text column instead of overrunning it.
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(car.name, style = titleStyle(render.theme), maxLines = 1)
                 PrimaryInfoLine(car, render)
             }
             Spacer(GlanceModifier.width(8.dp))
-            ActionButtons(car, render, max = 3)
+            ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight())
         }
     }
 
@@ -840,7 +851,13 @@ private data class WidgetTheme(
                 onSurface = ColorProvider(onSurface),
                 onSurfaceVariant = ColorProvider(onSurfaceVariant),
                 surfaceVariant = ColorProvider(surfaceVariant),
-                trackArgb = if (isDark) 0x33FFFFFF else 0x26000000,
+                // Was 0x33 (20%) in dark mode -- against a true-black AMOLED
+                // background specifically, that read as barely-there rather
+                // than "faint unfilled track," so the ring's own bright arc
+                // looked like two disconnected floating curves instead of one
+                // continuous circle with a filled portion. Bumped until the
+                // empty segment reads as clearly part of the same shape.
+                trackArgb = if (isDark) 0x4DFFFFFF else 0x33000000,
                 charge = ColorProvider(Color(BlooColors.chargeGreen)),
                 unlocked = ColorProvider(Color(BlooColors.heat)),
                 climate = ColorProvider(Color(BlooColors.climateTeal)),
