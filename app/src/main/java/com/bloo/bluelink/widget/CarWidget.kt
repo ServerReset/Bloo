@@ -268,13 +268,17 @@ class CarWidget : GlanceAppWidget() {
         // keeps reading render.theme like normal and gets it for free.
         val effective = if (photo != null) render.copy(theme = render.theme.forPhoto()) else render
         val size = LocalSize.current
-        // Pill shape needs at least one short dimension to read as a stadium
-        // rather than a barely-rounded rectangle, so it only ever kicks in at
-        // small sizes (roughly 2x2 cells and under) -- same "only visible on
-        // widgets sized about 2x2 cells or smaller" contract the original
-        // widget's own pill option had, restored here rather than reinvented.
-        // 999.dp clamps to a true pill against whichever side is shorter.
-        val corner = if (render.config.pillShape && minOf(size.width, size.height) < 180.dp) 999.dp else 20.dp
+        // A pill only reads as a stadium while one side is short; past that
+        // it would carve a large widget's own content into a lens, so it
+        // falls back to the roundest ordinary corner rather than applying
+        // literally. Every other choice applies at any size.
+        val corner = when (render.config.effectiveCorner) {
+            WidgetConfig.CORNER_SHARP -> 0.dp
+            WidgetConfig.CORNER_ROUND -> 32.dp
+            WidgetConfig.CORNER_PILL ->
+                if (minOf(size.width, size.height) < 180.dp) 999.dp else 32.dp
+            else -> 20.dp
+        }
         val outerCorner = GlanceModifier.fillMaxSize().cornerRadius(corner)
         // Base padding scales continuously with size; a pill shape needs a
         // little extra on top of that so content doesn't clip against the
@@ -950,6 +954,10 @@ class CarWidget : GlanceAppWidget() {
         // tier, not across the whole tile.
         availableWidth: Dp = LocalSize.current.width,
     ) {
+        // Gated here rather than at each of the dozen call sites, so the
+        // option can't be honoured by some tiers and quietly ignored by
+        // others as layouts get added.
+        if (!render.config.showHeader) return
         // Rough reserve for the car-switcher pill (its own size plus
         // spacing) when it's present -- an estimate, same spirit as every
         // other maxWidth passed to FitText in this file (see wouldOverflow).
@@ -975,6 +983,7 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun FooterRow(car: VehicleSnapshot, render: Render) {
+        if (!render.config.showFooter) return
         val updated = relativeLabel(car.fetchedAt.takeIf { it > 0 })
         if (updated.isNotBlank()) {
             Spacer(GlanceModifier.height(6.dp))
@@ -1492,14 +1501,22 @@ class CarWidget : GlanceAppWidget() {
     // without having to thread a size param through every single caller.
 
     @Composable
-    private fun titleStyle(theme: WidgetTheme) =
-        TextStyle(color = theme.onSurface, fontSize = Scale.titleSp(LocalSize.current), fontWeight = FontWeight.Bold)
+    private fun titleStyle(theme: WidgetTheme) = TextStyle(
+        color = theme.onSurface,
+        fontSize = (Scale.titleSp(LocalSize.current).value * theme.textScale).sp,
+        fontWeight = FontWeight.Bold,
+    )
     @Composable
-    private fun subtitleStyle(theme: WidgetTheme) =
-        TextStyle(color = theme.onSurfaceVariant, fontSize = Scale.subtitleSp(LocalSize.current))
+    private fun subtitleStyle(theme: WidgetTheme) = TextStyle(
+        color = theme.onSurfaceVariant,
+        fontSize = (Scale.subtitleSp(LocalSize.current).value * theme.textScale).sp,
+    )
     @Composable
-    private fun valueStyle(theme: WidgetTheme) =
-        TextStyle(color = theme.onSurface, fontSize = Scale.valueSp(LocalSize.current), fontWeight = FontWeight.Medium)
+    private fun valueStyle(theme: WidgetTheme) = TextStyle(
+        color = theme.onSurface,
+        fontSize = (Scale.valueSp(LocalSize.current).value * theme.textScale).sp,
+        fontWeight = FontWeight.Medium,
+    )
 
     // ---- Value helpers -------------------------------------------------------
 
@@ -1583,6 +1600,14 @@ private data class WidgetTheme(
     val charge: ColorProvider,
     val unlocked: ColorProvider,
     val climate: ColorProvider,
+    /** Multiplier applied to every font size the widget derives from its
+     *  measured size. Carried here because this is already the per-render
+     *  resolved-styling holder threaded to every module, so the text helpers
+     *  can reach it without a config parameter on each one.
+     *
+     *  Scaling up cannot overflow: FitText measures against the scaled size,
+     *  so a larger scale simply reaches its wrap and shrink rungs sooner. */
+    val textScale: Float = 1f,
 ) {
     companion object {
         fun resolve(
@@ -1611,6 +1636,13 @@ private data class WidgetTheme(
                 isDark -> Color(0xFF1C1D22)
                 else -> Color(0xFFF4F4F7)
             }
+            // Translucency is applied to the resolved surface here rather
+            // than at the call site, because this is the only place the
+            // background is still a Color rather than an opaque
+            // ColorProvider. The photo background path never reads this, so
+            // the option correctly has no effect there -- a photo brings its
+            // own backdrop and its own scrim.
+            val tinted = background.copy(alpha = background.alpha * config.safeBackgroundOpacity)
             val onSurface = if (isDark) Color(0xFFF2F2F5) else Color(0xFF1B1C20)
             val onSurfaceVariant = if (isDark) Color(0xFFC6C6CC) else Color(0xFF5C5E66)
             val surfaceVariant = if (isDark) Color(0xFF2A2C32) else Color(0xFFE7E7EC)
@@ -1620,7 +1652,8 @@ private data class WidgetTheme(
                 accentArgb = accent.toArgb(),
                 accentProvider = ColorProvider(accent),
                 onAccent = ColorProvider(onAccent),
-                background = ColorProvider(background),
+                background = ColorProvider(tinted),
+                textScale = config.safeTextScale,
                 onSurface = ColorProvider(onSurface),
                 onSurfaceVariant = ColorProvider(onSurfaceVariant),
                 surfaceVariant = ColorProvider(surfaceVariant),

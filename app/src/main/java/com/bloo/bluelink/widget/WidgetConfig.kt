@@ -43,8 +43,30 @@ data class WidgetConfig(
      *  usual rounded square. Only visibly different from the normal corner at
      *  small sizes (roughly 2x2 cells or under); see CarWidget.Content, which
      *  silently no-ops back to the normal corner above that so a pill doesn't
-     *  clip a large widget's own content into a lens shape. */
+     *  clip a large widget's own content into a lens shape.
+     *
+     *  Superseded by [corner] but kept so existing widgets keep their shape:
+     *  a config saved before [corner] existed still round-trips, and
+     *  [effectiveCorner] treats it as a request for [CORNER_PILL]. */
     val pillShape: Boolean = false,
+    /** Corner treatment: one of [CORNER_SHARP], [CORNER_SOFT], [CORNER_ROUND],
+     *  [CORNER_PILL]. Finer control than the original pill on/off, which only
+     *  ever offered "normal" or "extreme". */
+    val corner: String = CORNER_SOFT,
+    /** Background opacity, 0f..1f. Below 1 the themed surface goes
+     *  translucent so the wallpaper reads through -- the single most-requested
+     *  thing a launcher widget can offer. Ignored when [photoBackground] is
+     *  on, which brings its own backdrop. */
+    val backgroundOpacity: Float = 1f,
+    /** Multiplies every font size the widget derives from its measured size
+     *  (see CarWidget.Scale). Lets a user trade information density for
+     *  legibility without resizing the widget itself. */
+    val textScale: Float = 1f,
+    /** Show the car name / status header where the layout has room for one.
+     *  Off buys that space back for the ring and stats. */
+    val showHeader: Boolean = true,
+    /** Show the "Updated <n> min ago" footer where the layout has room. */
+    val showFooter: Boolean = true,
     /** Semantic accent override: one of [WidgetAccent] keys, or null = follow theme primary. */
     val accent: String? = null,
     /** Theme override for this widget: "auto" (system), "light", or "dark". */
@@ -58,7 +80,41 @@ data class WidgetConfig(
 
         const val PRIORITY_INFO = "info"
         const val PRIORITY_CONTROLS = "controls"
+
+        const val CORNER_SHARP = "sharp"
+        const val CORNER_SOFT = "soft"
+        const val CORNER_ROUND = "round"
+        const val CORNER_PILL = "pill"
+        val CORNERS = listOf(CORNER_SHARP, CORNER_SOFT, CORNER_ROUND, CORNER_PILL)
+
+        /** Smallest opacity offered. Fully transparent would leave a widget
+         *  that looks broken rather than styled -- text and buttons floating
+         *  with no surface to sit on -- so the floor keeps a visible tint. */
+        const val MIN_BACKGROUND_OPACITY = 0.2f
+
+        /** Text scale bounds. Wide enough to matter, tight enough that the
+         *  layouts still hold: past these, a scaled label starts driving
+         *  FitText into its wrap and shrink fallbacks on every tier rather
+         *  than only the cramped ones. */
+        const val MIN_TEXT_SCALE = 0.8f
+        const val MAX_TEXT_SCALE = 1.4f
     }
+
+    /** The corner treatment actually in force, honouring a [pillShape] saved
+     *  before [corner] existed so an upgrade never silently restyles a widget
+     *  the user had already set up. */
+    val effectiveCorner: String
+        get() = if (pillShape && corner == CORNER_SOFT) CORNER_PILL else corner
+
+    /** [backgroundOpacity] clamped to what the UI actually offers, so a value
+     *  hand-edited or left over from another version can't render the widget
+     *  invisible. */
+    val safeBackgroundOpacity: Float
+        get() = backgroundOpacity.coerceIn(MIN_BACKGROUND_OPACITY, 1f)
+
+    /** [textScale] clamped for the same reason. */
+    val safeTextScale: Float
+        get() = textScale.coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
 }
 
 /**

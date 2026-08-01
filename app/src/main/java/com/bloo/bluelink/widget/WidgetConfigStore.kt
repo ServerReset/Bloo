@@ -39,14 +39,27 @@ class WidgetConfigStore(private val context: Context) {
         val photoBackground: Boolean = false,
         val priority: String = WidgetConfig.PRIORITY_INFO,
         val pillShape: Boolean = false,
+        // Defaults here are what a config saved before these fields existed
+        // decodes to (ignoreUnknownKeys handles the other direction), so they
+        // deliberately match WidgetConfig's own -- an upgrade must never
+        // restyle a widget the user already set up.
+        val corner: String = WidgetConfig.CORNER_SOFT,
+        val backgroundOpacity: Float = 1f,
+        val textScale: Float = 1f,
+        val showHeader: Boolean = true,
+        val showFooter: Boolean = true,
         val accent: String? = null,
         val theme: String = WidgetConfig.THEME_AUTO,
     )
 
-    private fun Stored.toConfig() =
-        WidgetConfig(vin, actions, infoFields, showRing, showMap, photoBackground, priority, pillShape, accent, theme)
-    private fun WidgetConfig.toStored() =
-        Stored(vin, actions, infoFields, showRing, showMap, photoBackground, priority, pillShape, accent, theme)
+    private fun Stored.toConfig() = WidgetConfig(
+        vin, actions, infoFields, showRing, showMap, photoBackground, priority, pillShape,
+        corner, backgroundOpacity, textScale, showHeader, showFooter, accent, theme,
+    )
+    private fun WidgetConfig.toStored() = Stored(
+        vin, actions, infoFields, showRing, showMap, photoBackground, priority, pillShape,
+        corner, backgroundOpacity, textScale, showHeader, showFooter, accent, theme,
+    )
 
     /** Read one widget's config, or a default if it's never been configured. */
     suspend fun get(widgetId: Int): WidgetConfig {
