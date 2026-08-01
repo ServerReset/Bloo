@@ -1099,16 +1099,20 @@ class CarWidget : GlanceAppWidget() {
         return (text.length * sp * glyphRatio(style)) > maxWidth.value
     }
 
-    /** [FitText]'s preferred way of fitting an overflowing string: break it
-     *  across multiple lines at word boundaries (never mid-word) so a name
-     *  like "Lana's Whip Deluxe" reads as two or three real words per line
-     *  instead of being dumped one letter per row -- that per-letter
-     *  fallback is for when THIS fails, i.e. a single word is itself wider
-     *  than [maxWidth] and there's no space left to break on. Returns null
-     *  in that case so the caller knows to fall further back. */
-    private fun wordWrap(text: String, style: TextStyle, maxWidth: Dp): List<String>? {
+    /** Breaks [text] across lines at word boundaries (never mid-word), so a
+     *  name like "Lana's Whip Deluxe" reads as real words per line rather
+     *  than being dumped one letter per row.
+     *
+     *  Always returns at least one line and never gives up: a word too wide
+     *  to fit becomes its own line and is handed to [FitLine], which shrinks
+     *  or stacks just that word. This used to bail out entirely if ANY single
+     *  word was too wide, which meant one long word dragged the whole string
+     *  down to letter-stacking -- "Locked · Charging · Climate on" became a
+     *  25-row column in a narrow slot purely because "Charging" alone didn't
+     *  fit, even though every other word wrapped fine. */
+    private fun wordWrap(text: String, style: TextStyle, maxWidth: Dp): List<String> {
         val words = text.split(" ").filter { it.isNotEmpty() }
-        if (words.size < 2 || words.any { wouldOverflow(it, style, maxWidth) }) return null
+        if (words.isEmpty()) return emptyList()
         val lines = mutableListOf<String>()
         var line = words.first()
         for (word in words.drop(1)) {
@@ -1124,14 +1128,30 @@ class CarWidget : GlanceAppWidget() {
         return lines
     }
 
-    /** The floors [shrunkToFit] won't shrink past: no smaller than 78% of
-     *  the style's own size (so a shrunk line still reads as the same
-     *  typographic step as its neighbours rather than a different one), and
-     *  never below 9sp outright, which is about where widget text stops
-     *  being legible at arm's length. Text that still won't fit at the
-     *  floor falls through to stacking instead. */
+    /** The comfortable floors [shrunkToFit] won't shrink past: no smaller
+     *  than 78% of the style's own size (so a shrunk line still reads as the
+     *  same typographic step as its neighbours rather than a different one),
+     *  and never below 9sp outright, which is about where widget text stops
+     *  being legible at arm's length. */
     private val MIN_FONT_SCALE = 0.78f
     private val MIN_FONT_SP = 9f
+
+    /** The floor when [FitText] has exhausted every better option and the
+     *  only remaining choice is small-but-whole versus clipped. Below this
+     *  nothing renders meaningfully at all, so there is nothing to gain by
+     *  going further. */
+    private val ABSOLUTE_MIN_SP = 5f
+
+    /** How much of the available width [shrunkToFit] actually aims to fill.
+     *  The small remainder is deliberate slack so a shrunk line lands inside
+     *  its slot rather than exactly on its edge. */
+    private val FIT_SLACK = 0.96f
+
+    /** Longest token still worth stacking one character per row. A percent
+     *  or a short code stacks to a handful of rows and stays readable; past
+     *  this the column grows taller than the tile it is supposed to fit
+     *  inside, which is just clipping again on the other axis. */
+    private val MAX_STACK_CHARS = 6
 
     /** [FitText]'s second-choice fallback, for a single token that [wordWrap]
      *  can't help with (no spaces to break on): shrink the type just enough
@@ -1139,16 +1159,26 @@ class CarWidget : GlanceAppWidget() {
      *  [VerticalText] because a slightly smaller word still reads as a word,
      *  where a stack of single letters reads as a puzzle -- and because
      *  stacking grows downward without bound, which is its own overflow.
-     *  Returns null when fitting would mean going below the legibility
-     *  floors above, leaving stacking as the only remaining option. */
-    private fun shrunkToFit(text: String, style: TextStyle, maxWidth: Dp): TextStyle? {
+     *
+     *  [relaxed] drops the comfortable floors for [ABSOLUTE_MIN_SP], used
+     *  only once stacking has been ruled out too. Returns null when even
+     *  that won't fit. */
+    private fun shrunkToFit(
+        text: String, style: TextStyle, maxWidth: Dp, relaxed: Boolean = false,
+    ): TextStyle? {
         val sp = style.fontSize?.value ?: return null
         if (text.isEmpty()) return null
         // Inverse of wouldOverflow's own estimate, sharing the same ratio:
         // the font size at which this string would exactly fill maxWidth.
-        val needed = maxWidth.value / (text.length * glyphRatio(style))
+        // Inverse of wouldOverflow, but aimed at [FIT_SLACK] of the width
+        // rather than all of it. Solving for the size that fills maxWidth
+        // EXACTLY leaves the result sitting right on the boundary, where
+        // rounding and the estimate's own imprecision can tip it a hair over
+        // and clip it -- the one thing this whole path exists to prevent.
+        val needed = (maxWidth.value * FIT_SLACK) / (text.length * glyphRatio(style))
         if (needed >= sp) return style
-        if (needed < maxOf(sp * MIN_FONT_SCALE, MIN_FONT_SP)) return null
+        val floor = if (relaxed) ABSOLUTE_MIN_SP else maxOf(sp * MIN_FONT_SCALE, MIN_FONT_SP)
+        if (needed < floor) return null
         return style.copy(fontSize = needed.sp)
     }
 
@@ -1156,17 +1186,15 @@ class CarWidget : GlanceAppWidget() {
      *  name in the widget goes through, generalized from what used to be a
      *  one-off fallback just for [WidgetInfoField.PERCENT].
      *
-     *  Four steps, each preferred over the next because each degrades the
-     *  text less than the one after it:
+     *  Two stages. First [wordWrap] breaks the string into lines at word
+     *  boundaries; then every resulting line independently goes through
+     *  [FitLine], which owns the per-line fallbacks. Splitting it this way
+     *  is what lets a single over-wide word shrink on its own without
+     *  dragging the rest of the string down with it.
      *
-     *  1. it fits [maxWidth] as-is, so render it on one line;
-     *  2. [wordWrap] can break it into real-word lines;
-     *  3. [shrunkToFit] can shrink the type just enough to fit one line;
-     *  4. [VerticalText] stacks it one character per row.
-     *
-     *  Every step keeps the whole string on screen -- what changes is how
-     *  readable the result is, so the chain always takes the least-damaging
-     *  option that actually fits. */
+     *  Every stage keeps the whole string on screen -- what changes is only
+     *  how readable the result is, so the chain always takes the
+     *  least-damaging option that actually fits. */
     @Composable
     private fun FitText(
         text: String,
@@ -1180,22 +1208,56 @@ class CarWidget : GlanceAppWidget() {
             Text(text, style = style, maxLines = 1, modifier = modifier)
             return
         }
-        val wrapped = wordWrap(text, style, maxWidth)
-        if (wrapped == null) {
-            // Single unsplittable token: shrinking it beats stacking it,
-            // as long as it stays legible (see shrunkToFit's own floors).
-            val shrunk = shrunkToFit(text, style, maxWidth)
-            if (shrunk != null) {
-                Text(text, style = shrunk, maxLines = 1, modifier = modifier)
+        val lines = wordWrap(text, style, maxWidth)
+        if (lines.size <= 1) {
+            FitLine(lines.firstOrNull() ?: text, style, maxWidth, modifier, horizontalAlignment)
+            return
+        }
+        Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
+            lines.forEach { line ->
+                FitLine(line, style, maxWidth, GlanceModifier, horizontalAlignment)
+            }
+        }
+    }
+
+    /** Renders ONE already-wrapped line, which by definition has no word
+     *  break left to exploit, so the remaining options are all about size:
+     *
+     *  1. it fits [maxWidth] as-is, so render it;
+     *  2. [shrunkToFit] shrinks the type just enough, staying legible;
+     *  3. for a token short enough to stay a few rows tall, [VerticalText]
+     *     stacks it one character per row;
+     *  4. otherwise shrink past the comfortable floor, because a long stack
+     *     would overflow the tile's height and that is just clipping again
+     *     on the other axis. */
+    @Composable
+    private fun FitLine(
+        text: String,
+        style: TextStyle,
+        maxWidth: Dp,
+        modifier: GlanceModifier,
+        horizontalAlignment: Alignment.Horizontal,
+    ) {
+        if (!wouldOverflow(text, style, maxWidth)) {
+            Text(text, style = style, maxLines = 1, modifier = modifier)
+            return
+        }
+        val shrunk = shrunkToFit(text, style, maxWidth)
+        if (shrunk != null) {
+            Text(text, style = shrunk, maxLines = 1, modifier = modifier)
+            return
+        }
+        if (text.length > MAX_STACK_CHARS) {
+            // Text too small to read is recoverable by resizing the widget;
+            // text cut off the edge is not.
+            val forced = shrunkToFit(text, style, maxWidth, relaxed = true)
+            if (forced != null) {
+                Text(text, style = forced, maxLines = 1, modifier = modifier)
                 return
             }
         }
         Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
-            if (wrapped != null) {
-                wrapped.forEach { line -> Text(line, style = style, maxLines = 1) }
-            } else {
-                VerticalText(text, style)
-            }
+            VerticalText(text, style)
         }
     }
 
