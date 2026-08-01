@@ -1015,7 +1015,9 @@ class CarWidget : GlanceAppWidget() {
             provider = ImageProvider(bmp),
             contentDescription = "Car location",
             contentScale = ContentScale.Crop,
-            modifier = GlanceModifier.fillMaxWidth().height(Scale.mapHeight(LocalSize.current)).cornerRadius(14.dp),
+            modifier = GlanceModifier.fillMaxWidth()
+                .height(Scale.mapHeight(LocalSize.current))
+                .cornerRadius(innerCorner(render.config)),
         )
     }
 
@@ -1416,14 +1418,10 @@ class CarWidget : GlanceAppWidget() {
                 actionParametersOf(WidgetKeys.VIN to car.vin, WidgetKeys.ACTION to action.key),
             )
         }
-        // Pill-shaped widgets get pill-shaped buttons too -- otherwise a
-        // stadium-shaped widget with square-cornered buttons inside read as
-        // two mismatched shape languages fighting each other.
-        val buttonCorner = if (render.config.pillShape) 999.dp else 14.dp
         Box(
             modifier = (if (fixedHeight) modifier.height(Scale.buttonHeight(size)) else modifier)
                 .background(bg)
-                .cornerRadius(buttonCorner)
+                .cornerRadius(innerCorner(render.config))
                 .clickable(click),
             contentAlignment = Alignment.Center,
         ) {
@@ -1434,6 +1432,22 @@ class CarWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.size(iconSize),
             )
         }
+    }
+
+    /**
+     * The corner radius for surfaces INSIDE the widget -- action buttons, the
+     * map thumbnail -- derived from the same [WidgetConfig.corner] choice as
+     * the outer container so the whole widget speaks one shape language.
+     *
+     * Deliberately not the container's own radius: at 32dp a button only
+     * ~40dp tall is already a pill, so the inner scale is its own gentler
+     * ramp rather than the same numbers reused.
+     */
+    private fun innerCorner(config: WidgetConfig): Dp = when (config.effectiveCorner) {
+        WidgetConfig.CORNER_SHARP -> 0.dp
+        WidgetConfig.CORNER_ROUND -> 18.dp
+        WidgetConfig.CORNER_PILL -> 999.dp
+        else -> 14.dp
     }
 
     // ---- Small pieces --------------------------------------------------------
