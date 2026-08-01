@@ -372,17 +372,33 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun EmptyState(root: GlanceModifier, theme: WidgetTheme) {
+        val size = LocalSize.current
+        // [root] already carries Content's own padding, so the width text
+        // actually gets is the tile minus both sides of it.
+        val inner = (size.width - Scale.contentPadding(size) * 2).coerceAtLeast(16.dp)
         Box(modifier = root.clickable(openAction(LocalContext.current)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
+                FitText(
                     "Bloo",
-                    style = TextStyle(color = theme.accentProvider, fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                    TextStyle(color = theme.accentProvider, fontSize = Scale.titleSp(size), fontWeight = FontWeight.Bold),
+                    maxWidth = inner,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 )
-                Spacer(GlanceModifier.height(4.dp))
-                Text(
-                    "Open to sign in",
-                    style = TextStyle(color = theme.onSurfaceVariant, fontSize = 12.sp),
-                )
+                // The call to action only earns its space once there's room
+                // for it to read as a sentence. Below that the wordmark
+                // alone is the honest degradation -- the whole tile is
+                // still tappable and still opens the app, so nothing is
+                // lost but the prompt, which beats stacking "Open to sign
+                // in" into a thirteen-row letter column on a 1x1 tile.
+                if (size.height >= 72.dp && inner >= 80.dp) {
+                    Spacer(GlanceModifier.height(4.dp))
+                    FitText(
+                        "Open to sign in",
+                        TextStyle(color = theme.onSurfaceVariant, fontSize = Scale.subtitleSp(size)),
+                        maxWidth = inner,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    )
+                }
             }
         }
     }
@@ -1053,15 +1069,25 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    /** Rough estimate of whether [text] at [fontSize] would overflow
+    /** Average glyph width as a fraction of the font size, the one constant
+     *  behind both [wouldOverflow] and its inverse in [shrunkToFit] -- they
+     *  share it so the "does this fit" test and the "what size would fit"
+     *  solve can never drift apart and disagree. Bold type sets measurably
+     *  wider than regular at the same size, and every use of this estimate
+     *  should err toward "won't fit" rather than let a title clip, so bold
+     *  gets its own wider ratio instead of one average for everything. */
+    private fun glyphRatio(style: TextStyle): Float =
+        if (style.fontWeight == FontWeight.Bold) 0.64f else 0.6f
+
+    /** Rough estimate of whether [text] in [style] would overflow
      *  [maxWidth] -- Glance/RemoteViews has no real text-measurement
      *  callback the way Compose's own `onTextLayout` does, so this is
-     *  deliberately conservative (average glyph width ~0.6x font size)
-     *  rather than exact; used only to decide ahead of time whether to fall
-     *  back to [wordWrap]/[VerticalText], never to lay out pixel-perfect. */
-    private fun wouldOverflow(text: String, fontSize: TextUnit?, maxWidth: Dp): Boolean {
-        val sp = fontSize?.value ?: 12f
-        return (text.length * sp * 0.6f) > maxWidth.value
+     *  deliberately conservative rather than exact; used only to decide
+     *  ahead of time which rung of [FitText]'s fallback chain to take,
+     *  never to lay out pixel-perfect. */
+    private fun wouldOverflow(text: String, style: TextStyle, maxWidth: Dp): Boolean {
+        val sp = style.fontSize?.value ?: 12f
+        return (text.length * sp * glyphRatio(style)) > maxWidth.value
     }
 
     /** [FitText]'s preferred way of fitting an overflowing string: break it
@@ -1071,14 +1097,14 @@ class CarWidget : GlanceAppWidget() {
      *  fallback is for when THIS fails, i.e. a single word is itself wider
      *  than [maxWidth] and there's no space left to break on. Returns null
      *  in that case so the caller knows to fall further back. */
-    private fun wordWrap(text: String, fontSize: TextUnit?, maxWidth: Dp): List<String>? {
+    private fun wordWrap(text: String, style: TextStyle, maxWidth: Dp): List<String>? {
         val words = text.split(" ").filter { it.isNotEmpty() }
-        if (words.size < 2 || words.any { wouldOverflow(it, fontSize, maxWidth) }) return null
+        if (words.size < 2 || words.any { wouldOverflow(it, style, maxWidth) }) return null
         val lines = mutableListOf<String>()
         var line = words.first()
         for (word in words.drop(1)) {
             val candidate = "$line $word"
-            if (wouldOverflow(candidate, fontSize, maxWidth)) {
+            if (wouldOverflow(candidate, style, maxWidth)) {
                 lines += line
                 line = word
             } else {
@@ -1109,9 +1135,9 @@ class CarWidget : GlanceAppWidget() {
     private fun shrunkToFit(text: String, style: TextStyle, maxWidth: Dp): TextStyle? {
         val sp = style.fontSize?.value ?: return null
         if (text.isEmpty()) return null
-        // Inverse of wouldOverflow's own estimate: the font size at which
-        // this string would exactly fill maxWidth.
-        val needed = maxWidth.value / (text.length * 0.6f)
+        // Inverse of wouldOverflow's own estimate, sharing the same ratio:
+        // the font size at which this string would exactly fill maxWidth.
+        val needed = maxWidth.value / (text.length * glyphRatio(style))
         if (needed >= sp) return style
         if (needed < maxOf(sp * MIN_FONT_SCALE, MIN_FONT_SP)) return null
         return style.copy(fontSize = needed.sp)
@@ -1141,11 +1167,11 @@ class CarWidget : GlanceAppWidget() {
         horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     ) {
         if (text.isBlank()) return
-        if (!wouldOverflow(text, style.fontSize, maxWidth)) {
+        if (!wouldOverflow(text, style, maxWidth)) {
             Text(text, style = style, maxLines = 1, modifier = modifier)
             return
         }
-        val wrapped = wordWrap(text, style.fontSize, maxWidth)
+        val wrapped = wordWrap(text, style, maxWidth)
         if (wrapped == null) {
             // Single unsplittable token: shrinking it beats stacking it,
             // as long as it stays legible (see shrunkToFit's own floors).
