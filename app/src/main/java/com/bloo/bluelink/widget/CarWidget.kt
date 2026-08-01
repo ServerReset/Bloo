@@ -242,18 +242,28 @@ class CarWidget : GlanceAppWidget() {
          *  keeps it proportioned the same way everything else here is. */
         fun mapHeight(size: DpSize): Dp = lerp(progress(size), 56f, 110f).dp
 
-        /** How many [InfoStack] rows to actually show at the LARGE/XL tiers,
-         *  where the info stack shares a weighted Column with the ring, a
-         *  map, and the footer -- a fixed count (the old "always show 4" or
-         *  "always show every field") could ask for more rows than a tile
-         *  right at that tier's own minimum height has room for, and unlike
-         *  a single Text, RemoteViews doesn't clip a Column's overflowing
-         *  children -- it just lets them bleed past the tile's own bottom
-         *  edge, which reads exactly like the clipping this is meant to
-         *  prevent. Scales with the tile's own measured height instead of
-         *  the tier's nominal minimum. */
-        fun infoCap(size: DpSize, capMax: Int): Int =
-            (((size.height.value - 170f) / 40f).toInt() + 2).coerceIn(2, capMax)
+        /** How many [InfoStack] rows to actually show.
+         *
+         *  The stack shares a Column with the header, ring, buttons and
+         *  footer, and unlike a single Text, RemoteViews doesn't clip an
+         *  overflowing Column -- it lets the children bleed past the tile's
+         *  bottom edge, which reads exactly like the clipping the whole
+         *  FitText path exists to prevent. So the count has to come from the
+         *  room available rather than being fixed per tier.
+         *
+         *  Now also keyed off [textScale]: rows get taller as the user's
+         *  chosen text size grows, so a count that fit at 1.0x need not fit
+         *  at 1.4x. The reserve fraction is an estimate of what the header,
+         *  ring, buttons and footer claim -- deliberately generous, since
+         *  showing one row fewer is a far smaller cost than spilling off the
+         *  tile. */
+        fun infoCap(size: DpSize, capMax: Int, textScale: Float): Int {
+            // A row is one value line plus its 2dp spacer; ~1.35x font size
+            // approximates the line height RemoteViews gives it.
+            val rowDp = valueSp(size).value * textScale * 1.35f + 2f
+            val room = size.height.value * (1f - 0.62f)
+            return (room / rowDp).toInt().coerceIn(1, capMax)
+        }
     }
 
 
@@ -690,11 +700,11 @@ class CarWidget : GlanceAppWidget() {
                     minRowWidth = 140.dp,
                     ringWidth = ringEdge,
                     ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
-                    content = { w -> InfoStack(car, render, max = 3, availableWidth = w) },
+                    content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale), availableWidth = w) },
                 )
             } else {
                 Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                    InfoStack(car, render, max = 3)
+                    InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale))
                 }
             }
             Spacer(GlanceModifier.height(8.dp))
@@ -718,7 +728,7 @@ class CarWidget : GlanceAppWidget() {
         val content: @Composable (Dp) -> Unit = { w ->
             HeaderRow(car, render, availableWidth = w)
             Spacer(GlanceModifier.height(6.dp))
-            InfoStack(car, render, max = 3, availableWidth = w)
+            InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale), availableWidth = w)
             Spacer(GlanceModifier.height(6.dp))
             ActionButtons(car, render, max = 4, availableWidth = w)
         }
@@ -748,7 +758,7 @@ class CarWidget : GlanceAppWidget() {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.height(8.dp))
             }
-            InfoStack(car, render, max = 3)
+            InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale))
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 4)
         }
@@ -781,7 +791,7 @@ class CarWidget : GlanceAppWidget() {
                     }
                 },
                 content = { w ->
-                    InfoStack(car, render, max = Scale.infoCap(size, 4), availableWidth = w)
+                    InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w)
                     MapModule(render)
                 },
             )
@@ -814,7 +824,7 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4), availableWidth = w) },
+                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w) },
             )
             MapModule(render)
             Spacer(GlanceModifier.height(10.dp))
@@ -839,7 +849,7 @@ class CarWidget : GlanceAppWidget() {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
             Spacer(GlanceModifier.height(10.dp))
-            InfoStack(car, render, max = Scale.infoCap(size, 4))
+            InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale))
             MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 5)
@@ -873,7 +883,7 @@ class CarWidget : GlanceAppWidget() {
                     FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = ringEdge, horizontalAlignment = Alignment.CenterHorizontally)
                 },
                 content = { w ->
-                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size), availableWidth = w)
+                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale), availableWidth = w)
                     MapModule(render)
                 },
             )
@@ -905,7 +915,7 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
             Spacer(GlanceModifier.height(14.dp))
-            InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size))
+            InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale))
             MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = WidgetAction.ALL.size)
@@ -934,7 +944,7 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4), availableWidth = w) },
+                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w) },
             )
             Spacer(GlanceModifier.height(12.dp))
             MapModule(render)
