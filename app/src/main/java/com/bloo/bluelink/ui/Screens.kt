@@ -3635,21 +3635,49 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         // shrink along with the outgoing/incoming car during a swipe, exactly
         // like every other car pager's PagerDots already stays put outside
         // the per-page transform.
-        if (count > 1) {
-            PagerDotsFor(
-                pager = pager,
-                real = { realCar(it) },
-                count = count,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 10.dp)
-                    .graphicsLayer { alpha = dotsAlphaState.value },
-                // No hold-to-refresh here -- the cover screen's own edge-trace
-                // gesture (drag down from the top edge) is already the refresh
-                // affordance in this mode; the dots are display-only.
-                onRefresh = null,
-            )
+        // Car name + switching dots, in one TopCenter overlay.
+        //
+        // The name is here rather than in the tiles because cover pebbles
+        // render header-less by design, so nothing on the cover screen said
+        // which car you were looking at -- fine on the main tile, genuinely
+        // confusing on Charge or Climate after swiping between cars.
+        // Reported from a real device.
+        //
+        // It rides the same overlay the dots already occupied, so it claims
+        // no vertical space that wasn't already spoken for, and fades with
+        // the same refresh alpha so the loading indicator still owns the
+        // screen during a refresh.
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 10.dp, start = 12.dp, end = 12.dp)
+                .graphicsLayer { alpha = dotsAlphaState.value },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))?.let { current ->
+                Text(
+                    current.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (count > 1) {
+                Spacer(Modifier.height(6.dp))
+                PagerDotsFor(
+                    pager = pager,
+                    real = { realCar(it) },
+                    count = count,
+                    // No hold-to-refresh here -- the cover screen's own
+                    // edge-trace gesture (drag down from the top edge) is
+                    // already the refresh affordance in this mode; the dots
+                    // are display-only.
+                    onRefresh = null,
+                )
+            }
         }
     }
 }
@@ -3728,25 +3756,12 @@ private fun CompactCar(
     // pager, so a scrub drag can't also be read as a page swipe.
     val coverScrubbing = LocalCoverScrubbing.current
 
-    // ---- Camera cutout detection ----
-    // Read the front camera's bounding rect from the display cutout API.
-    // boundingRects are in screen pixels (display coordinate system), which
-    // aligns with the edge-to-edge Canvas coordinate space used below.
-    val view = LocalView.current
     val density = LocalDensity.current
-    val cameraHole: android.graphics.Rect? = remember(view) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            view.rootWindowInsets?.displayCutout?.boundingRects?.firstOrNull()
-        else null
-    }
-    // NOTE: the per-edge cutout CLEARANCE math that used to live here (cameraEdgeOf
-    // + a when(cameraEdge) clearance) has been removed — content padding is now
-    // driven by native WindowInsets.displayCutout on the tile Box below, which is
-    // corner-safe and recomposition-aware. `cameraHole` is kept ONLY to position
-    // the decorative ring (cosmetic); it is not load-bearing for layout, so its
-    // occasional first-frame staleness no longer lets content run under the bump.
-    // Decorative ring color — subtle outline that acknowledges the camera hole.
-    val ringColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+    // NOTE: nothing here reads the display cutout any more. The per-edge
+    // CLEARANCE math went first (content padding now comes from native
+    // WindowInsets.displayCutout on the tile Box below, which is corner-safe
+    // and recomposition-aware), and the decorative ring that was the last
+    // remaining reader has now gone too -- see where it used to be drawn.
 
     // ---- Edge-trace refresh gesture ----
     // Long-press anywhere on the cover screen to trace a line around the edge.
@@ -3870,30 +3885,20 @@ private fun CompactCar(
             }
         }
       }
-        // Decorative camera ring — drawn over the tile content so it's always
-        // visible regardless of which tile is showing. Only rendered when a
-        // display cutout was detected (flip-phone cover screen with punch-hole).
-        if (cameraHole != null) {
-            Canvas(Modifier.fillMaxSize()) {
-                val cx = cameraHole.exactCenterX()
-                val cy = cameraHole.exactCenterY()
-                val holeRadius = cameraHole.width() / 2f
-                // Inner circle: clear (transparent) punch matching the camera size.
-                drawCircle(
-                    color = ringColor,
-                    radius = holeRadius + with(density) { 2.dp.toPx() },
-                    center = androidx.compose.ui.geometry.Offset(cx, cy),
-                    style = Stroke(width = with(density) { 1.5.dp.toPx() }),
-                )
-                // Outer glow ring — slightly larger, very faint, for depth.
-                drawCircle(
-                    color = ringColor.copy(alpha = ringColor.alpha * 0.4f),
-                    radius = holeRadius + with(density) { 5.dp.toPx() },
-                    center = androidx.compose.ui.geometry.Offset(cx, cy),
-                    style = Stroke(width = with(density) { 1.dp.toPx() }),
-                )
-            }
-        }
+        // The decorative camera ring that used to be drawn here has been
+        // removed. It assumed the display cutout was a small circular
+        // punch-hole and derived its radius from `cutout.width() / 2`, but a
+        // flip cover screen reports the whole camera ISLAND as one bounding
+        // rect -- so instead of tracing a lens it swept an enormous faint
+        // circle across the panel, well outside the cameras it was meant to
+        // acknowledge. Reported from a real device.
+        //
+        // Not re-fitted to the island shape: the rect is a bounding box, not
+        // the real outline, so anything drawn from it is a guess at hardware
+        // geometry that varies per device. It was purely cosmetic and load-
+        // bearing for nothing (content padding comes from the native
+        // WindowInsets.displayCutout on the tile Box above), so the honest
+        // fix is to stop drawing it rather than to keep guessing.
         // Edge-trace ring: when holding (gesture handler lives on the outer
         // Box now, see above), a line traces the screen edge clockwise from
         // the top-left. Full circuit = refresh. Purely decorative here --
@@ -4922,6 +4927,13 @@ private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
 
 /** Tile names that [CompactCar] can render — unknown sections are excluded. */
 private val CompactKnownTiles = setOf(
+    // "controls" was missing here, which silently dropped the lock / horn /
+    // lights pebble from the cover screen entirely -- the one place those
+    // controls are most wanted, since the cover screen is what you actually
+    // see with the phone shut. SinglePebble has always handled "controls"
+    // (it renders ControlsPebble), so nothing else was needed to support it;
+    // this filter was the only thing standing in the way.
+    "controls",
     "climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai"
 )
 
