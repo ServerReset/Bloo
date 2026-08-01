@@ -15,6 +15,7 @@ class CanadaRepository(
     private val api: CanadaApi,
     private val store: SessionStore,
     private val brand: Brand,
+    private val credentialStore: CredentialStore,
 ) : VehicleRepository {
 
     private val summaries = java.util.concurrent.ConcurrentHashMap<String, CanadaVehicleSummary>()
@@ -154,10 +155,18 @@ class CanadaRepository(
     }
 
     /**
-     * Runs [block] with the saved Canada session. Unlike Kia US there's no
-     * silent-reauth refresh token flow documented for this backend, so an
-     * expired session (401/403) surfaces as a clear "sign in again" error
-     * rather than attempting a retry the reference project doesn't support.
+     * Runs [block] with the saved Canada session. The Canada backend has no
+     * lightweight refresh-token exchange (confirmed against the reference
+     * project this port is based on) -- but re-running the exact same
+     * password login this device already completed once succeeds silently,
+     * with no OTP, as long as this device's 90-day "remembered device" grant
+     * (mfaYn, see [CanadaApi]) from that original login hasn't expired yet.
+     * A real Bloo session can easily outlive one API access-token's shorter
+     * lifetime while staying well within that 90-day window, so most 401s
+     * here should be invisible to the user -- only a re-login that itself
+     * comes back demanding a fresh OTP (the device grant has genuinely
+     * lapsed) surfaces the "sign in again" error, mirroring [KiaRepository]'s
+     * own silent-reauth shape.
      */
     private suspend fun <T> withSession(block: suspend (CanadaSession) -> T): T {
         val stored = store.load(brand) ?: throw BlueLinkException("Not logged in")
@@ -165,7 +174,21 @@ class CanadaRepository(
             block(stored.toCanada())
         } catch (e: BlueLinkException) {
             if (e.code != 401 && e.code != 403) throw e
-            throw BlueLinkException("Session expired — please sign out and sign in again", code = e.code)
+            val creds = credentialStore.load(brand)
+                ?: throw BlueLinkException("Session expired — please sign in again", code = e.code)
+            AppLog.log("${brand.label} session expired; re-authenticating silently")
+            val auth = runCatching {
+                api.authUser(creds.email, creds.password, stored.deviceId ?: CanadaApi.newDeviceId(), stored.pin)
+            }.getOrNull()
+            if (auth !is CanadaAuth.LoggedIn) {
+                throw BlueLinkException("Session expired — please sign out and sign in again", code = e.code)
+            }
+            save(auth.session, creds.email, stored.pin)
+            val fresh = store.load(brand) ?: throw e
+            // pAuth tokens are bound to the now-invalidated session; drop the
+            // cache so the next command re-derives them against the new one.
+            pAuths.clear()
+            block(fresh.toCanada())
         }
     }
 }

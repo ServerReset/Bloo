@@ -35,7 +35,7 @@ interface VehicleRepository {
  */
 fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository = when {
     brand == Brand.KIA -> KiaRepository(KiaUsaApi(), store, credentials)
-    brand.isCanada -> CanadaRepository(CanadaApi(brand), store, brand)
+    brand.isCanada -> CanadaRepository(CanadaApi(brand), store, brand, credentials)
     else -> BlueLinkRepository(BlueLinkApi(brand), store, brand)
 }
 
