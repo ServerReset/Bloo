@@ -159,8 +159,25 @@ class CarWidget : GlanceAppWidget() {
         val photoBitmap: android.graphics.Bitmap?,
     )
 
-    /** The layout tiers, smallest to largest. Chosen from the measured size. */
-    private enum class Tier { MICRO, COMPACT_WIDE, COMPACT_TALL, MEDIUM, LARGE, XL }
+    /**
+     * The layout tiers, smallest to largest, each with its own composable --
+     * 14 in total, most of them (the 6 below MEDIUM) further doubled by
+     * [WidgetConfig.priority] into a genuinely distinct info-vs-controls
+     * layout, so a widget dropped small has real variety to grow into rather
+     * than one shape stretched to fit every size. Every tier reuses the same
+     * shared modules (HeaderRow, RingImage, InfoStack, ActionButtons, ...) --
+     * what changes tier to tier is composition and proportion, not
+     * reinvented logic, which is what keeps 14 layouts maintainable as one
+     * set of building blocks instead of 14 independent implementations.
+     */
+    private enum class Tier {
+        MICRO_TINY, MICRO,
+        COMPACT_WIDE_NARROW, COMPACT_WIDE,
+        COMPACT_TALL_NARROW, COMPACT_TALL,
+        MEDIUM_SQUARE, MEDIUM_WIDE, MEDIUM_TALL,
+        LARGE_WIDE, LARGE_TALL,
+        XL_WIDE, XL_TALL, XL_SQUARE,
+    }
 
     /** Below this width, [InfoStack] stops putting a value beside its label
      *  and starts stacking instead -- the same "give up on one line" width
@@ -217,16 +234,30 @@ class CarWidget : GlanceAppWidget() {
     private fun tierFor(size: DpSize): Tier {
         val w = size.width.value
         val h = size.height.value
-        // Ordered largest-first so the first match wins; each threshold is a clean
-        // dp gate (roughly: XL ≥ 5x5, LARGE ≥ 4-wide, MEDIUM ≥ 2x2), with the two
-        // COMPACT strips catching very lopsided small sizes before the tiny floor.
+        val short = minOf(w, h)
+        val aspect = w / h
+        // Ordered largest-first so the first match wins; each size gate is the
+        // same one the old 6-tier system used (roughly: XL ≥ 5x5, LARGE ≥
+        // 4-wide, MEDIUM ≥ 2x2, the two COMPACT strips catching very lopsided
+        // small sizes before the tiny floor) -- what's new is a second split
+        // inside each band by aspect ratio (or, for the tiniest tiers, by
+        // absolute size), so a wide 5x5 and a tall 5x5 actually get different
+        // proportioned layouts instead of the same one letterboxed.
         return when {
-            w >= 300f && h >= 300f -> Tier.XL
-            w >= 240f && h >= 170f -> Tier.LARGE
-            w >= 150f && h >= 150f -> Tier.MEDIUM
-            w >= 150f && h < 150f && w >= h * 1.6f -> Tier.COMPACT_WIDE
-            h >= 150f && w < 150f && h >= w * 1.4f -> Tier.COMPACT_TALL
-            else -> Tier.MICRO
+            w >= 300f && h >= 300f -> when {
+                aspect > 1.35f -> Tier.XL_WIDE
+                aspect < 0.74f -> Tier.XL_TALL
+                else -> Tier.XL_SQUARE
+            }
+            w >= 240f && h >= 170f -> if (aspect >= 1f) Tier.LARGE_WIDE else Tier.LARGE_TALL
+            w >= 150f && h >= 150f -> when {
+                aspect > 1.25f -> Tier.MEDIUM_WIDE
+                aspect < 0.8f -> Tier.MEDIUM_TALL
+                else -> Tier.MEDIUM_SQUARE
+            }
+            w >= 150f && h < 150f && w >= h * 1.6f -> if (w >= 220f) Tier.COMPACT_WIDE else Tier.COMPACT_WIDE_NARROW
+            h >= 150f && w < 150f && h >= w * 1.4f -> if (h >= 220f) Tier.COMPACT_TALL else Tier.COMPACT_TALL_NARROW
+            else -> if (short < 60f) Tier.MICRO_TINY else Tier.MICRO
         }
     }
 
@@ -274,12 +305,20 @@ class CarWidget : GlanceAppWidget() {
             }
             Box(modifier = root) {
                 when (tierFor(size)) {
+                    Tier.MICRO_TINY -> MicroTinyLayout(car, effective)
                     Tier.MICRO -> MicroLayout(car, effective)
+                    Tier.COMPACT_WIDE_NARROW -> CompactWideNarrowLayout(car, effective)
                     Tier.COMPACT_WIDE -> CompactWideLayout(car, effective)
+                    Tier.COMPACT_TALL_NARROW -> CompactTallNarrowLayout(car, effective)
                     Tier.COMPACT_TALL -> CompactTallLayout(car, effective)
-                    Tier.MEDIUM -> MediumLayout(car, effective)
-                    Tier.LARGE -> LargeLayout(car, effective)
-                    Tier.XL -> XlLayout(car, effective)
+                    Tier.MEDIUM_SQUARE -> MediumSquareLayout(car, effective)
+                    Tier.MEDIUM_WIDE -> MediumWideLayout(car, effective)
+                    Tier.MEDIUM_TALL -> MediumTallLayout(car, effective)
+                    Tier.LARGE_WIDE -> LargeWideLayout(car, effective)
+                    Tier.LARGE_TALL -> LargeTallLayout(car, effective)
+                    Tier.XL_WIDE -> XlWideLayout(car, effective)
+                    Tier.XL_TALL -> XlTallLayout(car, effective)
+                    Tier.XL_SQUARE -> XlSquareLayout(car, effective)
                 }
             }
         }
@@ -312,20 +351,40 @@ class CarWidget : GlanceAppWidget() {
     private fun controlsPriority(render: Render) = render.config.priority == WidgetConfig.PRIORITY_CONTROLS
 
     @Composable
-    private fun MicroLayout(car: VehicleSnapshot, render: Render) {
-        // MICRO is the unbounded catch-all tier -- every other tier's own
-        // threshold proves a minimum size the tier's fixed dp values were
-        // designed to fit inside, but MICRO has no such floor beyond the
-        // manifest's declared 40dp minimum (car_widget_info.xml). A ring/
-        // glyph/icon sized for a "normal" ~64dp micro tile would overflow a
-        // real 40dp one, so every size here scales down from its usual value
-        // to whatever's actually measured, rather than assuming there's
-        // always at least that much room.
+    private fun MicroTinyLayout(car: VehicleSnapshot, render: Render) {
+        // The true floor -- literally no room for any text at all (a name at
+        // any legible size would overflow a <60dp tile), so this is pure
+        // iconography: ring/glyph, or one button filling the whole tile.
         val size = LocalSize.current
-        val fit = (minOf(size.width, size.height) - 20.dp).coerceAtLeast(12.dp)
-        // Controls priority at this size means "this widget IS one button" --
-        // there's no room for a real row of buttons at a usable tap size, so
-        // just the first configured action fills the whole tile.
+        val fit = (minOf(size.width, size.height) - 16.dp).coerceAtLeast(10.dp)
+        if (controlsPriority(render)) {
+            val action = resolvedActions(car, render, max = 1).firstOrNull()
+            if (action != null) {
+                val iconSize = fit.coerceIn(12.dp, 26.dp)
+                ActionButton(action, car, render, modifier = GlanceModifier.fillMaxSize(), fixedHeight = false, iconSize = iconSize)
+                return
+            }
+        }
+        Box(
+            modifier = GlanceModifier.fillMaxSize().clickable(openAction(LocalContext.current)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = Scale.ring(size, fit).value.toInt())
+            } else {
+                StatusGlyph(car, render.theme, sizeDp = fit.coerceIn(12.dp, 34.dp).value.toInt())
+            }
+        }
+    }
+
+    @Composable
+    private fun MicroLayout(car: VehicleSnapshot, render: Render) {
+        // A little roomier than MICRO_TINY -- same ring/glyph/button core,
+        // but now there's just enough space for one tiny caption underneath
+        // when the ring itself isn't shown. FitText's own vertical fallback
+        // still covers the case where even that single caption is too wide.
+        val size = LocalSize.current
+        val fit = (minOf(size.width, size.height) - 22.dp).coerceAtLeast(14.dp)
         if (controlsPriority(render)) {
             val action = resolvedActions(car, render, max = 1).firstOrNull()
             if (action != null) {
@@ -334,17 +393,49 @@ class CarWidget : GlanceAppWidget() {
                 return
             }
         }
-        // A single glance: the fuel/charge ring if there's a percent to show and
-        // the ring is on, else a lock glyph. Whole tile opens the app.
-        Box(
+        Column(
             modifier = GlanceModifier.fillMaxSize().clickable(openAction(LocalContext.current)),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = Scale.ring(size, fit).value.toInt())
             } else {
-                StatusGlyph(car, render.theme, sizeDp = fit.coerceIn(14.dp, 40.dp).value.toInt())
+                StatusGlyph(car, render.theme, sizeDp = fit.coerceIn(14.dp, 36.dp).value.toInt())
+                Spacer(GlanceModifier.height(2.dp))
+                FitText(
+                    car.name, subtitleStyle(render.theme),
+                    maxWidth = (size.width - 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                )
             }
+        }
+    }
+
+    @Composable
+    private fun CompactWideNarrowLayout(car: VehicleSnapshot, render: Render) {
+        if (controlsPriority(render)) {
+            val actions = resolvedActions(car, render, max = 2)
+            if (actions.isNotEmpty()) {
+                ActionButtons(car, render, max = 2, modifier = GlanceModifier.fillMaxSize().padding(4.dp))
+                return
+            }
+        }
+        // Narrower than COMPACT_WIDE's own threshold -- no room for a
+        // subtitle line beside the ring too, just the name, and only 2
+        // buttons instead of 3.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height - 12.dp).coerceAtLeast(18.dp))
+        Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                Spacer(GlanceModifier.width(6.dp))
+            }
+            FitText(
+                car.name, titleStyle(render.theme),
+                maxWidth = size.width * 0.32f, modifier = GlanceModifier.defaultWeight(),
+            )
+            Spacer(GlanceModifier.width(6.dp))
+            ActionButtons(car, render, max = 2, modifier = GlanceModifier.defaultWeight())
         }
     }
 
@@ -382,11 +473,42 @@ class CarWidget : GlanceAppWidget() {
             // Giving it a weight too makes it share the remaining space
             // fairly with the text column instead of overrunning it.
             Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(car.name, style = titleStyle(render.theme), maxLines = 1)
+                FitText(car.name, titleStyle(render.theme), maxWidth = size.width * 0.36f)
                 PrimaryInfoLine(car, render)
             }
             Spacer(GlanceModifier.width(8.dp))
             ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight())
+        }
+    }
+
+    @Composable
+    private fun CompactTallNarrowLayout(car: VehicleSnapshot, render: Render) {
+        if (controlsPriority(render)) {
+            val actions = resolvedActions(car, render, max = 2)
+            if (actions.isNotEmpty()) {
+                Box(GlanceModifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
+                    ActionButtons(car, render, max = 2, vertical = true)
+                }
+                return
+            }
+        }
+        // Shorter than COMPACT_TALL's own threshold -- name + ring/glyph +
+        // a single button only, no room for the info stack too.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.width - 12.dp).coerceAtLeast(18.dp))
+        Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            FitText(
+                car.name, titleStyle(render.theme),
+                maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
+            )
+            Spacer(GlanceModifier.height(4.dp))
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+            } else {
+                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+            }
+            Spacer(GlanceModifier.height(4.dp))
+            ActionButtons(car, render, max = 1)
         }
     }
 
@@ -406,7 +528,10 @@ class CarWidget : GlanceAppWidget() {
         val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.width - 16.dp).coerceAtLeast(20.dp))
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(car.name, style = titleStyle(render.theme), maxLines = 1)
+            FitText(
+                car.name, titleStyle(render.theme),
+                maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
+            )
             Spacer(GlanceModifier.height(6.dp))
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -419,8 +544,8 @@ class CarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun MediumLayout(car: VehicleSnapshot, render: Render) {
-        // Same reasoning as LargeLayout/XlLayout's own clamp: the header +
+    private fun MediumSquareLayout(car: VehicleSnapshot, render: Render) {
+        // Same reasoning as the LARGE/XL tiers' own clamp: the header +
         // button rows can leave less than the ring's continuous target size
         // at MEDIUM's own minimum height (150dp).
         val size = LocalSize.current
@@ -443,7 +568,48 @@ class CarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun LargeLayout(car: VehicleSnapshot, render: Render) {
+    private fun MediumWideLayout(car: VehicleSnapshot, render: Render) {
+        // Wide MEDIUM: put the ring beside the header/info/buttons stack
+        // instead of above it, so a wide-but-short tile spends its extra
+        // width on layout instead of leaving it empty beside a centered ring.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height * 0.7f).coerceAtLeast(36.dp))
+        Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                Spacer(GlanceModifier.width(12.dp))
+            }
+            Column(modifier = GlanceModifier.defaultWeight()) {
+                HeaderRow(car, render)
+                Spacer(GlanceModifier.height(6.dp))
+                InfoStack(car, render, max = 3)
+                Spacer(GlanceModifier.height(6.dp))
+                ActionButtons(car, render, max = 4)
+            }
+        }
+    }
+
+    @Composable
+    private fun MediumTallLayout(car: VehicleSnapshot, render: Render) {
+        // Tall MEDIUM: everything stacked in one column, ring centered --
+        // the mirror of MediumWideLayout's side-by-side arrangement.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.width - 24.dp).coerceAtLeast(36.dp))
+        Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            HeaderRow(car, render)
+            Spacer(GlanceModifier.height(8.dp))
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                Spacer(GlanceModifier.height(8.dp))
+            }
+            InfoStack(car, render, max = 3)
+            Spacer(GlanceModifier.defaultWeight())
+            ActionButtons(car, render, max = 4)
+        }
+    }
+
+    @Composable
+    private fun LargeWideLayout(car: VehicleSnapshot, render: Render) {
         // The ring's row shares this Column with the header/buttons/footer via
         // defaultWeight(), so at LARGE's own minimum height (170dp) the ring's
         // continuous target can be taller than what's actually left over once
@@ -466,7 +632,7 @@ class CarWidget : GlanceAppWidget() {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     } else {
-                        StatusGlyph(car, render.theme, sizeDp = 56)
+                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 }
                 Spacer(GlanceModifier.width(12.dp))
@@ -482,8 +648,32 @@ class CarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun XlLayout(car: VehicleSnapshot, render: Render) {
-        // Same reasoning as LargeLayout's own ringEdge clamp.
+    private fun LargeTallLayout(car: VehicleSnapshot, render: Render) {
+        // Tall LARGE: ring centered full-width above the info stack instead
+        // of beside it -- there's more height to spend than width here, so a
+        // side-by-side split would leave the info column cramped.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.width * 0.55f).coerceAtLeast(48.dp))
+        Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            HeaderRow(car, render)
+            Spacer(GlanceModifier.height(10.dp))
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+            } else {
+                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+            }
+            Spacer(GlanceModifier.height(10.dp))
+            InfoStack(car, render, max = 4)
+            MapModule(render, heightDp = 80)
+            Spacer(GlanceModifier.defaultWeight())
+            ActionButtons(car, render, max = 5)
+            FooterRow(car, render)
+        }
+    }
+
+    @Composable
+    private fun XlWideLayout(car: VehicleSnapshot, render: Render) {
+        // Same reasoning as LargeWideLayout's own ringEdge clamp.
         val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.height * 0.42f).coerceAtLeast(60.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
@@ -501,7 +691,7 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = 88)
                     }
                     Spacer(GlanceModifier.height(8.dp))
-                    Text(primaryValue(car, render), style = titleStyle(render.theme), maxLines = 1)
+                    FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = size.width * 0.4f, horizontalAlignment = Alignment.CenterHorizontally)
                 }
                 Spacer(GlanceModifier.width(16.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
@@ -515,14 +705,81 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
+    @Composable
+    private fun XlTallLayout(car: VehicleSnapshot, render: Render) {
+        // Tall XL: one big centered ring up top with the primary value under
+        // it, the full info stack and map stacked below rather than split
+        // into side-by-side columns that would squeeze on a narrow-but-tall
+        // dashboard-sized tile.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.width * 0.5f).coerceAtLeast(64.dp))
+        Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            HeaderRow(car, render)
+            Spacer(GlanceModifier.height(14.dp))
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+            } else {
+                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+            }
+            Spacer(GlanceModifier.height(8.dp))
+            FitText(
+                primaryValue(car, render), titleStyle(render.theme),
+                maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
+            )
+            Spacer(GlanceModifier.height(14.dp))
+            InfoStack(car, render, max = WidgetInfoField.ALL.size)
+            MapModule(render, heightDp = 96)
+            Spacer(GlanceModifier.defaultWeight())
+            ActionButtons(car, render, max = WidgetAction.ALL.size)
+            FooterRow(car, render)
+        }
+    }
+
+    @Composable
+    private fun XlSquareLayout(car: VehicleSnapshot, render: Render) {
+        // Square XL: a balanced ring-left / info-right split above a full-
+        // width map, distinct from XlWideLayout's value-under-ring emphasis
+        // and XlTallLayout's fully stacked column.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height * 0.38f).coerceAtLeast(56.dp))
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            HeaderRow(car, render)
+            Spacer(GlanceModifier.height(12.dp))
+            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (render.config.showRing && car.percent != null) {
+                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                    } else {
+                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+                    }
+                }
+                Spacer(GlanceModifier.width(14.dp))
+                Column(modifier = GlanceModifier.defaultWeight()) {
+                    InfoStack(car, render, max = 4)
+                }
+            }
+            Spacer(GlanceModifier.height(12.dp))
+            MapModule(render, heightDp = 88)
+            Spacer(GlanceModifier.defaultWeight())
+            ActionButtons(car, render, max = WidgetAction.ALL.size)
+            FooterRow(car, render)
+        }
+    }
+
     // ---- Modules -------------------------------------------------------------
 
     @Composable
     private fun HeaderRow(car: VehicleSnapshot, render: Render) {
+        val size = LocalSize.current
+        // Rough reserve for the car-switcher pill (36dp + its own spacing)
+        // when it's present -- an estimate, same spirit as every other
+        // maxWidth passed to FitText in this file (see wouldOverflow).
+        val pillReserve = if (render.multiCar && render.config.vin == null) 44.dp else 0.dp
+        val textWidth = (size.width - pillReserve - 4.dp).coerceAtLeast(16.dp)
         Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(LocalContext.current)), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(car.name, style = titleStyle(render.theme), maxLines = 1)
-                Text(statusSubtitle(car), style = subtitleStyle(render.theme), maxLines = 1)
+                FitText(car.name, titleStyle(render.theme), maxWidth = textWidth)
+                FitText(statusSubtitle(car), subtitleStyle(render.theme), maxWidth = textWidth)
             }
             if (render.multiCar && render.config.vin == null) {
                 // Follow-selected widgets get a car switcher chevron.
@@ -546,10 +803,10 @@ class CarWidget : GlanceAppWidget() {
                 TextStyle(color = ColorProvider(Color(BlooColors.warn)), fontSize = 11.sp)
             else subtitleStyle(render.theme)
             val text = if (render.stale) "Updated $updated · may be stale" else "Updated $updated"
-            Text(
+            FitText(
                 text,
-                style = style,
-                maxLines = 1,
+                style,
+                maxWidth = LocalSize.current.width - 8.dp,
                 modifier = GlanceModifier.clickable(
                     actionRunCallback<WidgetRefreshAction>(actionParametersOf(WidgetKeys.VIN to car.vin)),
                 ),
@@ -574,7 +831,7 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun PrimaryInfoLine(car: VehicleSnapshot, render: Render) {
-        Text(primaryValue(car, render), style = subtitleStyle(render.theme), maxLines = 1)
+        FitText(primaryValue(car, render), subtitleStyle(render.theme), maxWidth = LocalSize.current.width * 0.36f)
     }
 
     /** The stacked read-only stats, honoring the user's chosen fields + order,
@@ -583,9 +840,9 @@ class CarWidget : GlanceAppWidget() {
      *  so "might not fit" is decided ahead of time from the measured tile
      *  width instead of reactively -- below [NARROW_WIDTH] every row drops
      *  the label beside its value in favour of stacking the value on its own
-     *  full-width line underneath, and [WidgetInfoField.PERCENT] specifically
-     *  falls back further to one digit per line (see [VerticalDigits]) if
-     *  even that's tight, so a reading like "82%" degrades to
+     *  full-width line underneath, and [FitText] falls back further to one
+     *  character per line (see [VerticalText]) for either one if even that's
+     *  tight, so a reading like "82%" degrades to
      *
      *  8
      *  2
@@ -595,23 +852,23 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun InfoStack(car: VehicleSnapshot, render: Render, max: Int) {
         val fields = render.config.infoFields.mapNotNull { WidgetInfoField.fromKey(it) }.take(max)
-        val narrow = LocalSize.current.width < NARROW_WIDTH
+        val size = LocalSize.current
+        val narrow = size.width < NARROW_WIDTH
         Column {
             fields.forEach { field ->
                 val value = infoValue(field, car, render) ?: return@forEach
                 if (narrow) {
                     Column(modifier = GlanceModifier.fillMaxWidth()) {
-                        Text(field.label, style = subtitleStyle(render.theme), maxLines = 1)
-                        if (field == WidgetInfoField.PERCENT && value.length > 3) {
-                            VerticalDigits(value, valueStyle(render.theme))
-                        } else {
-                            Text(value, style = valueStyle(render.theme), maxLines = 1)
-                        }
+                        FitText(field.label, subtitleStyle(render.theme), maxWidth = size.width - 4.dp)
+                        FitText(value, valueStyle(render.theme), maxWidth = size.width - 4.dp)
                     }
                 } else {
                     Row(modifier = GlanceModifier.fillMaxWidth()) {
-                        Text(field.label, style = subtitleStyle(render.theme), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                        Text(value, style = valueStyle(render.theme), maxLines = 1)
+                        FitText(
+                            field.label, subtitleStyle(render.theme),
+                            maxWidth = size.width * 0.5f, modifier = GlanceModifier.defaultWeight(),
+                        )
+                        FitText(value, valueStyle(render.theme), maxWidth = size.width * 0.45f)
                     }
                 }
                 Spacer(GlanceModifier.height(2.dp))
@@ -619,13 +876,50 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    /** Renders [text] one character per line, centered -- the fallback for a
-     *  short but wide readout (a percent, mainly) that still wouldn't fit on
-     *  its own full-width line at the narrowest tiers. */
+    /** Renders [text] one character per line, centered -- the universal
+     *  fallback [FitText] drops down to whenever a label/value/name is
+     *  estimated too wide for the line it's on, right down to a single
+     *  character per row if that's what it takes (e.g. "82%" becoming
+     *  "8" / "2" / "%") so nothing the widget shows is ever silently
+     *  clipped or ellipsized, at any tier or any string length. */
     @Composable
-    private fun VerticalDigits(text: String, style: TextStyle) {
+    private fun VerticalText(text: String, style: TextStyle) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = GlanceModifier.fillMaxWidth()) {
-            text.forEach { ch -> Text(ch.toString(), maxLines = 1, style = style) }
+            text.forEach { ch -> if (!ch.isWhitespace()) Text(ch.toString(), maxLines = 1, style = style) }
+        }
+    }
+
+    /** Rough estimate of whether [text] at [fontSize] would overflow
+     *  [maxWidth] -- Glance/RemoteViews has no real text-measurement
+     *  callback the way Compose's own `onTextLayout` does, so this is
+     *  deliberately conservative (average glyph width ~0.6x font size)
+     *  rather than exact; used only to decide ahead of time whether to fall
+     *  back to [VerticalText], never to lay out pixel-perfect. */
+    private fun wouldOverflow(text: String, fontSize: TextUnit?, maxWidth: Dp): Boolean {
+        val sp = fontSize?.value ?: 12f
+        return (text.length * sp * 0.6f) > maxWidth.value
+    }
+
+    /** Renders [text] on one line when it's estimated to fit inside
+     *  [maxWidth], else falls back to [VerticalText] -- the shared "never
+     *  cut off" contract every user-data label/value/name in the widget now
+     *  goes through, generalized from what used to be a one-off fallback
+     *  just for [WidgetInfoField.PERCENT]. */
+    @Composable
+    private fun FitText(
+        text: String,
+        style: TextStyle,
+        maxWidth: Dp,
+        modifier: GlanceModifier = GlanceModifier,
+        horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    ) {
+        if (text.isBlank()) return
+        if (wouldOverflow(text, style.fontSize, maxWidth)) {
+            Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
+                VerticalText(text, style)
+            }
+        } else {
+            Text(text, style = style, maxLines = 1, modifier = modifier)
         }
     }
 
