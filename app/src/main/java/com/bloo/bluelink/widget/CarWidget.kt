@@ -293,12 +293,21 @@ class CarWidget : GlanceAppWidget() {
             // from it).
             w >= 120f && h < 150f && w >= h * 1.4f -> if (w >= 220f) Tier.COMPACT_WIDE else Tier.COMPACT_WIDE_NARROW
             h >= 120f && w < 150f && h >= w * 1.3f -> if (h >= 220f) Tier.COMPACT_TALL else Tier.COMPACT_TALL_NARROW
-            // Fills the gap between MICRO (glyph-only, no name -- meant for
-            // tiles with barely more than the 40dp manifest floor) and the
-            // compact/medium bands above: a near-square widget already
-            // roomier than 80dp has space for a proper mini layout, not
-            // just an icon.
-            short >= 80f && aspect in 0.75f..1.33f -> Tier.COMPACT_SQUARE
+            // The catch-all for anything with real room that no band above
+            // claimed, sitting between MICRO (glyph-only, no name -- meant
+            // for tiles barely past the 40dp manifest floor) and the
+            // compact/medium bands: 80dp on the short side is enough for a
+            // proper mini layout rather than just an icon.
+            //
+            // Deliberately NOT gated on aspect ratio. It used to be, and the
+            // ceiling (1.33) didn't meet COMPACT_WIDE's floor (w >= 1.4h),
+            // so every tile in between -- 190x140, 135x100, 20 such sizes on
+            // a 5dp grid -- fell past every band to MICRO and rendered as a
+            // lone icon despite having room for the full layout. No aspect
+            // test is needed here anyway: the wide and tall bands above have
+            // already claimed every lopsided shape, so whatever reaches this
+            // line is square-ish by construction (1.44 at the very worst).
+            short >= 80f -> Tier.COMPACT_SQUARE
             else -> if (short < 60f) Tier.MICRO_TINY else Tier.MICRO
         }
     }
