@@ -34,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.glance.appwidget.update
 import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.data.SettingsStore
@@ -91,8 +90,10 @@ class WidgetConfigActivity : ComponentActivity() {
     private fun save(config: WidgetConfig) {
         lifecycleScope.launch {
             WidgetConfigStore(applicationContext).set(widgetId, config)
-            runCatching { CarWidget().update(applicationContext, glanceIdFor(widgetId)) }
-                .onFailure { runCatching { CarWidget().updateAll(applicationContext) } }
+            // Refresh every placed widget so the just-saved config takes effect. (Glance
+            // exposes updateAll as a top-level extension; there's no single-widget `update`
+            // extension in this API surface, and repainting all instances is correct here.)
+            runCatching { CarWidget().updateAll(applicationContext) }
             setResult(
                 Activity.RESULT_OK,
                 Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId),
@@ -100,11 +101,6 @@ class WidgetConfigActivity : ComponentActivity() {
             finish()
         }
     }
-
-    private suspend fun glanceIdFor(id: Int) =
-        androidx.glance.appwidget.GlanceAppWidgetManager(applicationContext)
-            .getGlanceIds(CarWidget::class.java)
-            .first { androidx.glance.appwidget.GlanceAppWidgetManager(applicationContext).getAppWidgetId(it) == id }
 }
 
 @Composable
