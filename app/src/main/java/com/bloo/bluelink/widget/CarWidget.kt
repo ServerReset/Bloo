@@ -161,14 +161,14 @@ class CarWidget : GlanceAppWidget() {
 
     /**
      * The layout tiers, smallest to largest, each with its own composable --
-     * 15 in total, most of them (the 7 below MEDIUM) further doubled by
+     * 16 in total, most of them (the 7 below MEDIUM) further doubled by
      * [WidgetConfig.priority] into a genuinely distinct info-vs-controls
      * layout, so a widget dropped small has real variety to grow into rather
      * than one shape stretched to fit every size. Every tier reuses the same
      * shared modules (HeaderRow, RingImage, InfoStack, ActionButtons, ...) --
      * what changes tier to tier is composition and proportion, not
-     * reinvented logic, which is what keeps 15 layouts maintainable as one
-     * set of building blocks instead of 15 independent implementations.
+     * reinvented logic, which is what keeps 16 layouts maintainable as one
+     * set of building blocks instead of 16 independent implementations.
      */
     private enum class Tier {
         MICRO_TINY, MICRO,
@@ -176,7 +176,7 @@ class CarWidget : GlanceAppWidget() {
         COMPACT_WIDE_NARROW, COMPACT_WIDE,
         COMPACT_TALL_NARROW, COMPACT_TALL,
         MEDIUM_SQUARE, MEDIUM_WIDE, MEDIUM_TALL,
-        LARGE_WIDE, LARGE_TALL,
+        LARGE_SQUARE, LARGE_WIDE, LARGE_TALL,
         XL_WIDE, XL_TALL, XL_SQUARE,
     }
 
@@ -241,6 +241,19 @@ class CarWidget : GlanceAppWidget() {
          *  (72/80/88/96dp) chosen ad hoc per layout; one continuous curve
          *  keeps it proportioned the same way everything else here is. */
         fun mapHeight(size: DpSize): Dp = lerp(progress(size), 56f, 110f).dp
+
+        /** How many [InfoStack] rows to actually show at the LARGE/XL tiers,
+         *  where the info stack shares a weighted Column with the ring, a
+         *  map, and the footer -- a fixed count (the old "always show 4" or
+         *  "always show every field") could ask for more rows than a tile
+         *  right at that tier's own minimum height has room for, and unlike
+         *  a single Text, RemoteViews doesn't clip a Column's overflowing
+         *  children -- it just lets them bleed past the tile's own bottom
+         *  edge, which reads exactly like the clipping this is meant to
+         *  prevent. Scales with the tile's own measured height instead of
+         *  the tier's nominal minimum. */
+        fun infoCap(size: DpSize, capMax: Int): Int =
+            (((size.height.value - 170f) / 40f).toInt() + 2).coerceIn(2, capMax)
     }
 
     private fun tierFor(size: DpSize): Tier {
@@ -261,20 +274,31 @@ class CarWidget : GlanceAppWidget() {
                 aspect < 0.74f -> Tier.XL_TALL
                 else -> Tier.XL_SQUARE
             }
-            w >= 240f && h >= 170f -> if (aspect >= 1f) Tier.LARGE_WIDE else Tier.LARGE_TALL
+            w >= 240f && h >= 170f -> when {
+                aspect > 1.2f -> Tier.LARGE_WIDE
+                aspect < 0.83f -> Tier.LARGE_TALL
+                else -> Tier.LARGE_SQUARE
+            }
             w >= 150f && h >= 150f -> when {
                 aspect > 1.25f -> Tier.MEDIUM_WIDE
                 aspect < 0.8f -> Tier.MEDIUM_TALL
                 else -> Tier.MEDIUM_SQUARE
             }
-            w >= 150f && h < 150f && w >= h * 1.6f -> if (w >= 220f) Tier.COMPACT_WIDE else Tier.COMPACT_WIDE_NARROW
-            h >= 150f && w < 150f && h >= w * 1.4f -> if (h >= 220f) Tier.COMPACT_TALL else Tier.COMPACT_TALL_NARROW
-            // Fills the real gap between MICRO (glyph-only, no name -- meant
-            // for tiles with barely more than the 40dp manifest floor) and
-            // MEDIUM's own 150dp floor: a near-square widget already roomier
-            // than that (90dp+) has space for a proper mini layout, not just
-            // an icon.
-            short >= 90f && aspect in 0.8f..1.25f -> Tier.COMPACT_SQUARE
+            // Loosened from the old w/h >= 150 gate -- a tile like 145x100
+            // is genuinely wide/lopsided and had real unused room, but
+            // missed every band above and fell all the way through to
+            // MICRO's icon-only treatment. 120dp + a slightly softer aspect
+            // gate catches it without overlapping MEDIUM's own 150x150 floor
+            // (MEDIUM requires BOTH sides >= 150, so nothing here steals
+            // from it).
+            w >= 120f && h < 150f && w >= h * 1.4f -> if (w >= 220f) Tier.COMPACT_WIDE else Tier.COMPACT_WIDE_NARROW
+            h >= 120f && w < 150f && h >= w * 1.3f -> if (h >= 220f) Tier.COMPACT_TALL else Tier.COMPACT_TALL_NARROW
+            // Fills the gap between MICRO (glyph-only, no name -- meant for
+            // tiles with barely more than the 40dp manifest floor) and the
+            // compact/medium bands above: a near-square widget already
+            // roomier than 80dp has space for a proper mini layout, not
+            // just an icon.
+            short >= 80f && aspect in 0.75f..1.33f -> Tier.COMPACT_SQUARE
             else -> if (short < 60f) Tier.MICRO_TINY else Tier.MICRO
         }
     }
@@ -333,6 +357,7 @@ class CarWidget : GlanceAppWidget() {
                     Tier.MEDIUM_SQUARE -> MediumSquareLayout(car, effective)
                     Tier.MEDIUM_WIDE -> MediumWideLayout(car, effective)
                     Tier.MEDIUM_TALL -> MediumTallLayout(car, effective)
+                    Tier.LARGE_SQUARE -> LargeSquareLayout(car, effective)
                     Tier.LARGE_WIDE -> LargeWideLayout(car, effective)
                     Tier.LARGE_TALL -> LargeTallLayout(car, effective)
                     Tier.XL_WIDE -> XlWideLayout(car, effective)
@@ -697,10 +722,42 @@ class CarWidget : GlanceAppWidget() {
                 }
                 Spacer(GlanceModifier.width(12.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
-                    InfoStack(car, render, max = 4)
+                    InfoStack(car, render, max = Scale.infoCap(size, 4))
                     MapModule(render)
                 }
             }
+            Spacer(GlanceModifier.height(10.dp))
+            ActionButtons(car, render, max = 5)
+            FooterRow(car, render)
+        }
+    }
+
+    @Composable
+    private fun LargeSquareLayout(car: VehicleSnapshot, render: Render) {
+        // Square LARGE: same ring-left / info-right split as LargeWideLayout,
+        // but the map runs full-width below the row instead of being
+        // squeezed inside the narrower info column -- the balanced
+        // ring/square version of the Wide/Square/Tall split MEDIUM and XL
+        // already have, giving LARGE its own third shape too.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height * 0.4f).coerceAtLeast(44.dp))
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            HeaderRow(car, render)
+            Spacer(GlanceModifier.height(10.dp))
+            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (render.config.showRing && car.percent != null) {
+                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                    } else {
+                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+                    }
+                }
+                Spacer(GlanceModifier.width(12.dp))
+                Column(modifier = GlanceModifier.defaultWeight()) {
+                    InfoStack(car, render, max = Scale.infoCap(size, 4))
+                }
+            }
+            MapModule(render)
             Spacer(GlanceModifier.height(10.dp))
             ActionButtons(car, render, max = 5)
             FooterRow(car, render)
@@ -723,7 +780,7 @@ class CarWidget : GlanceAppWidget() {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
             Spacer(GlanceModifier.height(10.dp))
-            InfoStack(car, render, max = 4)
+            InfoStack(car, render, max = Scale.infoCap(size, 4))
             MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 5)
@@ -755,7 +812,7 @@ class CarWidget : GlanceAppWidget() {
                 }
                 Spacer(GlanceModifier.width(16.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
-                    InfoStack(car, render, max = WidgetInfoField.ALL.size)
+                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size))
                     MapModule(render)
                 }
             }
@@ -787,7 +844,7 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
             Spacer(GlanceModifier.height(14.dp))
-            InfoStack(car, render, max = WidgetInfoField.ALL.size)
+            InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size))
             MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = WidgetAction.ALL.size)
@@ -815,7 +872,7 @@ class CarWidget : GlanceAppWidget() {
                 }
                 Spacer(GlanceModifier.width(14.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
-                    InfoStack(car, render, max = 4)
+                    InfoStack(car, render, max = Scale.infoCap(size, 4))
                 }
             }
             Spacer(GlanceModifier.height(12.dp))
