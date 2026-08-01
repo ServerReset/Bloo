@@ -449,7 +449,12 @@ class CarWidget : GlanceAppWidget() {
         // footer below: at 40dp tall the padded content box is 28dp, barely
         // two lines of small text.
         val size = LocalSize.current
-        if (controlsPriority(render)) {
+        // Only take over the tile if there's actually something to show:
+        // resolvedActions filters by brand (Kia and the Canada backend have
+        // no flash/horn endpoint), so a widget configured with only those
+        // resolves to an empty list, and returning here regardless would
+        // render a completely blank banner.
+        if (controlsPriority(render) && resolvedActions(car, render, max = 6).isNotEmpty()) {
             ActionButtons(car, render, max = 6, modifier = GlanceModifier.fillMaxSize())
             return
         }
@@ -482,7 +487,9 @@ class CarWidget : GlanceAppWidget() {
         // whole strip stays tappable, so what's dropped is a label that could
         // never have been read rather than any actual function.
         val size = LocalSize.current
-        if (controlsPriority(render)) {
+        // Same guard as BannerLayout -- an empty action list here would leave
+        // an empty Box rather than falling back to the ring.
+        if (controlsPriority(render) && resolvedActions(car, render, max = 6).isNotEmpty()) {
             Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 ActionButtons(car, render, max = 6, vertical = true)
             }
