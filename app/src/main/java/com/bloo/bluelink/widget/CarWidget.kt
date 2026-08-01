@@ -993,12 +993,13 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    /** Renders [text] one character per line, centered -- the universal
-     *  fallback [FitText] drops down to whenever a label/value/name is
-     *  estimated too wide for the line it's on, right down to a single
-     *  character per row if that's what it takes (e.g. "82%" becoming
-     *  "8" / "2" / "%") so nothing the widget shows is ever silently
-     *  clipped or ellipsized, at any tier or any string length. */
+    /** Renders [text] one character per line, centered -- the LAST-resort
+     *  fallback for a single unsplittable token (a percent, an odometer
+     *  reading, one long word with no spaces) that's still too wide for its
+     *  line even on its own, e.g. "82%" becoming "8" / "2" / "%". [FitText]
+     *  only reaches this after [wordWrap] has already failed to help --
+     *  everything that CAN be split across multiple readable lines instead
+     *  goes through that first. */
     @Composable
     private fun VerticalText(text: String, style: TextStyle) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = GlanceModifier.fillMaxWidth()) {
@@ -1011,17 +1012,45 @@ class CarWidget : GlanceAppWidget() {
      *  callback the way Compose's own `onTextLayout` does, so this is
      *  deliberately conservative (average glyph width ~0.6x font size)
      *  rather than exact; used only to decide ahead of time whether to fall
-     *  back to [VerticalText], never to lay out pixel-perfect. */
+     *  back to [wordWrap]/[VerticalText], never to lay out pixel-perfect. */
     private fun wouldOverflow(text: String, fontSize: TextUnit?, maxWidth: Dp): Boolean {
         val sp = fontSize?.value ?: 12f
         return (text.length * sp * 0.6f) > maxWidth.value
     }
 
+    /** [FitText]'s preferred way of fitting an overflowing string: break it
+     *  across multiple lines at word boundaries (never mid-word) so a name
+     *  like "Lana's Whip Deluxe" reads as two or three real words per line
+     *  instead of being dumped one letter per row -- that per-letter
+     *  fallback is for when THIS fails, i.e. a single word is itself wider
+     *  than [maxWidth] and there's no space left to break on. Returns null
+     *  in that case so the caller knows to fall further back. */
+    private fun wordWrap(text: String, fontSize: TextUnit?, maxWidth: Dp): List<String>? {
+        val words = text.split(" ").filter { it.isNotEmpty() }
+        if (words.size < 2 || words.any { wouldOverflow(it, fontSize, maxWidth) }) return null
+        val lines = mutableListOf<String>()
+        var line = words.first()
+        for (word in words.drop(1)) {
+            val candidate = "$line $word"
+            if (wouldOverflow(candidate, fontSize, maxWidth)) {
+                lines += line
+                line = word
+            } else {
+                line = candidate
+            }
+        }
+        lines += line
+        return lines
+    }
+
     /** Renders [text] on one line when it's estimated to fit inside
-     *  [maxWidth], else falls back to [VerticalText] -- the shared "never
-     *  cut off" contract every user-data label/value/name in the widget now
-     *  goes through, generalized from what used to be a one-off fallback
-     *  just for [WidgetInfoField.PERCENT]. */
+     *  [maxWidth]; otherwise tries [wordWrap] first -- multiple real-word
+     *  lines read far better than a wall of single letters -- and only
+     *  drops to [VerticalText]'s character-per-line fallback when even that
+     *  can't help (a single unsplittable token still too wide on its own).
+     *  This is the shared "never cut off" contract every user-data label/
+     *  value/name in the widget goes through, generalized from what used to
+     *  be a one-off fallback just for [WidgetInfoField.PERCENT]. */
     @Composable
     private fun FitText(
         text: String,
@@ -1031,12 +1060,17 @@ class CarWidget : GlanceAppWidget() {
         horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     ) {
         if (text.isBlank()) return
-        if (wouldOverflow(text, style.fontSize, maxWidth)) {
-            Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
+        if (!wouldOverflow(text, style.fontSize, maxWidth)) {
+            Text(text, style = style, maxLines = 1, modifier = modifier)
+            return
+        }
+        val wrapped = wordWrap(text, style.fontSize, maxWidth)
+        Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
+            if (wrapped != null) {
+                wrapped.forEach { line -> Text(line, style = style, maxLines = 1) }
+            } else {
                 VerticalText(text, style)
             }
-        } else {
-            Text(text, style = style, maxLines = 1, modifier = modifier)
         }
     }
 
