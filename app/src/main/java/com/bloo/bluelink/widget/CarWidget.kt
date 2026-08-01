@@ -159,26 +159,6 @@ class CarWidget : GlanceAppWidget() {
         val photoBitmap: android.graphics.Bitmap?,
     )
 
-    /**
-     * The layout tiers, smallest to largest, each with its own composable --
-     * 16 in total, most of them (the 7 below MEDIUM) further doubled by
-     * [WidgetConfig.priority] into a genuinely distinct info-vs-controls
-     * layout, so a widget dropped small has real variety to grow into rather
-     * than one shape stretched to fit every size. Every tier reuses the same
-     * shared modules (HeaderRow, RingImage, InfoStack, ActionButtons, ...) --
-     * what changes tier to tier is composition and proportion, not
-     * reinvented logic, which is what keeps 16 layouts maintainable as one
-     * set of building blocks instead of 16 independent implementations.
-     */
-    private enum class Tier {
-        MICRO_TINY, MICRO,
-        COMPACT_SQUARE,
-        COMPACT_WIDE_NARROW, COMPACT_WIDE,
-        COMPACT_TALL_NARROW, COMPACT_TALL,
-        MEDIUM_SQUARE, MEDIUM_WIDE, MEDIUM_TALL,
-        LARGE_SQUARE, LARGE_WIDE, LARGE_TALL,
-        XL_WIDE, XL_TALL, XL_SQUARE,
-    }
 
     /** Below this width, [InfoStack] stops putting a value beside its label
      *  and starts stacking instead -- the same "give up on one line" width
@@ -189,7 +169,7 @@ class CarWidget : GlanceAppWidget() {
      * Continuous size scaling, shared by every tier, so text/icons/padding/the
      * ring grow and shrink smoothly with the widget's exact measured size
      * instead of snapping between a handful of fixed per-tier constants --
-     * the Tier enum still decides layout STRUCTURE (what appears, how it's
+     * the [WidgetTier] enum still decides layout STRUCTURE (what appears, how it's
      * arranged), but everything about how big those pieces are now comes from
      * here, keyed off the same one signal ([progress]) at every tier boundary,
      * so nothing visibly jumps exactly where one tier hands off to the next.
@@ -256,61 +236,6 @@ class CarWidget : GlanceAppWidget() {
             (((size.height.value - 170f) / 40f).toInt() + 2).coerceIn(2, capMax)
     }
 
-    private fun tierFor(size: DpSize): Tier {
-        val w = size.width.value
-        val h = size.height.value
-        val short = minOf(w, h)
-        val aspect = w / h
-        // Ordered largest-first so the first match wins; each size gate is the
-        // same one the old 6-tier system used (roughly: XL ≥ 5x5, LARGE ≥
-        // 4-wide, MEDIUM ≥ 2x2, the two COMPACT strips catching very lopsided
-        // small sizes before the tiny floor) -- what's new is a second split
-        // inside each band by aspect ratio (or, for the tiniest tiers, by
-        // absolute size), so a wide 5x5 and a tall 5x5 actually get different
-        // proportioned layouts instead of the same one letterboxed.
-        return when {
-            w >= 300f && h >= 300f -> when {
-                aspect > 1.35f -> Tier.XL_WIDE
-                aspect < 0.74f -> Tier.XL_TALL
-                else -> Tier.XL_SQUARE
-            }
-            w >= 240f && h >= 170f -> when {
-                aspect > 1.2f -> Tier.LARGE_WIDE
-                aspect < 0.83f -> Tier.LARGE_TALL
-                else -> Tier.LARGE_SQUARE
-            }
-            w >= 150f && h >= 150f -> when {
-                aspect > 1.25f -> Tier.MEDIUM_WIDE
-                aspect < 0.8f -> Tier.MEDIUM_TALL
-                else -> Tier.MEDIUM_SQUARE
-            }
-            // Loosened from the old w/h >= 150 gate -- a tile like 145x100
-            // is genuinely wide/lopsided and had real unused room, but
-            // missed every band above and fell all the way through to
-            // MICRO's icon-only treatment. 120dp + a slightly softer aspect
-            // gate catches it without overlapping MEDIUM's own 150x150 floor
-            // (MEDIUM requires BOTH sides >= 150, so nothing here steals
-            // from it).
-            w >= 120f && h < 150f && w >= h * 1.4f -> if (w >= 220f) Tier.COMPACT_WIDE else Tier.COMPACT_WIDE_NARROW
-            h >= 120f && w < 150f && h >= w * 1.3f -> if (h >= 220f) Tier.COMPACT_TALL else Tier.COMPACT_TALL_NARROW
-            // The catch-all for anything with real room that no band above
-            // claimed, sitting between MICRO (glyph-only, no name -- meant
-            // for tiles barely past the 40dp manifest floor) and the
-            // compact/medium bands: 80dp on the short side is enough for a
-            // proper mini layout rather than just an icon.
-            //
-            // Deliberately NOT gated on aspect ratio. It used to be, and the
-            // ceiling (1.33) didn't meet COMPACT_WIDE's floor (w >= 1.4h),
-            // so every tile in between -- 190x140, 135x100, 20 such sizes on
-            // a 5dp grid -- fell past every band to MICRO and rendered as a
-            // lone icon despite having room for the full layout. No aspect
-            // test is needed here anyway: the wide and tall bands above have
-            // already claimed every lopsided shape, so whatever reaches this
-            // line is square-ish by construction (1.44 at the very worst).
-            short >= 80f -> Tier.COMPACT_SQUARE
-            else -> if (short < 60f) Tier.MICRO_TINY else Tier.MICRO
-        }
-    }
 
     @Composable
     private fun Content(render: Render) {
@@ -356,22 +281,22 @@ class CarWidget : GlanceAppWidget() {
             }
             Box(modifier = root) {
                 when (tierFor(size)) {
-                    Tier.MICRO_TINY -> MicroTinyLayout(car, effective)
-                    Tier.MICRO -> MicroLayout(car, effective)
-                    Tier.COMPACT_SQUARE -> CompactSquareLayout(car, effective)
-                    Tier.COMPACT_WIDE_NARROW -> CompactWideNarrowLayout(car, effective)
-                    Tier.COMPACT_WIDE -> CompactWideLayout(car, effective)
-                    Tier.COMPACT_TALL_NARROW -> CompactTallNarrowLayout(car, effective)
-                    Tier.COMPACT_TALL -> CompactTallLayout(car, effective)
-                    Tier.MEDIUM_SQUARE -> MediumSquareLayout(car, effective)
-                    Tier.MEDIUM_WIDE -> MediumWideLayout(car, effective)
-                    Tier.MEDIUM_TALL -> MediumTallLayout(car, effective)
-                    Tier.LARGE_SQUARE -> LargeSquareLayout(car, effective)
-                    Tier.LARGE_WIDE -> LargeWideLayout(car, effective)
-                    Tier.LARGE_TALL -> LargeTallLayout(car, effective)
-                    Tier.XL_WIDE -> XlWideLayout(car, effective)
-                    Tier.XL_TALL -> XlTallLayout(car, effective)
-                    Tier.XL_SQUARE -> XlSquareLayout(car, effective)
+                    WidgetTier.MICRO_TINY -> MicroTinyLayout(car, effective)
+                    WidgetTier.MICRO -> MicroLayout(car, effective)
+                    WidgetTier.COMPACT_SQUARE -> CompactSquareLayout(car, effective)
+                    WidgetTier.COMPACT_WIDE_NARROW -> CompactWideNarrowLayout(car, effective)
+                    WidgetTier.COMPACT_WIDE -> CompactWideLayout(car, effective)
+                    WidgetTier.COMPACT_TALL_NARROW -> CompactTallNarrowLayout(car, effective)
+                    WidgetTier.COMPACT_TALL -> CompactTallLayout(car, effective)
+                    WidgetTier.MEDIUM_SQUARE -> MediumSquareLayout(car, effective)
+                    WidgetTier.MEDIUM_WIDE -> MediumWideLayout(car, effective)
+                    WidgetTier.MEDIUM_TALL -> MediumTallLayout(car, effective)
+                    WidgetTier.LARGE_SQUARE -> LargeSquareLayout(car, effective)
+                    WidgetTier.LARGE_WIDE -> LargeWideLayout(car, effective)
+                    WidgetTier.LARGE_TALL -> LargeTallLayout(car, effective)
+                    WidgetTier.XL_WIDE -> XlWideLayout(car, effective)
+                    WidgetTier.XL_TALL -> XlTallLayout(car, effective)
+                    WidgetTier.XL_SQUARE -> XlSquareLayout(car, effective)
                 }
             }
         }

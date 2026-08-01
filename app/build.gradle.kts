@@ -149,4 +149,10 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
     compileOnly(project(":hidden-api-stub"))
+
+    // Pure-JVM unit tests (CI: testDebugUnitTest), same setup and rationale as
+    // :shared -- kotlin-test-junit maps kotlin.test's @Test/assert* onto JUnit 4
+    // and pulls JUnit transitively, so the Android unit-test task actually
+    // discovers them. Version = project Kotlin 2.2.20.
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
 }
