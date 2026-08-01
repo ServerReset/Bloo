@@ -6,16 +6,28 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -26,7 +38,10 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
@@ -180,10 +195,14 @@ private fun ConfigScreen(
 
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Accent")
-                ChipFlow {
-                    SelectChip("Theme", accent == null) { accent = null }
+                // Color swatches, not text chips -- matches the app's own theme
+                // picker (Settings > Theme > Built-in palettes), where every color
+                // choice is shown, not just named. A "Charge green"/"Amber" label
+                // alone doesn't tell you what you're about to pick.
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AccentSwatch(MaterialTheme.colorScheme.primary, "Theme", accent == null) { accent = null }
                     WidgetAccent.ALL.forEach { ac ->
-                        SelectChip(ac.label, accent == ac.key) { accent = ac.key }
+                        AccentSwatch(Color(ac.argb), ac.label, accent == ac.key) { accent = ac.key }
                     }
                 }
 
@@ -256,4 +275,40 @@ private fun ConfigScreen(
  *  that would be the one boolean control in the app not built this way. */
 @Composable private fun ToggleLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     MorphChip(selected = checked, onClick = { onChange(!checked) }, label = label, modifier = Modifier.fillMaxWidth())
+}
+
+/** A round color swatch for picking the widget's accent override -- same shape
+ *  language as Settings' own theme-palette picker (a ring that grows in on
+ *  selection, a checkmark once selected) so choosing the widget's accent
+ *  feels like the same control, not a different one that happens to live in
+ *  a different screen. */
+@Composable private fun AccentSwatch(color: Color, label: String, selected: Boolean, onClick: () -> Unit) {
+    val ring by animateDpAsState(
+        targetValue = if (selected) 3.dp else 0.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "accentSwatchRing",
+    )
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.outline)
+                .padding(ring)
+                .clip(CircleShape)
+                .background(color)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Icon(Icons.Filled.Check, contentDescription = label, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
