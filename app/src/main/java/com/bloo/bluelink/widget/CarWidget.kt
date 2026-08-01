@@ -563,7 +563,7 @@ class CarWidget : GlanceAppWidget() {
             // fairly with the text column instead of overrunning it.
             Column(modifier = GlanceModifier.defaultWeight()) {
                 FitText(car.name, titleStyle(render.theme), maxWidth = size.width * 0.36f)
-                PrimaryInfoLine(car, render)
+                PrimaryInfoLine(car, render, maxWidth = size.width * 0.36f)
             }
             Spacer(GlanceModifier.width(8.dp))
             ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight(), availableWidth = size.width * 0.32f)
@@ -649,8 +649,9 @@ class CarWidget : GlanceAppWidget() {
                 RingWithContent(
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                     minRowWidth = 140.dp,
+                    ringWidth = ringEdge,
                     ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
-                    content = { InfoStack(car, render, max = 3) },
+                    content = { w -> InfoStack(car, render, max = 3, availableWidth = w) },
                 )
             } else {
                 Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
@@ -671,22 +672,27 @@ class CarWidget : GlanceAppWidget() {
         // doesn't actually pan out.
         val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.height * 0.7f).coerceAtLeast(36.dp))
-        val content: @Composable () -> Unit = {
-            HeaderRow(car, render)
+        // Every child is handed the width this column actually gets, so the
+        // header's name, the info rows, and the button row all judge their
+        // own fit against the real space beside the ring rather than the
+        // whole tile.
+        val content: @Composable (Dp) -> Unit = { w ->
+            HeaderRow(car, render, availableWidth = w)
             Spacer(GlanceModifier.height(6.dp))
-            InfoStack(car, render, max = 3)
+            InfoStack(car, render, max = 3, availableWidth = w)
             Spacer(GlanceModifier.height(6.dp))
-            ActionButtons(car, render, max = 4)
+            ActionButtons(car, render, max = 4, availableWidth = w)
         }
         if (render.config.showRing && car.percent != null) {
             RingWithContent(
                 modifier = GlanceModifier.fillMaxSize(),
                 minRowWidth = 170.dp,
+                ringWidth = ringEdge,
                 ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
                 content = content,
             )
         } else {
-            Column(modifier = GlanceModifier.fillMaxSize()) { content() }
+            Column(modifier = GlanceModifier.fillMaxSize()) { content(size.width) }
         }
     }
 
@@ -727,6 +733,7 @@ class CarWidget : GlanceAppWidget() {
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 220.dp,
+                ringWidth = ringEdge,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -734,8 +741,8 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = {
-                    InfoStack(car, render, max = Scale.infoCap(size, 4))
+                content = { w ->
+                    InfoStack(car, render, max = Scale.infoCap(size, 4), availableWidth = w)
                     MapModule(render)
                 },
             )
@@ -760,6 +767,7 @@ class CarWidget : GlanceAppWidget() {
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 220.dp,
+                ringWidth = ringEdge,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -767,7 +775,7 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { InfoStack(car, render, max = Scale.infoCap(size, 4)) },
+                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4), availableWidth = w) },
             )
             MapModule(render)
             Spacer(GlanceModifier.height(10.dp))
@@ -811,6 +819,7 @@ class CarWidget : GlanceAppWidget() {
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 260.dp,
+                ringWidth = ringEdge,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -818,10 +827,14 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                     Spacer(GlanceModifier.height(8.dp))
-                    FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = size.width * 0.4f, horizontalAlignment = Alignment.CenterHorizontally)
+                    // Bounded by the ring, not by a fraction of the tile:
+                    // this column is only as wide as its widest child, so a
+                    // long value here would otherwise widen the ring slot
+                    // and steal width from the info column beside it.
+                    FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = ringEdge, horizontalAlignment = Alignment.CenterHorizontally)
                 },
-                content = {
-                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size))
+                content = { w ->
+                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size), availableWidth = w)
                     MapModule(render)
                 },
             )
@@ -874,6 +887,7 @@ class CarWidget : GlanceAppWidget() {
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth(),
                 minRowWidth = 260.dp,
+                ringWidth = ringEdge,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -881,7 +895,7 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { InfoStack(car, render, max = Scale.infoCap(size, 4)) },
+                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4), availableWidth = w) },
             )
             Spacer(GlanceModifier.height(12.dp))
             MapModule(render)
@@ -894,13 +908,20 @@ class CarWidget : GlanceAppWidget() {
     // ---- Modules -------------------------------------------------------------
 
     @Composable
-    private fun HeaderRow(car: VehicleSnapshot, render: Render) {
-        val size = LocalSize.current
-        // Rough reserve for the car-switcher pill (36dp + its own spacing)
-        // when it's present -- an estimate, same spirit as every other
-        // maxWidth passed to FitText in this file (see wouldOverflow).
-        val pillReserve = if (render.multiCar && render.config.vin == null) 44.dp else 0.dp
-        val textWidth = (size.width - pillReserve - 4.dp).coerceAtLeast(16.dp)
+    private fun HeaderRow(
+        car: VehicleSnapshot, render: Render,
+        // Same reasoning as InfoStack's own availableWidth -- the header
+        // sits inside RingWithContent's narrower column at the wide MEDIUM
+        // tier, not across the whole tile.
+        availableWidth: Dp = LocalSize.current.width,
+    ) {
+        // Rough reserve for the car-switcher pill (its own size plus
+        // spacing) when it's present -- an estimate, same spirit as every
+        // other maxWidth passed to FitText in this file (see wouldOverflow).
+        val pillReserve = if (render.multiCar && render.config.vin == null) {
+            Scale.pillSize(LocalSize.current) + 8.dp
+        } else 0.dp
+        val textWidth = (availableWidth - pillReserve - 4.dp).coerceAtLeast(16.dp)
         Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(LocalContext.current)), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.defaultWeight()) {
                 FitText(car.name, titleStyle(render.theme), maxWidth = textWidth)
@@ -954,9 +975,13 @@ class CarWidget : GlanceAppWidget() {
         )
     }
 
+    /** [maxWidth] is passed in rather than derived from the tile, because
+     *  this line's caller is the only thing that knows how much of the row
+     *  it actually owns -- the old hard-coded "36% of the tile" was a
+     *  CompactWide-specific guess baked into a shared module. */
     @Composable
-    private fun PrimaryInfoLine(car: VehicleSnapshot, render: Render) {
-        FitText(primaryValue(car, render), subtitleStyle(render.theme), maxWidth = LocalSize.current.width * 0.36f)
+    private fun PrimaryInfoLine(car: VehicleSnapshot, render: Render, maxWidth: Dp) {
+        FitText(primaryValue(car, render), subtitleStyle(render.theme), maxWidth = maxWidth)
     }
 
     /** The stacked read-only stats, honoring the user's chosen fields + order,
@@ -975,25 +1000,33 @@ class CarWidget : GlanceAppWidget() {
      *
      *  rather than ever being cut off. */
     @Composable
-    private fun InfoStack(car: VehicleSnapshot, render: Render, max: Int) {
+    private fun InfoStack(
+        car: VehicleSnapshot, render: Render, max: Int,
+        // The width this stack's own column actually gets, which is NOT the
+        // tile width whenever it sits beside a ring (see RingWithContent) --
+        // measuring against the whole tile there would let a label clear the
+        // wrap threshold on paper and still be clipped in a column half that
+        // wide, which is exactly the failure this whole FitText path exists
+        // to prevent.
+        availableWidth: Dp = LocalSize.current.width,
+    ) {
         val fields = render.config.infoFields.mapNotNull { WidgetInfoField.fromKey(it) }.take(max)
-        val size = LocalSize.current
-        val narrow = size.width < NARROW_WIDTH
+        val narrow = availableWidth < NARROW_WIDTH
         Column {
             fields.forEach { field ->
                 val value = infoValue(field, car, render) ?: return@forEach
                 if (narrow) {
                     Column(modifier = GlanceModifier.fillMaxWidth()) {
-                        FitText(field.label, subtitleStyle(render.theme), maxWidth = size.width - 4.dp)
-                        FitText(value, valueStyle(render.theme), maxWidth = size.width - 4.dp)
+                        FitText(field.label, subtitleStyle(render.theme), maxWidth = availableWidth - 4.dp)
+                        FitText(value, valueStyle(render.theme), maxWidth = availableWidth - 4.dp)
                     }
                 } else {
                     Row(modifier = GlanceModifier.fillMaxWidth()) {
                         FitText(
                             field.label, subtitleStyle(render.theme),
-                            maxWidth = size.width * 0.5f, modifier = GlanceModifier.defaultWeight(),
+                            maxWidth = availableWidth * 0.5f, modifier = GlanceModifier.defaultWeight(),
                         )
-                        FitText(value, valueStyle(render.theme), maxWidth = size.width * 0.45f)
+                        FitText(value, valueStyle(render.theme), maxWidth = availableWidth * 0.45f)
                     }
                 }
                 Spacer(GlanceModifier.height(2.dp))
@@ -1152,25 +1185,36 @@ class CarWidget : GlanceAppWidget() {
      * is how much width THIS specific pairing needs to read comfortably
      * side by side; below it, a vertical stack keeps both pieces legible
      * instead of squeezing them into a cramped row.
+     *
+     * [content] is handed the width its own slot ACTUALLY gets -- which in
+     * the side-by-side case is only what's left after the ring, not the
+     * whole tile. Everything inside it (info rows, a header, buttons) needs
+     * that real number to decide whether its own text/buttons fit, because
+     * measuring against the full tile width would let a label sail past
+     * the wrap threshold and get clipped in a column half that wide.
      */
     @Composable
     private fun RingWithContent(
         modifier: GlanceModifier,
         minRowWidth: Dp,
+        ringWidth: Dp,
         ring: @Composable () -> Unit,
-        content: @Composable () -> Unit,
+        content: @Composable (Dp) -> Unit,
     ) {
-        if (LocalSize.current.width >= minRowWidth) {
+        val tileWidth = LocalSize.current.width
+        if (tileWidth >= minRowWidth) {
             Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) { ring() }
                 Spacer(GlanceModifier.width(12.dp))
-                Column(modifier = GlanceModifier.defaultWeight()) { content() }
+                Column(modifier = GlanceModifier.defaultWeight()) {
+                    content((tileWidth - ringWidth - 12.dp).coerceAtLeast(24.dp))
+                }
             }
         } else {
             Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
                 ring()
                 Spacer(GlanceModifier.height(8.dp))
-                content()
+                content(tileWidth)
             }
         }
     }
