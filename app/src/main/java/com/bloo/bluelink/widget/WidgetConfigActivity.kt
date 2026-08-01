@@ -183,73 +183,6 @@ private fun ConfigScreen(
             // to the normal themed surface for a car with no photo set.
             ToggleLine("Use car photo as background", photoBackground) { photoBackground = it }
             Spacer(Modifier.height(8.dp))
-            // --- Shape (both modes) ---
-            Spacer(Modifier.height(16.dp))
-            SectionLabel("Corners")
-            MorphSegmented(
-                options = listOf(
-                    SegmentOption(WidgetConfig.CORNER_SHARP, "Sharp", null),
-                    SegmentOption(WidgetConfig.CORNER_SOFT, "Soft", null),
-                    SegmentOption(WidgetConfig.CORNER_ROUND, "Round", null),
-                    SegmentOption(WidgetConfig.CORNER_PILL, "Pill", null),
-                ),
-                selectedKey = corner,
-                onSelect = { corner = it },
-            )
-            // Pill needs a short enough side to read as a stadium at all, so
-            // above roughly 2x2 it falls back to the roundest ordinary corner
-            // -- said outright rather than leaving it a mystery why a large
-            // widget didn't change.
-            if (corner == WidgetConfig.CORNER_PILL) {
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "Full pill only on widgets about 2×2 cells or smaller; larger ones use Round.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // --- Background opacity (both modes) ---
-            Spacer(Modifier.height(16.dp))
-            SectionLabel("Background")
-            if (photoBackground) {
-                Text(
-                    "Using the car photo — opacity applies to the plain background only.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("1.0", "Solid", null),
-                        SegmentOption("0.75", "75%", null),
-                        SegmentOption("0.5", "50%", null),
-                        SegmentOption("0.25", "25%", null),
-                    ),
-                    // Matched by value rather than identity so a config saved
-                    // with any other number still lights up its nearest option
-                    // instead of showing nothing selected.
-                    selectedKey = listOf(1f, 0.75f, 0.5f, 0.25f)
-                        .minBy { kotlin.math.abs(it - backgroundOpacity) }.toString(),
-                    onSelect = { backgroundOpacity = it.toFloat() },
-                )
-            }
-
-            // --- Text size (both modes) ---
-            Spacer(Modifier.height(16.dp))
-            SectionLabel("Text size")
-            MorphSegmented(
-                options = listOf(
-                    SegmentOption("0.8", "Small", null),
-                    SegmentOption("1.0", "Normal", null),
-                    SegmentOption("1.2", "Large", null),
-                    SegmentOption("1.4", "Largest", null),
-                ),
-                selectedKey = listOf(0.8f, 1f, 1.2f, 1.4f)
-                    .minBy { kotlin.math.abs(it - textScale) }.toString(),
-                onSelect = { textScale = it.toFloat() },
-            )
-
             // --- Controls ---
             Spacer(Modifier.height(16.dp))
             SectionLabel("Controls")
@@ -300,6 +233,73 @@ private fun ConfigScreen(
                 ToggleLine("Show name and status header", showHeader) { showHeader = it }
                 Spacer(Modifier.height(8.dp))
                 ToggleLine("Show last-updated footer", showFooter) { showFooter = it }
+
+                // --- Shape ---
+                Spacer(Modifier.height(16.dp))
+                SectionLabel("Corners")
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption(WidgetConfig.CORNER_SHARP, "Sharp", null),
+                        SegmentOption(WidgetConfig.CORNER_SOFT, "Soft", null),
+                        SegmentOption(WidgetConfig.CORNER_ROUND, "Round", null),
+                        SegmentOption(WidgetConfig.CORNER_PILL, "Pill", null),
+                    ),
+                    selectedKey = corner,
+                    onSelect = { corner = it },
+                )
+                // Pill needs a short enough side to read as a stadium at all, so
+                // above roughly 2x2 it falls back to the roundest ordinary corner
+                // -- said outright rather than leaving it a mystery why a large
+                // widget didn't change.
+                if (corner == WidgetConfig.CORNER_PILL) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        "Full pill only on widgets about 2×2 cells or smaller; larger ones use Round.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // --- Background opacity ---
+                Spacer(Modifier.height(16.dp))
+                SectionLabel("Background")
+                if (photoBackground) {
+                    Text(
+                        "Using the car photo — opacity applies to the plain background only.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("1.0", "Solid", null),
+                            SegmentOption("0.75", "75%", null),
+                            SegmentOption("0.5", "50%", null),
+                            SegmentOption("0.25", "25%", null),
+                        ),
+                        // Matched by value rather than identity so a config saved
+                        // with any other number still lights up its nearest option
+                        // instead of showing nothing selected.
+                        selectedKey = listOf(1f, 0.75f, 0.5f, 0.25f)
+                            .minBy { kotlin.math.abs(it - backgroundOpacity) }.toString(),
+                        onSelect = { backgroundOpacity = it.toFloat() },
+                    )
+                }
+
+                // --- Text size ---
+                Spacer(Modifier.height(16.dp))
+                SectionLabel("Text size")
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("0.8", "Small", null),
+                        SegmentOption("1.0", "Normal", null),
+                        SegmentOption("1.2", "Large", null),
+                        SegmentOption("1.4", "Largest", null),
+                    ),
+                    selectedKey = listOf(0.8f, 1f, 1.2f, 1.4f)
+                        .minBy { kotlin.math.abs(it - textScale) }.toString(),
+                    onSelect = { textScale = it.toFloat() },
+                )
 
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Accent")
