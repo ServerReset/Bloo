@@ -39,6 +39,12 @@ data class WidgetConfig(
      *  configured action buttons filling the same space. Sizes with more room
      *  (MEDIUM and up) always show both regardless of this setting. */
     val priority: String = PRIORITY_INFO,
+    /** Extreme corner rounding -- a true pill/stadium shape instead of the
+     *  usual rounded square. Only visibly different from the normal corner at
+     *  small sizes (roughly 2x2 cells or under); see CarWidget.Content, which
+     *  silently no-ops back to the normal corner above that so a pill doesn't
+     *  clip a large widget's own content into a lens shape. */
+    val pillShape: Boolean = false,
     /** Semantic accent override: one of [WidgetAccent] keys, or null = follow theme primary. */
     val accent: String? = null,
     /** Theme override for this widget: "auto" (system), "light", or "dark". */

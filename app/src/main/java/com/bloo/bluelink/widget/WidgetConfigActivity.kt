@@ -131,6 +131,7 @@ private fun ConfigScreen(
     var showMap by remember { mutableStateOf(initial.showMap) }
     var photoBackground by remember { mutableStateOf(initial.photoBackground) }
     var priority by remember { mutableStateOf(initial.priority) }
+    var pillShape by remember { mutableStateOf(initial.pillShape) }
     var accent by remember { mutableStateOf(initial.accent) }
     var theme by remember { mutableStateOf(initial.theme) }
 
@@ -175,6 +176,19 @@ private fun ConfigScreen(
             // knob that changes what data the widget reads. No-ops gracefully
             // to the normal themed surface for a car with no photo set.
             ToggleLine("Use car photo as background", photoBackground) { photoBackground = it }
+            Spacer(Modifier.height(8.dp))
+            ToggleLine("Pill shape (extreme rounding)", pillShape) { pillShape = it }
+            // Silently no-ops above ~2x2 cells (the rounding needs a short
+            // enough side to read as a stadium at all) -- said outright
+            // instead of leaving it a mystery why a large widget didn't change.
+            if (pillShape) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "Only visible on widgets sized about 2×2 cells or smaller.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             // --- Controls ---
             Spacer(Modifier.height(16.dp))
@@ -260,6 +274,7 @@ private fun ConfigScreen(
                             showMap = showMap,
                             photoBackground = photoBackground,
                             priority = priority,
+                            pillShape = pillShape,
                             accent = accent,
                             theme = theme,
                         ),

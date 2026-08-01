@@ -192,26 +192,33 @@ class CarWidget : GlanceAppWidget() {
         // once here, on the Render itself, means every tier/module below just
         // keeps reading render.theme like normal and gets it for free.
         val effective = if (photo != null) render.copy(theme = render.theme.forPhoto()) else render
-        val outerCorner = GlanceModifier.fillMaxSize().cornerRadius(20.dp)
+        val size = LocalSize.current
+        // Pill shape needs at least one short dimension to read as a stadium
+        // rather than a barely-rounded rectangle, so it only ever kicks in at
+        // small sizes (roughly 2x2 cells and under) -- same "only visible on
+        // widgets sized about 2x2 cells or smaller" contract the original
+        // widget's own pill option had, restored here rather than reinvented.
+        // 999.dp clamps to a true pill against whichever side is shorter.
+        val corner = if (render.config.pillShape && minOf(size.width, size.height) < 180.dp) 999.dp else 20.dp
+        val outerCorner = GlanceModifier.fillMaxSize().cornerRadius(corner)
         val root = (if (photo == null) outerCorner.background(effective.theme.background) else outerCorner)
-            .padding(12.dp)
+            .padding(if (corner >= 999.dp) 16.dp else 12.dp)
         if (car == null) {
             EmptyState(root, effective.theme)
             return
         }
-        val size = LocalSize.current
-        Box(modifier = GlanceModifier.fillMaxSize().cornerRadius(20.dp)) {
+        Box(modifier = GlanceModifier.fillMaxSize().cornerRadius(corner)) {
             if (photo != null) {
                 Image(
                     provider = ImageProvider(photo),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = GlanceModifier.fillMaxSize().cornerRadius(20.dp),
+                    modifier = GlanceModifier.fillMaxSize().cornerRadius(corner),
                 )
                 // A flat dark scrim regardless of light/dark theme -- the photo's
                 // own brightness varies too much car to car to trust either
                 // theme's plain surface tint to stay legible under white text.
-                Box(GlanceModifier.fillMaxSize().cornerRadius(20.dp).background(ColorProvider(Color(0f, 0f, 0f, 0.38f)))) {}
+                Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, 0.38f)))) {}
             }
             Box(modifier = root) {
                 when (tierFor(size)) {

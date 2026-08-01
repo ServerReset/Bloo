@@ -38,14 +38,15 @@ class WidgetConfigStore(private val context: Context) {
         val showMap: Boolean = false,
         val photoBackground: Boolean = false,
         val priority: String = WidgetConfig.PRIORITY_INFO,
+        val pillShape: Boolean = false,
         val accent: String? = null,
         val theme: String = WidgetConfig.THEME_AUTO,
     )
 
     private fun Stored.toConfig() =
-        WidgetConfig(vin, actions, infoFields, showRing, showMap, photoBackground, priority, accent, theme)
+        WidgetConfig(vin, actions, infoFields, showRing, showMap, photoBackground, priority, pillShape, accent, theme)
     private fun WidgetConfig.toStored() =
-        Stored(vin, actions, infoFields, showRing, showMap, photoBackground, priority, accent, theme)
+        Stored(vin, actions, infoFields, showRing, showMap, photoBackground, priority, pillShape, accent, theme)
 
     /** Read one widget's config, or a default if it's never been configured. */
     suspend fun get(widgetId: Int): WidgetConfig {
