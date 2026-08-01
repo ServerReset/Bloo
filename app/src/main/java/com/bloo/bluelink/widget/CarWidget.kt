@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bloo.bluelink.MainActivity
+import com.bloo.bluelink.R
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
@@ -516,15 +517,20 @@ class CarWidget : GlanceAppWidget() {
         return parts.joinToString(" · ").ifBlank { car.model }
     }
 
-    private fun primaryValue(car: VehicleSnapshot, render: Render): String = when {
-        car.hasBattery && car.percent != null -> "${car.percent}%" +
-            (car.rangeMi?.let { " · ${formatDistance(it, render.metric)}" } ?: "")
-        car.rangeMi != null -> formatDistance(car.rangeMi, render.metric)
-        else -> car.model
+    private fun primaryValue(car: VehicleSnapshot, render: Render): String {
+        // Hoist to a local val: rangeMi is a nullable public property in :shared, which
+        // Kotlin won't smart-cast across a module boundary — a local copy is smart-castable.
+        val range = car.rangeMi
+        return when {
+            car.hasBattery && car.percent != null -> "${car.percent}%" +
+                (range?.let { " · ${formatDistance(it.toDouble(), render.metric)}" } ?: "")
+            range != null -> formatDistance(range.toDouble(), render.metric)
+            else -> car.model
+        }
     }
 
     private fun infoValue(field: WidgetInfoField, car: VehicleSnapshot, render: Render): String? = when (field) {
-        WidgetInfoField.RANGE -> car.rangeMi?.let { formatDistance(it, render.metric) }
+        WidgetInfoField.RANGE -> car.rangeMi?.let { formatDistance(it.toDouble(), render.metric) }
         WidgetInfoField.PERCENT -> car.percent?.let { "$it%" }
         WidgetInfoField.ODOMETER -> car.odometer?.takeIf { it.isNotBlank() }
         WidgetInfoField.PLATE -> car.licensePlate?.takeIf { it.isNotBlank() }
