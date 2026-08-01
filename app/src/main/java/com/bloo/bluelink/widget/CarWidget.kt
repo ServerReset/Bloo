@@ -199,7 +199,55 @@ class CarWidget : GlanceAppWidget() {
          *  comment), so this is deliberately two numbers combined: "how big
          *  the ring WANTS to be at this size" and "how big it's SAFE to be
          *  here," never just one or the other. */
-        fun ring(size: DpSize, maxAvailable: Dp): Dp = minOf(lerp(progress(size), 28f, 140f).dp, maxAvailable)
+        fun ring(size: DpSize, maxAvailable: Dp): Dp =
+            // Below MIN_RING the ring reads as a smudge rather than a gauge,
+            // and drawing it would push the column past its budget anyway --
+            // so yield the space to the text instead. RingImage/StatusGlyph
+            // both render nothing at 0, so callers need no extra branch.
+            if (maxAvailable < MIN_RING) 0.dp
+            else minOf(lerp(progress(size), 28f, 140f).dp, maxAvailable)
+
+        /** Smallest ring worth drawing; below this the space goes to text. */
+        private val MIN_RING = 24.dp
+
+        /** Approximate rendered height of one text line at [sp]. RemoteViews
+         *  gives no measurement callback, so every vertical estimate in this
+         *  file goes through this one factor rather than each inventing its
+         *  own. */
+        fun lineHeight(sp: Float, textScale: Float): Dp = (sp * textScale * 1.35f).dp
+
+        /**
+         * The vertical room actually left for the ring, once the header above
+         * it and the buttons (and optional footer) below it have taken theirs.
+         *
+         * Every tier used to cap the ring at a FRACTION OF THE TILE
+         * (height * 0.5 and friends), which silently assumed the rest of the
+         * column was small. It isn't at larger text sizes: on a 186x150 tile
+         * at 1.4x text the header alone is ~47dp and the buttons ~38dp, so of
+         * 129dp of padded budget only ~27dp remained -- while the fraction
+         * still authorised a 75dp ring. That is the same mistake
+         * [buttonHeight] had, capping against the wrong quantity, and it
+         * scales with the text-size option so it got worse exactly where a
+         * user had asked for bigger type.
+         */
+        fun ringRoom(
+            size: DpSize,
+            textScale: Float,
+            hasHeader: Boolean,
+            hasFooter: Boolean,
+            spacers: Dp,
+        ): Dp {
+            val budget = size.height - contentPadding(size) * 2
+            val header = if (hasHeader) {
+                lineHeight(titleSp(size).value, textScale) + lineHeight(subtitleSp(size).value, textScale)
+            } else 0.dp
+            val footer = if (hasFooter) lineHeight(subtitleSp(size).value, textScale) + 6.dp else 0.dp
+            // Floors at zero, NOT at some minimum ring size: when the column
+            // genuinely has no room left, forcing a 'small' ring anyway just
+            // reinstates the overflow at a smaller scale. Scale.ring turns
+            // too little room into no ring at all.
+            return (budget - header - footer - buttonHeight(size) - spacers).coerceAtLeast(0.dp)
+        }
 
         fun titleSp(size: DpSize): TextUnit = lerp(progress(size), 11f, 20f).sp
         fun subtitleSp(size: DpSize): TextUnit = lerp(progress(size), 9f, 13f).sp
@@ -694,7 +742,7 @@ class CarWidget : GlanceAppWidget() {
         // button rows can leave less than the ring's continuous target size
         // at MEDIUM's own minimum height (150dp).
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.height * 0.5f).coerceAtLeast(36.dp))
+        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
@@ -727,7 +775,7 @@ class CarWidget : GlanceAppWidget() {
         // ring -- RingWithContent falls back to stacking if that width
         // doesn't actually pan out.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.height * 0.7f).coerceAtLeast(36.dp))
+        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 12.dp))
         // Every child is handed the width this column actually gets, so the
         // header's name, the info rows, and the button row all judge their
         // own fit against the real space beside the ring rather than the
@@ -757,7 +805,7 @@ class CarWidget : GlanceAppWidget() {
         // Tall MEDIUM: everything stacked in one column, ring centered --
         // the mirror of MediumWideLayout's side-by-side arrangement.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.width - 24.dp).coerceAtLeast(36.dp))
+        val ringEdge = Scale.ring(size, minOf(size.width - 24.dp, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp)))
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
@@ -782,7 +830,7 @@ class CarWidget : GlanceAppWidget() {
         // proportioned at every size in between instead of only being safe at
         // the tier's two ends.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.height * 0.42f).coerceAtLeast(40.dp))
+        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
@@ -816,7 +864,7 @@ class CarWidget : GlanceAppWidget() {
         // ring/square version of the Wide/Square/Tall split MEDIUM and XL
         // already have, giving LARGE its own third shape too.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.height * 0.4f).coerceAtLeast(44.dp))
+        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
@@ -846,7 +894,7 @@ class CarWidget : GlanceAppWidget() {
         // of beside it -- there's more height to spend than width here, so a
         // side-by-side split would leave the info column cramped.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.width * 0.55f).coerceAtLeast(48.dp))
+        val ringEdge = Scale.ring(size, minOf(size.width * 0.55f, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)))
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
@@ -868,7 +916,7 @@ class CarWidget : GlanceAppWidget() {
     private fun XlWideLayout(car: VehicleSnapshot, render: Render) {
         // Same reasoning as LargeWideLayout's own ringEdge clamp.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.height * 0.42f).coerceAtLeast(60.dp))
+        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
@@ -907,7 +955,7 @@ class CarWidget : GlanceAppWidget() {
         // into side-by-side columns that would squeeze on a narrow-but-tall
         // dashboard-sized tile.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.width * 0.5f).coerceAtLeast(64.dp))
+        val ringEdge = Scale.ring(size, minOf(size.width * 0.5f, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp)))
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
@@ -936,7 +984,7 @@ class CarWidget : GlanceAppWidget() {
         // width map, distinct from XlWideLayout's value-under-ring emphasis
         // and XlTallLayout's fully stacked column.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.height * 0.38f).coerceAtLeast(56.dp))
+        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 24.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(12.dp))
@@ -1471,6 +1519,8 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun RingImage(car: VehicleSnapshot, render: Render, edgeDp: Int) {
+        // Scale.ring yields 0 when the column can't fit a legible ring.
+        if (edgeDp <= 0) return
         val ctx = LocalContext.current
         val density = ctx.resources.displayMetrics.density
         val px = (edgeDp * density).toInt().coerceAtLeast(24)
@@ -1493,6 +1543,7 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun StatusGlyph(car: VehicleSnapshot, theme: WidgetTheme, sizeDp: Int) {
+        if (sizeDp <= 0) return
         val locked = car.locked == true
         val res = if (locked) R.drawable.ic_shortcut_lock else R.drawable.ic_shortcut_unlock
         val tint = if (locked) theme.accentProvider else theme.unlocked

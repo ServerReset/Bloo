@@ -47,6 +47,19 @@ data class VehicleSnapshot(
      *  UI's own AppViewModel.isDriving() already does -- those runners only
      *  ever see a [VehicleSnapshot], never the live location state the main
      *  UI tracks separately. */
+    /** CAUTION -- the name is not a promise. This is the car's raw reported
+     *  speed VALUE, copied straight from the API's `{value, unit}` pair with
+     *  the unit code thrown away at capture (see AppViewModel, and Speed.unit
+     *  in Models.kt). Nothing in this codebase decodes those unit codes for
+     *  speed, distance or time, so which unit this actually holds is not
+     *  established anywhere.
+     *
+     *  That has never mattered, because [isDriving] -- its only reader --
+     *  merely asks whether it is above zero, which is true in any unit. It
+     *  would matter immediately for anything that DISPLAYS it: a widget row
+     *  or tile reading "62 mph" off a km/h value is worse than showing no
+     *  speed at all. Resolve the unit against a real car before rendering
+     *  this, and if you convert it, rename the field at the same time. */
     val speedMph: Double? = null,
     val updated: String? = null,
     /** Wall-clock (ms) when this snapshot last got fresh data from the car; 0 =
