@@ -78,6 +78,22 @@ class WidgetTierTest {
     }
 
     @Test
+    fun `the strip tiers only take genuinely strip-shaped tiles`() {
+        // BANNER and RAIL drop things the other tiers keep (a header, and in
+        // RAIL's case all text), which is only an honest trade when the short
+        // axis really has no room. A merely-large wide tile must not be
+        // flattened into a strip and lose its layout.
+        val misrouted = sizes()
+            .filter { (w, h) -> tier(w, h) == WidgetTier.BANNER || tier(w, h) == WidgetTier.RAIL }
+            .filter { (w, h) -> minOf(w, h) >= 110 || maxOf(w.toFloat() / h, h.toFloat() / w) < 3f }
+            .toList()
+        assertTrue(
+            misrouted.isEmpty(),
+            "non-strip sizes routed to BANNER/RAIL: ${misrouted.take(5).map { "${it.first}x${it.second}" }}",
+        )
+    }
+
+    @Test
     fun `the square tiers never receive a lopsided size`() {
         // The *_SQUARE layouts split their width between a ring and a content
         // column side by side; handing one a strongly wide or tall tile would
@@ -122,6 +138,7 @@ class WidgetTierTest {
     private fun band(tier: WidgetTier): Int = when (tier) {
         WidgetTier.MICRO_TINY -> 0
         WidgetTier.MICRO -> 1
+        WidgetTier.BANNER, WidgetTier.RAIL,
         WidgetTier.COMPACT_SQUARE, WidgetTier.COMPACT_WIDE_NARROW, WidgetTier.COMPACT_WIDE,
         WidgetTier.COMPACT_TALL_NARROW, WidgetTier.COMPACT_TALL -> 2
         WidgetTier.MEDIUM_SQUARE, WidgetTier.MEDIUM_WIDE, WidgetTier.MEDIUM_TALL -> 3

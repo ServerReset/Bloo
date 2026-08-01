@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.DpSize
  */
 internal enum class WidgetTier {
     MICRO_TINY, MICRO,
+    /** Extreme aspect ratios -- a long thin strip along one axis. See [tierFor]. */
+    BANNER, RAIL,
     COMPACT_SQUARE,
     COMPACT_WIDE_NARROW, COMPACT_WIDE,
     COMPACT_TALL_NARROW, COMPACT_TALL,
@@ -68,6 +70,17 @@ internal fun tierFor(size: DpSize): WidgetTier {
             aspect < 0.8f -> WidgetTier.MEDIUM_TALL
             else -> WidgetTier.MEDIUM_SQUARE
         }
+        // The aspect extremes, which the launcher genuinely allows: the
+        // manifest permits 40dp on one axis and 640dp on the other, so a
+        // 640x40 strip is a 16:1 tile. Those used to land in COMPACT_WIDE /
+        // COMPACT_TALL, which are built around a ring beside a text column
+        // beside buttons -- a shape that assumes far more of the short axis
+        // than a strip has. BANNER and RAIL are single-file layouts built for
+        // exactly that case. Both are gated on the short side staying small,
+        // so a merely-wide-and-roomy tile (640x200) still gets LARGE_WIDE
+        // rather than being flattened into a strip.
+        w >= 220f && h < 110f && w >= h * 3f -> WidgetTier.BANNER
+        h >= 220f && w < 110f && h >= w * 3f -> WidgetTier.RAIL
         // Loosened from the old w/h >= 150 gate -- a tile like 145x100 is
         // genuinely wide and had real unused room, but missed every band
         // above and fell all the way through to MICRO's icon-only

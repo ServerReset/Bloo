@@ -208,8 +208,28 @@ class CarWidget : GlanceAppWidget() {
         /** The root content padding around every tier's layout. */
         fun contentPadding(size: DpSize): Dp = lerp(progress(size), 6f, 18f).dp
 
-        fun buttonHeight(size: DpSize): Dp = lerp(progress(size), 32f, 48f).dp
-        fun buttonIcon(size: DpSize): Dp = lerp(progress(size), 16f, 26f).dp
+        /** An action button's height, capped by the room the padded content
+         *  box actually has.
+         *
+         *  The cap is the whole point: [progress] is driven by the SHORTER
+         *  side, so on a short-but-wide strip the ideal height is computed
+         *  from a generous width while the height is the thing that has to
+         *  hold it. Uncapped that overflowed on 902 sizes across the resize
+         *  range -- by 4dp at 98x40dp, where a 32dp button was being asked to
+         *  sit in 28dp of room. Same "wants to be" versus "safe to be"
+         *  pairing [ring] already uses, just self-capping since every button
+         *  lives in that same box. */
+        fun buttonHeight(size: DpSize): Dp {
+            val ideal = lerp(progress(size), 32f, 48f).dp
+            val room = (size.height - contentPadding(size) * 2).coerceAtLeast(16.dp)
+            return minOf(ideal, room)
+        }
+
+        /** Kept proportional to the button that contains it, so a button
+         *  shrunk by the cap above doesn't end up with an icon wider than
+         *  itself. */
+        fun buttonIcon(size: DpSize): Dp =
+            minOf(lerp(progress(size), 16f, 26f).dp, buttonHeight(size) * 0.62f)
 
         /** The car-switcher [IconPill]'s own size -- was a fixed 36dp/20dp
          *  regardless of tile size, which looked oversized pinned in a small
@@ -283,6 +303,8 @@ class CarWidget : GlanceAppWidget() {
                 when (tierFor(size)) {
                     WidgetTier.MICRO_TINY -> MicroTinyLayout(car, effective)
                     WidgetTier.MICRO -> MicroLayout(car, effective)
+                    WidgetTier.BANNER -> BannerLayout(car, effective)
+                    WidgetTier.RAIL -> RailLayout(car, effective)
                     WidgetTier.COMPACT_SQUARE -> CompactSquareLayout(car, effective)
                     WidgetTier.COMPACT_WIDE_NARROW -> CompactWideNarrowLayout(car, effective)
                     WidgetTier.COMPACT_WIDE -> CompactWideLayout(car, effective)
@@ -402,6 +424,69 @@ class CarWidget : GlanceAppWidget() {
                     maxWidth = (size.width - 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun BannerLayout(car: VehicleSnapshot, render: Render) {
+        // A long thin horizontal strip, down to 640x40 -- a 16:1 tile the
+        // launcher genuinely allows. Everything sits on ONE vertically
+        // centered row, because there is no room for a header above or a
+        // footer below: at 40dp tall the padded content box is 28dp, barely
+        // two lines of small text.
+        val size = LocalSize.current
+        if (controlsPriority(render)) {
+            ActionButtons(car, render, max = 6, modifier = GlanceModifier.fillMaxSize())
+            return
+        }
+        val ringEdge = Scale.ring(size, (size.height - 10.dp).coerceAtLeast(16.dp))
+        Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                Spacer(GlanceModifier.width(8.dp))
+            }
+            Column(modifier = GlanceModifier.defaultWeight()) {
+                FitText(car.name, titleStyle(render.theme), maxWidth = size.width * 0.3f)
+                PrimaryInfoLine(car, render, maxWidth = size.width * 0.3f)
+            }
+            Spacer(GlanceModifier.width(8.dp))
+            // A banner is nearly all width, so the buttons get a real share
+            // of it rather than the thin sliver a normal compact row leaves.
+            ActionButtons(
+                car, render, max = 4,
+                modifier = GlanceModifier.defaultWeight(), availableWidth = size.width * 0.34f,
+            )
+        }
+    }
+
+    @Composable
+    private fun RailLayout(car: VehicleSnapshot, render: Render) {
+        // The vertical mirror of BANNER, down to 40x640. Deliberately shows
+        // NO text: at 40dp wide the content box is 28dp, and any car name
+        // there would letter-stack into a column taller than the tile (see
+        // FitText). The ring or lock glyph still carries the state, and the
+        // whole strip stays tappable, so what's dropped is a label that could
+        // never have been read rather than any actual function.
+        val size = LocalSize.current
+        if (controlsPriority(render)) {
+            Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                ActionButtons(car, render, max = 6, vertical = true)
+            }
+            return
+        }
+        val ringEdge = Scale.ring(size, (size.width - 10.dp).coerceAtLeast(16.dp))
+        Column(
+            modifier = GlanceModifier.fillMaxSize().clickable(openAction(LocalContext.current)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (render.config.showRing && car.percent != null) {
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+            } else {
+                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+            }
+            Spacer(GlanceModifier.height(8.dp))
+            ActionButtons(car, render, max = 4, vertical = true)
         }
     }
 
