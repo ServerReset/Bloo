@@ -261,13 +261,24 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun MicroLayout(car: VehicleSnapshot, render: Render) {
+        // MICRO is the unbounded catch-all tier -- every other tier's own
+        // threshold proves a minimum size the tier's fixed dp values were
+        // designed to fit inside, but MICRO has no such floor beyond the
+        // manifest's declared 40dp minimum (car_widget_info.xml). A ring/
+        // glyph/icon sized for a "normal" ~64dp micro tile would overflow a
+        // real 40dp one, so every size here scales down from its usual value
+        // to whatever's actually measured, rather than assuming there's
+        // always at least that much room.
+        val size = LocalSize.current
+        val fit = (minOf(size.width, size.height) - 20.dp).coerceAtLeast(12.dp)
         // Controls priority at this size means "this widget IS one button" --
         // there's no room for a real row of buttons at a usable tap size, so
         // just the first configured action fills the whole tile.
         if (controlsPriority(render)) {
             val action = resolvedActions(car, render, max = 1).firstOrNull()
             if (action != null) {
-                ActionButton(action, car, render, modifier = GlanceModifier.fillMaxSize(), fixedHeight = false, iconSize = 30.dp)
+                val iconSize = fit.coerceIn(14.dp, 30.dp)
+                ActionButton(action, car, render, modifier = GlanceModifier.fillMaxSize(), fixedHeight = false, iconSize = iconSize)
                 return
             }
         }
@@ -278,9 +289,9 @@ class CarWidget : GlanceAppWidget() {
             contentAlignment = Alignment.Center,
         ) {
             if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = 64)
+                RingImage(car, render, edgeDp = fit.coerceIn(20.dp, 64.dp).value.toInt())
             } else {
-                StatusGlyph(car, render.theme, sizeDp = 40)
+                StatusGlyph(car, render.theme, sizeDp = fit.coerceIn(14.dp, 40.dp).value.toInt())
             }
         }
     }
@@ -294,9 +305,15 @@ class CarWidget : GlanceAppWidget() {
                 return
             }
         }
+        // COMPACT_WIDE's own tier threshold only proves the WIDTH is roomy
+        // (>= 150dp) -- the height is whatever satisfies its aspect-ratio
+        // gate against that width, which can be much shorter than the ring's
+        // usual 56dp. Clamp to what's actually measured so the ring can never
+        // be taller than the row it's centered in.
+        val ringEdge = (LocalSize.current.height - 16.dp).coerceIn(20.dp, 56.dp)
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = 56)
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(10.dp))
             }
             Column(modifier = GlanceModifier.defaultWeight()) {
@@ -319,11 +336,15 @@ class CarWidget : GlanceAppWidget() {
                 return
             }
         }
+        // Mirrors CompactWideLayout's own clamp: COMPACT_TALL's threshold only
+        // proves the HEIGHT is roomy, not the width, which can be much
+        // narrower than the ring's usual 72dp.
+        val ringEdge = (LocalSize.current.width - 16.dp).coerceIn(20.dp, 72.dp)
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(car.name, style = titleStyle(render.theme), maxLines = 1)
             Spacer(GlanceModifier.height(6.dp))
             if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = 72)
+                RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.height(6.dp))
             }
             InfoStack(car, render, max = 2)
@@ -334,12 +355,16 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun MediumLayout(car: VehicleSnapshot, render: Render) {
+        // Same reasoning as LargeLayout/XlLayout's own clamp: the header +
+        // button rows can leave less than 76dp for the ring's weighted row at
+        // MEDIUM's own minimum height (150dp).
+        val ringEdge = (LocalSize.current.height * 0.5f).coerceIn(36.dp, 76.dp)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
             Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
                 if (render.config.showRing && car.percent != null) {
-                    RingImage(car, render, edgeDp = 76)
+                    RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     Spacer(GlanceModifier.width(12.dp))
                 }
                 Column(modifier = GlanceModifier.defaultWeight()) {
@@ -353,6 +378,15 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun LargeLayout(car: VehicleSnapshot, render: Render) {
+        // The ring's row shares this Column with the header/buttons/footer via
+        // defaultWeight(), so at LARGE's own minimum height (170dp) a fixed
+        // 96dp ring can be taller than what's actually left over once those
+        // siblings claim their space -- unlike a plain size(), a weighted row
+        // doesn't shrink the fixed-size Image inside it, it just clips it.
+        // Scaling off the tile's own measured height (capped at the original
+        // 96dp design size) keeps the ring proportioned at every size in
+        // between instead of only being safe at the two ends.
+        val ringEdge = (LocalSize.current.height * 0.42f).coerceIn(40.dp, 96.dp)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
@@ -363,7 +397,7 @@ class CarWidget : GlanceAppWidget() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (render.config.showRing && car.percent != null) {
-                        RingImage(car, render, edgeDp = 96)
+                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     } else {
                         StatusGlyph(car, render.theme, sizeDp = 56)
                     }
@@ -382,6 +416,8 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun XlLayout(car: VehicleSnapshot, render: Render) {
+        // Same reasoning as LargeLayout's own ringEdge clamp.
+        val ringEdge = (LocalSize.current.height * 0.42f).coerceIn(60.dp, 140.dp)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
@@ -392,7 +428,7 @@ class CarWidget : GlanceAppWidget() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (render.config.showRing && car.percent != null) {
-                        RingImage(car, render, edgeDp = 140)
+                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
                     } else {
                         StatusGlyph(car, render.theme, sizeDp = 88)
                     }
