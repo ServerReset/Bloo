@@ -52,6 +52,8 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.ui.BlooTheme
 import com.bloo.bluelink.ui.MorphButton
 import com.bloo.bluelink.ui.MorphChip
+import com.bloo.bluelink.ui.MorphSegmented
+import com.bloo.bluelink.ui.SegmentOption
 import kotlinx.coroutines.launch
 
 /**
@@ -127,6 +129,8 @@ private fun ConfigScreen(
     val infoFields = remember { mutableStateListOf<String>().apply { addAll(initial.infoFields) } }
     var showRing by remember { mutableStateOf(initial.showRing) }
     var showMap by remember { mutableStateOf(initial.showMap) }
+    var photoBackground by remember { mutableStateOf(initial.photoBackground) }
+    var priority by remember { mutableStateOf(initial.priority) }
     var accent by remember { mutableStateOf(initial.accent) }
     var theme by remember { mutableStateOf(initial.theme) }
 
@@ -165,6 +169,12 @@ private fun ConfigScreen(
 
             // --- Status ring (both modes) ---
             ToggleLine("Show status ring", showRing) { showRing = it }
+            Spacer(Modifier.height(8.dp))
+            // Both modes -- a small widget with no photo is just as common a
+            // choice as a large advanced one, and this is purely visual, not a
+            // knob that changes what data the widget reads. No-ops gracefully
+            // to the normal themed surface for a car with no photo set.
+            ToggleLine("Use car photo as background", photoBackground) { photoBackground = it }
 
             // --- Controls ---
             Spacer(Modifier.height(16.dp))
@@ -177,6 +187,24 @@ private fun ConfigScreen(
                     }
                 }
             }
+
+            // --- Small-size priority (both modes) ---
+            Spacer(Modifier.height(16.dp))
+            SectionLabel("On small sizes")
+            Text(
+                "Below about 2×2 cells there's only room for one -- pick which wins.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            MorphSegmented(
+                options = listOf(
+                    SegmentOption(WidgetConfig.PRIORITY_INFO, "Info", null),
+                    SegmentOption(WidgetConfig.PRIORITY_CONTROLS, "Controls", null),
+                ),
+                selectedKey = priority,
+                onSelect = { priority = it },
+            )
 
             // --- Advanced-only sections ---
             if (advanced) {
@@ -230,6 +258,8 @@ private fun ConfigScreen(
                             infoFields = infoFields.sortedBy { key -> WidgetInfoField.fromKey(key)?.ordinal ?: Int.MAX_VALUE },
                             showRing = showRing,
                             showMap = showMap,
+                            photoBackground = photoBackground,
+                            priority = priority,
                             accent = accent,
                             theme = theme,
                         ),

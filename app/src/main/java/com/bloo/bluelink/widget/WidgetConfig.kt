@@ -27,6 +27,18 @@ data class WidgetConfig(
     val showRing: Boolean = true,
     /** Whether to show the location map thumbnail on large sizes (advanced-only knob). */
     val showMap: Boolean = false,
+    /** Use the car's own photo (blurred, full-bleed) as the widget background
+     *  instead of a flat themed surface. No-ops gracefully back to the themed
+     *  surface when the car has no photo set. */
+    val photoBackground: Boolean = false,
+    /** At the MICRO/COMPACT_WIDE/COMPACT_TALL tiers only (below roughly 2x2
+     *  cells -- see CarWidget.Tier) there isn't room to show both the status
+     *  ring/stats AND the action buttons at a usable size, so this decides
+     *  which one wins outright at those sizes: [PRIORITY_INFO] (the default)
+     *  shows the ring/name/stat, [PRIORITY_CONTROLS] replaces it with the
+     *  configured action buttons filling the same space. Sizes with more room
+     *  (MEDIUM and up) always show both regardless of this setting. */
+    val priority: String = PRIORITY_INFO,
     /** Semantic accent override: one of [WidgetAccent] keys, or null = follow theme primary. */
     val accent: String? = null,
     /** Theme override for this widget: "auto" (system), "light", or "dark". */
@@ -37,6 +49,9 @@ data class WidgetConfig(
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
         val THEMES = listOf(THEME_AUTO, THEME_LIGHT, THEME_DARK)
+
+        const val PRIORITY_INFO = "info"
+        const val PRIORITY_CONTROLS = "controls"
     }
 }
 

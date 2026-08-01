@@ -40,6 +40,7 @@ import androidx.glance.unit.ColorProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -110,6 +111,16 @@ class CarWidget : GlanceAppWidget() {
             val edge = (150 * density).toInt()
             runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb) }.getOrNull()
         } else null
+        // No-ops gracefully to the themed background when the car has no photo
+        // set (SettingsStore.imageUrl is only ever a local file path here --
+        // "/..." -- never a remote URL, matching how the app's own photo
+        // picker stores it).
+        val photoBitmap = if (config.photoBackground && car != null) {
+            val path = runCatching { SettingsStore(context).imageUrl(car.vin) }.getOrNull()
+            if (path != null && path.startsWith("/")) {
+                WidgetPhoto.decodeCached(path)?.let { WidgetPhoto.blurredCached(it, path) }
+            } else null
+        } else null
         val render = Render(
             car = car,
             config = config,
@@ -118,6 +129,7 @@ class CarWidget : GlanceAppWidget() {
             multiCar = data.vehicles.size > 1,
             stale = stale,
             mapBitmap = mapBitmap,
+            photoBitmap = photoBitmap,
         )
         provideContent {
             GlanceTheme {
@@ -140,6 +152,10 @@ class CarWidget : GlanceAppWidget() {
          *  failed) — I/O can't run in the Glance composables, so it's done in
          *  provideGlance and handed in ready to draw. */
         val mapBitmap: android.graphics.Bitmap?,
+        /** Pre-fetched, pre-blurred car photo for the "Photo background" option
+         *  (null when disabled or the car has no photo set) -- same reasoning
+         *  as [mapBitmap], decoded/blurred in provideGlance via [WidgetPhoto]. */
+        val photoBitmap: android.graphics.Bitmap?,
     )
 
     /** The layout tiers, smallest to largest. Chosen from the measured size. */
@@ -164,24 +180,43 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun Content(render: Render) {
         val car = render.car
-        val root = GlanceModifier
-            .fillMaxSize()
-            .background(render.theme.background)
-            .cornerRadius(20.dp)
+        val photo = render.photoBitmap
+        // Every text/tonal role swaps to a photo-safe variant when the photo
+        // background is actually active (no photo set = falls straight back
+        // to the normal themed surface) -- see WidgetTheme.forPhoto. Doing this
+        // once here, on the Render itself, means every tier/module below just
+        // keeps reading render.theme like normal and gets it for free.
+        val effective = if (photo != null) render.copy(theme = render.theme.forPhoto()) else render
+        val outerCorner = GlanceModifier.fillMaxSize().cornerRadius(20.dp)
+        val root = (if (photo == null) outerCorner.background(effective.theme.background) else outerCorner)
             .padding(12.dp)
         if (car == null) {
-            EmptyState(root, render.theme)
+            EmptyState(root, effective.theme)
             return
         }
         val size = LocalSize.current
-        Box(modifier = root) {
-            when (tierFor(size)) {
-                Tier.MICRO -> MicroLayout(car, render)
-                Tier.COMPACT_WIDE -> CompactWideLayout(car, render)
-                Tier.COMPACT_TALL -> CompactTallLayout(car, render)
-                Tier.MEDIUM -> MediumLayout(car, render)
-                Tier.LARGE -> LargeLayout(car, render)
-                Tier.XL -> XlLayout(car, render)
+        Box(modifier = GlanceModifier.fillMaxSize().cornerRadius(20.dp)) {
+            if (photo != null) {
+                Image(
+                    provider = ImageProvider(photo),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = GlanceModifier.fillMaxSize().cornerRadius(20.dp),
+                )
+                // A flat dark scrim regardless of light/dark theme -- the photo's
+                // own brightness varies too much car to car to trust either
+                // theme's plain surface tint to stay legible under white text.
+                Box(GlanceModifier.fillMaxSize().cornerRadius(20.dp).background(ColorProvider(Color(0f, 0f, 0f, 0.38f)))) {}
+            }
+            Box(modifier = root) {
+                when (tierFor(size)) {
+                    Tier.MICRO -> MicroLayout(car, effective)
+                    Tier.COMPACT_WIDE -> CompactWideLayout(car, effective)
+                    Tier.COMPACT_TALL -> CompactTallLayout(car, effective)
+                    Tier.MEDIUM -> MediumLayout(car, effective)
+                    Tier.LARGE -> LargeLayout(car, effective)
+                    Tier.XL -> XlLayout(car, effective)
+                }
             }
         }
     }
@@ -207,8 +242,23 @@ class CarWidget : GlanceAppWidget() {
 
     // ---- Tier layouts --------------------------------------------------------
 
+    /** True when this widget should show controls instead of info/ring at the
+     *  MICRO/COMPACT_WIDE/COMPACT_TALL tiers -- see [WidgetConfig.priority]'s
+     *  doc comment for why this only applies below MEDIUM. */
+    private fun controlsPriority(render: Render) = render.config.priority == WidgetConfig.PRIORITY_CONTROLS
+
     @Composable
     private fun MicroLayout(car: VehicleSnapshot, render: Render) {
+        // Controls priority at this size means "this widget IS one button" --
+        // there's no room for a real row of buttons at a usable tap size, so
+        // just the first configured action fills the whole tile.
+        if (controlsPriority(render)) {
+            val action = resolvedActions(car, render, max = 1).firstOrNull()
+            if (action != null) {
+                ActionButton(action, car, render, modifier = GlanceModifier.fillMaxSize(), fixedHeight = false, iconSize = 30.dp)
+                return
+            }
+        }
         // A single glance: the fuel/charge ring if there's a percent to show and
         // the ring is on, else a lock glyph. Whole tile opens the app.
         Box(
@@ -225,6 +275,13 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun CompactWideLayout(car: VehicleSnapshot, render: Render) {
+        if (controlsPriority(render)) {
+            val actions = resolvedActions(car, render, max = 4)
+            if (actions.isNotEmpty()) {
+                ActionButtons(car, render, max = 4, modifier = GlanceModifier.fillMaxSize().padding(4.dp))
+                return
+            }
+        }
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = 56)
@@ -241,6 +298,15 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun CompactTallLayout(car: VehicleSnapshot, render: Render) {
+        if (controlsPriority(render)) {
+            val actions = resolvedActions(car, render, max = 3)
+            if (actions.isNotEmpty()) {
+                Box(GlanceModifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
+                    ActionButtons(car, render, max = 3, vertical = true)
+                }
+                return
+            }
+        }
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(car.name, style = titleStyle(render.theme), maxLines = 1)
             Spacer(GlanceModifier.height(6.dp))
@@ -412,32 +478,62 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    /** The configured action buttons, capped to [max] for the current size. */
-    @Composable
-    private fun ActionButtons(car: VehicleSnapshot, render: Render, max: Int) {
-        // Kia's US API (and the Canada backend) has no flash/horn endpoint --
-        // com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator) is the
-        // same lookup Vehicle.supportsHornLights uses on the phone. Without this,
-        // a Kia user who'd configured Flash/Horn got a button that silently did
-        // nothing on every tap (WearCommandRunner routes it to KiaRepository's
-        // default no-op flashLights/hornAndLights).
+    /** The user's configured actions, filtered down to what this car's brand
+     *  actually supports and capped to [max] -- the shared resolution behind
+     *  both [ActionButtons] and the MICRO tier's single-button controls mode.
+     *  Kia's US API (and the Canada backend) has no flash/horn endpoint --
+     *  com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator) is the
+     *  same lookup Vehicle.supportsHornLights uses on the phone. Without this,
+     *  a Kia user who'd configured Flash/Horn got a button that silently did
+     *  nothing on every tap (WearCommandRunner routes it to KiaRepository's
+     *  default no-op flashLights/hornAndLights). */
+    private fun resolvedActions(car: VehicleSnapshot, render: Render, max: Int): List<WidgetAction> {
         val hornLightsSupported = com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator)
             .let { it != com.bloo.bluelink.data.Brand.KIA && !it.isCanada }
-        val actions = render.config.actions.mapNotNull { WidgetAction.fromKey(it) }
+        return render.config.actions.mapNotNull { WidgetAction.fromKey(it) }
             .filter { it != WidgetAction.CHARGE || car.hasBattery } // hide Charge on non-EV
             .filter { (it != WidgetAction.FLASH && it != WidgetAction.HORN) || hornLightsSupported }
             .take(max)
+    }
+
+    /** The configured action buttons, capped to [max] for the current size.
+     *  [vertical] stacks them in a column instead of a row -- used by the
+     *  tall/narrow compact tier so a controls-priority widget gets real
+     *  finger-sized buttons instead of squeezing several side by side into a
+     *  too-narrow strip. */
+    @Composable
+    private fun ActionButtons(
+        car: VehicleSnapshot, render: Render, max: Int,
+        vertical: Boolean = false, modifier: GlanceModifier = GlanceModifier.fillMaxWidth(),
+    ) {
+        val actions = resolvedActions(car, render, max)
         if (actions.isEmpty()) return
-        Row(modifier = GlanceModifier.fillMaxWidth()) {
-            actions.forEachIndexed { i, action ->
-                if (i > 0) Spacer(GlanceModifier.width(6.dp))
-                ActionButton(action, car, render, modifier = GlanceModifier.defaultWeight())
+        if (vertical) {
+            Column(modifier = modifier) {
+                actions.forEachIndexed { i, action ->
+                    if (i > 0) Spacer(GlanceModifier.height(6.dp))
+                    ActionButton(action, car, render, modifier = GlanceModifier.fillMaxWidth())
+                }
+            }
+        } else {
+            Row(modifier = modifier) {
+                actions.forEachIndexed { i, action ->
+                    if (i > 0) Spacer(GlanceModifier.width(6.dp))
+                    ActionButton(action, car, render, modifier = GlanceModifier.defaultWeight())
+                }
             }
         }
     }
 
     @Composable
-    private fun ActionButton(action: WidgetAction, car: VehicleSnapshot, render: Render, modifier: GlanceModifier) {
+    private fun ActionButton(
+        action: WidgetAction, car: VehicleSnapshot, render: Render, modifier: GlanceModifier,
+        // False only for the MICRO tier's single-button controls mode, where
+        // the caller's own fillMaxSize() modifier should decide the button's
+        // size instead of the usual fixed row/column height.
+        fixedHeight: Boolean = true,
+        iconSize: Dp = 22.dp,
+    ) {
         val theme = render.theme
         // Every button defaults to the branded accent fill -- the "chunky, colored
         // action button" look is Bloo's own established visual language (phone,
@@ -461,8 +557,7 @@ class CarWidget : GlanceAppWidget() {
             )
         }
         Box(
-            modifier = modifier
-                .height(44.dp)
+            modifier = (if (fixedHeight) modifier.height(44.dp) else modifier)
                 .background(bg)
                 .cornerRadius(14.dp)
                 .clickable(click),
@@ -472,7 +567,7 @@ class CarWidget : GlanceAppWidget() {
                 provider = ImageProvider(iconFor(action)),
                 contentDescription = action.label,
                 colorFilter = ColorFilter.tint(theme.onAccent),
-                modifier = GlanceModifier.size(22.dp),
+                modifier = GlanceModifier.size(iconSize),
             )
         }
     }
@@ -668,5 +763,27 @@ private data class WidgetTheme(
                 climate = ColorProvider(Color(BlooColors.climateTeal)),
             )
         }
+    }
+
+    /**
+     * Text/tonal roles re-tuned for legibility over an arbitrary car photo
+     * instead of a flat themed surface -- text goes to a fixed near-white
+     * (the photo already gets a dark scrim behind it, see [CarWidget.Content]),
+     * and every state-color button fill (accent/charge/unlocked/climate) picks
+     * up the same "frosted glass over a photo" translucency the rest of the
+     * app's glass surfaces use, rather than sitting fully opaque on top of the
+     * photo like a flat sticker.
+     */
+    fun forPhoto(): WidgetTheme {
+        fun glassy(c: Color) = c.copy(alpha = 0.62f)
+        return copy(
+            onSurface = ColorProvider(Color.White),
+            onSurfaceVariant = ColorProvider(Color(0xFFE4E4E8)),
+            surfaceVariant = ColorProvider(Color(0x3DFFFFFF)),
+            accentProvider = ColorProvider(glassy(accent)),
+            charge = ColorProvider(glassy(Color(BlooColors.chargeGreen))),
+            unlocked = ColorProvider(glassy(Color(BlooColors.heat))),
+            climate = ColorProvider(glassy(Color(BlooColors.climateTeal))),
+        )
     }
 }
