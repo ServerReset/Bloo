@@ -67,7 +67,7 @@ class WidgetTierTest {
         // floor. Anything with 90dp on BOTH sides has room for a real layout.
         // This is the assertion that would have caught the 190x140 bug.
         val holes = sizes()
-            .filter { (w, h) -> minOf(w, h) >= 0 } // TEMP mutation: must fail
+            .filter { (w, h) -> minOf(w, h) >= 90 }
             .filter { (w, h) -> tier(w, h) == WidgetTier.MICRO || tier(w, h) == WidgetTier.MICRO_TINY }
             .toList()
         assertTrue(
