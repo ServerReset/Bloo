@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bloo.bluelink.MainActivity
@@ -166,6 +167,53 @@ class CarWidget : GlanceAppWidget() {
      *  the original widget used for its own narrow-text fallback. */
     private val NARROW_WIDTH = 90.dp
 
+    /**
+     * Continuous size scaling, shared by every tier, so text/icons/padding/the
+     * ring grow and shrink smoothly with the widget's exact measured size
+     * instead of snapping between a handful of fixed per-tier constants --
+     * the Tier enum still decides layout STRUCTURE (what appears, how it's
+     * arranged), but everything about how big those pieces are now comes from
+     * here, keyed off the same one signal ([progress]) at every tier boundary,
+     * so nothing visibly jumps exactly where one tier hands off to the next.
+     */
+    private object Scale {
+        // The real span this app's widget can ever be measured at: MIN matches
+        // the manifest's declared floor (car_widget_info.xml minWidth/Height),
+        // MAX is comfortably into XL territory -- past it every value here is
+        // already at its ceiling, so a bigger widget just gets more empty
+        // margin rather than ever-growing text.
+        private const val MIN_DIM = 40f
+        private const val MAX_DIM = 320f
+
+        private fun lerp(t: Float, from: Float, to: Float): Float = from + (to - from) * t.coerceIn(0f, 1f)
+
+        /** 0f at the smallest possible widget, 1f at MAX_DIM and up, based on
+         *  the SHORTER measured side (the one that actually constrains how
+         *  much can fit, regardless of how long the other side stretches). */
+        fun progress(size: DpSize): Float {
+            val short = minOf(size.width.value, size.height.value)
+            return ((short - MIN_DIM) / (MAX_DIM - MIN_DIM)).coerceIn(0f, 1f)
+        }
+
+        /** The ring's continuous target size, capped by [maxAvailable] -- each
+         *  tier already knows how much room it actually has left after its own
+         *  header/button/footer siblings (see each RingImage call site's own
+         *  comment), so this is deliberately two numbers combined: "how big
+         *  the ring WANTS to be at this size" and "how big it's SAFE to be
+         *  here," never just one or the other. */
+        fun ring(size: DpSize, maxAvailable: Dp): Dp = minOf(lerp(progress(size), 28f, 140f).dp, maxAvailable)
+
+        fun titleSp(size: DpSize): TextUnit = lerp(progress(size), 11f, 20f).sp
+        fun subtitleSp(size: DpSize): TextUnit = lerp(progress(size), 9f, 13f).sp
+        fun valueSp(size: DpSize): TextUnit = lerp(progress(size), 10f, 15f).sp
+
+        /** The root content padding around every tier's layout. */
+        fun contentPadding(size: DpSize): Dp = lerp(progress(size), 6f, 18f).dp
+
+        fun buttonHeight(size: DpSize): Dp = lerp(progress(size), 32f, 48f).dp
+        fun buttonIcon(size: DpSize): Dp = lerp(progress(size), 16f, 26f).dp
+    }
+
     private fun tierFor(size: DpSize): Tier {
         val w = size.width.value
         val h = size.height.value
@@ -201,8 +249,12 @@ class CarWidget : GlanceAppWidget() {
         // 999.dp clamps to a true pill against whichever side is shorter.
         val corner = if (render.config.pillShape && minOf(size.width, size.height) < 180.dp) 999.dp else 20.dp
         val outerCorner = GlanceModifier.fillMaxSize().cornerRadius(corner)
+        // Base padding scales continuously with size; a pill shape needs a
+        // little extra on top of that so content doesn't clip against the
+        // extreme corner curve.
+        val basePadding = Scale.contentPadding(size)
         val root = (if (photo == null) outerCorner.background(effective.theme.background) else outerCorner)
-            .padding(if (corner >= 999.dp) 16.dp else 12.dp)
+            .padding(if (corner >= 999.dp) basePadding + 4.dp else basePadding)
         if (car == null) {
             EmptyState(root, effective.theme)
             return
@@ -289,7 +341,7 @@ class CarWidget : GlanceAppWidget() {
             contentAlignment = Alignment.Center,
         ) {
             if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = fit.coerceIn(20.dp, 64.dp).value.toInt())
+                RingImage(car, render, edgeDp = Scale.ring(size, fit).value.toInt())
             } else {
                 StatusGlyph(car, render.theme, sizeDp = fit.coerceIn(14.dp, 40.dp).value.toInt())
             }
@@ -307,10 +359,12 @@ class CarWidget : GlanceAppWidget() {
         }
         // COMPACT_WIDE's own tier threshold only proves the WIDTH is roomy
         // (>= 150dp) -- the height is whatever satisfies its aspect-ratio
-        // gate against that width, which can be much shorter than the ring's
-        // usual 56dp. Clamp to what's actually measured so the ring can never
-        // be taller than the row it's centered in.
-        val ringEdge = (LocalSize.current.height - 16.dp).coerceIn(20.dp, 56.dp)
+        // gate against that width, which can be much shorter than the ring
+        // wants to be. Scale.ring's continuous target is capped by whatever
+        // height is actually available, so the ring can never be taller than
+        // the row it's centered in.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height - 16.dp).coerceAtLeast(20.dp))
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -348,9 +402,9 @@ class CarWidget : GlanceAppWidget() {
             }
         }
         // Mirrors CompactWideLayout's own clamp: COMPACT_TALL's threshold only
-        // proves the HEIGHT is roomy, not the width, which can be much
-        // narrower than the ring's usual 72dp.
-        val ringEdge = (LocalSize.current.width - 16.dp).coerceIn(20.dp, 72.dp)
+        // proves the HEIGHT is roomy, not the width.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.width - 16.dp).coerceAtLeast(20.dp))
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(car.name, style = titleStyle(render.theme), maxLines = 1)
             Spacer(GlanceModifier.height(6.dp))
@@ -367,9 +421,10 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun MediumLayout(car: VehicleSnapshot, render: Render) {
         // Same reasoning as LargeLayout/XlLayout's own clamp: the header +
-        // button rows can leave less than 76dp for the ring's weighted row at
-        // MEDIUM's own minimum height (150dp).
-        val ringEdge = (LocalSize.current.height * 0.5f).coerceIn(36.dp, 76.dp)
+        // button rows can leave less than the ring's continuous target size
+        // at MEDIUM's own minimum height (150dp).
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height * 0.5f).coerceAtLeast(36.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
@@ -390,14 +445,15 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun LargeLayout(car: VehicleSnapshot, render: Render) {
         // The ring's row shares this Column with the header/buttons/footer via
-        // defaultWeight(), so at LARGE's own minimum height (170dp) a fixed
-        // 96dp ring can be taller than what's actually left over once those
-        // siblings claim their space -- unlike a plain size(), a weighted row
-        // doesn't shrink the fixed-size Image inside it, it just clips it.
-        // Scaling off the tile's own measured height (capped at the original
-        // 96dp design size) keeps the ring proportioned at every size in
-        // between instead of only being safe at the two ends.
-        val ringEdge = (LocalSize.current.height * 0.42f).coerceIn(40.dp, 96.dp)
+        // defaultWeight(), so at LARGE's own minimum height (170dp) the ring's
+        // continuous target can be taller than what's actually left over once
+        // those siblings claim their space -- unlike a plain size(), a
+        // weighted row doesn't shrink the fixed-size Image inside it, it just
+        // clips it. Capping by the tile's own measured height keeps the ring
+        // proportioned at every size in between instead of only being safe at
+        // the tier's two ends.
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height * 0.42f).coerceAtLeast(40.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
@@ -428,7 +484,8 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun XlLayout(car: VehicleSnapshot, render: Render) {
         // Same reasoning as LargeLayout's own ringEdge clamp.
-        val ringEdge = (LocalSize.current.height * 0.42f).coerceIn(60.dp, 140.dp)
+        val size = LocalSize.current
+        val ringEdge = Scale.ring(size, (size.height * 0.42f).coerceAtLeast(60.dp))
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
@@ -626,9 +683,10 @@ class CarWidget : GlanceAppWidget() {
         // the caller's own fillMaxSize() modifier should decide the button's
         // size instead of the usual fixed row/column height.
         fixedHeight: Boolean = true,
-        iconSize: Dp = 22.dp,
+        iconSize: Dp = Scale.buttonIcon(LocalSize.current),
     ) {
         val theme = render.theme
+        val size = LocalSize.current
         // Every button defaults to the branded accent fill -- the "chunky, colored
         // action button" look is Bloo's own established visual language (phone,
         // watch, and the old widget all share it). It only swaps to a semantic
@@ -651,7 +709,7 @@ class CarWidget : GlanceAppWidget() {
             )
         }
         Box(
-            modifier = (if (fixedHeight) modifier.height(44.dp) else modifier)
+            modifier = (if (fixedHeight) modifier.height(Scale.buttonHeight(size)) else modifier)
                 .background(bg)
                 .cornerRadius(14.dp)
                 .clickable(click),
@@ -720,13 +778,20 @@ class CarWidget : GlanceAppWidget() {
     }
 
     // ---- Text styles ---------------------------------------------------------
+    // @Composable (not plain functions) purely so each can read LocalSize.current
+    // itself -- every call site is already inside composition, so this scales
+    // font size continuously with the widget's exact measured size (see Scale)
+    // without having to thread a size param through every single caller.
 
+    @Composable
     private fun titleStyle(theme: WidgetTheme) =
-        TextStyle(color = theme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        TextStyle(color = theme.onSurface, fontSize = Scale.titleSp(LocalSize.current), fontWeight = FontWeight.Bold)
+    @Composable
     private fun subtitleStyle(theme: WidgetTheme) =
-        TextStyle(color = theme.onSurfaceVariant, fontSize = 12.sp)
+        TextStyle(color = theme.onSurfaceVariant, fontSize = Scale.subtitleSp(LocalSize.current))
+    @Composable
     private fun valueStyle(theme: WidgetTheme) =
-        TextStyle(color = theme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        TextStyle(color = theme.onSurface, fontSize = Scale.valueSp(LocalSize.current), fontWeight = FontWeight.Medium)
 
     // ---- Value helpers -------------------------------------------------------
 
