@@ -508,15 +508,28 @@ class CanadaApi(private val brand: Brand) {
             throw BlueLinkException(msg, code = resp.code)
         }
         val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
-        // Successful HTTP with an in-band error code still needs to surface as
-        // a session expiry so CanadaRepository's retry-once logic can trigger.
-        val statusCode = root.path("responseCode")?.str() ?: root.path("status", "statusCode")?.str()
-        if (statusCode != null && statusCode != "0000" && statusCode != "0") {
-            val msg = root.path("responseDesc").str() ?: root.path("status", "errorMessage").str()
-                ?: "Canada request failed ($statusCode)"
-            val expired = statusCode.contains("401") || msg.contains("expired", ignoreCase = true) ||
-                msg.contains("session", ignoreCase = true)
-            AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg")
+        // A successful HTTP status can still carry an in-band error. The CA (tods)
+        // backend nests the status under `responseHeader.responseCode` (0 = success,
+        // 1 = error) with details in a top-level `error` object — NOT the Kia-US
+        // shape (`status.statusCode`/top-level `responseCode`) this used to read,
+        // which doesn't exist in the CA envelope, so every in-band error slipped
+        // through as success (expired sessions never re-authed, real errors lost).
+        // Verified against the KiaUvoApiCA reference this client is ported from.
+        val respCode = root.path("responseHeader", "responseCode").int()
+        if (respCode != null && respCode != 0) {
+            val errCode = root.path("error", "errorCode").str()
+            // 7110 = "device not remembered, OTP required" — NOT a failure: authUser
+            // relies on call() returning normally here so it can fall through to the
+            // MFA flow. Throwing on it would break Canadian sign-in entirely.
+            if (errCode == "7110") return@use root
+            val msg = root.path("error", "errorDesc").str()
+                ?: root.path("error", "errorMessage").str()
+                ?: "Canada request failed (${errCode ?: respCode})"
+            // These codes mean the session/token is dead (locked, expired, wrong
+            // creds, OTP failed, token deleted, IP-bound token rejected). Surface
+            // as 401 so CanadaRepository.withSession remaps + withCommandAuth retries.
+            val expired = errCode in setOf("7402", "7403", "7404", "7549", "7602", "7606")
+            AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg (code $errCode)")
             throw BlueLinkException(msg, code = if (expired) 401 else resp.code)
         }
         root
@@ -526,7 +539,11 @@ class CanadaApi(private val brand: Brand) {
 
     private fun friendly(code: Int, body: String): String {
         val msg = runCatching {
-            json.parseToJsonElement(body).obj()?.let { it["responseDesc"] ?: it.path("status", "errorMessage") }?.str()
+            // CA envelope puts the human message at error.errorDesc; keep the old
+            // key paths as harmless fallbacks for any endpoint that differs.
+            json.parseToJsonElement(body).obj()?.let {
+                it.path("error", "errorDesc") ?: it["responseDesc"] ?: it.path("status", "errorMessage")
+            }?.str()
         }.getOrNull()
         return msg?.takeIf { it.isNotBlank() } ?: "Canada request failed (HTTP $code)"
     }
