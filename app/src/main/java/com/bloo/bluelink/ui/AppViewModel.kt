@@ -768,10 +768,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // watch's own signOutAll (snapshotStore.saveVehicles(emptyList())).
                 runCatching { statusCache.clear() }
                 runCatching { snapshotStore.saveVehicles(emptyList()) }
-                // Push the emptied snapshot to the home-screen widget so it stops
-                // showing the stale car/location instead of waiting for its next
-                // scheduled update.
-                runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
                 runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication()) }
                 // Preserve device-capability probe results across the full state
                 // reset -- they're device capabilities, not account state, and were
@@ -1444,8 +1440,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin]) })
         // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
-        // Refresh any home-screen widgets so their status reflects the new data.
-        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
         // Refresh Quick Settings tiles too.
         com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
     }
@@ -2517,16 +2511,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // is already a StateFlow mirroring settingsStore.appearance -- the UI
     // picks up the change automatically once the DataStore write completes
     // and that Flow re-emits, and the init-block collector separately mirrors
-    // the same Flow out to a paired watch. setThemeMode and setDynamicColor
-    // are the two exceptions that do extra work (see their own comments).
-    // Deviates from the group pattern above: the home-screen widget renders
-    // itself with its own theme resolution that isn't reactive to the
-    // DataStore Flow the way Compose UI is, so it needs an explicit nudge to
-    // repaint after a theme change; best-effort (runCatching) since a missing
-    // widget instance is not an error.
+    // the same Flow out to a paired watch. setDynamicColor is the exception
+    // that does extra work (see its own comment).
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
         settingsStore.setThemeMode(mode)
-        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(getApplication()) }
     }
     fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
     // Deviates from the group pattern above: turning dynamic (Material You)

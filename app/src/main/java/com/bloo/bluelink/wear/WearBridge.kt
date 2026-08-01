@@ -88,7 +88,6 @@ object WearBridge {
             val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
             publishSettingsNow(context, appearance)
         }
-        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(context) }
         runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }
 
@@ -132,8 +131,8 @@ object WearBridge {
      * pebble ordering/visibility) into a flat [WearSettingsPayload] of literal ARGB ints and
      * primitives the watch can render without needing any of the phone's Compose theming
      * code -- the watch just paints the colors it's given. Called both proactively whenever
-     * a setting changes and defensively on every periodic refresh (see [WidgetRefreshWorker])
-     * in case an earlier push was missed.
+     * a setting changes and defensively on every periodic refresh, in case an
+     * earlier push was missed.
      */
     suspend fun publishSettingsNow(context: Context, appearance: SettingsStore.Appearance) {
         val dark = when (appearance.themeMode) {
@@ -340,9 +339,8 @@ object WearBridge {
         }
     }
 
-    /** Update phone widgets and watch tiles (no state re-fetch). */
+    /** Refresh watch tiles (no state re-fetch). */
     private suspend fun updateAllSurfaces(context: Context) {
-        runCatching { com.bloo.bluelink.widget.BlooWidget().updateAll(context) }
         runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }
 }

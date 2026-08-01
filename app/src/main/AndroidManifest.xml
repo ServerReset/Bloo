@@ -232,9 +232,10 @@
             </intent-filter>
         </service>
 
-        <!-- Home-screen widget: pinned car status + four assignable pill buttons. -->
+        <!-- Adaptive home-screen car widget (Jetpack Glance). Scales 1x1 → 7x7,
+             showing progressively more of the car's status + quick controls. -->
         <receiver
-            android:name=".widget.BlooWidgetReceiver"
+            android:name=".widget.CarWidgetReceiver"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
@@ -242,10 +243,11 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/bloo_widget_info" />
+                android:resource="@xml/car_widget_info" />
         </receiver>
 
-        <!-- Widget setup (on first drop AND launcher long-press → settings). -->
+        <!-- Widget setup (on first drop AND launcher long-press → settings).
+             Its option set adapts to the app's simple/advanced mode. -->
         <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"
@@ -254,13 +256,6 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
-
-        <!-- Transparent biometric/PIN gate for widget button taps. -->
-        <activity
-            android:name=".widget.WidgetAuthActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:theme="@style/Theme.Bloo.Transparent" />
 
         <!-- Runs an alert notification's action button (e.g. Lock / Turn off),
              including taps bridged from the watch. -->

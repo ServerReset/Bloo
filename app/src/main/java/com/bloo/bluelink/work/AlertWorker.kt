@@ -87,8 +87,8 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 }
             }
         }
-        // The 30-min alert poll also constitutes a data refresh — fan out to all
-        // surfaces so widgets and tiles don't wait for the 15-min WidgetRefreshWorker.
+        // The 30-min alert poll also constitutes a data refresh — fan out to the
+        // watch + QS tiles so they don't wait for their own next scheduled update.
         WearBridge.refreshAllSurfaces(applicationContext)
         return Result.success()
     }

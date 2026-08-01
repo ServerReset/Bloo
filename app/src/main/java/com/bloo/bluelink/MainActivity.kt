@@ -18,7 +18,6 @@ import androidx.fragment.app.FragmentActivity
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
-import com.bloo.bluelink.widget.WidgetRefreshWorker
 import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.DriveSyncWorker
 import com.bloo.bluelink.work.UpdateCheckWorker
@@ -77,9 +76,6 @@ class MainActivity : FragmentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         AlertWorker.schedule(applicationContext)
-        // Keep widgets, the watch, and QS tiles fresh in the background even when
-        // the app is closed — the phone-hub heartbeat for all spokes.
-        WidgetRefreshWorker.schedule(applicationContext)
         // Drive settings sync used to only run while the app was foregrounded and
         // a refresh settled — a no-op periodic worker when sync isn't configured.
         DriveSyncWorker.schedule(applicationContext)

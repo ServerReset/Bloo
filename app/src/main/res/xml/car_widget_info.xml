@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppWidgetProviderInfo for the adaptive Bloo car widget.
+  Fully resizable in both axes; minWidth/minHeight sit at the 1x1 floor so the
+  widget can be dropped tiny and grown all the way to a 7x7 dashboard, with the
+  Glance content choosing a layout tier for whatever size it ends up.
+  targetCellWidth/Height (Android 12+) give a sensible 3x2 default drop size.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="40dp"
+    android:maxResizeWidth="640dp"
+    android:maxResizeHeight="640dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:configure="com.bloo.bluelink.widget.WidgetConfigActivity"
+    android:initialLayout="@layout/car_widget_loading"
+    android:previewImage="@drawable/ic_car_hero"
+    android:description="@string/widget_description" />

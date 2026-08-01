@@ -16,7 +16,6 @@ import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
-import com.bloo.bluelink.widget.WidgetInfoField
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -918,24 +917,6 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setWidgetLayoutMode(widgetId: Int, value: String) {
         editTracked { it[stringPreferencesKey("widget_${widgetId}_layout")] = value.takeIf { it in setOf("info", "controls") } ?: "info" }
-    }
-
-    /** Ordered "info" mode stats to show, below 3×3 (see WidgetInfoField) -- the
-     *  same idea as widgetConfig's action list, but for info mode instead of
-     *  controls mode. Key absent = not configured yet, falls back to the
-     *  pre-existing fixed set so upgrading doesn't change anyone's widget --
-     *  but a key that IS present, even storing "" (every chip deliberately
-     *  deselected), has to stay empty. Falling back to defaults there too
-     *  (as a naive ifEmpty{} would) made "deselect everything" silently
-     *  un-deselect itself the moment the widget next redrew. */
-    suspend fun widgetInfoFields(widgetId: Int): List<String> {
-        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_info")]
-            ?: return WidgetInfoField.DEFAULTS.map { it.key }
-        return raw.split(",").filter { it.isNotBlank() }
-    }
-
-    suspend fun setWidgetInfoFields(widgetId: Int, fields: List<String>) {
-        editTracked { it[stringPreferencesKey("widget_${widgetId}_info")] = fields.joinToString(",") }
     }
 
     /** Drive URI for auto-backup; null when not configured. */

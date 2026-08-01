@@ -12,7 +12,6 @@ import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.wear.WearBridge
-import com.bloo.bluelink.widget.BlooWidget
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.TimeUnit
@@ -78,7 +77,6 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             runCatching {
                 withTimeout(5_000L) {
                     WearBridge.publishSettingsNow(ctx, store.appearance.first())
-                    BlooWidget().updateAll(ctx)
                 }
             }
         }
