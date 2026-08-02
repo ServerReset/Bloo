@@ -3837,6 +3837,68 @@ private fun cutoutClearanceDp(): EdgeDp {
     }
 }
 
+
+/**
+ * The strip of screen BESIDE the camera island, when there is one worth using.
+ *
+ * A flip cover reports its whole camera island as one display-cutout rect
+ * hugging an edge, and every layout here so far has responded by reserving
+ * that entire edge -- the island's height across the full width. But the
+ * island only occupies part of that band; the rest of it is real, lit,
+ * unoccluded screen that nothing was allowed to use. On a screen this small
+ * that is a meaningful fraction of it.
+ *
+ * Returns the larger of the two free segments (left of the island or right of
+ * it) as an absolute rect in dp from the window's top-left, or null when there
+ * is no cutout, when the cutout doesn't hug a horizontal edge, or when what's
+ * beside it is too small to hold anything worth putting there. Null is the
+ * normal answer on a phone; this is a cover-screen affordance.
+ */
+private data class CoverBand(val xDp: Float, val yDp: Float, val widthDp: Float, val heightDp: Float)
+
+/** Below these a band is a sliver: too short for a legible line of text, or
+ *  too narrow for a name plus a tap target. */
+private const val COVER_BAND_MIN_W = 84f
+private const val COVER_BAND_MIN_H = 26f
+
+@Composable
+private fun coverCutoutBand(): CoverBand? {
+    val view = LocalView.current
+    val density = LocalDensity.current
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
+    val cutout = view.rootWindowInsets?.displayCutout ?: return null
+    val vw = view.width
+    val vh = view.height
+    if (vw <= 0 || vh <= 0) return null
+    val edgeBandPx = with(density) { 24.dp.toPx() }
+    var best: CoverBand? = null
+    for (r in cutout.boundingRects) {
+        // Only a rect hugging the TOP or BOTTOM edge leaves a band beside it
+        // that runs the other way. One hugging a side edge leaves a tall thin
+        // column, which is not a place to put a name and a button.
+        val hugsTop = r.top <= edgeBandPx
+        val hugsBottom = vh - r.bottom <= edgeBandPx
+        if (!hugsTop && !hugsBottom) continue
+        val leftFree = r.left.toFloat()
+        val rightFree = (vw - r.right).toFloat()
+        val useLeft = leftFree >= rightFree
+        val widthPx = if (useLeft) leftFree else rightFree
+        val xPx = if (useLeft) 0f else r.right.toFloat()
+        val band = with(density) {
+            CoverBand(
+                xDp = xPx.toDp().value,
+                yDp = r.top.toFloat().toDp().value,
+                widthDp = widthPx.toDp().value,
+                heightDp = (r.bottom - r.top).toFloat().toDp().value,
+            )
+        }
+        if (band.widthDp < COVER_BAND_MIN_W || band.heightDp < COVER_BAND_MIN_H) continue
+        // Widest wins, on the theory that whatever we put there wants room.
+        if (best == null || band.widthDp > best!!.widthDp) best = band
+    }
+    return best
+}
+
 /**
  * The adaptive cover-screen scaffold. Measures the REAL available space with
  * BoxWithConstraints and merges every inset source (nav bar, display cutout,
@@ -4052,7 +4114,12 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                 .graphicsLayer { alpha = dotsAlphaState.value },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))?.let { current ->
+            // Skipped when the camera band is showing the name instead -- see
+            // below. Saying it twice on a screen this size is worse than the
+            // problem the overlay was added to solve.
+            vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))
+                ?.takeIf { coverCutoutBand() == null }
+                ?.let { current ->
                 Text(
                     current.name,
                     // Was labelMedium/onSurfaceVariant -- the smallest, dimmest
@@ -4091,6 +4158,11 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         var coverQuery by rememberSaveable { mutableStateOf("") }
         var coverSubmitted by rememberSaveable { mutableStateOf("") }
         var coverFocused by rememberSaveable { mutableStateOf(false) }
+        // The strip beside the camera island, if this device leaves one. See
+        // coverCutoutBand: the island's edge was being reserved across the FULL
+        // width, so the part of that band the camera doesn't cover was lit,
+        // unoccluded screen that nothing was allowed to use.
+        val band = coverCutoutBand()
         if (appearance.showSearch) SearchOverlay(
             vm, state, appearance, coverNotif,
             query = coverQuery,
@@ -4100,7 +4172,53 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             onSubmit = { coverSubmitted = coverQuery },
             onFocusChange = { coverFocused = it },
             compact = true,
+            // When the band hosts the search button, the collapsed pill at the
+            // bottom would be a second way into the same thing, in the space
+            // the band was supposed to buy back.
+            showCollapsed = band == null,
         )
+        if (band != null) {
+            Row(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = band.xDp.dp, y = band.yDp.dp)
+                    .width(band.widthDp.dp)
+                    .height(band.heightDp.dp)
+                    .padding(horizontal = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                // The car's name, which every other cover page has to spend a
+                // whole title band on. Here it costs nothing.
+                vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))?.let { current ->
+                    com.bloo.uicommon.FittedText(
+                        text = current.name,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (appearance.showSearch) {
+                    Surface(
+                        onClick = { coverFocused = true },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.85f)),
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(26.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = "Search",
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -11635,6 +11753,11 @@ private fun BoxScope.SearchOverlay(
     onSubmit: () -> Unit,
     onFocusChange: (Boolean) -> Unit,
     compact: Boolean = false,
+    /** False when another control owns opening search (the cover's camera-band
+     *  button), so the collapsed pill doesn't sit at the bottom edge as a
+     *  second, redundant way in. The bar still appears once search is open --
+     *  it is the text field. */
+    showCollapsed: Boolean = true,
 ) {
     val panelShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
     val open = focused || query.isNotEmpty()
@@ -11717,6 +11840,7 @@ private fun BoxScope.SearchOverlay(
                 }
             }
         }
+        if (showCollapsed || open) {
         Spacer(Modifier.height(if (compact) 6.dp else 10.dp))
         GlowySearchBar(
             query,
@@ -11726,6 +11850,7 @@ private fun BoxScope.SearchOverlay(
             onSubmit = onSubmit,
             compact = compact,
         )
+        }
     }
 }
 
