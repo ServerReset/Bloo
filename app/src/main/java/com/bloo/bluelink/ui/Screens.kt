@@ -10321,7 +10321,11 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Font
-            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            // SIMPLE, not advanced. This card is where Atkinson Hyperlegible
+            // lives -- a typeface designed for low vision -- and an
+            // accessibility choice behind a mode called "advanced" is a
+            // choice the people who need it are least likely to find. The
+            // rest of the card costs nothing to show alongside it.
             SettingsCard("Font", Icons.Filled.TextFields) {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
@@ -10333,7 +10337,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                         ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
                     }
                 }
-            }
             }
 
             // Links
