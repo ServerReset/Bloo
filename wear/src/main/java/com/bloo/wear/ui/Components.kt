@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -73,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
@@ -344,14 +346,29 @@ fun ChargeRing(
         }
         // Was a hand-rolled AnimatedContent with the exact same transitionSpec
         // uicommon's shared AnimatedValue already centralizes.
+        val label = percent?.let { "$it%" } ?: "—"
+        // numeralSmall (24sp) is the CEILING, not the size. The charge % is
+        // this ring's hero number, so it wants the dedicated numeral tier --
+        // but 24sp is only comfortable inside the 88dp ring. On the 60dp
+        // summary ring it isn't: "99%" at 24sp is wider than the ring's inner
+        // circle and pushed out over the stroke, reported from a real device
+        // ("if it's 99%, it's protruding into the graphic radial gauge").
+        //
+        // So the size comes from the room. A bold digit advances roughly
+        // 0.62em, and the usable inner width is about 62% of the diameter once
+        // the stroke and a little breathing room are out, which gives an
+        // exact ceiling per (ring size, digit count). Divided by the system
+        // font scale, because that multiplies sp into dp and the ring is dp:
+        // without it a large-font watch reintroduces the same overflow.
+        val fontScale = LocalDensity.current.fontScale.coerceAtLeast(0.5f)
+        val fits = (size.value * 0.62f) / (label.length * 0.62f) / fontScale
+        val ceiling = MaterialTheme.typography.numeralSmall.fontSize.value
         com.bloo.uicommon.AnimatedValue(
-            // numeralSmall (24sp) — the charge % is THE hero glance number of this
-            // ring, so it uses the dedicated numeral tier instead of titleMedium
-            // (17sp), which read as just another value. Fits comfortably inside the
-            // 88dp ring. (This is the intended use of the numeral type tier, which
-            // was previously defined but wired nowhere.)
-            value = percent?.let { "$it%" } ?: "—",
-            style = MaterialTheme.typography.numeralSmall.copy(fontWeight = FontWeight.Bold),
+            value = label,
+            style = MaterialTheme.typography.numeralSmall.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = minOf(ceiling, fits).coerceAtLeast(9f).sp,
+            ),
         )
     }
 }
@@ -662,6 +679,12 @@ fun MorphButton(
      *  width. Used by side-by-side weighted pairs (hero Lock/Climate, More
      *  Flash/Horn) where the icon + gap was starving the label down to "Fla…". */
     showIcon: Boolean = true,
+    /** Overrides what TalkBack reads, for buttons whose visible label is the
+     *  ACTION while the current STATE is carried only by the highlight (the
+     *  hero's Lock/Climate pair). Without it, "Unlock" announces the thing to
+     *  do but never the thing that is -- which on a screen you may be reading
+     *  without looking is the half that matters. */
+    contentDescription: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -709,10 +732,13 @@ fun MorphButton(
                 spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
             )
             .then(
-                if (toggled != null) {
+                if (toggled != null || contentDescription != null) {
                     Modifier.semantics {
-                        role = Role.Switch
-                        this.toggleableState = ToggleableState(toggled)
+                        if (toggled != null) {
+                            role = Role.Switch
+                            this.toggleableState = ToggleableState(toggled)
+                        }
+                        contentDescription?.let { this.contentDescription = it }
                     }
                 } else Modifier,
             ),

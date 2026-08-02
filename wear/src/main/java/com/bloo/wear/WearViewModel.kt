@@ -1016,9 +1016,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      * [flip] applies the optimistic local-state update once the standalone
      * API call itself has returned successfully.
      */
-    fun toggleLock(vin: String) = command(vin, "doors") { v, repo, st ->
-        if (st?.doorLock == true) { repo.unlock(v); flip(vin) { it.copy(doorLock = false) } }
-        else { repo.lock(v); flip(vin) { it.copy(doorLock = true) } }
+    fun toggleLock(vin: String) = command(vin, "doors") { v, repo, _ ->
+        // Same rule as the relay path (see toWearCommand): the direction comes
+        // from the state the WATCH is showing, not from `st`. CarView.locked
+        // falls back to the phone's snapshot when this watch has no live
+        // status of its own, so reading `st?.doorLock` here could send LOCK
+        // while the button in front of the user said "Unlock".
+        if (_ui.value.cars.firstOrNull { it.vin == vin }?.locked == true) {
+            repo.unlock(v); flip(vin) { it.copy(doorLock = false) }
+        } else {
+            repo.lock(v); flip(vin) { it.copy(doorLock = true) }
+        }
     }
 
     // Hyundai/Genesis only -- see Vehicle.supportsHornLights. Passed as
@@ -1051,7 +1059,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      * (re)applied -- see [applyPreset] for the preset-aware equivalent.
      */
     fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
-        if (st?.airCtrlOn == true) {
+        // Displayed state, not `st` -- see toggleLock.
+        if (_ui.value.cars.firstOrNull { it.vin == vin }?.climateOn == true) {
             repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
             updateDraft(vin) { it.copy(activePresetId = null) }
         } else {
@@ -1071,8 +1080,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  and [flip] optimistically records the inverse right after the
      *  standalone API call succeeds (see the comment below on why this one
      *  needed the flip added after the fact). */
-    fun toggleCharge(vin: String) = command(vin, "charge") { v, repo, st ->
-        val wasCharging = st?.evStatus?.batteryCharge == true
+    fun toggleCharge(vin: String) = command(vin, "charge") { v, repo, _ ->
+        // Displayed state, not `st` -- see toggleLock.
+        val wasCharging = _ui.value.cars.firstOrNull { it.vin == vin }?.charging == true
         if (wasCharging) repo.stopCharge(v) else repo.startCharge(v)
         // Unlike toggleLock/toggleClimate, this never flipped local state --
         // on the standalone (no-phone) path the button stayed on its old
@@ -1844,10 +1854,28 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Builds the [com.bloo.bluelink.data.WearCommand] sent to the phone for
-     * [command]'s three generic actions ("doors"/"climate"/"charge" map to
-     * their TOGGLE_* [com.bloo.bluelink.data.WearAction]s; anything else
-     * falls back to a plain REFRESH). Used only when the caller didn't pass
-     * an `explicit` command. Always carries the car's CURRENT full
+     * [command]'s three generic actions. Used only when the caller didn't
+     * pass an `explicit` command.
+     *
+     * These used to be the TOGGLE_* verbs, and that was a real bug, reported
+     * from a real device as "I press the button, nothing happens, and the
+     * watch says the command succeeded". A TOGGLE_* is resolved by whoever
+     * RECEIVES it, against their own snapshot -- see
+     * [com.bloo.bluelink.data.WearCommandRunner.execute], where TOGGLE_LOCK
+     * reads `snap.locked == true` to pick a direction. That snapshot is the
+     * phone's, and it is not necessarily what the watch was showing: if the
+     * phone's copy is stale, the toggle goes the wrong way; if it is null
+     * (never fetched for that car), the toggle resolves to LOCK, so tapping
+     * the button on an already-locked car sends a redundant lock that
+     * genuinely succeeds and genuinely changes nothing.
+     *
+     * So the direction is decided HERE, from the state the watch is
+     * displaying -- the state that labelled the button the user tapped -- and
+     * sent as an explicit LOCK/UNLOCK, CLIMATE_ON/OFF, CHARGE_ON/OFF. The
+     * button label is derived from the same expression (see SummaryCard), so
+     * what it says and what it sends cannot disagree.
+     *
+     * Always carries the car's CURRENT full
      * [ClimateDraft] (temp, duration, defrost, steering, all four seats) on
      * every command regardless of action, not just for "climate" -- so if a
      * relayed climate toggle turns climate ON, the phone has the complete
@@ -1859,12 +1887,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // start used to run for the wire default of 10 minutes with no steering or
         // seat heat no matter what the user had set on the watch.
         val d = _ui.value.draftFor(vin)
+        // The car as the WATCH currently shows it. Unknown (null) states fall
+        // to the "on" verb, which is also what the button reads in that case:
+        // a car whose lock state we don't know shows "Lock" and sends LOCK.
+        val shown = _ui.value.cars.firstOrNull { it.vin == vin }
         return com.bloo.bluelink.data.WearCommand(
             vin = vin,
             action = when (action) {
-                "doors" -> com.bloo.bluelink.data.WearAction.TOGGLE_LOCK
-                "climate" -> com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE
-                "charge" -> com.bloo.bluelink.data.WearAction.TOGGLE_CHARGE
+                "doors" ->
+                    if (shown?.locked == true) com.bloo.bluelink.data.WearAction.UNLOCK
+                    else com.bloo.bluelink.data.WearAction.LOCK
+                "climate" ->
+                    if (shown?.climateOn == true) com.bloo.bluelink.data.WearAction.CLIMATE_OFF
+                    else com.bloo.bluelink.data.WearAction.CLIMATE_ON
+                "charge" ->
+                    if (shown?.charging == true) com.bloo.bluelink.data.WearAction.CHARGE_OFF
+                    else com.bloo.bluelink.data.WearAction.CHARGE_ON
                 else -> com.bloo.bluelink.data.WearAction.REFRESH
             },
             tempF = d.tempF,

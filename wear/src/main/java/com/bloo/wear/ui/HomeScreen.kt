@@ -1090,7 +1090,15 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     val locked = car.locked == true
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         MorphButton(
-            label = if (locked) "Locked" else "Unlocked",
+            // The ACTION, not the state. "Locked" was reported from a real
+            // device as unreadable: a user tapped a button captioned "Locked"
+            // to unlock, and could not tell afterwards whether the caption was
+            // naming the button or naming the car -- so a successful unlock,
+            // which merely re-captions it "Unlocked", read as nothing having
+            // happened. The state is still carried, by the highlight and the
+            // icon. This is also the exact expression toWearCommand uses to
+            // pick LOCK vs UNLOCK, so the label and the command can't disagree.
+            label = if (locked) "Unlock" else "Lock",
             icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
             // The unlocked car is the noteworthy state, so it's the
             // highlighted one -- matches the phone tile/complication. (This
@@ -1103,13 +1111,16 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             onClick = { vm.toggleLock(car.vin) },
             modifier = Modifier.weight(1f),
             toggled = locked,
-            // Half-width weighted pair: the icon + gap starved the label down to
-            // "Lo…"/"Unl…". Drop the icon so "Locked"/"Unlocked" fit in full — the
-            // state is already conveyed by the label text and the active highlight.
+            // Half-width weighted pair: the icon + gap starved the label. Drop
+            // it so "Unlock" fits in full; the highlight carries the state.
             showIcon = false,
+            contentDescription = if (locked) "Locked. Unlock" else "Unlocked. Lock",
         )
         MorphButton(
-            label = "Climate",
+            // Same rule: what the tap does. "Climate" on a car whose climate
+            // was already running was the second half of the same report --
+            // tapping it stopped climate and the caption never moved.
+            label = if (car.climateOn == true) "Stop" else "Climate",
             icon = Icons.Filled.Thermostat,
             active = car.climateOn == true,
             activeColor = MaterialTheme.colorScheme.tertiary,
@@ -1118,6 +1129,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             modifier = Modifier.weight(1f),
             toggled = car.climateOn == true,
             showIcon = false,
+            contentDescription = if (car.climateOn == true) "Climate on. Stop climate" else "Climate off. Start climate",
         )
     }
 }
