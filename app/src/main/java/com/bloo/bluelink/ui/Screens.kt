@@ -4086,7 +4086,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                     vibrancy = appearance.vibrancy,
                 ) {
                     CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
-                        CompactCar(v, state, vm, dotsAlphaState)
+                        CompactCar(v, state, vm, dotsAlphaState, onTileChange = { visibleTile = it })
                     }
                 }
             }
@@ -4095,6 +4095,12 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         // and the band itself), so they can never disagree about whether the
         // band exists and end up showing the name twice or not at all.
         val band = coverCutoutBand()
+        // Which cover tile is showing. The home tile titles ITSELF with the
+        // car's name (see CoverMainTile), so the shared overlay saying it too
+        // put the same words twice on a one-inch screen -- which is what the
+        // overlay was added to fix in the first place, for the OTHER tiles,
+        // whose titles name a section rather than a car.
+        var visibleTile by remember { mutableStateOf("main") }
         // Car-switching dots, hoisted out of CompactCar (a per-page composable)
         // and up to here -- a sibling of the whole pager, not inside any one
         // page's fade/scale graphicsLayer -- so it doesn't itself fade and
@@ -4125,7 +4131,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             // below. Saying it twice on a screen this size is worse than the
             // problem the overlay was added to solve.
             vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))
-                ?.takeIf { band == null }
+                ?.takeIf { band == null && visibleTile != "main" }
                 ?.let { current ->
                 Text(
                     current.name,
@@ -4221,6 +4227,9 @@ private fun CompactCar(
     // dots fade, which made this whole page recompose ~15 times per fade. As
     // State the value is read draw-phase only (see its graphicsLayer use below).
     dotsAlphaState: androidx.compose.runtime.State<Float>,
+    /** Which tile is centred, reported up so the shared top overlay knows
+     *  whether the page below it is already showing the car's name. */
+    onTileChange: (String) -> Unit = {},
 ) {
     val status = state.statusFor(v)
     val isGen5W = remember(v.brand, v.generation) { v.isGen5W }
@@ -4255,6 +4264,7 @@ private fun CompactCar(
     val vWrap = rememberWrapPager(tiles.size)
     val vPager = vWrap.pager
     val current = vWrap.currentReal
+    LaunchedEffect(current, tiles) { onTileChange(tiles.getOrElse(current) { "main" }) }
     // Per-tile scroll states, keyed by tile name so position persists across
     // pager recycling AND reordering. Tall tiles scroll their own content; the
     // VerticalPager then nested-scrolls to the next/previous tile once a tile is
