@@ -59,6 +59,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -4065,6 +4066,12 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         label = "coverDotsFade",
     )
     Box(Modifier.fillMaxSize()) {
+        // Which cover tile is showing. The home tile titles ITSELF with the
+        // car's name (see CoverMainTile), so the shared overlay saying it too
+        // put the same words twice on a one-inch screen -- which is what the
+        // overlay was added to fix in the first place, for the OTHER tiles,
+        // whose titles name a section rather than a car.
+        var visibleTile by remember { mutableStateOf("main") }
         HorizontalPager(
             state = pager,
             modifier = Modifier.fillMaxSize(),
@@ -4095,12 +4102,6 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         // and the band itself), so they can never disagree about whether the
         // band exists and end up showing the name twice or not at all.
         val band = coverCutoutBand()
-        // Which cover tile is showing. The home tile titles ITSELF with the
-        // car's name (see CoverMainTile), so the shared overlay saying it too
-        // put the same words twice on a one-inch screen -- which is what the
-        // overlay was added to fix in the first place, for the OTHER tiles,
-        // whose titles name a section rather than a car.
-        var visibleTile by remember { mutableStateOf("main") }
         // Car-switching dots, hoisted out of CompactCar (a per-page composable)
         // and up to here -- a sibling of the whole pager, not inside any one
         // page's fade/scale graphicsLayer -- so it doesn't itself fade and
