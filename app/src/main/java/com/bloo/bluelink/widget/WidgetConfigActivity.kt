@@ -6,9 +6,13 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -42,7 +47,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.lifecycleScope
@@ -155,6 +163,20 @@ private fun ConfigScreen(
                 if (advanced) "Advanced mode — full control." else "Choose a car and what to show.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(18.dp))
+
+            // A live miniature, so every option below can be judged by
+            // looking rather than by saving and going to the home screen.
+            WidgetPreview(
+                car = cars.firstOrNull { it.vin == vin } ?: cars.firstOrNull(),
+                corner = corner,
+                backgroundOpacity = backgroundOpacity,
+                textScale = textScale,
+                showRing = showRing,
+                actions = actions,
+                accentColor = accent?.let { key -> WidgetAccent.fromKey(key)?.let { Color(it.argb) } }
+                    ?: MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(20.dp))
 
@@ -430,6 +452,136 @@ private fun ConfigScreen(
             label,
             style = MaterialTheme.typography.labelSmall,
             color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * A live, animated miniature of the widget being configured.
+ *
+ * This is the answer to "which of these four corner options am I actually
+ * picking" -- the screen was otherwise a wall of segmented controls whose
+ * effects you could only see by saving, going to the home screen and
+ * looking. Every knob it can express is animated rather than snapped, so
+ * changing one reads as the widget morphing rather than the screen redrawing.
+ *
+ * Deliberately an APPROXIMATION, not a second implementation of the widget:
+ * it mirrors shape, background opacity, type scale, the ring and the button
+ * row, which is what the options on this screen actually change. It does not
+ * try to reproduce the tier system -- promising an exact preview across 18
+ * layouts is a promise it couldn't keep, and a preview that is subtly wrong
+ * is worse than one that is honestly schematic.
+ */
+@Composable
+private fun WidgetPreview(
+    car: VehicleSnapshot?,
+    corner: String,
+    backgroundOpacity: Float,
+    textScale: Float,
+    showRing: Boolean,
+    actions: List<String>,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val spec = spring<Float>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+    // The preview is ~150dp tall, so it uses corner values proportional to
+    // ITS size rather than the widget's own dp -- 32dp on a 150dp preview
+    // would read far rounder than 32dp does on a real 300dp tile.
+    val targetCorner = when (corner) {
+        WidgetConfig.CORNER_SHARP -> 0.dp
+        WidgetConfig.CORNER_ROUND -> 22.dp
+        WidgetConfig.CORNER_PILL -> 999.dp
+        else -> 14.dp
+    }
+    val radius by animateDpAsState(targetCorner, spring(stiffness = Spring.StiffnessMediumLow), label = "previewCorner")
+    val opacity by animateFloatAsState(backgroundOpacity, spec, label = "previewOpacity")
+    val scale by animateFloatAsState(textScale, spec, label = "previewText")
+    val ringAlpha by animateFloatAsState(if (showRing) 1f else 0f, spec, label = "previewRing")
+    val scheme = MaterialTheme.colorScheme
+
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .clip(RoundedCornerShape(radius))
+            .background(scheme.surfaceVariant.copy(alpha = opacity)),
+    ) {
+        Column(Modifier.fillMaxSize().padding(14.dp)) {
+            Text(
+                car?.name ?: "Your car",
+                style = MaterialTheme.typography.titleSmall,
+                fontSize = MaterialTheme.typography.titleSmall.fontSize * scale,
+                color = scheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "Locked · Charging",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = MaterialTheme.typography.labelSmall.fontSize * scale,
+                color = scheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                if (ringAlpha > 0.01f) {
+                    val pct = car?.percent ?: 62
+                    Canvas(Modifier.size(44.dp * ringAlpha)) {
+                        val stroke = size.minDimension * 0.14f
+                        drawArc(
+                            color = scheme.onSurface.copy(alpha = 0.22f * ringAlpha),
+                            startAngle = -90f, sweepAngle = 360f, useCenter = false,
+                            style = Stroke(width = stroke, cap = StrokeCap.Round),
+                        )
+                        drawArc(
+                            color = accentColor.copy(alpha = ringAlpha),
+                            startAngle = -90f, sweepAngle = 360f * (pct / 100f), useCenter = false,
+                            style = Stroke(width = stroke, cap = StrokeCap.Round),
+                        )
+                    }
+                    Spacer(Modifier.size(10.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    PreviewStat("Range", "196 mi", scale)
+                    PreviewStat("Battery", "${car?.percent ?: 62}%", scale)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val shown = actions.mapNotNull { WidgetAction.fromKey(it) }.take(4)
+                shown.forEach { action ->
+                    val fill by animateColorAsState(
+                        if (action == WidgetAction.CHARGE) accentColor else scheme.onSurface.copy(alpha = 0.14f),
+                        tween(220), label = "previewBtn",
+                    )
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(26.dp)
+                            .clip(RoundedCornerShape(if (corner == WidgetConfig.CORNER_PILL) 999.dp else 8.dp))
+                            .background(fill),
+                    )
+                }
+                if (shown.isEmpty()) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** One label/value line inside [WidgetPreview], scaled by the text-size option. */
+@Composable
+private fun PreviewStat(label: String, value: String, scale: Float) {
+    val style = MaterialTheme.typography.labelSmall
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            label, style = style, fontSize = style.fontSize * scale,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, modifier = Modifier.weight(1f), overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            value, style = style, fontSize = style.fontSize * scale,
+            color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }
 }
