@@ -248,14 +248,21 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
     key(ui.cars.map { it.vin }) {
         val carPager = rememberPagerState(initialPage = 0) { count }
 
-        val activeCarIndex by remember { derivedStateOf { carPager.settledPage } }
-
+        // settledPage watched through snapshotFlow rather than read into a
+        // composition-scope val and used as a LaunchedEffect key. As a val it
+        // subscribed THIS scope -- which holds the pager and therefore every
+        // composed car page -- so landing on a car recomposed all of them
+        // before the effect even ran. The flow gets the same values with no
+        // subscription here at all. Keyed on the pager so a car list change
+        // (which `key(...)` above already rebuilds this block for) restarts it.
         var lastShownVin by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(activeCarIndex) {
-            val vin = ui.cars.getOrNull(activeCarIndex)?.vin
-            if (vin != null && vin != lastShownVin) {
-                lastShownVin = vin
-                vm.onCarShown(vin)
+        LaunchedEffect(carPager) {
+            snapshotFlow { carPager.settledPage }.collect { idx ->
+                val vin = ui.cars.getOrNull(idx)?.vin
+                if (vin != null && vin != lastShownVin) {
+                    lastShownVin = vin
+                    vm.onCarShown(vin)
+                }
             }
         }
 
