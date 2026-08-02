@@ -20,10 +20,19 @@ import kotlin.math.tan
  *
  * Glance can't use Coil's async painters, so — like the charge ring — the map is
  * produced as a plain [Bitmap] here (in the widget's suspend provideGlance) and
- * shown via `Image(ImageProvider(bitmap))`. It fetches a single OpenStreetMap
- * "slippy map" tile at a fixed zoom, disk-caches it by z/x/y (so a car sitting
- * still never re-downloads), and draws a marker dot at the car's fractional
- * position within the tile.
+ * shown via `Image(ImageProvider(bitmap))`. It fetches OpenStreetMap "slippy
+ * map" tiles at a fixed zoom, disk-caches them by z/x/y (so a car sitting still
+ * never re-downloads), and draws a window CENTRED on the car with a marker in
+ * the middle.
+ *
+ * Centring is the whole point of the tile mosaic below. It used to draw one
+ * whole tile and put the marker at the car's fractional position inside it,
+ * which meant a car parked near a tile boundary sat against the edge of the
+ * thumbnail with all of its surroundings on the wrong side -- and since the
+ * layout shows this square through a wide, short slot with ContentScale.Crop,
+ * a car near the tile's top or bottom edge was cropped off the widget
+ * altogether. The map was then a picture of somewhere near the car rather than
+ * of the car, with no marker in it at all.
  *
  * Uses the same Web-Mercator projection + OSM tile-usage-policy User-Agent the
  * watch's MapThumbnail proved out. All I/O is wrapped so a network failure just
@@ -57,26 +66,50 @@ object WidgetMap {
         markerColor: Int,
     ): Bitmap? = withContext(Dispatchers.IO) {
         val edge = sizePx.coerceIn(48, 1024)
-        val n = (1 shl ZOOM).toDouble()
+        val n = 1 shl ZOOM
         val latRad = Math.toRadians(lat)
         val xf = (lon + 180.0) / 360.0 * n
         val yf = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * n
         val xt = xf.toInt()
         val yt = yf.toInt()
-        val fracX = (xf - xt).toFloat()
-        val fracY = (yf - yt).toFloat()
 
-        val tile = fetchTile(context, xt, yt) ?: return@withContext null
+        // A one-tile-wide window of the world, centred on the car rather than
+        // aligned to the tile grid. In global pixel coordinates at this zoom
+        // the car is at (xf, yf) * TILE_PX, and the window is the TILE_PX box
+        // around it -- which straddles a tile boundary unless the car happens
+        // to sit dead centre of one, hence up to four tiles below.
+        val left = xf * TILE_PX - TILE_PX / 2.0
+        val top = yf * TILE_PX - TILE_PX / 2.0
+        val scale = edge.toDouble() / TILE_PX
 
-        // Scale the 256px tile to the requested edge, then draw the marker.
         val out = Bitmap.createBitmap(edge, edge, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
-        val src = android.graphics.Rect(0, 0, tile.width, tile.height)
-        val dst = android.graphics.Rect(0, 0, edge, edge)
-        canvas.drawBitmap(tile, src, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        var haveCentre = false
+        for (ty in floorDiv(top)..floorDiv(top + TILE_PX - 1)) {
+            // No vertical wrap: past the poles there is no tile to fetch, and
+            // the window simply keeps whatever the neighbours drew.
+            if (ty < 0 || ty >= n) continue
+            for (tx in floorDiv(left)..floorDiv(left + TILE_PX - 1)) {
+                // Longitude does wrap, so a car near the antimeridian still
+                // gets the tiles on the far side of it rather than a gap.
+                val wrapped = ((tx % n) + n) % n
+                val tile = fetchTile(context, wrapped, ty) ?: continue
+                if (wrapped == xt && ty == yt) haveCentre = true
+                val dl = ((tx * TILE_PX - left) * scale).toFloat()
+                val dt = ((ty * TILE_PX - top) * scale).toFloat()
+                val span = (TILE_PX * scale).toFloat()
+                canvas.drawBitmap(tile, null, android.graphics.RectF(dl, dt, dl + span, dt + span), paint)
+            }
+        }
+        // The neighbours are best-effort -- a missing one just leaves that
+        // corner blank -- but without the tile the car is actually ON there is
+        // no map here worth showing, and the caller's null path (skip the
+        // module entirely) is the honest answer.
+        if (!haveCentre) return@withContext null
 
-        val cx = fracX * edge
-        val cy = fracY * edge
+        val cx = edge / 2f
+        val cy = edge / 2f
         val dotR = edge * 0.06f
         // White halo behind the coloured dot so it reads on any map background.
         canvas.drawCircle(cx, cy, dotR + edge * 0.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -85,6 +118,11 @@ object WidgetMap {
         canvas.drawCircle(cx, cy, dotR, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = markerColor })
         out
     }
+
+    /** Floor division into tile indices. The window's edges are doubles that
+     *  go negative near the antimeridian, where `toInt()` truncates toward
+     *  zero and would name the wrong tile. */
+    private fun floorDiv(px: Double): Int = Math.floorDiv(Math.floor(px).toLong(), TILE_PX.toLong()).toInt()
 
     /** Fetch a tile from disk cache, or download + cache it. Null on any failure. */
     private fun fetchTile(context: Context, x: Int, y: Int): Bitmap? {
