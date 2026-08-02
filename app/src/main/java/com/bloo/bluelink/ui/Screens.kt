@@ -10490,101 +10490,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
 
-            // Updates — always shown (the update tile still auto-appears under the
-            // hero, but this is the manual home: which build you're on, a force-check,
-            // a browser fallback source, and the optional Shizuku silent-install toggle
-            // gated to just its row so the card itself never vanishes).
-            SettingsCard("Updates", Icons.Filled.SystemUpdate) {
-                val updateTint = when {
-                    state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
-                // The installed build number carries the card as a hero stat, the
-                // same big-number language the garage hero uses for %/range —
-                // instead of a label/value row buried under a paragraph. The state
-                // rides alongside as a tonal chip rather than a second text line.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        RollingNumber(
-                            text = if (vm.currentBuildNumber > 0) "${vm.currentBuildNumber}" else "dev",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        // Branch only when it isn't the mainline the app normally
-                        // builds from — buildLabel already encodes that rule, so
-                        // reuse it rather than re-deriving "is this main?" here.
-                        val branchSuffix = com.bloo.bluelink.data
-                            .buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
-                            .substringAfter(" · ", "")
-                        Text(
-                            if (branchSuffix.isNotBlank()) "this build · $branchSuffix" else "this build",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Row(
-                        Modifier
-                            .clip(CircleShape)
-                            .background(updateTint.copy(alpha = 0.15f))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            when {
-                                state.updateChecking -> "Checking…"
-                                state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
-                                else -> "Up to date"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = updateTint,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(14.dp))
-                // Both update sources share one row instead of two stacked
-                // full-width pills: the in-app checker (primary) and the GitHub
-                // Releases page (a second source that still works when the
-                // checker says up-to-date or GitHub's API is flaky).
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphButton(
-                        onClick = { vm.checkForUpdateManually() },
-                        modifier = Modifier.weight(1f),
-                        enabled = !state.updateChecking,
-                        active = true,
-                    ) {
-                        MorphButtonLabel(
-                            icon = Icons.Filled.Refresh,
-                            label = if (state.updateChecking) "Checking…" else "Check",
-                            pending = state.updateChecking,
-                        )
-                    }
-                    MorphTextButton(
-                        "GitHub",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(com.bloo.bluelink.data.UpdateApi.RELEASES_URL))
-                                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                )
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                // Shizuku silent-install: the ROW is gated on Shizuku being present, but
-                // the card is not — so the update controls above always show.
-                if (state.shizukuAvailable) {
-                    Spacer(Modifier.height(4.dp))
-                    ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
-                        vm.setSeamlessInstallShizuku(it)
-                    }
-                }
-            }
-
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
             AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
@@ -10854,6 +10759,101 @@ private fun SettingsScreen(vm: AppViewModel) {
                     Spacer(Modifier.height(10.dp))
                     ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
                   }
+                }
+            }
+
+            // Updates — always shown (the update tile still auto-appears under the
+            // hero, but this is the manual home: which build you're on, a force-check,
+            // a browser fallback source, and the optional Shizuku silent-install toggle
+            // gated to just its row so the card itself never vanishes).
+            SettingsCard("Updates", Icons.Filled.SystemUpdate) {
+                val updateTint = when {
+                    state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                // The installed build number carries the card as a hero stat, the
+                // same big-number language the garage hero uses for %/range —
+                // instead of a label/value row buried under a paragraph. The state
+                // rides alongside as a tonal chip rather than a second text line.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        RollingNumber(
+                            text = if (vm.currentBuildNumber > 0) "${vm.currentBuildNumber}" else "dev",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        // Branch only when it isn't the mainline the app normally
+                        // builds from — buildLabel already encodes that rule, so
+                        // reuse it rather than re-deriving "is this main?" here.
+                        val branchSuffix = com.bloo.bluelink.data
+                            .buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
+                            .substringAfter(" · ", "")
+                        Text(
+                            if (branchSuffix.isNotBlank()) "this build · $branchSuffix" else "this build",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Row(
+                        Modifier
+                            .clip(CircleShape)
+                            .background(updateTint.copy(alpha = 0.15f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            when {
+                                state.updateChecking -> "Checking…"
+                                state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
+                                else -> "Up to date"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = updateTint,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                // Both update sources share one row instead of two stacked
+                // full-width pills: the in-app checker (primary) and the GitHub
+                // Releases page (a second source that still works when the
+                // checker says up-to-date or GitHub's API is flaky).
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphButton(
+                        onClick = { vm.checkForUpdateManually() },
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.updateChecking,
+                        active = true,
+                    ) {
+                        MorphButtonLabel(
+                            icon = Icons.Filled.Refresh,
+                            label = if (state.updateChecking) "Checking…" else "Check",
+                            pending = state.updateChecking,
+                        )
+                    }
+                    MorphTextButton(
+                        "GitHub",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(com.bloo.bluelink.data.UpdateApi.RELEASES_URL))
+                                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // Shizuku silent-install: the ROW is gated on Shizuku being present, but
+                // the card is not — so the update controls above always show.
+                if (state.shizukuAvailable) {
+                    Spacer(Modifier.height(4.dp))
+                    ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
+                        vm.setSeamlessInstallShizuku(it)
+                    }
                 }
             }
 
