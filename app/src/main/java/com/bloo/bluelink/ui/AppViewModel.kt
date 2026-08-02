@@ -2453,6 +2453,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // PHEV (which the API itself may still report as gas/isEv=false) needs
     // isEv forced true here or the call would go to the wrong (ICE) endpoint.
 
+    /**
+     * One-tap climate, for surfaces with no room for the full Climate pebble
+     * (the flip cover's action bar).
+     *
+     * Starting climate needs a whole [ClimateRequest]; every other one-tap
+     * surface -- widget, Quick Settings tile, watch -- resolves that the same
+     * way, from the car's last-saved settings (see
+     * [com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE]). This does the same
+     * rather than inventing a second answer, falling back to a plain 72F /
+     * 10-minute run only when the car has never had climate configured at all.
+     */
+    fun toggleClimate(v: Vehicle) {
+        if (_state.value.statusFor(v)?.airCtrlOn == true) {
+            stopClimate(v)
+            return
+        }
+        viewModelScope.launch {
+            val saved = runCatching { loadSavedClimate(v) }.getOrNull()
+            startClimate(v, saved ?: ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
+        }
+    }
+
     /** Begin charging; optimistically sets [VehicleStatus.evStatus]'s
      *  batteryCharge to true (a no-op patch if evStatus is itself null, since
      *  the nested `?.copy` on a null receiver stays null). */

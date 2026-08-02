@@ -3394,6 +3394,223 @@ private fun CoverHero(
     }
 }
 
+/**
+ * The flip cover's home tile: the car, its charge, and its controls on ONE
+ * screen.
+ *
+ * It replaces two separate cover pages that were each mostly empty. The old
+ * home tile was the phone's HeroHeader reused verbatim -- a card built around
+ * a photo, which the cover deliberately doesn't show, so it rendered a strip
+ * of charge text across the top and roughly two thirds of a ~1-inch screen of
+ * nothing underneath. The lock/horn controls then lived on their own second
+ * page with the same emptiness under them. Neither page filled a screen; both
+ * together do, and merging them means the thing you most want with the phone
+ * shut -- lock state and the lock button -- is on the page it opens on rather
+ * than one swipe away.
+ *
+ * The car's name leads, at headline size. It used to be a labelMedium line in
+ * the shared top overlay, sharing that space with the page dots, which on this
+ * screen made the single most identifying thing on it the smallest text on it.
+ */
+@Composable
+private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val metric = LocalAppearance.current.unitSystem == "metric"
+    val shape = RoundedCornerShape(PebbleCornerExpanded)
+    Surface(
+        modifier = Modifier.fillMaxSize().dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Column(Modifier.fillMaxSize().padding(14.dp)) {
+            com.bloo.uicommon.FittedText(
+                text = v.name,
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // The one-line state summary the header subtitle used to carry.
+            // Lock leads because it is the reason to look at a shut phone.
+            // Not driving/charging state: ChargeFuelBar's own status line
+            // below already carries those, and saying "Parked" twice on a
+            // screen this size is the kind of thing that made it feel empty
+            // and repetitive at once.
+            val bits = listOfNotNull(
+                status?.doorLock?.let { if (it) "Locked" else "Unlocked" },
+                if (status?.airCtrlOn == true) "Climate on" else null,
+            )
+            if (bits.isNotEmpty()) {
+                Text(
+                    bits.joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (status?.doorLock == false) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        LocalContentColor.current.copy(alpha = MutedContentAlpha)
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // Weighted on BOTH sides, so the glance sits centred in whatever
+            // is left between the title and the controls. A single trailing
+            // spacer would just move the old void from the bottom of the tile
+            // to the middle of it; two share it out, and the layout holds its
+            // proportions across cover sizes rather than only looking right on
+            // the one it was tuned on.
+            Spacer(Modifier.weight(1f))
+            ChargeFuelBar(
+                status,
+                state.hasBattery(v),
+                state.hasFuel(v),
+                state.drivingLabel(v),
+                metric = metric,
+            )
+            Spacer(Modifier.weight(1f))
+            CoverActionBar(v, state, vm)
+        }
+    }
+}
+
+/**
+ * The cover screen's bottom control bar: one tap each for the actions that
+ * live in the pebble headers on the phone -- lock, climate, charge, horn.
+ *
+ * Those header actions are the whole point of every pebble; on the cover they
+ * were reachable only by swiping to the matching page, and two of them (climate
+ * and charge) not at all, because those pages open on a glance hero rather than
+ * their header. A shut phone is the surface where "just lock it" matters most,
+ * so they get a permanent, full-width, thumb-height row instead.
+ *
+ * Buttons are sized by weight rather than fixed width, so a car with no
+ * horn/lights support or no battery gets three fat buttons rather than four
+ * narrow ones with a hole where the fourth was.
+ */
+@Composable
+private fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
+    val status = state.statusFor(v)
+    val ev = status?.evStatus
+    val locked = status?.doorLock
+    val charging = ev?.batteryCharge == true
+    val plugged = ev?.isPluggedIn == true || charging
+    val climateOn = status?.airCtrlOn == true
+    val enabled = !state.loading
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        CoverActionButton(
+            icon = if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock,
+            label = if (locked == true) "Unlock" else "Lock",
+            // Attention, not confirmation: an unlocked car is the state worth
+            // colouring, matching StateControl's own highlightWhenOff.
+            attention = locked == false,
+            pending = state.isPending(v.vin, "doors"),
+            enabled = enabled,
+            onClick = { if (locked == true) vm.unlock(v) else vm.lock(v) },
+        )
+        CoverActionButton(
+            icon = Icons.Filled.Thermostat,
+            label = if (climateOn) "Stop" else "Climate",
+            active = climateOn,
+            pending = state.isPending(v.vin, "climate"),
+            enabled = enabled,
+            onClick = { vm.toggleClimate(v) },
+        )
+        if (state.hasBattery(v)) {
+            CoverActionButton(
+                icon = Icons.Filled.Bolt,
+                label = if (charging) "Stop" else "Charge",
+                active = charging,
+                pending = state.isPending(v.vin, "charge"),
+                // The car can't start a charge it isn't plugged into, and the
+                // Charge pebble's own header button is gated the same way.
+                enabled = enabled && plugged,
+                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
+            )
+        }
+        if (v.supportsHornLights) {
+            CoverActionButton(
+                icon = Icons.Filled.Campaign,
+                label = "Horn",
+                pending = state.isPending(v.vin, "hornLights"),
+                enabled = enabled,
+                onClick = { vm.hornAndLights(v) },
+            )
+        }
+    }
+}
+
+/** One button in [CoverActionBar]: icon over a short label, filling its share
+ *  of the row. Colour carries state -- [active] for a running command's target
+ *  state, [attention] for a state the user probably wants to change. */
+@Composable
+private fun RowScope.CoverActionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
+    attention: Boolean = false,
+    pending: Boolean = false,
+    enabled: Boolean = true,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val haptics = LocalHaptics.current
+    val container by androidx.compose.animation.animateColorAsState(
+        when {
+            active -> scheme.primary
+            attention -> scheme.errorContainer
+            else -> scheme.surfaceContainerHighest
+        },
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "coverActionFill",
+    )
+    val content by androidx.compose.animation.animateColorAsState(
+        when {
+            active -> scheme.onPrimary
+            attention -> scheme.onErrorContainer
+            else -> scheme.onSurface
+        },
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "coverActionInk",
+    )
+    Surface(
+        modifier = Modifier
+            .weight(1f)
+            .height(56.dp)
+            .alpha(if (enabled) 1f else 0.45f)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(enabled = enabled && !pending) { haptics?.click(); onClick() },
+        shape = RoundedCornerShape(16.dp),
+        color = container,
+        contentColor = content,
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (pending) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = content,
+                )
+            } else {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(3.dp))
+            com.bloo.uicommon.FittedText(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = content,
+                ),
+            )
+        }
+    }
+}
+
 /** Most of one dimension a display cutout may ever claim as clearance. A real
  *  notch or lens is a few percent; anything demanding more than this is a
  *  camera island being measured as though it were a punch-hole, and honouring
@@ -3687,8 +3904,14 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))?.let { current ->
                 Text(
                     current.name,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // Was labelMedium/onSurfaceVariant -- the smallest, dimmest
+                    // text on a screen whose whole job is telling you which car
+                    // you are looking at. The home tile now says it at headline
+                    // size itself; this overlay is what the OTHER tiles have, so
+                    // it reads as a title rather than a caption.
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
@@ -3909,7 +4132,13 @@ private fun CompactCar(
                     // each pebble draws as an always-expanded, header-less, height-
                     // filling scrolling card (its cover glance-hero branch). The tile
                     // list renames "summary" -> "main", so map it back for SinglePebble.
-                    SinglePebble(if (tiles[i] == "main") "summary" else tiles[i], v, state, vm, Modifier)
+                    // The home tile is the cover's own combined layout, not
+                    // the phone's photo-first HeroHeader -- see CoverMainTile.
+                    if (tiles[i] == "main") {
+                        CoverMainTile(v, state, vm)
+                    } else {
+                        SinglePebble(tiles[i], v, state, vm, Modifier)
+                    }
                 }
             }
         }
@@ -5021,13 +5250,12 @@ private val LocalPebbleFillHeight = staticCompositionLocalOf { false }
 
 /** Tile names that [CompactCar] can render — unknown sections are excluded. */
 private val CompactKnownTiles = setOf(
-    // "controls" was missing here, which silently dropped the lock / horn /
-    // lights pebble from the cover screen entirely -- the one place those
-    // controls are most wanted, since the cover screen is what you actually
-    // see with the phone shut. SinglePebble has always handled "controls"
-    // (it renders ControlsPebble), so nothing else was needed to support it;
-    // this filter was the only thing standing in the way.
-    "controls",
+    // No "controls" here, deliberately. It was added when the lock/horn
+    // controls were unreachable on the cover, but as its own page it was one
+    // short row of buttons above two thirds of an empty screen. Those same
+    // controls now live in CoverMainTile's permanent action bar, on the page
+    // the cover opens on -- so a separate page for them would be a second,
+    // emptier copy of something already on screen.
     "climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai"
 )
 
