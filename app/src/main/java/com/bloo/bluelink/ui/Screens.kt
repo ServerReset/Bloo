@@ -627,6 +627,29 @@ fun BlooApp(vm: AppViewModel) {
                     else SettingsScreen(vm)
             }
         }
+        // Search lives HERE, above the screen-switching AnimatedContent and
+        // outside it, which is the whole point: one element that survives the
+        // transition, so garage -> Settings genuinely morphs a corner bubble
+        // into the bottom bar instead of cross-fading two different objects
+        // that happen to look alike. Only on the two screens that have
+        // anything to search; login, onboarding and the setup wizard don't.
+        val searchable = target == Screen.Garage || target == Screen.Settings
+        val cover = isCompactCoverScreen()
+        val notifPrefs by vm.notifications.collectAsState()
+        // On the garage (and the cover) it is the user's switch. In Settings it
+        // is always there -- that is how you find a setting.
+        if (searchable && !state.locked && (appearance.showSearch || target == Screen.Settings)) {
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                SearchLayer(
+                    vm = vm,
+                    state = state,
+                    appearance = appearance,
+                    notif = notifPrefs,
+                    onSettings = target == Screen.Settings && !cover,
+                    compact = cover,
+                )
+            }
+        }
     }
     }
     }
@@ -3335,25 +3358,6 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             onClick = { vm.openSettings() },
             modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
         )
-        // Search lives here too, not only in Settings. It answers questions
-        // about the CAR ("what's my odometer", "battery level") and runs
-        // commands ("lock my car") -- things you want from the screen showing
-        // the car, not from the one showing the preferences, which is the only
-        // place it existed. Collapsed it is a small pill at the bottom edge,
-        // out of the way of the pebble column; tapping it is what expands it.
-        val searchNotif by vm.notifications.collectAsState()
-        var garageQuery by rememberSaveable { mutableStateOf("") }
-        var garageSubmitted by rememberSaveable { mutableStateOf("") }
-        var garageFocused by rememberSaveable { mutableStateOf(false) }
-        if (appearance.showSearch) SearchOverlay(
-            vm, state, appearance, searchNotif,
-            query = garageQuery,
-            submittedQuery = garageSubmitted,
-            focused = garageFocused,
-            onQueryChange = { garageQuery = it },
-            onSubmit = { garageSubmitted = garageQuery },
-            onFocusChange = { garageFocused = it },
-        )
     }
     }
 }
@@ -4152,29 +4156,6 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                 )
             }
         }
-        // Search on the cover, in its compact form: an icon-sized bubble at the
-        // bottom edge that expands into the same suggestions/results panel the
-        // phone gets. This is the screen where typing is least likely and
-        // ASKING is most useful -- "battery level", "lock my car" -- and where
-        // the alternative is unfolding the phone.
-        val coverNotif by vm.notifications.collectAsState()
-        var coverQuery by rememberSaveable { mutableStateOf("") }
-        var coverSubmitted by rememberSaveable { mutableStateOf("") }
-        var coverFocused by rememberSaveable { mutableStateOf(false) }
-        if (appearance.showSearch) SearchOverlay(
-            vm, state, appearance, coverNotif,
-            query = coverQuery,
-            submittedQuery = coverSubmitted,
-            focused = coverFocused,
-            onQueryChange = { coverQuery = it },
-            onSubmit = { coverSubmitted = coverQuery },
-            onFocusChange = { coverFocused = it },
-            compact = true,
-            // When the band hosts the search button, the collapsed pill at the
-            // bottom would be a second way into the same thing, in the space
-            // the band was supposed to buy back.
-            showCollapsed = band == null,
-        )
         if (band != null) {
             Row(
                 Modifier
@@ -4188,6 +4169,12 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             ) {
                 // The car's name, which every other cover page has to spend a
                 // whole title band on. Here it costs nothing.
+                //
+                // Name only: search on the cover is the draggable bubble (see
+                // SearchLayer), and a second, fixed copy of it here would be
+                // the thing the bubble exists to avoid -- a search button
+                // parked somewhere the user can't move it off whatever it is
+                // covering.
                 vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))?.let { current ->
                     com.bloo.uicommon.FittedText(
                         text = current.name,
@@ -4197,23 +4184,6 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                         ),
                         modifier = Modifier.weight(1f),
                     )
-                }
-                if (appearance.showSearch) {
-                    Surface(
-                        onClick = { coverFocused = true },
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.85f)),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(26.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Filled.Search,
-                                contentDescription = "Search",
-                                modifier = Modifier.size(15.dp),
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -9929,31 +9899,12 @@ private fun SettingsScreen(vm: AppViewModel) {
 
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-  // Hoisted above the scrolling column: the search bar now floats fixed to
-  // the bottom of the SCREEN (a sibling of the scrolling content, not part of
-  // its scrolled flow), so both it and the column need this state.
-  var query by remember { mutableStateOf("") }
-  var searchFocused by remember { mutableStateOf(false) }
-  // System back returns to the garage, not out of the app -- but while the
-  // search pill is expanded, back should collapse it back to the small
-  // button first (matching every other "expanded surface" in the app),
-  // not skip straight past it to the previous screen.
-  BackHandler {
-      if (searchFocused || query.isNotEmpty()) {
-          searchFocused = false
-          query = ""
-      } else {
-          vm.closeSettings()
-      }
-  }
-  // Separate from `query`, which updates on every keystroke purely to
-  // live-filter the matching-settings list below (no side effects). Running
-  // a vehicle command or an AI query is a real action -- it must only fire
-  // once the user has actually submitted (Enter/search key, or tapping a
-  // suggestion chip), never mid-typing off a debounce timer.
-  var submittedQuery by remember { mutableStateOf("") }
-  // Drop any stale AI answer once the search box is cleared.
-  LaunchedEffect(query.isBlank()) { if (query.isBlank()) { vm.clearAiReply(); submittedQuery = "" } }
+  // Search no longer lives on this screen -- it is one app-root element now
+  // (see SearchLayer), so its query, its focus and its own back handling went
+  // with it. Back here means only what it always meant underneath: return to
+  // the garage. SearchLayer composes after this screen, so while search is
+  // open ITS handler is the one that runs first.
+  BackHandler { vm.closeSettings() }
   BackdropHost {
         // On wide screens (tablets, landscape), cap width and centre so lines
         // don't stretch wall-to-wall.
@@ -11048,12 +10999,6 @@ private fun SettingsScreen(vm: AppViewModel) {
           // here so scrolled content never sits behind it.
           Spacer(Modifier.height(bottomInset + 132.dp))
         }
-        // The bottom-anchored search overlay, shared with the garage and the
-        // cover screen -- see SearchOverlay.
-        SearchOverlay(vm, state, appearance, notif, query, submittedQuery, searchFocused,
-            onQueryChange = { query = it },
-            onSubmit = { submittedQuery = query },
-            onFocusChange = { searchFocused = it })
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
         // icons -- this content scrolls behind the status bar too (see the
@@ -11477,36 +11422,203 @@ private fun parseVehicleCommand(query: String): ParsedVehicleCommand? {
     }
 }
 
+/** The two shapes the one search element takes. It is never two composables
+ *  cross-fading: the same Surface changes size, so it can travel between
+ *  screens instead of disappearing on one and appearing on the other. */
+private enum class SearchForm { BUBBLE, BAR }
+
 /**
- * The Settings search bar: ONE persistent pill-shaped element the whole time
- * -- a real button that morphs into the full search field, not two separate
- * composables cross-fading in and out. Only its width fraction (~40% ->
- * 100%) and inner content (a "Search" label -> a real text field) animate;
- * the Surface/glow/shape underneath never changes identity.
+ * THE search element, hoisted to the app root so it is a single object that
+ * OUTLIVES the screen transition.
+ *
+ * It used to be instantiated separately by Settings, the garage and the cover,
+ * which meant three of them: leaving Settings destroyed one and created
+ * another, so the only transition available was a cross-fade between two
+ * different things that happened to look alike. Hosted here, above the
+ * screen-switching AnimatedContent, there is exactly one -- so moving between
+ * the garage and Settings genuinely morphs it, a circle in the corner growing
+ * into the bar across the bottom and back, because it is the same Surface the
+ * whole way.
+ *
+ * The shape follows the screen, not the user:
+ *  - Settings: the full bar, centred at the bottom. This is a screen you came
+ *    to in order to find something.
+ *  - Garage: a small circle in the bottom-right corner, icon only. Search is
+ *    available, not advertised; the car is what you came to look at.
+ *  - Cover: the same circle, smaller, and DRAGGABLE -- on a one-inch screen
+ *    anything parked in a corner is covering something, and which corner is
+ *    free depends on the tile you are on, so the answer has to be the user's.
+ *  - Open, anywhere: the bar, because at that point it is a text field.
  */
 @Composable
-private fun GlowySearchBar(
+private fun SearchLayer(
+    vm: AppViewModel,
+    state: UiState,
+    appearance: SettingsStore.Appearance,
+    notif: SettingsStore.NotificationPrefs,
+    onSettings: Boolean,
+    compact: Boolean,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var submitted by rememberSaveable { mutableStateOf("") }
+    var focused by rememberSaveable { mutableStateOf(false) }
+    val open = focused || query.isNotEmpty()
+    // Where the user has dragged the bubble, in dp from the top-left. NaN =
+    // never dragged, so it rests in its default corner. Saved, because having
+    // to re-park it after every rotation would make dragging it pointless.
+    var dragX by rememberSaveable { mutableFloatStateOf(Float.NaN) }
+    var dragY by rememberSaveable { mutableFloatStateOf(Float.NaN) }
+
+    BackHandler(enabled = open) { query = ""; focused = false }
+    // Drop any stale AI answer once the box is cleared, and forget the last
+    // submission with it -- otherwise reopening search shows the previous
+    // question's answer under an empty field.
+    LaunchedEffect(query.isBlank()) {
+        if (query.isBlank()) { vm.clearAiReply(); submitted = "" }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
+            .asPaddingValues().calculateBottomPadding()
+        val edge = if (compact) 8.dp else 16.dp
+        val bubble = if (compact) 40.dp else 52.dp
+        val barW = minOf(maxWidth - edge * 2, 640.dp)
+        val barH = 52.dp
+        val form = if (open || onSettings) SearchForm.BAR else SearchForm.BUBBLE
+
+        // Resting corner for the bubble, and the drag bounds that keep it on
+        // screen no matter where it was left.
+        val minX = edge
+        val maxX = (maxWidth - bubble - edge).coerceAtLeast(edge)
+        val minY = edge
+        val maxY = (maxHeight - bubble - edge - bottomInset).coerceAtLeast(edge)
+        val restX = maxX
+        val restY = maxY
+        val bubbleX = if (dragX.isNaN()) restX else dragX.dp.coerceIn(minX, maxX)
+        val bubbleY = if (dragY.isNaN()) restY else dragY.dp.coerceIn(minY, maxY)
+
+        val targetW = if (form == SearchForm.BAR) barW else bubble
+        val targetH = if (form == SearchForm.BAR) barH else bubble
+        val targetX = if (form == SearchForm.BAR) (maxWidth - barW) / 2 else bubbleX
+        val targetY = if (form == SearchForm.BAR) maxHeight - barH - edge - bottomInset else bubbleY
+
+        // One spring for all four, so the morph reads as a single object
+        // changing rather than four properties racing each other.
+        val spec = spring<Dp>(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow)
+        val w by animateDpAsState(targetW, spec, label = "searchW")
+        val h by animateDpAsState(targetH, spec, label = "searchH")
+        val x by animateDpAsState(targetX, spec, label = "searchX")
+        val y by animateDpAsState(targetY, spec, label = "searchY")
+
+        // Dismiss scrim. Below the pill in this Box, so it never eats its taps.
+        AnimatedVisibility(
+            visible = open,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(140)),
+            modifier = Modifier.matchParentSize(),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { query = ""; focused = false },
+            )
+        }
+
+        // Results / suggestions, anchored to the bottom rather than to the
+        // pill: the pill is always at the bottom centre while open, so this
+        // never has to chase a bubble around the screen.
+        AnimatedVisibility(
+            visible = open,
+            enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+            exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .padding(bottom = barH + edge + bottomInset + 10.dp),
+        ) {
+            val panelShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
+            Surface(
+                shape = panelShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.98f)),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                modifier = Modifier.width(barW).dropShadow(panelShape, blurRadius = 16.dp, offsetY = 6.dp),
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = if (compact) 180.dp else 360.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(if (compact) 10.dp else 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
+                ) {
+                    if (query.isNotBlank()) {
+                        SettingsSearchResults(query, submitted, vm, state, appearance, notif)
+                    } else {
+                        SearchSuggestions(state) { picked -> query = picked; submitted = picked }
+                    }
+                }
+            }
+        }
+
+        SearchPill(
+            query = query,
+            focused = focused,
+            form = form,
+            width = w,
+            height = h,
+            compact = compact,
+            onQueryChange = { query = it },
+            onFocusChange = { focused = it },
+            onSubmit = { submitted = query },
+            // Dragging only exists for the bubble. A bar spans the screen --
+            // there is nowhere to move it to -- and while it is a text field
+            // a drag would fight the keyboard and the panel above it.
+            onDrag = if (form == SearchForm.BUBBLE && compact) {
+                { dx, dy ->
+                    dragX = ((if (dragX.isNaN()) bubbleX else dragX.dp) + dx).coerceIn(minX, maxX).value
+                    dragY = ((if (dragY.isNaN()) bubbleY else dragY.dp) + dy).coerceIn(minY, maxY).value
+                }
+            } else null,
+            modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
+        )
+    }
+}
+
+/**
+ * The pill itself: one Surface at whatever [width]/[height] [SearchLayer] has
+ * animated it to, with a glow behind it and its content chosen by [form].
+ *
+ * Sized by the caller rather than by a width FRACTION of its own parent, which
+ * is what it used to do. A fraction cannot express "a circle in that corner"
+ * and "a bar across the bottom" as the same element, and it is the sameness
+ * that makes the screen-to-screen morph possible at all.
+ */
+@Composable
+private fun SearchPill(
     query: String,
     focused: Boolean,
+    form: SearchForm,
+    width: Dp,
+    height: Dp,
+    compact: Boolean,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onSubmit: () -> Unit,
-    /** Flip-cover sizing: a smaller collapsed bubble and tighter padding, so
-     *  it reads as a control floating over a one-inch tile rather than a bar
-     *  taking a third of it. */
-    compact: Boolean = false,
+    onDrag: ((Dp, Dp) -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
     val focusRequester = remember { FocusRequester() }
     val expanded = focused || query.isNotEmpty()
+    val density = LocalDensity.current
     LaunchedEffect(focused) { if (focused) runCatching { focusRequester.requestFocus() } }
-    // Hand-ticked at ~12fps rather than Compose's animation clock: the halo is
-    // a slow breath, and 12 steps a second is indistinguishable from 60 for
-    // something that takes a second to cross its range. Held as State and read
-    // ONLY inside the drawBehind below, so a tick invalidates the draw phase
-    // and nothing else -- as a `by`-delegated read in this scope it would have
-    // recomposed the whole bar, text field included, twelve times a second for
-    // as long as its screen was open.
+    // Hand-ticked at ~12fps: the halo is a slow breath, and 12 steps a second
+    // is indistinguishable from 60 for something that takes a second to cross
+    // its range. Held as State and read ONLY inside drawBehind, so a tick
+    // invalidates the draw phase and never recomposes the text field.
     val glowPulse = remember { mutableFloatStateOf(0.55f) }
     val haloColor = scheme.primary
     LaunchedEffect(expanded) {
@@ -11518,336 +11630,156 @@ private fun GlowySearchBar(
             delay(80)
         }
     }
-    val widthFraction by animateFloatAsState(
-        // Collapsed it is a bubble, not a bar. On the cover it shrinks further,
-        // to roughly an icon's worth of pill, because that screen has no room
-        // to spend a third of its width on something not currently in use.
-        targetValue = if (expanded) 1f else if (compact) 0.32f else 0.4f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
-        label = "searchWidth",
-    )
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
+        targetValue = if (pressed) 0.94f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "searchPress",
     )
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    Box(modifier.size(width, height).graphicsLayer { scaleX = pressScale; scaleY = pressScale }) {
+        // Two radial gradients painted behind the pill -- a wide bloom and a
+        // tighter core, so the light has depth. These were Modifier.blur boxes
+        // once: two offscreen render targets and two blur shaders re-run every
+        // frame, for a permanent fixture of the screen. A blurred solid pill IS
+        // a radial falloff, so painting the falloff directly gets the same
+        // picture for one gradient fill each.
         Box(
-            Modifier
-                .fillMaxWidth(widthFraction.coerceIn(0.05f, 1f))
-                .graphicsLayer { scaleX = pressScale; scaleY = pressScale },
-        ) {
-            // The halo: two radial gradients painted straight behind the pill,
-            // a wide soft bloom and a tighter hot core, so the light has depth
-            // rather than reading as one flat wash.
-            //
-            // These used to be two Boxes with Modifier.blur -- two offscreen
-            // render targets and two blur shaders, re-run every frame this bar
-            // is on screen, and it is a permanent fixture of its screen. A
-            // blurred solid pill IS a radial falloff; painting the falloff
-            // directly gets the same picture for one gradient fill each. That
-            // is what makes it cheap enough to also put on the garage and the
-            // cover screen, which is where it now lives too.
-            //
-            // Drawn in drawBehind, so the pulse animating below invalidates the
-            // DRAW phase only -- it never recomposes this composable or the
-            // text field inside it.
-            Box(
-                Modifier.matchParentSize().drawBehind {
-                    val pulse = glowPulse.floatValue
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    // Bloom: reaches well past the pill, faded to nothing at the
-                    // edge of its radius so there is no hard cut anywhere.
-                    val bloom = maxOf(size.width, size.height) * 0.62f
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                haloColor.copy(alpha = (if (expanded) 0.42f else 0.22f) * pulse),
-                                Color.Transparent,
-                            ),
-                            center = Offset(cx, cy),
-                            radius = bloom,
+            Modifier.matchParentSize().drawBehind {
+                val pulse = glowPulse.floatValue
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                val bloom = maxOf(size.width, size.height) * 0.62f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            haloColor.copy(alpha = (if (expanded) 0.42f else 0.24f) * pulse),
+                            Color.Transparent,
                         ),
+                        center = Offset(cx, cy),
                         radius = bloom,
-                        center = Offset(cx, cy),
-                    )
-                    val core = maxOf(size.width, size.height) * 0.34f
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                haloColor.copy(alpha = (if (expanded) 0.30f else 0.16f) * pulse),
-                                Color.Transparent,
-                            ),
-                            center = Offset(cx, cy),
-                            radius = core,
+                    ),
+                    radius = bloom,
+                    center = Offset(cx, cy),
+                )
+                val core = maxOf(size.width, size.height) * 0.34f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            haloColor.copy(alpha = (if (expanded) 0.30f else 0.18f) * pulse),
+                            Color.Transparent,
                         ),
+                        center = Offset(cx, cy),
                         radius = core,
-                        center = Offset(cx, cy),
-                    )
-                },
-            )
-            Surface(
-                onClick = { if (!expanded) onFocusChange(true) },
-                shape = RoundedCornerShape(50),
-                color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.80f)),
-                contentColor = scheme.onSurface,
-                tonalElevation = if (expanded) 10.dp else 6.dp,
-                border = BorderStroke(
-                    if (expanded) 1.5.dp else 1.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            scheme.primary.copy(alpha = (if (expanded) 0.65f else 0.35f) * glowPulse.floatValue),
-                            scheme.primary.copy(alpha = 0.05f),
-                        ),
+                    ),
+                    radius = core,
+                    center = Offset(cx, cy),
+                )
+            },
+        )
+        Surface(
+            onClick = { if (!expanded) onFocusChange(true) },
+            shape = RoundedCornerShape(50),
+            color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.86f)),
+            contentColor = scheme.onSurface,
+            tonalElevation = if (expanded) 10.dp else 6.dp,
+            border = BorderStroke(
+                if (expanded) 1.5.dp else 1.dp,
+                Brush.verticalGradient(
+                    listOf(
+                        scheme.primary.copy(alpha = (if (expanded) 0.65f else 0.4f) * glowPulse.floatValue),
+                        scheme.primary.copy(alpha = 0.05f),
                     ),
                 ),
-                interactionSource = interaction,
-                // A real drop shadow (offset + soft blur), not just Surface's
-                // own tonal shadowElevation, which reads as barely-there on
-                // most backgrounds -- this is a plain Box behind the Surface
-                // with its own background+blur, exactly like GlowySearchBar's
-                // halo above, just darker and offset downward.
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .dropShadow(RoundedCornerShape(50))
-                    .appGlassRim(RoundedCornerShape(50)),
-            ) {
-                Box {
-                    // Cross-fades + scales between the collapsed and expanded
-                    // content instead of an instant swap -- the pill's WIDTH
-                    // already animates smoothly, but the content inside used to
-                    // pop in/out the moment its branch flipped, landing well
-                    // before the width settled and reading as a jarring cut
-                    // partway through an otherwise fluid morph.
-                    AnimatedContent(
-                        targetState = expanded,
-                        transitionSpec = {
-                            (fadeIn(tween(220, delayMillis = 60)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 60))) togetherWith
-                            (fadeOut(tween(120)) + scaleOut(targetScale = 0.92f, animationSpec = tween(120)))
-                        },
-                        label = "searchContentMorph",
-                    ) { isExpanded ->
-                        if (isExpanded) {
-                            Row(
-                                Modifier.fillMaxWidth().padding(
-                                    horizontal = if (compact) 12.dp else 16.dp,
-                                    vertical = if (compact) 8.dp else 12.dp,
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 20.dp))
-                                Spacer(Modifier.width(if (compact) 6.dp else 10.dp))
-                                Box(Modifier.weight(1f)) {
-                                    BasicTextField(
-                                        value = query,
-                                        onValueChange = onQueryChange,
-                                        singleLine = true,
-                                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
-                                        cursorBrush = SolidColor(scheme.primary),
-                                        keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                                        keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
-                                        // No auto-collapse-on-blur here: onFocusChanged
-                                        // fires immediately with isFocused = false the
-                                        // instant this field first composes (before the
-                                        // LaunchedEffect-driven requestFocus() below has
-                                        // actually landed) -- with an empty query that
-                                        // false-positive blur collapsed the bar back down
-                                        // in the same beat it opened, which looked like
-                                        // tapping it did nothing at all. Closing is the
-                                        // explicit trailing Close button's job now.
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .focusRequester(focusRequester),
-                                        decorationBox = { inner ->
-                                            if (query.isEmpty()) {
-                                                Text(
-                                                    if (compact) "Search" else "Search settings & car data",
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    color = scheme.onSurfaceVariant,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            }
-                                            inner()
-                                        },
-                                    )
-                                }
-                                IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
-                                    Icon(
-                                        Icons.Filled.Close,
-                                        contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
-                                    )
-                                }
-                            }
-                        } else {
-                            // Collapsed: a centered icon+label cluster, not a
-                            // fill-weighted text box with nothing balancing the
-                            // other side -- that left everything reading as
-                            // left-aligned instead of centered in the pill.
-                            Row(
-                                Modifier.fillMaxWidth().padding(
-                                    horizontal = if (compact) 10.dp else 16.dp,
-                                    vertical = if (compact) 8.dp else 12.dp,
-                                ),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    Icons.Filled.Search,
-                                    contentDescription = if (compact) "Search" else null,
-                                    modifier = Modifier.size(if (compact) 18.dp else 20.dp),
-                                )
-                                // Icon only on the cover: at 0.32 width the word
-                                // would ellipsize to "Sea…", which says less than
-                                // the magnifier already does.
-                                if (!compact) {
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(
-                                        "Search",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
+            ),
+            interactionSource = interaction,
+            modifier = Modifier
+                .fillMaxSize()
+                .dropShadow(RoundedCornerShape(50))
+                .appGlassRim(RoundedCornerShape(50))
+                .then(
+                    if (onDrag != null) {
+                        Modifier.pointerInput(Unit) {
+                            detectDragGestures { change, amount ->
+                                change.consume()
+                                with(density) { onDrag(amount.x.toDp(), amount.y.toDp()) }
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * THE search surface: a bottom-anchored glowing pill that expands into
- * suggestions, matched settings, and AI answers.
- *
- * It was written inline inside SettingsScreen, which meant search only
- * existed where you had already gone looking for a setting -- and it answers
- * car questions ("what's my odometer") and runs commands ("lock my car"),
- * which are things you want from the screen showing the car, not from the
- * screen showing the preferences. It is one composable now, hosted by
- * Settings, the garage, and the cover screen alike; the query state lives
- * with the host, so each screen keeps its own and none of them clobbers
- * another.
- *
- * [compact] tightens it for the flip cover: smaller radii and insets, and a
- * shorter results panel, because there it is sharing a roughly one-inch
- * screen with the tile it floats over.
- */
-@Composable
-private fun BoxScope.SearchOverlay(
-    vm: AppViewModel,
-    state: UiState,
-    appearance: SettingsStore.Appearance,
-    notif: SettingsStore.NotificationPrefs,
-    query: String,
-    submittedQuery: String,
-    focused: Boolean,
-    onQueryChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onFocusChange: (Boolean) -> Unit,
-    compact: Boolean = false,
-    /** False when another control owns opening search (the cover's camera-band
-     *  button), so the collapsed pill doesn't sit at the bottom edge as a
-     *  second, redundant way in. The bar still appears once search is open --
-     *  it is the text field. */
-    showCollapsed: Boolean = true,
-) {
-    val panelShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
-    val open = focused || query.isNotEmpty()
-    // Two ways out, because on the garage and the cover this floats over the
-    // whole screen and the explicit Close button is a small target on a phone
-    // and a tiny one on a cover.
-    //
-    // Back first: without it, the system back gesture with search open did
-    // whatever the HOST screen's back does -- leaving the garage, backing out
-    // of Settings -- which is never what "I'm done searching" means. It clears
-    // the query as well as the focus, so back always lands on the same state
-    // whether you had typed anything or not.
-    BackHandler(enabled = open) { onQueryChange(""); onFocusChange(false) }
-    // Then tap-outside. A scrim, not just a click target: with the panel open
-    // the content behind is context, not something to interact with, and a
-    // faint dim says which of the two layers is live. It sits BELOW the panel
-    // in this Box, so it never eats the panel's own taps.
-    AnimatedVisibility(
-        visible = open,
-        enter = fadeIn(tween(180)),
-        exit = fadeOut(tween(140)),
-        modifier = Modifier.matchParentSize(),
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
-                .clickable(
-                    // No ripple/indication: this is a dismiss surface, and a
-                    // ripple blooming across the whole screen reads as the
-                    // background itself being a button.
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onQueryChange(""); onFocusChange(false) },
-        )
-    }
-    Column(
-        Modifier
-            .align(Alignment.BottomCenter)
-            .widthIn(max = 640.dp)
-            .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(horizontal = if (compact) 8.dp else 16.dp)
-            .padding(bottom = if (compact) 6.dp else 12.dp),
-    ) {
-        AnimatedVisibility(
-            visible = focused || query.isNotEmpty(),
-            enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
-            exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+                    } else Modifier,
+                ),
         ) {
-            // This panel floats directly over whatever screen hosts it, so it
-            // needs its own opaque backdrop: without one, "Try asking" and the
-            // gaps between suggestion pills had nothing painted under them and
-            // the content behind showed straight through the panel's own text.
-            Surface(
-                shape = panelShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.98f)),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                modifier = Modifier.fillMaxWidth().dropShadow(panelShape, blurRadius = 16.dp, offsetY = 6.dp),
-            ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = if (compact) 180.dp else 360.dp)
-                        .verticalScroll(rememberScrollState())
-                        .padding(if (compact) 10.dp else 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
-                ) {
-                    if (query.isNotBlank()) {
-                        SettingsSearchResults(query, submittedQuery, vm, state, appearance, notif)
-                    } else {
-                        // Focused but empty: nothing to search yet, so surface a
-                        // few example queries -- otherwise there's no way to
-                        // discover that search can answer data questions and run
-                        // commands, not just find settings by name. Tapping one is
-                        // itself the deliberate "go", so it submits immediately.
-                        SearchSuggestions(state) { picked -> onQueryChange(picked); onSubmit() }
+            AnimatedContent(
+                targetState = form to expanded,
+                transitionSpec = {
+                    (fadeIn(tween(200, delayMillis = 90)) + scaleIn(initialScale = 0.9f, animationSpec = tween(200, delayMillis = 90))) togetherWith
+                        (fadeOut(tween(110)) + scaleOut(targetScale = 0.9f, animationSpec = tween(110)))
+                },
+                label = "searchContentMorph",
+            ) { (shape, isOpen) ->
+                when {
+                    isOpen -> Row(
+                        Modifier.fillMaxSize().padding(horizontal = if (compact) 12.dp else 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 20.dp))
+                        Spacer(Modifier.width(if (compact) 6.dp else 10.dp))
+                        Box(Modifier.weight(1f)) {
+                            BasicTextField(
+                                value = query,
+                                onValueChange = onQueryChange,
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
+                                cursorBrush = SolidColor(scheme.primary),
+                                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+                                // No auto-collapse on blur: onFocusChanged fires
+                                // with isFocused = false the instant this field
+                                // composes, before the requestFocus above lands,
+                                // and that false positive used to close the bar in
+                                // the same beat it opened.
+                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                                decorationBox = { inner ->
+                                    if (query.isEmpty()) {
+                                        Text(
+                                            if (compact) "Search" else "Search settings & car data",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = scheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    inner()
+                                },
+                            )
+                        }
+                        IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
+                            )
+                        }
+                    }
+                    // Closed BAR (Settings): the icon plus the word, centred.
+                    shape == SearchForm.BAR -> Row(
+                        Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                    }
+                    // Closed BUBBLE: the glyph alone. contentDescription is on
+                    // the icon rather than the label, since there isn't one.
+                    else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = "Search",
+                            modifier = Modifier.size(if (compact) 18.dp else 22.dp),
+                        )
                     }
                 }
             }
-        }
-        if (showCollapsed || open) {
-        Spacer(Modifier.height(if (compact) 6.dp else 10.dp))
-        GlowySearchBar(
-            query,
-            focused,
-            onQueryChange = onQueryChange,
-            onFocusChange = onFocusChange,
-            onSubmit = onSubmit,
-            compact = compact,
-        )
         }
     }
 }
