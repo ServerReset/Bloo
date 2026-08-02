@@ -298,7 +298,11 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
             // currentPage (settles on the landed page, a discrete index), so the
             // active dot animates its size/color on landing -- matching the tile
             // dots on the right bezel instead of popping while those glide.
-            CurvedDots(count = count, activeIndex = carPager.currentPage, anchor = 90f, animate = true)
+            // Lambda for the same reason as the tile dots: currentPage is
+            // pager state, so reading it here would invalidate this whole Box --
+            // the pager and every composed car page inside it -- each time a
+            // swipe crosses the halfway point.
+            CurvedDots(count = count, activeIndex = { carPager.currentPage }, anchor = 90f, animate = true)
             // Shown once for the whole screen, above all pages.
             MessageSnackbar(ui.message, onDismiss = { vm.dismissMessage() })
         }
@@ -441,7 +445,20 @@ private fun CarColumn(
     var rotaryAccumPx by remember { mutableFloatStateOf(0f) }
     val rotaryStepPx = with(LocalDensity.current) { 24.dp.toPx() }
 
-    val centerItemIndex by remember {
+    // Held as State and read via `.value` ONLY inside lambdas and children --
+    // never `by`, and never in this function's own composition scope.
+    //
+    // THIS IS A SCROLL-PERFORMANCE FIX, reported from a real device as "the
+    // scrolling is lagging, not so smooth". It derives from state.layoutInfo,
+    // which changes every single scroll frame, so reading it here made the
+    // centered tile changing invalidate CarColumn itself -- and CarColumn
+    // composes the ScalingLazyColumn, so every visible TileContent recomposed
+    // with it, once per tile crossed, mid-fling, on a watch CPU. Nothing about
+    // the list depends on which tile is centered; only the dots and the car-name
+    // overlay do, and they now read it themselves so the invalidation stops at
+    // them. (The phone side already learned this -- see GarageScreen's identical
+    // note on its own dots-alpha state.)
+    val centerItemIndexState = remember {
         derivedStateOf {
             // Under the library's default ScalingLazyListAnchorType.ItemCenter (never
             // overridden here), ScalingLazyListItemInfo.offset is ALREADY center-line
@@ -452,7 +469,6 @@ private fun CarColumn(
             state.layoutInfo.visibleItemsInfo.minByOrNull { abs(it.offset) }?.index ?: 0
         }
     }
-    val centerTile = if (tileCount > 0) tiles[centerItemIndex % tileCount] else ""
 
     // Wrap-around guardian: once the user drifts near the ends of the virtual
     // list, silently teleport to the equivalent position in the centre segment
@@ -464,7 +480,7 @@ private fun CarColumn(
     // to the wrong tile.
     LaunchedEffect(tileCount, total) {
         if (!infinite) return@LaunchedEffect
-        snapshotFlow { centerItemIndex to state.isScrollInProgress }
+        snapshotFlow { centerItemIndexState.value to state.isScrollInProgress }
             .collect { (idx, scrolling) ->
                 if (!scrolling && rotaryJob?.isActive != true) {
                     if (idx < tileCount * 2 || idx > total - tileCount * 2) {
@@ -492,7 +508,7 @@ private fun CarColumn(
                     val dir = if (rotaryAccumPx > 0) 1 else -1
                     rotaryAccumPx = 0f
                     val maxIdx = (state.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                    val base = if (rotaryTargetIdx >= 0) rotaryTargetIdx else centerItemIndex
+                    val base = if (rotaryTargetIdx >= 0) rotaryTargetIdx else centerItemIndexState.value
                     var newTarget = if (infinite) base + dir else (base + dir).coerceIn(0, maxIdx)
                     // Remap near the virtual-list boundary immediately (not after the
                     // scroll settles) so a long continuous bezel roll never actually
@@ -562,7 +578,10 @@ private fun CarColumn(
         // capped at 12, with the active dot animating as you scroll.
         CurvedDots(
             count = tileCount,
-            activeIndex = if (tileCount > 0) centerItemIndex % tileCount else 0,
+            // Lambda, not a value: this is the per-scroll-frame read, and it
+            // has to happen inside CurvedDots rather than here. See
+            // centerItemIndexState above.
+            activeIndex = { if (tileCount > 0) centerItemIndexState.value % tileCount else 0 },
             anchor = 0f,
             animate = true,
             cap = 12,
@@ -578,7 +597,13 @@ private fun CarColumn(
         // Name the car once you leave its summary tile.
         CarNameOverlay(
             name = car.name,
-            visible = centerTile.isNotEmpty() && centerTile != WearTiles.SUMMARY,
+            // Also a lambda, and for the same reason: this is derived from the
+            // centered tile, so evaluating it here would put the per-frame read
+            // straight back into CarColumn's scope.
+            visible = {
+                val t = if (tileCount > 0) tiles[centerItemIndexState.value % tileCount] else ""
+                t.isNotEmpty() && t != WearTiles.SUMMARY
+            },
             phoneConnected = ui.phoneConnected,
             holdProgress = holdProgress,
             onHoldComplete = {
@@ -784,20 +809,24 @@ private fun TileContent(
 @Composable
 private fun CurvedDots(
     count: Int,
-    activeIndex: Int,
+    /** Read as a lambda so a caller whose index changes every scroll frame
+     *  (the tile dots) invalidates only this composable, not the screen that
+     *  hosts the list. */
+    activeIndex: () -> Int,
     anchor: Float,
     animate: Boolean,
     cap: Int = count,
 ) {
     if (count <= 1) return
     val shown = min(count, cap)
+    val idx = activeIndex()
     val active = if (count <= shown) {
         // Fewer items than dots: index maps 1:1, just clamp for safety.
-        activeIndex.coerceIn(0, shown - 1)
+        idx.coerceIn(0, shown - 1)
     } else {
         // More items than dots: rescale activeIndex's position in [0, count-1]
         // onto [0, shown-1] and round to the nearest whole dot.
-        ((activeIndex.toFloat() / (count - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
+        ((idx.toFloat() / (count - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
     }
     val selected = MaterialTheme.colorScheme.primary
     val unselected = MaterialTheme.colorScheme.outlineVariant
@@ -838,14 +867,15 @@ private fun CurvedDots(
 @Composable
 private fun BoxScope.CarNameOverlay(
     name: String,
-    visible: Boolean,
+    /** Lambda for the same reason as [CurvedDots]' activeIndex. */
+    visible: () -> Boolean,
     phoneConnected: Boolean = true,
     holdProgress: Animatable<Float, *>? = null,
     onHoldComplete: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     AnimatedVisibility(
-        visible = visible,
+        visible = visible(),
         modifier = Modifier.align(Alignment.TopCenter).padding(top = 26.dp),
         enter = fadeIn() + slideInVertically { -it },
         exit = fadeOut() + slideOutVertically { -it },
