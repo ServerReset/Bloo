@@ -357,3 +357,63 @@ class SyncMergeTest {
         assertNull(meta.writerDeviceId)                 // no top-level _writerDeviceId (it was inside prefs)
     }
 }
+
+/**
+ * Pins which preference keys are allowed to roam between devices.
+ *
+ * The classification is a real correctness boundary, not a style choice, and
+ * it is easy to get wrong when adding a setting: forget it and a genuine
+ * preference silently stops syncing; over-match a prefix and per-device
+ * runtime state starts travelling, which is worse -- importing a peer's
+ * "alert already fired" flag suppresses this device's own notifications, and
+ * importing a peer's episode-start timestamp compares clock domains and makes
+ * elapsed-time thresholds fire early or late.
+ *
+ * Separate class from SyncMergeTest so a failure here reads as "the sync
+ * boundary moved", not "the merge algorithm broke".
+ */
+class SyncDeviceLocalTest {
+
+    @Test
+    fun `user settings roam between devices`() {
+        // Every notification preference is a genuine user choice and must
+        // travel -- including the live charging bar, whose key was added with
+        // that feature and would otherwise have been silently device-only.
+        listOf(
+            "notify_service", "notify_door", "notify_door_min",
+            "notify_running", "notify_running_min",
+            "notify_unlocked", "notify_unlocked_min",
+            "notify_charging",
+            // A representative spread of the other portable settings.
+            "theme_mode", "unit_system", "settings_mode",
+        ).forEach {
+            assertFalse(SyncMerge.isDeviceLocal(it), "$it should sync between devices")
+        }
+    }
+
+    @Test
+    fun `per-device state never roams`() {
+        listOf(
+            // Sync plumbing: pointing another device at this device's file, or
+            // adopting its identity, corrupts the whole scheme.
+            "sync_uri", "sync_device_id", "sync_last_hash", "sync_synced_ever",
+            // Device capability, not preference: Shizuku may not exist elsewhere.
+            "seamless_install_shizuku",
+            // Per-VIN runtime state, matched by prefix rather than exact name.
+            "alert_door_KMHXX", "door_since_KMHXX", "engine_since_KMHXX",
+            "tile_refreshed_KMHXX",
+        ).forEach {
+            assertTrue(SyncMerge.isDeviceLocal(it), "$it must never leave this device")
+        }
+    }
+
+    @Test
+    fun `device-local prefixes don't over-match real settings`() {
+        // "alert_" is a prefix rule, so a future setting merely STARTING with
+        // a similar word must not be swept up by it. These are the near-misses
+        // that would be easy to introduce without noticing.
+        listOf("alerts_enabled", "doorbell", "engine_type", "tiles_order").forEach {
+            assertFalse(SyncMerge.isDeviceLocal(it), "$it was wrongly treated as device-local")
+        }
+    }
+}
