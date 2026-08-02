@@ -5455,7 +5455,14 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?) {
             // has to clear the gap too, or the marker drifts off the value it
             // is marking by exactly the gap's width.
             val l = limit / 100f
-            val targetX = usable * l + (if (l > filledFrac) gap else 0.dp)
+            // Clamped to keep the whole dot on the bar. Its centre is the
+            // value, so at a 95% limit the uncorrected offset puts half the
+            // circle past the right edge -- the widget's copy of this already
+            // clamped and the phone's didn't, which is the kind of divergence
+            // that makes "the same marker everywhere" quietly untrue.
+            val half = ChargeLimitDotSize / 2
+            val targetX = (usable * l + (if (l > filledFrac) gap else 0.dp))
+                .coerceIn(half, (maxWidth - half).coerceAtLeast(half))
             val x by animateDpAsState(
                 targetX,
                 spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
@@ -5464,7 +5471,7 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?) {
             ChargeLimitDot(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = x - ChargeLimitDotSize / 2),
+                    .offset(x = x - half),
                 onFill = l <= filledFrac,
             )
         }
