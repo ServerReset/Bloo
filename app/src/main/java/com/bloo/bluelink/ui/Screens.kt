@@ -4088,6 +4088,10 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                 }
             }
         }
+        // Measured once and shared by both readers below (the top-overlay name
+        // and the band itself), so they can never disagree about whether the
+        // band exists and end up showing the name twice or not at all.
+        val band = coverCutoutBand()
         // Car-switching dots, hoisted out of CompactCar (a per-page composable)
         // and up to here -- a sibling of the whole pager, not inside any one
         // page's fade/scale graphicsLayer -- so it doesn't itself fade and
@@ -4118,7 +4122,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             // below. Saying it twice on a screen this size is worse than the
             // problem the overlay was added to solve.
             vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))
-                ?.takeIf { coverCutoutBand() == null }
+                ?.takeIf { band == null }
                 ?.let { current ->
                 Text(
                     current.name,
@@ -4158,11 +4162,6 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         var coverQuery by rememberSaveable { mutableStateOf("") }
         var coverSubmitted by rememberSaveable { mutableStateOf("") }
         var coverFocused by rememberSaveable { mutableStateOf(false) }
-        // The strip beside the camera island, if this device leaves one. See
-        // coverCutoutBand: the island's edge was being reserved across the FULL
-        // width, so the part of that band the camera doesn't cover was lit,
-        // unoccluded screen that nothing was allowed to use.
-        val band = coverCutoutBand()
         if (appearance.showSearch) SearchOverlay(
             vm, state, appearance, coverNotif,
             query = coverQuery,
