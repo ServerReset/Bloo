@@ -133,6 +133,11 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Storefront
@@ -3341,7 +3346,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
         var garageQuery by rememberSaveable { mutableStateOf("") }
         var garageSubmitted by rememberSaveable { mutableStateOf("") }
         var garageFocused by rememberSaveable { mutableStateOf(false) }
-        SearchOverlay(
+        if (appearance.showSearch) SearchOverlay(
             vm, state, appearance, searchNotif,
             query = garageQuery,
             submittedQuery = garageSubmitted,
@@ -4086,7 +4091,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
         var coverQuery by rememberSaveable { mutableStateOf("") }
         var coverSubmitted by rememberSaveable { mutableStateOf("") }
         var coverFocused by rememberSaveable { mutableStateOf(false) }
-        SearchOverlay(
+        if (appearance.showSearch) SearchOverlay(
             vm, state, appearance, coverNotif,
             query = coverQuery,
             submittedQuery = coverSubmitted,
@@ -9867,7 +9872,7 @@ private fun SettingsScreen(vm: AppViewModel) {
                 modifier = Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
             ) {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
-            SettingsCard("Accounts") {
+            SettingsCard("Accounts", Icons.Filled.Person) {
                 if (state.accounts.isEmpty()) {
                     Text(
                         "Not signed in",
@@ -9943,7 +9948,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             // shown (not advanced-only): it's a headline feature, not a power-
             // user knob, and hiding it behind Advanced made it easy to miss.
             if (state.aiSupported) {
-                SettingsCard("AI") {
+                SettingsCard("AI", Icons.Filled.AutoAwesome) {
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
@@ -9976,7 +9981,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
                 var shortcutsExpanded by remember { mutableStateOf(false) }
-                SettingsCard("App shortcuts") {
+                SettingsCard("App shortcuts", Icons.Filled.Bolt) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "Quick-access shortcuts from the launcher icon",
@@ -10056,7 +10061,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Backup / Sync
-            SettingsCard("Backup & sync") {
+            SettingsCard("Backup & sync", Icons.Filled.CloudSync) {
                 var showDriveDialog by remember { mutableStateOf(false) }
                 val settingsImportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent(),
@@ -10275,7 +10280,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Display scale
-            SettingsCard("Display") {
+            SettingsCard("Display", Icons.Filled.Straighten) {
                 // Advanced-only: a power-user knob, unlike the Units picker
                 // below it which every user needs regardless of mode.
                 if (advanced) {
@@ -10290,6 +10295,19 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                     Spacer(Modifier.height(12.dp))
                 }
+                // SIMPLE, not advanced: this changes what is on the car screen
+                // every time you open the app, which is the test for whether a
+                // switch belongs in the small set. The text-scale slider above
+                // it is advanced by the same test -- it is a knob you set once.
+                ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
+                Text(
+                    "A search bubble at the bottom of the car screen and the cover screen. " +
+                        "Ask about the car (\"battery level\"), run a command (\"lock my car\"), " +
+                        "or jump to a setting. Settings always has it.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
                 // Unit system: controls temperature, distance, and speed display.
                 SettingsSegmentedRow(
                     label = "Units",
@@ -10304,7 +10322,7 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Font
             AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
-            SettingsCard("Font") {
+            SettingsCard("Font", Icons.Filled.TextFields) {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
@@ -10320,7 +10338,7 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Links
             AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
-            SettingsCard("Links") {
+            SettingsCard("Links", Icons.Filled.OpenInNew) {
                 SettingsSegmentedRow(
                     label = "Open links",
                     options = listOf(
@@ -10335,7 +10353,7 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Logs
             AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
-            SettingsCard("Logs") {
+            SettingsCard("Logs", Icons.Filled.Info) {
                 var logsExpanded by remember { mutableStateOf(false) }
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -10394,7 +10412,23 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Notifications
-            SettingsCard("Notifications") {
+            SettingsCard("Notifications", Icons.Filled.Notifications) {
+                // First, not last. Everything else in this card is an ALERT --
+                // a one-shot "something happened" the user hopes never fires.
+                // This one is a live surface they watch on purpose while the
+                // car charges, so burying it under four alert switches and
+                // their minute fields had it read as an afterthought.
+                ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
+                Text(
+                    "A progress bar in the shade and on the lock screen while the car charges, " +
+                        "filling as it goes, with the charge limit marked and a Stop button.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Spacer(Modifier.height(10.dp))
+
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
                 if (notif.doorOpen) {
@@ -10428,15 +10462,6 @@ private fun SettingsScreen(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
                 }
-                // Ongoing rather than one-shot, so it sits apart from the
-                // alert switches above it with its own explanation.
-                ToggleRow("Live charging notification", notif.charging) { vm.setNotifyCharging(it) }
-                Text(
-                    "Shows a progress bar while the car is charging, updating as it fills.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
                 ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
                 if (notif.unlocked) {
                     var unlockedMin by remember(notif.unlockedMinutes) { mutableStateOf(notif.unlockedMinutes.toString()) }
@@ -10466,7 +10491,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             // hero, but this is the manual home: which build you're on, a force-check,
             // a browser fallback source, and the optional Shizuku silent-install toggle
             // gated to just its row so the card itself never vanishes).
-            SettingsCard("Updates") {
+            SettingsCard("Updates", Icons.Filled.SystemUpdate) {
                 val updateTint = when {
                     state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -10560,7 +10585,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
             AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
-            SettingsCard("Quick tiles") {
+            SettingsCard("Quick tiles", Icons.Filled.Dashboard) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
@@ -10621,7 +10646,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Security
-            SettingsCard("Security") {
+            SettingsCard("Security", Icons.Filled.Lock) {
                 if (canBio) {
                     SettingsSegmentedRow(
                         label = "Require fingerprint to open",
@@ -10665,12 +10690,12 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Sounds & vibration
-            SettingsCard("Sounds & vibration") {
+            SettingsCard("Sounds & vibration", Icons.Filled.Vibration) {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
             }
 
             // Theme
-            SettingsCard("Theme") {
+            SettingsCard("Theme", Icons.Filled.Palette) {
                 // Short segment labels; AMOLED is "pure black" for OLED screens.
                 // "+AMOLED" follows the system light/dark switch exactly like
                 // System does, but swaps in AMOLED's true-black surfaces for its
@@ -10830,7 +10855,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Weather
-            SettingsCard("Weather") {
+            SettingsCard("Weather", Icons.Filled.WbSunny) {
                 var weatherQuery by remember { mutableStateOf("") }
                 val locationPermission = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
@@ -11805,8 +11830,11 @@ private fun SettingsSearchResults(
     add("Left-unlocked alerts", "notification unlocked lock left open") {
         ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
     }
-    add("Live charging notification", "notification charging live progress ongoing bar ev") {
-        ToggleRow("Live charging notification", notif.charging) { vm.setNotifyCharging(it) }
+    add("Search on the car screen", "search bubble car screen cover home garage ask command") {
+        ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
+    }
+    add("Live charging updates", "notification charging live progress ongoing bar ev limit") {
+        ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
     }
 
     // --- Per-car ---
@@ -12385,24 +12413,58 @@ private fun AddTilePill(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SettingsCard(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun SettingsCard(title: String, icon: ImageVector? = null, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(PebbleCornerExpanded)
+    val outline = LocalAppearance.current.pebbleOutline
+    Card(
+        Modifier
+            .fillMaxWidth()
+            // The same shadow and optional rim every pebble in the app gets.
+            // Settings was the one screen whose cards were bare Material
+            // Cards -- flat, cornered differently from everything else, with
+            // no depth at all -- so the screen read as belonging to a
+            // different app than the garage it opens from.
+            .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
+            .then(
+                if (outline) {
+                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
+                } else Modifier,
+            ),
+        shape = shape,
+    ) {
         Column(
             Modifier
                 .padding(16.dp)
                 .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
         ) {
-            // Role.Heading lets TalkBack's "headings" navigation control jump
-            // section-to-section across Settings' ~15 SettingsCards instead of
-            // linearly swiping through every row of every card to get anywhere
-            // -- there was no heading structure anywhere in the phone app.
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.semantics { heading() },
-            )
-            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // An icon per section, matching how every pebble names itself.
+                // Fifteen identically-styled text headings in one long scroll
+                // are hard to navigate by eye -- you read each one to find the
+                // one you want. A glyph is recognisable at a glance and at
+                // speed, which is the entire job of a heading in a list this
+                // long.
+                if (icon != null) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                }
+                // Role.Heading lets TalkBack's "headings" navigation control jump
+                // section-to-section across Settings' ~15 SettingsCards instead of
+                // linearly swiping through every row of every card to get anywhere
+                // -- there was no heading structure anywhere in the phone app.
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
+            Spacer(Modifier.height(10.dp))
             content()
         }
     }

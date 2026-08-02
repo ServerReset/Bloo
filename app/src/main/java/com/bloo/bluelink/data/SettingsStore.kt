@@ -151,6 +151,7 @@ class SettingsStore(private val context: Context) {
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
+        val SHOW_SEARCH = stringPreferencesKey("show_search")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
         val AURORA = stringPreferencesKey("aurora_background")
         val AURORA_MOTION = stringPreferencesKey("aurora_motion")
@@ -215,6 +216,11 @@ class SettingsStore(private val context: Context) {
          *  but pebbles are the majority of on-screen surface area, and a rim on
          *  every single one read as busier than most people want as the default. */
         val pebbleOutline: Boolean = false,
+        /** Show the search bubble on the car screen and the flip cover. On by
+         *  default: search answers questions about the car and runs commands,
+         *  so the screen showing the car is where it earns its place. Settings
+         *  always has it regardless -- that is how you find a setting. */
+        val showSearch: Boolean = true,
         /** When on, this device installs downloaded updates silently via Shizuku
          *  (local ADB) instead of the tap-through system installer. Off by default;
          *  device-local capability (Shizuku may not be present on other devices), so
@@ -276,6 +282,7 @@ class SettingsStore(private val context: Context) {
             watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
             watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
+            showSearch = prefs[Keys.SHOW_SEARCH]?.toBooleanStrictOrNull() ?: true,
             seamlessInstallShizuku = prefs[Keys.SEAMLESS_INSTALL_SHIZUKU]?.toBooleanStrictOrNull() ?: false,
         )
     }
@@ -296,6 +303,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setPebbleOutline(value: Boolean) {
         editTracked { it[Keys.PEBBLE_OUTLINE] = value.toString() }
+    }
+
+    suspend fun setShowSearch(value: Boolean) {
+        editTracked { it[Keys.SHOW_SEARCH] = value.toString() }
     }
 
     suspend fun setSeamlessInstallShizuku(value: Boolean) {

@@ -2913,6 +2913,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // (theme-derived vs. a fixed custom one); setAuroraCustomColor supplies
     // that fixed color (or null to fall back to theme-derived).
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
+    fun setShowSearch(value: Boolean) = viewModelScope.launch { settingsStore.setShowSearch(value) }
 
     /** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore).
      *  Turning it ON prompts for the Shizuku permission immediately — that request is
