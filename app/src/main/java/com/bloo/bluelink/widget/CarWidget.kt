@@ -1139,7 +1139,6 @@ class CarWidget : GlanceAppWidget() {
         Spacer(GlanceModifier.height(8.dp))
     }
 
-    @Composable
     /** The map at a fixed height, for the tiers that place it among
      *  fixed-height siblings. [room] is what the caller has actually got
      *  left for it -- the height used to be [Scale.mapHeight] unconditionally,
