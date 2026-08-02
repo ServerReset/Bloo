@@ -199,6 +199,14 @@ private fun ConfigScreen(
             // --- Status ring (both modes) ---
             ToggleLine("Show charge gauge", showRing) { showRing = it }
             Spacer(Modifier.height(8.dp))
+            // SIMPLE, not advanced. Where the car IS is one of the two things
+            // a car widget is for, and this was buried in advanced mode -- so
+            // for anyone who had never switched modes, the widget simply had
+            // no location, with no indication one was available. It appears on
+            // any tile with room to draw it (MEDIUM and up) and no-ops when
+            // the car has no coordinates.
+            ToggleLine("Show the car's location", showMap) { showMap = it }
+            Spacer(Modifier.height(8.dp))
             // Both modes -- a small widget with no photo is just as common a
             // choice as a large advanced one, and this is purely visual, not a
             // knob that changes what data the widget reads. No-ops gracefully
@@ -247,8 +255,6 @@ private fun ConfigScreen(
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
-                ToggleLine("Show location map (large sizes)", showMap) { showMap = it }
                 Spacer(Modifier.height(8.dp))
                 // Both only appear where a layout has room for them anyway;
                 // turning them off buys that space back for the ring and stats.

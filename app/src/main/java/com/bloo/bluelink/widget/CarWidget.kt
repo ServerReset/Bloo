@@ -728,7 +728,16 @@ class CarWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.height(6.dp))
                     InfoStack(car, render, max = rows, availableWidth = w)
                 }
-                Spacer(GlanceModifier.defaultWeight())
+                // Same trade as MEDIUM_TALL: the slack above the buttons is
+                // either a map or a spacer, and a map is worth more. Gated on
+                // there being enough of it to be a map rather than a sliver --
+                // this tier is short by definition, so most sizes here will
+                // keep the spacer.
+                if (render.mapBitmap != null && room - barH >= 56.dp) {
+                    MapFill(render)
+                } else {
+                    Spacer(GlanceModifier.defaultWeight())
+                }
                 ActionButtons(car, render, max = 4, availableWidth = w)
             }
             return
@@ -759,17 +768,26 @@ class CarWidget : GlanceAppWidget() {
             Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp) -
                 Scale.infoBlockHeight(size, rows, render.theme.textScale),
         )
+        // Whatever is left after the header, ring, stats and buttons goes to
+        // the map when the user has one enabled and the car has coordinates.
+        // MEDIUM is the smallest tier that shows one at all now: it used to
+        // start at LARGE, so a 2x2 spent its entire remainder on two weighted
+        // spacers -- dead space by construction. A weighted map takes exactly
+        // the same room and puts the car's location in it, and collapses to
+        // nothing when there's no bitmap, which is when the spacers are the
+        // right answer again.
+        val hasMap = render.mapBitmap != null
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             // Weighted spacers ABOVE and below centre what's left, rather
             // than one trailing spacer shoving it all to the top edge.
-            Spacer(GlanceModifier.defaultWeight())
+            if (!hasMap) Spacer(GlanceModifier.defaultWeight())
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.height(8.dp))
             }
             InfoStack(car, render, max = rows)
-            Spacer(GlanceModifier.defaultWeight())
+            if (hasMap) MapFill(render) else Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 4)
         }
     }
