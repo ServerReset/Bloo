@@ -1826,17 +1826,20 @@ class CarWidget : GlanceAppWidget() {
                 Row(modifier = GlanceModifier.width(width).height(height)) {
                     Spacer(GlanceModifier.width(x))
                     Box(
+                        // theme.background, not surface -- WidgetTheme has no
+                        // `surface`; the widget's own backdrop is what the dot
+                        // has to sit against here.
                         modifier = GlanceModifier.size(dot)
                             .cornerRadius(dot / 2)
-                            .background(theme.surface),
+                            .background(theme.background),
                     ) {
                         Box(
                             modifier = GlanceModifier.size(dot - 6.dp)
                                 .cornerRadius((dot - 6.dp) / 2)
-                                // Legible on either side of the split: the
-                                // pack's colour once the charge has passed it,
-                                // the bar's own background while it hasn't.
-                                .background(if (l <= frac) theme.surface else fillColor),
+                                // Legible on either side of the split: dark on
+                                // the green once the charge has passed it,
+                                // green on the grey track while it hasn't.
+                                .background(if (l <= frac) theme.background else fillColor),
                         ) {}
                     }
                 }
