@@ -11609,6 +11609,40 @@ private fun BoxScope.SearchOverlay(
     compact: Boolean = false,
 ) {
     val panelShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
+    val open = focused || query.isNotEmpty()
+    // Two ways out, because on the garage and the cover this floats over the
+    // whole screen and the explicit Close button is a small target on a phone
+    // and a tiny one on a cover.
+    //
+    // Back first: without it, the system back gesture with search open did
+    // whatever the HOST screen's back does -- leaving the garage, backing out
+    // of Settings -- which is never what "I'm done searching" means. It clears
+    // the query as well as the focus, so back always lands on the same state
+    // whether you had typed anything or not.
+    BackHandler(enabled = open) { onQueryChange(""); onFocusChange(false) }
+    // Then tap-outside. A scrim, not just a click target: with the panel open
+    // the content behind is context, not something to interact with, and a
+    // faint dim says which of the two layers is live. It sits BELOW the panel
+    // in this Box, so it never eats the panel's own taps.
+    AnimatedVisibility(
+        visible = open,
+        enter = fadeIn(tween(180)),
+        exit = fadeOut(tween(140)),
+        modifier = Modifier.matchParentSize(),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+                .clickable(
+                    // No ripple/indication: this is a dismiss surface, and a
+                    // ripple blooming across the whole screen reads as the
+                    // background itself being a button.
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { onQueryChange(""); onFocusChange(false) },
+        )
+    }
     Column(
         Modifier
             .align(Alignment.BottomCenter)
