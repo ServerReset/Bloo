@@ -8,6 +8,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAlerts
+import com.bloo.bluelink.data.ChargingLive
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
@@ -66,7 +67,13 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         val prefs = settings.notificationPrefs()
-        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked) return Result.success()
+        // `charging` belongs in this gate too: it is driven by the same poll,
+        // so leaving it out meant someone who turned every alert off but kept
+        // the live charging bar got no poll at all, and therefore a bar that
+        // never updated or cleared.
+        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked && !prefs.charging) {
+            return Result.success()
+        }
 
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue
