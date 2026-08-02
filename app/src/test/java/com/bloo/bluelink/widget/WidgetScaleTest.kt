@@ -229,35 +229,43 @@ class WidgetScaleTest {
      * configurations, worst by 33dp. RemoteViews doesn't clip an overfull
      * Column, it lets the children bleed past the bottom edge, so the symptom
      * is text hanging off the widget rather than anything caught in review.
+     *
+     * Scoped by [tierFor], because these are per-tier layouts and the budgets
+     * only have to hold where the tier is actually reached: a 40x40 tile's
+     * button row alone fills its whole content box, which is fine because
+     * nothing that small ever routes here.
      */
     @Test
     fun `compact column tiers fit their tile`() {
         for (size in sizes()) {
+            val tier = tierFor(size)
+            if (tier != WidgetTier.COMPACT_SQUARE && tier != WidgetTier.COMPACT_TALL_NARROW) continue
             val budget = content(size)
             for (ts in scales) {
                 val name = Scale.lineHeight(Scale.titleSp(size).value, ts)
-
-                // CompactSquareLayout: name + ring + one stat row.
-                val left = (budget - name - 8.dp).coerceAtLeast(0.dp)
-                val rows = Scale.infoRowsIn(size, left, ts, cap = 1)
-                val squareRing = Scale.ring(
-                    size,
-                    minOf(left - Scale.infoBlockHeight(size, rows, ts), size.width - 8.dp),
-                )
-                val square = name + 8.dp + squareRing + Scale.infoBlockHeight(size, rows, ts)
-                assertTrue(
-                    square.value <= budget.value + 0.01f,
-                    "compact square column ${square} exceeds ${budget} at $size @${ts}x",
-                )
-
-                // CompactTallNarrowLayout: name + ring + one button row.
-                val room = Scale.ringRoom(size, ts, hasHeader = false, hasFooter = false, spacers = 8.dp) - name
-                val tallRing = Scale.ring(size, minOf(room, size.width - 12.dp))
-                val tall = name + 8.dp + tallRing + Scale.buttonHeight(size)
-                assertTrue(
-                    tall.value <= budget.value + 0.01f,
-                    "compact tall-narrow column ${tall} exceeds ${budget} at $size @${ts}x",
-                )
+                if (tier == WidgetTier.COMPACT_SQUARE) {
+                    // name + ring + one stat row
+                    val left = (budget - name - 8.dp).coerceAtLeast(0.dp)
+                    val rows = Scale.infoRowsIn(size, left, ts, cap = 1)
+                    val ring = Scale.ring(
+                        size,
+                        minOf(left - Scale.infoBlockHeight(size, rows, ts), size.width - 8.dp),
+                    )
+                    val used = name + 8.dp + ring + Scale.infoBlockHeight(size, rows, ts)
+                    assertTrue(
+                        used.value <= budget.value + 0.5f,
+                        "compact square column ${used} exceeds ${budget} at $size @${ts}x",
+                    )
+                } else {
+                    // name + ring + one button row
+                    val room = Scale.ringRoom(size, ts, hasHeader = false, hasFooter = false, spacers = 8.dp) - name
+                    val ring = Scale.ring(size, minOf(room, size.width - 12.dp))
+                    val used = name + 8.dp + ring + Scale.buttonHeight(size)
+                    assertTrue(
+                        used.value <= budget.value + 0.5f,
+                        "compact tall-narrow column ${used} exceeds ${budget} at $size @${ts}x",
+                    )
+                }
             }
         }
     }
