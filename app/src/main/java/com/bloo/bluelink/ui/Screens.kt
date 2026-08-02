@@ -2663,6 +2663,11 @@ private class BlooSnackbarVisuals(
 private const val WRAP_MULTIPLIER = 1000
 /** Max per-page scale shrink at full off-screen offset (floor 0.94). */
 private const val PAGER_SHRINK = 0.06f
+/** How far a page lags the swipe, as a fraction of its width, at full offset.
+ *  Small on purpose: the pages are opaque and edge-to-edge, so anything much
+ *  larger opens a visible band of background between the outgoing and incoming
+ *  car instead of reading as depth. */
+private const val PAGER_PARALLAX = 0.07f
 
 /**
  * Wraps a [PagerState] whose page space is a big virtual range, exposing the
@@ -2709,7 +2714,8 @@ private fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPa
  * of the page content. NOT applied to the vertical tile pager, which stays flat
  * by design.
  *
- * Scale only — the matching alpha fade this used to apply was removed for a real
+ * Scale and translation only — no alpha. The matching fade this used to apply
+ * was removed for a real
  * frame-rate reason, not a taste one. A graphicsLayer with alpha < 1 over content
  * that overlaps (a full car page: cards, their drop shadows, the aurora behind
  * them) makes Compose's default compositing strategy allocate a FULL-SCREEN
@@ -2723,9 +2729,20 @@ private fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPa
  * wash under every card mid-swipe. Not worth it for a 0.2 fade.)
  */
 private fun Modifier.pagerDepth(pager: PagerState, page: Int): Modifier = graphicsLayer {
-    val off = ((page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
+    val raw = (page - pager.currentPage).toFloat() + pager.currentPageOffsetFraction
+    val off = abs(raw).coerceIn(0f, 1f)
     scaleX = 1f - off * PAGER_SHRINK
     scaleY = 1f - off * PAGER_SHRINK
+    // Parallax: each page drifts BACK against the swipe, so it travels a little
+    // slower than the finger and reads as sitting behind the viewport rather
+    // than sliding rigidly with it. This is what the removed alpha fade was
+    // reaching for -- separation between the outgoing and incoming car -- but
+    // translation is a RenderNode property, so unlike alpha it needs no
+    // offscreen buffer and costs nothing per frame. Deliberately NOT eased:
+    // this pager already had a spring between the drag and the transform once,
+    // and it read as the transform lagging the finger for the whole gesture.
+    // The raw offset drives it directly, same as the scale.
+    translationX = -raw.coerceIn(-1f, 1f) * size.width * PAGER_PARALLAX
 }
 
 /** Screen height (dp) below which the phone gets the compact cover-screen
@@ -3117,15 +3134,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // per-page transform at all, just a plain flat scroll.
                         val start = realBlock(page) * perPage
                         val end = minOf(start + perPage, count)
-                        // Whether this page is the one the pager has settled on. NOT used
-                        // to gate pebble rendering any more (every page renders its full
-                        // column — see the pager comment above); it exists ONLY to gate the
-                        // hoisted name-pill callback below, so a beyondViewportPageCount=1
-                        // pre-composed neighbour can't clobber the visible car's pill state.
-                        // `page == pager.settledPage` is a DISCRETE snapshot read — recomposes
-                        // this page only on settle, never per drag frame. The multi-car grid
-                        // (perPage != 1) shows every car at once, so it's always "settled".
-                        val settled = perPage != 1 || page == pager.settledPage
+                        // The "is this the settled page" test used to live here, as
+                        // `page == pager.settledPage`. Discrete, yes -- but it still
+                        // subscribed this page's composition to settledPage, so every
+                        // in-composition page (three, with beyondViewportPageCount=1)
+                        // recomposed its ENTIRE pebble column the moment a swipe
+                        // settled. That landed on the same frames as the settle
+                        // animation's tail and as selectIndex's own state emission,
+                        // which recomposes those same three pages again: two full
+                        // rebuilds of three car pages, back to back, exactly at the
+                        // end of the gesture. That is the switch-pages hitch.
+                        //
+                        // It gates one callback, so it moved INTO that callback --
+                        // read at invoke time, off the composition path entirely.
                         // No blur, no rotationZ tilt -- see the expanded pager above.
                         Row(
                             Modifier.fillMaxSize().pagerDepth(pager, page),
@@ -3149,9 +3170,16 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // neighbor (fresh scroll → nameHidden=false)
                                             // would clobber carNameVisible/scrollToTopFn
                                             // and wrongly hide the current car's pill.
-                                            onNameHiddenChanged = if (perPage == 1 && settled) { hidden, scrollFn ->
-                                                carNameVisible = hidden
-                                                scrollToTopFn = scrollFn
+                                            onNameHiddenChanged = if (perPage == 1) { hidden, scrollFn ->
+                                                // Settled test at CALLBACK time, not
+                                                // composition time -- see above. The
+                                                // multi-car grid shows every car at
+                                                // once, so it is always "settled" and
+                                                // never reaches this branch.
+                                                if (page == pager.settledPage) {
+                                                    carNameVisible = hidden
+                                                    scrollToTopFn = scrollFn
+                                                }
                                             } else null,
                                             // Only hide the per-car pull indicator in the
                                             // multi-car grid (perPage > 1) -- a prior fix

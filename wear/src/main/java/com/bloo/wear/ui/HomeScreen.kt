@@ -265,23 +265,42 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                 beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
-                // Smooth fade + subtle squeeze as pages leave/enter.
-                val pageOff by remember(page) {
-                    derivedStateOf {
-                        ((page - carPager.currentPage).toFloat() +
-                            carPager.currentPageOffsetFraction).let { abs(it).coerceIn(0f, 1f) }
-                    }
-                }
                 val car = ui.cars[page]
                 // active = only the settled page claims rotary focus / input.
                 val active = page == carPager.settledPage && !carPager.isScrollInProgress
                 val carRoles = ui.settings?.carColors?.get(car.vin)
                 val body: @Composable () -> Unit = {
                     Box(
+                        // Two fixes in this one block, both cost per swipe frame.
+                        //
+                        // ONE: the offset is read HERE, inside graphicsLayer -- a
+                        // draw-phase lambda that re-runs on state change without
+                        // recomposing anything. It used to be a `by
+                        // remember { derivedStateOf { ... } }` read in this page's
+                        // composition scope, and currentPageOffsetFraction changes
+                        // every frame of a swipe, so the whole page recomposed every
+                        // frame: CarColumn, the ScalingLazyColumn it hosts, every
+                        // visible tile. That is the page-switch stutter.
+                        //
+                        // TWO: no alpha. A graphicsLayer with alpha < 1 over
+                        // overlapping content forces Compose to allocate a
+                        // full-screen offscreen buffer and composite through it
+                        // every frame -- two of them mid-swipe, on a watch GPU,
+                        // to tint a page 28% darker in transit. The phone's own
+                        // pager removed its fade for exactly this reason (see
+                        // pagerDepth in Screens.kt); the watch never got the memo.
+                        // Scale and translation are RenderNode properties and need
+                        // no buffer at all, so the depth read is now carried by a
+                        // slightly stronger squeeze plus parallax instead.
                         Modifier.fillMaxSize().graphicsLayer {
-                            alpha  = 1f - pageOff * 0.28f
-                            scaleX = 1f - pageOff * 0.03f
-                            scaleY = 1f - pageOff * 0.03f
+                            val raw = (page - carPager.currentPage).toFloat() +
+                                carPager.currentPageOffsetFraction
+                            val off = abs(raw).coerceIn(0f, 1f)
+                            scaleX = 1f - off * 0.06f
+                            scaleY = 1f - off * 0.06f
+                            // Drifts back against the swipe, so the outgoing page
+                            // reads as falling behind rather than sliding rigidly.
+                            translationX = -raw.coerceIn(-1f, 1f) * size.width * 0.08f
                         }
                     ) {
                         CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)

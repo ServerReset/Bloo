@@ -1191,6 +1191,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun selectIndex(index: Int) {
         val v = _state.value.vehicles.getOrNull(index) ?: return
+        // A no-op selection must not emit. UiState is threaded into every
+        // pebble and is unstable, so one emission recomposes every car page
+        // currently in composition -- and this is called from a snapshotFlow on
+        // the pager's settledPage, which re-fires whenever the pager re-settles
+        // on the car it was already showing (a wrap snap, an external select
+        // that matched, a settle that never left the page). Paying three full
+        // car-page rebuilds to set currentIndex to the value it already holds
+        // is the worst kind of hitch: invisible work at exactly the moment the
+        // user is watching the gesture finish.
+        if (_state.value.currentIndex == index) {
+            ensureStatus(v)
+            return
+        }
         _state.update { it.copy(currentIndex = index) }
         viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
         ensureStatus(v)
