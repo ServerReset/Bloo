@@ -302,6 +302,16 @@ class CarWidget : GlanceAppWidget() {
         /** Kept proportional to the button that contains it, so a button
          *  shrunk by the cap above doesn't end up with an icon wider than
          *  itself. */
+        /** Smallest button width worth laying out, scaled by tile size. Small
+         *  tiles get a much lower floor so every configured control still fits
+         *  across rather than some being dropped -- see ActionButtons. */
+        fun minButtonWidth(size: DpSize): Dp = lerp(progress(size), 20f, 44f).dp
+
+        /** Gap between buttons, tightened on small tiles for the same reason:
+         *  spacing is the cheapest thing to give up when the choice is between
+         *  a gap and showing one more control. */
+        fun buttonGap(size: DpSize): Dp = lerp(progress(size), 3f, 8f).dp
+
         fun buttonIcon(size: DpSize): Dp =
             minOf(lerp(progress(size), 16f, 26f).dp, buttonHeight(size) * 0.62f)
 
@@ -545,9 +555,13 @@ class CarWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.width(8.dp))
             // A banner is nearly all width, so the buttons get a real share
             // of it rather than the thin sliver a normal compact row leaves.
+            // The real slice, not a fraction-of-tile guess: this Row splits
+            // whatever is left after the ring between the text column and the
+            // buttons, so that is exactly what the capacity maths should see.
             ActionButtons(
                 car, render, max = 4,
-                modifier = GlanceModifier.defaultWeight(), availableWidth = size.width * 0.34f,
+                modifier = GlanceModifier.defaultWeight(),
+                availableWidth = ((size.width - ringEdge - 16.dp) / 2).coerceAtLeast(24.dp),
             )
         }
     }
@@ -1505,8 +1519,14 @@ class CarWidget : GlanceAppWidget() {
         // fits rather than drawn past the edge. Showing three of four buttons
         // is a real cost, but it's an honest one -- the alternative was
         // drawing four and letting the launcher clip two of them.
-        val gap = 6.dp
-        val minButtonWidth = 40.dp
+        // DENSITY over dropping controls. Both of these scale with the tile
+        // rather than being flat, because a small widget's job is to show all
+        // its buttons, not a tidy subset: at a flat 40dp minimum a 300x78
+        // banner fit three of four actions and silently lost one. A 20dp
+        // button on a tile that size is small, but it's a deliberate trade --
+        // and still a real target, whereas a missing button can't be pressed.
+        val gap = Scale.buttonGap(size)
+        val minButtonWidth = Scale.minButtonWidth(size)
         val rowCapacity = ((availableWidth + gap) / (minButtonWidth + gap)).toInt()
         val colCapacity = ((availableHeight + gap) / (Scale.buttonHeight(size) + gap)).toInt()
         val stack = when {
@@ -1518,17 +1538,28 @@ class CarWidget : GlanceAppWidget() {
             else -> colCapacity > rowCapacity
         }
         val actions = all.take((if (stack) colCapacity else rowCapacity).coerceAtLeast(1))
+        // Centred both ways. When a layout hands ActionButtons the whole tile
+        // -- the controls-priority tiers, where the buttons ARE the widget --
+        // the block belongs in the middle of it, not against the top-left.
         if (stack) {
-            Column(modifier = modifier) {
+            Column(
+                modifier = modifier,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 actions.forEachIndexed { i, action ->
-                    if (i > 0) Spacer(GlanceModifier.height(6.dp))
+                    if (i > 0) Spacer(GlanceModifier.height(gap))
                     ActionButton(action, car, render, modifier = GlanceModifier.fillMaxWidth())
                 }
             }
         } else {
-            Row(modifier = modifier) {
+            Row(
+                modifier = modifier,
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 actions.forEachIndexed { i, action ->
-                    if (i > 0) Spacer(GlanceModifier.width(6.dp))
+                    if (i > 0) Spacer(GlanceModifier.width(gap))
                     ActionButton(action, car, render, modifier = GlanceModifier.defaultWeight())
                 }
             }
