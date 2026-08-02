@@ -226,7 +226,7 @@ object WearComms {
     suspend fun requestSync(context: Context, vin: String, refresh: Boolean): Boolean =
         withContext(Dispatchers.IO) {
             val node = phoneNodeId(context)
-            val command = WearCommand(vin = vin, action = if (refresh) WearAction.REFRESH else "")
+            val command = WearCommand(vin = vin, action = if (refresh) WearAction.REFRESH else WearAction.RESYNC)
             val sent = node != null &&
                 sendMessage(context, node, WearSync.PATH_SYNC_REQUEST, WearSync.encodeCommand(command).toByteArray())
             // Standalone fallback whenever the phone didn't receive it — matched

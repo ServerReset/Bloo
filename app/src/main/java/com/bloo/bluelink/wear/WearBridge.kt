@@ -23,6 +23,7 @@ import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -53,6 +54,39 @@ object WearBridge {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** Attempts per Data Layer write, and the first backoff between them
+     *  (doubling each retry: 400ms, then 800ms). */
+    private const val PUBLISH_ATTEMPTS = 3
+    private const val PUBLISH_RETRY_MS = 400L
+
+    /**
+     * Writes one Data Layer item, retrying a couple of times before giving up,
+     * and SAYING SO when it does.
+     *
+     * Every publish here used to be its own `runCatching { Tasks.await(
+     * putDataItem(...), 10s) }`: one attempt, and a failure vanished without a
+     * trace. That is the wrong shape twice over. A putDataItem writes to the
+     * LOCAL store and the system delivers it to nodes when they're reachable,
+     * so a failure is not "the watch is asleep" -- it is the local write or the
+     * Play Services connection failing, which is exactly the kind of transient
+     * thing a retry fixes. And when it doesn't, a watch quietly showing stale
+     * data with nothing in the log is the worst possible outcome to debug.
+     */
+    private suspend fun putItem(context: Context, path: String, build: PutDataMapRequest.() -> Unit) {
+        val request = PutDataMapRequest.create(path).apply(build).asPutDataRequest().setUrgent()
+        var lastError: Throwable? = null
+        repeat(PUBLISH_ATTEMPTS) { attempt ->
+            val outcome = runCatching {
+                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
+            }
+            if (outcome.isSuccess) return
+            lastError = outcome.exceptionOrNull()
+            if (attempt < PUBLISH_ATTEMPTS - 1) delay(PUBLISH_RETRY_MS shl attempt)
+        }
+        com.bloo.bluelink.data.AppLog.log("⚠ Watch publish failed ($path): ${lastError?.message}")
+    }
+
+
     /** Fire-and-forget publish of the current snapshots (and auth) to a paired watch. */
     fun publish(context: Context) {
         val app = context.applicationContext
@@ -70,13 +104,12 @@ object WearBridge {
             selectedVin = data.selectedVin,
             producedAt = System.currentTimeMillis(),
         )
-        val request = PutDataMapRequest.create(WearSync.PATH_STATE).apply {
+        putItem(context, WearSync.PATH_STATE) {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeState(payload))
             // A changing timestamp guarantees the item is treated as updated even
             // when the car states are byte-identical to the previous push.
             dataMap.putLong(WearSync.KEY_TIMESTAMP, payload.producedAt)
-        }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
+        }
     }
 
     /** Fan the latest snapshot out to every downstream surface (home widget, QS
@@ -87,6 +120,46 @@ object WearBridge {
         runCatching {
             val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
             publishSettingsNow(context, appearance)
+        }
+        runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
+    }
+
+    /**
+     * Republish EVERY channel the watch reads, from disk.
+     *
+     * This is what "Sync from phone" on the watch should always have meant. It
+     * used to land on [refreshAllSurfaces], which republishes state and
+     * settings only -- so a watch that had lost anything else (reinstalled,
+     * cleared, or whose Data Layer store was pruned) could not recover its
+     * sign-in or its climate presets from the watch at all. The user's only
+     * route back was to open the phone app and hope the ViewModel collector
+     * that owns that channel happened to re-emit.
+     *
+     * Every source here is read from disk rather than from the app's memory,
+     * which is the point: this has to work from WearPhoneService with the
+     * phone app closed, which is exactly when a watch is most likely to be
+     * asking. Presets are per-VIN on disk, so they're rebuilt for the cars in
+     * the current snapshot.
+     *
+     * Not included: weather / car photos / AI summaries ([WearExtras]). Those
+     * live in the running ViewModel, not on disk, and republishing an empty
+     * set would actively CLEAR what the watch already has -- worse than
+     * leaving it alone. They re-publish on their own the next time the phone
+     * app is opened.
+     */
+    suspend fun publishAll(context: Context) {
+        com.bloo.bluelink.data.AppLog.log("Watch: full resync requested")
+        runCatching { publishNow(context) }
+        runCatching { publishAuth(context) }
+        runCatching {
+            val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
+            publishSettingsNow(context, appearance)
+        }
+        runCatching {
+            val store = com.bloo.bluelink.data.SettingsStore(context)
+            val vins = SnapshotStore(context).current().vehicles.map { it.vin }
+            val presets = vins.associateWith { store.climatePresets(it) }.filterValues { it.isNotEmpty() }
+            publishPresetsNow(context, presets)
         }
         runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }
@@ -110,10 +183,9 @@ object WearBridge {
                 )
             }
         }
-        val request = PutDataMapRequest.create(WearSync.PATH_AUTH).apply {
+        putItem(context, WearSync.PATH_AUTH) {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeAuth(WearAuthBundle(sessions)))
-        }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
+        }
     }
 
     /**
@@ -218,10 +290,9 @@ object WearBridge {
             settingsMode = store.settingsMode(),
             syncDeviceSummary = syncDeviceSummary,
         )
-        val request = PutDataMapRequest.create(WearSync.PATH_SETTINGS).apply {
+        putItem(context, WearSync.PATH_SETTINGS) {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeSettings(payload))
-        }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
+        }
     }
 
     private fun rolesOf(s: androidx.compose.material3.ColorScheme) = WearColorRoles(
@@ -260,15 +331,17 @@ object WearBridge {
     fun publishPresets(context: Context, byVin: Map<String, List<com.bloo.bluelink.data.ClimatePreset>>) {
         val app = context.applicationContext
         scope.launch {
-            runCatching {
-                val request = PutDataMapRequest.create(WearSync.PATH_PRESETS).apply {
-                    dataMap.putString(
-                        WearSync.KEY_PAYLOAD,
-                        WearSync.encodePresets(com.bloo.bluelink.data.WearPresets(byVin)),
-                    )
-                }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(app).putDataItem(request), 10, TimeUnit.SECONDS)
-            }
+            publishPresetsNow(app, byVin)
+        }
+    }
+
+    /** Suspending [publishPresets], so a full resync can await it. */
+    suspend fun publishPresetsNow(context: Context, byVin: Map<String, List<com.bloo.bluelink.data.ClimatePreset>>) {
+        putItem(context, WearSync.PATH_PRESETS) {
+            dataMap.putString(
+                WearSync.KEY_PAYLOAD,
+                WearSync.encodePresets(com.bloo.bluelink.data.WearPresets(byVin)),
+            )
         }
     }
 
@@ -277,12 +350,9 @@ object WearBridge {
     fun publishClimate(context: Context, state: com.bloo.bluelink.data.WearClimateState) {
         val app = context.applicationContext
         scope.launch {
-            runCatching {
-                val request = PutDataMapRequest.create(WearSync.PATH_CLIMATE).apply {
-                    dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeClimate(state))
-                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
-                }.asPutDataRequest().setUrgent()
-                Tasks.await(Wearable.getDataClient(app).putDataItem(request), 10, TimeUnit.SECONDS)
+            putItem(app, WearSync.PATH_CLIMATE) {
+                dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeClimate(state))
+                dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
             }
         }
     }
@@ -301,10 +371,9 @@ object WearBridge {
      * patches would race last-writer-wins.
      */
     suspend fun publishExtrasNow(context: Context, extras: com.bloo.bluelink.data.WearExtras) {
-        val request = PutDataMapRequest.create(WearSync.PATH_EXTRAS).apply {
+        putItem(context, WearSync.PATH_EXTRAS) {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeExtras(extras))
-        }.asPutDataRequest().setUrgent()
-        runCatching { Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS) }
+        }
     }
 
     /** Trigger a Drive sync: download settings from Drive, import them, and re-publish

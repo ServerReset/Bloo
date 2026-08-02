@@ -21,6 +21,7 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,42 @@ class WearPhoneService : WearableListenerService() {
         // request) could otherwise both read the same stale snapshot, and
         // whichever publish lands second would silently drop the other's update.
         private val extrasMutex = kotlinx.coroutines.sync.Mutex()
+
+        /** Attempts per result message, and the first backoff between them
+         *  (doubling: 300ms, then 600ms). See sendResult. */
+        private const val RESULT_ATTEMPTS = 3
+        private const val RESULT_RETRY_MS = 300L
+    }
+
+    /**
+     * Sends one result message back to the watch, retrying briefly.
+     *
+     * These are the replies the watch is actively waiting on -- a command's real
+     * outcome, a Drive sync's, an AI summary's -- and unlike a DataItem a message
+     * is not queued: it needs the node reachable at that instant or it is simply
+     * gone. The watch then sits on a spinner until its own timeout and tells the
+     * user nothing useful. A command takes seconds to run, which is plenty of
+     * time for a watch screen to blank or a Bluetooth link to blip, so the one
+     * moment we most need to reach it is the one most likely to fail. Two extra
+     * attempts a few hundred ms apart cover that without pretending a genuinely
+     * absent watch will answer.
+     */
+    private suspend fun sendResult(nodeId: String, path: String, payload: String) {
+        var lastError: Throwable? = null
+        repeat(RESULT_ATTEMPTS) { attempt ->
+            val outcome = runCatching {
+                Tasks.await(
+                    Wearable.getMessageClient(applicationContext).sendMessage(
+                        nodeId, path, payload.toByteArray(),
+                    ),
+                    10, TimeUnit.SECONDS,
+                )
+            }
+            if (outcome.isSuccess) return
+            lastError = outcome.exceptionOrNull()
+            if (attempt < RESULT_ATTEMPTS - 1) delay(RESULT_RETRY_MS shl attempt)
+        }
+        AppLog.log("⚠ Watch reply undelivered ($path): ${lastError?.message}")
     }
 
     /**
@@ -115,16 +152,7 @@ class WearPhoneService : WearableListenerService() {
                     val result = WearCommandRunner.execute(applicationContext, command)
                     if (result.ok) AppLog.log("Phone relay: ${command.action} → ok")
                     else AppLog.log("⚠ Phone relay: ${command.action} → ${result.message}")
-                    runCatching {
-                        Tasks.await(
-                            Wearable.getMessageClient(applicationContext).sendMessage(
-                                event.sourceNodeId,
-                                WearSync.PATH_COMMAND_RESULT,
-                                WearSync.encodeResult(result).toByteArray(),
-                            ),
-                            10, TimeUnit.SECONDS,
-                        )
-                    }
+                    sendResult(event.sourceNodeId, WearSync.PATH_COMMAND_RESULT, WearSync.encodeResult(result))
                     val ctx = applicationContext
                     WearBridge.refreshAllSurfaces(ctx)
                 }
@@ -139,6 +167,7 @@ class WearPhoneService : WearableListenerService() {
                             WearCommandRunner.refresh(ctx, command.vin)
                             WearBridge.refreshAllSurfaces(ctx)
                         }
+                        WearAction.RESYNC -> WearBridge.publishAll(ctx)
                         WearAction.DRIVE_SYNC -> {
                             val outcome = WearBridge.driveSync(ctx)
                             val result = if (outcome == null) {
@@ -150,18 +179,13 @@ class WearPhoneService : WearableListenerService() {
                                 // that must not read as "Drive sync failed" on the watch.
                                 WearSyncResult(ok = outcome.error == null, message = outcome.error)
                             }
-                            runCatching {
-                                Tasks.await(
-                                    Wearable.getMessageClient(ctx).sendMessage(
-                                        event.sourceNodeId,
-                                        WearSync.PATH_SYNC_RESULT,
-                                        WearSync.encodeSyncResult(result).toByteArray(),
-                                    ),
-                                    10, TimeUnit.SECONDS,
-                                )
-                            }
+                            sendResult(event.sourceNodeId, WearSync.PATH_SYNC_RESULT, WearSync.encodeSyncResult(result))
                         }
-                        else -> WearBridge.refreshAllSurfaces(ctx)
+                        // Anything else on this path is the watch's "Sync from
+                        // phone" button, which means everything -- not just the
+                        // state + settings refreshAllSurfaces covers. See
+                        // WearBridge.publishAll.
+                        else -> WearBridge.publishAll(ctx)
                     }
                 }
             }

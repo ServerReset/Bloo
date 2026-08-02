@@ -270,6 +270,18 @@ object WearAction {
     /** Re-fetch a single car's status (or all, when [WearCommand.vin] is blank). */
     const val REFRESH = "refresh"
 
+    /** "Send me everything again": the watch asking the phone to republish every
+     *  channel it reads -- state, auth, settings, presets. The watch's own
+     *  "Sync from phone" button. Distinct from [REFRESH], which goes out to the
+     *  CAR for fresh status; this one never touches the network, it just
+     *  re-mirrors what the phone already has.
+     *
+     *  Sent on PATH_SYNC_REQUEST. It used to be the empty string, which worked
+     *  only because the phone's `when` fell through to its else branch -- a
+     *  contract that says nothing to a reader and breaks the moment anyone adds
+     *  a case. The phone still honours "" for watches on older builds. */
+    const val RESYNC = "resync"
+
     /** Request the phone to generate and push an AI summary for a car. */
     const val AI_SUMMARY = "ai_summary"
 
