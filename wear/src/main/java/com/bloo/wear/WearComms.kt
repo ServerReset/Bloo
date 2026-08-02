@@ -18,6 +18,7 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
@@ -62,6 +63,11 @@ object WearComms {
 
     /** How long any single Data Layer [Tasks.await] is allowed to block. */
     private const val TIMEOUT_SECONDS = 10L
+
+    /** Attempts per Data Layer write, and the first backoff between them
+     *  (doubling: 400ms, then 800ms). Mirrors the phone's WearBridge.putItem. */
+    private const val PUBLISH_ATTEMPTS = 3
+    private const val PUBLISH_RETRY_MS = 400L
 
     /** Outcome of [send]/[relayCommand] so callers can distinguish how a command
      *  was actually dispatched:
@@ -365,15 +371,31 @@ object WearComms {
      *  Runs on [Dispatchers.IO]. */
     private suspend fun publishDataItem(context: Context, path: String, payload: String): Boolean =
         withContext(Dispatchers.IO) {
-            runCatching {
-                val request = PutDataMapRequest.create(path).apply {
-                    dataMap.putString(WearSync.KEY_PAYLOAD, payload)
-                    dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
-                }.asPutDataRequest().setUrgent()
-                Tasks.await(
-                    Wearable.getDataClient(context).putDataItem(request),
-                    TIMEOUT_SECONDS, TimeUnit.SECONDS,
-                )
-            }.isSuccess
+            val request = PutDataMapRequest.create(path).apply {
+                dataMap.putString(WearSync.KEY_PAYLOAD, payload)
+                dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
+            }.asPutDataRequest().setUrgent()
+            // Retried, and logged when it still fails -- the phone half does the
+            // same (see WearBridge.putItem). This one carries the watch's own
+            // edits: a reordered pebble stack, a preset the user just saved, a
+            // climate draft. Every one of those has an optimistic override on
+            // the watch waiting for the phone to echo it back, so a write that
+            // silently didn't happen leaves the watch showing a change the phone
+            // will never confirm -- and the caller can't tell, because a single
+            // swallowed failure returns exactly what a real one does.
+            var lastError: Throwable? = null
+            repeat(PUBLISH_ATTEMPTS) { attempt ->
+                val outcome = runCatching {
+                    Tasks.await(
+                        Wearable.getDataClient(context).putDataItem(request),
+                        TIMEOUT_SECONDS, TimeUnit.SECONDS,
+                    )
+                }
+                if (outcome.isSuccess) return@withContext true
+                lastError = outcome.exceptionOrNull()
+                if (attempt < PUBLISH_ATTEMPTS - 1) delay(PUBLISH_RETRY_MS shl attempt)
+            }
+            AppLog.log("⚠ Watch publish failed ($path): ${lastError?.message}")
+            false
         }
 }
