@@ -29,8 +29,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -618,7 +616,7 @@ private fun CarColumn(
 
         // The system clock (Wear's TimeText) draws itself over whatever this
         // app renders at the very top-center -- same gap as the phone's
-        // status bar, matched with the same soft blurred scrim treatment.
+        // status bar, matched with the same soft fade treatment.
         TopClockScrim()
     }
 }
@@ -664,17 +662,28 @@ private fun BoxScope.HoldRefreshRing(progress: () -> Float) {
     }
 }
 
-/** Soft blurred scrim behind the system clock (TimeText), same treatment as
- *  the phone's status bar scrim -- see StatusBarScrim in the phone app. */
+/** Soft fade behind the system clock (TimeText), same treatment as the phone's
+ *  status bar scrim -- see StatusBarScrim in the phone app.
+ *
+ *  NO Modifier.blur here, deliberately. It used to have one, and it was a
+ *  full-width RenderEffect: an offscreen render target plus a blur shader,
+ *  re-run every frame this overlay is drawn -- which is every frame of every
+ *  scroll, since it sits above the tile list. What it was blurring is
+ *  [topFadeScrim], a plain vertical gradient, whose blurred output is
+ *  indistinguishable from its unblurred one: a gradient is already soft, and
+ *  the only edges a blur could round off are the screen edges. So it cost a
+ *  per-frame GPU pass on a watch to produce the same pixels.
+ *
+ *  The fade is now taller (34 -> 40dp) to give back the extra softness the
+ *  blur's spread was contributing at the bottom edge. */
 @Composable
 private fun BoxScope.TopClockScrim() {
     Box(
         Modifier
             .align(Alignment.TopCenter)
             .fillMaxWidth()
-            .height(34.dp)
-            .topFadeScrim(MaterialTheme.colorScheme.background.copy(alpha = 0.5f), 34.dp)
-            .blur(14.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+            .height(40.dp)
+            .topFadeScrim(MaterialTheme.colorScheme.background.copy(alpha = 0.5f), 40.dp),
     )
 }
 
