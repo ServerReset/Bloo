@@ -1091,8 +1091,12 @@ class CarWidget : GlanceAppWidget() {
             provider = ImageProvider(bmp),
             contentDescription = "Car location",
             contentScale = ContentScale.Crop,
+            // Tappable, like every other part of this widget. A map of where
+            // the car is invites a tap more than anything else on the tile,
+            // and it was the one large region that did nothing.
             modifier = GlanceModifier.fillMaxWidth().defaultWeight()
-                .cornerRadius(innerCorner(render.config)),
+                .cornerRadius(innerCorner(render.config))
+                .clickable(openAction(LocalContext.current)),
         )
         Spacer(GlanceModifier.height(8.dp))
     }
@@ -1107,7 +1111,8 @@ class CarWidget : GlanceAppWidget() {
             contentScale = ContentScale.Crop,
             modifier = GlanceModifier.fillMaxWidth()
                 .height(Scale.mapHeight(LocalSize.current))
-                .cornerRadius(innerCorner(render.config)),
+                .cornerRadius(innerCorner(render.config))
+                .clickable(openAction(LocalContext.current)),
         )
     }
 
