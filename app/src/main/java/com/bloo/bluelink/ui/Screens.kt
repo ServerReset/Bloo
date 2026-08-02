@@ -4486,7 +4486,14 @@ private fun HeroHeader(
             if (!(cover && imageUrl.isNullOrBlank())) {
                 // On the flip cover the hero is a full-screen centred tile with room to
                 // spare, so show the car photo bigger there; phone/normal keeps `height`.
-                HeroVisual(v, imageUrl, if (cover) 210.dp else height)
+                // Concentric with the card: an inner radius should be the
+                // outer one MINUS the inset between them, otherwise two
+                // near-equal radii at different insets read as a mistake --
+                // which is what a 20dp card around an 18dp photo inset by
+                // 16dp was doing. Floored so it stays visibly rounded.
+                val outer = if (cover) corner else PebbleCornerExpanded
+                val innerCorner = (outer - 16.dp).coerceAtLeast(8.dp)
+                HeroVisual(v, imageUrl, if (cover) 210.dp else height, innerCorner)
                 Spacer(Modifier.height(12.dp))
             }
             ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
@@ -4739,14 +4746,14 @@ private fun rememberPhotoModel(url: String): Any =
 
 /** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
-private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
+private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp, corner: Dp = 18.dp) {
     if (imageUrl.isNullOrBlank()) {
         val scheme = MaterialTheme.colorScheme
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(height)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(corner))
                 .background(carTonalBrush(scheme)),
         )
     } else {
@@ -4762,7 +4769,7 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(height)
-                .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(18.dp))),
+                .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner))),
         )
     }
 }
@@ -4892,13 +4899,30 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             )
             if (targetPct != null) {
                 val x = maxWidth * (targetPct.coerceIn(0, 100) / 100f)
+                // A NOTCH, not a dot. The old 12dp circle sat ON TOP of the
+                // fill, so as charge approached the limit two round shapes
+                // overlapped and read as a smudge rather than a marker --
+                // exactly where the marker matters most. This cuts a slim
+                // gap through the bar and puts a bright tick inside it, so
+                // it stays legible against the filled and unfilled sides
+                // alike and never collides with the fill's rounded cap.
                 Box(
                     Modifier
-                        .offset(x = x - 6.dp)
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f))
-                        .align(Alignment.CenterStart),
+                        .offset(x = x - 3.dp)
+                        .width(6.dp)
+                        .fillMaxHeight()
+                        .align(Alignment.CenterStart)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surface),
+                )
+                Box(
+                    Modifier
+                        .offset(x = x - 1.dp)
+                        .width(2.dp)
+                        .height(10.dp)
+                        .align(Alignment.CenterStart)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)),
                 )
             }
         }
@@ -7188,13 +7212,23 @@ private fun PebbleShell(
                             spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             expandFrom = Alignment.Top,
                         ),
+                        // Collapse springs like the expand does. It used to be a
+                        // flat 160ms tween against a spring open, which is what
+                        // made closing feel like a snap next to a smooth open.
                         exit = fadeOut(tween(130)) + shrinkVertically(
-                            tween(160),
+                            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             shrinkTowards = Alignment.Top,
                         ),
                     ) {
                         Column(
-                            Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                            // AnimatedVisibility only animates the whole block
+                            // appearing and disappearing; content that changes
+                            // WHILE expanded (an install step arriving, notes
+                            // loading) still jumped the card's height. This
+                            // animates those in place too.
+                            Modifier.animateContentSize(
+                                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                            ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             content = content,
                         )

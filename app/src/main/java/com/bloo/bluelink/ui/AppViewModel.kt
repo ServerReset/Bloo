@@ -1323,7 +1323,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = "error") }
                     // else: silent -- next refresh tries again
                     is com.bloo.bluelink.update.UpdateCheckResult.UpToDate -> {
-                        _state.update { it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false) }
+                        _state.update {
+                            // Never yank the tile out from under work already in
+                            // flight. UpToDate is returned for a genuine "nothing
+                            // newer" AND for a snooze short-circuit, so a refresh
+                            // during a download or install used to clear
+                            // updateAvailable and take the whole tile with it --
+                            // the progress UI vanished mid-install with no way
+                            // back to it, which is what a refresh looked like it
+                            // was doing. A ready-to-install APK is kept for the
+                            // same reason: the user still has an Install button
+                            // to press.
+                            if (it.updateDownloading || it.updateInstalling || it.updateApkReady) it
+                            else it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false)
+                        }
                         if (surfaceResult) _state.update { it.copy(message = "You're on the latest build.", messageType = "info") }
                     }
                 }
