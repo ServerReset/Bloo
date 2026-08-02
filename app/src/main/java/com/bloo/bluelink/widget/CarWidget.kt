@@ -236,6 +236,15 @@ class CarWidget : GlanceAppWidget() {
         fun infoBlockHeight(size: DpSize, rows: Int, textScale: Float): Dp =
             (lineHeight(valueSp(size).value, textScale).value * rows + 2f * rows).dp
 
+        /** The inverse of [infoBlockHeight]: how many rows actually fit in
+         *  [room]. [infoCap] estimates the room from a fraction of the tile;
+         *  this is for the layouts that have already worked out exactly what
+         *  they have left. */
+        fun infoRowsIn(size: DpSize, room: Dp, textScale: Float, cap: Int): Int {
+            val row = lineHeight(valueSp(size).value, textScale).value + 2f
+            return (room.value / row).toInt().coerceIn(0, cap)
+        }
+
         /** Approximate rendered height of one text line at [sp]. RemoteViews
          *  gives no measurement callback, so every vertical estimate in this
          *  file goes through this one factor rather than each inventing its
@@ -919,7 +928,36 @@ class CarWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.height(6.dp))
             ActionButtons(car, render, max = 4, availableWidth = w)
         }
-        if (render.config.showRing && car.percent != null) {
+        val showsRing = render.config.showRing && car.percent != null
+        // A wide MEDIUM whose height has been spent on the header and buttons
+        // leaves a ring that is a token rather than a gauge. Rather than draw
+        // it small beside the column, spend the axis this tile has: the bar
+        // runs the full width under the header, and the column gets the whole
+        // tile instead of what was left beside a circle. Same call BANNER and
+        // COMPACT_WIDE make, one band up.
+        if (showsRing && ringEdge < Scale.RING_WORTH_IT) {
+            val w = size.width - Scale.contentPadding(size) * 2
+            val barH = Scale.barHeight(size)
+            // What the header, buttons and this layout's own spacers left,
+            // minus the bar itself, is what the info rows get -- so the rows
+            // are a consequence of the room rather than a guess that the bar
+            // then has to fit around.
+            val room = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 18.dp)
+            val rows = Scale.infoRowsIn(size, (room - barH).coerceAtLeast(0.dp), render.theme.textScale, 2)
+            Column(modifier = GlanceModifier.fillMaxSize()) {
+                HeaderRow(car, render, availableWidth = w)
+                Spacer(GlanceModifier.height(6.dp))
+                ChargeBar(car, render.theme, width = w, height = barH)
+                if (rows > 0) {
+                    Spacer(GlanceModifier.height(6.dp))
+                    InfoStack(car, render, max = rows, availableWidth = w)
+                }
+                Spacer(GlanceModifier.defaultWeight())
+                ActionButtons(car, render, max = 4, availableWidth = w)
+            }
+            return
+        }
+        if (showsRing) {
             RingWithContent(
                 modifier = GlanceModifier.fillMaxSize(),
                 minRowWidth = 170.dp,
@@ -1929,7 +1967,14 @@ class CarWidget : GlanceAppWidget() {
             )
             Spacer(GlanceModifier.height(4.dp))
             ChargeBar(car, theme, width = width, height = barH)
-            val sub = primaryValue(car, render).takeIf { showSub }
+            // NOT primaryValue: that leads with the percentage, which is the
+            // 44sp number directly above it. The sub-line's job here is to say
+            // what primaryValue's version of this layout couldn't fit -- whose
+            // car it is, and how far it goes.
+            val sub = listOfNotNull(
+                car.name.takeIf { it.isNotBlank() },
+                car.rangeMi?.let { formatDistance(it.toDouble(), render.metric) },
+            ).joinToString(" · ").takeIf { showSub && it.isNotBlank() }
             if (sub != null) {
                 Spacer(GlanceModifier.height(4.dp))
                 FitText(sub, subtitleStyle(theme), maxWidth = width)
