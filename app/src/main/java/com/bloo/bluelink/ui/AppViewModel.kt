@@ -1470,6 +1470,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
         // Refresh Quick Settings tiles too.
         com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
+        refreshChargingBar(vehicles)
+    }
+
+    /**
+     * Brings the live charging notification in step with what the app itself
+     * just fetched.
+     *
+     * Until now only the background workers ever wrote that bar, so the one
+     * moment the user has the freshest possible data -- standing in the app,
+     * having just pulled to refresh -- was the one moment the bar in the
+     * shade didn't move. It reads the same fields the workers do, and
+     * update() cancels on its own when a car isn't charging, so this also
+     * clears the bar the instant a refresh shows charging has finished.
+     *
+     * It also starts the 5-minute poll chain when the app is first to see
+     * charging begin, rather than waiting up to 30 minutes for AlertWorker
+     * to notice and hand off.
+     */
+    private suspend fun refreshChargingBar(vehicles: List<Vehicle>) {
+        runCatching {
+            val enabled = settingsStore.notificationPrefs().charging
+            val statuses = _state.value.statuses
+            var anyCharging = false
+            vehicles.forEach { v ->
+                val ev = statuses[v.vin]?.evStatus
+                if (ev?.batteryCharge == true) anyCharging = true
+                ChargingLive.update(
+                    context = getApplication(),
+                    vin = v.vin,
+                    carName = v.name,
+                    charging = ev?.batteryCharge == true,
+                    percent = ev?.batteryStatus,
+                    minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
+                    pluggedInLabel = ev?.pluggedInLabel,
+                    enabled = enabled,
+                    chargeLimit = ev?.targetForCurrentPlug(),
+                )
+            }
+            if (enabled && anyCharging) {
+                com.bloo.bluelink.work.ChargingPollWorker.kick(getApplication())
+            }
+        }
     }
 
 
