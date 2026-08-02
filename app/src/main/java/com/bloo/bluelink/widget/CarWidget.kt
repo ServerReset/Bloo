@@ -657,10 +657,12 @@ class CarWidget : GlanceAppWidget() {
         // button rows can leave less than the ring's continuous target size
         // at MEDIUM's own minimum height (150dp).
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp))
+        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp)
+        val ringEdge = Scale.ring(size, ringRoom)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
+            ChargeBarFallback(car, render, ringEdge, ringRoom)
             if (render.config.showRing && car.percent != null) {
                 // RingWithContent auto-stacks vertically instead of
                 // squeezing ring+info into a cramped row if the tile's
@@ -783,10 +785,12 @@ class CarWidget : GlanceAppWidget() {
         // proportioned at every size in between instead of only being safe at
         // the tier's two ends.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp))
+        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)
+        val ringEdge = Scale.ring(size, ringRoom)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
+            ChargeBarFallback(car, render, ringEdge, ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 220.dp,
@@ -817,10 +821,12 @@ class CarWidget : GlanceAppWidget() {
         // ring/square version of the Wide/Square/Tall split MEDIUM and XL
         // already have, giving LARGE its own third shape too.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp))
+        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)
+        val ringEdge = Scale.ring(size, ringRoom)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
+            ChargeBarFallback(car, render, ringEdge, ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 220.dp,
@@ -873,10 +879,12 @@ class CarWidget : GlanceAppWidget() {
     private fun XlWideLayout(car: VehicleSnapshot, render: Render) {
         // Same reasoning as LargeWideLayout's own ringEdge clamp.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp))
+        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp)
+        val ringEdge = Scale.ring(size, ringRoom)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
+            ChargeBarFallback(car, render, ringEdge, ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 260.dp,
@@ -945,10 +953,12 @@ class CarWidget : GlanceAppWidget() {
         // width map, distinct from XlWideLayout's value-under-ring emphasis
         // and XlTallLayout's fully stacked column.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 24.dp))
+        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 24.dp)
+        val ringEdge = Scale.ring(size, ringRoom)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(12.dp))
+            ChargeBarFallback(car, render, ringEdge, ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth(),
                 minRowWidth = 260.dp,
@@ -1802,6 +1812,35 @@ class CarWidget : GlanceAppWidget() {
                 )
             }
         }
+    }
+
+    /**
+     * The gauge for the big tiers when [Scale.ring] yielded nothing.
+     *
+     * [Scale.ringRoom] measures what the header, buttons and footer left, and
+     * [Scale.ring] turns too little of it into NO ring rather than a smudge.
+     * That is the right call for a ring -- but it meant a LARGE or XL tile at
+     * the 1.4x text size, where those three can eat the whole height, showed
+     * no charge indicator whatsoever. A 240x170 tile lands there today.
+     *
+     * A bar needs 10-14dp where a ring needs 24 at the very least, so it fits
+     * where the ring couldn't. It is drawn out of the room the ring was
+     * already budgeted and then didn't use, and only when that room genuinely
+     * holds it, so it cannot squeeze the weighted content row beneath it.
+     * Nothing changes on tiles where a ring does fit.
+     */
+    @Composable
+    private fun ChargeBarFallback(car: VehicleSnapshot, render: Render, ringEdge: Dp, room: Dp) {
+        if (!render.config.showRing || car.percent == null || ringEdge > 0.dp) return
+        val size = LocalSize.current
+        val barH = Scale.barHeight(size)
+        if (room < barH + 8.dp) return
+        ChargeBar(
+            car, render.theme,
+            width = size.width - Scale.contentPadding(size) * 2,
+            height = barH,
+        )
+        Spacer(GlanceModifier.height(8.dp))
     }
 
     /** One rounded stretch of [ChargeBar]. */
