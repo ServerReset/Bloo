@@ -3395,6 +3395,122 @@ private fun CoverHero(
 }
 
 /**
+ * THE cover-screen tile template. Every page on the flip cover is one of
+ * these, so they all read as the same object with different contents rather
+ * than as a stack of unrelated cards.
+ *
+ * Three bands, always in this order:
+ *  1. TITLE -- a small icon and the tile's name at title size, with an
+ *     optional state [subtitle] under it. Cover pebbles used to have no title
+ *     at all: the header row is dropped in fill-height mode (it cost ~76dp
+ *     before a single line of content) and all that was left was a 30dp icon
+ *     badge floating over the body's top-start corner. That badge said which
+ *     tile you were on only if you already knew the iconography, and it
+ *     overlapped the content it sat on.
+ *  2. BODY -- weighted, so it takes everything left over, and centred within
+ *     that. Scrolls when it's taller than the space, using the caller's
+ *     [scrollState] so the cover pager can tell "scroll the tile" from "page
+ *     to the next tile".
+ *  3. ACTIONS -- an optional bottom bar pinned outside the scroll area, so a
+ *     tile's controls are reachable no matter where its body is scrolled to.
+ *
+ * The bands are the standard; what goes in them is per-tile. That is the
+ * whole point: the home tile's four-button bar and a pebble's single pinned
+ * action are the same band in the same place at the same height, so paging
+ * between them moves the content and nothing else.
+ */
+@Composable
+private fun CoverTile(
+    title: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    subtitleColor: Color? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    scrollState: ScrollState? = null,
+    actions: (@Composable RowScope.() -> Unit)? = null,
+    body: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(PebbleCornerExpanded)
+    val outline = LocalAppearance.current.pebbleOutline
+    Card(
+        modifier = modifier
+            .fillMaxSize()
+            .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
+            .then(
+                if (outline) {
+                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
+                } else Modifier,
+            ),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColorFor(containerColor),
+        ),
+    ) {
+        Column(Modifier.fillMaxSize().padding(horizontal = CoverContentInset)) {
+            Spacer(Modifier.height(14.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                com.bloo.uicommon.FittedText(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = subtitleColor ?: LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // BoxWithConstraints captures the real available height, undisturbed
+            // by verticalScroll one level in, so heightIn(min = ...) can force
+            // the scrolling Column to at least that tall -- which is what makes
+            // a short body centre in the band instead of collapsing to its top
+            // with dead space underneath, while a tall one still scrolls.
+            val scroll = scrollState ?: rememberScrollState()
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val minHeight = maxHeight
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .fadingEdges(scroll)
+                        .verticalScroll(scroll)
+                        .heightIn(min = minHeight)
+                        .padding(vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                    content = body,
+                )
+            }
+            if (actions != null) {
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    content = actions,
+                )
+            } else {
+                Spacer(Modifier.height(14.dp))
+            }
+        }
+    }
+}
+
+/**
  * The flip cover's home tile: the car, its charge, and its controls on ONE
  * screen.
  *
@@ -3416,62 +3532,29 @@ private fun CoverHero(
 private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val metric = LocalAppearance.current.unitSystem == "metric"
-    val shape = RoundedCornerShape(PebbleCornerExpanded)
-    Surface(
-        modifier = Modifier.fillMaxSize().dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp),
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+    // The car's own name is this tile's title -- the template's title band is
+    // where every other page says what it is, so the home page says which car.
+    // Lock leads the subtitle because it is the reason to look at a shut
+    // phone; driving/charging state is left to ChargeFuelBar's own status
+    // line, which is directly below it and already says both.
+    val bits = listOfNotNull(
+        status?.doorLock?.let { if (it) "Locked" else "Unlocked" },
+        if (status?.airCtrlOn == true) "Climate on" else null,
+    )
+    CoverTile(
+        title = v.name,
+        icon = Icons.Filled.DirectionsCar,
+        subtitle = bits.joinToString(" · ").ifBlank { null },
+        subtitleColor = if (status?.doorLock == false) MaterialTheme.colorScheme.error else null,
+        actions = { CoverActionBar(v, state, vm) },
     ) {
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
-            com.bloo.uicommon.FittedText(
-                text = v.name,
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            // The one-line state summary the header subtitle used to carry.
-            // Lock leads because it is the reason to look at a shut phone.
-            // Not driving/charging state: ChargeFuelBar's own status line
-            // below already carries those, and saying "Parked" twice on a
-            // screen this size is the kind of thing that made it feel empty
-            // and repetitive at once.
-            val bits = listOfNotNull(
-                status?.doorLock?.let { if (it) "Locked" else "Unlocked" },
-                if (status?.airCtrlOn == true) "Climate on" else null,
-            )
-            if (bits.isNotEmpty()) {
-                Text(
-                    bits.joinToString(" · "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (status?.doorLock == false) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        LocalContentColor.current.copy(alpha = MutedContentAlpha)
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            // Weighted on BOTH sides, so the glance sits centred in whatever
-            // is left between the title and the controls. A single trailing
-            // spacer would just move the old void from the bottom of the tile
-            // to the middle of it; two share it out, and the layout holds its
-            // proportions across cover sizes rather than only looking right on
-            // the one it was tuned on.
-            Spacer(Modifier.weight(1f))
-            ChargeFuelBar(
-                status,
-                state.hasBattery(v),
-                state.hasFuel(v),
-                state.drivingLabel(v),
-                metric = metric,
-            )
-            Spacer(Modifier.weight(1f))
-            CoverActionBar(v, state, vm)
-        }
+        ChargeFuelBar(
+            status,
+            state.hasBattery(v),
+            state.hasFuel(v),
+            state.drivingLabel(v),
+            metric = metric,
+        )
     }
 }
 
@@ -3483,14 +3566,15 @@ private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
  * were reachable only by swiping to the matching page, and two of them (climate
  * and charge) not at all, because those pages open on a glance hero rather than
  * their header. A shut phone is the surface where "just lock it" matters most,
- * so they get a permanent, full-width, thumb-height row instead.
+ * so they get a permanent, full-width, thumb-height row instead -- the
+ * [CoverTile] actions band, which every cover page now has.
  *
  * Buttons are sized by weight rather than fixed width, so a car with no
  * horn/lights support or no battery gets three fat buttons rather than four
  * narrow ones with a hole where the fourth was.
  */
 @Composable
-private fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
+private fun RowScope.CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val ev = status?.evStatus
     val locked = status?.doorLock
@@ -3498,46 +3582,44 @@ private fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val plugged = ev?.isPluggedIn == true || charging
     val climateOn = status?.airCtrlOn == true
     val enabled = !state.loading
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    CoverActionButton(
+        icon = if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock,
+        label = if (locked == true) "Unlock" else "Lock",
+        // Attention, not confirmation: an unlocked car is the state worth
+        // colouring, matching StateControl's own highlightWhenOff.
+        attention = locked == false,
+        pending = state.isPending(v.vin, "doors"),
+        enabled = enabled,
+        onClick = { if (locked == true) vm.unlock(v) else vm.lock(v) },
+    )
+    CoverActionButton(
+        icon = Icons.Filled.Thermostat,
+        label = if (climateOn) "Stop" else "Climate",
+        active = climateOn,
+        pending = state.isPending(v.vin, "climate"),
+        enabled = enabled,
+        onClick = { vm.toggleClimate(v) },
+    )
+    if (state.hasBattery(v)) {
         CoverActionButton(
-            icon = if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock,
-            label = if (locked == true) "Unlock" else "Lock",
-            // Attention, not confirmation: an unlocked car is the state worth
-            // colouring, matching StateControl's own highlightWhenOff.
-            attention = locked == false,
-            pending = state.isPending(v.vin, "doors"),
-            enabled = enabled,
-            onClick = { if (locked == true) vm.unlock(v) else vm.lock(v) },
+            icon = Icons.Filled.Bolt,
+            label = if (charging) "Stop" else "Charge",
+            active = charging,
+            pending = state.isPending(v.vin, "charge"),
+            // The car can't start a charge it isn't plugged into, and the
+            // Charge pebble's own header button is gated the same way.
+            enabled = enabled && plugged,
+            onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
         )
+    }
+    if (v.supportsHornLights) {
         CoverActionButton(
-            icon = Icons.Filled.Thermostat,
-            label = if (climateOn) "Stop" else "Climate",
-            active = climateOn,
-            pending = state.isPending(v.vin, "climate"),
+            icon = Icons.Filled.Campaign,
+            label = "Horn",
+            pending = state.isPending(v.vin, "hornLights"),
             enabled = enabled,
-            onClick = { vm.toggleClimate(v) },
+            onClick = { vm.hornAndLights(v) },
         )
-        if (state.hasBattery(v)) {
-            CoverActionButton(
-                icon = Icons.Filled.Bolt,
-                label = if (charging) "Stop" else "Charge",
-                active = charging,
-                pending = state.isPending(v.vin, "charge"),
-                // The car can't start a charge it isn't plugged into, and the
-                // Charge pebble's own header button is gated the same way.
-                enabled = enabled && plugged,
-                onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
-            )
-        }
-        if (v.supportsHornLights) {
-            CoverActionButton(
-                icon = Icons.Filled.Campaign,
-                label = "Horn",
-                pending = state.isPending(v.vin, "hornLights"),
-                enabled = enabled,
-                onClick = { vm.hornAndLights(v) },
-            )
-        }
     }
 }
 
@@ -7273,6 +7355,40 @@ private fun PebbleShell(
         label = "pebbleCorner",
     )
     val fillHeight = LocalPebbleFillHeight.current
+    // On the cover screen a pebble IS a cover tile -- same template as the
+    // home tile and every other page (title band, centred body, actions
+    // band). It used to be this same Card with the header row dropped and a
+    // 30dp icon badge floating over the body's corner, which meant a pebble
+    // page looked like a different kind of object from the home page and
+    // named itself only to someone who already knew the iconography.
+    // headerAction becomes the actions band, so the pebble's one control
+    // lands in the same place, at the same size, as the home tile's four.
+    if (fillHeight && expanded) {
+        val act = headerAction?.takeIf { it.label.isNotEmpty() }
+        CoverTile(
+            title = title,
+            icon = icon,
+            subtitle = summary,
+            containerColor = containerColor,
+            scrollState = LocalCoverScrollState.current,
+            actions = if (act == null) {
+                null
+            } else {
+                {
+                    CoverActionButton(
+                        icon = act.icon,
+                        label = act.label,
+                        onClick = act.onClick,
+                        active = act.active,
+                        pending = act.pending,
+                        enabled = act.enabled,
+                    )
+                }
+            },
+            body = content,
+        )
+        return
+    }
     val pebbleShape = RoundedCornerShape(corner)
     // Off by default -- see Appearance.pebbleOutline's doc comment. Most
     // floating chrome always has a rim, but pebbles are the majority of
@@ -7316,192 +7432,112 @@ private fun PebbleShell(
             Column(
                 if (fillHeight) Modifier.fillMaxHeight() else Modifier,
             ) {
-                if (fillHeight) {
-                    // No header row on the cover screen -- the full-height icon
-                    // + title + chevron row this tier used to share with every
-                    // other pebble reserved a fixed ~76dp+padding before a
-                    // single line of actual content, a big bite out of an
-                    // already tiny screen, especially for a tile whose body
-                    // needs to scroll. A small floating icon badge over the
-                    // content's top-start corner (drawn in the Box below,
-                    // outside any dedicated row of its own) identifies the
-                    // tile instead -- the tile-scrubber dots on the right edge
-                    // already announce its name too (see VerticalPagerDots),
-                    // so this is a supplementary visual cue, not the only one.
-                    if (expanded) {
-                        val bodyScroll = LocalCoverScrollState.current ?: rememberScrollState()
-                        Box(Modifier.weight(1f).fillMaxWidth()) {
-                            // BoxWithConstraints captures the real available height
-                            // (undisturbed by verticalScroll, which is applied one
-                            // level in) so heightIn(min = ...) below can force the
-                            // scrolling Column to at least that tall. A short tile's
-                            // content then centers within that height via
-                            // spacedBy(..., CenterVertically) instead of collapsing
-                            // to the top with dead space underneath; a tall tile's
-                            // content still exceeds it and scrolls exactly as before.
-                            BoxWithConstraints(Modifier.fillMaxSize()) {
-                                val minHeight = maxHeight
-                                Column(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .fadingEdges(bodyScroll)
-                                        .verticalScroll(bodyScroll)
-                                        .heightIn(min = minHeight)
-                                        // Near-symmetric vertical padding so the
-                                        // spacedBy(CenterVertically) below actually
-                                        // optically centers a short tile's content. Top
-                                        // is slightly larger only to clear the top-start
-                                        // badge; the old 34/10 split pushed every short
-                                        // tile's content visibly below true center.
-                                        .padding(start = CoverContentInset, end = CoverContentInset, top = 22.dp, bottom = 16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-                                    content = content,
-                                )
-                            }
-                            Box(
-                                Modifier
-                                    .align(Alignment.TopStart)
-                                    .padding(8.dp)
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    // Higher-contrast so it reads as a clear tile
-                                    // identifier rather than a faint speck.
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                        // Restore the pebble's primary action on the cover screen. The
-                        // fillHeight branch drops the whole header row (above), which on
-                        // the phone is where headerAction lives (the else branch at the
-                        // bottom) -- so Charge Start/Stop, Location "Locate", and AI
-                        // "Summarize" were UNREACHABLE on the cover: the tile showed
-                        // info but its one control couldn't be tapped. Pin the action as
-                        // a full-width button BELOW the scrolling body (not inside it),
-                        // so it's always reachable regardless of scroll. Skip empty-label
-                        // actions (e.g. the Diagnostics warning icon) -- those were
-                        // expand-only toggles with no cover value; the tile is already
-                        // expanded here so there's nothing to toggle.
-                        headerAction?.takeIf { it.label.isNotEmpty() }?.let { act ->
-                            Spacer(Modifier.height(8.dp))
-                            MorphButton(
-                                onClick = act.onClick,
-                                // Balance the pinned action against the scroll body's
-                                // 16dp bottom inset (was a lopsided 4dp, bottom-heavy).
-                                modifier = Modifier.fillMaxWidth().padding(start = CoverContentInset, end = CoverContentInset, top = 4.dp, bottom = 12.dp),
-                                enabled = act.enabled && !act.pending,
-                                active = act.active,
-                                activeContainerColor = act.activeContainer ?: MaterialTheme.colorScheme.primary,
-                            ) {
-                                MorphButtonLabel(icon = act.icon, label = act.label, pending = act.pending, spinning = act.spinning)
-                            }
-                        }
-                    }
-                } else {
-                    // Header: tap anywhere to toggle, long-press to drag-reorder. The
-                    // action button and chevron handle their own clicks. Fixed min height
-                    // so every collapsed pebble lines up.
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .then(
-                                if (forceExpanded) Modifier
-                                else Modifier.clickable {
-                                    if (expanded) haptics?.tick() else haptics?.click()
-                                    onToggle()
-                                },
-                            )
-                            .then(dragHandle)
-                            .heightIn(min = PebbleHeaderHeight)
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            // Same heading fix as SettingsCard: with 8+ pebbles per
-                            // car and no heading structure, TalkBack users could
-                            // only reach a given section (Climate, Charge, ...) by
-                            // swiping through every row of every pebble above it.
-                            Text(
-                                title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                // Cap at one line: at a large display/font size the
-                                // header action button (SplitExpandButton, now width-
-                                // bounded below) used to squeeze this weighted Column
-                                // so a title like "Location"/"Weather"/"Diagnostics"
-                                // wrapped and visually collided with the button. One
-                                // line + ellipsis keeps the title on its own line.
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.semantics { heading() },
-                            )
-                            if (summary != null) {
-                                AnimatedContent(
-                                    targetState = summary,
-                                    transitionSpec = {
-                                        (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                                        (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
-                                    },
-                                    label = "pebbleSummary",
-                                ) { s ->
-                                    Text(
-                                        s,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                                        maxLines = 1,
-                                        // Ellipsize a long summary ("Set a location")
-                                        // instead of hard-clipping it to "Set a…".
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                        if (!forceExpanded) {
-                            if (headerAction != null) {
-                                SplitExpandButton(
-                                    action = headerAction,
-                                    expanded = expanded,
-                                    onToggle = onToggle,
-                                )
-                            } else {
-                                MorphExpandButton(
-                                    expanded = expanded,
-                                    onToggle = onToggle,
-                                )
-                            }
-                        }
-                    }
-                    // Normal pebbles: animate the body fading + sliding open/closed.
-                    AnimatedVisibility(
-                        visible = expanded,
-                        enter = fadeIn(tween(180)) + expandVertically(
-                            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                            expandFrom = Alignment.Top,
-                        ),
-                        // Collapse springs like the expand does. It used to be a
-                        // flat 160ms tween against a spring open, which is what
-                        // made closing feel like a snap next to a smooth open.
-                        exit = fadeOut(tween(130)) + shrinkVertically(
-                            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                            shrinkTowards = Alignment.Top,
-                        ),
-                    ) {
-                        Column(
-                            // AnimatedVisibility only animates the whole block
-                            // appearing and disappearing; content that changes
-                            // WHILE expanded (an install step arriving, notes
-                            // loading) still jumped the card's height. This
-                            // animates those in place too.
-                            Modifier.animateContentSize(
-                                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                            ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            content = content,
+                // Phone only. The cover screen never reaches here: PebbleShell
+                // returns above, through CoverTile, so a pebble on the cover is
+                // the same template as every other page there. What follows is
+                // the collapsible header + animated body card.
+                // Header: tap anywhere to toggle, long-press to drag-reorder. The
+                // action button and chevron handle their own clicks. Fixed min height
+                // so every collapsed pebble lines up.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (forceExpanded) Modifier
+                            else Modifier.clickable {
+                                if (expanded) haptics?.tick() else haptics?.click()
+                                onToggle()
+                            },
                         )
+                        .then(dragHandle)
+                        .heightIn(min = PebbleHeaderHeight)
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        // Same heading fix as SettingsCard: with 8+ pebbles per
+                        // car and no heading structure, TalkBack users could
+                        // only reach a given section (Climate, Charge, ...) by
+                        // swiping through every row of every pebble above it.
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            // Cap at one line: at a large display/font size the
+                            // header action button (SplitExpandButton, now width-
+                            // bounded below) used to squeeze this weighted Column
+                            // so a title like "Location"/"Weather"/"Diagnostics"
+                            // wrapped and visually collided with the button. One
+                            // line + ellipsis keeps the title on its own line.
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        if (summary != null) {
+                            AnimatedContent(
+                                targetState = summary,
+                                transitionSpec = {
+                                    (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                                    (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                                },
+                                label = "pebbleSummary",
+                            ) { s ->
+                                Text(
+                                    s,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                    maxLines = 1,
+                                    // Ellipsize a long summary ("Set a location")
+                                    // instead of hard-clipping it to "Set a…".
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                     }
+                    if (!forceExpanded) {
+                        if (headerAction != null) {
+                            SplitExpandButton(
+                                action = headerAction,
+                                expanded = expanded,
+                                onToggle = onToggle,
+                            )
+                        } else {
+                            MorphExpandButton(
+                                expanded = expanded,
+                                onToggle = onToggle,
+                            )
+                        }
+                    }
+                }
+                // Normal pebbles: animate the body fading + sliding open/closed.
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = fadeIn(tween(180)) + expandVertically(
+                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        expandFrom = Alignment.Top,
+                    ),
+                    // Collapse springs like the expand does. It used to be a
+                    // flat 160ms tween against a spring open, which is what
+                    // made closing feel like a snap next to a smooth open.
+                    exit = fadeOut(tween(130)) + shrinkVertically(
+                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        shrinkTowards = Alignment.Top,
+                    ),
+                ) {
+                    Column(
+                        // AnimatedVisibility only animates the whole block
+                        // appearing and disappearing; content that changes
+                        // WHILE expanded (an install step arriving, notes
+                        // loading) still jumped the card's height. This
+                        // animates those in place too.
+                        Modifier.animateContentSize(
+                            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        content = content,
+                    )
                 }
             }
         }
