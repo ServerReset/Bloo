@@ -2139,6 +2139,10 @@ class CarWidget : GlanceAppWidget() {
         WidgetInfoField.LOCK -> car.locked?.let { if (it) "Locked" else "Unlocked" }
         WidgetInfoField.CLIMATE -> car.climateOn?.let { if (it) "On" else "Off" }
         WidgetInfoField.MODEL -> car.model.takeIf { it.isNotBlank() }
+        // Null when the car isn't plugged in: the limit it would charge to is
+        // real, but "80%" beside a car sitting in a driveway reads as a
+        // current state rather than a setting.
+        WidgetInfoField.LIMIT -> car.chargeLimitPct?.let { "$it%" }
     }
 
     private fun serviceDueLabel(car: VehicleSnapshot, metric: Boolean): String? {

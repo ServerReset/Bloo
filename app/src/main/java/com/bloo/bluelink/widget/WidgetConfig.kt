@@ -184,7 +184,10 @@ enum class WidgetInfoField(val key: String, val label: String) {
     // wherever the user actually wants them.
     LOCK("lock", "Lock"),
     CLIMATE("climate", "Climate"),
-    MODEL("model", "Model");
+    MODEL("model", "Model"),
+    // Appended for the same reason as the three above: saved configs sort by
+    // ordinal, so a mid-enum insert would reshuffle an existing widget's rows.
+    LIMIT("limit", "Limit");
 
     companion object {
         val DEFAULTS = listOf(RANGE.key, UPDATED.key)
