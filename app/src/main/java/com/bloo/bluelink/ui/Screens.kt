@@ -11476,8 +11476,12 @@ private fun SearchLayer(
     // Where the user has dragged the bubble, in dp from the top-left. NaN =
     // never dragged, so it rests in its default corner. Saved, because having
     // to re-park it after every rotation would make dragging it pointless.
-    var dragX by rememberSaveable { mutableFloatStateOf(Float.NaN) }
-    var dragY by rememberSaveable { mutableFloatStateOf(Float.NaN) }
+    // mutableStateOf, not mutableFloatStateOf: rememberSaveable needs a Saver
+    // for whatever it is handed, and the boxed-Float one is the guaranteed
+    // path. This changes twice a gesture, not twice a frame -- the boxing is
+    // not worth a runtime "no Saver found" on some Compose version.
+    var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
+    var dragY by rememberSaveable { mutableStateOf(Float.NaN) }
 
     BackHandler(enabled = open) { query = ""; focused = false }
     // Drop any stale AI answer once the box is cleared, and forget the last
