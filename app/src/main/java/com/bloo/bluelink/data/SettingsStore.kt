@@ -344,6 +344,11 @@ class SettingsStore(private val context: Context) {
         val runningMinutes: Int = 10,
         val unlocked: Boolean = true,
         val unlockedMinutes: Int = 10,
+        /** The live charging progress notification (see ChargingLive). Unlike
+         *  the alerts above it is ongoing rather than one-shot, so it gets its
+         *  own switch -- someone who wants door alerts may well not want a
+         *  permanent bar in their shade while the car charges overnight. */
+        val charging: Boolean = true,
     )
 
     /** The single [NotificationPrefs] decode, shared by both the one-shot
@@ -358,6 +363,7 @@ class SettingsStore(private val context: Context) {
             runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
             unlocked = p[booleanPreferencesKey("notify_unlocked")] ?: true,
             unlockedMinutes = p[stringPreferencesKey("notify_unlocked_min")]?.toIntOrNull() ?: 10,
+            charging = p[booleanPreferencesKey("notify_charging")] ?: true,
         )
 
     /** One-shot read of [NotificationPrefs] (vs. the [notifications] Flow below,
@@ -395,6 +401,9 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setUnlockedMinutes(v: Int) =
         editTracked { it[stringPreferencesKey("notify_unlocked_min")] = v.toString() }.let {}
+
+    suspend fun setNotifyCharging(v: Boolean) =
+        editTracked { it[booleanPreferencesKey("notify_charging")] = v }.let {}
 
     // Transient alert bookkeeping (per car), used to fire each alert only once.
     // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a

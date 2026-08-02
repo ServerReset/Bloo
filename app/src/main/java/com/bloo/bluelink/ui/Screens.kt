@@ -9977,6 +9977,15 @@ private fun SettingsScreen(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
                 }
+                // Ongoing rather than one-shot, so it sits apart from the
+                // alert switches above it with its own explanation.
+                ToggleRow("Live charging notification", notif.charging) { vm.setNotifyCharging(it) }
+                Text(
+                    "Shows a progress bar while the car is charging, updating as it fills.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
                 ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
                 if (notif.unlocked) {
                     var unlockedMin by remember(notif.unlockedMinutes) { mutableStateOf(notif.unlockedMinutes.toString()) }
@@ -11240,6 +11249,9 @@ private fun SettingsSearchResults(
     }
     add("Left-unlocked alerts", "notification unlocked lock left open") {
         ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
+    }
+    add("Live charging notification", "notification charging live progress ongoing bar ev") {
+        ToggleRow("Live charging notification", notif.charging) { vm.setNotifyCharging(it) }
     }
 
     // --- Per-car ---

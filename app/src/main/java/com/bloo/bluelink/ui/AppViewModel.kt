@@ -9,6 +9,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.ChargingLive
 import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.formatPlaceName
 import com.bloo.bluelink.data.ClimatePreset
@@ -437,6 +438,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setNotifyRunning(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyRunning(v) }
     fun setRunningMinutes(m: Int) = viewModelScope.launch { settingsStore.setRunningMinutes(m) }
     fun setNotifyUnlocked(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyUnlocked(v) }
+
+    /** Turning the live charging bar off clears any already-posted one at
+     *  once, rather than leaving it pinned in the shade until the next poll
+     *  happens to notice the setting changed. */
+    fun setNotifyCharging(v: Boolean) = viewModelScope.launch {
+        settingsStore.setNotifyCharging(v)
+        if (!v) ChargingLive.cancelAll(getApplication(), _state.value.vehicles.map { it.vin })
+    }
     fun setUnlockedMinutes(m: Int) = viewModelScope.launch { settingsStore.setUnlockedMinutes(m) }
 
     /** Write the current live status/location maps to disk (survives restart). */

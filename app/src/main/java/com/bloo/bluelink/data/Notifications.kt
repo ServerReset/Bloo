@@ -310,3 +310,139 @@ object CarAlerts {
     private fun runningId(v: Vehicle) = ("run" + v.vin).hashCode()
     private fun unlockedId(v: Vehicle) = ("unlocked" + v.vin).hashCode()
 }
+
+/**
+ * The live, self-updating charging notification.
+ *
+ * Unlike [CarAlerts], which fires one-shot alerts when a condition first
+ * becomes true, this is an ONGOING notification that exists for exactly as
+ * long as the car is charging and rewrites itself in place as the percentage
+ * climbs -- a progress bar in the shade rather than a stream of alerts.
+ *
+ * It lives on its own low-importance channel so it never makes a sound or
+ * peeks: a notification that reposts on every poll would be intolerable on
+ * the default channel. IMPORTANCE_LOW also gets it treated as a progress
+ * chip by launchers/system UIs that surface ongoing progress notifications
+ * (One UI's Now Bar, Android's ongoing-activity area) rather than as another
+ * item in the list.
+ *
+ * NOTE on Android 16's "promoted ongoing" Live Updates: that needs
+ * Notification.ProgressStyle plus requestPromotedOngoing, which the
+ * NotificationCompat in this project's androidx.core (1.15.0) does not yet
+ * expose. Rather than bump a core dependency blind, this uses the ongoing +
+ * determinate-progress + CATEGORY_PROGRESS combination, which is what those
+ * surfaces already key off and which works on every supported API level.
+ */
+object ChargingLive {
+    private const val CHANNEL = "bloo_charging"
+    private const val ACCENT = 0xFF7B83EB.toInt()
+
+    /** One stable notification id per car, distinct from the alert ids so a
+     *  charging notification never overwrites a door/service alert. */
+    private fun idFor(vin: String) = ("charging" + vin).hashCode()
+
+    private fun ensureChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val mgr = context.getSystemService(NotificationManager::class.java)
+            if (mgr.getNotificationChannel(CHANNEL) == null) {
+                mgr.createNotificationChannel(
+                    NotificationChannel(CHANNEL, "Charging", NotificationManager.IMPORTANCE_LOW)
+                        .apply {
+                            description = "A live progress notification while your car is charging"
+                            setShowBadge(false)
+                        },
+                )
+            }
+        }
+    }
+
+    /**
+     * Posts, updates or clears the charging notification for one car.
+     *
+     * Safe and cheap to call on every poll: when the car isn't charging (or
+     * the feature is off, or permission is missing) it just cancels any
+     * notification already showing, so charging ending always tidies up
+     * rather than leaving a stale bar pinned in the shade.
+     *
+     * [percent] and [minutesToFull] are both optional because a car can
+     * report that it is charging before it reports either -- the notification
+     * degrades to an indeterminate bar rather than showing a confident 0%.
+     */
+    fun update(
+        context: Context,
+        vin: String,
+        carName: String,
+        charging: Boolean,
+        percent: Int?,
+        minutesToFull: Int?,
+        pluggedInLabel: String?,
+        enabled: Boolean,
+    ) {
+        val id = idFor(vin)
+        if (!enabled || !charging || !Notifications.hasPermission(context)) {
+            runCatching { NotificationManagerCompat.from(context).cancel(id) }
+            return
+        }
+        ensureChannel(context)
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val pi = launch?.let {
+            PendingIntent.getActivity(
+                context, id, it,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+        // "82% · 1h 20m left · Plugged in (AC)" -- built from whichever pieces
+        // the car actually reported, joined so a missing one leaves no stray
+        // separator behind.
+        val detail = listOfNotNull(
+            percent?.let { "$it%" },
+            minutesToFull?.takeIf { it > 0 }?.let { "${fmtMinutes(it)} left" },
+            pluggedInLabel?.takeIf { it.isNotBlank() && !it.startsWith("Not ") },
+        ).joinToString(" · ")
+
+        val builder = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_bloo)
+            .setColor(ACCENT)
+            .setContentTitle("$carName is charging")
+            .setContentText(detail.ifBlank { "Charging" })
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // Ongoing so it can't be swiped away while charging continues, and
+            // alert-once so rewriting it every poll stays silent.
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setProgress(100, percent ?: 0, percent == null)
+            .apply { pi?.let { setContentIntent(it) } }
+
+        // Stop-charging is offered inline, since the whole point of a live
+        // notification is acting without opening the app.
+        val stopIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_RUN
+            data = Uri.parse("bloo://charging/$vin/stop")
+            putExtra(AlertActionReceiver.EXTRA_VIN, vin)
+            // CHARGE_OFF, not TOGGLE_CHARGE: if the car finished or was
+            // unplugged between the poll that drew this notification and
+            // the tap, a toggle would START charging again.
+            putExtra(AlertActionReceiver.EXTRA_ACTION, WearAction.CHARGE_OFF)
+            putExtra(AlertActionReceiver.EXTRA_NOTIF_ID, id)
+            putExtra(AlertActionReceiver.EXTRA_LABEL, "Stop")
+        }
+        builder.addAction(
+            0, "Stop charging",
+            PendingIntent.getBroadcast(
+                context, id, stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            ),
+        )
+        runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
+    }
+
+    /** Clears every car's charging notification -- used when the feature is
+     *  switched off in settings, so an already-posted bar disappears at once
+     *  instead of lingering until the next poll. */
+    fun cancelAll(context: Context, vins: List<String>) {
+        val mgr = NotificationManagerCompat.from(context)
+        vins.forEach { vin -> runCatching { mgr.cancel(idFor(vin)) } }
+    }
+}

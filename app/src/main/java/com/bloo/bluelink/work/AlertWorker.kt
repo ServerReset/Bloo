@@ -85,6 +85,24 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
                     }
                 }
+                // The live charging bar is refreshed from the same poll, so it
+                // tracks the real percentage rather than being posted once and
+                // going stale. Called even when `status` is null or the car
+                // isn't charging: update() cancels in those cases, which is
+                // what clears the bar when charging finishes.
+                runCatching {
+                    val ev = status?.evStatus
+                    ChargingLive.update(
+                        context = applicationContext,
+                        vin = v.vin,
+                        carName = v.name,
+                        charging = ev?.batteryCharge == true,
+                        percent = ev?.batteryStatus,
+                        minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
+                        pluggedInLabel = ev?.pluggedInLabel,
+                        enabled = prefs.charging,
+                    )
+                }
             }
         }
         // The 30-min alert poll also constitutes a data refresh — fan out to the
