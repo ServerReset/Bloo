@@ -444,7 +444,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  happens to notice the setting changed. */
     fun setNotifyCharging(v: Boolean) = viewModelScope.launch {
         settingsStore.setNotifyCharging(v)
-        if (!v) ChargingLive.cancelAll(getApplication(), _state.value.vehicles.map { it.vin })
+        if (!v) {
+            ChargingLive.cancelAll(getApplication(), _state.value.vehicles.map { it.vin })
+            // Kill the 5-minute poll chain too, or it keeps waking up just to
+            // discover the feature is off and do nothing.
+            com.bloo.bluelink.work.ChargingPollWorker.cancel(getApplication())
+        }
     }
     fun setUnlockedMinutes(m: Int) = viewModelScope.launch { settingsStore.setUnlockedMinutes(m) }
 

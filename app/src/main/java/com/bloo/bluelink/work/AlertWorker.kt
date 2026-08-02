@@ -99,6 +99,12 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 // what clears the bar when charging finishes.
                 runCatching {
                     val ev = status?.evStatus
+                    // Hand off to the 5-minute chain the moment charging is
+                    // seen: this worker only ticks every 30 minutes, which is
+                    // far too slow for a progress bar to look live.
+                    if (ev?.batteryCharge == true && prefs.charging) {
+                        ChargingPollWorker.kick(applicationContext)
+                    }
                     ChargingLive.update(
                         context = applicationContext,
                         vin = v.vin,
