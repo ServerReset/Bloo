@@ -1817,7 +1817,13 @@ class CarWidget : GlanceAppWidget() {
         // the extremes, where there is nothing to separate.
         val gap = if (width >= 60.dp && frac > 0.02f && frac < 0.98f) 3.dp else 0.dp
         val usable = (width - gap).coerceAtLeast(0.dp)
-        val filled = usable * frac
+        // Floored at the bar's own height when there is ANY charge, so a low
+        // one reads as a rounded nub rather than a hairline: below that the
+        // 50% corner radius eats the whole shape and 3% looks identical to 0%.
+        // Capped at `usable` so the floor can't overrun a narrow slot, and
+        // `rest` is derived from the result rather than computed in parallel,
+        // so the two always still sum to the bar.
+        val filled = if (frac <= 0f) 0.dp else minOf(usable, maxOf(usable * frac, height))
         val rest = (usable - filled).coerceAtLeast(0.dp)
         val fillColor = if (car.charging == true) theme.charge else theme.accentProvider
         // Glance has no z-stacking of a marker over a Row without a Box, so
@@ -1843,7 +1849,12 @@ class CarWidget : GlanceAppWidget() {
             // spelled "reserve x of empty space first".
             if (limit != null && width >= 60.dp) {
                 val l = limit / 100f
-                val dot = (height + 4.dp)
+                // Exactly the bar's height, NOT taller. The dot lives in a Box
+                // sized to the bar, so anything bigger is clipped by it -- a
+                // marker with its top and bottom shaved off, which is worse
+                // than a slightly smaller circle. It reads as sitting on the
+                // bar because of its ring, not because it overhangs.
+                val dot = height
                 val x = (usable * l + (if (l > frac) gap else 0.dp) - dot / 2)
                     .coerceIn(0.dp, (width - dot).coerceAtLeast(0.dp))
                 Row(modifier = GlanceModifier.width(width).height(height)) {
@@ -1856,9 +1867,10 @@ class CarWidget : GlanceAppWidget() {
                             .cornerRadius(dot / 2)
                             .background(theme.background),
                     ) {
+                        val core = (dot - 5.dp).coerceAtLeast(2.dp)
                         Box(
-                            modifier = GlanceModifier.size(dot - 6.dp)
-                                .cornerRadius((dot - 6.dp) / 2)
+                            modifier = GlanceModifier.size(core)
+                                .cornerRadius(core / 2)
                                 // Legible on either side of the split: dark on
                                 // the green once the charge has passed it,
                                 // green on the grey track while it hasn't.

@@ -5423,7 +5423,11 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?) {
     val limit = limitPct?.takeIf { it in 1..99 }
     BoxWithConstraints(Modifier.fillMaxWidth().height(ChargeBarHeight)) {
         val usable = (maxWidth - gap).coerceAtLeast(0.dp)
-        val filled = usable * filledFrac
+        // Floored at the bar's own height when there is ANY charge: below that
+        // the 50% corner radius eats the whole shape, so 3% and 0% draw the
+        // same nothing. Capped at `usable` so the floor can't overrun the bar,
+        // and `rest` derived from the result so the two always still sum to it.
+        val filled = if (filledFrac <= 0f) 0.dp else minOf(usable, maxOf(usable * filledFrac, ChargeBarHeight))
         val rest = (usable - filled).coerceAtLeast(0.dp)
         Row(Modifier.fillMaxSize()) {
             if (filled > 0.dp) {
