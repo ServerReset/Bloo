@@ -291,20 +291,18 @@ object WearComms {
     /** Push a "turn AI summaries on/off" toggle back to the phone. Its own path
      *  (not [WearSync.PATH_LOCAL]) so it can never race with that path's uiScale
      *  echo. */
-    suspend fun publishAiToggle(context: Context, enabled: Boolean) {
+    suspend fun publishAiToggle(context: Context, enabled: Boolean): Boolean =
         publishDataItem(context, WearSync.PATH_AI_TOGGLE, WearSync.encodeAiToggle(WearAiTogglePayload(enabled)))
-    }
 
     /** Push a "turn the aurora background on/off" toggle back to the phone, same
      *  own-path pattern as [publishAiToggle]. [colorMode] additionally sets the
      *  phone's aurora colour mode from the watch when non-null. */
-    suspend fun publishAuroraToggle(context: Context, enabled: Boolean, colorMode: String? = null) {
+    suspend fun publishAuroraToggle(context: Context, enabled: Boolean, colorMode: String? = null): Boolean =
         publishDataItem(
             context,
             WearSync.PATH_AURORA_TOGGLE,
             WearSync.encodeAuroraToggle(WearAuroraTogglePayload(enabled, colorMode)),
         )
-    }
 
     // ── Cold-launch backfill ─────────────────────────────────────────────────
 

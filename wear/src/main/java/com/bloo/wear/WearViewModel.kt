@@ -1606,23 +1606,40 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         WearComms.publishLocalSettings(ctx, ls.fontScale, ls.unitSystem, ls.pinLockEnabled, ls.pinLockTiming)
     }
 
+    /**
+     * Holds an optimistic settings override only while the push that justifies
+     * it actually reached the phone.
+     *
+     * [savePebbleOrder] already worked this way and documented why: the
+     * override is cleared by an EXACT match against the phone's echo, so if the
+     * phone never received the change there is no echo coming, and the override
+     * sits there masking every later phone-side change to that setting for the
+     * rest of the session. The three settings toggles set an override and then
+     * fired the push fire-and-forget, so they had exactly that bug -- turn the
+     * aurora off on the watch with the phone out of range, and the watch stops
+     * believing the phone about the aurora until you restart the app.
+     */
+    private fun holdOverride(key: String, value: Any?, push: suspend () -> Boolean) {
+        _ui.update { u -> u.copy(settingsOverride = u.settingsOverride + (key to value)) }
+        viewModelScope.launch {
+            val ok = runCatching { push() }.getOrDefault(false)
+            if (!ok) _ui.update { u -> u.copy(settingsOverride = u.settingsOverride - key) }
+        }
+    }
+
     /** Turn AI summaries on/off. Optimistically flips the synced flag so the
      *  toggle and AI tile react instantly; the phone's echo (or a future
      *  settings push) settles it for real. */
     fun setAiEnabled(enabled: Boolean) {
-        _ui.update { u ->
-            u.copy(settings = u.settings?.copy(aiEnabled = enabled), settingsOverride = u.settingsOverride + ("aiEnabled" to enabled))
-        }
-        viewModelScope.launch { WearComms.publishAiToggle(ctx, enabled) }
+        _ui.update { u -> u.copy(settings = u.settings?.copy(aiEnabled = enabled)) }
+        holdOverride("aiEnabled", enabled) { WearComms.publishAiToggle(ctx, enabled) }
     }
 
     /** Turn the watch's own aurora background on/off. Same optimistic-update +
      *  phone-echo pattern as [setAiEnabled]. */
     fun setAuroraEnabled(enabled: Boolean) {
-        _ui.update { u ->
-            u.copy(settings = u.settings?.copy(auroraEnabled = enabled), settingsOverride = u.settingsOverride + ("auroraEnabled" to enabled))
-        }
-        viewModelScope.launch { WearComms.publishAuroraToggle(ctx, enabled) }
+        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraEnabled = enabled)) }
+        holdOverride("auroraEnabled", enabled) { WearComms.publishAuroraToggle(ctx, enabled) }
     }
 
     /** Set the aurora colour mode ("complementary"/"material"/"custom") from
@@ -1632,10 +1649,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  or off as a side effect of just changing its colour. */
     fun setAuroraColorMode(mode: String) {
         val enabled = _ui.value.settings?.auroraEnabled ?: return
-        _ui.update { u ->
-            u.copy(settings = u.settings?.copy(auroraColorMode = mode), settingsOverride = u.settingsOverride + ("auroraColorMode" to mode))
-        }
-        viewModelScope.launch { WearComms.publishAuroraToggle(ctx, enabled, colorMode = mode) }
+        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraColorMode = mode)) }
+        holdOverride("auroraColorMode", mode) { WearComms.publishAuroraToggle(ctx, enabled, colorMode = mode) }
     }
 
     /** Choose which action chips the glanceable Tile shows, then redraw it. */
