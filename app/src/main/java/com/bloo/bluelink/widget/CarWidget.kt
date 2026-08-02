@@ -543,14 +543,24 @@ class CarWidget : GlanceAppWidget() {
             return
         }
         val ringEdge = Scale.ring(size, (size.height - 10.dp).coerceAtLeast(16.dp))
+        val showsRing = render.config.showRing && car.percent != null
+        // The width each weighted child of this Row REALLY gets: whatever is
+        // left once the ring and the fixed spacers are taken out, split
+        // between the text column and the buttons. The fraction-of-tile
+        // guesses this replaces were wrong twice over -- they under-reported
+        // the slice, and they kept assuming a ring was there even when one
+        // isn't drawn, so a widget with the ring switched off still laid its
+        // text and buttons out as if a third of the row were missing.
+        val slice = ((size.width - (if (showsRing) ringEdge + 8.dp else 0.dp) - 8.dp) / 2)
+            .coerceAtLeast(24.dp)
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (render.config.showRing && car.percent != null) {
+            if (showsRing) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(8.dp))
             }
             Column(modifier = GlanceModifier.defaultWeight()) {
-                FitText(car.name, titleStyle(render.theme), maxWidth = size.width * 0.3f)
-                PrimaryInfoLine(car, render, maxWidth = size.width * 0.3f)
+                FitText(car.name, titleStyle(render.theme), maxWidth = slice)
+                PrimaryInfoLine(car, render, maxWidth = slice)
             }
             Spacer(GlanceModifier.width(8.dp))
             // A banner is nearly all width, so the buttons get a real share
@@ -561,7 +571,7 @@ class CarWidget : GlanceAppWidget() {
             ActionButtons(
                 car, render, max = 4,
                 modifier = GlanceModifier.defaultWeight(),
-                availableWidth = ((size.width - ringEdge - 16.dp) / 2).coerceAtLeast(24.dp),
+                availableWidth = slice,
             )
         }
     }
@@ -654,21 +664,27 @@ class CarWidget : GlanceAppWidget() {
         // buttons instead of 3.
         val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.height - 12.dp).coerceAtLeast(18.dp))
+        val showsRing = render.config.showRing && car.percent != null
+        // The width each weighted child of this Row REALLY gets: whatever is
+        // left once the ring and the fixed spacers are taken out, split
+        // between the text column and the buttons. The fraction-of-tile
+        // guesses this replaces were wrong twice over -- they under-reported
+        // the slice, and they kept assuming a ring was there even when one
+        // isn't drawn, so a widget with the ring switched off still laid its
+        // text and buttons out as if a third of the row were missing.
+        val slice = ((size.width - (if (showsRing) ringEdge + 6.dp else 0.dp) - 6.dp) / 2)
+            .coerceAtLeast(24.dp)
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (render.config.showRing && car.percent != null) {
+            if (showsRing) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(6.dp))
             }
             FitText(
                 car.name, titleStyle(render.theme),
-                maxWidth = size.width * 0.32f, modifier = GlanceModifier.defaultWeight(),
+                maxWidth = slice, modifier = GlanceModifier.defaultWeight(),
             )
             Spacer(GlanceModifier.width(6.dp))
-            // This row splits its remaining width ~evenly between the name
-            // and the buttons -- an explicit estimate here (rather than the
-            // default "whole tile width") so the auto-vertical-stack check
-            // isn't fooled into thinking there's twice the room there is.
-            ActionButtons(car, render, max = 2, modifier = GlanceModifier.defaultWeight(), availableWidth = size.width * 0.32f)
+            ActionButtons(car, render, max = 2, modifier = GlanceModifier.defaultWeight(), availableWidth = slice)
         }
     }
 
@@ -689,8 +705,18 @@ class CarWidget : GlanceAppWidget() {
         // the row it's centered in.
         val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.height - 16.dp).coerceAtLeast(20.dp))
+        val showsRing = render.config.showRing && car.percent != null
+        // The width each weighted child of this Row REALLY gets: whatever is
+        // left once the ring and the fixed spacers are taken out, split
+        // between the text column and the buttons. The fraction-of-tile
+        // guesses this replaces were wrong twice over -- they under-reported
+        // the slice, and they kept assuming a ring was there even when one
+        // isn't drawn, so a widget with the ring switched off still laid its
+        // text and buttons out as if a third of the row were missing.
+        val slice = ((size.width - (if (showsRing) ringEdge + 10.dp else 0.dp) - 8.dp) / 2)
+            .coerceAtLeast(24.dp)
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (render.config.showRing && car.percent != null) {
+            if (showsRing) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(10.dp))
             }
@@ -706,11 +732,11 @@ class CarWidget : GlanceAppWidget() {
             // Giving it a weight too makes it share the remaining space
             // fairly with the text column instead of overrunning it.
             Column(modifier = GlanceModifier.defaultWeight()) {
-                FitText(car.name, titleStyle(render.theme), maxWidth = size.width * 0.36f)
-                PrimaryInfoLine(car, render, maxWidth = size.width * 0.36f)
+                FitText(car.name, titleStyle(render.theme), maxWidth = slice)
+                PrimaryInfoLine(car, render, maxWidth = slice)
             }
             Spacer(GlanceModifier.width(8.dp))
-            ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight(), availableWidth = size.width * 0.32f)
+            ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight(), availableWidth = slice)
         }
     }
 
