@@ -210,6 +210,31 @@ class CarWidget : GlanceAppWidget() {
         /** Smallest ring worth drawing; below this the space goes to text. */
         private val MIN_RING = 24.dp
 
+        /**
+         * The ring on a TALL tile, where it is the hero rather than one item
+         * in a row.
+         *
+         * [ring]'s continuous curve tops out at 140dp, which is right when
+         * the ring shares a row with text but leaves a tall widget looking
+         * broken: a 230x535 tile spent its first 140dp on the ring and the
+         * remaining ~250dp on nothing at all, because the leftover went into
+         * a single trailing weighted Spacer. Reported from a real device --
+         * a huge black void down the middle of the widget.
+         *
+         * Here the ring simply takes the room it's given, bounded by the
+         * tile's own width so it stays circular rather than by an arbitrary
+         * ceiling.
+         */
+        fun ringHero(size: DpSize, maxAvailable: Dp): Dp {
+            val room = minOf(maxAvailable, size.width - 24.dp)
+            return if (room < MIN_RING) 0.dp else room
+        }
+
+        /** Estimated height of an [InfoStack] of [rows] rows, so a tall tier
+         *  can leave space for it before handing the rest to [ringHero]. */
+        fun infoBlockHeight(size: DpSize, rows: Int, textScale: Float): Dp =
+            (lineHeight(valueSp(size).value, textScale).value * rows + 2f * rows).dp
+
         /** Approximate rendered height of one text line at [sp]. RemoteViews
          *  gives no measurement callback, so every vertical estimate in this
          *  file goes through this one factor rather than each inventing its
@@ -805,15 +830,24 @@ class CarWidget : GlanceAppWidget() {
         // Tall MEDIUM: everything stacked in one column, ring centered --
         // the mirror of MediumWideLayout's side-by-side arrangement.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, minOf(size.width - 24.dp, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp)))
+        val rows = Scale.infoCap(size, 3, render.theme.textScale)
+        // Hand the ring everything left after the header, buttons and the
+        // info rows, instead of a fixed curve plus a trailing void.
+        val ringEdge = Scale.ringHero(
+            size,
+            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp) -
+                Scale.infoBlockHeight(size, rows, render.theme.textScale),
+        )
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
-            Spacer(GlanceModifier.height(8.dp))
+            // Weighted spacers ABOVE and below centre what's left, rather
+            // than one trailing spacer shoving it all to the top edge.
+            Spacer(GlanceModifier.defaultWeight())
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.height(8.dp))
             }
-            InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale))
+            InfoStack(car, render, max = rows)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 4)
         }
@@ -846,7 +880,7 @@ class CarWidget : GlanceAppWidget() {
                     }
                 },
                 content = { w ->
-                    InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w)
+                    InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true)
                     MapModule(render)
                 },
             )
@@ -879,7 +913,7 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w) },
+                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
             )
             MapModule(render)
             Spacer(GlanceModifier.height(10.dp))
@@ -894,7 +928,12 @@ class CarWidget : GlanceAppWidget() {
         // of beside it -- there's more height to spend than width here, so a
         // side-by-side split would leave the info column cramped.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, minOf(size.width * 0.55f, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)))
+        val rows = Scale.infoCap(size, 4, render.theme.textScale)
+        val ringEdge = Scale.ringHero(
+            size,
+            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp) -
+                Scale.infoBlockHeight(size, rows, render.theme.textScale),
+        )
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
@@ -904,7 +943,7 @@ class CarWidget : GlanceAppWidget() {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
             Spacer(GlanceModifier.height(10.dp))
-            InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale))
+            InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), footerShown = true)
             MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 5)
@@ -938,7 +977,7 @@ class CarWidget : GlanceAppWidget() {
                     FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = ringEdge, horizontalAlignment = Alignment.CenterHorizontally)
                 },
                 content = { w ->
-                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale), availableWidth = w)
+                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale), availableWidth = w, footerShown = true)
                     MapModule(render)
                 },
             )
@@ -955,7 +994,12 @@ class CarWidget : GlanceAppWidget() {
         // into side-by-side columns that would squeeze on a narrow-but-tall
         // dashboard-sized tile.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, minOf(size.width * 0.5f, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp)))
+        val rows = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale)
+        val ringEdge = Scale.ringHero(
+            size,
+            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp) -
+                Scale.infoBlockHeight(size, rows, render.theme.textScale),
+        )
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
@@ -970,7 +1014,7 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
             Spacer(GlanceModifier.height(14.dp))
-            InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale))
+            InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale), footerShown = true)
             MapModule(render)
             Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = WidgetAction.ALL.size)
@@ -999,7 +1043,7 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w) },
+                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
             )
             Spacer(GlanceModifier.height(12.dp))
             MapModule(render)
@@ -1120,8 +1164,16 @@ class CarWidget : GlanceAppWidget() {
         // wide, which is exactly the failure this whole FitText path exists
         // to prevent.
         availableWidth: Dp = LocalSize.current.width,
+        // True on tiers that also render FooterRow, which already reads
+        // "Updated 9 min ago". Without this the same sentence appeared twice
+        // on one widget -- once as an info row, once as the footer directly
+        // beneath the buttons. Reported from a real device.
+        footerShown: Boolean = false,
     ) {
-        val fields = render.config.infoFields.mapNotNull { WidgetInfoField.fromKey(it) }.take(max)
+        val fields = render.config.infoFields
+            .mapNotNull { WidgetInfoField.fromKey(it) }
+            .filterNot { footerShown && it == WidgetInfoField.UPDATED }
+            .take(max)
         val narrow = availableWidth < NARROW_WIDTH
         Column {
             fields.forEach { field ->
