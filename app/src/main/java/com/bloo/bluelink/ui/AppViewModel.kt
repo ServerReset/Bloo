@@ -27,6 +27,8 @@ import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.maskEmail
+import com.bloo.bluelink.data.ReservChargeInfos
+import com.bloo.bluelink.data.TargetSOC
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
@@ -2472,7 +2474,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  optimistic patch since VehicleStatus doesn't carry a single field that
      *  maps cleanly onto "the limits are now X/Y" the way charging on/off does. */
     fun setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
-        runCommand(v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)", null) {
+        runCommand(
+            v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)",
+            // Optimistic, like every other command here. The limit isn't just a
+            // number in a settings row any more -- it's the seam in the hero's
+            // charge bar, the notch in the widget's ring and the watch's, and
+            // the Point on the live notification. Waiting for a round-trip and
+            // a poll before any of those move makes tapping Set look like it
+            // did nothing. Reverted locally by runCommand if the car refuses.
+            { st ->
+                val ev = st.evStatus
+                if (ev == null) {
+                    st
+                } else {
+                    st.copy(
+                        evStatus = ev.copy(
+                            // Replaced wholesale rather than merged: these two
+                            // plug types are the entire list the API reports,
+                            // and setChargeTargets always sends both.
+                            reservChargeInfos = ReservChargeInfos(
+                                listOf(
+                                    TargetSOC(plugType = 0, targetSOClevel = dcPercent),
+                                    TargetSOC(plugType = 1, targetSOClevel = acPercent),
+                                ),
+                            ),
+                        ),
+                    )
+                }
+            },
+        ) {
             repoFor(v).setChargeTargets(electric(v), acPercent, dcPercent)
         }
 
