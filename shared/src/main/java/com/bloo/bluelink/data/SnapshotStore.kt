@@ -108,6 +108,11 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
     // with fuel data instead of battery data.
     val pct = status.percentFor(hasBattery)
     val range = status.rangeMiFor(hasBattery)
+    // Hoisted to a local: a nullable property of another class is only
+    // smart-castable under conditions this file has already been bitten by
+    // once (see rangeMi's note in AppViewModel). A local is free and removes
+    // the question.
+    val ev = status.evStatus
     return copy(
         percent = pct ?: percent,
         rangeMi = range ?: rangeMi,
@@ -119,6 +124,21 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
         lon = status.vehicleLocation?.coord?.lon ?: lon,
         speedMph = status.vehicleLocation?.speed?.value ?: speedMph,
         updated = status.dateTime ?: updated,
+        // The charge limit, which this function never carried -- so the only
+        // path that set it was the phone app's own snapshotOf(). Every OTHER
+        // refresh goes through here (the watch standalone, the QS tiles, the
+        // widget's own), and each of those left the limit at whatever the
+        // phone last wrote, or at null forever for a car the phone app had
+        // never refreshed while plugged in. The dot that marks it is on five
+        // surfaces now; four of them were reading a field nothing kept current.
+        //
+        // NOT the `new ?: old` shape the fields above use, deliberately.
+        // Unplugged genuinely means "no limit applies", not "unknown", so a
+        // status that carries EV data is trusted completely -- including its
+        // nulls, which is what makes the marker disappear when you unplug. A
+        // status with no evStatus at all (a gas car, a partial fetch) is the
+        // only case where the old value stands.
+        chargeLimitPct = if (ev != null) ev.targetForCurrentPlug() else chargeLimitPct,
         // merged() folds in a status we JUST fetched, so this data is now current.
         fetchedAt = System.currentTimeMillis(),
     )
