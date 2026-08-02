@@ -43,6 +43,7 @@ import com.bloo.bluelink.data.toClimateSync
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherApi
 import androidx.glance.appwidget.updateAll
@@ -1503,6 +1504,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             licensePlate = _state.value.licensePlates[v.vin],
             lastServiceMiles = _state.value.lastServiceMiles[v.vin],
             serviceIntervalMiles = _state.value.serviceIntervalMiles[v.vin],
+            chargeLimitPct = status?.evStatus?.targetForCurrentPlug(),
         )
     }
 

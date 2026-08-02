@@ -1928,28 +1928,86 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = width,
             )
             Spacer(GlanceModifier.height(4.dp))
-            // Glance has no fractional width, but the exact slot width is
-            // already known here, so the fill is computed in dp rather than
-            // guessed -- same discipline as everything else in this file.
-            // Floored at the bar's own height so a very low charge still
-            // reads as a rounded nub instead of a sliver.
-            val fill = (width * (pct.coerceIn(0, 100) / 100f)).coerceAtLeast(barH)
-            Box(
-                modifier = GlanceModifier.width(width).height(barH)
-                    .cornerRadius(barH / 2).background(theme.surfaceVariant),
-            ) {
-                Box(
-                    modifier = GlanceModifier.width(fill).height(barH)
-                        .cornerRadius(barH / 2)
-                        .background(
-                            if (car.charging == true) theme.charge else theme.accentProvider,
-                        ),
-                ) {}
-            }
+            ChargeBar(car, theme, width = width, height = barH)
             val sub = primaryValue(car, render).takeIf { showSub }
             if (sub != null) {
                 Spacer(GlanceModifier.height(4.dp))
                 FitText(sub, subtitleStyle(theme), maxWidth = width)
+            }
+        }
+    }
+
+    /**
+     * The horizontal charge bar under [BarHero]'s number.
+     *
+     * Split at the car's charge limit when it reported one, so the stretch
+     * the car has been told not to fill reads as a separate, dimmer segment
+     * rather than as more headroom -- the same shape the phone's hero card
+     * and the live charging notification now use for the same value.
+     *
+     * Glance has no fractional width, but the exact slot width is known
+     * here, so every piece is computed in dp rather than guessed. Each
+     * segment's fill is its own local share of the global charge, which is
+     * what keeps a charge that has overrun its limit reading correctly
+     * instead of clamping invisibly at the seam.
+     */
+    @Composable
+    private fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, height: Dp) {
+        val pct = (car.percent ?: 0).coerceIn(0, 100)
+        val frac = pct / 100f
+        val limit = car.chargeLimitPct?.takeIf { it in 1..99 }
+        // The seam costs real width, so it's only drawn where there is width
+        // to spend: on a narrow slot a 3dp gap is a visible bite out of a
+        // short bar and says less than the charge itself does.
+        val gap = if (limit != null && width >= 60.dp) 3.dp else 0.dp
+        val limitFrac = if (gap > 0.dp && limit != null) limit / 100f else 1f
+        val usable = (width - gap).coerceAtLeast(0.dp)
+        val head = usable * limitFrac
+        val tail = (usable - head).coerceAtLeast(0.dp)
+        Row(modifier = GlanceModifier.width(width).height(height)) {
+            Segment(
+                width = head,
+                fill = if (limitFrac <= 0f) 0f else frac / limitFrac,
+                height = height,
+                track = theme.surfaceVariant,
+                fillColor = if (car.charging == true) theme.charge else theme.accentProvider,
+            )
+            if (tail > 0.dp) {
+                Spacer(GlanceModifier.width(gap))
+                Segment(
+                    width = tail,
+                    fill = if (limitFrac >= 1f) 0f else (frac - limitFrac) / (1f - limitFrac),
+                    height = height,
+                    track = theme.surfaceVariant,
+                    fillColor = if (car.charging == true) theme.charge else theme.accentProvider,
+                )
+            }
+        }
+    }
+
+    /** One rounded stretch of [ChargeBar]. */
+    @Composable
+    private fun Segment(
+        width: Dp,
+        fill: Float,
+        height: Dp,
+        track: ColorProvider,
+        fillColor: ColorProvider,
+    ) {
+        Box(
+            modifier = GlanceModifier.width(width).height(height)
+                .cornerRadius(height / 2).background(track),
+        ) {
+            val f = fill.coerceIn(0f, 1f)
+            if (f > 0f) {
+                // Floored at the bar's own height so a very low charge still
+                // reads as a rounded nub instead of a sliver, and capped at
+                // the segment so the floor can't overrun a short one.
+                val w = minOf(width, (width * f).coerceAtLeast(height))
+                Box(
+                    modifier = GlanceModifier.width(w).height(height)
+                        .cornerRadius(height / 2).background(fillColor),
+                ) {}
             }
         }
     }

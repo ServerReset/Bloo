@@ -73,6 +73,12 @@ data class VehicleSnapshot(
     val licensePlate: String? = null,
     val lastServiceMiles: Int? = null,
     val serviceIntervalMiles: Int? = null,
+    /** The car's charge limit for the plug it's currently on (see
+     *  [EvStatus.targetForCurrentPlug]), 1..100, or null when it isn't
+     *  plugged in or didn't report one. Mirrored so the out-of-process
+     *  surfaces can draw the same "will charge / won't" split the phone
+     *  hero and the live charging notification both show. */
+    val chargeLimitPct: Int? = null,
 ) {
     /** Rebuild the command-capable Vehicle (used by widgets/tiles). */
     fun toVehicle(): Vehicle = Vehicle(
