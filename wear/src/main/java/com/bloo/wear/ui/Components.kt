@@ -52,7 +52,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -96,6 +95,7 @@ import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.math.tan
@@ -318,30 +318,27 @@ fun ChargeRing(
                 animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessLow),
                 label = "chargeLimitAngle",
             )
-            // Painted in the background colour rather than cleared: this is a
-            // composed indicator, not a bitmap we own, so the gap is drawn
-            // over it in the colour behind it.
-            val cutColor = MaterialTheme.colorScheme.background
+            // A DOT on the ring, matching the dot on the bar everywhere else
+            // this value is drawn (phone hero, widget bar, widget ring, live
+            // notification). It used to be a gap cut through the ring, which
+            // read as a break in the gauge rather than a mark on it.
+            //
+            // Painted rather than cleared: this is a composed indicator, not a
+            // bitmap we own, so the "hole" the dot sits in is drawn in the
+            // colour behind it.
+            val holeColor = MaterialTheme.colorScheme.background
+            val passed = (percent ?: 0) / 100f >= limitFrac
+            val markColor = if (passed) MaterialTheme.colorScheme.onSurfaceVariant else animatedColor
             Canvas(Modifier.size(size)) {
                 val stroke = 5.dp.toPx()
-                val inset = stroke / 2f
                 val radius = (this.size.minDimension - stroke) / 2f
-                // Constant arc LENGTH, not a constant angle: the same gap has
-                // to read on a 60dp summary ring and an 88dp hero one.
-                val sweep = Math.toDegrees((stroke * 1.7f / radius.coerceAtLeast(1f)).toDouble())
-                    .toFloat().coerceIn(4f, 20f)
-                drawArc(
-                    color = cutColor,
-                    startAngle = -90f + 360f * limitFrac - sweep / 2f,
-                    sweepAngle = sweep,
-                    useCenter = false,
-                    topLeft = Offset(inset, inset),
-                    size = androidx.compose.ui.geometry.Size(
-                        this.size.width - stroke,
-                        this.size.height - stroke,
-                    ),
-                    style = Stroke(width = stroke * 1.8f),
-                )
+                val angle = Math.toRadians((-90f + 360f * limitFrac).toDouble())
+                val cx = this.size.width / 2f + (cos(angle) * radius).toFloat()
+                val cy = this.size.height / 2f + (sin(angle) * radius).toFloat()
+                // Sized off the ring's own stroke so it reads the same on the
+                // 60dp summary ring and the 88dp hero one.
+                drawCircle(color = holeColor, radius = stroke * 0.95f, center = Offset(cx, cy))
+                drawCircle(color = markColor, radius = stroke * 0.58f, center = Offset(cx, cy))
             }
         }
         // Was a hand-rolled AnimatedContent with the exact same transitionSpec

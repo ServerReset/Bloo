@@ -349,9 +349,9 @@ object ChargingLive {
     /** The not-yet-charged remainder. Deliberately dim rather than empty --
      *  a zero-width remaining segment at 100% is filtered out below. */
     private const val TRACK = 0x40FFFFFF
-    /** The stretch ABOVE the car's charge limit: dimmer still, because it
-     *  isn't headroom this charge will ever use. */
-    private const val TRACK_BEYOND = 0x1FFFFFFF
+    /** The limit dot once the charge has gone past it -- a light mark on the
+     *  green, where the green-on-green it would otherwise be says nothing. */
+    private const val LIMIT_PASSED = 0xFFE8E8E8.toInt()
 
     /** One stable notification id per car, distinct from the alert ids so a
      *  charging notification never overwrites a door/service alert. */
@@ -444,14 +444,12 @@ object ChargingLive {
             // rather than setProgress's plain track, so the charged portion
             // carries the accent and the rest reads as headroom.
             //
-            // With a charge limit reported, the remainder splits again: the
-            // headroom this charge will actually use (up to the limit) stays
-            // TRACK, and everything above the limit drops to TRACK_BEYOND,
-            // with a point marking the seam. Segment lengths always total
-            // 100, whatever order percent and limit come in -- including a
-            // charge that has already overrun its limit.
-            val headroom = ((limit ?: 100) - percent).coerceAtLeast(0)
-            val beyond = (100 - percent - headroom).coerceAtLeast(0)
+            // TWO segments, split at the CHARGE: green is what's in the pack,
+            // the track is what isn't. The limit is a POINT on that bar, set
+            // below -- not a third segment and not a second division. Every
+            // other surface draws this value the same way now (the phone hero,
+            // the widget's bar and ring, the watch ring): fill to the charge,
+            // track for the rest, a dot at the limit.
             val style = NotificationCompat.ProgressStyle()
                 .setStyledByProgress(false)
                 .setProgress(percent)
@@ -463,17 +461,21 @@ object ChargingLive {
                         if (percent > 0) {
                             add(NotificationCompat.ProgressStyle.Segment(percent).setColor(CHARGE_GREEN))
                         }
-                        if (headroom > 0) {
-                            add(NotificationCompat.ProgressStyle.Segment(headroom).setColor(TRACK))
-                        }
-                        if (beyond > 0) {
-                            add(NotificationCompat.ProgressStyle.Segment(beyond).setColor(TRACK_BEYOND))
+                        if (percent < 100) {
+                            add(NotificationCompat.ProgressStyle.Segment(100 - percent).setColor(TRACK))
                         }
                     },
                 )
             if (limit != null) {
+                // The dot. Coloured like the marker everywhere else: the
+                // pack's green while the charge is still short of it, and a
+                // plain light mark once the charge has passed it, so it stays
+                // legible against whichever segment it lands on.
                 style.setProgressPoints(
-                    listOf(NotificationCompat.ProgressStyle.Point(limit).setColor(CHARGE_GREEN)),
+                    listOf(
+                        NotificationCompat.ProgressStyle.Point(limit)
+                            .setColor(if (percent >= limit) LIMIT_PASSED else CHARGE_GREEN),
+                    ),
                 )
             }
             builder.setStyle(style)

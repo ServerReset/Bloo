@@ -373,6 +373,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.PI
+import kotlin.math.sin
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.ln
@@ -5405,65 +5407,103 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
 @Composable
 private fun ChargeSegmentBar(frac: Float, limitPct: Int?) {
     val scheme = MaterialTheme.colorScheme
-    val limitFrac by animateFloatAsState(
-        targetValue = (limitPct ?: 100).coerceIn(0, 100) / 100f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "chargeLimitSplit",
-    )
-    // The gap animates in/out with the limit itself, so a car that loses its
-    // target (unplugged) closes the seam smoothly instead of the bar jumping
-    // wider by the gap's width.
+    // The split is at the CHARGE, not the limit. Green is what's in the pack,
+    // grey is what isn't, and the gap between them is where the level is --
+    // which is the one thing the bar has to say at a glance, and the thing an
+    // earlier version of this got wrong by splitting at the limit instead.
+    // The limit is a MARKER on that bar, not a division of it.
+    val filledFrac = frac.coerceIn(0f, 1f)
+    // No gap at the extremes: an empty or full pack has nothing to separate,
+    // and a 5dp notch hard against a rounded cap reads as a rendering fault.
     val gap by animateDpAsState(
-        targetValue = if (limitPct != null) 5.dp else 0.dp,
+        targetValue = if (filledFrac > 0.02f && filledFrac < 0.98f) 5.dp else 0.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "chargeLimitGap",
+        label = "chargeSplitGap",
     )
-    BoxWithConstraints(Modifier.fillMaxWidth().height(18.dp)) {
+    val limit = limitPct?.takeIf { it in 1..99 }
+    BoxWithConstraints(Modifier.fillMaxWidth().height(ChargeBarHeight)) {
         val usable = (maxWidth - gap).coerceAtLeast(0.dp)
-        val head = usable * limitFrac.coerceIn(0f, 1f)
-        val tail = (usable - head).coerceAtLeast(0.dp)
+        val filled = usable * filledFrac
+        val rest = (usable - filled).coerceAtLeast(0.dp)
         Row(Modifier.fillMaxSize()) {
-            // Fills are expressed as each segment's OWN local fraction of the
-            // global charge, so a charge that has overrun its limit keeps
-            // reading correctly: the head fills, and the overrun continues
-            // into the tail rather than being clamped invisibly at the seam.
-            ChargeSegment(
-                width = head,
-                fill = if (limitFrac <= 0f) 0f else (frac / limitFrac),
-                track = ChargeGreen.copy(alpha = 0.18f),
-            )
-            if (tail > 0.dp) {
-                Spacer(Modifier.width(gap))
-                ChargeSegment(
-                    width = tail,
-                    fill = if (limitFrac >= 1f) 0f else (frac - limitFrac) / (1f - limitFrac),
-                    // Neutral, not green-tinted: this stretch isn't charge
-                    // waiting to happen, it's charge the user has ruled out.
-                    track = scheme.onSurface.copy(alpha = 0.13f),
+            if (filled > 0.dp) {
+                Box(
+                    Modifier
+                        .width(filled)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(50))
+                        .background(Brush.horizontalGradient(listOf(ChargeGreenDark, ChargeGreen))),
                 )
             }
+            if (rest > 0.dp) {
+                if (filled > 0.dp) Spacer(Modifier.width(gap))
+                Box(
+                    Modifier
+                        .width(rest)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(50))
+                        .background(scheme.onSurface.copy(alpha = 0.16f)),
+                )
+            }
+        }
+        if (limit != null) {
+            // The limit's x, in the bar's own coordinates -- past the split it
+            // has to clear the gap too, or the marker drifts off the value it
+            // is marking by exactly the gap's width.
+            val l = limit / 100f
+            val targetX = usable * l + (if (l > filledFrac) gap else 0.dp)
+            val x by animateDpAsState(
+                targetX,
+                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+                label = "chargeLimitDot",
+            )
+            ChargeLimitDot(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = x - ChargeLimitDotSize / 2),
+                onFill = l <= filledFrac,
+            )
         }
     }
 }
 
-/** One rounded stretch of [ChargeSegmentBar]: a [track] with a green fill
- *  across [fill] (0..1) of its own width. */
+/** The bar's height, and the limit marker's diameter, shared by every surface
+ *  that draws this bar so the proportions read as one component rather than
+ *  five near-misses. */
+private val ChargeBarHeight = 18.dp
+private val ChargeLimitDotSize = 14.dp
+
+/**
+ * The charge-limit marker: a small circle sitting ON the bar at the limit.
+ *
+ * A dot, not a seam. The bar's own split already means something -- where the
+ * charge currently is -- and a second division cannot mean a second thing
+ * without the reader having to work out which is which. A marker sits on top
+ * and says "here", which is all a limit needs to say.
+ *
+ * [onFill] flips its colours so it stays legible whichever side of the split
+ * it lands on: a dark core on green while the charge is still below it, a
+ * green core on grey once the charge has passed it. Either way it keeps a ring
+ * in the bar's own background colour, so it reads as sitting above the bar
+ * rather than punched into it.
+ */
 @Composable
-private fun ChargeSegment(width: Dp, fill: Float, track: Color) {
+private fun ChargeLimitDot(modifier: Modifier = Modifier, onFill: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val core by androidx.compose.animation.animateColorAsState(
+        if (onFill) scheme.surface else ChargeGreen,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "limitDotCore",
+    )
     Box(
-        Modifier.width(width).fillMaxHeight().clip(RoundedCornerShape(9.dp)).background(track),
-    ) {
-        val f = fill.coerceIn(0f, 1f)
-        if (f > 0f) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(Brush.horizontalGradient(listOf(ChargeGreenDark, ChargeGreen))),
-            )
-        }
-    }
+        modifier
+            .size(ChargeLimitDotSize)
+            .clip(CircleShape)
+            .background(scheme.surface)
+            .padding(3.dp)
+            .clip(CircleShape)
+            .background(core),
+    )
 }
 
 // Was a phone-only re-declaration of the same hex values shared/BlooColors.kt
@@ -11630,19 +11670,32 @@ private fun SearchPill(
     val expanded = focused || query.isNotEmpty()
     val density = LocalDensity.current
     LaunchedEffect(focused) { if (focused) runCatching { focusRequester.requestFocus() } }
-    // Hand-ticked at ~12fps: the halo is a slow breath, and 12 steps a second
-    // is indistinguishable from 60 for something that takes a second to cross
-    // its range. Held as State and read ONLY inside drawBehind, so a tick
-    // invalidates the draw phase and never recomposes the text field.
+    // The glow is a moving light, not a light that brightens: a hotspot
+    // travels around the pill's rim while the whole halo breathes. One clock
+    // drives both, ticked at ~30fps -- fast enough that travel reads as
+    // motion rather than stepping, and still a third of the frames a
+    // full-rate animation would ask for on something that is on screen the
+    // whole time the app is.
+    //
+    // Held as State and read ONLY inside drawBehind, so a tick invalidates the
+    // DRAW phase and never recomposes this composable or the text field in it.
+    val glowPhase = remember { mutableFloatStateOf(0f) }
     val glowPulse = remember { mutableFloatStateOf(0.55f) }
     val haloColor = scheme.primary
+    // A second hue, mixed in on the far side of the sweep, so the light has
+    // colour depth instead of being one flat tint at two brightnesses.
+    val haloColor2 = scheme.tertiary
     LaunchedEffect(expanded) {
-        val periodMs = if (expanded) 1100L else 2200L
+        // Sweeps faster and breathes harder while open: the bar is the thing
+        // being used at that point, and the motion says so.
+        val sweepMs = if (expanded) 2600L else 5200L
+        val breatheMs = if (expanded) 1100L else 2200L
         val start = System.currentTimeMillis()
         while (true) {
             val elapsed = System.currentTimeMillis() - start
-            glowPulse.floatValue = 0.55f + (1f - 0.55f) * triangleWave(elapsed, periodMs)
-            delay(80)
+            glowPhase.floatValue = ((elapsed % sweepMs).toFloat() / sweepMs)
+            glowPulse.floatValue = 0.55f + (1f - 0.55f) * triangleWave(elapsed, breatheMs)
+            delay(33)
         }
     }
     val interaction = remember { MutableInteractionSource() }
@@ -11662,13 +11715,15 @@ private fun SearchPill(
         Box(
             Modifier.matchParentSize().drawBehind {
                 val pulse = glowPulse.floatValue
+                val phase = glowPhase.floatValue
                 val cx = size.width / 2f
                 val cy = size.height / 2f
-                val bloom = maxOf(size.width, size.height) * 0.62f
+                // The ambient bloom: the whole shape lit from within, breathing.
+                val bloom = maxOf(size.width, size.height) * 0.7f
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            haloColor.copy(alpha = (if (expanded) 0.42f else 0.24f) * pulse),
+                            haloColor.copy(alpha = (if (expanded) 0.34f else 0.20f) * pulse),
                             Color.Transparent,
                         ),
                         center = Offset(cx, cy),
@@ -11677,19 +11732,51 @@ private fun SearchPill(
                     radius = bloom,
                     center = Offset(cx, cy),
                 )
-                val core = maxOf(size.width, size.height) * 0.34f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            haloColor.copy(alpha = (if (expanded) 0.30f else 0.18f) * pulse),
-                            Color.Transparent,
+                // The travelling hotspot. It runs the PERIMETER of the pill --
+                // a straight run along each long edge and a turn at each end --
+                // rather than a circle, so on the wide bar it reads as light
+                // moving along the shape instead of orbiting somewhere behind
+                // its middle. Two of them, half a lap apart and in different
+                // hues, so there is always one in view on a wide bar and the
+                // colour shifts as they pass.
+                val rr = size.height / 2f
+                fun pointAt(t: Float): Offset {
+                    val runX = (size.width - size.height).coerceAtLeast(0f)
+                    val perim = 2f * runX + 2f * PI.toFloat() * rr
+                    var d = ((t % 1f) + 1f) % 1f * perim
+                    // Top edge, left to right.
+                    if (d < runX) return Offset(rr + d, cy - rr)
+                    d -= runX
+                    // Right cap.
+                    val capLen = PI.toFloat() * rr
+                    if (d < capLen) {
+                        val a = -PI.toFloat() / 2f + (d / capLen) * PI.toFloat()
+                        return Offset(size.width - rr + cos(a) * rr, cy + sin(a) * rr)
+                    }
+                    d -= capLen
+                    // Bottom edge, right to left.
+                    if (d < runX) return Offset(size.width - rr - d, cy + rr)
+                    d -= runX
+                    // Left cap.
+                    val a = PI.toFloat() / 2f + (d / capLen) * PI.toFloat()
+                    return Offset(rr + cos(a) * rr, cy + sin(a) * rr)
+                }
+                val hot = maxOf(size.height * 0.9f, 18f)
+                listOf(phase to haloColor, (phase + 0.5f) to haloColor2).forEach { (t, c) ->
+                    val p = pointAt(t)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                c.copy(alpha = (if (expanded) 0.55f else 0.4f) * pulse),
+                                Color.Transparent,
+                            ),
+                            center = p,
+                            radius = hot,
                         ),
-                        center = Offset(cx, cy),
-                        radius = core,
-                    ),
-                    radius = core,
-                    center = Offset(cx, cy),
-                )
+                        radius = hot,
+                        center = p,
+                    )
+                }
             },
         )
         Surface(

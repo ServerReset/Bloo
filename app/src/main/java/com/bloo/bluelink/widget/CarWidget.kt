@@ -1785,31 +1785,61 @@ class CarWidget : GlanceAppWidget() {
         val pct = (car.percent ?: 0).coerceIn(0, 100)
         val frac = pct / 100f
         val limit = car.chargeLimitPct?.takeIf { it in 1..99 }
-        // The seam costs real width, so it's only drawn where there is width
-        // to spend: on a narrow slot a 3dp gap is a visible bite out of a
-        // short bar and says less than the charge itself does.
-        val gap = if (limit != null && width >= 60.dp) 3.dp else 0.dp
-        val limitFrac = if (gap > 0.dp && limit != null) limit / 100f else 1f
+        // Split at the CHARGE: green is what's in the pack, grey is what
+        // isn't, and the gap between them is the level. The limit is a marker
+        // ON that bar, drawn below, not a second division of it -- the same
+        // model the phone hero, the watch ring and the live notification use.
+        //
+        // The gap costs real width, so it is skipped on a narrow slot and at
+        // the extremes, where there is nothing to separate.
+        val gap = if (width >= 60.dp && frac > 0.02f && frac < 0.98f) 3.dp else 0.dp
         val usable = (width - gap).coerceAtLeast(0.dp)
-        val head = usable * limitFrac
-        val tail = (usable - head).coerceAtLeast(0.dp)
-        Row(modifier = GlanceModifier.width(width).height(height)) {
-            Segment(
-                width = head,
-                fill = if (limitFrac <= 0f) 0f else frac / limitFrac,
-                height = height,
-                track = theme.surfaceVariant,
-                fillColor = if (car.charging == true) theme.charge else theme.accentProvider,
-            )
-            if (tail > 0.dp) {
-                Spacer(GlanceModifier.width(gap))
-                Segment(
-                    width = tail,
-                    fill = if (limitFrac >= 1f) 0f else (frac - limitFrac) / (1f - limitFrac),
-                    height = height,
-                    track = theme.surfaceVariant,
-                    fillColor = if (car.charging == true) theme.charge else theme.accentProvider,
-                )
+        val filled = usable * frac
+        val rest = (usable - filled).coerceAtLeast(0.dp)
+        val fillColor = if (car.charging == true) theme.charge else theme.accentProvider
+        // Glance has no z-stacking of a marker over a Row without a Box, so
+        // the whole bar lives in one: the Row paints, the dot overlays.
+        Box(modifier = GlanceModifier.width(width).height(height)) {
+            Row(modifier = GlanceModifier.width(width).height(height)) {
+                if (filled > 0.dp) {
+                    Box(
+                        modifier = GlanceModifier.width(filled).height(height)
+                            .cornerRadius(height / 2).background(fillColor),
+                    ) {}
+                }
+                if (rest > 0.dp) {
+                    if (filled > 0.dp) Spacer(GlanceModifier.width(gap))
+                    Box(
+                        modifier = GlanceModifier.width(rest).height(height)
+                            .cornerRadius(height / 2).background(theme.surfaceVariant),
+                    ) {}
+                }
+            }
+            // The marker. Positioned by a leading spacer rather than an offset
+            // -- Glance has no translation modifier, so "put this at x" is
+            // spelled "reserve x of empty space first".
+            if (limit != null && width >= 60.dp) {
+                val l = limit / 100f
+                val dot = (height + 4.dp)
+                val x = (usable * l + (if (l > frac) gap else 0.dp) - dot / 2)
+                    .coerceIn(0.dp, (width - dot).coerceAtLeast(0.dp))
+                Row(modifier = GlanceModifier.width(width).height(height)) {
+                    Spacer(GlanceModifier.width(x))
+                    Box(
+                        modifier = GlanceModifier.size(dot)
+                            .cornerRadius(dot / 2)
+                            .background(theme.surface),
+                    ) {
+                        Box(
+                            modifier = GlanceModifier.size(dot - 6.dp)
+                                .cornerRadius((dot - 6.dp) / 2)
+                                // Legible on either side of the split: the
+                                // pack's colour once the charge has passed it,
+                                // the bar's own background while it hasn't.
+                                .background(if (l <= frac) theme.surface else fillColor),
+                        ) {}
+                    }
+                }
             }
         }
     }
@@ -1841,33 +1871,6 @@ class CarWidget : GlanceAppWidget() {
             height = barH,
         )
         Spacer(GlanceModifier.height(8.dp))
-    }
-
-    /** One rounded stretch of [ChargeBar]. */
-    @Composable
-    private fun Segment(
-        width: Dp,
-        fill: Float,
-        height: Dp,
-        track: ColorProvider,
-        fillColor: ColorProvider,
-    ) {
-        Box(
-            modifier = GlanceModifier.width(width).height(height)
-                .cornerRadius(height / 2).background(track),
-        ) {
-            val f = fill.coerceIn(0f, 1f)
-            if (f > 0f) {
-                // Floored at the bar's own height so a very low charge still
-                // reads as a rounded nub instead of a sliver, and capped at
-                // the segment so the floor can't overrun a short one.
-                val w = minOf(width, (width * f).coerceAtLeast(height))
-                Box(
-                    modifier = GlanceModifier.width(w).height(height)
-                        .cornerRadius(height / 2).background(fillColor),
-                ) {}
-            }
-        }
     }
 
     // ---- Small pieces --------------------------------------------------------
