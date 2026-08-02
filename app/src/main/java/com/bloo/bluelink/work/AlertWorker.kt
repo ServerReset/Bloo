@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.wear.WearBridge
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
@@ -114,6 +115,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                         minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
                         pluggedInLabel = ev?.pluggedInLabel,
                         enabled = prefs.charging,
+                        chargeLimit = ev?.targetForCurrentPlug(),
                     )
                 }
             }

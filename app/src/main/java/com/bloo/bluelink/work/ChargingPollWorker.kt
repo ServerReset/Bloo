@@ -13,6 +13,7 @@ import com.bloo.bluelink.data.ChargingLive
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.data.repositoryFor
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
@@ -71,6 +72,7 @@ class ChargingPollWorker(ctx: Context, params: WorkerParameters) : CoroutineWork
                         minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
                         pluggedInLabel = ev?.pluggedInLabel,
                         enabled = true,
+                        chargeLimit = ev?.targetForCurrentPlug(),
                     )
                 }
             }

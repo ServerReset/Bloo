@@ -349,6 +349,9 @@ object ChargingLive {
     /** The not-yet-charged remainder. Deliberately dim rather than empty --
      *  a zero-width remaining segment at 100% is filtered out below. */
     private const val TRACK = 0x40FFFFFF
+    /** The stretch ABOVE the car's charge limit: dimmer still, because it
+     *  isn't headroom this charge will ever use. */
+    private const val TRACK_BEYOND = 0x1FFFFFFF
 
     /** One stable notification id per car, distinct from the alert ids so a
      *  charging notification never overwrites a door/service alert. */
@@ -390,6 +393,10 @@ object ChargingLive {
         minutesToFull: Int?,
         pluggedInLabel: String?,
         enabled: Boolean,
+        /** The car's charge limit for the plug it's on, if it reported one.
+         *  Drawn as the seam between "will charge" and "won't", matching the
+         *  app hero's own segmented bar. */
+        chargeLimit: Int? = null,
     ) {
         val id = idFor(vin)
         if (!enabled || !charging || !Notifications.hasPermission(context)) {
@@ -407,8 +414,12 @@ object ChargingLive {
         // "82% · 1h 20m left · Plugged in (AC)" -- built from whichever pieces
         // the car actually reported, joined so a missing one leaves no stray
         // separator behind.
+        val limit = chargeLimit?.takeIf { it in 1..99 }
         val detail = listOfNotNull(
             percent?.let { "$it%" },
+            // Only worth saying while it's still ahead of the car: once
+            // charging has reached the limit the number is the same number.
+            limit?.takeIf { percent == null || percent < it }?.let { "to $it%" },
             minutesToFull?.takeIf { it > 0 }?.let { "${fmtMinutes(it)} left" },
             pluggedInLabel?.takeIf { it.isNotBlank() && !it.startsWith("Not ") },
         ).joinToString(" · ")
@@ -432,24 +443,40 @@ object ChargingLive {
             // bar is drawn as one filled segment plus one remaining segment,
             // rather than setProgress's plain track, so the charged portion
             // carries the accent and the rest reads as headroom.
-            builder.setStyle(
-                NotificationCompat.ProgressStyle()
-                    .setStyledByProgress(false)
-                    .setProgress(percent)
-                    .setProgressSegments(
-                        // Built conditionally rather than filtered afterwards:
-                        // a zero-length segment is meaningless, and at 0% or
-                        // 100% one of the two is exactly that.
-                        buildList {
-                            if (percent > 0) {
-                                add(NotificationCompat.ProgressStyle.Segment(percent).setColor(CHARGE_GREEN))
-                            }
-                            if (percent < 100) {
-                                add(NotificationCompat.ProgressStyle.Segment(100 - percent).setColor(TRACK))
-                            }
-                        },
-                    ),
-            )
+            //
+            // With a charge limit reported, the remainder splits again: the
+            // headroom this charge will actually use (up to the limit) stays
+            // TRACK, and everything above the limit drops to TRACK_BEYOND,
+            // with a point marking the seam. Segment lengths always total
+            // 100, whatever order percent and limit come in -- including a
+            // charge that has already overrun its limit.
+            val headroom = ((limit ?: 100) - percent).coerceAtLeast(0)
+            val beyond = (100 - percent - headroom).coerceAtLeast(0)
+            val style = NotificationCompat.ProgressStyle()
+                .setStyledByProgress(false)
+                .setProgress(percent)
+                .setProgressSegments(
+                    // Built conditionally rather than filtered afterwards:
+                    // a zero-length segment is meaningless, and at 0% or
+                    // 100% one of these is exactly that.
+                    buildList {
+                        if (percent > 0) {
+                            add(NotificationCompat.ProgressStyle.Segment(percent).setColor(CHARGE_GREEN))
+                        }
+                        if (headroom > 0) {
+                            add(NotificationCompat.ProgressStyle.Segment(headroom).setColor(TRACK))
+                        }
+                        if (beyond > 0) {
+                            add(NotificationCompat.ProgressStyle.Segment(beyond).setColor(TRACK_BEYOND))
+                        }
+                    },
+                )
+            if (limit != null) {
+                style.setProgressPoints(
+                    listOf(NotificationCompat.ProgressStyle.Point(limit).setColor(CHARGE_GREEN)),
+                )
+            }
+            builder.setStyle(style)
             // The compact text on the status-bar chip, where there is room for
             // a couple of glyphs and nothing more.
             builder.setShortCriticalText("$percent%")
