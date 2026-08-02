@@ -3394,6 +3394,12 @@ private fun CoverHero(
     }
 }
 
+/** Most of one dimension a display cutout may ever claim as clearance. A real
+ *  notch or lens is a few percent; anything demanding more than this is a
+ *  camera island being measured as though it were a punch-hole, and honouring
+ *  it costs more screen than it protects. See cutoutClearanceDp. */
+private const val MAX_CUTOUT_FRACTION = 0.22f
+
 /**
  * Per-edge camera-bump clearance in dp, computed from the display cutout rects for
  * ANY bump position. This is the generalized, corner-safe successor to the old
@@ -3437,7 +3443,30 @@ private fun cutoutClearanceDp(): EdgeDp {
         if (vOnly && r.top <= edgeBandPx) top = maxOf(top, vIntr!!)
         if (vOnly && vh - r.bottom <= edgeBandPx) bottom = maxOf(bottom, vIntr!!)
     }
-    return with(density) { EdgeDp(left.toDp().value, top.toDp().value, right.toDp().value, bottom.toDp().value) }
+    // Clamp each edge to a fraction of its own dimension.
+    //
+    // The arithmetic above assumes the cutout is a small punch-hole, so the
+    // clearance is measured from the FAR side of the rect: `r.right + margin`,
+    // or `(vw - r.left) + margin`. That's right for a lens and catastrophic
+    // for a flip cover screen, which reports its whole camera ISLAND as one
+    // bounding rect -- an island starting halfway across yields a clearance of
+    // half the display, and the content gets squeezed into the strip that's
+    // left with the rest sitting empty. Reported from a real device.
+    //
+    // Past this cap the rect isn't a notch to dodge, it's the panel's shape,
+    // and the honest response is to use the space rather than surrender it:
+    // anything the hardware genuinely occludes is already excluded from the
+    // window the app was given.
+    val maxH = vw * MAX_CUTOUT_FRACTION
+    val maxV = vh * MAX_CUTOUT_FRACTION
+    return with(density) {
+        EdgeDp(
+            left.coerceAtMost(maxH).toDp().value,
+            top.coerceAtMost(maxV).toDp().value,
+            right.coerceAtMost(maxH).toDp().value,
+            bottom.coerceAtMost(maxV).toDp().value,
+        )
+    }
 }
 
 /**
