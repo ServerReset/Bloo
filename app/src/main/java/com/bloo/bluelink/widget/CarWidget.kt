@@ -741,22 +741,38 @@ class CarWidget : GlanceAppWidget() {
                 return
             }
         }
-        // Mirrors CompactWideLayout's own clamp: COMPACT_TALL's threshold only
-        // proves the HEIGHT is roomy, not the width.
+        // COMPACT_TALL's threshold only proves the HEIGHT is roomy, not the
+        // width, so the ring is still capped against the width -- but the
+        // height it does have should be USED. This tier had no weighted
+        // spacer at all, so on a 126x360dp tile everything stacked against
+        // the top edge and the bottom half was empty. Reported from a real
+        // device.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.width - 16.dp).coerceAtLeast(20.dp))
+        val rows = 2
+        // Hero-sized like the other tall tiers: take what's left after the
+        // name, info rows and buttons rather than a fixed curve that leaves
+        // the rest blank.
+        val ringEdge = Scale.ringHero(
+            size,
+            Scale.ringRoom(size, render.theme.textScale, hasHeader = false, hasFooter = false, spacers = 18.dp) -
+                Scale.infoBlockHeight(size, rows, render.theme.textScale) -
+                Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale),
+        )
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             FitText(
                 car.name, titleStyle(render.theme),
                 maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
-            Spacer(GlanceModifier.height(6.dp))
+            // Weighted above AND below, so whatever the ring doesn't claim is
+            // split evenly and the block reads as centred instead of piled at
+            // the top.
+            Spacer(GlanceModifier.defaultWeight())
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.height(6.dp))
             }
-            InfoStack(car, render, max = 2)
-            Spacer(GlanceModifier.height(6.dp))
+            InfoStack(car, render, max = rows)
+            Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 2)
         }
     }
@@ -944,8 +960,7 @@ class CarWidget : GlanceAppWidget() {
             }
             Spacer(GlanceModifier.height(10.dp))
             InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), footerShown = true)
-            MapModule(render)
-            Spacer(GlanceModifier.defaultWeight())
+            MapFill(render)
             ActionButtons(car, render, max = 5)
             FooterRow(car, render)
         }
@@ -1015,8 +1030,7 @@ class CarWidget : GlanceAppWidget() {
             )
             Spacer(GlanceModifier.height(14.dp))
             InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale), footerShown = true)
-            MapModule(render)
-            Spacer(GlanceModifier.defaultWeight())
+            MapFill(render)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
         }
@@ -1045,9 +1059,7 @@ class CarWidget : GlanceAppWidget() {
                 },
                 content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
             )
-            Spacer(GlanceModifier.height(12.dp))
-            MapModule(render)
-            Spacer(GlanceModifier.defaultWeight())
+            MapFill(render)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
         }
@@ -1116,6 +1128,39 @@ class CarWidget : GlanceAppWidget() {
     /** The location map thumbnail, shown only when the pre-fetched bitmap exists
      *  (config.showMap on + car has coords + tile fetched OK). Rounded corners to
      *  match the widget's card language. */
+    /**
+     * Fills a tall layout's leftover vertical space with the location map.
+     *
+     * Every big tier used to end with a bare `Spacer(defaultWeight())`, which
+     * by definition collects ALL the slack in one place -- on a 600x520dp tile
+     * that was a black gap taller than the content above it, with the buttons
+     * shoved against the bottom edge. Reported from a real device.
+     *
+     * The map is exactly what belongs there: it's the one piece of content
+     * that genuinely wants more room the more room there is, so it takes the
+     * weight instead of a spacer and grows with the widget. Without
+     * coordinates (or with the map switched off) it falls back to the spacer,
+     * because leaving a gap is still better than stretching something that
+     * was never meant to fill.
+     */
+    @Composable
+    private fun MapFill(render: Render) {
+        val bmp = render.mapBitmap
+        if (bmp == null) {
+            Spacer(GlanceModifier.defaultWeight())
+            return
+        }
+        Spacer(GlanceModifier.height(8.dp))
+        Image(
+            provider = ImageProvider(bmp),
+            contentDescription = "Car location",
+            contentScale = ContentScale.Crop,
+            modifier = GlanceModifier.fillMaxWidth().defaultWeight()
+                .cornerRadius(innerCorner(render.config)),
+        )
+        Spacer(GlanceModifier.height(8.dp))
+    }
+
     @Composable
     private fun MapModule(render: Render) {
         val bmp = render.mapBitmap ?: return

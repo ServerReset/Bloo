@@ -35,7 +35,7 @@ class WidgetConfigStore(private val context: Context) {
         val actions: List<String> = WidgetAction.DEFAULTS,
         val infoFields: List<String> = WidgetInfoField.DEFAULTS,
         val showRing: Boolean = true,
-        val showMap: Boolean = false,
+        val showMap: Boolean = true,
         val photoBackground: Boolean = false,
         val priority: String = WidgetConfig.PRIORITY_INFO,
         val pillShape: Boolean = false,

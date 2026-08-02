@@ -25,8 +25,15 @@ data class WidgetConfig(
     val infoFields: List<String> = WidgetInfoField.DEFAULTS,
     /** Whether to draw the charge/fuel status ring when there's room for it. */
     val showRing: Boolean = true,
-    /** Whether to show the location map thumbnail on large sizes (advanced-only knob). */
-    val showMap: Boolean = false,
+    /** Whether to show the location map on large sizes.
+     *
+     *  Defaults ON. It used to default off, which meant the big layouts
+     *  reserved a weighted slot for it and then rendered nothing there --
+     *  a large widget was mostly empty space with the buttons pushed to the
+     *  bottom edge. Where the car is happens to be exactly the thing worth
+     *  showing once there's room for it, so the space and the content now
+     *  agree. Still no-ops gracefully when the car has no coordinates. */
+    val showMap: Boolean = true,
     /** Use the car's own photo (blurred, full-bleed) as the widget background
      *  instead of a flat themed surface. No-ops gracefully back to the themed
      *  surface when the car has no photo set. */
