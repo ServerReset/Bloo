@@ -3337,14 +3337,19 @@ private const val COVER_TINY_DP = 300f
  *  and the pinned action button in [PebbleShell]'s fillHeight branch, so they can't drift. */
 private val CoverContentInset = 16.dp
 
+/** True inside a [CoverTile]'s body, i.e. below a title band that already
+ *  shows the page's icon and name. [CoverHero] reads it to avoid drawing that
+ *  same glyph a second time, a few dp lower and larger. */
+private val LocalCoverTileTitled = staticCompositionLocalOf { false }
+
 /** The one converged cover-hero icon size. Was drifting 30/48/64 across tiles; a single
  *  scale is what makes the cover read as one system. Device-verify the exact value
  *  (32–36 is the safe window at ~1.15x font scale); 34 is one nudge up from the old majority. */
 private val CoverHeroIcon = 34.dp
 
 /**
- * The one shared glance-hero every cover tile opens with: a converged-size [icon] + a
- * shrink-to-fit headline [value] (via [com.bloo.uicommon.FittedText], so it can never
+ * The one shared glance-hero every cover tile opens with: a shrink-to-fit
+ * headline [value] (via [com.bloo.uicommon.FittedText], so it can never
  * clip/wrap), optionally a [trailing] value pushed to the row end (e.g. Climate setpoint)
  * and a [subline] below (e.g. AI status, Location coordinates). Left-aligned, full-width,
  * and — critically — emits NO trailing Spacer: the cover shell's `spacedBy(CenterVertically)`
@@ -3368,7 +3373,17 @@ private fun CoverHero(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(CoverHeroIcon))
+            // The [icon] is drawn ONLY when this hero isn't already inside a
+            // CoverTile that named the page with the same glyph. It always is,
+            // now that every cover page goes through the template -- so in
+            // practice this draws nothing and the value gets the full width,
+            // which on a one-inch screen is several characters of headline.
+            // The parameter stays because the icon is what a caller reaches
+            // for first, and silently ignoring one passed outside a titled
+            // tile would be worse than honouring it.
+            if (!LocalCoverTileTitled.current) {
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(CoverHeroIcon))
+            }
             com.bloo.uicommon.FittedText(
                 text = value,
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = valueColor),
@@ -3486,16 +3501,18 @@ private fun CoverTile(
             val scroll = scrollState ?: rememberScrollState()
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val minHeight = maxHeight
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .fadingEdges(scroll)
-                        .verticalScroll(scroll)
-                        .heightIn(min = minHeight)
-                        .padding(vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-                    content = body,
-                )
+                CompositionLocalProvider(LocalCoverTileTitled provides true) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .fadingEdges(scroll)
+                            .verticalScroll(scroll)
+                            .heightIn(min = minHeight)
+                            .padding(vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                        content = body,
+                    )
+                }
             }
             if (actions != null) {
                 Row(
