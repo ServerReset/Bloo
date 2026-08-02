@@ -302,6 +302,43 @@ class CarWidget : GlanceAppWidget() {
         /** Kept proportional to the button that contains it, so a button
          *  shrunk by the cap above doesn't end up with an icon wider than
          *  itself. */
+        /** The big percentage in the bar treatment -- deliberately larger
+         *  than [titleSp], because on a wide tile the number IS the content
+         *  and the space is horizontal. */
+        fun heroSp(size: DpSize): TextUnit = lerp(progress(size), 22f, 44f).sp
+
+        /** Below this a hero number is no bigger than the ordinary title it
+         *  replaced, so the treatment has bought nothing. */
+        const val HERO_MIN_SP = 15f
+
+        /**
+         * The hero number's size on a tile with [avail] of vertical room, once
+         * [reserve] (the bar and its spacer) is set aside.
+         *
+         * [heroSp] alone is keyed off [progress], i.e. the SHORTER side of the
+         * tile -- which on a short-but-wide strip is exactly the side that has
+         * to hold the line, so the ideal and the room disagree. Capping here is
+         * the same fix applied to [buttonHeight] and [ringRoom]: measure the
+         * thing against the quantity that actually constrains it.
+         *
+         * Null means what's left can't hold a legible number, and BarHero
+         * declines rather than shrinking into illegibility -- the same
+         * yield-nothing-rather-than-something-wrong contract as [ring].
+         */
+        fun heroSpIn(size: DpSize, avail: Dp, reserve: Dp, textScale: Float): Float? {
+            val ideal = heroSp(size).value * textScale
+            val room = (avail - reserve).value / 1.35f
+            val chosen = minOf(ideal, room)
+            return if (chosen < HERO_MIN_SP) null else chosen
+        }
+
+        /** Height of the horizontal charge bar. */
+        fun barHeight(size: DpSize): Dp = lerp(progress(size), 8f, 14f).dp
+
+        /** Below this the ring is a token rather than a gauge, and a wide tile
+         *  is better served by the bar treatment -- see BarHero. */
+        val RING_WORTH_IT = 52.dp
+
         /** Smallest button width worth laying out, scaled by tile size. Small
          *  tiles get a much lower floor so every configured control still fits
          *  across rather than some being dropped -- see ActionButtons. */
@@ -553,14 +590,21 @@ class CarWidget : GlanceAppWidget() {
         // text and buttons out as if a third of the row were missing.
         val slice = ((size.width - (if (showsRing) ringEdge + 8.dp else 0.dp) - 8.dp) / 2)
             .coerceAtLeast(24.dp)
+        // A banner is almost pure width, so a ring bounded by its ~78dp height
+        // is a token. Below RING_WORTH_IT the bar treatment takes over and
+        // spends the axis this tile actually has.
+        val useBar = showsRing && ringEdge < Scale.RING_WORTH_IT
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (showsRing) {
+            if (showsRing && !useBar) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(8.dp))
             }
             Column(modifier = GlanceModifier.defaultWeight()) {
-                FitText(car.name, titleStyle(render.theme), maxWidth = slice)
-                PrimaryInfoLine(car, render, maxWidth = slice)
+                if (useBar) {
+                    BarHero(car, render, width = slice)
+                } else {
+                    NameAndStat(car, render, width = slice)
+                }
             }
             Spacer(GlanceModifier.width(8.dp))
             // A banner is nearly all width, so the buttons get a real share
@@ -715,8 +759,11 @@ class CarWidget : GlanceAppWidget() {
         // text and buttons out as if a third of the row were missing.
         val slice = ((size.width - (if (showsRing) ringEdge + 10.dp else 0.dp) - 8.dp) / 2)
             .coerceAtLeast(24.dp)
+        // Same call as BANNER: a wide-and-short tile bounds the ring by its
+        // short side, so past a point the bar says more in less height.
+        val useBar = showsRing && ringEdge < Scale.RING_WORTH_IT
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (showsRing) {
+            if (showsRing && !useBar) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(10.dp))
             }
@@ -732,8 +779,11 @@ class CarWidget : GlanceAppWidget() {
             // Giving it a weight too makes it share the remaining space
             // fairly with the text column instead of overrunning it.
             Column(modifier = GlanceModifier.defaultWeight()) {
-                FitText(car.name, titleStyle(render.theme), maxWidth = slice)
-                PrimaryInfoLine(car, render, maxWidth = slice)
+                if (useBar) {
+                    BarHero(car, render, width = slice)
+                } else {
+                    NameAndStat(car, render, width = slice)
+                }
             }
             Spacer(GlanceModifier.width(8.dp))
             ActionButtons(car, render, max = 3, modifier = GlanceModifier.defaultWeight(), availableWidth = slice)
@@ -1228,6 +1278,29 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun PrimaryInfoLine(car: VehicleSnapshot, render: Render, maxWidth: Dp) {
         FitText(primaryValue(car, render), subtitleStyle(render.theme), maxWidth = maxWidth)
+    }
+
+    /**
+     * The ordinary text pair -- the car's name over its primary stat -- with
+     * the stat dropped when the row can't hold both lines.
+     *
+     * The pair was previously written out at each call site as two unguarded
+     * [FitText]s. FitText budgets WIDTH only; nothing was checking that two
+     * stacked lines fit the tile's HEIGHT, so on a 640x40 strip at the 1.4x
+     * text size they overran it by 9.8dp -- and RemoteViews renders that as a
+     * line bleeding past the bottom edge, not as a clip. The name always fits
+     * on its own (both it and the budget are driven by the short side), so
+     * the stat is the only thing this has to decide about.
+     */
+    @Composable
+    private fun NameAndStat(car: VehicleSnapshot, render: Render, width: Dp) {
+        val size = LocalSize.current
+        val scale = render.theme.textScale
+        val avail = size.height - Scale.contentPadding(size) * 2
+        FitText(car.name, titleStyle(render.theme), maxWidth = width)
+        val both = Scale.lineHeight(Scale.titleSp(size).value, scale) +
+            Scale.lineHeight(Scale.subtitleSp(size).value, scale)
+        if (both <= avail) PrimaryInfoLine(car, render, maxWidth = width)
     }
 
     /** The stacked read-only stats, honoring the user's chosen fields + order,
@@ -1803,6 +1876,82 @@ class CarWidget : GlanceAppWidget() {
         WidgetConfig.CORNER_ROUND -> 18.dp
         WidgetConfig.CORNER_PILL -> 999.dp
         else -> 14.dp
+    }
+
+    /**
+     * The bar treatment: a big percentage over a horizontal charge bar.
+     *
+     * A ring is the right hero when a tile has height to spend on it. On a
+     * wide, short tile it is the wrong shape entirely -- it's bounded by the
+     * SHORT side, so it shrinks to a token while the width it can't use sits
+     * empty. This spends the axis that tile actually has: the number reads
+     * from across a room, and the bar carries the same information as the
+     * ring in a fraction of the height.
+     *
+     * It's also what the app's own hero card does, so a wide widget and the
+     * app now show charge the same way instead of two different visual
+     * languages for one value.
+     */
+    @Composable
+    private fun BarHero(car: VehicleSnapshot, render: Render, width: Dp) {
+        val theme = render.theme
+        val size = LocalSize.current
+        val pct = car.percent
+        // Budget the vertical the same way every other module here does: the
+        // number sizes itself to what's left after the bar, the sub-line is
+        // the first thing to go, and the whole treatment steps aside when
+        // even the number can't be big enough to be one. Unbudgeted this
+        // overran 422 sizes across the resize range -- worst a 220x40 strip
+        // by 1.7dp, and RemoteViews doesn't clip an overflowing Column.
+        val avail = size.height - Scale.contentPadding(size) * 2
+        val barH = Scale.barHeight(size)
+        val heroSp = pct?.let { Scale.heroSpIn(size, avail, barH + 4.dp, theme.textScale) }
+        if (pct == null || heroSp == null) {
+            // No percentage to make a hero of, or no room to make it big
+            // enough to be one. Either way the bar treatment isn't what this
+            // tile wants, so it gets the ordinary name/stat pair rather than a
+            // shrunken imitation of a hero.
+            NameAndStat(car, render, width = width)
+            return
+        }
+        val heroH = Scale.lineHeight(heroSp, 1f)
+        val subH = Scale.lineHeight(Scale.subtitleSp(size).value, theme.textScale) + 4.dp
+        val showSub = heroH + 4.dp + barH + subH <= avail
+        Column(modifier = GlanceModifier.fillMaxWidth()) {
+            FitText(
+                "$pct%",
+                TextStyle(
+                    color = theme.onSurface,
+                    fontSize = heroSp.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+                maxWidth = width,
+            )
+            Spacer(GlanceModifier.height(4.dp))
+            // Glance has no fractional width, but the exact slot width is
+            // already known here, so the fill is computed in dp rather than
+            // guessed -- same discipline as everything else in this file.
+            // Floored at the bar's own height so a very low charge still
+            // reads as a rounded nub instead of a sliver.
+            val fill = (width * (pct.coerceIn(0, 100) / 100f)).coerceAtLeast(barH)
+            Box(
+                modifier = GlanceModifier.width(width).height(barH)
+                    .cornerRadius(barH / 2).background(theme.surfaceVariant),
+            ) {
+                Box(
+                    modifier = GlanceModifier.width(fill).height(barH)
+                        .cornerRadius(barH / 2)
+                        .background(
+                            if (car.charging == true) theme.charge else theme.accentProvider,
+                        ),
+                ) {}
+            }
+            val sub = primaryValue(car, render).takeIf { showSub }
+            if (sub != null) {
+                Spacer(GlanceModifier.height(4.dp))
+                FitText(sub, subtitleStyle(theme), maxWidth = width)
+            }
+        }
     }
 
     // ---- Small pieces --------------------------------------------------------
