@@ -24,6 +24,7 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
@@ -1143,8 +1144,13 @@ class CarWidget : GlanceAppWidget() {
      * because leaving a gap is still better than stretching something that
      * was never meant to fill.
      */
+    // Extension on ColumnScope, NOT a plain composable: defaultWeight() is
+    // declared INSIDE Row/ColumnScope rather than on GlanceModifier itself, so
+    // it only resolves where that receiver is in scope. Every other use in this
+    // file happens to sit directly inside a Column lambda and gets it for free;
+    // pulling this out into its own function is what surfaced that.
     @Composable
-    private fun MapFill(render: Render) {
+    private fun ColumnScope.MapFill(render: Render) {
         val bmp = render.mapBitmap
         if (bmp == null) {
             Spacer(GlanceModifier.defaultWeight())
