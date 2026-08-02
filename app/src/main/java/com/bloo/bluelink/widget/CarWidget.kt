@@ -734,7 +734,7 @@ class CarWidget : GlanceAppWidget() {
                 // this tier is short by definition, so most sizes here will
                 // keep the spacer.
                 if (render.mapBitmap != null && room - barH >= 56.dp) {
-                    MapFill(render)
+                    MapFill(render, room - barH)
                 } else {
                     Spacer(GlanceModifier.defaultWeight())
                 }
@@ -760,14 +760,19 @@ class CarWidget : GlanceAppWidget() {
         // Tall MEDIUM: everything stacked in one column, ring centered --
         // the mirror of MediumWideLayout's side-by-side arrangement.
         val size = LocalSize.current
-        val rows = Scale.infoCap(size, 3, render.theme.textScale)
-        // Hand the ring everything left after the header, buttons and the
-        // info rows, instead of a fixed curve plus a trailing void.
-        val ringEdge = Scale.ringHero(
+        // Hand the ring everything left after the header, buttons, info rows
+        // and the map's reserve, instead of a fixed curve plus a trailing
+        // void -- see Scale.tallSplit for why the map has to be taken out
+        // before the ring is sized rather than after.
+        val split = Scale.tallSplit(
             size,
-            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp) -
-                Scale.infoBlockHeight(size, rows, render.theme.textScale),
+            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp),
+            capRows = Scale.infoCap(size, 3, render.theme.textScale),
+            textScale = render.theme.textScale,
+            wantMap = render.mapBitmap != null,
         )
+        val rows = split.rows
+        val ringEdge = split.ring
         // Whatever is left after the header, ring, stats and buttons goes to
         // the map when the user has one enabled and the car has coordinates.
         // MEDIUM is the smallest tier that shows one at all now: it used to
@@ -776,7 +781,7 @@ class CarWidget : GlanceAppWidget() {
         // the same room and puts the car's location in it, and collapses to
         // nothing when there's no bitmap, which is when the spacers are the
         // right answer again.
-        val hasMap = render.mapBitmap != null
+        val hasMap = render.mapBitmap != null && split.map > 0.dp
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             // Weighted spacers ABOVE and below centre what's left, rather
@@ -787,7 +792,7 @@ class CarWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.height(8.dp))
             }
             InfoStack(car, render, max = rows)
-            if (hasMap) MapFill(render) else Spacer(GlanceModifier.defaultWeight())
+            if (hasMap) MapFill(render, split.map) else Spacer(GlanceModifier.defaultWeight())
             ActionButtons(car, render, max = 4)
         }
     }
@@ -805,6 +810,11 @@ class CarWidget : GlanceAppWidget() {
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)
         val ringEdge = Scale.ring(size, ringRoom)
+        // The map sits INSIDE the info column here, beside the ring rather
+        // than below it, so what it has to fit in is the row's height less
+        // the rows already stacked above it -- not the whole column.
+        val rows = Scale.infoCap(size, 4, render.theme.textScale)
+        val mapRoom = (ringRoom - Scale.infoBlockHeight(size, rows, render.theme.textScale)).coerceAtLeast(0.dp)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
@@ -821,8 +831,8 @@ class CarWidget : GlanceAppWidget() {
                     }
                 },
                 content = { w ->
-                    InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true)
-                    MapModule(render)
+                    InfoStack(car, render, max = rows, availableWidth = w, footerShown = true)
+                    MapModule(render, mapRoom)
                 },
             )
             Spacer(GlanceModifier.height(10.dp))
@@ -840,11 +850,14 @@ class CarWidget : GlanceAppWidget() {
         // already have, giving LARGE its own third shape too.
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)
-        val ringEdge = Scale.ring(size, ringRoom)
+        // Full-width map below the row, so here it competes with the ring for
+        // the same column and has to be taken out of the ring's budget first.
+        val mapRoom = Scale.mapReserve(size, ringRoom, render.mapBitmap != null)
+        val ringEdge = Scale.ring(size, ringRoom - mapRoom)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
-            ChargeBarFallback(car, render, ringEdge, ringRoom)
+            ChargeBarFallback(car, render, ringEdge, ringRoom - mapRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 220.dp,
@@ -858,7 +871,7 @@ class CarWidget : GlanceAppWidget() {
                 },
                 content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
             )
-            MapModule(render)
+            MapModule(render, mapRoom)
             Spacer(GlanceModifier.height(10.dp))
             ActionButtons(car, render, max = 5)
             FooterRow(car, render)
@@ -871,14 +884,22 @@ class CarWidget : GlanceAppWidget() {
         // of beside it -- there's more height to spend than width here, so a
         // side-by-side split would leave the info column cramped.
         val size = LocalSize.current
-        val rows = Scale.infoCap(size, 4, render.theme.textScale)
-        val ringEdge = Scale.ringHero(
+        val split = Scale.tallSplit(
             size,
-            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp) -
-                Scale.infoBlockHeight(size, rows, render.theme.textScale),
+            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp),
+            capRows = Scale.infoCap(size, 4, render.theme.textScale),
+            textScale = render.theme.textScale,
+            wantMap = render.mapBitmap != null,
         )
+        val ringEdge = split.ring
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
+            // With no map, MapFill below is a weighted spacer -- matching it
+            // here centres what's left instead of pooling every leftover dp
+            // in one void along the bottom edge. On a very tall tile the ring
+            // is bounded by the tile's WIDTH, so there is always leftover to
+            // place. MediumTallLayout already balanced its column this way.
+            if (split.map <= 0.dp) Spacer(GlanceModifier.defaultWeight())
             Spacer(GlanceModifier.height(10.dp))
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -886,8 +907,8 @@ class CarWidget : GlanceAppWidget() {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
             Spacer(GlanceModifier.height(10.dp))
-            InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), footerShown = true)
-            MapFill(render)
+            InfoStack(car, render, max = split.rows, footerShown = true)
+            MapFill(render, split.map)
             ActionButtons(car, render, max = 5)
             FooterRow(car, render)
         }
@@ -899,6 +920,11 @@ class CarWidget : GlanceAppWidget() {
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp)
         val ringEdge = Scale.ring(size, ringRoom)
+        // Same as LargeWideLayout: the map is stacked under the info rows
+        // inside the column beside the ring, so its room is what those rows
+        // leave of the row's own height.
+        val rows = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale)
+        val mapRoom = (ringRoom - Scale.infoBlockHeight(size, rows, render.theme.textScale)).coerceAtLeast(0.dp)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
@@ -921,8 +947,8 @@ class CarWidget : GlanceAppWidget() {
                     FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = ringEdge, horizontalAlignment = Alignment.CenterHorizontally)
                 },
                 content = { w ->
-                    InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale), availableWidth = w, footerShown = true)
-                    MapModule(render)
+                    InfoStack(car, render, max = rows, availableWidth = w, footerShown = true)
+                    MapModule(render, mapRoom)
                 },
             )
             Spacer(GlanceModifier.height(14.dp))
@@ -938,14 +964,18 @@ class CarWidget : GlanceAppWidget() {
         // into side-by-side columns that would squeeze on a narrow-but-tall
         // dashboard-sized tile.
         val size = LocalSize.current
-        val rows = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale)
-        val ringEdge = Scale.ringHero(
+        val split = Scale.tallSplit(
             size,
-            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp) -
-                Scale.infoBlockHeight(size, rows, render.theme.textScale),
+            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp),
+            capRows = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale),
+            textScale = render.theme.textScale,
+            wantMap = render.mapBitmap != null,
         )
+        val ringEdge = split.ring
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
+            // Same balancing spacer as LargeTallLayout's.
+            if (split.map <= 0.dp) Spacer(GlanceModifier.defaultWeight())
             Spacer(GlanceModifier.height(14.dp))
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -958,8 +988,8 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
             Spacer(GlanceModifier.height(14.dp))
-            InfoStack(car, render, max = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale), footerShown = true)
-            MapFill(render)
+            InfoStack(car, render, max = split.rows, footerShown = true)
+            MapFill(render, split.map)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
         }
@@ -972,11 +1002,14 @@ class CarWidget : GlanceAppWidget() {
         // and XlTallLayout's fully stacked column.
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 24.dp)
-        val ringEdge = Scale.ring(size, ringRoom)
+        // Full-width map below the row, competing with the ring for the same
+        // column -- reserved first, as in LargeSquareLayout.
+        val mapRoom = Scale.mapReserve(size, ringRoom, render.mapBitmap != null)
+        val ringEdge = Scale.ring(size, ringRoom - mapRoom)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(12.dp))
-            ChargeBarFallback(car, render, ringEdge, ringRoom)
+            ChargeBarFallback(car, render, ringEdge, ringRoom - mapRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth(),
                 minRowWidth = 260.dp,
@@ -990,7 +1023,7 @@ class CarWidget : GlanceAppWidget() {
                 },
                 content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
             )
-            MapFill(render)
+            MapFill(render, mapRoom)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
         }
@@ -1079,10 +1112,15 @@ class CarWidget : GlanceAppWidget() {
     // it only resolves where that receiver is in scope. Every other use in this
     // file happens to sit directly inside a Column lambda and gets it for free;
     // pulling this out into its own function is what surfaced that.
+    /** The map as a weighted module, taking the slack its caller reserved
+     *  for it ([room]) -- which is 0 when the caller worked out there wasn't
+     *  enough of it to be a map, and then this is a plain spacer again. The
+     *  weight is what actually sizes it; [room] is how the caller and this
+     *  function agree on whether it is drawn at all. */
     @Composable
-    private fun ColumnScope.MapFill(render: Render) {
+    private fun ColumnScope.MapFill(render: Render, room: Dp) {
         val bmp = render.mapBitmap
-        if (bmp == null) {
+        if (bmp == null || room <= 0.dp) {
             Spacer(GlanceModifier.defaultWeight())
             return
         }
@@ -1102,15 +1140,22 @@ class CarWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun MapModule(render: Render) {
+    /** The map at a fixed height, for the tiers that place it among
+     *  fixed-height siblings. [room] is what the caller has actually got
+     *  left for it -- the height used to be [Scale.mapHeight] unconditionally,
+     *  which on a cramped square tile was more than the whole column had
+     *  left and pushed the ring beside it to nothing. */
+    @Composable
+    private fun MapModule(render: Render, room: Dp) {
         val bmp = render.mapBitmap ?: return
+        if (room < Scale.MAP_MIN) return
         Spacer(GlanceModifier.height(8.dp))
         Image(
             provider = ImageProvider(bmp),
             contentDescription = "Car location",
             contentScale = ContentScale.Crop,
             modifier = GlanceModifier.fillMaxWidth()
-                .height(Scale.mapHeight(LocalSize.current))
+                .height(minOf(Scale.mapHeight(LocalSize.current), room))
                 .cornerRadius(innerCorner(render.config))
                 .clickable(openAction(LocalContext.current)),
         )

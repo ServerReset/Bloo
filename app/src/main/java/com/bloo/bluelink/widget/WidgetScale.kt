@@ -219,6 +219,63 @@ internal object Scale {
      *  keeps it proportioned the same way everything else here is. */
     fun mapHeight(size: DpSize): Dp = lerp(progress(size), 56f, 110f).dp
 
+    /** Smallest map worth drawing. Below this it reads as a stripe of
+     *  colour rather than a picture of anywhere, and the modules around it
+     *  make better use of the room. */
+    val MAP_MIN = 44.dp
+
+    /**
+     * The height to set aside for the map before anything else is sized,
+     * out of a column with [room] to spend.
+     *
+     * The map used to be given a weighted slot and left to claim whatever
+     * the ring had not already taken -- but the ring's own sizing takes
+     * everything it is offered, so on most tiles that was nothing. Capped at
+     * a third of the column so the map stays a supporting module rather than
+     * displacing the gauge, and zero when a third isn't enough to be a map
+     * at all, in which case the caller draws no map and keeps the space.
+     */
+    fun mapReserve(size: DpSize, room: Dp, wantMap: Boolean): Dp {
+        if (!wantMap) return 0.dp
+        val want = minOf(mapHeight(size) + 8.dp, room * 0.35f)
+        return if (want < MAP_MIN) 0.dp else want
+    }
+
+    /** How a tall tier divides its free column. See [tallSplit]. */
+    data class TallSplit(val ring: Dp, val rows: Int, val map: Dp)
+
+    /**
+     * Splits a tall tier's free column between the hero ring, the info rows
+     * and the optional map.
+     *
+     * The tall tiers used to size the ring from `ringRoom - infoBlockHeight`
+     * and then hand the map a weighted slot below it. But [ringHero] takes
+     * everything it is offered, so that subtraction left exactly nothing for
+     * the weight to claim: turning on the location option produced a map of
+     * zero height on every tall tile whose ring was room-bound rather than
+     * width-bound, which is most of them. The map has to be reserved BEFORE
+     * the ring is sized, not left to compete with it afterwards.
+     *
+     * The reserve is capped at a third of the column so the map stays a
+     * supporting module and the ring stays the hero -- and the row count is
+     * then derived from what's actually left rather than from [infoCap]'s
+     * fixed fraction of the tile, so the three claims can't sum past the
+     * column they share.
+     */
+    fun tallSplit(
+        size: DpSize,
+        room: Dp,
+        capRows: Int,
+        textScale: Float,
+        wantMap: Boolean,
+    ): TallSplit {
+        val map = mapReserve(size, room, wantMap)
+        val rest = (room - map).coerceAtLeast(0.dp)
+        val rows = infoRowsIn(size, rest * 0.45f, textScale, capRows)
+        val ring = ringHero(size, rest - infoBlockHeight(size, rows, textScale))
+        return TallSplit(ring, rows, map)
+    }
+
     /** How many [InfoStack] rows to actually show.
      *
      *  The stack shares a Column with the header, ring, buttons and

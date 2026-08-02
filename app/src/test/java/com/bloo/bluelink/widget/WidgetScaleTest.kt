@@ -165,4 +165,57 @@ class WidgetScaleTest {
             assertTrue(h <= avail || avail.value < 16f, "button ${h} exceeds ${avail} at $size")
         }
     }
+
+    /**
+     * A tall tier's three claims -- ring, info rows, map -- never sum past
+     * the column they share, and the map is either a real map or nothing.
+     *
+     * This is the invariant the tall tiers used to break: [Scale.ringHero]
+     * takes everything it is offered, so sizing it from the whole column and
+     * then handing the map a weighted slot underneath gave the map zero
+     * height on every tile whose ring was room-bound. Turning the location
+     * option on produced no map at all, which is indistinguishable from the
+     * option not working.
+     */
+    @Test
+    fun `tall split fits its column and leaves a usable map`() {
+        for (size in sizes()) {
+            for (ts in scales) {
+                val room = Scale.ringRoom(size, ts, true, true, 20.dp)
+                for (wantMap in listOf(false, true)) {
+                    val s = Scale.tallSplit(size, room, capRows = 5, textScale = ts, wantMap = wantMap)
+                    val used = s.ring + s.map + Scale.infoBlockHeight(size, s.rows, ts)
+                    assertTrue(
+                        used.value <= room.value + 0.5f,
+                        "tall split uses ${used} of ${room} at $size @${ts}x map=$wantMap",
+                    )
+                    if (!wantMap) {
+                        assertTrue(s.map == 0.dp, "map reserved with no map at $size")
+                    } else {
+                        assertTrue(
+                            s.map == 0.dp || s.map >= Scale.MAP_MIN,
+                            "map ${s.map} is a sliver at $size @${ts}x",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Asking for a map never costs the ring more than the map is worth: a
+     *  tile with room for a gauge still has one once the map is reserved,
+     *  rather than the reserve quietly consuming the whole column. */
+    @Test
+    fun `reserving a map leaves the ring the larger share`() {
+        for (size in sizes()) {
+            for (ts in scales) {
+                val room = Scale.ringRoom(size, ts, true, true, 20.dp)
+                val map = Scale.mapReserve(size, room, wantMap = true)
+                assertTrue(
+                    map.value <= room.value * 0.35f + 0.01f,
+                    "map ${map} claims more than a third of ${room} at $size @${ts}x",
+                )
+            }
+        }
+    }
 }
