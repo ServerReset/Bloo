@@ -69,6 +69,7 @@ private const val PIN_MAX_ATTEMPTS = 5
 private const val PIN_LOCKOUT_MS = 30_000L // 30s
 
 /** A fully resolved per-car view, merging live status with the phone snapshot. */
+@androidx.compose.runtime.Immutable
 data class CarView(
     val vin: String,
     val name: String,
@@ -157,7 +158,19 @@ data class ChargeLimitDraft(val ac: Int? = null, val dc: Int? = null)
  * time any underlying source (vehicle status, snapshots, settings, drafts,
  * pending commands, etc.) changes -- Compose screens just collect [WearViewModel.ui]
  * and never touch the ViewModel's private mutable state directly.
+ *
+ * [androidx.compose.runtime.Immutable] states that contract to the compiler
+ * rather than only to the reader. It is not a hint: the class holds List/Map/
+ * Set fields, which Compose otherwise assumes could mutate underneath it, so
+ * without the annotation NOTHING that takes a WearUi is skippable -- every
+ * tile on screen fully rebuilds whenever its parent recomposes for any
+ * reason at all, including reasons that have nothing to do with the data
+ * (a page becoming the active one, a scroll settling). That is a real cost
+ * on a watch, and it is paid for a guarantee the class already makes: every
+ * field is a val, every collection is replaced wholesale by publish(), and
+ * nothing anywhere mutates one in place.
  */
+@androidx.compose.runtime.Immutable
 data class WearUi(
     val screen: WearScreen = WearScreen.Loading,
     val cars: List<CarView> = emptyList(),
@@ -292,6 +305,7 @@ val seatStepLabels = listOf("Off", "Low", "Med", "High")
  * round trip. All shared command logic funnels through the private [command]
  * helper near the bottom of this file.
  */
+@androidx.compose.runtime.Stable
 class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     private val ctx get() = getApplication<Application>()
