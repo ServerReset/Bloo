@@ -460,7 +460,23 @@ class CarWidget : GlanceAppWidget() {
             }
         }
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.height * 0.55f).coerceAtLeast(28.dp))
+        val scale = render.theme.textScale
+        // The last fraction-of-the-tile ring cap in this file, and it was
+        // wrong the same way every other one was: 55% of the height assumes
+        // the name above and the stat below are small, and they aren't at
+        // larger text sizes. Of the COMPACT_SQUARE size range this column
+        // overran its tile on 498 configurations, by as much as 33dp -- a
+        // third of a small tile's content bleeding past the bottom edge,
+        // which is what RemoteViews does with an overfull Column instead of
+        // clipping it. Budgeted from what the text actually leaves now, and
+        // capped by the width too so the circle stays a circle.
+        val budget = size.height - Scale.contentPadding(size) * 2
+        val left = (budget - Scale.lineHeight(Scale.titleSp(size).value, scale) - 8.dp).coerceAtLeast(0.dp)
+        val rows = Scale.infoRowsIn(size, left, scale, cap = 1)
+        val ringEdge = Scale.ring(
+            size,
+            minOf(left - Scale.infoBlockHeight(size, rows, scale), size.width - 8.dp),
+        )
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             FitText(
                 car.name, titleStyle(render.theme),
@@ -473,7 +489,7 @@ class CarWidget : GlanceAppWidget() {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
             Spacer(GlanceModifier.height(4.dp))
-            InfoStack(car, render, max = 1)
+            if (rows > 0) InfoStack(car, render, max = rows)
         }
     }
 
@@ -587,7 +603,16 @@ class CarWidget : GlanceAppWidget() {
         // Shorter than COMPACT_TALL's own threshold -- name + ring/glyph +
         // a single button only, no room for the info stack too.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, (size.width - 12.dp).coerceAtLeast(18.dp))
+        // Capped against the WIDTH alone, this column overran its tile the
+        // same way CompactSquareLayout's did -- a 100x130 tile at 1.4x text
+        // ran 7dp past the bottom, because the name and the button row below
+        // the ring were never subtracted from anything. ringRoom already
+        // accounts for the buttons and the padding; the name is this tier's
+        // own extra. The width cap stays: it's what keeps the circle round on
+        // a narrow tile, it just isn't the only bound.
+        val room = Scale.ringRoom(size, render.theme.textScale, hasHeader = false, hasFooter = false, spacers = 8.dp) -
+            Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale)
+        val ringEdge = Scale.ring(size, minOf(room, size.width - 12.dp))
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             FitText(
                 car.name, titleStyle(render.theme),

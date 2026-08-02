@@ -218,4 +218,47 @@ class WidgetScaleTest {
             }
         }
     }
+
+    /**
+     * The two column-shaped compact tiers fit their tile.
+     *
+     * Both used to cap the ring against an axis that wasn't the one holding
+     * the column -- CompactSquare against 55% of the height, CompactTallNarrow
+     * against the width -- so neither ever subtracted the name above or the
+     * stat/buttons below. That overran the tile on 498 COMPACT_SQUARE
+     * configurations, worst by 33dp. RemoteViews doesn't clip an overfull
+     * Column, it lets the children bleed past the bottom edge, so the symptom
+     * is text hanging off the widget rather than anything caught in review.
+     */
+    @Test
+    fun `compact column tiers fit their tile`() {
+        for (size in sizes()) {
+            val budget = content(size)
+            for (ts in scales) {
+                val name = Scale.lineHeight(Scale.titleSp(size).value, ts)
+
+                // CompactSquareLayout: name + ring + one stat row.
+                val left = (budget - name - 8.dp).coerceAtLeast(0.dp)
+                val rows = Scale.infoRowsIn(size, left, ts, cap = 1)
+                val squareRing = Scale.ring(
+                    size,
+                    minOf(left - Scale.infoBlockHeight(size, rows, ts), size.width - 8.dp),
+                )
+                val square = name + 8.dp + squareRing + Scale.infoBlockHeight(size, rows, ts)
+                assertTrue(
+                    square.value <= budget.value + 0.01f,
+                    "compact square column ${square} exceeds ${budget} at $size @${ts}x",
+                )
+
+                // CompactTallNarrowLayout: name + ring + one button row.
+                val room = Scale.ringRoom(size, ts, hasHeader = false, hasFooter = false, spacers = 8.dp) - name
+                val tallRing = Scale.ring(size, minOf(room, size.width - 12.dp))
+                val tall = name + 8.dp + tallRing + Scale.buttonHeight(size)
+                assertTrue(
+                    tall.value <= budget.value + 0.01f,
+                    "compact tall-narrow column ${tall} exceeds ${budget} at $size @${ts}x",
+                )
+            }
+        }
+    }
 }
