@@ -1266,6 +1266,39 @@ class CarWidget : GlanceAppWidget() {
             .filterNot { footerShown && it == WidgetInfoField.UPDATED }
             .take(max)
         val narrow = availableWidth < NARROW_WIDTH
+        // Two columns once the slot is wide enough for both halves to still
+        // clear the narrow threshold. A single column on a genuinely wide
+        // tier stacked six stats down a strip while the space beside them sat
+        // empty, and made the block tall enough to crowd the ring and map it
+        // shares a column with. Paired, the same stats read in half the
+        // height, which is what the big tiers actually needed.
+        val columnGap = 12.dp
+        val paired = !narrow && fields.size > 2 &&
+            (availableWidth - columnGap) / 2 >= NARROW_WIDTH + 20.dp
+        if (paired) {
+            val cellWidth = (availableWidth - columnGap) / 2
+            Column {
+                fields.chunked(2).forEach { pair ->
+                    Row(modifier = GlanceModifier.fillMaxWidth()) {
+                        pair.forEachIndexed { i, field ->
+                            if (i > 0) Spacer(GlanceModifier.width(columnGap))
+                            Column(modifier = GlanceModifier.defaultWeight()) {
+                                InfoRow(field, car, render, cellWidth)
+                            }
+                        }
+                        // An odd count leaves the last row half-full; the empty
+                        // half holds its place so the pair above stays aligned
+                        // rather than the lone stat stretching across.
+                        if (pair.size == 1) {
+                            Spacer(GlanceModifier.width(columnGap))
+                            Spacer(GlanceModifier.defaultWeight())
+                        }
+                    }
+                    Spacer(GlanceModifier.height(2.dp))
+                }
+            }
+            return
+        }
         Column {
             fields.forEach { field ->
                 val value = infoValue(field, car, render) ?: return@forEach
@@ -1284,6 +1317,28 @@ class CarWidget : GlanceAppWidget() {
                     }
                 }
                 Spacer(GlanceModifier.height(2.dp))
+            }
+        }
+    }
+
+    /** One label/value stat, in whatever width its cell actually has. Shared
+     *  by [InfoStack]'s single-column and paired layouts so the two can't
+     *  drift in how they wrap or when they fall back to stacking. */
+    @Composable
+    private fun InfoRow(field: WidgetInfoField, car: VehicleSnapshot, render: Render, width: Dp) {
+        val value = infoValue(field, car, render) ?: return
+        if (width < NARROW_WIDTH) {
+            Column(modifier = GlanceModifier.fillMaxWidth()) {
+                FitText(field.label, subtitleStyle(render.theme), maxWidth = width - 4.dp)
+                FitText(value, valueStyle(render.theme), maxWidth = width - 4.dp)
+            }
+        } else {
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                FitText(
+                    field.label, subtitleStyle(render.theme),
+                    maxWidth = width * 0.5f, modifier = GlanceModifier.defaultWeight(),
+                )
+                FitText(value, valueStyle(render.theme), maxWidth = width * 0.45f)
             }
         }
     }
@@ -1564,6 +1619,19 @@ class CarWidget : GlanceAppWidget() {
             else -> colCapacity > rowCapacity
         }
         val actions = all.take((if (stack) colCapacity else rowCapacity).coerceAtLeast(1))
+        // Labels are all-or-nothing across the row: measured against the
+        // LONGEST label present, so the widest one setting cleanly is the
+        // condition for any of them appearing.
+        val perButton = if (stack) availableWidth
+            else ((availableWidth - gap * (actions.size - 1)) / actions.size).coerceAtLeast(0.dp)
+        val labelStyle = TextStyle(
+            color = render.theme.onAccent,
+            fontSize = (Scale.subtitleSp(size).value * render.theme.textScale).sp,
+            fontWeight = FontWeight.Medium,
+        )
+        val labelRoom = perButton - (Scale.buttonIcon(size) + 14.dp)
+        val showLabels = Scale.buttonHeight(size) >= 36.dp &&
+            actions.all { !wouldOverflow(it.label, labelStyle, labelRoom) }
         // Centred both ways. When a layout hands ActionButtons the whole tile
         // -- the controls-priority tiers, where the buttons ARE the widget --
         // the block belongs in the middle of it, not against the top-left.
@@ -1575,7 +1643,13 @@ class CarWidget : GlanceAppWidget() {
             ) {
                 actions.forEachIndexed { i, action ->
                     if (i > 0) Spacer(GlanceModifier.height(gap))
-                    ActionButton(action, car, render, modifier = GlanceModifier.fillMaxWidth())
+                    // Stacked: each button spans the full slice, so it's the
+                    // orientation most likely to have room for a label.
+                    ActionButton(
+                        action, car, render,
+                        modifier = GlanceModifier.fillMaxWidth(),
+                        showLabel = showLabels,
+                    )
                 }
             }
         } else {
@@ -1586,7 +1660,11 @@ class CarWidget : GlanceAppWidget() {
             ) {
                 actions.forEachIndexed { i, action ->
                     if (i > 0) Spacer(GlanceModifier.width(gap))
-                    ActionButton(action, car, render, modifier = GlanceModifier.defaultWeight())
+                    ActionButton(
+                        action, car, render,
+                        modifier = GlanceModifier.defaultWeight(),
+                        showLabel = showLabels,
+                    )
                 }
             }
         }
@@ -1644,6 +1722,12 @@ class CarWidget : GlanceAppWidget() {
         // size instead of the usual fixed row/column height.
         fixedHeight: Boolean = true,
         iconSize: Dp = Scale.buttonIcon(LocalSize.current),
+        // Whether to name the action beside its icon. Decided by the CALLER
+        // for the whole row at once, never per button: labels have different
+        // lengths, so a per-button test would label "Lock" and "Horn" while
+        // leaving "Climate" and "Charge" as bare glyphs in the same row. All
+        // or none is the only version that reads as designed.
+        showLabel: Boolean = false,
     ) {
         val theme = render.theme
         val size = LocalSize.current
@@ -1675,12 +1759,33 @@ class CarWidget : GlanceAppWidget() {
                 .clickable(click),
             contentAlignment = Alignment.Center,
         ) {
-            Image(
-                provider = ImageProvider(iconFor(action)),
-                contentDescription = action.label,
-                colorFilter = ColorFilter.tint(theme.onAccent),
-                modifier = GlanceModifier.size(iconSize),
-            )
+            // An icon alone is a guess -- a snowflake could be climate,
+            // defrost, or "cool the battery". Where there's room, the button
+            // says which.
+            if (showLabel) {
+                val labelStyle = TextStyle(
+                    color = theme.onAccent,
+                    fontSize = (Scale.subtitleSp(size).value * theme.textScale).sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        provider = ImageProvider(iconFor(action)),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(theme.onAccent),
+                        modifier = GlanceModifier.size(iconSize),
+                    )
+                    Spacer(GlanceModifier.width(6.dp))
+                    Text(action.label, style = labelStyle, maxLines = 1)
+                }
+            } else {
+                Image(
+                    provider = ImageProvider(iconFor(action)),
+                    contentDescription = action.label,
+                    colorFilter = ColorFilter.tint(theme.onAccent),
+                    modifier = GlanceModifier.size(iconSize),
+                )
+            }
         }
     }
 
