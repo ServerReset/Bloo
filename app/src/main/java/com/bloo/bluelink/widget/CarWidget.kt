@@ -2030,6 +2030,12 @@ class CarWidget : GlanceAppWidget() {
             trackColor = render.theme.trackArgb,
             centerText = car.percent?.let { "$it%" },
             centerColor = arc,
+            // Only on rings big enough for the notch to read as one. Below
+            // that it's a nick in a small circle, which says less than the
+            // unbroken ring does.
+            limitFraction = car.chargeLimitPct
+                ?.takeIf { edgeDp >= 44 }
+                ?.let { it.coerceIn(0, 100) / 100f },
         )
         Image(
             provider = ImageProvider(bmp),

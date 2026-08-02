@@ -3,6 +3,8 @@ package com.bloo.bluelink.widget
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.RectF
 
 /**
@@ -28,6 +30,9 @@ object ChargeRing {
      * @param centerText optional text drawn in the middle (e.g. "82%"); null = none
      * @param centerColor ARGB of the centre text
      * @param strokeFraction ring thickness as a fraction of radius (default 0.16)
+     * @param limitFraction optional 0f..1f charge-limit position; cuts a notch
+     *        clean through the ring there so the stretch the car has been told
+     *        not to fill reads as a separate segment. Null = no limit known.
      */
     fun render(
         sizePx: Int,
@@ -37,6 +42,7 @@ object ChargeRing {
         centerText: String? = null,
         centerColor: Int = arcColor,
         strokeFraction: Float = 0.16f,
+        limitFraction: Float? = null,
     ): Bitmap {
         val edge = sizePx.coerceAtLeast(1)
         val bmp = Bitmap.createBitmap(edge, edge, Bitmap.Config.ARGB_8888)
@@ -65,6 +71,33 @@ object ChargeRing {
             }
             // Start at 12 o'clock (-90°), sweep clockwise by the fill amount.
             canvas.drawArc(rect, -90f, 360f * clamped, false, arcPaint)
+        }
+
+        // The charge limit, as the seam between two segments rather than a
+        // marker drawn on top of one -- matching the app's hero bar and the
+        // live charging notification. CLEAR cuts through both the arc and the
+        // track to the transparent bitmap beneath, so the widget's own
+        // background shows through the gap and the notch stays legible
+        // whichever side the charge has reached. A marker painted ON the ring
+        // couldn't: at the limit it would sit exactly where the arc's rounded
+        // cap lands.
+        val limit = limitFraction?.takeIf { it > 0.02f && it < 0.99f }
+        if (limit != null) {
+            val cut = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                // Wider than the ring so the cut's own antialiased edges land
+                // outside it and the gap reads as a clean break.
+                strokeWidth = stroke * 1.6f
+                strokeCap = Paint.Cap.BUTT
+                xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+            }
+            // A fixed angular width would be a hair at 24dp and a chasm at
+            // 140dp, so the gap is a constant arc LENGTH instead: ~1.6x the
+            // ring's own stroke, converted back to degrees for this radius.
+            val radius = (rect.width() / 2f).coerceAtLeast(1f)
+            val sweep = Math.toDegrees((stroke * 1.6f / radius).toDouble()).toFloat()
+                .coerceIn(3f, 24f)
+            canvas.drawArc(rect, -90f + 360f * limit - sweep / 2f, sweep, false, cut)
         }
 
         if (!centerText.isNullOrBlank()) {
