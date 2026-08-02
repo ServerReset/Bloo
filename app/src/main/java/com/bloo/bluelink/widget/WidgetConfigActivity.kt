@@ -197,7 +197,7 @@ private fun ConfigScreen(
             Spacer(Modifier.height(16.dp))
 
             // --- Status ring (both modes) ---
-            ToggleLine("Show status ring", showRing) { showRing = it }
+            ToggleLine("Show charge gauge", showRing) { showRing = it }
             Spacer(Modifier.height(8.dp))
             // Both modes -- a small widget with no photo is just as common a
             // choice as a large advanced one, and this is purely visual, not a
