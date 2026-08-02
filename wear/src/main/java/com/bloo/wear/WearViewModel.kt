@@ -32,6 +32,7 @@ import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.repositoryFor
+import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.data.toWearCommand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -84,6 +85,11 @@ data class CarView(
     val timeToFullMin: Int?,
     val acLimit: Int?,
     val dcLimit: Int?,
+    /** The limit for the plug actually connected, or null when unplugged --
+     *  the one the ring notches, as opposed to the two the Charge card lets
+     *  you edit. Falls back to the phone's snapshot in relay mode, where the
+     *  watch has no live EvStatus of its own. */
+    val chargeLimit: Int?,
     val fetchedAt: Long?,
     val doorsOpen: List<String>,
     val windowsOpen: List<String>,
@@ -2028,6 +2034,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             timeToFullMin = ev?.remainTime2?.atc?.value?.toInt(),
             acLimit = ev?.reservChargeInfos?.level(1),
             dcLimit = ev?.reservChargeInfos?.level(0),
+            chargeLimit = ev?.targetForCurrentPlug() ?: snap?.chargeLimitPct,
             // "Updated X ago" should reflect when the DATA was actually fetched. The
             // watch's own fetchedAt[vin] is set only when the watch fetches live status
             // itself; a paired watch showing a phone snapshot had no such stamp, so it

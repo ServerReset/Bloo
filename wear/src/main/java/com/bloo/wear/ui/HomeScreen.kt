@@ -1014,7 +1014,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     val isStale = car.fetchedAt != null && System.currentTimeMillis() - car.fetchedAt > com.bloo.bluelink.data.STALE_STATUS_MS
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(contentAlignment = Alignment.TopEnd) {
-            ChargeRing(car.percent, size = 60.dp, charging = car.charging == true)
+            ChargeRing(car.percent, size = 60.dp, charging = car.charging == true, limitPercent = car.chargeLimit)
             if (alertCount > 0) {
                 Box(
                     modifier = Modifier
