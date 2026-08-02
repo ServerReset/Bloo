@@ -349,9 +349,6 @@ object ChargingLive {
     /** The not-yet-charged remainder. Deliberately dim rather than empty --
      *  a zero-width remaining segment at 100% is filtered out below. */
     private const val TRACK = 0x40FFFFFF
-    /** The limit dot once the charge has gone past it -- a light mark on the
-     *  green, where the green-on-green it would otherwise be says nothing. */
-    private const val LIMIT_PASSED = 0xFFE8E8E8.toInt()
 
     /** One stable notification id per car, distinct from the alert ids so a
      *  charging notification never overwrites a door/service alert. */
@@ -414,6 +411,22 @@ object ChargingLive {
         // "82% · 1h 20m left · Plugged in (AC)" -- built from whichever pieces
         // the car actually reported, joined so a missing one leaves no stray
         // separator behind.
+        // The limit is shown in the TEXT here, and only in the text.
+        //
+        // This notification is the one surface where the marker is not drawn,
+        // and that is not an oversight. A promoted ongoing notification -- the
+        // thing that puts this in Samsung's Now bar and the status-bar chip --
+        // has to satisfy a list of conditions, and the system silently demotes
+        // it to an ordinary notification when it doesn't. Adding
+        // setProgressPoints was the only change to this builder between a
+        // version confirmed working on a real device and one confirmed
+        // demoted, so the points come back out.
+        //
+        // I could not prove WHY from here: promotion is decided by the OS at
+        // post time and reports nothing back an app can read. What I can do is
+        // not keep the one change that correlates with losing it, for a dot
+        // inside a bar that only appears if the promotion works in the first
+        // place.
         val limit = chargeLimit?.takeIf { it in 1..99 }
         val detail = listOfNotNull(
             percent?.let { "$it%" },
@@ -466,18 +479,9 @@ object ChargingLive {
                         }
                     },
                 )
-            if (limit != null) {
-                // The dot. Coloured like the marker everywhere else: the
-                // pack's green while the charge is still short of it, and a
-                // plain light mark once the charge has passed it, so it stays
-                // legible against whichever segment it lands on.
-                style.setProgressPoints(
-                    listOf(
-                        NotificationCompat.ProgressStyle.Point(limit)
-                            .setColor(if (percent >= limit) LIMIT_PASSED else CHARGE_GREEN),
-                    ),
-                )
-            }
+            // NO setProgressPoints, deliberately -- see the note on `limit`
+            // above. The dot that marks the limit on every other surface is
+            // carried here by the text ("to 80%") instead.
             builder.setStyle(style)
             // The compact text on the status-bar chip, where there is room for
             // a couple of glyphs and nothing more.
