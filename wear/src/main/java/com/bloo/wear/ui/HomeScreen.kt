@@ -300,14 +300,20 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
                         // no buffer at all, so the depth read is now carried by a
                         // slightly stronger squeeze plus parallax instead.
                         Modifier.fillMaxSize().graphicsLayer {
-                            val raw = (page - carPager.currentPage).toFloat() +
-                                carPager.currentPageOffsetFraction
-                            val off = abs(raw).coerceIn(0f, 1f)
+                            // Offset per the Compose Pager docs' sample.
+                            val off = abs(
+                                (carPager.currentPage - page).toFloat() +
+                                    carPager.currentPageOffsetFraction,
+                            ).coerceIn(0f, 1f)
+                            // Scale only. A parallax translation was tried and
+                            // reverted after a phone screenshot showed what it
+                            // does to a full-bleed pager whose neighbours are
+                            // composed: any drift toward the viewport parks a
+                            // sliver of the next car at the screen edge at REST.
+                            // The watch pager has the same shape, so it had the
+                            // same bug waiting.
                             scaleX = 1f - off * 0.06f
                             scaleY = 1f - off * 0.06f
-                            // Drifts back against the swipe, so the outgoing page
-                            // reads as falling behind rather than sliding rigidly.
-                            translationX = -raw.coerceIn(-1f, 1f) * size.width * 0.08f
                         }
                     ) {
                         CarColumn(vm, ui, car, listStates, onSettings, onTrips, onReorder, active)
