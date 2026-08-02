@@ -4,6 +4,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16 Live Updates. Normal permission (no runtime prompt), but the
+         notification is silently NOT promoted without it, so it is required for
+         the charging bar to reach the status-bar chip and lock screen. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Optional: only used to set the weather location to the device's position.
          The app works fine without it (a place can be typed in Settings instead). -->

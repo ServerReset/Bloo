@@ -326,16 +326,29 @@ object CarAlerts {
  * (One UI's Now Bar, Android's ongoing-activity area) rather than as another
  * item in the list.
  *
- * NOTE on Android 16's "promoted ongoing" Live Updates: that needs
- * Notification.ProgressStyle plus requestPromotedOngoing, which the
- * NotificationCompat in this project's androidx.core (1.15.0) does not yet
- * expose. Rather than bump a core dependency blind, this uses the ongoing +
- * determinate-progress + CATEGORY_PROGRESS combination, which is what those
- * surfaces already key off and which works on every supported API level.
+ * On Android 16 this is a real LIVE UPDATE: NotificationCompat.ProgressStyle
+ * plus setRequestPromotedOngoing(true) asks the system to promote it, which
+ * surfaces the charge as a status-bar chip and on the lock screen rather than
+ * only inside the shade. Google documents nine conditions for promotion and
+ * this meets all of them: ProgressStyle, the POST_PROMOTED_NOTIFICATIONS
+ * manifest permission, the promotion request, ongoing, a contentTitle, no
+ * custom RemoteViews, not a group summary, not colorized, and a channel above
+ * IMPORTANCE_MIN (this one is LOW, which qualifies).
+ *
+ * Below API 36 the same builder degrades by itself -- ProgressStyle renders
+ * as an ordinary determinate progress bar and the promotion request is
+ * ignored -- so there is one code path, not two. minSdk here is 26, so that
+ * fallback is a requirement rather than a hedge.
  */
 object ChargingLive {
     private const val CHANNEL = "bloo_charging"
     private const val ACCENT = 0xFF7B83EB.toInt()
+    /** Filled portion of the Live Update bar: the same green the app and
+     *  widget already use for charging, so the chip matches the car card. */
+    private const val CHARGE_GREEN = BlooColors.chargeGreen
+    /** The not-yet-charged remainder. Deliberately dim rather than empty --
+     *  a zero-width remaining segment at 100% is filtered out below. */
+    private const val TRACK = 0x40FFFFFF
 
     /** One stable notification id per car, distinct from the alert ids so a
      *  charging notification never overwrites a door/service alert. */
@@ -412,8 +425,43 @@ object ChargingLive {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
-            .setProgress(100, percent ?: 0, percent == null)
             .apply { pi?.let { setContentIntent(it) } }
+
+        if (percent != null) {
+            // ProgressStyle is what makes this a promotable Live Update. The
+            // bar is drawn as one filled segment plus one remaining segment,
+            // rather than setProgress's plain track, so the charged portion
+            // carries the accent and the rest reads as headroom.
+            builder.setStyle(
+                NotificationCompat.ProgressStyle()
+                    .setStyledByProgress(false)
+                    .setProgress(percent)
+                    .setProgressSegments(
+                        // Built conditionally rather than filtered afterwards:
+                        // a zero-length segment is meaningless, and at 0% or
+                        // 100% one of the two is exactly that.
+                        buildList {
+                            if (percent > 0) {
+                                add(NotificationCompat.ProgressStyle.Segment(percent).setColor(CHARGE_GREEN))
+                            }
+                            if (percent < 100) {
+                                add(NotificationCompat.ProgressStyle.Segment(100 - percent).setColor(TRACK))
+                            }
+                        },
+                    ),
+            )
+            // The compact text on the status-bar chip, where there is room for
+            // a couple of glyphs and nothing more.
+            builder.setShortCriticalText("$percent%")
+        } else {
+            // Charging confirmed but no percentage yet -- an indeterminate bar
+            // is honest, where ProgressStyle would have to invent a number.
+            builder.setProgress(0, 0, true)
+        }
+        // Asks the system to promote this to a Live Update. Ignored below API
+        // 36 and whenever any of the documented conditions isn't met, so it is
+        // safe to request unconditionally.
+        builder.setRequestPromotedOngoing(true)
 
         // Stop-charging is offered inline, since the whole point of a live
         // notification is acting without opening the app.
