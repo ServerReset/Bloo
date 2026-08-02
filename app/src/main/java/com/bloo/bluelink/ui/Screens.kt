@@ -4882,49 +4882,90 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             ),
             label = "chargeFill",
         )
-        // Target-SOC marker: dot at the AC/DC limit, only when plugged in.
-        val targetPct = status?.evStatus?.targetForCurrentPlug()
-        BoxWithConstraints(Modifier.fillMaxWidth().height(18.dp)) {
-            // Track + gradient fill (darker green on the left → current green right).
-            Box(
-                Modifier.fillMaxSize().clip(RoundedCornerShape(9.dp))
-                    .background(ChargeGreen.copy(alpha = 0.18f)),
+        // The AC/DC charge limit, when the car is plugged in and it's below full.
+        val targetPct = status?.evStatus?.targetForCurrentPlug()?.takeIf { it in 1..99 }
+        ChargeSegmentBar(frac = animatedFrac, limitPct = targetPct)
+    }
+}
+
+/**
+ * The hero's charge bar: one segment up to the charge limit, a gap, then the
+ * part of the pack the car has been told not to fill.
+ *
+ * This replaces a marker drawn ON TOP of a single continuous bar -- first a
+ * dot, then a notch. Both had the same problem: the limit is a boundary
+ * between two different meanings ("will charge" / "won't"), and an overlay
+ * has to fight the fill for the same pixels exactly where it matters most,
+ * as the charge arrives at the limit. Making it the seam between two
+ * segments means the marker can't collide with anything, because it isn't
+ * drawn -- it's the gap. Same shape the live charging notification uses (see
+ * ChargingLive's ProgressStyle segments), so the two surfaces now say it the
+ * same way.
+ *
+ * The seam animates: changing the limit while charging slides the split to
+ * its new position and the fill re-proportions into it, rather than the bar
+ * snapping to a different shape between two frames.
+ */
+@Composable
+private fun ChargeSegmentBar(frac: Float, limitPct: Int?) {
+    val scheme = MaterialTheme.colorScheme
+    val limitFrac by animateFloatAsState(
+        targetValue = (limitPct ?: 100).coerceIn(0, 100) / 100f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "chargeLimitSplit",
+    )
+    // The gap animates in/out with the limit itself, so a car that loses its
+    // target (unplugged) closes the seam smoothly instead of the bar jumping
+    // wider by the gap's width.
+    val gap by animateDpAsState(
+        targetValue = if (limitPct != null) 5.dp else 0.dp,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "chargeLimitGap",
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth().height(18.dp)) {
+        val usable = (maxWidth - gap).coerceAtLeast(0.dp)
+        val head = usable * limitFrac.coerceIn(0f, 1f)
+        val tail = (usable - head).coerceAtLeast(0.dp)
+        Row(Modifier.fillMaxSize()) {
+            // Fills are expressed as each segment's OWN local fraction of the
+            // global charge, so a charge that has overrun its limit keeps
+            // reading correctly: the head fills, and the overrun continues
+            // into the tail rather than being clamped invisibly at the seam.
+            ChargeSegment(
+                width = head,
+                fill = if (limitFrac <= 0f) 0f else (frac / limitFrac),
+                track = ChargeGreen.copy(alpha = 0.18f),
             )
+            if (tail > 0.dp) {
+                Spacer(Modifier.width(gap))
+                ChargeSegment(
+                    width = tail,
+                    fill = if (limitFrac >= 1f) 0f else (frac - limitFrac) / (1f - limitFrac),
+                    // Neutral, not green-tinted: this stretch isn't charge
+                    // waiting to happen, it's charge the user has ruled out.
+                    track = scheme.onSurface.copy(alpha = 0.13f),
+                )
+            }
+        }
+    }
+}
+
+/** One rounded stretch of [ChargeSegmentBar]: a [track] with a green fill
+ *  across [fill] (0..1) of its own width. */
+@Composable
+private fun ChargeSegment(width: Dp, fill: Float, track: Color) {
+    Box(
+        Modifier.width(width).fillMaxHeight().clip(RoundedCornerShape(9.dp)).background(track),
+    ) {
+        val f = fill.coerceIn(0f, 1f)
+        if (f > 0f) {
             Box(
                 Modifier
                     .fillMaxHeight()
-                    .width(maxWidth * animatedFrac.coerceIn(0f, 1f))
+                    .fillMaxWidth(f)
                     .clip(RoundedCornerShape(9.dp))
                     .background(Brush.horizontalGradient(listOf(ChargeGreenDark, ChargeGreen))),
             )
-            if (targetPct != null) {
-                val x = maxWidth * (targetPct.coerceIn(0, 100) / 100f)
-                // A NOTCH, not a dot. The old 12dp circle sat ON TOP of the
-                // fill, so as charge approached the limit two round shapes
-                // overlapped and read as a smudge rather than a marker --
-                // exactly where the marker matters most. This cuts a slim
-                // gap through the bar and puts a bright tick inside it, so
-                // it stays legible against the filled and unfilled sides
-                // alike and never collides with the fill's rounded cap.
-                Box(
-                    Modifier
-                        .offset(x = x - 3.dp)
-                        .width(6.dp)
-                        .fillMaxHeight()
-                        .align(Alignment.CenterStart)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(MaterialTheme.colorScheme.surface),
-                )
-                Box(
-                    Modifier
-                        .offset(x = x - 1.dp)
-                        .width(2.dp)
-                        .height(10.dp)
-                        .align(Alignment.CenterStart)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)),
-                )
-            }
         }
     }
 }
