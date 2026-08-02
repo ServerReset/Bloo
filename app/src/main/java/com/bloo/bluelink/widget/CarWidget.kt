@@ -1482,17 +1482,42 @@ class CarWidget : GlanceAppWidget() {
         // sibling (sharing a Row with a ring/text column) knows its own
         // slice is narrower than that and should say so.
         availableWidth: Dp = LocalSize.current.width,
+        // The height this row/column actually has. Needed for the same reason
+        // as availableWidth -- see the capacity note below.
+        availableHeight: Dp = LocalSize.current.height -
+            Scale.contentPadding(LocalSize.current) * 2,
     ) {
-        val actions = resolvedActions(car, render, max)
-        if (actions.isEmpty()) return
-        // Auto-escalate to a vertical stack once a horizontal row genuinely
-        // wouldn't leave each button a legible tap target -- a caller can
-        // still ask for vertical outright for its own layout reasons (the
-        // tall compact tiers), but this catches the case a caller asked for
-        // a row and the actual measured width can't support it, instead of
-        // silently squeezing buttons illegibly thin.
+        val size = LocalSize.current
+        val all = resolvedActions(car, render, max)
+        if (all.isEmpty()) return
+        // How many buttons ACTUALLY fit each way, rather than only asking
+        // whether a row is too tight.
+        //
+        // The previous rule escalated to a vertical stack whenever a row
+        // couldn't give every button a legible width -- which fixed the
+        // horizontal squeeze by overflowing vertically instead. On a 300x78dp
+        // banner with four actions configured, it stacked them into a ~146dp
+        // column inside a 78dp widget: two buttons visible, the rest clipped
+        // off the bottom. Reported from a real device.
+        //
+        // Now both axes get a capacity, and whichever orientation can show
+        // the whole set wins; if neither can, the set is TRUNCATED to what
+        // fits rather than drawn past the edge. Showing three of four buttons
+        // is a real cost, but it's an honest one -- the alternative was
+        // drawing four and letting the launcher clip two of them.
+        val gap = 6.dp
         val minButtonWidth = 40.dp
-        val stack = vertical || (availableWidth / actions.size) < minButtonWidth
+        val rowCapacity = ((availableWidth + gap) / (minButtonWidth + gap)).toInt()
+        val colCapacity = ((availableHeight + gap) / (Scale.buttonHeight(size) + gap)).toInt()
+        val stack = when {
+            // An explicit request still has to fit; it just gets first refusal.
+            vertical -> true
+            rowCapacity >= all.size -> false
+            colCapacity >= all.size -> true
+            // Neither fits everything: prefer whichever shows more.
+            else -> colCapacity > rowCapacity
+        }
+        val actions = all.take((if (stack) colCapacity else rowCapacity).coerceAtLeast(1))
         if (stack) {
             Column(modifier = modifier) {
                 actions.forEachIndexed { i, action ->
