@@ -86,6 +86,16 @@ kotlin {
     }
 }
 
+
+// See compose-stability.conf: the shared model types are compiled without the
+// Compose plugin, so the compiler assumes they are unstable and no composable
+// taking one can ever skip.
+composeCompiler {
+    stabilityConfigurationFiles.add(
+        rootProject.layout.projectDirectory.file("compose-stability.conf"),
+    )
+}
+
 dependencies {
     val composeUi = "1.12.0-alpha03"
 

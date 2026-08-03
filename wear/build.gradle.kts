@@ -81,6 +81,15 @@ kotlin {
     }
 }
 
+
+// Same reasoning as the phone module -- see compose-stability.conf. The watch
+// reads the same :shared model types in its own composables.
+composeCompiler {
+    stabilityConfigurationFiles.add(
+        rootProject.layout.projectDirectory.file("compose-stability.conf"),
+    )
+}
+
 dependencies {
     implementation(project(":shared"))
     // Shared foundation-only Compose components (custom slider, WiggleText, etc.).
