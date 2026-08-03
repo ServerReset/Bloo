@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import android.app.Application
 import android.location.Geocoder
 import androidx.biometric.BiometricManager
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -116,28 +115,14 @@ sealed interface Screen {
  * every collection is rebuilt by `copy()` (`_state.update { it.copy(...) }`)
  * rather than mutated in place, so `equals` is a sound recomposition signal.
  * Keep it that way — never put a MutableList/mutableStateListOf field here.
+ *
+ * Four setters used to reach that same end by a route that read like the thing
+ * the line above forbids — toMutableList(), edit the copy, store it. Sound,
+ * since the copy was fresh and dropped straight after, but it left the file
+ * arguing with itself about its own invariant. They build the new value
+ * outright now, so the rule and the code agree.
  */
 @androidx.compose.runtime.Immutable
-/**
- * @Immutable is a PROMISE, and these are the terms it is being made on: every
- * field is a val, and every collection stored in one is built fresh and never
- * touched again after it lands here (the four places that used to build a
- * mutable copy and edit it in place now build the new value outright, so there
- * is no instance in this class that anything still holds a mutable handle to).
- *
- * Without it Compose infers this class UNSTABLE -- List, Map and Set are
- * interfaces that could be mutable, so it must assume they are -- and an
- * unstable parameter makes its composable non-skippable UNCONDITIONALLY. Not
- * "recomposes when it changes": recomposes every single time its parent does,
- * even when handed the very same instance. UiState is threaded into
- * VehicleDetailContent and from there into every pebble, so any recomposition
- * of the pager -- a scroll flag, a name pill, a settle -- rebuilt three full
- * car pages that had nothing new to show.
- *
- * With the annotation those calls skip on an equal instance, which is the
- * common case for everything that isn't an actual data change.
- */
-@Immutable
 data class UiState(
     val screen: Screen = Screen.Login,
     /** Biometric app-lock overlay: the real app renders (blurred) behind it. */
