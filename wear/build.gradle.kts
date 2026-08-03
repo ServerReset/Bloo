@@ -81,9 +81,30 @@ kotlin {
     }
 }
 
-
-// Same reasoning as the phone module -- see compose-stability.conf. The watch
-// reads the same :shared model types in its own composables.
+// Classes the Compose compiler must treat as STABLE even though it does not
+// compile them itself. See compose-stability.conf, which is deliberately just
+// the pattern list -- the explanation lives here so that file has nothing in it
+// for the compiler to parse but class patterns.
+//
+// Everything in com.bloo.bluelink.data lives in :shared, a plain
+// android.library with no Compose compiler plugin (it is shared with the watch
+// and has no UI in it). The compiler cannot infer stability for a class it did
+// not compile, so it assumes the worst: Vehicle, VehicleStatus, GeoLocation,
+// Weather, EvTrip, ClimatePreset, SeatConfig, Powertrain and the rest were all
+// UNSTABLE to this module.
+//
+// Skippability is all-or-nothing per call site, so one unstable parameter makes
+// a composable non-skippable whatever the others are. VehicleDetailContent
+// takes a Vehicle and hands it to the whole pebble column, so the car pages
+// could never skip -- and every other stability fix aimed at them (@Immutable
+// on UiState, @Stable on AppViewModel) was blocked behind this one and could
+// not show any effect on its own.
+//
+// The claim is true of these types: data classes of vals parsed from JSON or
+// read from disk, no mutable collection fields, and no var fields anywhere in
+// the package (the only vars in it are locals inside functions). Keep it that
+// way -- a var added there makes this a lie, and the symptom is a STALE ui,
+// not a slow one.
 composeCompiler {
     stabilityConfigurationFiles.add(
         rootProject.layout.projectDirectory.file("compose-stability.conf"),
