@@ -1247,6 +1247,35 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     // they crowd into an unreadable smear; halving the count (11 vs 21) fixes that.
     val fahrenheit = useFahrenheit(ui)
     SliderRow("Temp", degLabel(d.tempF.toString(), fahrenheit), d.tempF, 62, 82, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
+    // One tap for the ends of the range, which is where people actually want
+    // to be: "as cold as it goes" is a common intent and, on a watch, eleven
+    // slider steps of dragging to reach it. The phone understands the same two
+    // words in search ("coldest", "warmest"), so the vocabulary matches across
+    // the two devices even though the gestures differ.
+    Spacer(Modifier.height(4.dp))
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        MorphButton(
+            label = "Coldest",
+            icon = Icons.Filled.AcUnit,
+            active = d.tempF == 62,
+            activeColor = tempColor(62),
+            pending = false,
+            onClick = { vm.setClimateTemp(car.vin, 62) },
+            modifier = Modifier.weight(1f),
+        )
+        MorphButton(
+            label = "Warmest",
+            icon = Icons.Filled.Whatshot,
+            active = d.tempF == 82,
+            activeColor = tempColor(82),
+            pending = false,
+            onClick = { vm.setClimateTemp(car.vin, 82) },
+            modifier = Modifier.weight(1f),
+        )
+    }
     SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
     MorphButton(

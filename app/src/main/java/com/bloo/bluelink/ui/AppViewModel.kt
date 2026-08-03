@@ -374,7 +374,15 @@ private const val MIN_COMMAND_LOCK_MS = 3000L
  *  name it. */
 private val AI_COMMANDS = setOf(
     "lock", "unlock", "charge_on", "charge_off", "climate_on", "climate_off",
+    "lights", "horn",
 )
+// charge_limit is deliberately NOT here. Every action above is a verb with no
+// argument, so validating it means checking one word against this set. A charge
+// limit carries a NUMBER, and a model that picks the wrong number sets the wrong
+// limit with no way for this layer to tell -- 80 and 90 are equally plausible
+// strings. The deterministic parser reads that number out of the query itself,
+// where it is either present and correct or absent, so that is where the limit
+// stays.
 
 @Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {

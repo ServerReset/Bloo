@@ -11595,6 +11595,8 @@ private fun aiCommandLabel(cmd: String): String = when (cmd) {
     "unlock" -> "Unlock"
     "charge_on" -> "Start charging"
     "charge_off" -> "Stop charging"
+    "lights" -> "Flash the lights on"
+    "horn" -> "Sound the horn on"
     "climate_on" -> "Start climate on"
     "climate_off" -> "Stop climate on"
     else -> "Run on"
@@ -11795,6 +11797,21 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
             } else {
                 ParsedVehicleCommand("climate_on", "default", "Starting climate for")
             }
+        // Charge LIMIT before charge start/stop: "set the charge limit to 80"
+        // contains "charg", and the limit is the more specific request.
+        Regex("(charge|charging) (limit|target)|limit .*(charge|charging)|charge to \\d{2,3}")
+            .containsMatchIn(q) -> {
+            val pct = Regex("\\b(\\d{2,3})\\s*%?").find(q)?.groupValues?.get(1)?.toIntOrNull()
+            if (pct != null && pct in 50..100) {
+                ParsedVehicleCommand("charge_limit", pct.toString(), "Setting charge limit to $pct% on")
+            } else {
+                null
+            }
+        }
+        Regex("(flash|blink) (the )?(lights|headlights)|lights? (on|flash)").containsMatchIn(q) ->
+            ParsedVehicleCommand("lights", label = "Flashing lights on")
+        Regex("\\bhonk\\b|sound (the )?horn|\\bhorn\\b|beep (the )?(car|horn)|find (my|the) car").containsMatchIn(q) ->
+            ParsedVehicleCommand("horn", label = "Sounding horn on")
         Regex("(stop|turn off|cancel|halt|end) (the )?charg|unplug").containsMatchIn(q) ->
             ParsedVehicleCommand("charge_off", label = "Stopping charge for")
         Regex("(start|begin|turn on|resume) (the )?charg|charge (it|the car|my car)( now)?|top (it )?up")

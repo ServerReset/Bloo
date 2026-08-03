@@ -121,6 +121,24 @@ object TileCommandRunner {
                     "climate" -> runClimate(ctx, repo, v, snap, climateTarget)
                     "climate_on" -> runClimateStart(ctx, repo, v, snap, climateTarget)
                     "climate_off" -> { repo.stopClimate(v); "Stopping climate" }
+                    // No arguments, no state to predict: these two make the car
+                    // do something audible/visible and change nothing that any
+                    // surface displays, which is why they need no optimistic
+                    // write below.
+                    "lights" -> { repo.flashLights(v); "Flashing lights on ${v.name}" }
+                    "horn" -> { repo.hornAndLights(v); "Sounding horn on ${v.name}" }
+                    // The percentage rides in on the same string parameter the
+                    // climate target uses -- it is the command's argument slot,
+                    // and giving it a second one for the sake of naming would
+                    // change every call site for one command's benefit. Both
+                    // plug types are set together because setChargeTargets
+                    // always sends both, and the API reports exactly these two.
+                    "charge_limit" -> {
+                        val pct = climateTarget.toIntOrNull()?.coerceIn(50, 100)
+                            ?: error("Bad charge limit")
+                        repo.setChargeTargets(v, pct, pct)
+                        "Charge limit set to $pct% on ${v.name}"
+                    }
                     else -> "Done"
                 }
             }.fold(
