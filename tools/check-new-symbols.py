@@ -32,4 +32,29 @@ for f,lines in added.items():
             if name not in imported and name not in declared:
                 print(f"{f}: {name}(  <- not imported, not declared")
                 bad+=1
+
+# --- second check: an annotation added directly above a declaration that
+# already carries the same one, fully qualified or not. This is what cost a
+# red build when @Immutable was re-added to a class that already had
+# @androidx.compose.runtime.Immutable -- invisible to a grep for "^@Immutable",
+# and invisible to a reader who starts at the line being edited.
+for f in added:
+    if not os.path.exists(f):
+        continue
+    lines = open(f).read().split("\n")
+    for i, ln in enumerate(lines):
+        m = re.match(r'\s*@(?:[\w.]+\.)?(\w+)\s*$', ln)
+        if not m:
+            continue
+        name = m.group(1)
+        # look back over KDoc/comments for the same annotation
+        j = i - 1
+        while j >= 0 and (lines[j].strip().startswith(("*", "/*", "//", "*/")) or not lines[j].strip()):
+            j -= 1
+        if j >= 0:
+            m2 = re.match(r'\s*@(?:[\w.]+\.)?(\w+)\s*$', lines[j])
+            if m2 and m2.group(1) == name:
+                print(f"{f}:{i+1}: @{name} is already applied at line {j+1}")
+                bad += 1
+
 sys.exit(1 if bad else 0)
