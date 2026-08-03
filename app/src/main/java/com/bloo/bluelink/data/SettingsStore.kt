@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import androidx.compose.runtime.Immutable
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -170,6 +171,12 @@ class SettingsStore(private val context: Context) {
         const val DEFAULT_CLIMATE_PRESET_PREFIX = "default_climate_preset_"
     }
 
+    /** @Immutable for the same reason as UiState: this is threaded through
+     *  every screen and into CarThemeOverride on every car page, and while
+     *  Compose infers it unstable (it holds Maps and Lists) nothing taking it
+     *  can ever skip. All fields are vals and every collection in one is built
+     *  fresh by the store, never edited in place. */
+    @Immutable
     data class Appearance(
         val themeMode: ThemeMode = ThemeMode.SYSTEM,
         val fontChoice: FontChoice = FontChoice.SYSTEM,
@@ -347,6 +354,8 @@ class SettingsStore(private val context: Context) {
      *  held continuously for its paired *Minutes threshold (see
      *  [doorOpenSince]/[engineOnSince]/[unlockedSince] below, which track how
      *  long the condition has been true per car). */
+    /** @Immutable -- same terms as [Appearance]. */
+    @Immutable
     data class NotificationPrefs(
         val service: Boolean = true,
         val doorOpen: Boolean = true,

@@ -4,6 +4,7 @@ import android.app.Application
 import android.location.Geocoder
 import androidx.biometric.BiometricManager
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
@@ -365,6 +366,24 @@ data class CanadaOtpUi(
 /** Minimum time a command control stays locked after firing, to block double-taps. */
 private const val MIN_COMMAND_LOCK_MS = 3000L
 
+/**
+ * @Stable, and this is the parameter that would otherwise undo the work done
+ * on [UiState].
+ *
+ * Skippability is ALL-or-nothing per call site: one unstable parameter makes
+ * the whole composable non-skippable, no matter how stable the rest are. `vm`
+ * is passed alongside `state` into VehicleDetailContent and down into every
+ * pebble, so marking UiState immutable while leaving this inferred-unstable
+ * would have changed nothing at all at exactly the call sites it was meant to
+ * fix.
+ *
+ * The promise holds the way it holds for any ViewModel: this is a single
+ * instance that lives longer than the composition reading it, its identity
+ * never changes under a composable, equality is referential, and everything
+ * observable about it is read through a StateFlow collected into snapshot
+ * state -- which is what notifies composition of a change.
+ */
+@Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = SessionStore(app)
