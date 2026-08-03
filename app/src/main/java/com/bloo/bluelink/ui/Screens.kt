@@ -10600,13 +10600,16 @@ private fun SettingsScreen(vm: AppViewModel) {
                 // ours. This is the door to it.
                 if (notif.charging && Build.VERSION.SDK_INT >= 36) {
                     val ctx = LocalContext.current
-                    TextButton(
-                        onClick = { ChargingLive.openLiveUpdateSettings(ctx) },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.padding(bottom = 6.dp),
-                    ) {
-                        Text("Not showing in the status bar?", style = MaterialTheme.typography.labelSmall)
-                    }
+                    Text(
+                        "Not showing in the status bar?",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { ChargingLive.openLiveUpdateSettings(ctx) }
+                            .padding(vertical = 4.dp)
+                            .padding(bottom = 6.dp),
+                    )
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(10.dp))
