@@ -3062,7 +3062,9 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // and later a velocity-driven blur here, and the tilt on top
                         // of the fade/scale, and all of it together read as worse
                         // than the plain fade/scale alone. Just that now.
-                        Box(Modifier.fillMaxSize().pagerDepth(exPager, page)) {
+                        // Flat, for the same reason as the garage pager below:
+                        // these pages are the same shadow-heavy pebble columns.
+                        Box(Modifier.fillMaxSize()) {
                             val pv = vehicles[exWrap.real(page)]
                             CarThemeOverride(
                                 paletteId = appearance.carCustomPaletteIds[pv.vin],
@@ -3178,9 +3180,21 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // It gates one callback, so it moved INTO that callback --
                         // read at invoke time, off the composition path entirely.
                         // No blur, no rotationZ tilt -- see the expanded pager above.
-                        Row(
-                            Modifier.fillMaxSize().pagerDepth(pager, page),
-                        ) {
+                        // NO pagerDepth here. Reported from a real device: this
+                        // swipe was smooth when it was a plain flat scroll, and
+                        // went juttery once the shrink was added. A graphicsLayer
+                        // scale is cheap on a simple layer, but this page is a
+                        // full pebble column and every pebble draws an elevation
+                        // shadow -- shadows are rasterized from the layer's
+                        // resolved size, so a scale that changes every frame
+                        // re-renders all of them every frame, on the drag's
+                        // critical path. The cover-screen pager keeps its shrink
+                        // because its pages are small and shadow-light.
+                        //
+                        // The transition this was meant to improve is not worth
+                        // the gesture it happens during: a swipe that tracks the
+                        // finger exactly IS the effect.
+                        Row(Modifier.fillMaxSize()) {
                             for (i in start until end) {
                                 val gv = vehicles[i]
                                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -5413,14 +5427,20 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?) {
     // earlier version of this got wrong by splitting at the limit instead.
     // The limit is a MARKER on that bar, not a division of it.
     val filledFrac = frac.coerceIn(0f, 1f)
-    // No gap at the extremes: an empty or full pack has nothing to separate,
-    // and a 5dp notch hard against a rounded cap reads as a rendering fault.
+    val limit = limitPct?.takeIf { it in 1..99 }
+    // The common case is the charge sitting AT its limit -- a car set to 80%
+    // and charged to 80%. The split and the marker then land on the same
+    // pixel, and drawing both put a 5dp hole under a 14dp dot: two devices
+    // saying one thing, rendered as damage. Near the split the gap yields and
+    // the marker alone carries it.
+    val atSplit = limit != null && abs(limit / 100f - filledFrac) < 0.03f
     val gap by animateDpAsState(
-        targetValue = if (filledFrac > 0.02f && filledFrac < 0.98f) 5.dp else 0.dp,
+        // No gap at the extremes either: an empty or full pack has nothing to
+        // separate, and a notch hard against a rounded cap reads as a fault.
+        targetValue = if (filledFrac > 0.02f && filledFrac < 0.98f && !atSplit) 5.dp else 0.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "chargeSplitGap",
     )
-    val limit = limitPct?.takeIf { it in 1..99 }
     BoxWithConstraints(Modifier.fillMaxWidth().height(ChargeBarHeight)) {
         val usable = (maxWidth - gap).coerceAtLeast(0.dp)
         // Floored at the bar's own height when there is ANY charge: below that
@@ -5492,25 +5512,36 @@ private val ChargeLimitDotSize = 14.dp
  * without the reader having to work out which is which. A marker sits on top
  * and says "here", which is all a limit needs to say.
  *
- * [onFill] flips its colours so it stays legible whichever side of the split
- * it lands on: a dark core on green while the charge is still below it, a
- * green core on grey once the charge has passed it. Either way it keeps a ring
- * in the bar's own background colour, so it reads as sitting above the bar
- * rather than punched into it.
+ * [onFill] flips BOTH of its colours, and that pairing is the whole trick. The
+ * ring takes the colour of whatever the marker is standing on -- green on the
+ * fill, the card's surface on the track -- and the core takes the opposite. So
+ * the ring never reads as a halo; it reads as nothing at all, and what's left
+ * is a clean dot in the one colour the bar isn't using at that point.
+ *
+ * The previous version painted the ring `surface` unconditionally, which is
+ * correct on the grey track and wrong on the fill: once the charge reached the
+ * limit the core went `surface` too, ring and core became one colour, and the
+ * marker rendered as a solid dark disc punched through the green. Reported
+ * from a real device, at the single most ordinary state this bar has -- a car
+ * set to 80% and charged to 80%.
  */
 @Composable
 private fun ChargeLimitDot(modifier: Modifier = Modifier, onFill: Boolean) {
     val scheme = MaterialTheme.colorScheme
+    val spec = spring<Color>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)
+    val ring by androidx.compose.animation.animateColorAsState(
+        if (onFill) ChargeGreen else scheme.surface,
+        spec, label = "limitDotRing",
+    )
     val core by androidx.compose.animation.animateColorAsState(
         if (onFill) scheme.surface else ChargeGreen,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "limitDotCore",
+        spec, label = "limitDotCore",
     )
     Box(
         modifier
             .size(ChargeLimitDotSize)
             .clip(CircleShape)
-            .background(scheme.surface)
+            .background(ring)
             .padding(3.dp)
             .clip(CircleShape)
             .background(core),
@@ -11487,7 +11518,15 @@ private fun parseVehicleCommand(query: String): ParsedVehicleCommand? {
 /** The two shapes the one search element takes. It is never two composables
  *  cross-fading: the same Surface changes size, so it can travel between
  *  screens instead of disappearing on one and appearing on the other. */
-private enum class SearchForm { BUBBLE, BAR }
+/**
+ * The three shapes the one search element takes.
+ *
+ * PILL is the collapsed state on Settings: icon plus the word, at a medium
+ * width. Settings used to collapse to the FULL-width bar, which is a text
+ * field's footprint with no text field in it -- a lot of bottom edge claimed
+ * to say one word. The bar is what it becomes when you touch it.
+ */
+private enum class SearchForm { BUBBLE, PILL, BAR }
 
 /**
  * THE search element, hoisted to the app root so it is a single object that
@@ -11550,7 +11589,14 @@ private fun SearchLayer(
         val bubble = if (compact) 40.dp else 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
         val barH = 52.dp
-        val form = if (open || onSettings) SearchForm.BAR else SearchForm.BUBBLE
+        // A medium pill: wide enough for the icon and the word with room
+        // around them, and nowhere near the bar's span.
+        val pillW = minOf(if (compact) 132.dp else 168.dp, barW)
+        val form = when {
+            open -> SearchForm.BAR
+            onSettings -> SearchForm.PILL
+            else -> SearchForm.BUBBLE
+        }
 
         // Resting corner for the bubble, and the drag bounds that keep it on
         // screen no matter where it was left.
@@ -11563,18 +11609,28 @@ private fun SearchLayer(
         val bubbleX = if (dragX.isNaN()) restX else dragX.dp.coerceIn(minX, maxX)
         val bubbleY = if (dragY.isNaN()) restY else dragY.dp.coerceIn(minY, maxY)
 
-        val targetW = if (form == SearchForm.BAR) barW else bubble
-        val targetH = if (form == SearchForm.BAR) barH else bubble
-        val targetX = if (form == SearchForm.BAR) (maxWidth - barW) / 2 else bubbleX
-        val targetY = if (form == SearchForm.BAR) maxHeight - barH - edge - bottomInset else bubbleY
+        val targetW = when (form) {
+            SearchForm.BAR -> barW
+            SearchForm.PILL -> pillW
+            SearchForm.BUBBLE -> bubble
+        }
+        val targetH = if (form == SearchForm.BUBBLE) bubble else barH
+        val targetX = if (form == SearchForm.BUBBLE) bubbleX else (maxWidth - targetW) / 2
+        val targetY = if (form == SearchForm.BUBBLE) bubbleY else maxHeight - barH - edge - bottomInset
 
-        // One spring for all four, so the morph reads as a single object
-        // changing rather than four properties racing each other.
-        val spec = spring<Dp>(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow)
-        val w by animateDpAsState(targetW, spec, label = "searchW")
-        val h by animateDpAsState(targetH, spec, label = "searchH")
-        val x by animateDpAsState(targetX, spec, label = "searchX")
-        val y by animateDpAsState(targetY, spec, label = "searchY")
+        // Two springs, not one, and this is the part that makes the resize
+        // read well: SIZE gets a little overshoot so the pill arrives with
+        // some give, while POSITION stays critically damped. Sharing one
+        // bouncy spring meant the whole element slid past its resting place
+        // and came back -- the wobble that made growing into the bar look
+        // loose rather than deliberate. Width and height still share their
+        // spring, so the shape stays coherent while it changes.
+        val sizeSpec = spring<Dp>(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow)
+        val posSpec = spring<Dp>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMediumLow)
+        val w by animateDpAsState(targetW, sizeSpec, label = "searchW")
+        val h by animateDpAsState(targetH, sizeSpec, label = "searchH")
+        val x by animateDpAsState(targetX, posSpec, label = "searchX")
+        val y by animateDpAsState(targetY, posSpec, label = "searchY")
 
         // Dismiss scrim. Below the pill in this Box, so it never eats its taps.
         AnimatedVisibility(
@@ -11662,6 +11718,11 @@ private fun SearchLayer(
  * and "a bar across the bottom" as the same element, and it is the sameness
  * that makes the screen-to-screen morph possible at all.
  */
+/** The glow's resting brightness, and how long it takes to get there. Rest is
+ *  not zero: the pill should still look lit, just not animated. */
+private const val GLOW_REST = 0.34f
+private const val GLOW_SETTLE_MS = 900
+
 @Composable
 private fun SearchPill(
     query: String,
@@ -11691,26 +11752,50 @@ private fun SearchPill(
     // Held as State and read ONLY inside drawBehind, so a tick invalidates the
     // DRAW phase and never recomposes this composable or the text field in it.
     val glowPhase = remember { mutableFloatStateOf(0f) }
-    val glowPulse = remember { mutableFloatStateOf(0.55f) }
+    val glowPulse = remember { mutableFloatStateOf(GLOW_REST) }
     val haloColor = scheme.primary
     // A second hue, mixed in on the far side of the sweep, so the light has
     // colour depth instead of being one flat tint at two brightnesses.
     val haloColor2 = scheme.tertiary
-    LaunchedEffect(expanded) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Bumped to wake the light up again. The glow does NOT run forever: a
+    // permanent travelling hotspot on a permanent fixture of the screen is
+    // something you end up looking past at best and away from at worst, and
+    // it was reported as distracting. It now runs while the search is being
+    // used or has just changed, then settles to a still, dim halo and stops
+    // ticking entirely -- no more draw invalidations until something wakes
+    // it. Touching it, opening it, or its shape changing all count.
+    var wake by remember { mutableIntStateOf(0) }
+    LaunchedEffect(pressed) { if (pressed) wake++ }
+    LaunchedEffect(expanded, form, wake) {
         // Sweeps faster and breathes harder while open: the bar is the thing
         // being used at that point, and the motion says so.
         val sweepMs = if (expanded) 2600L else 5200L
         val breatheMs = if (expanded) 1100L else 2200L
+        // Open, it stays alive as long as it's open -- you are looking at it
+        // on purpose. Closed, it has a few seconds to catch the eye and then
+        // gets out of the way.
+        val liveMs = if (expanded) Long.MAX_VALUE else 5000L
         val start = System.currentTimeMillis()
-        while (true) {
-            val elapsed = System.currentTimeMillis() - start
+        var elapsed = 0L
+        while (elapsed < liveMs) {
+            elapsed = System.currentTimeMillis() - start
             glowPhase.floatValue = ((elapsed % sweepMs).toFloat() / sweepMs)
-            glowPulse.floatValue = 0.55f + (1f - 0.55f) * triangleWave(elapsed, breatheMs)
+            glowPulse.floatValue = GLOW_REST + (1f - GLOW_REST) * triangleWave(elapsed, breatheMs)
+            delay(33)
+        }
+        // Ease down to rest rather than cutting: a light that stops mid-breath
+        // is a glitch, a light that dims to still is a decision.
+        val from = glowPulse.floatValue
+        val settleStart = System.currentTimeMillis()
+        while (true) {
+            val t = ((System.currentTimeMillis() - settleStart) / GLOW_SETTLE_MS.toFloat()).coerceIn(0f, 1f)
+            glowPulse.floatValue = from + (GLOW_REST - from) * t
+            if (t >= 1f) break
             delay(33)
         }
     }
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
@@ -11798,9 +11883,16 @@ private fun SearchPill(
             tonalElevation = if (expanded) 10.dp else 6.dp,
             border = BorderStroke(
                 if (expanded) 1.5.dp else 1.dp,
+                // Static. This is an argument to Surface, i.e. COMPOSITION
+                // scope -- it used to multiply in glowPulse, which meant every
+                // 33ms tick of the glow clock recomposed this whole composable
+                // and the text field inside it, thirty times a second, for the
+                // entire time the app was open. The moving light belongs in
+                // the drawBehind gradients above, where a tick invalidates
+                // draw and nothing else; the rim just needs to be lit.
                 Brush.verticalGradient(
                     listOf(
-                        scheme.primary.copy(alpha = (if (expanded) 0.65f else 0.4f) * glowPulse.floatValue),
+                        scheme.primary.copy(alpha = if (expanded) 0.65f else 0.4f),
                         scheme.primary.copy(alpha = 0.05f),
                     ),
                 ),
@@ -11872,8 +11964,8 @@ private fun SearchPill(
                             )
                         }
                     }
-                    // Closed BAR (Settings): the icon plus the word, centred.
-                    shape == SearchForm.BAR -> Row(
+                    // Closed PILL (Settings): the icon plus the word, centred.
+                    shape == SearchForm.PILL -> Row(
                         Modifier.fillMaxSize(),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
