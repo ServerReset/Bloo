@@ -59,6 +59,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -298,7 +299,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Density
@@ -11595,8 +11598,28 @@ private fun SearchLayer(
     // not worth a runtime "no Saver found" on some Compose version.
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
     var dragY by rememberSaveable { mutableStateOf(Float.NaN) }
+    // True only between finger-down and finger-up on the bubble. The position
+    // animation is BYPASSED while it is true -- see the spec choice below.
+    var dragging by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
 
     BackHandler(enabled = open) { query = ""; focused = false }
+    // A tick when it opens and when it closes. The morph is the visual half of
+    // a state change the user just caused; the tick is the half they feel, and
+    // it lands on the frame the shape starts moving rather than when it
+    // arrives, so the gesture reads as having been received immediately.
+    // Armed only after the first composition: a LaunchedEffect keyed on a
+    // boolean also runs when that boolean is simply born false, so without
+    // this the app buzzes once on launch, for nothing happening.
+    var hapticArmed by remember { mutableStateOf(false) }
+    LaunchedEffect(open) {
+        if (hapticArmed) {
+            haptics.performHapticFeedback(
+                if (open) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove,
+            )
+        }
+        hapticArmed = true
+    }
     // Drop any stale AI answer once the box is cleared, and forget the last
     // submission with it -- otherwise reopening search shows the previous
     // question's answer under an empty field.
@@ -11648,7 +11671,15 @@ private fun SearchLayer(
         // loose rather than deliberate. Width and height still share their
         // spring, so the shape stays coherent while it changes.
         val sizeSpec = spring<Dp>(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow)
-        val posSpec = spring<Dp>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMediumLow)
+        // A spring is right for the morph and WRONG for a drag: routing the
+        // finger's position through one meant the bubble trailed behind the
+        // touch for the whole gesture and then coasted past it on release --
+        // it felt like dragging something on elastic, not like moving it.
+        // While the finger is down the position snaps (1:1 with touch); the
+        // moment it lifts, the spring is back to carry the settle.
+        val posSpec = if (dragging) snap<Dp>() else {
+            spring<Dp>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+        }
         val w by animateDpAsState(targetW, sizeSpec, label = "searchW")
         val h by animateDpAsState(targetH, sizeSpec, label = "searchH")
         val x by animateDpAsState(targetX, posSpec, label = "searchX")
@@ -11726,10 +11757,30 @@ private fun SearchLayer(
                     dragY = ((if (dragY.isNaN()) bubbleY else dragY.dp) + dy).coerceIn(minY, maxY).value
                 }
             } else null,
+            onDragStart = { dragging = true },
+            onDragEnd = {
+                dragging = false
+                // Snap to the nearer side wall. A bubble left mid-screen is
+                // the worst place it can be -- it covers content on both
+                // sides of itself and reads as dropped rather than placed.
+                // Parked against an edge it covers one margin, and the spring
+                // that carries it there is the whole reward for the gesture.
+                // Vertical position is left exactly where it was put: which
+                // ROW is free is the user's judgement, which side is tidier
+                // is not.
+                val cur = if (dragX.isNaN()) restX else dragX.dp.coerceIn(minX, maxX)
+                dragX = (if (cur + bubble / 2 < maxWidth / 2) minX else maxX).value
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            },
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
         )
     }
 }
+
+/** The glow's resting brightness, and how long it takes to get there. Rest is
+ *  not zero: the pill should still look lit, just not animated. */
+private const val GLOW_REST = 0.34f
+private const val GLOW_SETTLE_MS = 900
 
 /**
  * The pill itself: one Surface at whatever [width]/[height] [SearchLayer] has
@@ -11740,11 +11791,6 @@ private fun SearchLayer(
  * and "a bar across the bottom" as the same element, and it is the sameness
  * that makes the screen-to-screen morph possible at all.
  */
-/** The glow's resting brightness, and how long it takes to get there. Rest is
- *  not zero: the pill should still look lit, just not animated. */
-private const val GLOW_REST = 0.34f
-private const val GLOW_SETTLE_MS = 900
-
 @Composable
 private fun SearchPill(
     query: String,
@@ -11757,6 +11803,8 @@ private fun SearchPill(
     onFocusChange: (Boolean) -> Unit,
     onSubmit: () -> Unit,
     onDrag: ((Dp, Dp) -> Unit)?,
+    onDragStart: () -> Unit = {},
+    onDragEnd: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -11927,7 +11975,11 @@ private fun SearchPill(
                 .then(
                     if (onDrag != null) {
                         Modifier.pointerInput(Unit) {
-                            detectDragGestures { change, amount ->
+                            detectDragGestures(
+                                onDragStart = { onDragStart() },
+                                onDragEnd = { onDragEnd() },
+                                onDragCancel = { onDragEnd() },
+                            ) { change, amount ->
                                 change.consume()
                                 with(density) { onDrag(amount.x.toDp(), amount.y.toDp()) }
                             }
@@ -11938,8 +11990,18 @@ private fun SearchPill(
             AnimatedContent(
                 targetState = form to expanded,
                 transitionSpec = {
-                    (fadeIn(tween(200, delayMillis = 90)) + scaleIn(initialScale = 0.9f, animationSpec = tween(200, delayMillis = 90))) togetherWith
-                        (fadeOut(tween(110)) + scaleOut(targetScale = 0.9f, animationSpec = tween(110)))
+                    // Cross-fade only, fast, and NOT delayed.
+                    //
+                    // This used to scale the content in from 0.9 after a 90ms
+                    // hold. Both were wrong for what is happening around it:
+                    // the container is already springing to a new size, so a
+                    // second scale on the content inside it is two different
+                    // rates of growth fighting over the same pixels, and the
+                    // delay meant the shape arrived somewhere before its
+                    // contents admitted they were moving. The old content
+                    // leaving quickly and the new one arriving over the top,
+                    // while the shape carries the motion, is the whole effect.
+                    fadeIn(tween(140)) togetherWith fadeOut(tween(90))
                 },
                 label = "searchContentMorph",
             ) { (shape, isOpen) ->
