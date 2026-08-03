@@ -326,9 +326,21 @@ fun ChargeRing(
             // Painted rather than cleared: this is a composed indicator, not a
             // bitmap we own, so the "hole" the dot sits in is drawn in the
             // colour behind it.
-            val holeColor = MaterialTheme.colorScheme.background
+            // Both colours flip together, the same pairing the phone's bar
+            // marker uses: the HOLE takes the colour of whatever the dot is
+            // standing on, and the dot takes the opposite. Standing on the
+            // filled arc the hole is the arc's own colour, so no halo is
+            // visible and what reads is a clean dark dot punched into the
+            // green; standing on the unfilled track the hole is the
+            // background, which is what separates the dot from the track.
+            //
+            // The passed case used to paint a background-coloured hole AND a
+            // muted grey dot on top of the green arc -- a dark ring around a
+            // dull mark, which is the same halo-plus-smudge the phone's
+            // version was reported for. The two surfaces draw one marker now.
             val passed = (percent ?: 0) / 100f >= limitFrac
-            val markColor = if (passed) MaterialTheme.colorScheme.onSurfaceVariant else animatedColor
+            val holeColor = if (passed) animatedColor else MaterialTheme.colorScheme.background
+            val markColor = if (passed) MaterialTheme.colorScheme.background else animatedColor
             Canvas(Modifier.size(size)) {
                 val stroke = 5.dp.toPx()
                 val radius = (this.size.minDimension - stroke) / 2f
