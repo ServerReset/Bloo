@@ -130,7 +130,7 @@ data class UiState(
     val loading: Boolean = false,
     val refreshing: Boolean = false,
     val vehicles: List<Vehicle> = emptyList(),
-    val currentIndex: Int = 0,
+    // currentIndex is deliberately NOT here -- see AppViewModel.currentIndex.
     /** On large screens, the index expanded to full screen (null = grid view). */
     val expandedIndex: Int? = null,
     val statuses: Map<String, VehicleStatus> = emptyMap(),
@@ -412,6 +412,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Status requests currently queued or running, keyed "vin:refresh"
      *  (de-dupes; a live refresh=true isn't dropped behind a background
      *  refresh=false fetch for the same car). */
+    /**
+     * Which car the pager is on -- its OWN flow, deliberately not a field of
+     * [UiState], and this is the swipe fix.
+     *
+     * UiState is a data class, so its equals covers every field; change one
+     * and no reader can skip. It is threaded into VehicleDetailContent and
+     * from there into every pebble, so putting the pager's position inside it
+     * meant that finishing a swipe -- the one moment the whole object had to
+     * change for a reason no pebble cares about -- rebuilt all three live car
+     * pages. selectIndex already guarded the case where the index did not
+     * actually move, and described the cost as "the worst kind of hitch:
+     * invisible work at exactly the moment the user is watching the gesture
+     * finish." That guard only ever covered the no-op; a real page change paid
+     * it in full, every time.
+     *
+     * Split out, the settle touches nothing the pages read, so they skip
+     * entirely. The handful of screen-level composables that genuinely need
+     * the index collect this instead, and only they recompose.
+     */
+    private val _currentIndex = MutableStateFlow(0)
+    val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
+
     private val statusInFlight = mutableSetOf<String>()
 
     /** Subset of [statusInFlight] whose call used surfaceErrors=true (drives the spinner + settle haptic). */
@@ -1006,11 +1028,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 tileBackground = tileBackground,
                 tileLiveRefresh = tileLiveRefresh,
                 shortcutSet = shortcutSet,
-                currentIndex = index,
                 screen = screen,
                 garageLoadError = null,
             )
         }
+        // Restores the last-selected car. This used to ride along inside the
+        // copy() above; it lives in its own flow now (see currentIndex), so it
+        // has to be set alongside rather than within.
+        _currentIndex.value = index
         // One-time: now that vehicles (and their default climate presets) are
         // known, start the Drive auto-sync bootstrap + collector.
         bootstrapDriveSync()
@@ -1225,18 +1250,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // car-page rebuilds to set currentIndex to the value it already holds
         // is the worst kind of hitch: invisible work at exactly the moment the
         // user is watching the gesture finish.
-        if (_state.value.currentIndex == index) {
+        if (_currentIndex.value == index) {
             ensureStatus(v)
             return
         }
-        _state.update { it.copy(currentIndex = index) }
+        _currentIndex.value = index
         viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
         ensureStatus(v)
     }
 
     /** Large-screen only: expand one car to full screen (also selects it, so
      *  the two indices never disagree about which car is "current"). */
-    fun expand(index: Int) = _state.update { it.copy(expandedIndex = index, currentIndex = index) }
+    fun expand(index: Int) {
+        _currentIndex.value = index
+        _state.update { it.copy(expandedIndex = index) }
+    }
     /** Back out of the expanded single-car view to the grid. */
     fun collapse() = _state.update { it.copy(expandedIndex = null) }
 
@@ -1494,9 +1522,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // together with vehicles, but this was the one place that moved
             // vehicles without it, so dragging a car above the currently
             // selected one silently swapped which car the detail view showed.
-            val selectedVin = s.vehicles.getOrNull(s.currentIndex)?.vin
+            val selectedVin = s.vehicles.getOrNull(_currentIndex.value)?.vin
             val newIndex = order.indexOfFirst { it.vin == selectedVin }
-            s.copy(vehicles = order, currentIndex = if (newIndex >= 0) newIndex else s.currentIndex)
+            if (newIndex >= 0) _currentIndex.value = newIndex
+            s.copy(vehicles = order)
         }
         viewModelScope.launch {
             settingsStore.setVehicleOrder(order.map { it.vin })

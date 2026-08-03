@@ -2886,7 +2886,12 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
     if (vehicles.isEmpty()) return
     val appearance = LocalAppearance.current
 
-    val currentVehicle = vehicles.getOrNull(state.currentIndex.coerceIn(0, vehicles.lastIndex))
+    // Collected here rather than read off UiState: the pager's position is its
+    // own flow now precisely so that finishing a swipe does not invalidate the
+    // car pages. Reading it in THIS composable is fine and intended -- this is
+    // one of the few places that genuinely needs it, and it is above the pages.
+    val currentIndex by vm.currentIndex.collectAsState()
+    val currentVehicle = vehicles.getOrNull(currentIndex.coerceIn(0, vehicles.lastIndex))
     val currentFetchedAt = currentVehicle?.let { state.fetchedAt(it) }
     val sessionStartMs = remember { System.currentTimeMillis() }
     LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
@@ -3096,7 +3101,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
             } else {
                 val pageCount = (count + perPage - 1) / perPage
-                val initialBlock = (state.currentIndex.coerceIn(0, count - 1)) / perPage
+                val initialBlock = (currentIndex.coerceIn(0, count - 1)) / perPage
                 // Infinite wrap-around: WrapPagerState.realCount is the BLOCK count
                 // here (ceil(count / perPage)), and the real vehicle index for a page
                 // is realBlock(page) * perPage.
@@ -3109,7 +3114,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                 }
                 // The above only pushes the pager's own settles into
-                // state.currentIndex, never the other direction -- so an
+                // currentIndex, never the other direction -- so an
                 // external change (a widget/shortcut tap selecting a specific
                 // car while this pager was already composed on a different
                 // one) updated currentIndex, and the floating name pill below
@@ -3118,8 +3123,8 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // "look at this car now," so jump (no animated fly-through
                 // across a potentially large virtual-page delta) the instant
                 // currentIndex moves out from under the page actually shown.
-                LaunchedEffect(state.currentIndex) {
-                    val targetBlock = state.currentIndex.coerceIn(0, count - 1) / perPage
+                LaunchedEffect(currentIndex) {
+                    val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
@@ -3253,7 +3258,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                             count = pageCount,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
-                            onRefresh = { vm.refreshStatus(vehicles[state.currentIndex]) },
+                            onRefresh = { vm.refreshStatus(vehicles[currentIndex]) },
                         )
                     }
                     // Grid mode (perPage > 1, wide/large screens) hides each
@@ -3318,7 +3323,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     AnimatedContent(
-                                        targetState = state.currentIndex,
+                                        targetState = currentIndex,
                                         transitionSpec = {
                                             val dir = if (targetState > initialState) 1 else -1
                                             (slideInHorizontally(tween(200)) { it * dir / 3 } +
@@ -3336,7 +3341,7 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     }
                                     if (vehicles.size > 1) {
                                         AnimatedContent(
-                                            targetState = state.currentIndex,
+                                            targetState = currentIndex,
                                             transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
                                             label = "carNamePillCount",
                                         ) { idx ->
@@ -4058,7 +4063,9 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     // Infinite wrap-around, matching every other car-switching pager in the
     // app (the expanded pager, the default grid) and the cover screen's own
     // tile pager, which already looped.
-    val wrap = rememberWrapPager(count, state.currentIndex.coerceIn(0, count - 1))
+    // Same as GarageScreen: the index is its own flow, collected here.
+    val currentIndex by vm.currentIndex.collectAsState()
+    val wrap = rememberWrapPager(count, currentIndex.coerceIn(0, count - 1))
     val pager = wrap.pager
     fun realCar(virtualPage: Int) = wrap.real(virtualPage)
     LaunchedEffect(pager) {
@@ -4069,8 +4076,8 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     // selecting a specific car while the cover screen was already showing a
     // different one) by snapping to it, instead of only ever pushing this
     // pager's own settles into currentIndex one-way.
-    LaunchedEffect(state.currentIndex) {
-        wrap.snapToReal(state.currentIndex.coerceIn(0, count - 1))
+    LaunchedEffect(currentIndex) {
+        wrap.snapToReal(currentIndex.coerceIn(0, count - 1))
     }
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
@@ -4153,7 +4160,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             // Skipped when the camera band is showing the name instead -- see
             // below. Saying it twice on a screen this size is worse than the
             // problem the overlay was added to solve.
-            vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))
+            vehicles.getOrNull(currentIndex.coerceIn(0, count - 1))
                 ?.takeIf { band == null && visibleTile != "main" }
                 ?.let { current ->
                 Text(
@@ -4204,7 +4211,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                 // the thing the bubble exists to avoid -- a search button
                 // parked somewhere the user can't move it off whatever it is
                 // covering.
-                vehicles.getOrNull(state.currentIndex.coerceIn(0, count - 1))?.let { current ->
+                vehicles.getOrNull(currentIndex.coerceIn(0, count - 1))?.let { current ->
                     com.bloo.uicommon.FittedText(
                         text = current.name,
                         style = MaterialTheme.typography.labelLarge.copy(
