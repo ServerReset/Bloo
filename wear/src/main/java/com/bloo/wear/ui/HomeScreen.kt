@@ -1,5 +1,11 @@
 package com.bloo.wear.ui
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.runtime.produceState
+import androidx.compose.foundation.Image
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -1082,6 +1088,29 @@ private fun AlertsCard(car: CarView) {
 @Composable
 private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard(null) {
     val alertCount = car.alertCount
+    // The car's own photo, if the phone has sent one. Loaded from the watch's
+    // cache and remembered per VIN + file stamp, so switching cars does not
+    // re-decode and a re-published identical photo does not either.
+    val ctx = LocalContext.current
+    val photo by produceState<android.graphics.Bitmap?>(initialValue = null, car.vin) {
+        value = withContext(Dispatchers.IO) {
+            WearPhotoCache.pathFor(ctx, car.vin)?.let {
+                runCatching { android.graphics.BitmapFactory.decodeFile(it) }.getOrNull()
+            }
+        }
+    }
+    photo?.let { bmp ->
+        Image(
+            bitmap = bmp.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(12.dp)),
+        )
+        Spacer(Modifier.height(8.dp))
+    }
     val isStale = car.fetchedAt != null && System.currentTimeMillis() - car.fetchedAt > com.bloo.bluelink.data.STALE_STATUS_MS
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(contentAlignment = Alignment.TopEnd) {

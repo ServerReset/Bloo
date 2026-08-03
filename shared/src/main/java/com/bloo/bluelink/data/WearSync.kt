@@ -47,6 +47,11 @@ object WearSync {
      *  control or applies/toggles a preset, and both mirror the other's. */
     const val PATH_CLIMATE = "/bloo/climate"
 
+    /** DataMap key carrying one car's photo BYTES as an Asset, in the same
+     *  item as the JSON payload. Per-VIN so one car's photo changing does not
+     *  invalidate the rest. */
+    fun assetKeyFor(vin: String): String = "photo_$vin"
+
     /** DataItem path: phone → watch extras (weather, car photo URLs, AI
      *  summaries) so the watch reaches fuller parity with the phone. */
     const val PATH_EXTRAS = "/bloo/extras"

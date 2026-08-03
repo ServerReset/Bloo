@@ -82,18 +82,22 @@ class WearListenerService : WearableListenerService() {
         // Drain the buffer synchronously on the binder thread — the buffer is
         // only valid for the duration of this callback — then hand the extracted
         // strings off to the coroutine scope.
+        // The DataMap is carried along with the payload string, not just read
+        // for it: PATH_EXTRAS also holds the car photos as Assets, and the
+        // buffer these events come from is recycled the moment this returns --
+        // so anything still needed inside the coroutine has to be taken now.
         val updates = events.mapNotNull { event ->
             if (event.type != DataEvent.TYPE_CHANGED) return@mapNotNull null
             val item = event.dataItem
-            val raw = DataMapItem.fromDataItem(item).dataMap.getString(WearSync.KEY_PAYLOAD)
-                ?: return@mapNotNull null
-            item.uri.path to raw
+            val map = DataMapItem.fromDataItem(item).dataMap
+            val raw = map.getString(WearSync.KEY_PAYLOAD) ?: return@mapNotNull null
+            Triple(item.uri.path, raw, map)
         }
         if (updates.isEmpty()) return
 
         serviceScope.launch {
             var tileNeedsRefresh = false
-            updates.forEach { (path, raw) ->
+            updates.forEach { (path, raw, dataMap) ->
                 runCatching {
                     when (path) {
                         WearSync.PATH_STATE -> {
@@ -114,7 +118,21 @@ class WearListenerService : WearableListenerService() {
                         }
                         WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(applicationContext, raw)
                         WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(applicationContext, raw)
-                        WearSync.PATH_EXTRAS -> WearStateWriter.persistExtras(applicationContext, raw)
+                        WearSync.PATH_EXTRAS -> {
+                            WearStateWriter.persistExtras(applicationContext, raw)
+                            // The photos ride in the same item as Assets, whose
+                            // bytes have to be pulled explicitly -- an Asset in
+                            // a DataMap is a handle, not a payload. The VIN list
+                            // comes from the JSON we just persisted, so a car
+                            // removed on the phone stops being fetched here on
+                            // the same beat rather than one publish later.
+                            val vins = runCatching { WearSync.decodeExtras(raw).images.keys }
+                                .getOrDefault(emptySet())
+                            if (vins.isNotEmpty()) {
+                                WearPhotoCache.ingest(applicationContext, vins, dataMap)
+                                WearPhotoCache.prune(applicationContext, vins)
+                            }
+                        }
                         // Other paths (pebble order, local prefs, AI/aurora
                         // toggles) are published by the watch itself, not the
                         // phone; the service takes no action on its own writes.

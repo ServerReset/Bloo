@@ -373,6 +373,24 @@ object WearBridge {
     suspend fun publishExtrasNow(context: Context, extras: com.bloo.bluelink.data.WearExtras) {
         putItem(context, WearSync.PATH_EXTRAS) {
             dataMap.putString(WearSync.KEY_PAYLOAD, WearSync.encodeExtras(extras))
+            // The car photos as actual BYTES, attached as Data Layer Assets.
+            //
+            // extras.images carries the phone's own file paths, which is what
+            // this used to be the whole of. A path is meaningless on a separate
+            // device with a separate filesystem, so the watch received strings
+            // it could do nothing with -- the photo never travelled at all.
+            // Assets are the Data Layer's mechanism for binary: the system
+            // transfers them out of band and hands the watch a file descriptor.
+            //
+            // Downscaled hard before sending. These are phone-camera photos
+            // going to a screen ~450px across, over Bluetooth, and the Data
+            // Layer's per-item budget is small -- shipping a 4MB original would
+            // fail the put and take the weather and AI summaries in this same
+            // item down with it.
+            extras.images.forEach { (vin, path) ->
+                val asset = com.bloo.bluelink.wear.WearPhotoAssets.encode(path) ?: return@forEach
+                dataMap.putAsset(WearSync.assetKeyFor(vin), asset)
+            }
         }
     }
 

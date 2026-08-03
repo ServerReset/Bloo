@@ -33,6 +33,14 @@ for f,lines in added.items():
     # ignore the check, which is worse than not having it.
     prev = subprocess.run(["git","show",f"HEAD:{f}"],capture_output=True,text=True).stdout
     already = set(re.findall(r'(?<![\w.])([A-Z]\w+)\s*\(', prev))
+    # Kotlin stdlib constructors/factories that never need importing. Not an
+    # exhaustive list -- just the ones common enough that flagging them trains
+    # you to ignore the tool.
+    already |= {
+        "Pair", "Triple", "Regex", "Exception", "RuntimeException", "Error",
+        "IllegalStateException", "IllegalArgumentException", "String", "Array",
+        "IntArray", "ByteArray", "FloatArray", "BooleanArray", "Comparator",
+    }
     for ln in lines:
         code=re.sub(r'//.*','',ln)
         for name in re.findall(r'(?<![\w.])([A-Z]\w+)\s*\(', code):
