@@ -43,7 +43,10 @@ for f,lines in added.items():
     }
     for ln in lines:
         code=re.sub(r'//.*','',ln)
-        for name in re.findall(r'(?<![\w.])([A-Z]\w+)\s*\(', code):
+        # Both "Name(" and "Name.member(" -- a qualified static/object call is
+        # just as unresolvable, and missing it is what let an unimported
+        # WearPhotoCache.pathFor( through to a red build.
+        for name in re.findall(r'(?<![\w.])([A-Z]\w+)\s*[(.]', code):
             if name not in imported and name not in declared and name not in already:
                 print(f"{f}: {name}(  <- not imported, not declared")
                 bad+=1

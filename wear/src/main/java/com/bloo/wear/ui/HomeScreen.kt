@@ -145,6 +145,7 @@ import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
 import com.bloo.wear.WearPebbles
+import com.bloo.wear.WearPhotoCache
 import com.bloo.wear.WearTiles
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
