@@ -12260,7 +12260,13 @@ private fun SearchPill(
         // frame, for a permanent fixture of the screen. A blurred solid pill IS
         // a radial falloff, so painting the falloff directly gets the same
         // picture for one gradient fill each.
-        Box(
+        // The bloom is for the BUBBLE and for the open bar -- a floating circle
+        // over content needs to announce itself, and an open text field is the
+        // thing you are using. A collapsed pill sitting in a settings screen is
+        // neither: it is a button in a list of buttons, and a soft halo behind
+        // it just reads as a smudged rectangle around a control. Reported from
+        // a screenshot, and it looked exactly like that.
+        if (expanded || form == SearchForm.BUBBLE) Box(
             Modifier.matchParentSize().drawBehind {
                 val pulse = glowPulse.floatValue
                 val phase = glowPhase.floatValue
@@ -12334,12 +12340,24 @@ private fun SearchPill(
             // a photo hero picks up whatever is behind it and stops looking
             // like a control at all; at this size there is not enough of it for
             // the glass effect to read as glass.
-            color = scheme.surfaceContainerHighest.copy(
-                alpha = glassContainerAlpha(if (compact) 0.97f else 0.86f),
-            ),
-            contentColor = scheme.onSurface,
+            // A collapsed pill gets a filled tonal container and its matching
+            // content colour. It used to be a near-transparent surface with a
+            // hairline and onSurfaceVariant text, which on a dark settings
+            // screen is a grey word inside a grey outline -- indistinguishable
+            // from a disabled control, which is what the screenshot showed.
+            color = when {
+                form == SearchForm.PILL && !expanded -> scheme.secondaryContainer
+                else -> scheme.surfaceContainerHighest.copy(
+                    alpha = glassContainerAlpha(if (compact) 0.97f else 0.86f),
+                )
+            },
+            contentColor = if (form == SearchForm.PILL && !expanded) {
+                scheme.onSecondaryContainer
+            } else {
+                scheme.onSurface
+            },
             tonalElevation = if (expanded) 10.dp else 6.dp,
-            border = BorderStroke(
+            border = if (form == SearchForm.PILL && !expanded) null else BorderStroke(
                 if (expanded) 1.5.dp else 1.dp,
                 // Static. This is an argument to Surface, i.e. COMPOSITION
                 // scope -- it used to multiply in glowPulse, which meant every
