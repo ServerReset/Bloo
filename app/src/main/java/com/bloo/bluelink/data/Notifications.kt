@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -349,6 +350,9 @@ object ChargingLive {
     /** The not-yet-charged remainder. Deliberately dim rather than empty --
      *  a zero-width remaining segment at 100% is filtered out below. */
     private const val TRACK = 0x40FFFFFF
+    /** The limit marker on the bar. Light, so it reads against both the green
+     *  fill it sits on below the limit and the dim track above it. */
+    private const val LIMIT_POINT = 0xFFFFFFFF.toInt()
 
     /** One stable notification id per car, distinct from the alert ids so a
      *  charging notification never overwrites a door/service alert. */
@@ -408,25 +412,33 @@ object ChargingLive {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
-        // "82% · 1h 20m left · Plugged in (AC)" -- built from whichever pieces
-        // the car actually reported, joined so a missing one leaves no stray
-        // separator behind.
-        // The limit is shown in the TEXT here, and only in the text.
+        // "82% · to 80% · 1h 20m left · Plugged in (AC)" -- built from
+        // whichever pieces the car actually reported, joined so a missing one
+        // leaves no stray separator behind.
         //
-        // This notification is the one surface where the marker is not drawn,
-        // and that is not an oversight. A promoted ongoing notification -- the
-        // thing that puts this in Samsung's Now bar and the status-bar chip --
-        // has to satisfy a list of conditions, and the system silently demotes
-        // it to an ordinary notification when it doesn't. Adding
-        // setProgressPoints was the only change to this builder between a
-        // version confirmed working on a real device and one confirmed
-        // demoted, so the points come back out.
+        // On the history here, because it matters for the next person who
+        // touches this builder: setProgressPoints was once removed from it on
+        // the theory that it was costing the promotion, since it was the only
+        // change between a build confirmed working on a real device and one
+        // confirmed demoted. Removing it did NOT restore the promotion, so the
+        // theory was wrong and the point is back -- this bar marks the limit
+        // the same way every other surface does.
         //
-        // I could not prove WHY from here: promotion is decided by the OS at
-        // post time and reports nothing back an app can read. What I can do is
-        // not keep the one change that correlates with losing it, for a dot
-        // inside a bar that only appears if the promotion works in the first
-        // place.
+        // What the documented conditions actually are (developer.android.com,
+        // "Create live update notifications"): a promotable style, ongoing, a
+        // content title, setRequestPromotedOngoing, and the
+        // POST_PROMOTED_NOTIFICATIONS permission; demoted by a custom
+        // RemoteViews, a group summary, setColorized, or an IMPORTANCE_MIN
+        // channel. This builder satisfies every one of them, and is now
+        // byte-for-byte equivalent in every promotion-relevant respect to the
+        // build that was confirmed working.
+        //
+        // The condition the app CANNOT satisfy from code is the one the docs
+        // call out separately: hasPromotableCharacteristics() "does not
+        // consider whether the user disabled Live Updates for the app in
+        // settings." That is a per-app OS toggle, it is not readable, and a
+        // notification denied by it looks exactly like this -- an ordinary
+        // notification, no Now bar. Hence openLiveUpdateSettings below.
         val limit = chargeLimit?.takeIf { it in 1..99 }
         val detail = listOfNotNull(
             percent?.let { "$it%" },
@@ -479,9 +491,14 @@ object ChargingLive {
                         }
                     },
                 )
-            // NO setProgressPoints, deliberately -- see the note on `limit`
-            // above. The dot that marks the limit on every other surface is
-            // carried here by the text ("to 80%") instead.
+            // The limit as a point ON the bar, which is exactly what it is on
+            // the phone hero, the widget's bar and ring, and the watch: the
+            // fill is the charge, the point is the target.
+            if (limit != null) {
+                style.setProgressPoints(
+                    listOf(NotificationCompat.ProgressStyle.Point(limit).setColor(LIMIT_POINT)),
+                )
+            }
             builder.setStyle(style)
             // The compact text on the status-bar chip, where there is room for
             // a couple of glyphs and nothing more.
@@ -517,6 +534,32 @@ object ChargingLive {
             ),
         )
         runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
+    }
+
+    /**
+     * Opens this app's system notification settings.
+     *
+     * Android decides at post time whether an ongoing notification is promoted
+     * to a Live Update, reports nothing back that an app can read, and -- per
+     * the documentation -- ignores its own promotability check entirely if the
+     * user has Live Updates switched off for the app. So when the bar posts as
+     * an ordinary notification despite the builder being correct, the only
+     * remaining lever is the user's, and the app's job is to hand them the
+     * door rather than to keep guessing at the builder.
+     */
+    fun openLiveUpdateSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }.onFailure {
+            runCatching {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        .setData(Uri.fromParts("package", context.packageName, null))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+        }
     }
 
     /** Clears every car's charging notification -- used when the feature is

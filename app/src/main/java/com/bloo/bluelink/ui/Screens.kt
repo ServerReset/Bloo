@@ -328,6 +328,7 @@ import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
+import com.bloo.bluelink.data.ChargingLive
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
@@ -10587,8 +10588,26 @@ private fun SettingsScreen(vm: AppViewModel) {
                         "filling as it goes, with the charge limit marked and a Stop button.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
+                    modifier = Modifier.padding(bottom = 6.dp),
                 )
+                // Android decides at post time whether to promote this to a
+                // Live Update -- the treatment that puts it in the status-bar
+                // chip and Samsung's Now bar -- and reports nothing back that
+                // the app can read. Its own docs note the promotability check
+                // ignores the per-app Live Updates switch entirely, so when the
+                // bar posts as an ordinary notification with a correct builder,
+                // that switch is the remaining lever and it is the user's, not
+                // ours. This is the door to it.
+                if (notif.charging && Build.VERSION.SDK_INT >= 36) {
+                    val ctx = LocalContext.current
+                    TextButton(
+                        onClick = { ChargingLive.openLiveUpdateSettings(ctx) },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    ) {
+                        Text("Not showing in the status bar?", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(10.dp))
 
