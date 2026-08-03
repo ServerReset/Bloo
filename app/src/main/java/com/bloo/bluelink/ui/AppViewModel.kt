@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import android.app.Application
 import android.location.Geocoder
 import androidx.biometric.BiometricManager
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
@@ -116,6 +117,26 @@ sealed interface Screen {
  * Keep it that way — never put a MutableList/mutableStateListOf field here.
  */
 @androidx.compose.runtime.Immutable
+/**
+ * @Immutable is a PROMISE, and these are the terms it is being made on: every
+ * field is a val, and every collection stored in one is built fresh and never
+ * touched again after it lands here (the four places that used to build a
+ * mutable copy and edit it in place now build the new value outright, so there
+ * is no instance in this class that anything still holds a mutable handle to).
+ *
+ * Without it Compose infers this class UNSTABLE -- List, Map and Set are
+ * interfaces that could be mutable, so it must assume they are -- and an
+ * unstable parameter makes its composable non-skippable UNCONDITIONALLY. Not
+ * "recomposes when it changes": recomposes every single time its parent does,
+ * even when handed the very same instance. UiState is threaded into
+ * VehicleDetailContent and from there into every pebble, so any recomposition
+ * of the pager -- a scroll flag, a name pill, a settle -- rebuilt three full
+ * car pages that had nothing new to show.
+ *
+ * With the annotation those calls skip on an equal instance, which is the
+ * common case for everything that isn't an actual data change.
+ */
+@Immutable
 data class UiState(
     val screen: Screen = Screen.Login,
     /** Biometric app-lock overlay: the real app renders (blurred) behind it. */
@@ -2103,11 +2124,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Assign (or clear) a Quick Settings tile to a car + command. */
     fun setTileAssignment(index: Int, vin: String?, cmd: String?) {
         _state.update {
-            val list = it.tileConfigs.toMutableList()
-            if (index in list.indices) {
-                list[index] = if (vin != null && cmd != null) vin to cmd else null
-            }
-            it.copy(tileConfigs = list)
+            val entry = if (vin != null && cmd != null) vin to cmd else null
+            it.copy(tileConfigs = it.tileConfigs.mapIndexed { i, old -> if (i == index) entry else old })
         }
         viewModelScope.launch {
             settingsStore.setTileConfig(index, vin, cmd)
@@ -2118,9 +2136,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Set (or clear with null/blank) a tile's custom display name. */
     fun setTileLabel(index: Int, label: String?) {
         _state.update {
-            val list = it.tileLabels.toMutableList()
-            if (index in list.indices) list[index] = label?.trim()?.takeIf { s -> s.isNotEmpty() }
-            it.copy(tileLabels = list)
+            val clean = label?.trim()?.takeIf { s -> s.isNotEmpty() }
+            it.copy(tileLabels = it.tileLabels.mapIndexed { i, old -> if (i == index) clean else old })
         }
         viewModelScope.launch {
             settingsStore.setTileLabel(index, label)
@@ -2131,9 +2148,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Set what the climate tile runs: "default", "smart", or a preset id. */
     fun setTileClimateTarget(index: Int, target: String) {
         _state.update {
-            val list = it.tileClimateTargets.toMutableList()
-            if (index in list.indices) list[index] = target
-            it.copy(tileClimateTargets = list)
+            it.copy(tileClimateTargets = it.tileClimateTargets.mapIndexed { i, old -> if (i == index) target else old })
         }
         viewModelScope.launch {
             settingsStore.setTileClimateTarget(index, target)
@@ -2169,9 +2184,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Pin (or clear, with null) a pebble to the dual-column hot spot. */
     fun setHotspot(v: Vehicle, section: String?) {
         _state.update {
-            val m = it.hotspotSections.toMutableMap()
-            if (section == null) m.remove(v.vin) else m[v.vin] = section
-            it.copy(hotspotSections = m)
+            it.copy(
+                hotspotSections =
+                    if (section == null) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to section),
+            )
         }
         viewModelScope.launch { settingsStore.setHotspot(v.vin, section) }
     }
