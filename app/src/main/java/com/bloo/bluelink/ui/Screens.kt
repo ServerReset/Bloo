@@ -301,7 +301,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Density
@@ -11811,7 +11813,23 @@ private fun SearchPill(
     val focusRequester = remember { FocusRequester() }
     val expanded = focused || query.isNotEmpty()
     val density = LocalDensity.current
-    LaunchedEffect(focused) { if (focused) runCatching { focusRequester.requestFocus() } }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    // Focus is DRIVEN by `focused`, both ways. It used to only ever be
+    // requested, never released: dismissing the bar -- scrim tap, close
+    // button, back -- collapsed the pill and left the keyboard standing over
+    // it, because nothing ever told the field to let go. Clearing focus here
+    // is safe in a way that listening for blur is not (see the note on the
+    // text field's modifier): this reacts to the state that OWNS the bar,
+    // not to a transient focus event that arrives before the field is ready.
+    LaunchedEffect(focused) {
+        if (focused) {
+            runCatching { focusRequester.requestFocus() }
+        } else {
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+        }
+    }
     // The glow is a moving light, not a light that brightens: a hotspot
     // travels around the pill's rim while the whole halo breathes. One clock
     // drives both, ticked at ~30fps -- fast enough that travel reads as
@@ -12020,7 +12038,11 @@ private fun SearchPill(
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
                                 cursorBrush = SolidColor(scheme.primary),
                                 keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+                                // Submitting puts the keyboard away. The answer
+                                // to what you just asked appears in the panel
+                                // directly above this bar, which is exactly
+                                // where the keyboard was covering.
+                                keyboardActions = KeyboardActions(onSearch = { onSubmit(); keyboard?.hide() }),
                                 // No auto-collapse on blur: onFocusChanged fires
                                 // with isFocused = false the instant this field
                                 // composes, before the requestFocus above lands,
