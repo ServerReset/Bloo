@@ -26,10 +26,17 @@ for f,lines in added.items():
     imported={m.split(".")[-1] for m in re.findall(r'^import\s+([\w.]+)', src, re.M)}
     declared=set(re.findall(r'\b(?:class|object|interface|enum class|fun)\s+([A-Z]\w*)', src))
     declared|=set(re.findall(r'\bval\s+([A-Z]\w*)', src))
+    # Names already used in the committed version of this file resolve today,
+    # whatever the mechanism -- kotlin stdlib (Regex, Pair), a same-package
+    # declaration from another module, a typealias. Only a name that is NEW to
+    # the file is worth asking about; anything else is noise that trains you to
+    # ignore the check, which is worse than not having it.
+    prev = subprocess.run(["git","show",f"HEAD:{f}"],capture_output=True,text=True).stdout
+    already = set(re.findall(r'(?<![\w.])([A-Z]\w+)\s*\(', prev))
     for ln in lines:
         code=re.sub(r'//.*','',ln)
         for name in re.findall(r'(?<![\w.])([A-Z]\w+)\s*\(', code):
-            if name not in imported and name not in declared:
+            if name not in imported and name not in declared and name not in already:
                 print(f"{f}: {name}(  <- not imported, not declared")
                 bad+=1
 

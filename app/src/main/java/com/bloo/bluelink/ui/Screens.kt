@@ -11616,14 +11616,65 @@ private class ParsedVehicleCommand(val cmd: String, val climateTarget: String = 
  *  snapshot -- so "stop the climate" while climate was already off would
  *  *start* it on the real car. The bare toggle tokens ("climate"/"charge") are
  *  reserved for genuinely ambiguous phrasing (none currently produced here). */
-private fun parseVehicleCommand(query: String): ParsedVehicleCommand? {
+/**
+ * The temperature asked for, in Fahrenheit, or null if the query names none.
+ *
+ * Superlatives resolve to the ends of [CLIMATE_TEMP_RANGE_F], which is the
+ * honest reading of "coldest" -- it means the coldest the car will accept, not
+ * absolute zero, and the range is the same one the climate slider offers.
+ *
+ * A BARE number is deliberately not a temperature. "Ioniq 5", "Model 3" and
+ * "EV6 GT" all put digits in a query that is naming a car, so a number only
+ * counts when a preposition introduces it ("at 64", "to 64") or a unit follows
+ * it ("64 degrees", "64F"). Getting this wrong would start climate at 5 degrees
+ * because the car is called an Ioniq 5.
+ */
+private fun parseClimateTemperature(q: String, metric: Boolean): Int? {
+    if (Regex("coldest|as cold as|max(imum)? (cold|cool)|lowest temp|full (cold|cool)").containsMatchIn(q)) {
+        return CLIMATE_TEMP_RANGE_F.first
+    }
+    if (Regex("warmest|hottest|as (warm|hot) as|max(imum)? (heat|warm)|highest temp|full heat").containsMatchIn(q)) {
+        return CLIMATE_TEMP_RANGE_F.last
+    }
+    val m = Regex("\\b(?:at|to)\\s*(\\d{2,3})\\s*°?\\s*([fc])?\\b").find(q)
+        ?: Regex("\\b(\\d{2,3})\\s*°?\\s*(?:degrees?\\b|([fc])\\b)").find(q)
+        ?: return null
+    val n = m.groupValues[1].toIntOrNull() ?: return null
+    val unit = m.groupValues.drop(2).firstOrNull { it.isNotBlank() }
+    val f = when {
+        unit == "c" -> ambientFahrenheit(n.toDouble())
+        unit == "f" -> n
+        // No unit given: believe the user's own setting rather than assuming
+        // Fahrenheit. "start climate at 20" from someone on metric means 20C.
+        metric -> ambientFahrenheit(n.toDouble())
+        else -> n
+    }
+    return f.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
+}
+
+private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
     val q = query.lowercase()
+    // Only meaningful for a climate START, and only when the phrasing is not
+    // already asking for smart climate (which computes its own target from the
+    // weather -- naming a temperature and asking for smart at once is a
+    // contradiction, and smart is the more specific request).
+    val temp = parseClimateTemperature(q, metric)
+    val tempLabel = temp?.let { if (metric) "${((it - 32) * 5 / 9.0).roundToInt()}°C" else "$it°F" }
     return when {
         Regex("\\bunlock\\b").containsMatchIn(q) -> ParsedVehicleCommand("unlock", label = "Unlocking")
         Regex("\\block\\b").containsMatchIn(q) -> ParsedVehicleCommand("lock", label = "Locking")
         Regex("smart climate|smart (ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_on", "smart", "Starting smart climate for")
         Regex("stop (the )?(climate|ac|a/c|heat)|turn off (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
-        Regex("(start|turn on|run) (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_on", "default", "Starting climate for")
+        Regex("(start|turn on|run) (the )?(climate|ac|a/c|heat)").containsMatchIn(q) ->
+            if (temp != null) {
+                ParsedVehicleCommand(
+                    "climate_on",
+                    TileCommandRunner.TEMP_PREFIX + temp,
+                    "Starting climate at $tempLabel for",
+                )
+            } else {
+                ParsedVehicleCommand("climate_on", "default", "Starting climate for")
+            }
         Regex("stop (the )?charg|turn off (the )?charg").containsMatchIn(q) -> ParsedVehicleCommand("charge_off", label = "Stopping charge for")
         Regex("(start|begin|turn on) (the )?charg|charge (it|the car) now").containsMatchIn(q) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
         else -> null
@@ -12290,6 +12341,9 @@ private fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: 
             add("odometer" + (carName?.let { " for $it" } ?: ""))
             add("battery level")
             add("lock" + (carName?.let { " my $it" } ?: " my car"))
+            // Teaches the temperature syntax, which is not guessable: nothing
+            // else on screen says a command can carry a value.
+            add("start climate at the coldest temperature" + (carName?.let { " on $it" } ?: ""))
             add("haptic feedback")
             if (state.vehicles.any { state.hasBattery(it) }) add("start smart climate")
         }
@@ -12506,7 +12560,10 @@ private fun SettingsSearchResults(
     // submitted (Enter/search key, or a suggestion tap), never mid-typing off
     // a debounce timer. Typing "lock my car" used to run the lock the moment
     // the debounce elapsed, whether or not that's what the user meant to do.
-    val command = remember(submittedQuery) { if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery) }
+    val metricUnits = appearance.unitSystem == "metric"
+    val command = remember(submittedQuery, metricUnits) {
+        if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery, metricUnits)
+    }
     if (command != null) {
         val ctx = LocalContext.current
         // Whole-word, longest-match car resolution -- NOT a bare substring test.

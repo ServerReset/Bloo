@@ -13,6 +13,11 @@ import kotlinx.coroutines.sync.withLock
  */
 object TileCommandRunner {
 
+    /** Marks a climate target that carries an explicit temperature, e.g.
+     *  "temp:64". See [runClimateStart]. */
+    const val TEMP_PREFIX = "temp:"
+
+
     /** Outcome of a single tile command: whether it succeeded, plus a short
      *  human-readable status/error message suitable for a toast or log line. */
     data class Result(val ok: Boolean, val message: String)
@@ -207,6 +212,20 @@ object TileCommandRunner {
                 val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
                 ClimateRequest(
                     tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
+                    defrost = false,
+                    durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
+                )
+            }
+            // "temp:64" -- an explicit temperature in Fahrenheit, which is
+            // what search produces for "start climate at the coldest
+            // temperature on X". Additive to the existing string protocol
+            // rather than a new parameter: every other caller (the tiles, the
+            // watch) keeps passing what it always did, and a preset id can
+            // never collide with this because ids are UUIDs.
+            target.startsWith(TEMP_PREFIX) -> {
+                val f = target.removePrefix(TEMP_PREFIX).toIntOrNull() ?: error("Bad temperature")
+                ClimateRequest(
+                    tempF = f.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last),
                     defrost = false,
                     durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
                 )
