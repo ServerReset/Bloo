@@ -26,6 +26,10 @@ import java.io.File
  */
 object WearPhotoCache {
 
+    /** How long to wait for one photo's bytes. Generous, because the transfer
+     *  is over Bluetooth and the phone may be busy, but finite. */
+    private const val ASSET_TIMEOUT_SECONDS = 20L
+
     private fun dir(context: Context): File =
         File(context.filesDir, "car_photos").also { it.mkdirs() }
 
@@ -48,9 +52,20 @@ object WearPhotoCache {
             for (vin in vins) {
                 val asset: Asset = map.getAsset(WearSync.assetKeyFor(vin)) ?: continue
                 runCatching {
+                    // Bounded, like every other Data Layer call in this app
+                    // (WearBridge.putItem uses the same shape). An asset fetch
+                    // waits on a transfer from the phone over Bluetooth: if the
+                    // phone walks out of range mid-pull, an unbounded await
+                    // parks an IO thread until it comes back. A photo is the
+                    // least important thing here and must not be the thing that
+                    // holds a thread.
                     val fd = Wearable.getDataClient(context)
                         .getFdForAsset(asset)
-                        .let { com.google.android.gms.tasks.Tasks.await(it) }
+                        .let {
+                            com.google.android.gms.tasks.Tasks.await(
+                                it, ASSET_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS,
+                            )
+                        }
                     val bytes = fd.inputStream.use { it.readBytes() }
                     if (bytes.isEmpty()) return@runCatching
                     val target = dir(context).resolve("$vin.jpg")
