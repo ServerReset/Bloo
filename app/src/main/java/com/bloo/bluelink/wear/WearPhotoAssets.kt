@@ -35,9 +35,29 @@ object WearPhotoAssets {
      * extras publish -- decoding them at full size first would be the kind of
      * allocation that shows up as a stutter with no obvious cause.
      */
+    /**
+     * Cache of the last encode per path, keyed on the file's identity.
+     *
+     * publishExtrasNow runs on every extras change -- a weather refresh, an AI
+     * summary landing, a status poll -- and each one used to re-decode,
+     * re-scale and re-compress every car's photo from scratch. That is real
+     * work (a multi-megapixel decode per car) repeated for a result that is
+     * bit-identical until the user actually picks a new photo, which is
+     * approximately never.
+     *
+     * Keyed on path + lastModified + length rather than path alone, so
+     * replacing a photo at the same path still produces a fresh encode.
+     */
+    private val cache = HashMap<String, Pair<String, Asset>>()
+
+    private fun stampFor(f: File) = "${f.lastModified()}:${f.length()}"
+
     fun encode(path: String): Asset? = runCatching {
         val f = File(path)
         if (!f.isFile || f.length() == 0L) return null
+
+        val stamp = stampFor(f)
+        synchronized(cache) { cache[path]?.takeIf { it.first == stamp }?.second }?.let { return it }
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)
@@ -61,6 +81,12 @@ object WearPhotoAssets {
         out.compress(Bitmap.CompressFormat.JPEG, QUALITY, stream)
         if (out !== bmp) out.recycle()
         bmp.recycle()
-        Asset.createFromBytes(stream.toByteArray())
+        val asset = Asset.createFromBytes(stream.toByteArray())
+        // Stamped AFTER the work, with the value read before it: if the file
+        // changed while this was decoding, the stamp no longer matches and the
+        // next call redoes it rather than caching a photo that is already
+        // stale.
+        synchronized(cache) { cache[path] = stamp to asset }
+        asset
     }.getOrNull()
 }
