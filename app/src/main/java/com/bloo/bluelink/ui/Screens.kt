@@ -11514,6 +11514,87 @@ private val SearchStopwords = setOf(
 
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
+/** True if any WORD in [hay] starts with [prefix] -- "lim" hits "charge limit"
+ *  but not "unlimited". Scanning for the boundary beats splitting the string,
+ *  which would allocate a list per entry per keystroke. */
+private fun hasWordStarting(hay: String, prefix: String): Boolean {
+    var i = hay.indexOf(prefix)
+    while (i >= 0) {
+        if (i == 0 || !hay[i - 1].isLetterOrDigit()) return true
+        i = hay.indexOf(prefix, i + 1)
+    }
+    return false
+}
+
+/** Within one insertion, deletion or substitution. Deliberately not a full
+ *  Levenshtein: one typo is what people actually make, and bounding it at one
+ *  keeps this O(n) and keeps "haptic" from matching "static". */
+private fun withinOneEdit(a: String, b: String): Boolean {
+    if (a == b) return true
+    val (short, long) = if (a.length <= b.length) a to b else b to a
+    if (long.length - short.length > 1) return false
+    var i = 0
+    var j = 0
+    var slack = 1
+    while (i < short.length && j < long.length) {
+        if (short[i] == long[j]) { i++; j++; continue }
+        if (slack == 0) return false
+        slack = 0
+        if (short.length == long.length) { i++; j++ } else j++
+    }
+    return true
+}
+
+/** True if any word of [hay] is within one edit of [token]. */
+private fun hasFuzzyWord(hay: String, token: String): Boolean {
+    var start = 0
+    while (start <= hay.length) {
+        var end = start
+        while (end < hay.length && hay[end].isLetterOrDigit()) end++
+        if (end > start && withinOneEdit(hay.substring(start, end), token)) return true
+        start = if (end == start) start + 1 else end + 1
+    }
+    return false
+}
+
+/**
+ * How well one entry answers the query, or null for "not at all".
+ *
+ * The old engine was `tokens.all { it in haystack }` and then showed whatever
+ * survived IN DECLARATION ORDER. Two problems, and the second is the one you
+ * feel: a bare substring test makes "car" hit "carbon", and with no ranking at
+ * all the best match for "charge" was whichever charge-related setting happened
+ * to be added to the list first. Ranking is most of what makes a search feel
+ * like it understands the question.
+ *
+ * Every token must still match something ([tokens] are ANDed) -- narrowing by
+ * adding a word is the one behaviour people rely on. What changed is WHERE a
+ * token matched now counts: the title outranks the keywords, the start of a
+ * word outranks the middle of one, and shorter titles win ties, so "charge
+ * limit" beats "charge limit notification threshold" for the query "charge
+ * limit".
+ */
+private fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): Int? {
+    val title = e.title.lowercase()
+    var total = 0
+    for (t in tokens) {
+        val hit = when {
+            title == t -> 1000
+            title.startsWith(t) -> 500
+            hasWordStarting(title, t) -> 320
+            t in title -> 160
+            hasWordStarting(e.haystack, t) -> 90
+            t in e.haystack -> 40
+            fuzzy && t.length >= 4 && hasFuzzyWord(e.haystack, t) -> 10
+            else -> return null
+        }
+        total += hit
+    }
+    // Tie-break on brevity: among equally-matched entries the shortest title is
+    // the most specific answer, not the least.
+    return total * 100 - title.length
+}
+
 /** A vehicle command recognised in a free-form search query. [cmd]/[climateTarget]
  *  map directly onto [com.bloo.bluelink.data.TileCommandRunner]'s own command
  *  vocabulary, so search runs commands through the exact same path the Quick
@@ -11639,10 +11720,17 @@ private fun SearchLayer(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
             .asPaddingValues().calculateBottomPadding()
+        // With the keyboard up, the panel and the bar together are competing
+        // for the sliver of screen that is left -- on a phone that is a couple
+        // of hundred dp, not the 360 the panel would otherwise take. Measure
+        // what is actually free rather than guessing: the panel gets what
+        // remains above the bar, minus a margin so it never looks wedged.
+        val keyboardUp = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 80.dp
         val edge = if (compact) 8.dp else 16.dp
         val bubble = if (compact) 40.dp else 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
         val barH = 52.dp
+        val freeAbovePill = (maxHeight - bottomInset - barH - edge * 2 - 24.dp).coerceAtLeast(96.dp)
         // A medium pill: wide enough for the icon and the word with room
         // around them, and nowhere near the bar's span.
         val pillW = minOf(if (compact) 132.dp else 168.dp, barW)
@@ -11687,7 +11775,11 @@ private fun SearchLayer(
         // While the finger is down the position snaps (1:1 with touch); the
         // moment it lifts, the spring is back to carry the settle.
         val posSpec = if (dragging) snap<Dp>() else {
-            spring<Dp>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+            // Softer and slower than the size spring. Letting go of the bubble
+            // should read as the thing falling home under its own weight, not
+            // as a UI snapping a value back -- and it is the one motion here
+            // the user watches from start to finish with nothing else moving.
+            spring<Dp>(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow)
         }
         val w by animateDpAsState(targetW, sizeSpec, label = "searchW")
         val h by animateDpAsState(targetH, sizeSpec, label = "searchH")
@@ -11733,15 +11825,34 @@ private fun SearchLayer(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = if (compact) 180.dp else 360.dp)
+                        .heightIn(max = minOf(if (compact) 180.dp else 360.dp, freeAbovePill))
                         .verticalScroll(rememberScrollState())
                         .padding(if (compact) 10.dp else 14.dp),
                     verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
                 ) {
                     if (query.isNotBlank()) {
-                        SettingsSearchResults(query, submitted, vm, state, appearance, notif)
+                        // Fewer results while the keyboard is up. This is what
+                        // the new ranking buys: cutting to the top few is only
+                        // honest when the top few really are the best ones, and
+                        // a scrollable list you cannot see the bottom of is
+                        // worse than a short list you can.
+                        SettingsSearchResults(
+                            query, submitted, vm, state, appearance, notif,
+                            // The cover screen with the keyboard up is the
+                            // hard case: a ~260dp square, most of it keyboard.
+                            // Two results that are fully visible beat six you
+                            // have to scroll blind through.
+                            limit = when {
+                                compact && keyboardUp -> 2
+                                keyboardUp -> 4
+                                else -> Int.MAX_VALUE
+                            },
+                        )
                     } else {
-                        SearchSuggestions(state) { picked -> query = picked; submitted = picked }
+                        SearchSuggestions(state, compact = compact || keyboardUp) { picked ->
+                            query = picked
+                            submitted = picked
+                        }
                     }
                 }
             }
@@ -11769,16 +11880,16 @@ private fun SearchLayer(
             onDragStart = { dragging = true },
             onDragEnd = {
                 dragging = false
-                // Snap to the nearer side wall. A bubble left mid-screen is
-                // the worst place it can be -- it covers content on both
-                // sides of itself and reads as dropped rather than placed.
-                // Parked against an edge it covers one margin, and the spring
-                // that carries it there is the whole reward for the gesture.
-                // Vertical position is left exactly where it was put: which
-                // ROW is free is the user's judgement, which side is tidier
-                // is not.
-                val cur = if (dragX.isNaN()) restX else dragX.dp.coerceIn(minX, maxX)
-                dragX = (if (cur + bubble / 2 < maxWidth / 2) minX else maxX).value
+                // Home, not "wherever you let go", and not the nearer wall
+                // either. On a cover screen there is exactly one corner that is
+                // out of the way of everything -- bottom-right, furthest from
+                // the clock and the camera -- so the drag is for holding the
+                // button aside to read what is under it, and the release puts
+                // it back. NaN is the resting position, so clearing these two
+                // IS the animation: the position spring is live again the
+                // moment `dragging` goes false and carries it home.
+                dragX = Float.NaN
+                dragY = Float.NaN
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             },
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
@@ -11863,40 +11974,78 @@ private fun SearchPill(
     // it. Touching it, opening it, or its shape changing all count.
     var wake by remember { mutableIntStateOf(0) }
     LaunchedEffect(pressed) { if (pressed) wake++ }
+    // True once the light has finished settling: the pill has had its moment
+    // and should now get out of the way. Drives the resting look below.
+    var idle by remember { mutableStateOf(false) }
     LaunchedEffect(expanded, form, wake) {
+        idle = false
         // Sweeps faster and breathes harder while open: the bar is the thing
         // being used at that point, and the motion says so.
-        val sweepMs = if (expanded) 2600L else 5200L
-        val breatheMs = if (expanded) 1100L else 2200L
+        val sweepMs = if (expanded) 2600f else 5200f
+        val breatheMs = if (expanded) 1100f else 2200f
         // Open, it stays alive as long as it's open -- you are looking at it
         // on purpose. Closed, it has a few seconds to catch the eye and then
         // gets out of the way.
-        val liveMs = if (expanded) Long.MAX_VALUE else 5000L
-        val start = System.currentTimeMillis()
-        var elapsed = 0L
+        val liveMs = if (expanded) Float.MAX_VALUE else 5000f
+        // Driven by withFrameNanos rather than delay(33). A wall-clock timer
+        // has no idea when the next frame is, so its ticks land wherever they
+        // fall relative to the display -- some frames get two updates and some
+        // get none, which is visible on a slow sweep as uneven travel. Frame
+        // callbacks tick exactly once per frame, cost nothing when the screen
+        // is not drawing, and stop dead when the composition leaves.
+        var t0 = 0L
+        var elapsed = 0f
         while (elapsed < liveMs) {
-            elapsed = System.currentTimeMillis() - start
-            glowPhase.floatValue = ((elapsed % sweepMs).toFloat() / sweepMs)
-            glowPulse.floatValue = GLOW_REST + (1f - GLOW_REST) * triangleWave(elapsed, breatheMs)
-            delay(33)
+            withFrameNanos { now ->
+                if (t0 == 0L) t0 = now
+                elapsed = (now - t0) / 1_000_000f
+                glowPhase.floatValue = (elapsed % sweepMs) / sweepMs
+                glowPulse.floatValue = GLOW_REST + (1f - GLOW_REST) * triangleWave(elapsed.toLong(), breatheMs.toLong())
+            }
         }
         // Ease down to rest rather than cutting: a light that stops mid-breath
         // is a glitch, a light that dims to still is a decision.
         val from = glowPulse.floatValue
-        val settleStart = System.currentTimeMillis()
-        while (true) {
-            val t = ((System.currentTimeMillis() - settleStart) / GLOW_SETTLE_MS.toFloat()).coerceIn(0f, 1f)
-            glowPulse.floatValue = from + (GLOW_REST - from) * t
-            if (t >= 1f) break
-            delay(33)
+        var s0 = 0L
+        var done = false
+        while (!done) {
+            withFrameNanos { now ->
+                if (s0 == 0L) s0 = now
+                val k = ((now - s0) / 1_000_000f / GLOW_SETTLE_MS).coerceIn(0f, 1f)
+                glowPulse.floatValue = from + (GLOW_REST - from) * k
+                if (k >= 1f) done = true
+            }
         }
+        idle = true
     }
+    // The resting state: once the light has settled the pill fades back and
+    // shrinks a little, so a permanent fixture of the screen stops competing
+    // with the content it floats over. Never while open -- and never so far
+    // that it becomes hard to find, which is why this dims rather than hides.
+    val resting = idle && !expanded
+    val restAlpha by animateFloatAsState(
+        targetValue = if (resting) 0.5f else 1f,
+        animationSpec = tween(durationMillis = 520, easing = LinearOutSlowInEasing),
+        label = "searchRestAlpha",
+    )
+    val restScale by animateFloatAsState(
+        targetValue = if (resting) 0.9f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
+        label = "searchRestScale",
+    )
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "searchPress",
     )
-    Box(modifier.size(width, height).graphicsLayer { scaleX = pressScale; scaleY = pressScale }) {
+    Box(
+        modifier.size(width, height).graphicsLayer {
+            val k = pressScale * restScale
+            scaleX = k
+            scaleY = k
+            alpha = restAlpha
+        },
+    ) {
         // Two radial gradients painted behind the pill -- a wide bloom and a
         // tighter core, so the light has depth. These were Modifier.blur boxes
         // once: two offscreen render targets and two blur shaders re-run every
@@ -11973,7 +12122,13 @@ private fun SearchPill(
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
             shape = RoundedCornerShape(50),
-            color = scheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.86f)),
+            // Nearly opaque on the cover screen. A translucent 40dp circle over
+            // a photo hero picks up whatever is behind it and stops looking
+            // like a control at all; at this size there is not enough of it for
+            // the glass effect to read as glass.
+            color = scheme.surfaceContainerHighest.copy(
+                alpha = glassContainerAlpha(if (compact) 0.97f else 0.86f),
+            ),
             contentColor = scheme.onSurface,
             tonalElevation = if (expanded) 10.dp else 6.dp,
             border = BorderStroke(
@@ -11995,8 +12150,14 @@ private fun SearchPill(
             interactionSource = interaction,
             modifier = Modifier
                 .fillMaxSize()
-                .dropShadow(RoundedCornerShape(50))
-                .appGlassRim(RoundedCornerShape(50))
+                // The cover screen gets neither the drop shadow nor the glass
+                // rim. Both are tuned for a 52dp pill or a full-width bar; on a
+                // 40dp circle they are a soft dark halo and a bright outline
+                // stacked on a shape barely wider than the two of them, which
+                // is what made this read as a smudge rather than a button. The
+                // border below plus the glow behind carry it there.
+                .then(if (compact) Modifier else Modifier.dropShadow(RoundedCornerShape(50)))
+                .then(if (compact) Modifier else Modifier.appGlassRim(RoundedCornerShape(50)))
                 .then(
                     if (onDrag != null) {
                         Modifier.pointerInput(Unit) {
@@ -12093,7 +12254,10 @@ private fun SearchPill(
                         Icon(
                             Icons.Filled.Search,
                             contentDescription = "Search",
-                            modifier = Modifier.size(if (compact) 18.dp else 22.dp),
+                            // 18dp inside a 40dp circle left a ring of empty
+                            // surface wider than the glyph; the button read as
+                            // a blob with something small in it.
+                            modifier = Modifier.size(if (compact) 21.dp else 22.dp),
                         )
                     }
                 }
@@ -12109,14 +12273,26 @@ private fun SearchPill(
  * just finds settings by name.
  */
 @Composable
-private fun SearchSuggestions(state: UiState, onPick: (String) -> Unit) {
+private fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: (String) -> Unit) {
     val carName = state.vehicles.firstOrNull()?.name
+    // Short forms when the room is short -- on a cover screen with the keyboard
+    // up, "odometer for Ioniq 5" wraps to two lines and pushes the next chip
+    // off the panel, so a hint about what you can ask costs you the ability to
+    // see what else you can ask. The long forms teach the syntax; the short
+    // ones just have to fit and still work when tapped.
     val examples = buildList {
-        add("odometer" + (carName?.let { " for $it" } ?: ""))
-        add("battery level")
-        add("lock" + (carName?.let { " my $it" } ?: " my car"))
-        add("haptic feedback")
-        if (state.vehicles.any { state.hasBattery(it) }) add("start smart climate")
+        if (compact) {
+            add("odometer")
+            add("battery")
+            add("lock my car")
+            add("haptics")
+        } else {
+            add("odometer" + (carName?.let { " for $it" } ?: ""))
+            add("battery level")
+            add("lock" + (carName?.let { " my $it" } ?: " my car"))
+            add("haptic feedback")
+            if (state.vehicles.any { state.hasBattery(it) }) add("start smart climate")
+        }
     }
     Text(
         "Try asking",
@@ -12163,6 +12339,10 @@ private fun SettingsSearchResults(
     state: UiState,
     appearance: SettingsStore.Appearance,
     notif: SettingsStore.NotificationPrefs,
+    /** Show at most this many, best first. See the call site: with a keyboard
+     *  up there is no room for a long list, and ranking is what makes taking
+     *  the top few the right answer rather than an arbitrary one. */
+    limit: Int = Int.MAX_VALUE,
 ) {
     val tokens = query.lowercase().split(Regex("[^a-z0-9%]+"))
         .filter { it.isNotBlank() && it !in SearchStopwords }
@@ -12272,7 +12452,19 @@ private fun SettingsSearchResults(
     // LAST -- this composable is placed above the floating search bar, so the
     // resulting stack top-to-bottom is [suggested results] [AI tile]
     // [search bar], matching the requested reading order bottom-up.
-    val results = if (tokens.isEmpty()) entries else entries.filter { e -> tokens.all { it in e.haystack } }
+    // Ranked, not filtered. The fuzzy pass is a FALLBACK, only reached when the
+    // strict one found nothing -- so a real match is never outranked by a
+    // one-typo guess, and the cost of scanning every word of every entry is
+    // only paid on a query that was going to show "no matches" otherwise.
+    val results = if (tokens.isEmpty()) {
+        entries
+    } else {
+        val strict = entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = false)?.let { e to it } }
+        val scored = strict.ifEmpty {
+            entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = true)?.let { e to it } }
+        }
+        scored.sortedByDescending { it.second }.map { it.first }
+    }.let { if (it.size > limit) it.take(limit) else it }
     // Floating above busy/aurora content needs real separation -- a plain
     // default Card blends into whatever's behind it. Elevated container +
     // actual shadow (not just tonal elevation) so results clearly pop.
