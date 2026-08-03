@@ -11951,16 +11951,10 @@ private fun SearchLayer(
         // nothing to do with anything the user just did. Restarted, it is
         // already home when the mode appears, and the entrance spring inside
         // SearchPill is what you see instead.
-        val w: Dp
-        val h: Dp
-        val x: Dp
-        val y: Dp
-        key(compact) {
-            w = animateDpAsState(targetW, sizeSpec, label = "searchW").value
-            h = animateDpAsState(targetH, sizeSpec, label = "searchH").value
-            x = animateDpAsState(targetX, posSpec, label = "searchX").value
-            y = animateDpAsState(targetY, posSpec, label = "searchY").value
-        }
+        val w = key(compact) { animateDpAsState(targetW, sizeSpec, label = "searchW").value }
+        val h = key(compact) { animateDpAsState(targetH, sizeSpec, label = "searchH").value }
+        val x = key(compact) { animateDpAsState(targetX, posSpec, label = "searchX").value }
+        val y = key(compact) { animateDpAsState(targetY, posSpec, label = "searchY").value }
 
         // Dismiss scrim. Below the pill in this Box, so it never eats its taps.
         AnimatedVisibility(
