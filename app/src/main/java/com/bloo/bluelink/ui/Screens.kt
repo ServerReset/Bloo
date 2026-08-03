@@ -11589,6 +11589,17 @@ private fun expandToken(t: String): List<String> {
     return buildList { add(t); addAll(extra) }
 }
 
+/** A runner command id as a sentence fragment, for the confirm card. */
+private fun aiCommandLabel(cmd: String): String = when (cmd) {
+    "lock" -> "Lock"
+    "unlock" -> "Unlock"
+    "charge_on" -> "Start charging"
+    "charge_off" -> "Stop charging"
+    "climate_on" -> "Start climate on"
+    "climate_off" -> "Stop climate on"
+    else -> "Run on"
+}
+
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
 /** True if any WORD in [hay] starts with [prefix] -- "lim" hits "charge limit"
@@ -12747,6 +12758,72 @@ private fun SettingsSearchResults(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+        }
+    }
+
+    // Free-form command, via the AI, when the deterministic parser did not
+    // recognise the phrasing. Data questions already go through askAi below --
+    // this is the other half: making the car DO something described in words
+    // the parser has no pattern for.
+    //
+    // It asks before it acts, and that is deliberate rather than timid. The
+    // parser runs its commands immediately because a pattern it matched is a
+    // phrasing someone wrote down on purpose; a model's reading of an
+    // unanticipated sentence is a guess, and the cost of a wrong guess here is
+    // a car unlocked on a street somewhere. One tap is a small price for the
+    // difference between "the app did what I said" and "the app did what a
+    // model thought I said". aiResolveCommand has already thrown out anything
+    // that is not a real action on a real car of yours, so what this offers is
+    // always executable -- the question is only whether it is what you meant.
+    if (command == null && state.aiEnabled && submittedQuery.isNotBlank()) {
+        val ctx = LocalContext.current
+        var proposal by remember(submittedQuery) { mutableStateOf<Pair<String, String>?>(null) }
+        var thinking by remember(submittedQuery) { mutableStateOf(true) }
+        var ran by remember(submittedQuery) { mutableStateOf<String?>(null) }
+        var running by remember(submittedQuery) { mutableStateOf(false) }
+        LaunchedEffect(submittedQuery) {
+            proposal = vm.aiResolveCommand(submittedQuery)
+            thinking = false
+        }
+        val p = proposal
+        if (p != null) {
+            val car = state.vehicles.firstOrNull { it.vin == p.second }
+            Card(
+                resultCardModifier,
+                shape = resultCardShape,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Did you mean?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    }
+                    Text(
+                        ran ?: "${aiCommandLabel(p.first)} ${car?.name ?: "your car"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (ran == null && car != null) {
+                        val scope = rememberCoroutineScope()
+                        Button(
+                            onClick = {
+                                running = true
+                                scope.launch {
+                                    val r = runCatching {
+                                        TileCommandRunner.run(ctx, car.vin, p.first, "default")
+                                    }.getOrNull()
+                                    ran = r?.message ?: "Command failed"
+                                    running = false
+                                    vm.refreshStatus(car)
+                                }
+                            },
+                            enabled = !running,
+                        ) {
+                            Text(if (running) "Working…" else "Run it")
+                        }
+                    }
+                }
             }
         }
     }

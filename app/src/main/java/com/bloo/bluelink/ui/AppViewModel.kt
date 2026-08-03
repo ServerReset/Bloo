@@ -368,6 +368,14 @@ private const val MIN_COMMAND_LOCK_MS = 3000L
  * observable about it is read through a StateFlow collected into snapshot
  * state -- which is what notifies composition of a change.
  */
+/** The only actions [AppViewModel.aiResolveCommand] may return -- exactly the
+ *  ids TileCommandRunner has a case for. Deliberately NOT derived from a
+ *  broader list: if the runner cannot execute it, the model must not be able to
+ *  name it. */
+private val AI_COMMANDS = setOf(
+    "lock", "unlock", "charge_on", "charge_off", "climate_on", "climate_off",
+)
+
 @Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -2071,6 +2079,57 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
         }
+    }
+
+    /**
+     * Maps a free-form command to a structured one the app can actually run,
+     * or null if it cannot be mapped SAFELY.
+     *
+     * The deterministic parser in the search UI handles the phrasings it knows;
+     * this is the fallback for everything else ("make it toasty in the Ioniq
+     * before I head out"). Gemini Nano is a small on-device model with no
+     * function calling, so it is asked for one line in a fixed shape and every
+     * part of that line is then checked against reality:
+     *
+     *  - the action must be one of the runner's own command ids. Anything else,
+     *    including a plausible-sounding invention like "open_trunk", is
+     *    discarded rather than attempted.
+     *  - the car must match one of THIS user's cars by name. The model never
+     *    supplies a VIN and is never trusted to; it names a car, and the name
+     *    is resolved here.
+     *
+     * So a hallucination cannot reach the vehicle: the worst case is this
+     * returns null and the user is told it did not understand. That property is
+     * the reason this returns a validated pair rather than a command string.
+     */
+    suspend fun aiResolveCommand(query: String): Pair<String, String>? {
+        if (!_state.value.aiEnabled || query.isBlank()) return null
+        val cars = _state.value.vehicles
+        if (cars.isEmpty()) return null
+        val names = cars.joinToString(", ") { it.name }
+        val prompt = buildString {
+            append("Map the request to one car action. Reply with ONE line, no explanation.\n")
+            append("Format: ACTION|CAR\n")
+            append("ACTION must be exactly one of: ")
+            append(AI_COMMANDS.joinToString(", "))
+            append(", none\n")
+            append("CAR must be exactly one of: ").append(names).append("\n")
+            append("Use none if the request is not one of those actions.\n")
+            append("Request: ").append(query)
+        }
+        val raw = runCatching { ai.summarize(prompt) }
+            .onFailure { AppLog.log("⚠ AI command: ${it.message}") }
+            .getOrNull() ?: return null
+        // The model will sometimes wrap the line in prose despite being asked
+        // not to; take the first line that actually has the separator in it.
+        val line = raw.lineSequence().map { it.trim() }.firstOrNull { it.contains('|') } ?: return null
+        val action = line.substringBefore('|').trim().lowercase().removePrefix("action:").trim()
+        val carName = line.substringAfter('|').trim().removePrefix("car:").trim()
+        if (action !in AI_COMMANDS) return null
+        val car = cars.firstOrNull { it.name.equals(carName, ignoreCase = true) }
+            ?: cars.singleOrNull()
+            ?: return null
+        return action to car.vin
     }
 
     /** Dismiss the AI search-answer card. */
