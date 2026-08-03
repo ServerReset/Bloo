@@ -11512,6 +11512,83 @@ private val SearchStopwords = setOf(
     "car", "cars", "my", "s", "setting", "settings", "get", "in",
 )
 
+/**
+ * Words people use for things this app calls something else.
+ *
+ * The index is written in the app's own vocabulary, which is the vocabulary of
+ * someone who already knows where everything is. A search box is used by
+ * someone who does not: they type "vibrate", not "haptic feedback"; "dark
+ * mode", not "theme"; "gps", not "location". Rather than stuff every synonym
+ * into every entry's keyword string -- which has to be remembered at each of
+ * the ~60 call sites, and silently is not -- each query token expands to
+ * itself plus its synonyms, and an entry matching ANY of them counts as
+ * matching the token.
+ *
+ * Written token -> app vocabulary, not the reverse: this maps what a person
+ * types onto what the index contains.
+ */
+private val SearchSynonyms: Map<String, List<String>> = mapOf(
+    "vibrate" to listOf("haptic"),
+    "vibration" to listOf("haptic"),
+    "buzz" to listOf("haptic"),
+    "dark" to listOf("theme", "night"),
+    "light" to listOf("theme"),
+    "night" to listOf("theme", "dark"),
+    "colour" to listOf("color", "palette"),
+    "colours" to listOf("color", "palette"),
+    "gps" to listOf("location"),
+    "map" to listOf("location"),
+    "where" to listOf("location"),
+    "parked" to listOf("location"),
+    "font" to listOf("text", "typeface"),
+    "size" to listOf("scale", "text"),
+    "bigger" to listOf("scale", "text"),
+    "smaller" to listOf("scale", "text"),
+    "mileage" to listOf("odometer", "miles"),
+    "miles" to listOf("odometer"),
+    "km" to listOf("odometer", "kilometres"),
+    "range" to listOf("battery", "fuel"),
+    "charge" to listOf("battery", "charging"),
+    "percent" to listOf("battery", "charge"),
+    "battery" to listOf("charge"),
+    "plug" to listOf("charge", "charging"),
+    "ac" to listOf("climate"),
+    "heat" to listOf("climate"),
+    "heater" to listOf("climate"),
+    "cool" to listOf("climate"),
+    "aircon" to listOf("climate"),
+    "defrost" to listOf("climate", "defog"),
+    "warm" to listOf("climate"),
+    "preheat" to listOf("climate"),
+    "seats" to listOf("seat"),
+    "doors" to listOf("lock", "door"),
+    "alarm" to listOf("horn"),
+    "beep" to listOf("horn"),
+    "flash" to listOf("lights"),
+    "headlights" to listOf("lights"),
+    "watch" to listOf("wear", "wearable"),
+    "backup" to listOf("sync", "drive", "google"),
+    "cloud" to listOf("sync", "drive"),
+    "notify" to listOf("notification", "alert"),
+    "notifications" to listOf("notification", "alert"),
+    "password" to listOf("pin", "credentials", "login"),
+    "signout" to listOf("logout", "sign"),
+    "plate" to listOf("license", "registration"),
+    "service" to listOf("maintenance"),
+    "tyre" to listOf("tire"),
+    "update" to listOf("version", "upgrade"),
+    "language" to listOf("locale"),
+    "units" to listOf("unit", "metric", "imperial"),
+    "celsius" to listOf("metric", "unit"),
+    "fahrenheit" to listOf("imperial", "unit"),
+)
+
+/** A token and every form of it worth matching. */
+private fun expandToken(t: String): List<String> {
+    val extra = SearchSynonyms[t] ?: return listOf(t)
+    return buildList { add(t); addAll(extra) }
+}
+
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
 /** True if any WORD in [hay] starts with [prefix] -- "lim" hits "charge limit"
@@ -11578,16 +11655,25 @@ private fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): I
     val title = e.title.lowercase()
     var total = 0
     for (t in tokens) {
-        val hit = when {
-            title == t -> 1000
-            title.startsWith(t) -> 500
-            hasWordStarting(title, t) -> 320
-            t in title -> 160
-            hasWordStarting(e.haystack, t) -> 90
-            t in e.haystack -> 40
-            fuzzy && t.length >= 4 && hasFuzzyWord(e.haystack, t) -> 10
-            else -> return null
+        // Best hit across the token and its synonyms. A synonym that lands is
+        // worth less than the literal word: someone who typed "haptic" meant
+        // the haptics entry more certainly than someone who typed "vibrate".
+        var hit = 0
+        for ((i, form) in expandToken(t).withIndex()) {
+            val penalty = if (i == 0) 0 else 30
+            val score = when {
+                title == form -> 1000
+                title.startsWith(form) -> 500
+                hasWordStarting(title, form) -> 320
+                form in title -> 160
+                hasWordStarting(e.haystack, form) -> 90
+                form in e.haystack -> 40
+                fuzzy && form.length >= 4 && hasFuzzyWord(e.haystack, form) -> 10
+                else -> 0
+            }
+            if (score > 0) hit = maxOf(hit, score - penalty)
         }
+        if (hit == 0) return null
         total += hit
     }
     // Tie-break on brevity: among equally-matched entries the shortest title is
@@ -11660,12 +11746,35 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
     // contradiction, and smart is the more specific request).
     val temp = parseClimateTemperature(q, metric)
     val tempLabel = temp?.let { if (metric) "${((it - 32) * 5 / 9.0).roundToInt()}°C" else "$it°F" }
+    // Defrost implies climate at full heat -- "clear the windscreen" is a
+    // request about ice, not about a number, so it picks its own temperature
+    // unless the query also named one.
+    val wantsDefrost = Regex("defrost|defog|demist|clear (the )?(wind(screen|shield)|glass|ice)|de-ice").containsMatchIn(q)
     return when {
-        Regex("\\bunlock\\b").containsMatchIn(q) -> ParsedVehicleCommand("unlock", label = "Unlocking")
-        Regex("\\block\\b").containsMatchIn(q) -> ParsedVehicleCommand("lock", label = "Locking")
-        Regex("smart climate|smart (ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_on", "smart", "Starting smart climate for")
-        Regex("stop (the )?(climate|ac|a/c|heat)|turn off (the )?(climate|ac|a/c|heat)").containsMatchIn(q) -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
-        Regex("(start|turn on|run) (the )?(climate|ac|a/c|heat)").containsMatchIn(q) ->
+        // Unlock before lock: "unlock" contains "lock".
+        Regex("\\bunlock\\b|\\bopen (the |my )?(car|doors?)\\b|let me in").containsMatchIn(q) ->
+            ParsedVehicleCommand("unlock", label = "Unlocking")
+        Regex("\\block\\b|secure (the |my )?car|lock (it|up)\\b").containsMatchIn(q) ->
+            ParsedVehicleCommand("lock", label = "Locking")
+        Regex("smart climate|smart (ac|a/c|heat|clim)").containsMatchIn(q) ->
+            ParsedVehicleCommand("climate_on", "smart", "Starting smart climate for")
+        // Defrost on its own is a start-climate request, so it is matched
+        // before the generic stop/start climate patterns below.
+        wantsDefrost && !Regex("stop|turn off|cancel").containsMatchIn(q) -> {
+            val f = temp ?: CLIMATE_TEMP_RANGE_F.last
+            ParsedVehicleCommand(
+                "climate_on",
+                TileCommandRunner.TEMP_PREFIX + f + TileCommandRunner.DEFROST_SUFFIX,
+                "Defrosting",
+            )
+        }
+        Regex("(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)")
+            .containsMatchIn(q) -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
+        Regex(
+            "(start|turn on|run|fire up|kick on) (the )?(climate|ac|a/c|heat(er)?|aircon|air con)" +
+                "|pre.?(heat|cool|condition)|warm (it|the car|my car) up|cool (it|the car|my car) down" +
+                "|(warm|cool) up (the|my) car",
+        ).containsMatchIn(q) ->
             if (temp != null) {
                 ParsedVehicleCommand(
                     "climate_on",
@@ -11675,8 +11784,10 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
             } else {
                 ParsedVehicleCommand("climate_on", "default", "Starting climate for")
             }
-        Regex("stop (the )?charg|turn off (the )?charg").containsMatchIn(q) -> ParsedVehicleCommand("charge_off", label = "Stopping charge for")
-        Regex("(start|begin|turn on) (the )?charg|charge (it|the car) now").containsMatchIn(q) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
+        Regex("(stop|turn off|cancel|halt|end) (the )?charg|unplug").containsMatchIn(q) ->
+            ParsedVehicleCommand("charge_off", label = "Stopping charge for")
+        Regex("(start|begin|turn on|resume) (the )?charg|charge (it|the car|my car)( now)?|top (it )?up")
+            .containsMatchIn(q) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
         else -> null
     }
 }
@@ -11832,10 +11943,24 @@ private fun SearchLayer(
             // the user watches from start to finish with nothing else moving.
             spring<Dp>(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow)
         }
-        val w by animateDpAsState(targetW, sizeSpec, label = "searchW")
-        val h by animateDpAsState(targetH, sizeSpec, label = "searchH")
-        val x by animateDpAsState(targetX, posSpec, label = "searchX")
-        val y by animateDpAsState(targetY, posSpec, label = "searchY")
+        // key(compact) so entering or leaving flip mode RESTARTS these
+        // animations at their new target rather than animating to it. The cover
+        // screen's resting corner is a different point in a differently-sized
+        // box, so without this the ball crawled across the whole screen from
+        // wherever the other layout had left it -- a long slide that had
+        // nothing to do with anything the user just did. Restarted, it is
+        // already home when the mode appears, and the entrance spring inside
+        // SearchPill is what you see instead.
+        val w: Dp
+        val h: Dp
+        val x: Dp
+        val y: Dp
+        key(compact) {
+            w = animateDpAsState(targetW, sizeSpec, label = "searchW").value
+            h = animateDpAsState(targetH, sizeSpec, label = "searchH").value
+            x = animateDpAsState(targetX, posSpec, label = "searchX").value
+            y = animateDpAsState(targetY, posSpec, label = "searchY").value
+        }
 
         // Dismiss scrim. Below the pill in this Box, so it never eats its taps.
         AnimatedVisibility(
@@ -12073,6 +12198,16 @@ private fun SearchPill(
     // shrinks a little, so a permanent fixture of the screen stops competing
     // with the content it floats over. Never while open -- and never so far
     // that it becomes hard to find, which is why this dims rather than hides.
+    // Springs in on first appearance -- and because SearchLayer keys the
+    // animations on the layout mode, "first appearance" includes arriving on
+    // the cover screen. The ball lands in its corner rather than sliding to it.
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val entrance by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.55f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "searchEntrance",
+    )
     val resting = idle && !expanded
     val restAlpha by animateFloatAsState(
         targetValue = if (resting) 0.5f else 1f,
@@ -12091,7 +12226,7 @@ private fun SearchPill(
     )
     Box(
         modifier.size(width, height).graphicsLayer {
-            val k = pressScale * restScale
+            val k = pressScale * restScale * entrance
             scaleX = k
             scaleY = k
             alpha = restAlpha

@@ -17,6 +17,9 @@ object TileCommandRunner {
      *  "temp:64". See [runClimateStart]. */
     const val TEMP_PREFIX = "temp:"
 
+    /** Appended to a [TEMP_PREFIX] target to also run the defroster. */
+    const val DEFROST_SUFFIX = ":defrost"
+
 
     /** Outcome of a single tile command: whether it succeeded, plus a short
      *  human-readable status/error message suitable for a toast or log line. */
@@ -223,10 +226,15 @@ object TileCommandRunner {
             // watch) keeps passing what it always did, and a preset id can
             // never collide with this because ids are UUIDs.
             target.startsWith(TEMP_PREFIX) -> {
-                val f = target.removePrefix(TEMP_PREFIX).toIntOrNull() ?: error("Bad temperature")
+                // "temp:64" or "temp:82:defrost". Suffix rather than a second
+                // prefix so the two can be asked for together, which is what
+                // "defrost the windscreen" actually wants: heat AND defrost.
+                val body = target.removePrefix(TEMP_PREFIX)
+                val defrost = body.endsWith(DEFROST_SUFFIX)
+                val f = body.removeSuffix(DEFROST_SUFFIX).toIntOrNull() ?: error("Bad temperature")
                 ClimateRequest(
                     tempF = f.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last),
-                    defrost = false,
+                    defrost = defrost,
                     durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
                 )
             }
