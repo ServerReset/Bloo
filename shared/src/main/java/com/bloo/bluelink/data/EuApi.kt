@@ -536,11 +536,27 @@ class EuApi(private val brand: Brand) {
                 throw BlueLinkException("$msg [$where]", code = resp.code)
             }
             val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
+            // A successful HTTP status can still carry an in-band CCAPI error
+            // (retCode "F" + resCode/resMsg). Codes from the reference's
+            // _check_response_for_errors.
             val retCode = root.path("retCode").str()
             if (retCode == "F") {
                 val err = root.path("resCode").str()
                 val msg = root.path("resMsg").str() ?: "Europe request failed (${err ?: "?"})"
-                val expired = err != null && (err.startsWith("400") || err == "4004" || err == "4005")
+                // 4004 "Duplicate request": an identical command is already being
+                // processed server-side — the command DID land, so treat it as an
+                // accepted no-op rather than surfacing a scary error (and never
+                // retry it, which would just duplicate again).
+                if (err == "4004") {
+                    AppLog.log("${request.url.encodedPath}: duplicate request — already accepted, ignoring")
+                    return@use root
+                }
+                // Only real token/device expiry (7501 auth, 4002 bad deviceId, or an
+                // explicit token-expired message) surfaces as 401 so EuRepository
+                // refreshes + retries. Everything else is a plain error, no retry.
+                val expired = err == "7501" || err == "4002" ||
+                    msg.contains("token is expired", ignoreCase = true) ||
+                    msg.contains("token has expired", ignoreCase = true)
                 AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg (code $err)")
                 throw BlueLinkException(msg, code = if (expired) 401 else resp.code)
             }
