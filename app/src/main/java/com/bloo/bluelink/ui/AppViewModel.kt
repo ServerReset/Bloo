@@ -22,6 +22,7 @@ import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CanadaAuth
 import com.bloo.bluelink.data.CanadaRepository
+import com.bloo.bluelink.data.EuRepository
 import com.bloo.bluelink.data.KiaAuth
 import com.bloo.bluelink.data.KiaRepository
 import com.bloo.bluelink.data.VehicleRepository
@@ -657,6 +658,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             loginCanada(username.trim(), password, pin.trim(), brand)
             return
         }
+        if (brand.isEurope) {
+            loginEurope(username.trim(), password, pin.trim(), brand)
+            return
+        }
         launchBusy {
             (repoFor(brand) as BlueLinkRepository).login(username.trim(), password, pin.trim())
             credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
@@ -665,6 +670,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Push the session to the watch IMMEDIATELY on login success (not only
             // via the eventual post-garage-fetch publish) so a watch waiting on a
             // "Set up on phone" handoff advances past its login screen right away.
+            runCatching { com.bloo.bluelink.wear.WearBridge.publishAuth(getApplication()) }
+            loadGarageInternal()
+        }
+    }
+
+    /**
+     * Europe (Hyundai Bluelink EU) sign-in. Single-step like the Hyundai/Genesis
+     * US branch — no OTP — just against [EuRepository] instead of
+     * [BlueLinkRepository]; same post-login bookkeeping (persist credentials,
+     * push the session to the watch, reload the garage).
+     */
+    private fun loginEurope(username: String, password: String, pin: String, brand: Brand) {
+        launchBusy {
+            (repoFor(brand) as EuRepository).login(username, password, pin)
+            credentialStore.save(Credentials(username, password, pin, brand))
+            AppLog.log("Signed in as ${maskEmail(username)} (${brand.label})")
+            _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
             runCatching { com.bloo.bluelink.wear.WearBridge.publishAuth(getApplication()) }
             loadGarageInternal()
         }

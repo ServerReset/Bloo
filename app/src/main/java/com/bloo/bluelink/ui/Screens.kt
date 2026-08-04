@@ -1789,9 +1789,10 @@ private fun LoginScreen(
         Brand.HYUNDAI_CA -> "A better Bluelink · Canada"
         Brand.GENESIS_CA -> "A better Genesis Connect · Canada"
         Brand.KIA_CA -> "A better Kia Connect · Canada"
+        Brand.HYUNDAI_EU -> "A better Bluelink · Europe"
     }
     val emailLabel = when (brand) {
-        Brand.HYUNDAI, Brand.HYUNDAI_CA -> "Bluelink email"
+        Brand.HYUNDAI, Brand.HYUNDAI_CA, Brand.HYUNDAI_EU -> "Bluelink email"
         Brand.GENESIS, Brand.GENESIS_CA -> "Genesis account email"
         Brand.KIA, Brand.KIA_CA -> "Kia Connect email"
     }
@@ -1869,11 +1870,21 @@ private fun LoginScreen(
                         color = scheme.onSurface,
                     )
                     MorphSegmented(
-                        options = listOf(SegmentOption("US", "United States", null), SegmentOption("CA", "Canada", null)),
+                        options = listOf(
+                            SegmentOption("US", "United States", null),
+                            SegmentOption("CA", "Canada", null),
+                            SegmentOption("EU", "Europe", null),
+                        ),
                         selectedKey = region,
                         onSelect = { key ->
                             region = key
-                            brand = if (key == "CA") Brand.HYUNDAI_CA else Brand.HYUNDAI
+                            // Reset to the region's first (only, for EU) brand,
+                            // since each region's backend/sign-in shape differs.
+                            brand = when (key) {
+                                "CA" -> Brand.HYUNDAI_CA
+                                "EU" -> Brand.HYUNDAI_EU
+                                else -> Brand.HYUNDAI
+                            }
                         },
                     )
 
@@ -1882,13 +1893,17 @@ private fun LoginScreen(
                         style = MaterialTheme.typography.labelLarge,
                         color = scheme.onSurface,
                     )
-                    val brandOptions = if (region == "CA") {
-                        listOf(Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA)
-                    } else {
-                        listOf(Brand.HYUNDAI, Brand.GENESIS, Brand.KIA)
+                    val brandOptions = when (region) {
+                        "CA" -> listOf(Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA)
+                        // Europe ships Hyundai only for now (Kia/Genesis EU ride the
+                        // same backend and can be added here once verifiable).
+                        "EU" -> listOf(Brand.HYUNDAI_EU)
+                        else -> listOf(Brand.HYUNDAI, Brand.GENESIS, Brand.KIA)
                     }
                     MorphSegmented(
-                        options = brandOptions.map { b -> SegmentOption(b.name, b.label.removeSuffix(" (Canada)"), null) },
+                        options = brandOptions.map { b ->
+                            SegmentOption(b.name, b.label.removeSuffix(" (Canada)").removeSuffix(" (Europe)"), null)
+                        },
                         selectedKey = brand.name,
                         onSelect = { key -> brand = Brand.valueOf(key) },
                     )
@@ -1993,6 +2008,7 @@ private fun LoginScreen(
                                     Brand.HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
                                     Brand.GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
                                     Brand.KIA_CA -> "https://www.kia.ca/en/owners"
+                                    Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
                                 }
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(forgotUrl)))
                             },
@@ -8320,7 +8336,7 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
                             inApp,
                         )
                     }
-                    Brand.KIA, Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA -> Unit
+                    Brand.KIA, Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA, Brand.HYUNDAI_EU -> Unit
                 }
             } else {
                 if (isSamsung) {
