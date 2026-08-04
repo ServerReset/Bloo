@@ -14,11 +14,13 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.Base64
 import java.util.Locale
@@ -168,19 +170,28 @@ class EuApi(private val brand: Brand) {
      */
     suspend fun login(username: String, password: String, deviceId: String, pin: String?): EuSession =
         withContext(Dispatchers.IO) {
-            // 1. authorize (seeds the CCAPI session cookies okhttp carries forward)
+            // The OAuth handshake spans several requests that share session cookies
+            // (JSESSIONID etc.), so it runs on a client with its own in-memory
+            // cookie jar — the shared client keeps none. Mirrors the reference
+            // client's use of a single requests.Session for the whole flow.
+            val http = clientWithCookies()
+
+            // 1. authorize — returns an HTML/redirect page (NOT json); we only run
+            //    it to seed the session cookies, so execute + discard the body.
             val authorizeUrl = apiUrl + "user/oauth2/authorize?response_type=code&state=ccsp&client_id=" +
                 serviceId + "&redirect_uri=" + brand.baseUrl + "/" + REDIRECT_PATH + "&lang=en"
-            call(Request.Builder().url(authorizeUrl).get().apiHeaders().build())
+            exec(http, Request.Builder().url(authorizeUrl).get().apiHeaders().build())
 
-            // 2. language (CCAPI expects this before signin)
+            // 2. language (CCAPI expects this before signin); response body unused.
             val langBody = buildJsonObject { put("lang", "en") }.toString().toRequestBody(jsonMedia)
-            call(Request.Builder().url(apiUrl + "user/language").post(langBody).apiHeaders().build())
+            exec(http, Request.Builder().url(apiUrl + "user/language").post(langBody).apiHeaders().build())
 
             // 3. signin -> { redirectUrl: ".../redirect?code=<AUTH_CODE>&..." }
             val signinBody = buildJsonObject { put("email", username); put("password", password) }
                 .toString().toRequestBody(jsonMedia)
-            val signinRoot = call(Request.Builder().url(apiUrl + "user/signin").post(signinBody).apiHeaders().build())
+            val signinRoot = call(
+                Request.Builder().url(apiUrl + "user/signin").post(signinBody).apiHeaders().build(), http,
+            )
             val redirectUrl = signinRoot.path("redirectUrl").str()
                 ?: throw BlueLinkException("Europe sign-in failed — check your Bluelink email and password")
             val code = redirectUrl.substringAfter("code=", "").substringBefore("&").ifBlank {
@@ -196,7 +207,7 @@ class EuApi(private val brand: Brand) {
             val tokenReq = Request.Builder().url(apiUrl + "user/oauth2/token").post(tokenForm)
                 .apiHeaders().header("Authorization", "Basic $basic")
                 .header("Content-Type", "application/x-www-form-urlencoded").build()
-            val tokenRoot = call(tokenReq)
+            val tokenRoot = call(tokenReq, http)
             val access = tokenRoot.path("access_token").str()
                 ?: throw BlueLinkException("Europe sign-in failed to obtain an access token")
             // Store the bare token; authHeaders() adds the "Bearer " prefix itself.
@@ -442,7 +453,36 @@ class EuApi(private val brand: Brand) {
      *  CCAPI signals an expired token with 401, which [EuRepository] catches to
      *  refresh + retry. A successful HTTP status can still carry an in-band
      *  `retCode == "F"` error (resCode/resMsg), surfaced here as an exception. */
-    private fun call(request: Request): JsonElement = raw(request).use { resp ->
+    /** A client that carries session cookies for the multi-step OAuth handshake.
+     *  Reuses the shared dispatcher/pool/logging interceptor but adds a private
+     *  in-memory cookie jar, so cookies never leak across logins or brands. */
+    private fun clientWithCookies(): OkHttpClient {
+        val store = mutableListOf<Cookie>()
+        val jar = object : CookieJar {
+            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+                store.removeAll { existing -> cookies.any { it.name == existing.name } }
+                store.addAll(cookies)
+            }
+            override fun loadForRequest(url: HttpUrl): List<Cookie> = store.toList()
+        }
+        return sharedClient.newBuilder().cookieJar(jar).build()
+    }
+
+    /** Execute a request purely for its side effects (cookies), discarding the
+     *  body — used for the authorize/language steps that return HTML, not JSON.
+     *  Still throws on a non-2xx so a broken handshake surfaces early. */
+    private fun exec(client: OkHttpClient, request: Request) {
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                val msg = friendly(resp.code, resp.body?.string().orEmpty())
+                AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")
+                throw BlueLinkException(msg, code = resp.code)
+            }
+        }
+    }
+
+    private fun call(request: Request, client: OkHttpClient = this.client): JsonElement =
+        client.newCall(request).execute().use { resp ->
         val text = resp.body?.string().orEmpty()
         if (!resp.isSuccessful) {
             val msg = friendly(resp.code, text)
@@ -462,8 +502,6 @@ class EuApi(private val brand: Brand) {
         }
         root
     }
-
-    private fun raw(request: Request): Response = client.newCall(request).execute()
 
     private fun friendly(code: Int, body: String): String {
         val msg = runCatching {
