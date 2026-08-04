@@ -7,40 +7,49 @@ import java.util.Base64
  * carry. The CCAPI rejects requests whose stamp it can't reproduce, so this is
  * required on device registration, sign-in, and every command.
  *
- * Algorithm (ported from the Apache-2.0 `hyundai_kia_connect_api` reference):
- * take the raw string `"$appId:$timestampMillis"`, XOR it byte-for-byte against
- * the decoded base64 [CFB] seed (repeating the seed if the raw is longer), and
- * base64-encode the result.
+ * Algorithm — ported verbatim from the Apache-2.0 `hyundai_kia_connect_api`
+ * reference (`KiaUvoApiEU._get_stamp`):
  *
- * [CFB] and [APP_ID] rotate when Hyundai ships a new app build. They are the
- * single maintenance point: if EU sign-in starts returning 4xx with a stamp
- * error, refresh them from the reference project's `const.py` (Hyundai EU) —
- * mirroring the rotatable `clientSecret` documented in [Brand]. They are marked
- * FILL-FROM-SOURCE rather than fabricated, because a wrong stamp fails silently
- * at the server and the repo's rule is real data only, nothing simulated.
+ * ```python
+ * raw_data = f"{APP_ID}:{int(datetime.now().timestamp())}".encode()
+ * result   = bytes(b1 ^ b2 for b1, b2 in zip(CFB, raw_data))
+ * return base64.b64encode(result).decode()
+ * ```
+ *
+ * Two details that matter and are easy to get wrong:
+ *  - the timestamp is **Unix seconds**, not milliseconds;
+ *  - `zip` stops at the **shorter** of CFB / raw_data, so the XOR (and the
+ *    output) is truncated to that length — the CFB is never repeated.
+ *
+ * [CFB]/[APP_ID] and the matching `clientSecret` in [Brand] are the Hyundai EU
+ * values from that project's `KiaUvoApiEU.py`. They rotate when Hyundai ships a
+ * new app build; if EU sign-in starts failing with a stamp error, refresh all
+ * three from the same source — this is the single maintenance point, mirroring
+ * how [Brand] already documents its rotatable `clientSecret` values.
  */
 object EuStamp {
-    /** FILL-FROM-SOURCE: base64 CFB seed bound to [APP_ID] (Hyundai EU). */
-    const val CFB: String = "FILL-FROM-SOURCE"
+    /** Hyundai EU CFB seed (base64) — pairs with [APP_ID]. */
+    const val CFB: String = "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
 
-    /** FILL-FROM-SOURCE: the Hyundai EU appId the stamp is bound to. */
-    const val APP_ID: String = "FILL-FROM-SOURCE"
+    /** Hyundai EU ccsp-application-id the stamp is bound to. */
+    const val APP_ID: String = "014d2225-8495-4735-812d-2616334fd15d"
 
     /**
-     * Compute a stamp. [timestampMillis] must be the current wall-clock time in
-     * milliseconds at the moment of the request (the server checks recency).
-     * [appId]/[cfbBase64] default to the shipped constants but are injectable so
-     * the pure algorithm can be unit-tested against fixed vectors.
+     * Compute a stamp. [unixSeconds] must be the current wall-clock time in
+     * **seconds** (the server checks recency). [appId]/[cfbBase64] default to the
+     * shipped constants but are injectable so the pure algorithm can be
+     * unit-tested against fixed vectors.
      */
     fun generate(
         appId: String = APP_ID,
         cfbBase64: String = CFB,
-        timestampMillis: Long,
+        unixSeconds: Long,
     ): String {
         val cfb = Base64.getDecoder().decode(cfbBase64)
-        require(cfb.isNotEmpty()) { "CFB seed decoded to empty bytes" }
-        val raw = "$appId:$timestampMillis".toByteArray()
-        val out = ByteArray(raw.size) { i -> (cfb[i % cfb.size].toInt() xor raw[i].toInt()).toByte() }
+        val raw = "$appId:$unixSeconds".toByteArray()
+        // zip(CFB, raw): truncate to the shorter of the two, XOR pairwise.
+        val n = minOf(cfb.size, raw.size)
+        val out = ByteArray(n) { (cfb[it].toInt() xor raw[it].toInt()).toByte() }
         return Base64.getEncoder().encodeToString(out)
     }
 }

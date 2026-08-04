@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -80,7 +81,8 @@ class EuApi(private val brand: Brand) {
     private val clientSecret get() = brand.clientSecret
 
     companion object {
-        private const val USER_AGENT = "okhttp/4.12.0"
+        // Matches the reference EU client's User-Agent (the CCAPI is picky).
+        private const val USER_AGENT = "okhttp/3.12.0"
         // CCAPI OAuth redirect target; the sign-in step returns a redirectUrl to
         // this with the authorization `code` as a query param.
         private const val REDIRECT_PATH = "api/v1/user/oauth2/redirect"
@@ -107,7 +109,8 @@ class EuApi(private val brand: Brand) {
     private val jsonMedia = "application/json;charset=UTF-8".toMediaType()
     private val client: OkHttpClient get() = sharedClient
 
-    private fun nowStamp(): String = EuStamp.generate(timestampMillis = System.currentTimeMillis())
+    // The CCAPI stamp binds to the request time in Unix SECONDS (see EuStamp).
+    private fun nowStamp(): String = EuStamp.generate(unixSeconds = System.currentTimeMillis() / 1000)
 
     // --- Headers -----------------------------------------------------------
 
@@ -383,35 +386,42 @@ class EuApi(private val brand: Brand) {
     suspend fun stopClimate(session: EuSession, v: EuVehicleSummary, controlToken: String) =
         control(session, v, controlToken, "temperature", buildJsonObject { put("command", "stop") })
 
-    /** Set AC (Standard) and DC (Quick) charge target SOC percentages. */
+    /** Set AC (plugType 1) and DC (plugType 0) charge target SOC percentages.
+     *  Unlike the other commands this is a v1 endpoint (`.../charge/target`, NOT
+     *  ccs2/control) taking the full targetSOClist in one request — ported from
+     *  the reference EU client. CCS2-CONFIRM. */
     suspend fun setChargeTargets(
         session: EuSession, v: EuVehicleSummary, controlToken: String, acPercent: Int, dcPercent: Int,
-    ) = control(
-        session, v, controlToken, "charge/target",
-        buildJsonObject { put("targetSOClevel", acPercent); put("plugType", 1) },
-    ).also {
-        control(
-            session, v, controlToken, "charge/target",
-            buildJsonObject { put("targetSOClevel", dcPercent); put("plugType", 0) },
-        )
+    ) = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("targetSOClist", buildJsonArray {
+                add(buildJsonObject { put("plugType", 0); put("targetSOClevel", dcPercent) })
+                add(buildJsonObject { put("plugType", 1); put("targetSOClevel", acPercent) })
+            })
+        }.toString().toRequestBody(jsonMedia)
+        val req = Request.Builder().url("${brand.baseUrl}/api/v1/spa/vehicles/${v.id}/charge/target")
+            .post(body).commandHeaders(session, controlToken).build()
+        call(req)
+        Unit
     }
 
     /** Start climate / pre-conditioning. Temperature arrives as Fahrenheit
-     *  ([ClimateRequest.tempF]); CCS2 wants Celsius tenths. */
+     *  ([ClimateRequest.tempF]) and is sent as a Celsius half-degree. Body shape
+     *  ported from the reference EU client's ccs2/control/temperature payload;
+     *  the per-seat `seatClimateInfo` block is intentionally omitted (best-effort
+     *  temperature + defrost + steering-wheel only). CCS2-CONFIRM. */
     suspend fun startClimate(
         session: EuSession, v: EuVehicleSummary, controlToken: String, req: ClimateRequest,
     ) {
-        val celsius = ((req.tempF - 32) * 5.0 / 9.0)
+        val celsius = Math.round((req.tempF - 32) * 5.0 / 9.0 * 2) / 2.0
         val cmd = buildJsonObject {
             put("command", "start")
-            put("hvacType", 1)
-            put("options", buildJsonObject {
-                put("defrost", req.defrost)
-                put("heating1", if (req.steeringWheelHeat) 1 else 0)
-            })
-            put("tempCode", String.format(Locale.US, "%02.1f", celsius))
-            put("temperature", celsius)
-            put("duration", buildJsonObject { put("ignitionOnDuration", req.durationMinutes) })
+            put("ignitionDuration", req.durationMinutes)
+            put("strgWhlHeating", if (req.steeringWheelHeat) 1 else 0)
+            put("hvacTempType", 1)
+            put("hvacTemp", celsius)
+            put("tempUnit", "C")
+            put("windshieldFrontDefogState", req.defrost)
         }
         control(session, v, controlToken, "temperature", cmd)
     }

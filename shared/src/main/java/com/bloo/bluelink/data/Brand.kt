@@ -109,7 +109,9 @@ enum class Brand(
         baseUrl = "https://prd.eu-ccapi.hyundai.com:8080",
         host = "prd.eu-ccapi.hyundai.com",
         clientId = "6d477c38-3ca4-4cf3-9557-2a1929a94654",
-        clientSecret = "FILL-FROM-SOURCE", // hyundai_kia_connect_api const.py (Hyundai EU)
+        // From hyundai_kia_connect_api KiaUvoApiEU.py (Hyundai EU). base64("$clientId:$clientSecret")
+        // reproduces that project's hard-coded BASIC_AUTHORIZATION token (see EuApi.login).
+        clientSecret = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV",
         label = "Hyundai (Europe)",
     );
 
