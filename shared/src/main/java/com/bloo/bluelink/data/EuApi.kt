@@ -318,18 +318,26 @@ class EuApi(private val brand: Brand) {
 
     // --- Status / location ---------------------------------------------------
 
-    /** Latest CCS2 vehicle state. [refresh] forces a fresh read from the car. */
+    /** Latest CCS2 vehicle state. The carstatus endpoints live on the v1 SPA API
+     *  (only the ccs2 control commands are on v2). [refresh] first GETs the
+     *  no-/latest "wake" endpoint (best-effort — it returns async and can be flaky
+     *  on a sleeping car), then reads the now-fresh cached snapshot from /latest. */
     suspend fun status(session: EuSession, v: EuVehicleSummary, refresh: Boolean): VehicleStatus? =
         withContext(Dispatchers.IO) {
-            val path = "vehicles/${v.id}/ccs2/carstatus" + if (refresh) "" else "/latest"
-            val req = Request.Builder().url(spaV2 + path).get().authHeaders(session, v.ccs2).build()
+            val base = spa + "vehicles/${v.id}/ccs2/carstatus"
+            if (refresh) {
+                runCatching {
+                    call(Request.Builder().url(base).get().authHeaders(session, v.ccs2).build())
+                }
+            }
+            val req = Request.Builder().url("$base/latest").get().authHeaders(session, v.ccs2).build()
             val state = call(req).path("resMsg", "state", "Vehicle") as? JsonObject ?: return@withContext null
             parseStatus(state)
         }
 
-    /** Last-known GPS from the CCS2 state's Location block. */
+    /** Last-known GPS from the CCS2 state's Location block (v1 carstatus/latest). */
     suspend fun location(session: EuSession, v: EuVehicleSummary): GeoLocation? = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(spaV2 + "vehicles/${v.id}/ccs2/carstatus/latest")
+        val req = Request.Builder().url(spa + "vehicles/${v.id}/ccs2/carstatus/latest")
             .get().authHeaders(session, v.ccs2).build()
         val loc = call(req).path("resMsg", "state", "Vehicle", "Location") as? JsonObject ?: return@withContext null
         val lat = loc.path("GeoCoord", "Latitude").dbl()
@@ -411,7 +419,7 @@ class EuApi(private val brand: Brand) {
     }
 
     // --- Commands ------------------------------------------------------------
-    // CCS2 lock/charge/climate: POST /ccs2/control/* with the control token.
+    // CCS2 lock/charge/climate: POST to the ccs2 control endpoints with the control token.
     // Charge target is a v1 endpoint. Bodies ported from ApiImplType1.
 
     suspend fun lock(session: EuSession, v: EuVehicleSummary, controlToken: String) =
