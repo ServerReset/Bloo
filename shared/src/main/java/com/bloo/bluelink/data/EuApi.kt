@@ -335,14 +335,16 @@ class EuApi(private val brand: Brand) {
             parseStatus(state)
         }
 
-    /** Last-known GPS from the CCS2 state's Location block (v1 carstatus/latest). */
+    /** Last-known parked GPS via the dedicated `/location/park` endpoint (returns
+     *  `resMsg.coord.lat/lon`) — the CCS2 carstatus snapshot doesn't reliably
+     *  carry a position. Non-rate-limited (parked position), access-token auth. */
     suspend fun location(session: EuSession, v: EuVehicleSummary): GeoLocation? = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(spa + "vehicles/${v.id}/ccs2/carstatus/latest")
+        val req = Request.Builder().url(spa + "vehicles/${v.id}/location/park")
             .get().authHeaders(session, v.ccs2).build()
-        val loc = call(req).path("resMsg", "state", "Vehicle", "Location") as? JsonObject ?: return@withContext null
-        val lat = loc.path("GeoCoord", "Latitude").dbl()
-        val lon = loc.path("GeoCoord", "Longitude").dbl()
-        if (lat != null && lon != null) GeoLocation(lat, lon, loc.path("Speed", "Value").dbl()) else null
+        val loc = call(req).path("resMsg") ?: return@withContext null
+        val lat = loc.path("coord", "lat").dbl()
+        val lon = loc.path("coord", "lon").dbl()
+        if (lat != null && lon != null) GeoLocation(lat, lon, loc.path("speed", "value").dbl()) else null
     }
 
     /**
@@ -466,10 +468,11 @@ class EuApi(private val brand: Brand) {
     }
 
     /** Set AC (plugType 1) and DC (plugType 0) charge target SOC percentages, via
-     *  the v1 `.../charge/target` endpoint (not ccs2/control) with the full
-     *  targetSOClist in one request. */
+     *  the v1 `.../charge/target` endpoint. Unlike lock/climate this authenticates
+     *  with the plain access token (NOT the PIN control token) — the reference's
+     *  set_charge_limits uses the authenticated headers, and the control token 403s. */
     suspend fun setChargeTargets(
-        session: EuSession, v: EuVehicleSummary, controlToken: String, acPercent: Int, dcPercent: Int,
+        session: EuSession, v: EuVehicleSummary, acPercent: Int, dcPercent: Int,
     ) = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             put("targetSOClist", buildJsonArray {
@@ -478,7 +481,7 @@ class EuApi(private val brand: Brand) {
             })
         }.toString().toRequestBody(jsonMedia)
         val req = Request.Builder().url(spa + "vehicles/${v.id}/charge/target")
-            .post(body).commandHeaders(session, v.ccs2, controlToken).build()
+            .post(body).authHeaders(session, v.ccs2).build()
         call(req)
         Unit
     }

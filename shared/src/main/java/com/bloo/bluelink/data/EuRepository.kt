@@ -77,8 +77,11 @@ class EuRepository(
     override suspend fun stopClimate(v: Vehicle) =
         withCommandAuth(v) { s, summary, token -> api.stopClimate(s, summary, token) }
 
-    override suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int) =
-        withCommandAuth(v) { s, summary, token -> api.setChargeTargets(s, summary, token, acPercent, dcPercent) }
+    // Charge targets authenticate with the access token (not the PIN control
+    // token), so this goes through withSession rather than withCommandAuth.
+    override suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int) = withSession { s ->
+        api.setChargeTargets(s, summaryFor(s, v), acPercent, dcPercent)
+    }
 
     override suspend fun startCharge(v: Vehicle) =
         withCommandAuth(v) { s, summary, token -> api.startCharge(s, summary, token) }
