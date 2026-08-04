@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -99,6 +100,12 @@ class EuApi(private val brand: Brand) {
 
         /** A fresh device id (persisted; the ccsp-device-id is derived per login). */
         fun newDeviceId(): String = UUID.randomUUID().toString()
+
+        // Force-refresh polling: the car reports asynchronously (~20s live), so
+        // poll /latest this many times at this interval (≈20s cap) waiting for the
+        // snapshot timestamp to advance. Kept small for EU's strict rate limits.
+        private const val REFRESH_POLLS = 5
+        private const val REFRESH_POLL_INTERVAL_MS = 4000L
 
         private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
@@ -318,21 +325,40 @@ class EuApi(private val brand: Brand) {
 
     // --- Status / location ---------------------------------------------------
 
-    /** Latest CCS2 vehicle state. The carstatus endpoints live on the v1 SPA API
-     *  (only the ccs2 control commands are on v2). [refresh] first GETs the
-     *  no-/latest "wake" endpoint (best-effort — it returns async and can be flaky
-     *  on a sleeping car), then reads the now-fresh cached snapshot from /latest. */
+    /**
+     * Latest CCS2 vehicle state (carstatus is on the v1 SPA API; only the ccs2
+     * control commands are on v2).
+     *
+     * When [refresh] is false this just reads the cached `/latest` snapshot — fast,
+     * but it lags the car (right after a command it still shows the old state).
+     *
+     * When [refresh] is true it does a genuine force-refresh: GET the no-`/latest`
+     * "wake" endpoint, then poll `/latest` until its snapshot timestamp (`Date`)
+     * advances past the pre-wake value — the car reports asynchronously (~20s
+     * live), so this is the only way to see a post-command state. It returns as
+     * soon as fresh data arrives and is capped at ~20s so the spinner can't hang;
+     * if the car stays silent it falls back to the last snapshot. Kept to a
+     * handful of requests to respect EU's strict rate limits.
+     */
     suspend fun status(session: EuSession, v: EuVehicleSummary, refresh: Boolean): VehicleStatus? =
         withContext(Dispatchers.IO) {
             val base = spa + "vehicles/${v.id}/ccs2/carstatus"
-            if (refresh) {
-                runCatching {
-                    call(Request.Builder().url(base).get().authHeaders(session, v.ccs2).build())
-                }
+            fun readLatest(): JsonObject? =
+                call(Request.Builder().url("$base/latest").get().authHeaders(session, v.ccs2).build())
+                    .path("resMsg", "state", "Vehicle") as? JsonObject
+
+            if (!refresh) return@withContext readLatest()?.let { parseStatus(it) }
+
+            val before = readLatest()
+            val beforeDate = before.path("Date").str()
+            // Wake the car (best-effort — the wake returns an async envelope, not state).
+            runCatching { call(Request.Builder().url(base).get().authHeaders(session, v.ccs2).build()) }
+            repeat(REFRESH_POLLS) {
+                delay(REFRESH_POLL_INTERVAL_MS)
+                val now = readLatest()
+                if (now != null && now.path("Date").str() != beforeDate) return@withContext parseStatus(now)
             }
-            val req = Request.Builder().url("$base/latest").get().authHeaders(session, v.ccs2).build()
-            val state = call(req).path("resMsg", "state", "Vehicle") as? JsonObject ?: return@withContext null
-            parseStatus(state)
+            (before ?: readLatest())?.let { parseStatus(it) }
         }
 
     /** Last-known parked GPS via the dedicated `/location/park` endpoint (returns
