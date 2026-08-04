@@ -391,9 +391,18 @@ class EuApi(private val brand: Brand) {
         val win1 = cabin.path("Window", "Row1") as? JsonObject
         val win2 = cabin.path("Window", "Row2") as? JsonObject
 
+        // CCS2 per-door "Lock" is inverted: 0 = locked, 1 = unlocked (the
+        // reference reads `not bool(Lock)`). The car is locked only when ALL
+        // present doors report Lock == 0.
+        val doorLocks = listOfNotNull(
+            door1.path("Driver", "Lock").int(),
+            door1.path("Passenger", "Lock").int(),
+            door2.path("Left", "Lock").int(),
+            door2.path("Right", "Lock").int(),
+        )
+
         return VehicleStatus(
-            // Lock: driver-door Lock flag (1 = locked).
-            doorLock = door1.path("Driver", "Lock").flag(),
+            doorLock = if (doorLocks.isEmpty()) null else doorLocks.all { it == 0 },
             engine = vh.path("DrivingReady").flag(),
             trunkOpen = body.path("Trunk", "Open").flag(),
             hoodOpen = body.path("Hood", "Open").flag(),
