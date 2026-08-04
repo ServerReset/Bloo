@@ -151,7 +151,10 @@ class EuRepository(
         return try {
             block(stored.toEu())
         } catch (e: BlueLinkException) {
-            if (e.code != 401 && e.code != 403) throw e
+            // Only a genuine token/device expiry (EuApi maps those to 401) triggers
+            // a silent refresh. A bare 403 or a business error like "Duplicate
+            // request" is terminal here — retrying it would just refresh/duplicate.
+            if (e.code != 401) throw e
             AppLog.log("${brand.label} session expired; refreshing")
             val refreshed = runCatching { api.refresh(stored.toEu()) }.getOrNull()
             val session = refreshed ?: reLogin() ?: throw BlueLinkException(

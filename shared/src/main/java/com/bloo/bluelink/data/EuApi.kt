@@ -529,36 +529,36 @@ class EuApi(private val brand: Brand) {
     private fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
         httpClient.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) {
-                val where = "${request.method} ${request.url.encodedPath}"
-                val msg = friendly(resp.code, text)
-                AppLog.log("ERROR ${resp.code} $where: $msg")
-                throw BlueLinkException("$msg [$where]", code = resp.code)
+            val root = if (text.isBlank()) JsonObject(emptyMap())
+            else runCatching { json.parseToJsonElement(text) }.getOrNull() ?: JsonObject(emptyMap())
+            val where = "${request.method} ${request.url.encodedPath}"
+            // In-band CCAPI status (resCode/resMsg) can accompany EITHER a 2xx or a
+            // 4xx HTTP status. Codes from the reference's _check_response_for_errors.
+            val resCode = root.path("resCode").str()
+            val resMsg = root.path("resMsg").str()
+
+            // 4004 "Duplicate request": an identical command is already being
+            // processed server-side (e.g. a command fired right after a refresh, or
+            // a double-tap) — the request DID land, so treat it as an accepted
+            // no-op whatever the HTTP status, and never retry (that just duplicates
+            // again). This is what makes the spurious "Duplicate request" error and
+            // the retry-driven refresh-on-error go away.
+            if (resCode == "4004") {
+                AppLog.log("$where: duplicate request — already accepted, ignoring")
+                return@use root
             }
-            val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
-            // A successful HTTP status can still carry an in-band CCAPI error
-            // (retCode "F" + resCode/resMsg). Codes from the reference's
-            // _check_response_for_errors.
-            val retCode = root.path("retCode").str()
-            if (retCode == "F") {
-                val err = root.path("resCode").str()
-                val msg = root.path("resMsg").str() ?: "Europe request failed (${err ?: "?"})"
-                // 4004 "Duplicate request": an identical command is already being
-                // processed server-side — the command DID land, so treat it as an
-                // accepted no-op rather than surfacing a scary error (and never
-                // retry it, which would just duplicate again).
-                if (err == "4004") {
-                    AppLog.log("${request.url.encodedPath}: duplicate request — already accepted, ignoring")
-                    return@use root
-                }
-                // Only real token/device expiry (7501 auth, 4002 bad deviceId, or an
-                // explicit token-expired message) surfaces as 401 so EuRepository
-                // refreshes + retries. Everything else is a plain error, no retry.
-                val expired = err == "7501" || err == "4002" ||
-                    msg.contains("token is expired", ignoreCase = true) ||
-                    msg.contains("token has expired", ignoreCase = true)
-                AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg (code $err)")
-                throw BlueLinkException(msg, code = if (expired) 401 else resp.code)
+
+            // Only genuine token/device expiry retries (mapped to 401). 7501 = auth,
+            // 4002 = bad deviceId, or an explicit "token expired" message. A plain
+            // HTTP 401 counts too. Everything else is a terminal error (no retry) —
+            // notably we do NOT treat a bare 403 as retryable.
+            val expired = resp.code == 401 || resCode == "7501" || resCode == "4002" ||
+                (resMsg?.contains("token", true) == true && resMsg.contains("expired", true))
+
+            if (!resp.isSuccessful || root.path("retCode").str() == "F") {
+                val msg = resMsg ?: friendly(resp.code, text)
+                AppLog.log("ERROR ${resp.code} $where: $msg (resCode $resCode)")
+                throw BlueLinkException("$msg [$where]", code = if (expired) 401 else resp.code)
             }
             root
         }
@@ -569,10 +569,6 @@ class EuApi(private val brand: Brand) {
         }.getOrNull()
         return msg?.takeIf { it.isNotBlank() } ?: "Europe request failed (HTTP $code)"
     }
-
-    private fun parseJson(text: String, code: Int): JsonElement =
-        runCatching { json.parseToJsonElement(text) }
-            .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
 
     // --- JSON helpers (identical convention to CanadaApi/KiaUsaApi) -----------
 
