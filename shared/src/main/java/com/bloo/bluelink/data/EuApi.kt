@@ -16,22 +16,28 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.Cookie
 import okhttp3.CookieJar
+import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
+import java.math.BigInteger
+import java.security.KeyFactory
+import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import javax.crypto.Cipher
 
 /**
  * A signed-in Hyundai Bluelink Europe (CCAPI / "CCS2") session. [deviceId] is the
- * `ccsp-device-id` obtained from device registration and must stay stable across
- * refreshes; [pin] is the account service PIN, required to mint the short-lived
- * control token every command needs (the EU analogue of Canada's `pAuth`).
+ * `ccsp-device-id` from device registration and must stay stable across refreshes;
+ * [pin] is the account service PIN, required to mint the short-lived control token
+ * every command needs (the EU analogue of Canada's `pAuth`). [accessToken] is the
+ * bare token — headers prepend "Bearer ".
  */
 data class EuSession(
     val accessToken: String,
@@ -40,35 +46,30 @@ data class EuSession(
     val pin: String?,
 )
 
-/** A Europe-account vehicle summary. [id] is the CCAPI `vehicleId`, used in the
- *  `/spa/vehicles/{id}/...` path on every vehicle-scoped call. */
+/** A Europe-account vehicle summary. [id] is the CCAPI `vehicleId`; [ccs2] is the
+ *  car's `ccuCCS2ProtocolSupport` flag, echoed back in the `Ccuccs2protocolsupport`
+ *  header and used to pick the v2/ccs2 endpoints (non-zero for E-GMP cars). */
 data class EuVehicleSummary(
     val id: String,
     val name: String,
     val model: String,
     val vin: String,
     val isEv: Boolean,
+    val ccs2: Int,
 )
 
 /**
- * Client for Hyundai Bluelink Europe on the CCAPI platform (the "CCS2" protocol
- * used by E-GMP / 2023+ cars — Ioniq 5/6, etc.). One shared API shape that Kia
- * Connect EU and Genesis EU also ride (different host + client only), exactly
- * like the three Canada brands share [CanadaApi]; only Hyundai EU is wired today
- * via [Brand.isEurope].
+ * Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" — E-GMP /
+ * 2023+ cars). One shared API shape that Kia Connect EU and Genesis EU also ride
+ * (different host/client/login-form host only), like the three Canada brands
+ * share [CanadaApi]; only Hyundai EU is wired today via [Brand.isEurope].
  *
- * Ported from the Apache-2.0 community project hyundai_kia_connect_api
- * (github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api — HyundaiBlueLinkApiEU
- * + the CCS2 ApiImplType1 state mapping). Two categories are deliberately marked
- * for live confirmation rather than fabricated, because the repo's rule is real
- * data only and a wrong value fails silently at the server:
- *
- *  - **Opaque constants** ([EuStamp.CFB]/[EuStamp.APP_ID], [Brand.clientSecret]):
- *    rotate with Hyundai's app; fill from the reference project's const.py.
- *  - **CCS2 wire specifics** (the exact `state.Vehicle.*` field paths in
- *    [parseStatus] and the control-command bodies): ported best-effort and must
- *    be validated/adjusted against ONE real `carstatus/latest` capture from the
- *    owner's car. Each is flagged inline with `CCS2-CONFIRM`.
+ * Ported from the Apache-2.0 hyundai_kia_connect_api (KiaUvoApiEU + the CCS2
+ * ApiImplType1). The current EU sign-in is the "IDPConnect" OAuth2 flow: it
+ * fetches an RSA public key, encrypts the password with it, posts the sign-in
+ * form to the identity host (idpconnect-eu.hyundai.com), reads the authorization
+ * code from the 302 redirect, then exchanges it for tokens. Opaque constants
+ * ([EuStamp], [Brand.clientSecret]) are the Hyundai EU values from that source.
  */
 class EuApi(private val brand: Brand) {
 
@@ -76,20 +77,27 @@ class EuApi(private val brand: Brand) {
         require(brand.isEurope) { "EuApi requires a Europe brand, got $brand" }
     }
 
-    private val apiUrl get() = "${brand.baseUrl}/api/v1/"
-    private val spaV2 get() = "${brand.baseUrl}/api/v2/spa/vehicles/"
     private val host get() = brand.host
-    private val serviceId get() = brand.clientId          // ccsp-service-id / oauth client_id
+    private val userApi get() = "${brand.baseUrl}/api/v1/user/"
+    private val spa get() = "${brand.baseUrl}/api/v1/spa/"
+    private val spaV2 get() = "${brand.baseUrl}/api/v2/spa/"
+    private val serviceId get() = brand.clientId
     private val clientSecret get() = brand.clientSecret
 
-    companion object {
-        // Matches the reference EU client's User-Agent (the CCAPI is picky).
-        private const val USER_AGENT = "okhttp/3.12.0"
-        // CCAPI OAuth redirect target; the sign-in step returns a redirectUrl to
-        // this with the authorization `code` as a query param.
-        private const val REDIRECT_PATH = "api/v1/user/oauth2/redirect"
+    // Hyundai EU sign-in form / identity host and OAuth redirect target. When
+    // Kia/Genesis EU are added these become brand-keyed (idpconnect-eu.kia.com,
+    // redirect_uri .../oauth2/redirect for Kia).
+    private val loginFormHost get() = "https://idpconnect-eu.hyundai.com"
+    private val redirectUri get() = userApi + "oauth2/token"
 
-        /** A fresh device id; persisted (the ccsp-device-id is bound to it). */
+    companion object {
+        private const val USER_AGENT_OKHTTP = "okhttp/3.12.0"
+        // The IDPConnect authorize endpoint 400s without the "_CCS_APP_AOS" suffix.
+        private const val USER_AGENT_IDP =
+            "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 " +
+                "(KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19_CCS_APP_AOS"
+
+        /** A fresh device id (persisted; the ccsp-device-id is derived per login). */
         fun newDeviceId(): String = UUID.randomUUID().toString()
 
         private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
@@ -114,41 +122,41 @@ class EuApi(private val brand: Brand) {
     // The CCAPI stamp binds to the request time in Unix SECONDS (see EuStamp).
     private fun nowStamp(): String = EuStamp.generate(unixSeconds = System.currentTimeMillis() / 1000)
 
-    // --- Headers -----------------------------------------------------------
+    // --- Headers -------------------------------------------------------------
 
-    /** Headers every CCAPI call needs, authenticated or not. */
+    /** CCAPI service headers every prd.eu-ccapi call needs (pre- or post-auth). */
     private fun Request.Builder.apiHeaders(): Request.Builder = this
         .header("Content-Type", "application/json;charset=UTF-8")
-        .header("Accept", "application/json, text/plain, */*")
-        .header("Accept-Language", "en-US,en;q=0.9")
-        .header("User-Agent", USER_AGENT)
-        .header("Host", host)
-        .header("Connection", "keep-alive")
         .header("ccsp-service-id", serviceId)
         .header("ccsp-application-id", EuStamp.APP_ID)
         .header("Stamp", nowStamp())
+        .header("Host", host)
+        .header("Connection", "Keep-Alive")
+        .header("Accept-Encoding", "gzip")
+        .header("User-Agent", USER_AGENT_OKHTTP)
 
-    /** [apiHeaders] plus the OAuth bearer token + device id every authenticated call needs. */
-    private fun Request.Builder.authHeaders(session: EuSession): Request.Builder =
+    /** [apiHeaders] plus the bearer access token, device id and CCS2-support flag. */
+    private fun Request.Builder.authHeaders(session: EuSession, ccs2: Int): Request.Builder =
         apiHeaders()
             .header("Authorization", "Bearer ${session.accessToken}")
             .header("ccsp-device-id", session.deviceId)
+            .header("Ccuccs2protocolsupport", ccs2.toString())
 
-    /** [authHeaders] with the PIN-derived control token swapped into Authorization —
-     *  CCS2 control endpoints authenticate the command with the control token, not
-     *  the plain access token. */
-    private fun Request.Builder.commandHeaders(session: EuSession, controlToken: String): Request.Builder =
-        apiHeaders()
+    /** [authHeaders] with the PIN-derived control token in both Authorization and
+     *  AuthorizationCCSP — CCS2 control endpoints authenticate on the control
+     *  token, not the plain access token. [controlToken] already carries "Bearer ". */
+    private fun Request.Builder.commandHeaders(session: EuSession, ccs2: Int, controlToken: String): Request.Builder =
+        authHeaders(session, ccs2)
             .header("Authorization", controlToken)
-            .header("ccsp-device-id", session.deviceId)
+            .header("AuthorizationCCSP", controlToken)
 
     // --- Auth ----------------------------------------------------------------
 
     /**
      * Registers this device with the CCAPI push channel and returns the
-     * `ccsp-device-id` all later authenticated calls carry. A generated push
-     * registration id is fine — Bloo doesn't use CCAPI push, it only needs the
-     * device id the register call mints. Ported from HyundaiBlueLinkApiEU._device_id.
+     * `ccsp-device-id` all authenticated calls carry. Bloo doesn't use CCAPI push
+     * — it only needs the device id the register call mints from a generated push
+     * registration id. Ported from KiaUvoApiEU._get_device_id (no auth token).
      */
     suspend fun register(): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
@@ -156,80 +164,111 @@ class EuApi(private val brand: Brand) {
             put("pushType", "GCM")
             put("uuid", UUID.randomUUID().toString())
         }.toString().toRequestBody(jsonMedia)
-        val req = Request.Builder().url(apiUrl + "spa/notifications/register").post(body).apiHeaders().build()
+        val req = Request.Builder().url(spa + "notifications/register").post(body).apiHeaders().build()
         call(req).path("resMsg", "deviceId").str()
             ?: throw BlueLinkException("Europe device registration failed")
     }
 
     /**
-     * Full OAuth2 sign-in: seed cookies via authorize, set language, post the
-     * credentials, pull the authorization `code` out of the returned redirect
-     * URL, then exchange it for access/refresh tokens (HTTP Basic with the EU
-     * client credentials). Returns a session carrying [deviceId]/[pin] for later
-     * command auth. Ported from HyundaiBlueLinkApiEU.login.
+     * Headless IDPConnect sign-in: authorize (seed cookies) -> fetch RSA cert ->
+     * RSA-encrypt the password -> POST the sign-in form and read the auth `code`
+     * from the 302 redirect -> exchange the code for tokens. Ported verbatim in
+     * shape from KiaUvoApiEU._login_with_password.
      */
     suspend fun login(username: String, password: String, deviceId: String, pin: String?): EuSession =
         withContext(Dispatchers.IO) {
-            // The OAuth handshake spans several requests that share session cookies
-            // (JSESSIONID etc.), so it runs on a client with its own in-memory
-            // cookie jar — the shared client keeps none. Mirrors the reference
-            // client's use of a single requests.Session for the whole flow.
-            val http = clientWithCookies()
-
-            // 1. authorize — returns an HTML/redirect page (NOT json); we only run
-            //    it to seed the session cookies, so execute + discard the body.
-            val authorizeUrl = apiUrl + "user/oauth2/authorize?response_type=code&state=ccsp&client_id=" +
-                serviceId + "&redirect_uri=" + brand.baseUrl + "/" + REDIRECT_PATH + "&lang=en"
-            exec(http, Request.Builder().url(authorizeUrl).get().apiHeaders().build())
-
-            // 2. language (CCAPI expects this before signin); response body unused.
-            val langBody = buildJsonObject { put("lang", "en") }.toString().toRequestBody(jsonMedia)
-            exec(http, Request.Builder().url(apiUrl + "user/language").post(langBody).apiHeaders().build())
-
-            // 3. signin -> { redirectUrl: ".../redirect?code=<AUTH_CODE>&..." }
-            val signinBody = buildJsonObject { put("email", username); put("password", password) }
-                .toString().toRequestBody(jsonMedia)
-            val signinRoot = call(
-                Request.Builder().url(apiUrl + "user/signin").post(signinBody).apiHeaders().build(), http,
-            )
-            val redirectUrl = signinRoot.path("redirectUrl").str()
-                ?: throw BlueLinkException("Europe sign-in failed — check your Bluelink email and password")
-            val code = redirectUrl.substringAfter("code=", "").substringBefore("&").ifBlank {
-                throw BlueLinkException("Europe sign-in did not return an authorization code")
+            // One cookie jar shared across the handshake; two clients over it that
+            // differ only in redirect-following (signin must NOT follow, so its 302
+            // Location — carrying the code — is readable).
+            val store = mutableListOf<Cookie>()
+            val jar = object : CookieJar {
+                override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+                    store.removeAll { e -> cookies.any { it.name == e.name } }
+                    store.addAll(cookies)
+                }
+                override fun loadForRequest(url: HttpUrl): List<Cookie> = store.toList()
             }
+            val follow = sharedClient.newBuilder().cookieJar(jar).followRedirects(true).build()
+            val noFollow = sharedClient.newBuilder().cookieJar(jar).followRedirects(false).build()
 
-            // 4. exchange code -> tokens (HTTP Basic: base64("<serviceId>:<clientSecret>"))
-            val basic = Base64.getEncoder()
-                .encodeToString("$serviceId:$clientSecret".toByteArray(Charsets.UTF_8))
-            val tokenForm = ("grant_type=authorization_code&redirect_uri=" + brand.baseUrl + "/" + REDIRECT_PATH +
-                "&code=" + code)
-                .toRequestBody("application/x-www-form-urlencoded".toMediaType())
-            val tokenReq = Request.Builder().url(apiUrl + "user/oauth2/token").post(tokenForm)
-                .apiHeaders().header("Authorization", "Basic $basic")
-                .header("Content-Type", "application/x-www-form-urlencoded").build()
-            val tokenRoot = call(tokenReq, http)
+            fun idp(url: String) = Request.Builder().url(url).header("User-Agent", USER_AGENT_IDP)
+
+            // 1. authorize — seed IDP session cookies (follows redirect to login form).
+            val authorizeUrl = "$loginFormHost/auth/api/v2/user/oauth2/authorize" +
+                "?response_type=code&client_id=$serviceId&redirect_uri=$redirectUri&lang=en&state=ccsp&country=de"
+            follow.newCall(idp(authorizeUrl).get().build()).execute().close()
+
+            // 2. RSA public key (JWK) for password encryption.
+            val certRoot = call(idp("$loginFormHost/auth/api/v1/accounts/certs").get().build(), follow)
+            val jwk = certRoot.path("retValue") as? JsonObject
+                ?: throw BlueLinkException("Europe sign-in: could not fetch the login key")
+            val kid = jwk.path("kid").str().orEmpty()
+            val encryptedPw = rsaEncryptHex(
+                password,
+                jwk.path("n").str() ?: throw BlueLinkException("Europe sign-in: bad login key"),
+                jwk.path("e").str() ?: throw BlueLinkException("Europe sign-in: bad login key"),
+            )
+
+            // 3. signin — form POST, do NOT follow the redirect; pull code from Location.
+            val signinForm = FormBody.Builder()
+                .add("client_id", serviceId)
+                .add("encryptedPassword", "true")
+                .add("password", encryptedPw)
+                .add("redirect_uri", redirectUri)
+                .add("scope", "")
+                .add("nonce", "")
+                .add("state", "ccsp")
+                .add("username", username)
+                .add("connector_session_key", "")
+                .add("kid", kid)
+                .add("_csrf", "")
+                .build()
+            val location = noFollow.newCall(
+                idp("$loginFormHost/auth/account/signin").post(signinForm).build(),
+            ).execute().use { resp ->
+                if (resp.code != 302) {
+                    throw BlueLinkException(
+                        "Europe sign-in failed (HTTP ${resp.code}) — check your Bluelink email and password",
+                        code = resp.code,
+                    )
+                }
+                resp.header("location").orEmpty()
+            }
+            val code = Regex("[?&]code=([^&]+)").find(location)?.groupValues?.get(1)
+                ?: throw BlueLinkException(
+                    if (location.contains("authorization", true))
+                        "Bluelink needs a one-time consent in the official app/website first, then try again."
+                    else "Europe sign-in was rejected — check your Bluelink email and password.",
+                )
+
+            // 4. exchange code -> tokens (form; client_secret sent as a field).
+            val tokenForm = FormBody.Builder()
+                .add("grant_type", "authorization_code")
+                .add("code", code)
+                .add("redirect_uri", redirectUri)
+                .add("client_id", serviceId)
+                .add("client_secret", clientSecret)
+                .build()
+            val tokenRoot = call(
+                idp("$loginFormHost/auth/api/v2/user/oauth2/token").post(tokenForm).build(), follow,
+            )
             val access = tokenRoot.path("access_token").str()
                 ?: throw BlueLinkException("Europe sign-in failed to obtain an access token")
-            // Store the bare token; authHeaders() adds the "Bearer " prefix itself.
-            EuSession(
-                accessToken = access,
-                refreshToken = tokenRoot.path("refresh_token").str(),
-                deviceId = deviceId,
-                pin = pin,
-            )
+            EuSession(access, tokenRoot.path("refresh_token").str(), deviceId, pin)
         }
 
-    /** Exchange the refresh token for a fresh access token (no re-login / password). */
+    /** Exchange the refresh token for a fresh access token (no re-login). */
     suspend fun refresh(session: EuSession): EuSession = withContext(Dispatchers.IO) {
         val refresh = session.refreshToken
             ?: throw BlueLinkException("Session expired — please sign in again", code = 401)
-        val basic = Base64.getEncoder().encodeToString("$serviceId:$clientSecret".toByteArray(Charsets.UTF_8))
-        val form = ("grant_type=refresh_token&redirect_uri=" + brand.baseUrl + "/" + REDIRECT_PATH +
-            "&refresh_token=" + refresh)
-            .toRequestBody("application/x-www-form-urlencoded".toMediaType())
-        val req = Request.Builder().url(apiUrl + "user/oauth2/token").post(form)
-            .apiHeaders().header("Authorization", "Basic $basic")
-            .header("Content-Type", "application/x-www-form-urlencoded").build()
+        val form = FormBody.Builder()
+            .add("grant_type", "refresh_token")
+            .add("refresh_token", refresh)
+            .add("client_id", serviceId)
+            .add("client_secret", clientSecret)
+            .build()
+        val req = Request.Builder().url("$loginFormHost/auth/api/v2/user/oauth2/token")
+            .header("User-Agent", USER_AGENT_IDP).post(form).build()
         val root = call(req)
         val access = root.path("access_token").str()
             ?: throw BlueLinkException("Session expired — please sign in again", code = 401)
@@ -237,56 +276,61 @@ class EuApi(private val brand: Brand) {
     }
 
     /**
-     * Mint the short-lived control token every command needs, by verifying the
-     * account PIN. Not cached here — [EuRepository] caches it and re-fetches on a
-     * 401, the same way [CanadaRepository] handles `pAuth`. Returns the
-     * Authorization value to send verbatim (CCAPI returns it already typed).
+     * Mint the short-lived control token every command needs by verifying the PIN
+     * (PUT user/pin). Not cached here — [EuRepository] caches it and refetches on a
+     * 401, like [CanadaRepository] does with `pAuth`. Returns the value already
+     * prefixed "Bearer " for the Authorization header.
      */
     suspend fun controlToken(session: EuSession, pin: String): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject { put("deviceId", session.deviceId); put("pin", pin) }
             .toString().toRequestBody(jsonMedia)
-        val req = Request.Builder().url(apiUrl + "user/pin").put(body).authHeaders(session).build()
-        val root = call(req)
-        val token = root.path("controlToken").str()
+        val req = Request.Builder().url(userApi + "pin?token=")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer ${session.accessToken}")
+            .header("Host", host)
+            .header("Accept-Encoding", "gzip")
+            .header("User-Agent", USER_AGENT_OKHTTP)
+            .put(body).build()
+        val token = call(req).path("controlToken").str()
             ?: throw BlueLinkException("Incorrect service PIN")
-        // CCAPI returns the bare token; the control endpoints want it prefixed "Bearer ".
         if (token.startsWith("Bearer ")) token else "Bearer $token"
     }
 
     // --- Vehicles ------------------------------------------------------------
 
     suspend fun vehicles(session: EuSession): List<EuVehicleSummary> = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url("${brand.baseUrl}/api/v1/spa/vehicles").get().authHeaders(session).build()
+        val req = Request.Builder().url(spa + "vehicles").get().authHeaders(session, 0).build()
         val list = call(req).path("resMsg", "vehicles") as? JsonArray ?: JsonArray(emptyList())
         list.mapNotNull { e ->
             val o = e.obj() ?: return@mapNotNull null
             val id = o["vehicleId"]?.str() ?: return@mapNotNull null
+            val type = o["type"]?.str()?.uppercase(Locale.US)
             EuVehicleSummary(
                 id = id,
                 name = o["nickname"]?.str() ?: o["vehicleName"]?.str() ?: id.takeLast(6),
-                model = listOfNotNull(o["year"]?.str(), o["vehicleName"]?.str()).joinToString(" ").ifBlank { "Car" },
+                model = o["vehicleName"]?.str() ?: "Car",
                 vin = o["vin"]?.str() ?: id,
-                // CCS2 EVs report a "type" of "EV" (or "PHEV"); ICE reports "GN".
-                isEv = o["type"]?.str()?.uppercase(Locale.US)?.let { it == "EV" || it == "PHEV" } ?: true,
+                isEv = type == "EV" || type == "PHEV" || type == "PE",
+                ccs2 = o["ccuCCS2ProtocolSupport"]?.int() ?: 0,
             )
         }
     }
 
     // --- Status / location ---------------------------------------------------
 
-    /** Latest CCS2 vehicle state. [refresh] forces a fresh read from the car
-     *  (the `/ccs2/carstatus` path) vs the cached `/ccs2/carstatus/latest`. */
+    /** Latest CCS2 vehicle state. [refresh] forces a fresh read from the car. */
     suspend fun status(session: EuSession, v: EuVehicleSummary, refresh: Boolean): VehicleStatus? =
         withContext(Dispatchers.IO) {
-            val path = if (refresh) "${v.id}/ccs2/carstatus" else "${v.id}/ccs2/carstatus/latest"
-            val req = Request.Builder().url(spaV2 + path).get().authHeaders(session).build()
+            val path = "vehicles/${v.id}/ccs2/carstatus" + if (refresh) "" else "/latest"
+            val req = Request.Builder().url(spaV2 + path).get().authHeaders(session, v.ccs2).build()
             val state = call(req).path("resMsg", "state", "Vehicle") as? JsonObject ?: return@withContext null
             parseStatus(state)
         }
 
-    /** Last-known GPS from the CCS2 state's Location block (no separate call). */
+    /** Last-known GPS from the CCS2 state's Location block. */
     suspend fun location(session: EuSession, v: EuVehicleSummary): GeoLocation? = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(spaV2 + "${v.id}/ccs2/carstatus/latest").get().authHeaders(session).build()
+        val req = Request.Builder().url(spaV2 + "vehicles/${v.id}/ccs2/carstatus/latest")
+            .get().authHeaders(session, v.ccs2).build()
         val loc = call(req).path("resMsg", "state", "Vehicle", "Location") as? JsonObject ?: return@withContext null
         val lat = loc.path("GeoCoord", "Latitude").dbl()
         val lon = loc.path("GeoCoord", "Longitude").dbl()
@@ -294,13 +338,10 @@ class EuApi(private val brand: Brand) {
     }
 
     /**
-     * Maps the CCS2 `state.Vehicle` tree onto the shared [VehicleStatus] model.
-     *
-     * CCS2-CONFIRM: the field paths below are ported from the reference project's
-     * CCS2 state mapping and are the single thing that MUST be checked against one
-     * real `carstatus/latest` capture from the owner's E-GMP car — casing and
-     * nesting differ between firmware versions. Everything reads defensively
-     * (null when absent), so a wrong path yields a missing field, never a crash.
+     * Maps the CCS2 `state.Vehicle` tree onto the shared [VehicleStatus] model,
+     * using the dot-paths the reference's get_child_value reads (confirmed against
+     * KiaUvoApiEU/ApiImplType1). Everything reads defensively so a firmware that
+     * omits a field yields a missing value, never a crash.
      */
     private fun parseStatus(vh: JsonObject): VehicleStatus {
         val green = vh["Green"] as? JsonObject
@@ -310,19 +351,18 @@ class EuApi(private val brand: Brand) {
         val chassis = vh["Chassis"] as? JsonObject
         val electronics = vh["Electronics"] as? JsonObject
 
-        val soc = green.path("BatteryManagement", "BatteryRemain", "Ratio").int()
-        val plugged = green.path("ChargingInformation", "ConnectorFastening", "State").int()
-        val charging = green.path("ChargingInformation", "Charging", "RemainTime").dbl()
-        val rangeKm = drivetrain.path("FuelSystem", "DTE", "Total").dbl()
+        val soc = green.path("BatteryManagement", "BatteryRemain", "Ratio").dbl()?.toInt()
+        val plug = green.path("ChargingDoor", "State").int()
+        val chargeRemain = green.path("ChargingInformation", "Charging", "RemainTime").dbl()
+        val rangeKm = (drivetrain.path("FuelSystem", "DTE", "Total")
+            ?: drivetrain.path("FuelSystem", "DTE", "EV")).dbl()
 
         val evStatus = if (green == null) null else EvStatus(
             batteryStatus = soc,
-            batteryCharge = charging?.let { it > 0.0 },
-            batteryPlugin = plugged,
-            drvDistance = rangeKm?.kmToMi()?.let {
-                listOf(DrvDistance(RangeByFuel(Dte(it, 3)))) // unit 3 = km on the wire; value stored as mi
-            } ?: emptyList(),
-            remainTime2 = charging?.let { RemainTime2(atc = TimeValue(it, 1)) },
+            batteryCharge = chargeRemain?.let { it > 0.0 },
+            batteryPlugin = plug,
+            drvDistance = rangeKm?.kmToMi()?.let { listOf(DrvDistance(RangeByFuel(Dte(it, 3)))) } ?: emptyList(),
+            remainTime2 = chargeRemain?.let { RemainTime2(atc = TimeValue(it, 1)) },
             reservChargeInfos = run {
                 val ac = green.path("ChargingInformation", "TargetSoC", "Standard").int()
                 val dc = green.path("ChargingInformation", "TargetSoC", "Quick").int()
@@ -336,51 +376,43 @@ class EuApi(private val brand: Brand) {
             },
         )
 
-        // Doors: CCS2 nests per row/seat with an Open flag (0 closed / 1 open).
-        val door = cabin.path("Door", "Row1") as? JsonObject
-        val doorRear = cabin.path("Door", "Row2") as? JsonObject
-        val doorOpen = if (door == null && doorRear == null) null else DoorOpen(
-            frontLeft = door.path("Driver", "Open").int(),
-            frontRight = door.path("Passenger", "Open").int(),
-            backLeft = doorRear.path("Left", "Open").int(),
-            backRight = doorRear.path("Right", "Open").int(),
-        )
-        val window = cabin.path("Window", "Row1") as? JsonObject
-        val windowRear = cabin.path("Window", "Row2") as? JsonObject
-        val windowOpen = if (window == null && windowRear == null) null else WindowOpen(
-            frontLeft = window.path("Driver", "Open").int(),
-            frontRight = window.path("Passenger", "Open").int(),
-            backLeft = windowRear.path("Left", "Open").int(),
-            backRight = windowRear.path("Right", "Open").int(),
-        )
+        val door1 = cabin.path("Door", "Row1") as? JsonObject
+        val door2 = cabin.path("Door", "Row2") as? JsonObject
+        val win1 = cabin.path("Window", "Row1") as? JsonObject
+        val win2 = cabin.path("Window", "Row2") as? JsonObject
 
         return VehicleStatus(
-            // Lock is reported at the driver door in CCS2 (1 = locked). CCS2-CONFIRM.
-            doorLock = door.path("Driver", "Lock").flag(),
-            airCtrlOn = cabin.path("HVAC", "Row1", "Driver", "Blower", "SpeedLevel").int()?.let { it > 0 },
-            // No meaningful engine-on concept for an E-GMP EV; left unset.
-            engine = null,
+            // Lock: driver-door Lock flag (1 = locked).
+            doorLock = door1.path("Driver", "Lock").flag(),
+            engine = vh.path("DrivingReady").flag(),
             trunkOpen = body.path("Trunk", "Open").flag(),
             hoodOpen = body.path("Hood", "Open").flag(),
-            doorOpen = doorOpen,
-            windowOpen = windowOpen,
+            defrost = body.path("Windshield", "Front", "Defog", "State").int()?.let { it == 1 },
+            doorOpen = if (door1 == null && door2 == null) null else DoorOpen(
+                frontLeft = door1.path("Driver", "Open").int(),
+                frontRight = door1.path("Passenger", "Open").int(),
+                backLeft = door2.path("Left", "Open").int(),
+                backRight = door2.path("Right", "Open").int(),
+            ),
+            windowOpen = if (win1 == null && win2 == null) null else WindowOpen(
+                frontLeft = win1.path("Driver", "Open").int(),
+                frontRight = win1.path("Passenger", "Open").int(),
+                backLeft = win2.path("Left", "Open").int(),
+                backRight = win2.path("Right", "Open").int(),
+            ),
             dte = rangeKm?.let { Dte(it.kmToMi(), 3) },
             battery = electronics.path("Battery", "Level").int()?.let { Battery12V(batSoc = it) },
             evStatus = evStatus,
             dateTime = vh.path("Date").str(),
             tirePressureLamp = (chassis.path("Axle") as? JsonObject)?.let {
-                TirePressureLamp(
-                    tirePressureLampAll = chassis.path("Axle", "Tire", "PressureLow").int(),
-                )
+                TirePressureLamp(tirePressureLampAll = chassis.path("Axle", "Tire", "PressureLow").int())
             },
-            fuelLevel = drivetrain.path("FuelSystem", "FuelLevel").int(),
         )
     }
 
     // --- Commands ------------------------------------------------------------
-    // CCS2-CONFIRM: control endpoint paths + bodies are ported best-effort and
-    // must be validated against the car. Each posts a small command object to a
-    // /ccs2/control/* endpoint with the control token in Authorization.
+    // CCS2 lock/charge/climate: POST /ccs2/control/* with the control token.
+    // Charge target is a v1 endpoint. Bodies ported from ApiImplType1.
 
     suspend fun lock(session: EuSession, v: EuVehicleSummary, controlToken: String) =
         control(session, v, controlToken, "door", buildJsonObject { put("command", "close") })
@@ -397,30 +429,10 @@ class EuApi(private val brand: Brand) {
     suspend fun stopClimate(session: EuSession, v: EuVehicleSummary, controlToken: String) =
         control(session, v, controlToken, "temperature", buildJsonObject { put("command", "stop") })
 
-    /** Set AC (plugType 1) and DC (plugType 0) charge target SOC percentages.
-     *  Unlike the other commands this is a v1 endpoint (`.../charge/target`, NOT
-     *  ccs2/control) taking the full targetSOClist in one request — ported from
-     *  the reference EU client. CCS2-CONFIRM. */
-    suspend fun setChargeTargets(
-        session: EuSession, v: EuVehicleSummary, controlToken: String, acPercent: Int, dcPercent: Int,
-    ) = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            put("targetSOClist", buildJsonArray {
-                add(buildJsonObject { put("plugType", 0); put("targetSOClevel", dcPercent) })
-                add(buildJsonObject { put("plugType", 1); put("targetSOClevel", acPercent) })
-            })
-        }.toString().toRequestBody(jsonMedia)
-        val req = Request.Builder().url("${brand.baseUrl}/api/v1/spa/vehicles/${v.id}/charge/target")
-            .post(body).commandHeaders(session, controlToken).build()
-        call(req)
-        Unit
-    }
-
     /** Start climate / pre-conditioning. Temperature arrives as Fahrenheit
-     *  ([ClimateRequest.tempF]) and is sent as a Celsius half-degree. Body shape
-     *  ported from the reference EU client's ccs2/control/temperature payload;
-     *  the per-seat `seatClimateInfo` block is intentionally omitted (best-effort
-     *  temperature + defrost + steering-wheel only). CCS2-CONFIRM. */
+     *  ([ClimateRequest.tempF]) and is sent as a Celsius half-degree. Seats are
+     *  left off (state 0). Body shape from ApiImplType1's ccs2 temperature start;
+     *  drvSeatLoc "L" assumes a left-hand-drive (mainland EU) car. */
     suspend fun startClimate(
         session: EuSession, v: EuVehicleSummary, controlToken: String, req: ClimateRequest,
     ) {
@@ -431,77 +443,89 @@ class EuApi(private val brand: Brand) {
             put("strgWhlHeating", if (req.steeringWheelHeat) 1 else 0)
             put("hvacTempType", 1)
             put("hvacTemp", celsius)
+            put("sideRearMirrorHeating", 0)
+            put("drvSeatLoc", "L")
+            put("seatClimateInfo", buildJsonObject {
+                put("drvSeatClimateState", 0)
+                put("psgSeatClimateState", 0)
+                put("rrSeatClimateState", 0)
+                put("rlSeatClimateState", 0)
+            })
             put("tempUnit", "C")
             put("windshieldFrontDefogState", req.defrost)
         }
         control(session, v, controlToken, "temperature", cmd)
     }
 
+    /** Set AC (plugType 1) and DC (plugType 0) charge target SOC percentages, via
+     *  the v1 `.../charge/target` endpoint (not ccs2/control) with the full
+     *  targetSOClist in one request. */
+    suspend fun setChargeTargets(
+        session: EuSession, v: EuVehicleSummary, controlToken: String, acPercent: Int, dcPercent: Int,
+    ) = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("targetSOClist", buildJsonArray {
+                add(buildJsonObject { put("plugType", 0); put("targetSOClevel", dcPercent) })
+                add(buildJsonObject { put("plugType", 1); put("targetSOClevel", acPercent) })
+            })
+        }.toString().toRequestBody(jsonMedia)
+        val req = Request.Builder().url(spa + "vehicles/${v.id}/charge/target")
+            .post(body).commandHeaders(session, v.ccs2, controlToken).build()
+        call(req)
+        Unit
+    }
+
     private suspend fun control(
         session: EuSession, v: EuVehicleSummary, controlToken: String, path: String, cmd: JsonObject,
     ) = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(spaV2 + "${v.id}/ccs2/control/$path")
+        val req = Request.Builder().url(spaV2 + "vehicles/${v.id}/ccs2/control/$path")
             .post(cmd.toString().toRequestBody(jsonMedia))
-            .commandHeaders(session, controlToken).build()
+            .commandHeaders(session, v.ccs2, controlToken).build()
         call(req)
         Unit
     }
 
     // --- Plumbing ------------------------------------------------------------
 
-    /** Runs [request] and returns the parsed JSON body. Throws on non-2xx; the
-     *  CCAPI signals an expired token with 401, which [EuRepository] catches to
-     *  refresh + retry. A successful HTTP status can still carry an in-band
-     *  `retCode == "F"` error (resCode/resMsg), surfaced here as an exception. */
-    /** A client that carries session cookies for the multi-step OAuth handshake.
-     *  Reuses the shared dispatcher/pool/logging interceptor but adds a private
-     *  in-memory cookie jar, so cookies never leak across logins or brands. */
-    private fun clientWithCookies(): OkHttpClient {
-        val store = mutableListOf<Cookie>()
-        val jar = object : CookieJar {
-            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                store.removeAll { existing -> cookies.any { it.name == existing.name } }
-                store.addAll(cookies)
-            }
-            override fun loadForRequest(url: HttpUrl): List<Cookie> = store.toList()
+    /** RSA-PKCS1v1.5-encrypt [password] with the JWK public key ([nB64Url]/[eB64Url]
+     *  are base64url modulus/exponent), returning lowercase hex — matching the
+     *  reference's `cipher.encrypt(pw).hex()`. */
+    private fun rsaEncryptHex(password: String, nB64Url: String, eB64Url: String): String {
+        fun decodeUrl(s: String): ByteArray {
+            val padded = s + "=".repeat((4 - s.length % 4) % 4)
+            return Base64.getUrlDecoder().decode(padded)
         }
-        return sharedClient.newBuilder().cookieJar(jar).build()
+        val key = KeyFactory.getInstance("RSA").generatePublic(
+            RSAPublicKeySpec(BigInteger(1, decodeUrl(nB64Url)), BigInteger(1, decodeUrl(eB64Url))),
+        )
+        val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        return cipher.doFinal(password.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     }
 
-    /** Execute a request purely for its side effects (cookies), discarding the
-     *  body — used for the authorize/language steps that return HTML, not JSON.
-     *  Still throws on a non-2xx so a broken handshake surfaces early. */
-    private fun exec(client: OkHttpClient, request: Request) {
-        client.newCall(request).execute().use { resp ->
+    /** Runs [request] on [httpClient] and returns the parsed JSON body. Throws on
+     *  non-2xx (401 -> [EuRepository] refreshes + retries) and on an in-band
+     *  `retCode == "F"` error. The failing method+path is included in the message. */
+    private fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
+        httpClient.newCall(request).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) {
-                val msg = friendly(resp.code, resp.body?.string().orEmpty())
-                AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")
-                throw BlueLinkException(msg, code = resp.code)
+                val where = "${request.method} ${request.url.encodedPath}"
+                val msg = friendly(resp.code, text)
+                AppLog.log("ERROR ${resp.code} $where: $msg")
+                throw BlueLinkException("$msg [$where]", code = resp.code)
             }
+            val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
+            val retCode = root.path("retCode").str()
+            if (retCode == "F") {
+                val err = root.path("resCode").str()
+                val msg = root.path("resMsg").str() ?: "Europe request failed (${err ?: "?"})"
+                val expired = err != null && (err.startsWith("400") || err == "4004" || err == "4005")
+                AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg (code $err)")
+                throw BlueLinkException(msg, code = if (expired) 401 else resp.code)
+            }
+            root
         }
-    }
-
-    private fun call(request: Request, client: OkHttpClient = this.client): JsonElement =
-        client.newCall(request).execute().use { resp ->
-        val text = resp.body?.string().orEmpty()
-        if (!resp.isSuccessful) {
-            val msg = friendly(resp.code, text)
-            AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")
-            throw BlueLinkException(msg, code = resp.code)
-        }
-        val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
-        val retCode = root.path("retCode").str()
-        if (retCode == "F") {
-            val err = root.path("resCode").str()
-            val msg = root.path("resMsg").str() ?: "Europe request failed (${err ?: "?"})"
-            // 4004/4005-family = token invalid/expired -> surface as 401 so the
-            // repository refreshes and retries. CCS2-CONFIRM the exact codes.
-            val expired = err != null && (err.startsWith("400") || err == "4004" || err == "4005")
-            AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg (code $err)")
-            throw BlueLinkException(msg, code = if (expired) 401 else resp.code)
-        }
-        root
-    }
 
     private fun friendly(code: Int, body: String): String {
         val msg = runCatching {
@@ -523,9 +547,8 @@ class EuApi(private val brand: Brand) {
     private fun JsonElement?.flag(): Boolean? =
         (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
 
-    /** CCS2 reports distance in km; Bloo stores distance as miles everywhere and
-     *  converts to km only at display time (see FormatUtils.formatDistance), so
-     *  normalise at the parse boundary — same as CanadaApi does. */
+    /** CCS2 reports distance in km; Bloo stores miles everywhere and converts to
+     *  km only at display time (see FormatUtils.formatDistance) — normalise here. */
     private fun Double.kmToMi(): Double = this * 0.621371
 
     private fun JsonElement?.path(vararg keys: String): JsonElement? {
