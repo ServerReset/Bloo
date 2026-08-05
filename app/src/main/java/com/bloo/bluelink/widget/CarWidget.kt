@@ -409,8 +409,19 @@ class CarWidget : GlanceAppWidget() {
      *  gap before info rows -- that would otherwise need reserving one at a
      *  time for a saving of a few dp. Shared by [RailLayout],
      *  [CompactTallNarrowLayout] and [CompactTallLayout]; swept for overflow
-     *  in WidgetScaleTest with this exact value. */
-    private val TALL_TIER_MARGIN = 12.dp
+     *  in WidgetScaleTest with this exact value.
+     *
+     *  Was 12.dp: too small on a narrow, short tile where the button stack
+     *  alone (plus its own gap-before spacer) already consumes the whole
+     *  budget -- heroRoom then clamps to 0.dp, and clamping means this
+     *  margin was never actually SUBTRACTED from anything, so the forced
+     *  gap-before-map/gap-before-buttons spacers that render unconditionally
+     *  whenever there's a map or a button row overflowed the tile by up to
+     *  2-4dp regardless of how big this constant was. Bumped to cover that
+     *  plus the matching bump to each layout's own maxStackedButtons
+     *  overhead below, so the button count itself leaves room rather than
+     *  relying on this margin alone. */
+    private val TALL_TIER_MARGIN = 16.dp
 
     @Composable
     private fun RailLayout(car: VehicleSnapshot, render: Render) {
@@ -448,7 +459,13 @@ class CarWidget : GlanceAppWidget() {
         // not a flat number -- six stacked buttons at this tier's own button
         // height can exceed the whole content box near Rail's 220dp floor,
         // before the ring or a map has claimed anything. See maxStackedButtons.
-        val buttonCount = Scale.maxStackedButtons(size, budget, overhead = 8.dp, cap = allActions.size)
+        // overhead is 16.dp, not buttonZone's own 8.dp: buttonZone's trailing
+        // +8.dp is matched here, PLUS the separate forced Spacer(8.dp) that
+        // renders unconditionally right before ActionButtons below whenever
+        // buttonCount > 0 -- that spacer isn't part of buttonZone, so a
+        // button count chosen without reserving it too overflowed the tile
+        // by up to 2dp whenever the map spacer also landed on top.
+        val buttonCount = Scale.maxStackedButtons(size, budget, overhead = 16.dp, cap = allActions.size)
         val buttonZone = if (buttonCount > 0) {
             Scale.buttonHeight(size) * buttonCount + Scale.buttonGap(size) * (buttonCount - 1) + 8.dp
         } else {
@@ -665,7 +682,12 @@ class CarWidget : GlanceAppWidget() {
         val nameHeight = Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale) + 4.dp
         // Capped by what actually fits after the name, not a flat number --
         // see maxStackedButtons and RailLayout's own note on why.
-        val buttonCount = Scale.maxStackedButtons(size, budget - nameHeight, overhead = 4.dp, cap = allActions.size.coerceAtMost(4))
+        // overhead is 8.dp, not buttonZone's own 4.dp -- same reasoning as
+        // RailLayout's own overhead comment: the separate forced
+        // Spacer(4.dp) rendered right before ActionButtons below whenever
+        // buttonCount > 0 isn't part of buttonZone and has to be reserved
+        // here too, or the button count picked leaves no room for it.
+        val buttonCount = Scale.maxStackedButtons(size, budget - nameHeight, overhead = 8.dp, cap = allActions.size.coerceAtMost(4))
         val buttonZone = if (buttonCount > 0) {
             Scale.buttonHeight(size) * buttonCount + Scale.buttonGap(size) * (buttonCount - 1) + 4.dp
         } else {

@@ -282,6 +282,17 @@ class WidgetScaleTest {
      * buttons actually fit, which overflowed near Rail's own 220dp floor
      * before this test caught it.
      *
+     * This test itself then caught a SECOND overflow the same fix
+     * introduced: each layout renders a forced Spacer right before its
+     * button row (and RAIL another right before its map) that is NOT part
+     * of buttonZone's own reservation. When the button stack alone already
+     * consumed the whole budget, heroRoom clamped to 0.dp -- and clamping
+     * meant the margin below was never actually subtracted from anything,
+     * so those forced spacers rendered on top of an already-full tile.
+     * Fixed by folding the extra spacer into each maxStackedButtons overhead
+     * (so the button count itself leaves room) and widening the margin to
+     * match -- both here, and in the constant CarWidget.kt derives it from.
+     *
      * Every combination of configured-action count (0..7, the full action
      * set the config screen can produce) and map on/off, at every text
      * scale -- the same
@@ -294,7 +305,7 @@ class WidgetScaleTest {
         // duplicated here the same way this file already duplicates each
         // layout's own inline spacing constants rather than reaching into
         // the widget class for them.
-        val margin = 12.dp
+        val margin = 16.dp
         for (size in sizes()) {
             val tier = tierFor(size)
             if (tier != WidgetTier.RAIL && tier != WidgetTier.COMPACT_TALL_NARROW && tier != WidgetTier.COMPACT_TALL) continue
@@ -304,7 +315,7 @@ class WidgetScaleTest {
                     for (wantMap in listOf(false, true)) {
                         when (tier) {
                             WidgetTier.RAIL -> {
-                                val n = Scale.maxStackedButtons(size, budget, overhead = 8.dp, cap = actionCount)
+                                val n = Scale.maxStackedButtons(size, budget, overhead = 16.dp, cap = actionCount)
                                 val buttonZone = if (n > 0) {
                                     Scale.buttonHeight(size) * n + Scale.buttonGap(size) * (n - 1) + 8.dp
                                 } else {
@@ -322,7 +333,7 @@ class WidgetScaleTest {
                             }
                             WidgetTier.COMPACT_TALL_NARROW -> {
                                 val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts) + 4.dp
-                                val n = Scale.maxStackedButtons(size, budget - nameH, overhead = 4.dp, cap = minOf(actionCount, 4))
+                                val n = Scale.maxStackedButtons(size, budget - nameH, overhead = 8.dp, cap = minOf(actionCount, 4))
                                 val buttonZone = if (n > 0) {
                                     Scale.buttonHeight(size) * n + Scale.buttonGap(size) * (n - 1) + 4.dp
                                 } else {
