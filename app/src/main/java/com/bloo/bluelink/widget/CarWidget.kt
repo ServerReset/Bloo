@@ -284,6 +284,38 @@ class CarWidget : GlanceAppWidget() {
      *  doc comment for why this only applies below MEDIUM. */
     private fun controlsPriority(render: Render) = render.config.priority == WidgetConfig.PRIORITY_CONTROLS
 
+    /**
+     * Budget-fraction status-ring/glyph edge for a controls-priority layout.
+     *
+     * Every controls-priority tier used to replace its ENTIRE content with
+     * ActionButtons and return -- so "small sizes: Controls" meant a tile
+     * showing literally nothing about the car itself: no charge, no lock
+     * state, not even which car it was. Reported from a batch of real
+     * device screenshots across every controls-priority tier.
+     *
+     * A small fraction of whatever budget the caller has, capped low: the
+     * buttons stay the point of a controls-priority tile, this is a glance
+     * at the car's own state alongside them, not a second ring module
+     * competing for the same room. Returns 0 (via [Scale.ring]'s own floor)
+     * when even that fraction can't read.
+     */
+    private fun controlsMiniStatusEdge(size: DpSize, budget: Dp, fraction: Float = 0.32f, cap: Dp = 40.dp): Dp =
+        Scale.ring(size, minOf(budget * fraction, cap))
+
+    /** Draws whichever of [RingImage]/[StatusGlyph] the config calls for at
+     *  [edge], or nothing when [edge] is too small to read -- the shared
+     *  body every controls-priority tier's mini status badge uses, so the
+     *  ring/glyph choice can't drift between them. */
+    @Composable
+    private fun MiniStatus(car: VehicleSnapshot, render: Render, edge: Dp) {
+        if (edge < 16.dp) return
+        if (render.config.showRing && car.percent != null) {
+            RingImage(car, render, edgeDp = edge.value.toInt())
+        } else {
+            StatusGlyph(car, render.theme, sizeDp = edge.value.toInt())
+        }
+    }
+
     @Composable
     private fun MicroTinyLayout(car: VehicleSnapshot, render: Render) {
         // The true floor -- literally no room for any text at all (a name at
@@ -359,7 +391,14 @@ class CarWidget : GlanceAppWidget() {
         // resolves to an empty list, and returning here regardless would
         // render a completely blank banner.
         if (controlsPriority(render) && resolvedActions(car, render, max = 6).isNotEmpty()) {
-            ActionButtons(car, render, max = 6, modifier = GlanceModifier.fillMaxSize())
+            val edge = controlsMiniStatusEdge(size, size.height - Scale.contentPadding(size) * 2)
+            Row(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                if (edge >= 16.dp) {
+                    MiniStatus(car, render, edge)
+                    Spacer(GlanceModifier.width(8.dp))
+                }
+                ActionButtons(car, render, max = 6, modifier = GlanceModifier.defaultWeight())
+            }
             return
         }
         val ringEdge = Scale.ring(size, (size.height - 10.dp).coerceAtLeast(16.dp))
@@ -443,8 +482,19 @@ class CarWidget : GlanceAppWidget() {
         val size = LocalSize.current
         val allActions = resolvedActions(car, render, max = WidgetAction.ALL.size)
         if (controlsPriority(render) && allActions.isNotEmpty()) {
-            Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true)
+            val budgetH = size.height - Scale.contentPadding(size) * 2
+            val edge = controlsMiniStatusEdge(size, size.width - Scale.contentPadding(size) * 2, fraction = 1f)
+            val spacerH = if (edge >= 16.dp) 8.dp else 0.dp
+            Column(GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (edge >= 16.dp) {
+                    MiniStatus(car, render, edge)
+                    Spacer(GlanceModifier.height(spacerH))
+                }
+                ActionButtons(
+                    car, render, max = WidgetAction.ALL.size, vertical = true,
+                    modifier = GlanceModifier.defaultWeight(),
+                    availableHeight = (budgetH - edge - spacerH).coerceAtLeast(0.dp),
+                )
             }
             return
         }
@@ -513,10 +563,18 @@ class CarWidget : GlanceAppWidget() {
         // row/column -- there's enough room on a near-square 90dp+ tile for
         // four properly-sized buttons arranged like a mini keypad, a shape
         // none of the other controls-priority layouts use.
+        val size = LocalSize.current
         if (controlsPriority(render)) {
             val actions = resolvedActions(car, render, max = 4)
             if (actions.isNotEmpty()) {
+                val edge = controlsMiniStatusEdge(size, minOf(size.width, size.height) - Scale.contentPadding(size) * 2)
                 Column(modifier = GlanceModifier.fillMaxSize().padding(4.dp)) {
+                    if (edge >= 16.dp) {
+                        Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                            MiniStatus(car, render, edge)
+                        }
+                        Spacer(GlanceModifier.height(4.dp))
+                    }
                     actions.chunked(2).forEachIndexed { i, row ->
                         if (i > 0) Spacer(GlanceModifier.height(4.dp))
                         Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
@@ -530,7 +588,6 @@ class CarWidget : GlanceAppWidget() {
                 return
             }
         }
-        val size = LocalSize.current
         val scale = render.theme.textScale
         // The last fraction-of-the-tile ring cap in this file, and it was
         // wrong the same way every other one was: 55% of the height assumes
@@ -566,17 +623,24 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun CompactWideNarrowLayout(car: VehicleSnapshot, render: Render) {
+        val size = LocalSize.current
         if (controlsPriority(render)) {
             val actions = resolvedActions(car, render, max = 2)
             if (actions.isNotEmpty()) {
-                ActionButtons(car, render, max = 2, modifier = GlanceModifier.fillMaxSize().padding(4.dp))
+                val edge = controlsMiniStatusEdge(size, (size.height - Scale.contentPadding(size) * 2))
+                Row(GlanceModifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (edge >= 16.dp) {
+                        MiniStatus(car, render, edge)
+                        Spacer(GlanceModifier.width(6.dp))
+                    }
+                    ActionButtons(car, render, max = 2, modifier = GlanceModifier.defaultWeight())
+                }
                 return
             }
         }
         // Narrower than COMPACT_WIDE's own threshold -- no room for a
         // subtitle line beside the ring too, just the name, and only 2
         // buttons instead of 3.
-        val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.height - 12.dp).coerceAtLeast(18.dp))
         val showsRing = render.config.showRing && car.percent != null
         // The width each weighted child of this Row REALLY gets: whatever is
@@ -604,10 +668,18 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun CompactWideLayout(car: VehicleSnapshot, render: Render) {
+        val size = LocalSize.current
         if (controlsPriority(render)) {
             val actions = resolvedActions(car, render, max = 4)
             if (actions.isNotEmpty()) {
-                ActionButtons(car, render, max = 4, modifier = GlanceModifier.fillMaxSize().padding(4.dp))
+                val edge = controlsMiniStatusEdge(size, (size.height - Scale.contentPadding(size) * 2))
+                Row(GlanceModifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (edge >= 16.dp) {
+                        MiniStatus(car, render, edge)
+                        Spacer(GlanceModifier.width(8.dp))
+                    }
+                    ActionButtons(car, render, max = 4, modifier = GlanceModifier.defaultWeight())
+                }
                 return
             }
         }
@@ -617,7 +689,6 @@ class CarWidget : GlanceAppWidget() {
         // wants to be. Scale.ring's continuous target is capped by whatever
         // height is actually available, so the ring can never be taller than
         // the row it's centered in.
-        val size = LocalSize.current
         val ringEdge = Scale.ring(size, (size.height - 16.dp).coerceAtLeast(20.dp))
         val showsRing = render.config.showRing && car.percent != null
         // The width each weighted child of this Row REALLY gets: whatever is
@@ -673,8 +744,19 @@ class CarWidget : GlanceAppWidget() {
         val size = LocalSize.current
         val allActions = resolvedActions(car, render, max = WidgetAction.ALL.size)
         if (controlsPriority(render) && allActions.isNotEmpty()) {
-            Box(GlanceModifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
-                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true)
+            val budgetH = size.height - Scale.contentPadding(size) * 2
+            val edge = controlsMiniStatusEdge(size, size.width - Scale.contentPadding(size) * 2, fraction = 1f)
+            val spacerH = if (edge >= 16.dp) 6.dp else 0.dp
+            Column(GlanceModifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (edge >= 16.dp) {
+                    MiniStatus(car, render, edge)
+                    Spacer(GlanceModifier.height(spacerH))
+                }
+                ActionButtons(
+                    car, render, max = WidgetAction.ALL.size, vertical = true,
+                    modifier = GlanceModifier.defaultWeight(),
+                    availableHeight = (budgetH - edge - spacerH - 8.dp).coerceAtLeast(0.dp),
+                )
             }
             return
         }
@@ -740,8 +822,19 @@ class CarWidget : GlanceAppWidget() {
         val size = LocalSize.current
         val allActions = resolvedActions(car, render, max = WidgetAction.ALL.size)
         if (controlsPriority(render) && allActions.isNotEmpty()) {
-            Box(GlanceModifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
-                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true)
+            val budgetH = size.height - Scale.contentPadding(size) * 2
+            val edge = controlsMiniStatusEdge(size, size.width - Scale.contentPadding(size) * 2, fraction = 1f)
+            val spacerH = if (edge >= 16.dp) 8.dp else 0.dp
+            Column(GlanceModifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (edge >= 16.dp) {
+                    MiniStatus(car, render, edge)
+                    Spacer(GlanceModifier.height(spacerH))
+                }
+                ActionButtons(
+                    car, render, max = WidgetAction.ALL.size, vertical = true,
+                    modifier = GlanceModifier.defaultWeight(),
+                    availableHeight = (budgetH - edge - spacerH - 12.dp).coerceAtLeast(0.dp),
+                )
             }
             return
         }

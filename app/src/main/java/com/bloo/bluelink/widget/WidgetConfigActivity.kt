@@ -1,24 +1,14 @@
 package com.bloo.bluelink.widget
 
-import coil.compose.AsyncImage
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.draw.alpha
-import androidx.compose.runtime.produceState
-import androidx.compose.material.icons.filled.LocationOn
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -54,10 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.lifecycleScope
@@ -172,22 +158,6 @@ private fun ConfigScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(18.dp))
-
-            // A live miniature, so every option below can be judged by
-            // looking rather than by saving and going to the home screen.
-            WidgetPreview(
-                car = cars.firstOrNull { it.vin == vin } ?: cars.firstOrNull(),
-                corner = corner,
-                backgroundOpacity = backgroundOpacity,
-                textScale = textScale,
-                showRing = showRing,
-                showMap = showMap,
-                photoBackground = photoBackground,
-                actions = actions,
-                accentColor = accent?.let { key -> WidgetAccent.fromKey(key)?.let { Color(it.argb) } }
-                    ?: MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(20.dp))
 
             // --- Car (both modes) ---
             SectionLabel("Car")
@@ -471,214 +441,3 @@ private fun ConfigScreen(
     }
 }
 
-/**
- * A live, animated miniature of the widget being configured.
- *
- * This is the answer to "which of these four corner options am I actually
- * picking" -- the screen was otherwise a wall of segmented controls whose
- * effects you could only see by saving, going to the home screen and
- * looking. Every knob it can express is animated rather than snapped, so
- * changing one reads as the widget morphing rather than the screen redrawing.
- *
- * Deliberately an APPROXIMATION, not a second implementation of the widget:
- * it mirrors shape, background opacity, type scale, the ring and the button
- * row, which is what the options on this screen actually change. It does not
- * try to reproduce the tier system -- promising an exact preview across 18
- * layouts is a promise it couldn't keep, and a preview that is subtly wrong
- * is worse than one that is honestly schematic.
- */
-@Composable
-private fun WidgetPreview(
-    car: VehicleSnapshot?,
-    corner: String,
-    backgroundOpacity: Float,
-    textScale: Float,
-    showRing: Boolean,
-    showMap: Boolean,
-    photoBackground: Boolean,
-    actions: List<String>,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-) {
-    val spec = spring<Float>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
-    // The preview is ~150dp tall, so it uses corner values proportional to
-    // ITS size rather than the widget's own dp -- 32dp on a 150dp preview
-    // would read far rounder than 32dp does on a real 300dp tile.
-    val targetCorner = when (corner) {
-        WidgetConfig.CORNER_SHARP -> 0.dp
-        WidgetConfig.CORNER_ROUND -> 22.dp
-        WidgetConfig.CORNER_PILL -> 999.dp
-        else -> 14.dp
-    }
-    val radius by animateDpAsState(targetCorner, spring(stiffness = Spring.StiffnessMediumLow), label = "previewCorner")
-    val opacity by animateFloatAsState(backgroundOpacity, spec, label = "previewOpacity")
-    val scale by animateFloatAsState(textScale, spec, label = "previewText")
-    val ringAlpha by animateFloatAsState(if (showRing) 1f else 0f, spec, label = "previewRing")
-    val scheme = MaterialTheme.colorScheme
-    val context = LocalContext.current
-    // The car's own stored photo, read the same way the phone's own per-car
-    // photo picker does (SettingsStore.imageUrl). Before this the preview
-    // never agreed with "Use car photo as background": the toggle changed
-    // what the REAL widget looked like and left this card exactly as flat
-    // as it always was, so there was no way to judge a photo background
-    // without saving the widget and finding it on the home screen. Re-reads
-    // whenever the toggle or the selected car changes; null immediately
-    // (rather than showing a stale photo) the instant the toggle is off.
-    val photoUrl by produceState<String?>(initialValue = null, car?.vin, photoBackground) {
-        value = if (photoBackground && car != null) {
-            runCatching { SettingsStore(context).imageUrl(car.vin) }.getOrNull()?.takeIf { it.isNotBlank() }
-        } else {
-            null
-        }
-    }
-    val photoAlpha by animateFloatAsState(if (photoUrl != null) 1f else 0f, spec, label = "previewPhoto")
-
-    Box(
-        modifier
-            .fillMaxWidth()
-            .height(150.dp)
-            .clip(RoundedCornerShape(radius))
-            // No flat background at all once a photo is actually showing --
-            // matches the real widget (Content() in CarWidget.kt), which
-            // paints the plain surface ONLY when there is no photo. The
-            // opacity slider is genuinely inert once a photo is set (the
-            // settings text above already says so); this makes the preview
-            // agree rather than showing a translucent card the real widget
-            // would never draw.
-            .then(
-                if (photoUrl == null) {
-                    Modifier.background(scheme.surfaceVariant.copy(alpha = opacity))
-                } else {
-                    Modifier
-                },
-            ),
-    ) {
-        if (photoUrl != null) {
-            AsyncImage(
-                model = remember(photoUrl) {
-                    val u = photoUrl!!
-                    if (u.startsWith("/")) java.io.File(u) else u
-                },
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().alpha(photoAlpha),
-            )
-            // The same flat scrim the real widget draws over a photo
-            // background, so the preview's own text stays legible against it
-            // regardless of the photo's brightness, same as on the home screen.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .alpha(photoAlpha)
-                    .background(Color.Black.copy(alpha = 0.38f)),
-            )
-        }
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
-            Text(
-                car?.name ?: "Your car",
-                style = MaterialTheme.typography.titleSmall,
-                fontSize = MaterialTheme.typography.titleSmall.fontSize * scale,
-                color = scheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                "Locked · Charging",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = MaterialTheme.typography.labelSmall.fontSize * scale,
-                color = scheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                if (ringAlpha > 0.01f) {
-                    val pct = car?.percent ?: 62
-                    Canvas(Modifier.size(44.dp * ringAlpha)) {
-                        val stroke = size.minDimension * 0.14f
-                        drawArc(
-                            color = scheme.onSurface.copy(alpha = 0.22f * ringAlpha),
-                            startAngle = -90f, sweepAngle = 360f, useCenter = false,
-                            style = Stroke(width = stroke, cap = StrokeCap.Round),
-                        )
-                        drawArc(
-                            color = accentColor.copy(alpha = ringAlpha),
-                            startAngle = -90f, sweepAngle = 360f * (pct / 100f), useCenter = false,
-                            style = Stroke(width = stroke, cap = StrokeCap.Round),
-                        )
-                    }
-                    Spacer(Modifier.size(10.dp))
-                }
-                Column(Modifier.weight(1f)) {
-                    PreviewStat("Range", "196 mi", scale)
-                    PreviewStat("Battery", "${car?.percent ?: 62}%", scale)
-                }
-            }
-            // A representative location chip, not a live map fetch -- an
-            // actual tile would mean real network I/O just to preview a
-            // toggle. Before this "Show the car's location" was the one
-            // option with no visible effect here at all: everything else on
-            // this screen could be judged by looking, and this could only be
-            // judged by saving the widget and finding it on the home screen.
-            if (showMap) {
-                Spacer(Modifier.height(6.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(scheme.onSurface.copy(alpha = 0.12f))
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.LocationOn, contentDescription = null,
-                        tint = accentColor, modifier = Modifier.size(12.dp),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        "Location shown",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = MaterialTheme.typography.labelSmall.fontSize * scale,
-                        color = scheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                val shown = actions.mapNotNull { WidgetAction.fromKey(it) }.take(4)
-                shown.forEach { action ->
-                    val fill by animateColorAsState(
-                        if (action == WidgetAction.CHARGE) accentColor else scheme.onSurface.copy(alpha = 0.14f),
-                        tween(220), label = "previewBtn",
-                    )
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .height(26.dp)
-                            .clip(RoundedCornerShape(if (corner == WidgetConfig.CORNER_PILL) 999.dp else 8.dp))
-                            .background(fill),
-                    )
-                }
-                if (shown.isEmpty()) Spacer(Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-/** One label/value line inside [WidgetPreview], scaled by the text-size option. */
-@Composable
-private fun PreviewStat(label: String, value: String, scale: Float) {
-    val style = MaterialTheme.typography.labelSmall
-    Row(Modifier.fillMaxWidth()) {
-        Text(
-            label, style = style, fontSize = style.fontSize * scale,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1, modifier = Modifier.weight(1f), overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            value, style = style, fontSize = style.fontSize * scale,
-            color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
