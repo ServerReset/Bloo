@@ -913,7 +913,7 @@ class CarWidget : GlanceAppWidget() {
         // ring -- RingWithContent falls back to stacking if that width
         // doesn't actually pan out.
         val size = LocalSize.current
-        val ringEdge = Scale.ring(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 12.dp))
+        val ringEdge = Scale.ringWide(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 12.dp))
         // Every child is handed the width this column actually gets, so the
         // header's name, the info rows, and the button row all judge their
         // own fit against the real space beside the ring rather than the
@@ -1030,7 +1030,7 @@ class CarWidget : GlanceAppWidget() {
         // the tier's two ends.
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)
-        val ringEdge = Scale.ring(size, ringRoom)
+        val ringEdge = Scale.ringWide(size, ringRoom)
         // The map sits INSIDE the info column here, beside the ring rather
         // than below it, so what it has to fit in is the row's height less
         // the rows already stacked above it -- not the whole column.
@@ -1140,7 +1140,7 @@ class CarWidget : GlanceAppWidget() {
         // Same reasoning as LargeWideLayout's own ringEdge clamp.
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp)
-        val ringEdge = Scale.ring(size, ringRoom)
+        val ringEdge = Scale.ringWide(size, ringRoom)
         // Same as LargeWideLayout: the map is stacked under the info rows
         // inside the column beside the ring, so its room is what those rows
         // leave of the row's own height.
@@ -1168,7 +1168,7 @@ class CarWidget : GlanceAppWidget() {
                     FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = ringEdge, horizontalAlignment = Alignment.CenterHorizontally)
                 },
                 content = { w ->
-                    InfoStack(car, render, max = rows, availableWidth = w, footerShown = true)
+                    InfoStack(car, render, max = rows, availableWidth = w, footerShown = true, hidePrimary = true)
                     MapModule(render, mapRoom)
                 },
             )
@@ -1209,7 +1209,7 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
             Spacer(GlanceModifier.height(14.dp))
-            InfoStack(car, render, max = split.rows, footerShown = true)
+            InfoStack(car, render, max = split.rows, footerShown = true, hidePrimary = true)
             MapFill(render, split.map)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
@@ -1443,10 +1443,17 @@ class CarWidget : GlanceAppWidget() {
         // on one widget -- once as an info row, once as the footer directly
         // beneath the buttons. Reported from a real device.
         footerShown: Boolean = false,
+        // True on XlWideLayout/XlTallLayout, which already draw a headline
+        // "69% · 361 mi" via primaryValue() right beside/above the ring --
+        // without this, a user with Percent or Range in their chosen info
+        // fields saw that exact number a second time, right below the
+        // first, on the same tile. Reported from a real device screenshot.
+        hidePrimary: Boolean = false,
     ) {
         val fields = render.config.infoFields
             .mapNotNull { WidgetInfoField.fromKey(it) }
             .filterNot { footerShown && it == WidgetInfoField.UPDATED }
+            .filterNot { hidePrimary && (it == WidgetInfoField.RANGE || it == WidgetInfoField.PERCENT) }
             .take(max)
         val narrow = availableWidth < NARROW_WIDTH
         // Two columns once the slot is wide enough for both halves to still

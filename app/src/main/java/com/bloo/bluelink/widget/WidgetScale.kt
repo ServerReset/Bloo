@@ -79,6 +79,26 @@ internal object Scale {
         return if (room < MIN_RING) 0.dp else room
     }
 
+    /**
+     * The ring for a WIDE tier's RingWithContent row -- [ring]'s own 140dp
+     * curve ceiling applies there too, and on a big LARGE/XL wide tile that
+     * left most of the ring's own row empty above and below a comparatively
+     * tiny circle: reported from real devices, a 300dp-tall ring row with a
+     * 140dp ring floating in the middle of it.
+     *
+     * Same "take the room you're given" fix as [ringHero], but bounded by a
+     * FRACTION of the tile's width rather than nearly all of it -- here the
+     * ring shares its row with a whole second column (header/info/buttons),
+     * so it can't claim the width [ringHero] can when it's the only thing on
+     * the row. 0.42 leaves the content column the majority side of the
+     * split RingWithContent already settles into above its minRowWidth
+     * threshold.
+     */
+    fun ringWide(size: DpSize, maxAvailable: Dp): Dp {
+        val room = minOf(maxAvailable, size.width * 0.42f)
+        return if (room < MIN_RING) 0.dp else room
+    }
+
     /** Estimated height of an [InfoStack] of [rows] rows, so a tall tier
      *  can leave space for it before handing the rest to [ringHero]. */
     fun infoBlockHeight(size: DpSize, rows: Int, textScale: Float): Dp =
