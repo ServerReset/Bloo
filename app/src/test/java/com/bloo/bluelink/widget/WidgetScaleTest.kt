@@ -269,4 +269,94 @@ class WidgetScaleTest {
             }
         }
     }
+
+
+    /**
+     * RAIL, COMPACT_TALL_NARROW and COMPACT_TALL: the three tiers rewritten
+     * to stop wasting most of a tall tile on empty photo (reported from real
+     * devices, six screenshots in one batch -- a small ring-and-button
+     * cluster centred in a huge amount of nothing). Mirrors each layout's own
+     * budget arithmetic exactly, including [Scale.maxStackedButtons] -- the
+     * function that exists because an EARLIER version of this exact fix
+     * reserved a flat "up to six buttons" without checking whether six
+     * buttons actually fit, which overflowed near Rail's own 220dp floor
+     * before this test caught it.
+     *
+     * Every combination of configured-action count (0..7, the full action
+     * set the config screen can produce) and map on/off, at every text
+     * scale -- the same
+     * sweep that found the bug, now enforced in CI against the real
+     * functions rather than a one-off script.
+     */
+    @Test
+    fun `tall narrow tiers fit their tile at every action count`() {
+        // Mirrors TALL_TIER_MARGIN in CarWidget.kt -- private there, so
+        // duplicated here the same way this file already duplicates each
+        // layout's own inline spacing constants rather than reaching into
+        // the widget class for them.
+        val margin = 12.dp
+        for (size in sizes()) {
+            val tier = tierFor(size)
+            if (tier != WidgetTier.RAIL && tier != WidgetTier.COMPACT_TALL_NARROW && tier != WidgetTier.COMPACT_TALL) continue
+            val budget = content(size)
+            for (ts in scales) {
+                for (actionCount in 0..7) {
+                    for (wantMap in listOf(false, true)) {
+                        when (tier) {
+                            WidgetTier.RAIL -> {
+                                val n = Scale.maxStackedButtons(size, budget, overhead = 8.dp, cap = actionCount)
+                                val buttonZone = if (n > 0) {
+                                    Scale.buttonHeight(size) * n + Scale.buttonGap(size) * (n - 1) + 8.dp
+                                } else {
+                                    0.dp
+                                }
+                                val heroRoom = (budget - buttonZone - margin).coerceAtLeast(0.dp)
+                                val split = Scale.tallSplit(size, heroRoom, capRows = 0, textScale = ts, wantMap = wantMap)
+                                val spacerBeforeMap = if (wantMap && split.map > 0.dp) 6.dp else 0.dp
+                                val spacerBeforeButtons = if (n > 0) 8.dp else 0.dp
+                                val used = buttonZone + split.ring + split.map + spacerBeforeMap + spacerBeforeButtons
+                                assertTrue(
+                                    used.value <= budget.value + 0.5f,
+                                    "RAIL ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount map=$wantMap",
+                                )
+                            }
+                            WidgetTier.COMPACT_TALL_NARROW -> {
+                                val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts) + 4.dp
+                                val n = Scale.maxStackedButtons(size, budget - nameH, overhead = 4.dp, cap = minOf(actionCount, 4))
+                                val buttonZone = if (n > 0) {
+                                    Scale.buttonHeight(size) * n + Scale.buttonGap(size) * (n - 1) + 4.dp
+                                } else {
+                                    0.dp
+                                }
+                                val heroRoom = (budget - nameH - buttonZone - margin).coerceAtLeast(0.dp)
+                                val split = Scale.tallSplit(size, heroRoom, capRows = 1, textScale = ts, wantMap = wantMap)
+                                val spacerRows = if (split.rows > 0) 4.dp else 0.dp
+                                val spacerMap = if (wantMap && split.map > 0.dp) 4.dp else 0.dp
+                                val spacerButtons = if (n > 0) 4.dp else 0.dp
+                                val used = nameH + buttonZone + split.ring + Scale.infoBlockHeight(size, split.rows, ts) +
+                                    split.map + spacerRows + spacerMap + spacerButtons
+                                assertTrue(
+                                    used.value <= budget.value + 0.5f,
+                                    "COMPACT_TALL_NARROW ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount map=$wantMap",
+                                )
+                            }
+                            else -> {
+                                val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts)
+                                val buttonZone = Scale.buttonHeight(size) + 12.dp
+                                val heroRoom = (budget - nameH - buttonZone - margin).coerceAtLeast(0.dp)
+                                val split = Scale.tallSplit(size, heroRoom, capRows = 4, textScale = ts, wantMap = wantMap)
+                                val spacerRing = if (split.ring > 0.dp) 6.dp else 0.dp
+                                val used = nameH + split.ring + spacerRing + Scale.infoBlockHeight(size, split.rows, ts) +
+                                    split.map + buttonZone
+                                assertTrue(
+                                    used.value <= budget.value + 0.5f,
+                                    "COMPACT_TALL ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount map=$wantMap",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

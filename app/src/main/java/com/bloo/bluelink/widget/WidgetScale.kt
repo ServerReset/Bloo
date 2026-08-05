@@ -156,6 +156,27 @@ internal object Scale {
         return minOf(ideal, room)
     }
 
+    /**
+     * How many buttons stacked VERTICALLY actually fit within [budget], up to
+     * [cap] -- so a caller reserving room for "every configured action" does
+     * not reserve more than the tile can hold.
+     *
+     * This exists because reserving a fixed "up to N" without checking that N
+     * buttons' worth of height actually fits is the same mistake that cost
+     * this file several device-reported overflows already: on a Rail tile
+     * near its own 220dp floor, six stacked buttons at this tier's own button
+     * height can add up to MORE than the whole padded content box, before
+     * the ring or a map has claimed anything. Swept the full tier size range
+     * against this exact formula (WidgetScaleTest) rather than trusting it
+     * by inspection, the same way every other budget in this file is.
+     */
+    fun maxStackedButtons(size: DpSize, budget: Dp, overhead: Dp, cap: Int): Int {
+        val h = buttonHeight(size)
+        val gap = buttonGap(size)
+        val n = ((budget - overhead + gap).value / (h + gap).value).toInt()
+        return n.coerceIn(0, cap)
+    }
+
     /** The big percentage in the bar treatment -- deliberately larger
      *  than [titleSp], because on a wide tile the number IS the content
      *  and the space is horizontal. */

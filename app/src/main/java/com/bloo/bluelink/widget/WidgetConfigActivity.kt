@@ -1,5 +1,11 @@
 package com.bloo.bluelink.widget
 
+import coil.compose.AsyncImage
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.produceState
+import androidx.compose.material.icons.filled.LocationOn
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
@@ -174,6 +180,8 @@ private fun ConfigScreen(
                 backgroundOpacity = backgroundOpacity,
                 textScale = textScale,
                 showRing = showRing,
+                showMap = showMap,
+                photoBackground = photoBackground,
                 actions = actions,
                 accentColor = accent?.let { key -> WidgetAccent.fromKey(key)?.let { Color(it.argb) } }
                     ?: MaterialTheme.colorScheme.primary,
@@ -485,6 +493,8 @@ private fun WidgetPreview(
     backgroundOpacity: Float,
     textScale: Float,
     showRing: Boolean,
+    showMap: Boolean,
+    photoBackground: Boolean,
     actions: List<String>,
     accentColor: Color,
     modifier: Modifier = Modifier,
@@ -504,14 +514,64 @@ private fun WidgetPreview(
     val scale by animateFloatAsState(textScale, spec, label = "previewText")
     val ringAlpha by animateFloatAsState(if (showRing) 1f else 0f, spec, label = "previewRing")
     val scheme = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    // The car's own stored photo, read the same way the phone's own per-car
+    // photo picker does (SettingsStore.imageUrl). Before this the preview
+    // never agreed with "Use car photo as background": the toggle changed
+    // what the REAL widget looked like and left this card exactly as flat
+    // as it always was, so there was no way to judge a photo background
+    // without saving the widget and finding it on the home screen. Re-reads
+    // whenever the toggle or the selected car changes; null immediately
+    // (rather than showing a stale photo) the instant the toggle is off.
+    val photoUrl by produceState<String?>(initialValue = null, car?.vin, photoBackground) {
+        value = if (photoBackground && car != null) {
+            runCatching { SettingsStore(context).imageUrl(car.vin) }.getOrNull()?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+    }
+    val photoAlpha by animateFloatAsState(if (photoUrl != null) 1f else 0f, spec, label = "previewPhoto")
 
     Box(
         modifier
             .fillMaxWidth()
             .height(150.dp)
             .clip(RoundedCornerShape(radius))
-            .background(scheme.surfaceVariant.copy(alpha = opacity)),
+            // No flat background at all once a photo is actually showing --
+            // matches the real widget (Content() in CarWidget.kt), which
+            // paints the plain surface ONLY when there is no photo. The
+            // opacity slider is genuinely inert once a photo is set (the
+            // settings text above already says so); this makes the preview
+            // agree rather than showing a translucent card the real widget
+            // would never draw.
+            .then(
+                if (photoUrl == null) {
+                    Modifier.background(scheme.surfaceVariant.copy(alpha = opacity))
+                } else {
+                    Modifier
+                },
+            ),
     ) {
+        if (photoUrl != null) {
+            AsyncImage(
+                model = remember(photoUrl) {
+                    val u = photoUrl!!
+                    if (u.startsWith("/")) java.io.File(u) else u
+                },
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().alpha(photoAlpha),
+            )
+            // The same flat scrim the real widget draws over a photo
+            // background, so the preview's own text stays legible against it
+            // regardless of the photo's brightness, same as on the home screen.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .alpha(photoAlpha)
+                    .background(Color.Black.copy(alpha = 0.38f)),
+            )
+        }
         Column(Modifier.fillMaxSize().padding(14.dp)) {
             Text(
                 car?.name ?: "Your car",
@@ -551,6 +611,36 @@ private fun WidgetPreview(
                 Column(Modifier.weight(1f)) {
                     PreviewStat("Range", "196 mi", scale)
                     PreviewStat("Battery", "${car?.percent ?: 62}%", scale)
+                }
+            }
+            // A representative location chip, not a live map fetch -- an
+            // actual tile would mean real network I/O just to preview a
+            // toggle. Before this "Show the car's location" was the one
+            // option with no visible effect here at all: everything else on
+            // this screen could be judged by looking, and this could only be
+            // judged by saving the widget and finding it on the home screen.
+            if (showMap) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(scheme.onSurface.copy(alpha = 0.12f))
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.LocationOn, contentDescription = null,
+                        tint = accentColor, modifier = Modifier.size(12.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "Location shown",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = MaterialTheme.typography.labelSmall.fontSize * scale,
+                        color = scheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))

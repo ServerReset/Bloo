@@ -403,36 +403,90 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
+    /** Fixed safety margin subtracted from a tall tier's free-column budget,
+     *  on top of whatever's individually reserved (buttons, name). Covers the
+     *  small incidental spacers between modules -- the gap before a map, the
+     *  gap before info rows -- that would otherwise need reserving one at a
+     *  time for a saving of a few dp. Shared by [RailLayout],
+     *  [CompactTallNarrowLayout] and [CompactTallLayout]; swept for overflow
+     *  in WidgetScaleTest with this exact value. */
+    private val TALL_TIER_MARGIN = 12.dp
+
     @Composable
     private fun RailLayout(car: VehicleSnapshot, render: Render) {
         // The vertical mirror of BANNER, down to 40x640. Deliberately shows
-        // NO text: at 40dp wide the content box is 28dp, and any car name
+        // NO name: at 40dp wide the content box is 28dp, and any car name
         // there would letter-stack into a column taller than the tile (see
-        // FitText). The ring or lock glyph still carries the state, and the
-        // whole strip stays tappable, so what's dropped is a label that could
-        // never have been read rather than any actual function.
+        // FitText). That is the only thing this tier gives up -- everything
+        // else here now scales with the tile the way every other tier does.
+        //
+        // A Rail resized tall used to spend almost none of the extra height:
+        // a ring capped well short of what the width allowed, at most 4
+        // buttons regardless of how many were configured or how much room
+        // there was to stack them, and no map even with location switched
+        // on -- a small cluster centred in a sea of empty photo, reported
+        // from real devices across several widget sizes in one batch. The
+        // buttons' own reserved zone is sized for every CONFIGURED action
+        // (not a fixed handful), and the ring/map split whatever is left the
+        // same way [MediumTallLayout] and the other tall tiers already do.
         val size = LocalSize.current
-        // Same guard as BannerLayout -- an empty action list here would leave
-        // an empty Box rather than falling back to the ring.
-        if (controlsPriority(render) && resolvedActions(car, render, max = 6).isNotEmpty()) {
+        val allActions = resolvedActions(car, render, max = WidgetAction.ALL.size)
+        if (controlsPriority(render) && allActions.isNotEmpty()) {
             Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                ActionButtons(car, render, max = 6, vertical = true)
+                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true)
             }
             return
         }
-        val ringEdge = Scale.ring(size, (size.width - 10.dp).coerceAtLeast(16.dp))
+        val budget = size.height - Scale.contentPadding(size) * 2
+        // Reserved BEFORE the hero content is sized, same reasoning as the
+        // map-before-ring fix elsewhere in this file: the thing with a real,
+        // guaranteed size requirement has to claim its room first, or a
+        // "hero grows to fill whatever's offered" element (the ring here)
+        // just eats the space a variable-length button stack actually needs.
+        //
+        // The count itself is capped by what the BUDGET can actually hold,
+        // not a flat number -- six stacked buttons at this tier's own button
+        // height can exceed the whole content box near Rail's 220dp floor,
+        // before the ring or a map has claimed anything. See maxStackedButtons.
+        val buttonCount = Scale.maxStackedButtons(size, budget, overhead = 8.dp, cap = allActions.size)
+        val buttonZone = if (buttonCount > 0) {
+            Scale.buttonHeight(size) * buttonCount + Scale.buttonGap(size) * (buttonCount - 1) + 8.dp
+        } else {
+            0.dp
+        }
+        // A small fixed margin on top of the buttons/name reservations,
+        // covering the incidental spacers between modules (the gap before a
+        // map, the gap before info rows) that aren't individually budgeted --
+        // deliberately generous, the same trade [Scale.infoCap] already
+        // makes: a few dp of unused room costs nothing, spilling past the
+        // tile does.
+        val heroRoom = (budget - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
+        val hasMap = render.mapBitmap != null
+        // capRows = 0: Rail shows no text, so tallSplit's row budget is
+        // unused and the ring gets everything the map reserve didn't claim.
+        val split = Scale.tallSplit(size, heroRoom, capRows = 0, textScale = render.theme.textScale, wantMap = hasMap)
         Column(
             modifier = GlanceModifier.fillMaxSize().clickable(openAction(LocalContext.current)),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Weighted spacers ABOVE and below centre what's left when there
+            // is no map to fill it, rather than piling everything at the top.
+            if (!hasMap) Spacer(GlanceModifier.defaultWeight())
             if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                RingImage(car, render, edgeDp = split.ring.value.toInt())
             } else {
-                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+                StatusGlyph(car, render.theme, sizeDp = split.ring.value.toInt())
             }
-            Spacer(GlanceModifier.height(8.dp))
-            ActionButtons(car, render, max = 4, vertical = true)
+            if (hasMap) {
+                Spacer(GlanceModifier.height(6.dp))
+                MapFill(render, split.map)
+            } else {
+                Spacer(GlanceModifier.defaultWeight())
+            }
+            if (buttonCount > 0) {
+                Spacer(GlanceModifier.height(8.dp))
+                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true, availableHeight = buttonZone)
+            }
         }
     }
 
@@ -591,88 +645,115 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun CompactTallNarrowLayout(car: VehicleSnapshot, render: Render) {
-        if (controlsPriority(render)) {
-            val actions = resolvedActions(car, render, max = 2)
-            if (actions.isNotEmpty()) {
-                Box(GlanceModifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
-                    ActionButtons(car, render, max = 2, vertical = true)
-                }
-                return
-            }
-        }
-        // Shorter than COMPACT_TALL's own threshold -- name + ring/glyph +
-        // a single button only, no room for the info stack too.
+        // At its OWN minimum this tier really is name + ring/glyph + one
+        // button with nothing to spare, which is what the old fixed caps
+        // matched -- but a widget resized well past that floor kept the same
+        // single button and no location no matter how tall it got. Same
+        // treatment as Rail now: the button zone is sized for every
+        // configured action, and whatever height that leaves is split
+        // between the ring and an optional map the same way every other
+        // tall tier already does.
         val size = LocalSize.current
-        // Capped against the WIDTH alone, this column overran its tile the
-        // same way CompactSquareLayout's did -- a 100x130 tile at 1.4x text
-        // ran 7dp past the bottom, because the name and the button row below
-        // the ring were never subtracted from anything. ringRoom already
-        // accounts for the buttons and the padding; the name is this tier's
-        // own extra. The width cap stays: it's what keeps the circle round on
-        // a narrow tile, it just isn't the only bound.
-        val room = Scale.ringRoom(size, render.theme.textScale, hasHeader = false, hasFooter = false, spacers = 8.dp) -
-            Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale)
-        val ringEdge = Scale.ring(size, minOf(room, size.width - 12.dp))
+        val allActions = resolvedActions(car, render, max = WidgetAction.ALL.size)
+        if (controlsPriority(render) && allActions.isNotEmpty()) {
+            Box(GlanceModifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
+                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true)
+            }
+            return
+        }
+        val budget = size.height - Scale.contentPadding(size) * 2
+        val nameHeight = Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale) + 4.dp
+        // Capped by what actually fits after the name, not a flat number --
+        // see maxStackedButtons and RailLayout's own note on why.
+        val buttonCount = Scale.maxStackedButtons(size, budget - nameHeight, overhead = 4.dp, cap = allActions.size.coerceAtMost(4))
+        val buttonZone = if (buttonCount > 0) {
+            Scale.buttonHeight(size) * buttonCount + Scale.buttonGap(size) * (buttonCount - 1) + 4.dp
+        } else {
+            0.dp
+        }
+        val hasMap = render.mapBitmap != null
+        val heroRoom = (budget - nameHeight - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
+        val split = Scale.tallSplit(size, heroRoom, capRows = 1, textScale = render.theme.textScale, wantMap = hasMap)
+        // The width cap that already existed here, kept: it's what keeps the
+        // circle round on a genuinely narrow tile.
+        val ringEdge = minOf(split.ring, size.width - 12.dp)
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             FitText(
                 car.name, titleStyle(render.theme),
                 maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
             Spacer(GlanceModifier.height(4.dp))
+            if (!hasMap) Spacer(GlanceModifier.defaultWeight())
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
             } else {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
-            Spacer(GlanceModifier.height(4.dp))
-            ActionButtons(car, render, max = 1)
+            if (split.rows > 0) {
+                Spacer(GlanceModifier.height(4.dp))
+                InfoStack(car, render, max = split.rows)
+            }
+            if (hasMap) {
+                Spacer(GlanceModifier.height(4.dp))
+                MapFill(render, split.map)
+            } else {
+                Spacer(GlanceModifier.defaultWeight())
+            }
+            if (buttonCount > 0) {
+                Spacer(GlanceModifier.height(4.dp))
+                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true, availableHeight = buttonZone)
+            }
         }
     }
 
     @Composable
     private fun CompactTallLayout(car: VehicleSnapshot, render: Render) {
-        if (controlsPriority(render)) {
-            val actions = resolvedActions(car, render, max = 3)
-            if (actions.isNotEmpty()) {
-                Box(GlanceModifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
-                    ActionButtons(car, render, max = 3, vertical = true)
-                }
-                return
-            }
-        }
         // COMPACT_TALL's threshold only proves the HEIGHT is roomy, not the
         // width, so the ring is still capped against the width -- but the
-        // height it does have should be USED. This tier had no weighted
-        // spacer at all, so on a 126x360dp tile everything stacked against
-        // the top edge and the bottom half was empty. Reported from a real
-        // device.
+        // height it does have should be USED. This tier used a fixed 2 info
+        // rows and 2 buttons regardless of how tall it actually got resized,
+        // and never showed a map even with location on. Reported from real
+        // devices: a name, one info row, and two buttons with the rest of a
+        // very tall tile left as bare photo above and below.
         val size = LocalSize.current
-        val rows = 2
-        // Hero-sized like the other tall tiers: take what's left after the
-        // name, info rows and buttons rather than a fixed curve that leaves
-        // the rest blank.
-        val ringEdge = Scale.ringHero(
-            size,
-            Scale.ringRoom(size, render.theme.textScale, hasHeader = false, hasFooter = false, spacers = 18.dp) -
-                Scale.infoBlockHeight(size, rows, render.theme.textScale) -
-                Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale),
-        )
+        val allActions = resolvedActions(car, render, max = WidgetAction.ALL.size)
+        if (controlsPriority(render) && allActions.isNotEmpty()) {
+            Box(GlanceModifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
+                ActionButtons(car, render, max = WidgetAction.ALL.size, vertical = true)
+            }
+            return
+        }
+        val budget = size.height - Scale.contentPadding(size) * 2
+        val nameHeight = Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale)
+        // One ROW of buttons, not stacked -- this tier is wide enough for
+        // several side by side, so width (via ActionButtons' own rowCapacity)
+        // decides the count, not a vertical reservation per button.
+        val buttonZone = Scale.buttonHeight(size) + 12.dp
+        val hasMap = render.mapBitmap != null
+        val heroRoom = (budget - nameHeight - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
+        val split = Scale.tallSplit(size, heroRoom, capRows = 4, textScale = render.theme.textScale, wantMap = hasMap)
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             FitText(
                 car.name, titleStyle(render.theme),
                 maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
-            // Weighted above AND below, so whatever the ring doesn't claim is
-            // split evenly and the block reads as centred instead of piled at
-            // the top.
-            Spacer(GlanceModifier.defaultWeight())
+            // Weighted only when there's no map to fill it, so whatever the
+            // ring and rows don't claim still reads as centred rather than
+            // piled at the top.
+            if (!hasMap) Spacer(GlanceModifier.defaultWeight())
             if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                RingImage(car, render, edgeDp = split.ring.value.toInt())
                 Spacer(GlanceModifier.height(6.dp))
             }
-            InfoStack(car, render, max = rows)
-            Spacer(GlanceModifier.defaultWeight())
-            ActionButtons(car, render, max = 2)
+            if (split.rows > 0) InfoStack(car, render, max = split.rows)
+            if (hasMap) {
+                MapFill(render, split.map)
+            } else {
+                Spacer(GlanceModifier.defaultWeight())
+            }
+            if (allActions.isNotEmpty()) {
+                ActionButtons(car, render, max = WidgetAction.ALL.size, availableHeight = buttonZone)
+            }
         }
     }
 
