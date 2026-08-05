@@ -81,4 +81,33 @@ for f in added:
                 print(f"{f}:{i+1}: @{name} is already applied at line {j+1}")
                 bad += 1
 
+# --- third check: lowercase Compose Modifier extension functions (e.g.
+# Modifier.width(...)) added by the diff but never imported into the file.
+# The two checks above only match capitalized names ([A-Z]\w+), so they were
+# blind to this shape entirely -- exactly what let Modifier.width(4.dp)
+# through to a red build in WidgetConfigActivity.kt when only .height/.size/
+# .weight had been imported into that file before. Not exhaustive: just the
+# layout modifiers common enough to show up mid-edit without a fresh import.
+MODIFIER_EXTENSIONS = {
+    "width", "height", "size", "padding", "offset", "fillMaxWidth",
+    "fillMaxHeight", "fillMaxSize", "weight", "align", "wrapContentSize",
+    "wrapContentWidth", "wrapContentHeight", "requiredWidth", "requiredHeight",
+    "requiredSize", "widthIn", "heightIn", "sizeIn", "aspectRatio",
+}
+for f, lines in added.items():
+    if not os.path.exists(f):
+        continue
+    src = open(f).read()
+    imported_members = {m.split(".")[-1] for m in re.findall(r'^import\s+([\w.]+)', src, re.M)}
+    prev = subprocess.run(["git", "show", f"HEAD:{f}"], capture_output=True, text=True).stdout
+    # Same rationale as the first check: a call already resolving somewhere
+    # in the committed file (however it got there) isn't this diff's problem.
+    already_used = set(re.findall(r'\.(\w+)\s*\(', prev))
+    for ln in lines:
+        code = re.sub(r'//.*', '', ln)
+        for name in re.findall(r'\.(\w+)\s*\(', code):
+            if name in MODIFIER_EXTENSIONS and name not in imported_members and name not in already_used:
+                print(f"{f}: .{name}(  <- Compose modifier extension not imported, not previously used")
+                bad += 1
+
 sys.exit(1 if bad else 0)
