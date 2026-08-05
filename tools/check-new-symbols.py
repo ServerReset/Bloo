@@ -32,7 +32,13 @@ for f,lines in added.items():
     # the file is worth asking about; anything else is noise that trains you to
     # ignore the check, which is worse than not having it.
     prev = subprocess.run(["git","show",f"HEAD:{f}"],capture_output=True,text=True).stdout
-    already = set(re.findall(r'(?<![\w.])([A-Z]\w+)\s*\(', prev))
+    # Same shape as the new-code pattern below (Name( or Name.member() --
+    # this was widened to catch qualified calls without widening THIS one to
+    # match, so a name used only in qualified form anywhere in the file's
+    # history (e.g. WearPhotoCache.ingest() already committed) was never
+    # recognised as "already fine" and got flagged on every later edit near
+    # it. Caught by the checker's own false positive, not by review.
+    already = set(re.findall(r'(?<![\w.])([A-Z]\w+)\s*[(.]', prev))
     # Kotlin stdlib constructors/factories that never need importing. Not an
     # exhaustive list -- just the ones common enough that flagging them trains
     # you to ignore the tool.

@@ -128,10 +128,13 @@ class WearListenerService : WearableListenerService() {
                             // the same beat rather than one publish later.
                             val vins = runCatching { WearSync.decodeExtras(raw).images.keys }
                                 .getOrDefault(emptySet())
-                            if (vins.isNotEmpty()) {
-                                WearPhotoCache.ingest(applicationContext, vins, dataMap)
-                                WearPhotoCache.prune(applicationContext, vins)
-                            }
+                            // prune runs even when vins is empty -- removing
+                            // the LAST car is the one case an isNotEmpty guard
+                            // around both calls would have skipped it
+                            // entirely, leaving that car's cached photo file
+                            // on the watch forever.
+                            if (vins.isNotEmpty()) WearPhotoCache.ingest(applicationContext, vins, dataMap)
+                            WearPhotoCache.prune(applicationContext, vins)
                         }
                         // Other paths (pebble order, local prefs, AI/aurora
                         // toggles) are published by the watch itself, not the

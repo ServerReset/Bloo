@@ -388,9 +388,14 @@ object WearBridge {
             // fail the put and take the weather and AI summaries in this same
             // item down with it.
             extras.images.forEach { (vin, path) ->
-                val asset = com.bloo.bluelink.wear.WearPhotoAssets.encode(path) ?: return@forEach
+                val asset = com.bloo.bluelink.wear.WearPhotoAssets.encode(vin, path) ?: return@forEach
                 dataMap.putAsset(WearSync.assetKeyFor(vin), asset)
             }
+            // Cars no longer in this publish (removed, or the photo cleared)
+            // drop out of the encode cache too -- otherwise the cache is
+            // unbounded by "cars this account has ever had" instead of "cars
+            // it has now".
+            com.bloo.bluelink.wear.WearPhotoAssets.prune(extras.images.keys)
         }
     }
 

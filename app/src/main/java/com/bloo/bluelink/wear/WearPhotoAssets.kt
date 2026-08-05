@@ -26,17 +26,7 @@ object WearPhotoAssets {
     private const val QUALITY = 80
 
     /**
-     * Decodes, downscales and compresses [path], or null if there is nothing
-     * usable there.
-     *
-     * Two-pass decode: the bounds-only pass reads the header to pick an integer
-     * `inSampleSize`, so the full-resolution bitmap is never allocated. A phone
-     * photo is tens of megabytes decoded, and this runs for every car on every
-     * extras publish -- decoding them at full size first would be the kind of
-     * allocation that shows up as a stutter with no obvious cause.
-     */
-    /**
-     * Cache of the last encode per path, keyed on the file's identity.
+     * Cache of the last encode per CAR, keyed on VIN rather than path.
      *
      * publishExtrasNow runs on every extras change -- a weather refresh, an AI
      * summary landing, a status poll -- and each one used to re-decode,
@@ -45,19 +35,41 @@ object WearPhotoAssets {
      * bit-identical until the user actually picks a new photo, which is
      * approximately never.
      *
-     * Keyed on path + lastModified + length rather than path alone, so
-     * replacing a photo at the same path still produces a fresh encode.
+     * Keyed on VIN, not on the path, and this is the part that matters: the
+     * photo picker (CropScreen, in the main UI file) writes every new photo to a
+     * FRESH timestamped file -- car_$vin_$timestamp.jpg -- rather than
+     * overwriting the old one. A cache keyed on path took that as a brand new
+     * key on every photo change and never dropped the old one, so the
+     * compressed bytes of every photo a car had ever had stayed reachable for
+     * the life of the process. Keying on VIN means a new photo naturally
+     * replaces the old cache entry instead of joining it. The stamp (path +
+     * lastModified + length) is still what decides whether the cached bytes
+     * are still current, so a genuinely-changed photo at the same VIN still
+     * re-encodes.
      */
-    private val cache = HashMap<String, Pair<String, Asset>>()
+    private val cache = HashMap<String, PhotoEntry>()
 
-    private fun stampFor(f: File) = "${f.lastModified()}:${f.length()}"
+    private data class PhotoEntry(val stamp: String, val asset: Asset)
 
-    fun encode(path: String): Asset? = runCatching {
+    private fun stampFor(path: String, f: File) = "$path:${f.lastModified()}:${f.length()}"
+
+    /**
+     * Decodes, downscales and compresses [vin]'s photo at [path], or null if
+     * there is nothing usable there or nothing has changed since the last
+     * call (see the cache doc above).
+     *
+     * Two-pass decode: the bounds-only pass reads the header to pick an integer
+     * `inSampleSize`, so the full-resolution bitmap is never allocated. A phone
+     * photo is tens of megabytes decoded, and this runs for every car on every
+     * extras publish -- decoding them at full size first would be the kind of
+     * allocation that shows up as a stutter with no obvious cause.
+     */
+    fun encode(vin: String, path: String): Asset? = runCatching {
         val f = File(path)
         if (!f.isFile || f.length() == 0L) return null
 
-        val stamp = stampFor(f)
-        synchronized(cache) { cache[path]?.takeIf { it.first == stamp }?.second }?.let { return it }
+        val stamp = stampFor(path, f)
+        synchronized(cache) { cache[vin]?.takeIf { it.stamp == stamp }?.asset }?.let { return it }
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)
@@ -85,8 +97,17 @@ object WearPhotoAssets {
         // Stamped AFTER the work, with the value read before it: if the file
         // changed while this was decoding, the stamp no longer matches and the
         // next call redoes it rather than caching a photo that is already
-        // stale.
-        synchronized(cache) { cache[path] = stamp to asset }
+        // stale. Storing under `vin` is what makes this a REPLACE rather than
+        // an addition -- see the class doc.
+        synchronized(cache) { cache[vin] = PhotoEntry(stamp, asset) }
         asset
     }.getOrNull()
+
+    /** Drops cached encodes for cars that are no longer paired, mirroring
+     *  [com.bloo.wear.WearPhotoCache.prune] on the watch side -- otherwise a
+     *  removed car's LAST photo stays cached (harmlessly small, but pointless)
+     *  for the life of the process. */
+    fun prune(keep: Collection<String>) {
+        synchronized(cache) { cache.keys.retainAll(keep.toSet()) }
+    }
 }
