@@ -11970,11 +11970,13 @@ private fun SearchLayer(
         // While the finger is down the position snaps (1:1 with touch); the
         // moment it lifts, the spring is back to carry the settle.
         val posSpec = if (dragging) snap<Dp>() else {
-            // Softer and slower than the size spring. Letting go of the bubble
-            // should read as the thing falling home under its own weight, not
-            // as a UI snapping a value back -- and it is the one motion here
-            // the user watches from start to finish with nothing else moving.
-            spring<Dp>(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow)
+            // Bouncier than the size spring, and deliberately so: this is what
+            // plays when the bubble snaps to an edge on release, and a snap
+            // with no overshoot reads as the value being SET, not as the
+            // bubble landing somewhere. A bit of give past the edge and back
+            // is what makes it read as physical contact -- it bounced off
+            // the edge -- rather than a UI correcting a number.
+            spring<Dp>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
         }
         // key(compact) so entering or leaving flip mode RESTARTS these
         // animations at their new target rather than animating to it. The cover
@@ -12082,15 +12084,40 @@ private fun SearchLayer(
             } else null,
             onDragStart = { dragging = true },
             onDragEnd = {
-                // Stays exactly where it was let go. A previous version of
-                // this sprang the bubble back to the corner on every release,
-                // on the theory that one out-of-the-way spot was better than
-                // wherever a drag happened to end -- but the whole reason to
-                // drag it in flip mode is to park it somewhere specific and
-                // have it STAY there, which "always snaps back" defeats
-                // outright. dragX/dragY are already rememberSaveable, so the
-                // dropped position survives rotation and process death same
-                // as before; it's just no longer erased on finger-up.
+                // Snaps to the NEAREST of the four edges, not a fixed corner
+                // and not wherever the finger happened to be. A version of
+                // this once sprang back to one specific corner on every
+                // release, which defeated the entire point of dragging it --
+                // this is the middle ground: it can be parked anywhere ALONG
+                // an edge, freely, but it never rests out in the open middle
+                // of the screen, where a floating circle covers whatever a
+                // one-inch display was showing there with nothing to be
+                // gained by it sitting exactly there rather than at the edge
+                // just past it.
+                //
+                // Only the axis PERPENDICULAR to the chosen edge moves; the
+                // position along that edge is whatever the drag ended at, so
+                // "somewhere along the left edge, a third of the way down" is
+                // a real resting place this remembers, not just the four
+                // corners.
+                if (!dragX.isNaN() && !dragY.isNaN()) {
+                    val cx = dragX.dp
+                    val cy = dragY.dp
+                    val toLeft = cx - minX
+                    val toRight = maxX - cx
+                    val toTop = cy - minY
+                    val toBottom = maxY - cy
+                    // minOf has no 4-argument overload in the stdlib -- nested
+                    // 2-argument calls, not a 4-element list, to avoid an
+                    // allocation on every drag release for four numbers.
+                    val nearest = minOf(minOf(toLeft, toRight), minOf(toTop, toBottom))
+                    when {
+                        nearest == toLeft -> dragX = minX.value
+                        nearest == toRight -> dragX = maxX.value
+                        nearest == toTop -> dragY = minY.value
+                        else -> dragY = maxY.value
+                    }
+                }
                 dragging = false
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             },
