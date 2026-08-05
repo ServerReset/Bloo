@@ -326,21 +326,18 @@ fun ChargeRing(
             // Painted rather than cleared: this is a composed indicator, not a
             // bitmap we own, so the "hole" the dot sits in is drawn in the
             // colour behind it.
-            // Both colours flip together, the same pairing the phone's bar
-            // marker uses: the HOLE takes the colour of whatever the dot is
-            // standing on, and the dot takes the opposite. Standing on the
-            // filled arc the hole is the arc's own colour, so no halo is
-            // visible and what reads is a clean dark dot punched into the
-            // green; standing on the unfilled track the hole is the
-            // background, which is what separates the dot from the track.
             //
-            // The passed case used to paint a background-coloured hole AND a
-            // muted grey dot on top of the green arc -- a dark ring around a
-            // dull mark, which is the same halo-plus-smudge the phone's
-            // version was reported for. The two surfaces draw one marker now.
-            val passed = (percent ?: 0) / 100f >= limitFrac
-            val holeColor = if (passed) animatedColor else MaterialTheme.colorScheme.background
-            val markColor = if (passed) MaterialTheme.colorScheme.background else animatedColor
+            // FIXED colours, not flipped by which side of the fill the dot is
+            // on -- see the phone's ChargeLimitDot for the full reasoning.
+            // This used to flip the hole to the ring's own colour once the
+            // charge passed the limit, which made the halo disappear
+            // entirely (hole == ring == no visible edge) right at the state
+            // this gauge is in most often: a car charged to its own limit.
+            // The hole is always `background`, cutting a window in the ring
+            // regardless of what colour that ring currently is; the mark is
+            // always `onSurface`, which is guaranteed to contrast against it.
+            val holeColor = MaterialTheme.colorScheme.background
+            val markColor = MaterialTheme.colorScheme.onSurface
             Canvas(Modifier.size(size)) {
                 val stroke = 5.dp.toPx()
                 val radius = (this.size.minDimension - stroke) / 2f

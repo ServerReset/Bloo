@@ -5505,7 +5505,6 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?) {
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .offset(x = x - half),
-                onFill = l <= filledFrac,
             )
         }
     }
@@ -5525,39 +5524,35 @@ private val ChargeLimitDotSize = 14.dp
  * without the reader having to work out which is which. A marker sits on top
  * and says "here", which is all a limit needs to say.
  *
- * [onFill] flips BOTH of its colours, and that pairing is the whole trick. The
- * ring takes the colour of whatever the marker is standing on -- green on the
- * fill, the card's surface on the track -- and the core takes the opposite. So
- * the ring never reads as a halo; it reads as nothing at all, and what's left
- * is a clean dot in the one colour the bar isn't using at that point.
+ * FIXED colours, on purpose, not swapped by which side of the fill the dot
+ * lands on. Two versions of this tried flipping the ring and core between the
+ * fill colour and the surface colour depending on position -- first ring
+ * always `surface`, then ring/core swapped by side -- and both had the same
+ * failure mode once the charge reached the limit: whichever pairing was
+ * "correct" for the fill side made the ring and core the SAME colour, so the
+ * marker rendered as either a solid disc or a same-coloured hole punched
+ * through the green, at exactly the state this bar is in most often (a car
+ * charged to its own limit). A marker that changes what it looks like
+ * depending on where it's standing is also just harder to recognise at a
+ * glance than one that doesn't.
  *
- * The previous version painted the ring `surface` unconditionally, which is
- * correct on the grey track and wrong on the fill: once the charge reached the
- * limit the core went `surface` too, ring and core became one colour, and the
- * marker rendered as a solid dark disc punched through the green. Reported
- * from a real device, at the single most ordinary state this bar has -- a car
- * set to 80% and charged to 80%.
+ * The halo is the card's own surface colour, so it reads as a small window
+ * cut into the bar -- visibly different from BOTH the green fill and the grey
+ * track, whatever it's sitting on. The core is `onSurface`, which Material's
+ * own colour system guarantees contrasts against `surface`. Neither depends
+ * on the bar's state, so the dot looks like one thing everywhere on the bar.
  */
 @Composable
-private fun ChargeLimitDot(modifier: Modifier = Modifier, onFill: Boolean) {
+private fun ChargeLimitDot(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val spec = spring<Color>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)
-    val ring by androidx.compose.animation.animateColorAsState(
-        if (onFill) ChargeGreen else scheme.surface,
-        spec, label = "limitDotRing",
-    )
-    val core by androidx.compose.animation.animateColorAsState(
-        if (onFill) scheme.surface else ChargeGreen,
-        spec, label = "limitDotCore",
-    )
     Box(
         modifier
             .size(ChargeLimitDotSize)
             .clip(CircleShape)
-            .background(ring)
+            .background(scheme.surface)
             .padding(3.dp)
             .clip(CircleShape)
-            .background(core),
+            .background(scheme.onSurface),
     )
 }
 
@@ -11938,8 +11933,18 @@ private fun SearchLayer(
         val maxY = (maxHeight - bubble - edge - bottomInset).coerceAtLeast(edge)
         val restX = maxX
         val restY = maxY
-        val bubbleX = if (dragX.isNaN()) restX else dragX.dp.coerceIn(minX, maxX)
-        val bubbleY = if (dragY.isNaN()) restY else dragY.dp.coerceIn(minY, maxY)
+        // dragX/dragY are ONLY consulted in compact (flip) mode. They are one
+        // shared pair of saved floats -- dragging is only possible in flip
+        // mode, but before this gate the normal-mode bubble read the exact
+        // same state, so once the flip bubble had ever been moved, switching
+        // to the normal phone screen showed it wherever flip mode had left it
+        // instead of the fixed bottom-right corner. Normal mode now always
+        // rests at restX/restY, full stop -- what dragX/dragY hold is purely
+        // flip mode's memory, and normal mode has no memory of its own by
+        // design (there's nowhere on that screen to remember: one fixed spot
+        // is the whole point).
+        val bubbleX = if (compact && !dragX.isNaN()) dragX.dp.coerceIn(minX, maxX) else restX
+        val bubbleY = if (compact && !dragY.isNaN()) dragY.dp.coerceIn(minY, maxY) else restY
 
         val targetW = when (form) {
             SearchForm.BAR -> barW
@@ -12077,28 +12082,22 @@ private fun SearchLayer(
             } else null,
             onDragStart = { dragging = true },
             onDragEnd = {
+                // Stays exactly where it was let go. A previous version of
+                // this sprang the bubble back to the corner on every release,
+                // on the theory that one out-of-the-way spot was better than
+                // wherever a drag happened to end -- but the whole reason to
+                // drag it in flip mode is to park it somewhere specific and
+                // have it STAY there, which "always snaps back" defeats
+                // outright. dragX/dragY are already rememberSaveable, so the
+                // dropped position survives rotation and process death same
+                // as before; it's just no longer erased on finger-up.
                 dragging = false
-                // Home, not "wherever you let go", and not the nearer wall
-                // either. On a cover screen there is exactly one corner that is
-                // out of the way of everything -- bottom-right, furthest from
-                // the clock and the camera -- so the drag is for holding the
-                // button aside to read what is under it, and the release puts
-                // it back. NaN is the resting position, so clearing these two
-                // IS the animation: the position spring is live again the
-                // moment `dragging` goes false and carries it home.
-                dragX = Float.NaN
-                dragY = Float.NaN
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             },
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
         )
     }
 }
-
-/** The glow's resting brightness, and how long it takes to get there. Rest is
- *  not zero: the pill should still look lit, just not animated. */
-private const val GLOW_REST = 0.34f
-private const val GLOW_SETTLE_MS = 900
 
 /**
  * The pill itself: one Surface at whatever [width]/[height] [SearchLayer] has
@@ -12146,80 +12145,8 @@ private fun SearchPill(
             keyboard?.hide()
         }
     }
-    // The glow is a moving light, not a light that brightens: a hotspot
-    // travels around the pill's rim while the whole halo breathes. One clock
-    // drives both, ticked at ~30fps -- fast enough that travel reads as
-    // motion rather than stepping, and still a third of the frames a
-    // full-rate animation would ask for on something that is on screen the
-    // whole time the app is.
-    //
-    // Held as State and read ONLY inside drawBehind, so a tick invalidates the
-    // DRAW phase and never recomposes this composable or the text field in it.
-    val glowPhase = remember { mutableFloatStateOf(0f) }
-    val glowPulse = remember { mutableFloatStateOf(GLOW_REST) }
-    val haloColor = scheme.primary
-    // A second hue, mixed in on the far side of the sweep, so the light has
-    // colour depth instead of being one flat tint at two brightnesses.
-    val haloColor2 = scheme.tertiary
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    // Bumped to wake the light up again. The glow does NOT run forever: a
-    // permanent travelling hotspot on a permanent fixture of the screen is
-    // something you end up looking past at best and away from at worst, and
-    // it was reported as distracting. It now runs while the search is being
-    // used or has just changed, then settles to a still, dim halo and stops
-    // ticking entirely -- no more draw invalidations until something wakes
-    // it. Touching it, opening it, or its shape changing all count.
-    var wake by remember { mutableIntStateOf(0) }
-    LaunchedEffect(pressed) { if (pressed) wake++ }
-    // True once the light has finished settling: the pill has had its moment
-    // and should now get out of the way. Drives the resting look below.
-    var idle by remember { mutableStateOf(false) }
-    LaunchedEffect(expanded, form, wake) {
-        idle = false
-        // Sweeps faster and breathes harder while open: the bar is the thing
-        // being used at that point, and the motion says so.
-        val sweepMs = if (expanded) 2600f else 5200f
-        val breatheMs = if (expanded) 1100f else 2200f
-        // Open, it stays alive as long as it's open -- you are looking at it
-        // on purpose. Closed, it has a few seconds to catch the eye and then
-        // gets out of the way.
-        val liveMs = if (expanded) Float.MAX_VALUE else 5000f
-        // Driven by withFrameNanos rather than delay(33). A wall-clock timer
-        // has no idea when the next frame is, so its ticks land wherever they
-        // fall relative to the display -- some frames get two updates and some
-        // get none, which is visible on a slow sweep as uneven travel. Frame
-        // callbacks tick exactly once per frame, cost nothing when the screen
-        // is not drawing, and stop dead when the composition leaves.
-        var t0 = 0L
-        var elapsed = 0f
-        while (elapsed < liveMs) {
-            withFrameNanos { now ->
-                if (t0 == 0L) t0 = now
-                elapsed = (now - t0) / 1_000_000f
-                glowPhase.floatValue = (elapsed % sweepMs) / sweepMs
-                glowPulse.floatValue = GLOW_REST + (1f - GLOW_REST) * triangleWave(elapsed.toLong(), breatheMs.toLong())
-            }
-        }
-        // Ease down to rest rather than cutting: a light that stops mid-breath
-        // is a glitch, a light that dims to still is a decision.
-        val from = glowPulse.floatValue
-        var s0 = 0L
-        var done = false
-        while (!done) {
-            withFrameNanos { now ->
-                if (s0 == 0L) s0 = now
-                val k = ((now - s0) / 1_000_000f / GLOW_SETTLE_MS).coerceIn(0f, 1f)
-                glowPulse.floatValue = from + (GLOW_REST - from) * k
-                if (k >= 1f) done = true
-            }
-        }
-        idle = true
-    }
-    // The resting state: once the light has settled the pill fades back and
-    // shrinks a little, so a permanent fixture of the screen stops competing
-    // with the content it floats over. Never while open -- and never so far
-    // that it becomes hard to find, which is why this dims rather than hides.
     // Springs in on first appearance -- and because SearchLayer keys the
     // animations on the layout mode, "first appearance" includes arriving on
     // the cover screen. The ball lands in its corner rather than sliding to it.
@@ -12230,109 +12157,26 @@ private fun SearchPill(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "searchEntrance",
     )
-    val resting = idle && !expanded
-    val restAlpha by animateFloatAsState(
-        targetValue = if (resting) 0.5f else 1f,
-        animationSpec = tween(durationMillis = 520, easing = LinearOutSlowInEasing),
-        label = "searchRestAlpha",
-    )
-    val restScale by animateFloatAsState(
-        targetValue = if (resting) 0.9f else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
-        label = "searchRestScale",
-    )
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "searchPress",
     )
+    // No ambient glow. This used to carry a travelling-hotspot bloom that
+    // swept the pill's rim and breathed continuously the entire time the
+    // search element was on screen, plus a separate fade-and-shrink once it
+    // went idle. Reported as bad-looking and distracting, and it earned
+    // that: a permanent light show on a control that is visible almost all
+    // the time competes with everything the user is actually looking at. The
+    // pill's affordance is now just its filled shape and border below --
+    // legible without needing to move to prove it's there.
     Box(
         modifier.size(width, height).graphicsLayer {
-            val k = pressScale * restScale * entrance
+            val k = pressScale * entrance
             scaleX = k
             scaleY = k
-            alpha = restAlpha
         },
     ) {
-        // Two radial gradients painted behind the pill -- a wide bloom and a
-        // tighter core, so the light has depth. These were Modifier.blur boxes
-        // once: two offscreen render targets and two blur shaders re-run every
-        // frame, for a permanent fixture of the screen. A blurred solid pill IS
-        // a radial falloff, so painting the falloff directly gets the same
-        // picture for one gradient fill each.
-        // The bloom is for the BUBBLE and for the open bar -- a floating circle
-        // over content needs to announce itself, and an open text field is the
-        // thing you are using. A collapsed pill sitting in a settings screen is
-        // neither: it is a button in a list of buttons, and a soft halo behind
-        // it just reads as a smudged rectangle around a control. Reported from
-        // a screenshot, and it looked exactly like that.
-        if (expanded || form == SearchForm.BUBBLE) Box(
-            Modifier.matchParentSize().drawBehind {
-                val pulse = glowPulse.floatValue
-                val phase = glowPhase.floatValue
-                val cx = size.width / 2f
-                val cy = size.height / 2f
-                // The ambient bloom: the whole shape lit from within, breathing.
-                val bloom = maxOf(size.width, size.height) * 0.7f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            haloColor.copy(alpha = (if (expanded) 0.34f else 0.20f) * pulse),
-                            Color.Transparent,
-                        ),
-                        center = Offset(cx, cy),
-                        radius = bloom,
-                    ),
-                    radius = bloom,
-                    center = Offset(cx, cy),
-                )
-                // The travelling hotspot. It runs the PERIMETER of the pill --
-                // a straight run along each long edge and a turn at each end --
-                // rather than a circle, so on the wide bar it reads as light
-                // moving along the shape instead of orbiting somewhere behind
-                // its middle. Two of them, half a lap apart and in different
-                // hues, so there is always one in view on a wide bar and the
-                // colour shifts as they pass.
-                val rr = size.height / 2f
-                fun pointAt(t: Float): Offset {
-                    val runX = (size.width - size.height).coerceAtLeast(0f)
-                    val perim = 2f * runX + 2f * PI.toFloat() * rr
-                    var d = ((t % 1f) + 1f) % 1f * perim
-                    // Top edge, left to right.
-                    if (d < runX) return Offset(rr + d, cy - rr)
-                    d -= runX
-                    // Right cap.
-                    val capLen = PI.toFloat() * rr
-                    if (d < capLen) {
-                        val a = -PI.toFloat() / 2f + (d / capLen) * PI.toFloat()
-                        return Offset(size.width - rr + cos(a) * rr, cy + sin(a) * rr)
-                    }
-                    d -= capLen
-                    // Bottom edge, right to left.
-                    if (d < runX) return Offset(size.width - rr - d, cy + rr)
-                    d -= runX
-                    // Left cap.
-                    val a = PI.toFloat() / 2f + (d / capLen) * PI.toFloat()
-                    return Offset(rr + cos(a) * rr, cy + sin(a) * rr)
-                }
-                val hot = maxOf(size.height * 0.9f, 18f)
-                listOf(phase to haloColor, (phase + 0.5f) to haloColor2).forEach { (t, c) ->
-                    val p = pointAt(t)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                c.copy(alpha = (if (expanded) 0.55f else 0.4f) * pulse),
-                                Color.Transparent,
-                            ),
-                            center = p,
-                            radius = hot,
-                        ),
-                        radius = hot,
-                        center = p,
-                    )
-                }
-            },
-        )
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
             shape = RoundedCornerShape(50),

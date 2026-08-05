@@ -1929,9 +1929,17 @@ class CarWidget : GlanceAppWidget() {
                 Row(modifier = GlanceModifier.width(width).height(height)) {
                     Spacer(GlanceModifier.width(x))
                     Box(
-                        // theme.background, not surface -- WidgetTheme has no
-                        // `surface`; the widget's own backdrop is what the dot
-                        // has to sit against here.
+                        // FIXED colours, not swapped by which side of the fill
+                        // this lands on -- see the phone's ChargeLimitDot for
+                        // the full reasoning. Flipping the core between
+                        // theme.background and fillColor made the marker a
+                        // same-coloured hole once the charge reached the
+                        // limit (background halo + background core), which is
+                        // exactly the state this bar is in most of the time.
+                        // theme.background (not surface -- WidgetTheme has no
+                        // `surface`) cuts a visible window in the bar
+                        // regardless of what's under it; onSurface inside
+                        // that window is guaranteed to contrast against it.
                         modifier = GlanceModifier.size(dot)
                             .cornerRadius(dot / 2)
                             .background(theme.background),
@@ -1940,10 +1948,7 @@ class CarWidget : GlanceAppWidget() {
                         Box(
                             modifier = GlanceModifier.size(core)
                                 .cornerRadius(core / 2)
-                                // Legible on either side of the split: dark on
-                                // the green once the charge has passed it,
-                                // green on the grey track while it hasn't.
-                                .background(if (l <= frac) theme.background else fillColor),
+                                .background(theme.onSurface),
                         ) {}
                     }
                 }

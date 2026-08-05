@@ -342,7 +342,22 @@ object CarAlerts {
  * fallback is a requirement rather than a hedge.
  */
 object ChargingLive {
-    private const val CHANNEL = "bloo_charging"
+    // Bumped from "bloo_charging" to "bloo_charging_v2". Channel PROPERTIES
+    // are immutable from the app's side once created -- ensureChannel below
+    // only ever calls createNotificationChannel when no channel with this id
+    // exists yet, and Android does not let an app change an existing
+    // channel's importance afterwards, only the user can, in system
+    // settings. This channel has existed under the old id since the very
+    // first version of this feature, through many rebuilds in one long
+    // session; if it was ever created at the wrong importance by an earlier
+    // iteration, or the user silenced/downgraded it while testing any of
+    // those iterations, every later fix to the CODE would have been talking
+    // to a channel the system had already locked in. A fresh id guarantees
+    // today's code is what actually creates it, with nothing earlier able to
+    // have left it in a state this file can't detect or repair. If this was
+    // never actually the problem, the new id costs nothing -- it just means
+    // charging notifications land on a differently-named channel from here on.
+    private const val CHANNEL = "bloo_charging_v2"
     private const val ACCENT = 0xFF7B83EB.toInt()
     /** Filled portion of the Live Update bar: the same green the app and
      *  widget already use for charging, so the chip matches the car card. */
@@ -548,18 +563,32 @@ object ChargingLive {
      * door rather than to keep guessing at the builder.
      */
     fun openLiveUpdateSettings(context: Context) {
-        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        // The CHANNEL's own settings page, not the app's general notification
+        // list. The "Charging" channel is one row among however many this app
+        // has, and a Live Updates toggle (where the OS exposes one) lives on
+        // the CHANNEL's page, not the app's -- landing the user on the app's
+        // whole list makes them go find and tap the right row themselves.
+        // Falls back to the app-level page (previous behaviour) if the
+        // channel-specific action isn't available, and from there to bare
+        // app-details, same as before.
+        val channelIntent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, CHANNEL)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val appIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(intent) }.onFailure {
-            runCatching {
-                context.startActivity(
-                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                        .setData(Uri.fromParts("package", context.packageName, null))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+        runCatching { context.startActivity(channelIntent) }
+            .recoverCatching { context.startActivity(appIntent) }
+            .onFailure {
+                runCatching {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.fromParts("package", context.packageName, null))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
             }
-        }
     }
 
     /** Clears every car's charging notification -- used when the feature is
