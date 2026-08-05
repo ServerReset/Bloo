@@ -141,6 +141,14 @@ enum class WidgetAction(
     CHARGE("charge", "Charge", com.bloo.bluelink.data.WearAction.TOGGLE_CHARGE, Kind.TOGGLE),
     FLASH("flash", "Flash", com.bloo.bluelink.data.WearAction.FLASH_LIGHTS, Kind.MOMENTARY),
     HORN("horn", "Horn", com.bloo.bluelink.data.WearAction.HORN_AND_LIGHTS, Kind.MOMENTARY),
+    // Appended rather than slotted beside LOCK: WidgetConfig.actions is a
+    // saved ordinal-sorted list (see WidgetConfigActivity's own save
+    // comment), so inserting mid-enum would reshuffle an existing widget's
+    // button order. The explicit verb LOCK's own toggle already reaches --
+    // this is for someone who wants Unlock as its own always-there button
+    // rather than relying on Lock's toggle to land on the right state, the
+    // same distinction the app's own quick actions make.
+    UNLOCK("unlock", "Unlock", com.bloo.bluelink.data.WearAction.UNLOCK, Kind.TOGGLE),
     REFRESH("refresh", "Refresh", null, Kind.REFRESH),
     OPEN("open", "Open app", null, Kind.NAV);
 

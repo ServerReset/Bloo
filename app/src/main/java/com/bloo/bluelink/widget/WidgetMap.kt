@@ -41,7 +41,12 @@ import kotlin.math.tan
  */
 object WidgetMap {
 
-    private const val ZOOM = 15
+    // Was 15 -- street level, close enough that the one-tile window around
+    // the car showed a single road fragment with no surrounding context (a
+    // house number's worth of street, not a neighbourhood). 13 covers
+    // roughly 4x the ground per tile at the same pixel size, reading as
+    // "which part of town" rather than "which specific driveway".
+    private const val ZOOM = 13
     private const val TILE_PX = 256
     // OSM's usage policy requires an identifying User-Agent; a default/missing one
     // gets a "blocked" tile back. Mirrors WearImage's fix.

@@ -412,10 +412,12 @@ class CarWidget : GlanceAppWidget() {
         // text and buttons out as if a third of the row were missing.
         val slice = ((size.width - (if (showsRing) ringEdge + 8.dp else 0.dp) - 8.dp) / 2)
             .coerceAtLeast(24.dp)
-        // A banner is almost pure width, so a ring bounded by its ~78dp height
-        // is a token. Below RING_WORTH_IT the bar treatment takes over and
-        // spends the axis this tile actually has.
-        val useBar = showsRing && ringEdge < Scale.RING_WORTH_IT
+        // A banner is almost pure width, the shape a bar was built for -- it
+        // reads its value from across a room in a fraction of the height a
+        // ring needs. Always preferred here now, not just as a fallback
+        // below RING_WORTH_IT: the circle is for compact/vertical tiles,
+        // this tile is neither.
+        val useBar = showsRing
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             if (showsRing && !useBar) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -528,7 +530,14 @@ class CarWidget : GlanceAppWidget() {
         // makes: a few dp of unused room costs nothing, spilling past the
         // tile does.
         val heroRoom = (budget - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
-        val hasMap = render.mapBitmap != null
+        // Never on RAIL: a location map needs real width to read as a place
+        // rather than a random street fragment, and RAIL's whole point is
+        // being under 110dp wide. Reported from a real device -- the map
+        // filled almost the entire tile with an unreadable, zoomed-in sliver
+        // of road while the ring shrank to a badge and the buttons to a
+        // sliver of their own. That width the map would have claimed goes
+        // to the ring instead, same as when the user has location off.
+        val hasMap = false
         // capRows = 0: Rail shows no text, so tallSplit's row budget is
         // unused and the ring gets everything the map reserve didn't claim.
         val split = Scale.tallSplit(size, heroRoom, capRows = 0, textScale = render.theme.textScale, wantMap = hasMap)
@@ -700,9 +709,10 @@ class CarWidget : GlanceAppWidget() {
         // text and buttons out as if a third of the row were missing.
         val slice = ((size.width - (if (showsRing) ringEdge + 10.dp else 0.dp) - 8.dp) / 2)
             .coerceAtLeast(24.dp)
-        // Same call as BANNER: a wide-and-short tile bounds the ring by its
-        // short side, so past a point the bar says more in less height.
-        val useBar = showsRing && ringEdge < Scale.RING_WORTH_IT
+        // Same call as BANNER now: this tile is wide, not compact/vertical,
+        // so the bar is preferred outright rather than only as a fallback
+        // once the ring shrinks below RING_WORTH_IT.
+        val useBar = showsRing
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             if (showsRing && !useBar) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -775,7 +785,12 @@ class CarWidget : GlanceAppWidget() {
         } else {
             0.dp
         }
-        val hasMap = render.mapBitmap != null
+        // Never on this tier either -- same reasoning as RailLayout's own
+        // hasMap: under 150dp wide, a location map reads as an unreadable
+        // zoomed-in street fragment rather than a place, and the width it
+        // would have claimed is worth more spent on the ring/name/buttons
+        // that already fit this tile.
+        val hasMap = false
         val heroRoom = (budget - nameHeight - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
         val split = Scale.tallSplit(size, heroRoom, capRows = 1, textScale = render.theme.textScale, wantMap = hasMap)
         // The width cap that already existed here, kept: it's what keeps the
@@ -844,7 +859,10 @@ class CarWidget : GlanceAppWidget() {
         // several side by side, so width (via ActionButtons' own rowCapacity)
         // decides the count, not a vertical reservation per button.
         val buttonZone = Scale.buttonHeight(size) + 12.dp
-        val hasMap = render.mapBitmap != null
+        // Never on this tier -- still under 150dp wide (COMPACT_TALL's own
+        // gate only proves the HEIGHT is roomy), same reasoning as RailLayout
+        // and CompactTallNarrowLayout's own hasMap.
+        val hasMap = false
         val heroRoom = (budget - nameHeight - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
         val split = Scale.tallSplit(size, heroRoom, capRows = 4, textScale = render.theme.textScale, wantMap = hasMap)
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -913,7 +931,6 @@ class CarWidget : GlanceAppWidget() {
         // ring -- RingWithContent falls back to stacking if that width
         // doesn't actually pan out.
         val size = LocalSize.current
-        val ringEdge = Scale.ringWide(size, Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 12.dp))
         // Every child is handed the width this column actually gets, so the
         // header's name, the info rows, and the button row all judge their
         // own fit against the real space beside the ring rather than the
@@ -926,13 +943,12 @@ class CarWidget : GlanceAppWidget() {
             ActionButtons(car, render, max = 4, availableWidth = w)
         }
         val showsRing = render.config.showRing && car.percent != null
-        // A wide MEDIUM whose height has been spent on the header and buttons
-        // leaves a ring that is a token rather than a gauge. Rather than draw
-        // it small beside the column, spend the axis this tile has: the bar
-        // runs the full width under the header, and the column gets the whole
-        // tile instead of what was left beside a circle. Same call BANNER and
-        // COMPACT_WIDE make, one band up.
-        if (showsRing && ringEdge < Scale.RING_WORTH_IT) {
+        // A wide tile spends its axis better on a bar than a circle: it runs
+        // the full width under the header, and the column gets the whole
+        // tile instead of what was left beside a circle. Always preferred
+        // now, not just as a fallback once the ring shrinks below
+        // RING_WORTH_IT -- same call BANNER and COMPACT_WIDE make.
+        if (showsRing) {
             val w = size.width - Scale.contentPadding(size) * 2
             val barH = Scale.barHeight(size)
             // What the header, buttons and this layout's own spacers left,
@@ -963,17 +979,10 @@ class CarWidget : GlanceAppWidget() {
             }
             return
         }
-        if (showsRing) {
-            RingWithContent(
-                modifier = GlanceModifier.fillMaxSize(),
-                minRowWidth = 170.dp,
-                ringWidth = ringEdge,
-                ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
-                content = content,
-            )
-        } else {
-            Column(modifier = GlanceModifier.fillMaxSize()) { content(size.width) }
-        }
+        // No ring to show at all (off, or no percent yet): the column gets
+        // the whole tile, same shape as the bar branch above without a
+        // gauge of any kind.
+        Column(modifier = GlanceModifier.fillMaxSize()) { content(size.width) }
     }
 
     @Composable
@@ -1020,18 +1029,15 @@ class CarWidget : GlanceAppWidget() {
 
     @Composable
     private fun LargeWideLayout(car: VehicleSnapshot, render: Render) {
-        // The ring's row shares this Column with the header/buttons/footer via
-        // defaultWeight(), so at LARGE's own minimum height (170dp) the ring's
-        // continuous target can be taller than what's actually left over once
-        // those siblings claim their space -- unlike a plain size(), a
-        // weighted row doesn't shrink the fixed-size Image inside it, it just
-        // clips it. Capping by the tile's own measured height keeps the ring
-        // proportioned at every size in between instead of only being safe at
-        // the tier's two ends.
+        // A wide tile spends its axis better on a bar than a circle -- see
+        // XlWideLayout's own note. Bounded to a share of the tile's width
+        // rather than the ring's old height-driven curve, so the hero
+        // column stops eating room a wide LARGE tile doesn't need to spend
+        // on it vertically.
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)
-        val ringEdge = Scale.ringWide(size, ringRoom)
-        // The map sits INSIDE the info column here, beside the ring rather
+        val heroWidth = Scale.ringWide(size, ringRoom)
+        // The map sits INSIDE the info column here, beside the hero rather
         // than below it, so what it has to fit in is the row's height less
         // the rows already stacked above it -- not the whole column.
         val rows = Scale.infoCap(size, 4, render.theme.textScale)
@@ -1039,20 +1045,29 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
-            ChargeBarFallback(car, render, ringEdge, ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 220.dp,
-                ringWidth = ringEdge,
+                ringWidth = heroWidth,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
-                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            FitText(
+                                "${car.percent}%", titleStyle(render.theme),
+                                maxWidth = heroWidth, horizontalAlignment = Alignment.CenterHorizontally,
+                            )
+                            Spacer(GlanceModifier.height(6.dp))
+                            ChargeBar(car, render.theme, width = heroWidth, height = Scale.barHeight(size))
+                        }
                     } else {
-                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+                        StatusGlyph(car, render.theme, sizeDp = Scale.ring(size, heroWidth).value.toInt())
                     }
                 },
                 content = { w ->
-                    InfoStack(car, render, max = rows, availableWidth = w, footerShown = true)
+                    InfoStack(
+                        car, render, max = rows, availableWidth = w, footerShown = true,
+                        hideFields = setOf(WidgetInfoField.PERCENT),
+                    )
                     MapModule(render, mapRoom)
                 },
             )
@@ -1140,35 +1155,42 @@ class CarWidget : GlanceAppWidget() {
         // Same reasoning as LargeWideLayout's own ringEdge clamp.
         val size = LocalSize.current
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp)
-        val ringEdge = Scale.ringWide(size, ringRoom)
+        // A wide tile spends its axis better on a bar than a circle -- a
+        // bar reads its value from across a room in a fraction of the
+        // height a ring needs, and this tier has width to spare. Bounded to
+        // a share of the tile's width, same reasoning as [Scale.ringWide].
+        val heroWidth = Scale.ringWide(size, ringRoom)
         // Same as LargeWideLayout: the map is stacked under the info rows
-        // inside the column beside the ring, so its room is what those rows
+        // inside the column beside the hero, so its room is what those rows
         // leave of the row's own height.
         val rows = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale)
         val mapRoom = (ringRoom - Scale.infoBlockHeight(size, rows, render.theme.textScale)).coerceAtLeast(0.dp)
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
-            ChargeBarFallback(car, render, ringEdge, ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
                 minRowWidth = 260.dp,
-                ringWidth = ringEdge,
+                ringWidth = heroWidth,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
-                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            FitText(
+                                "${car.percent}%", titleStyle(render.theme),
+                                maxWidth = heroWidth, horizontalAlignment = Alignment.CenterHorizontally,
+                            )
+                            Spacer(GlanceModifier.height(6.dp))
+                            ChargeBar(car, render.theme, width = heroWidth, height = Scale.barHeight(size))
+                        }
                     } else {
-                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
+                        StatusGlyph(car, render.theme, sizeDp = Scale.ring(size, heroWidth).value.toInt())
                     }
-                    Spacer(GlanceModifier.height(8.dp))
-                    // Bounded by the ring, not by a fraction of the tile:
-                    // this column is only as wide as its widest child, so a
-                    // long value here would otherwise widen the ring slot
-                    // and steal width from the info column beside it.
-                    FitText(primaryValue(car, render), titleStyle(render.theme), maxWidth = ringEdge, horizontalAlignment = Alignment.CenterHorizontally)
                 },
                 content = { w ->
-                    InfoStack(car, render, max = rows, availableWidth = w, footerShown = true, hidePrimary = true)
+                    InfoStack(
+                        car, render, max = rows, availableWidth = w, footerShown = true,
+                        hideFields = setOf(WidgetInfoField.PERCENT),
+                    )
                     MapModule(render, mapRoom)
                 },
             )
@@ -1209,7 +1231,10 @@ class CarWidget : GlanceAppWidget() {
                 maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
             )
             Spacer(GlanceModifier.height(14.dp))
-            InfoStack(car, render, max = split.rows, footerShown = true, hidePrimary = true)
+            InfoStack(
+                car, render, max = split.rows, footerShown = true,
+                hideFields = setOf(WidgetInfoField.RANGE, WidgetInfoField.PERCENT),
+            )
             MapFill(render, split.map)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
             FooterRow(car, render)
@@ -1443,17 +1468,18 @@ class CarWidget : GlanceAppWidget() {
         // on one widget -- once as an info row, once as the footer directly
         // beneath the buttons. Reported from a real device.
         footerShown: Boolean = false,
-        // True on XlWideLayout/XlTallLayout, which already draw a headline
-        // "69% · 361 mi" via primaryValue() right beside/above the ring --
-        // without this, a user with Percent or Range in their chosen info
+        // Non-empty on tiers whose hero already shows one or both of these
+        // numbers itself -- XlTallLayout's primaryValue() headline reads
+        // "69% · 361 mi" (both), the wide tiers' bar hero shows just "69%".
+        // Without this, a user with Percent or Range in their chosen info
         // fields saw that exact number a second time, right below the
         // first, on the same tile. Reported from a real device screenshot.
-        hidePrimary: Boolean = false,
+        hideFields: Set<WidgetInfoField> = emptySet(),
     ) {
         val fields = render.config.infoFields
             .mapNotNull { WidgetInfoField.fromKey(it) }
             .filterNot { footerShown && it == WidgetInfoField.UPDATED }
-            .filterNot { hidePrimary && (it == WidgetInfoField.RANGE || it == WidgetInfoField.PERCENT) }
+            .filterNot { it in hideFields }
             .take(max)
         val narrow = availableWidth < NARROW_WIDTH
         // Two columns once the slot is wide enough for both halves to still
@@ -1494,13 +1520,13 @@ class CarWidget : GlanceAppWidget() {
                 val value = infoValue(field, car, render) ?: return@forEach
                 if (narrow) {
                     Column(modifier = GlanceModifier.fillMaxWidth()) {
-                        FitText(field.label, subtitleStyle(render.theme), maxWidth = availableWidth - 4.dp)
+                        FitText(fieldLabel(field, car), subtitleStyle(render.theme), maxWidth = availableWidth - 4.dp)
                         FitText(value, valueStyle(render.theme), maxWidth = availableWidth - 4.dp)
                     }
                 } else {
                     Row(modifier = GlanceModifier.fillMaxWidth()) {
                         FitText(
-                            field.label, subtitleStyle(render.theme),
+                            fieldLabel(field, car), subtitleStyle(render.theme),
                             maxWidth = availableWidth * 0.5f, modifier = GlanceModifier.defaultWeight(),
                         )
                         FitText(value, valueStyle(render.theme), maxWidth = availableWidth * 0.45f)
@@ -1519,13 +1545,13 @@ class CarWidget : GlanceAppWidget() {
         val value = infoValue(field, car, render) ?: return
         if (width < NARROW_WIDTH) {
             Column(modifier = GlanceModifier.fillMaxWidth()) {
-                FitText(field.label, subtitleStyle(render.theme), maxWidth = width - 4.dp)
+                FitText(fieldLabel(field, car), subtitleStyle(render.theme), maxWidth = width - 4.dp)
                 FitText(value, valueStyle(render.theme), maxWidth = width - 4.dp)
             }
         } else {
             Row(modifier = GlanceModifier.fillMaxWidth()) {
                 FitText(
-                    field.label, subtitleStyle(render.theme),
+                    fieldLabel(field, car), subtitleStyle(render.theme),
                     maxWidth = width * 0.5f, modifier = GlanceModifier.defaultWeight(),
                 )
                 FitText(value, valueStyle(render.theme), maxWidth = width * 0.45f)
@@ -1929,6 +1955,10 @@ class CarWidget : GlanceAppWidget() {
         // the app), teal while climate is running, green while charging.
         val bg = when {
             action == WidgetAction.LOCK && car.locked == false -> theme.unlocked
+            // Same red cue as LOCK's own swap -- Unlock is the same state,
+            // just reached from its own dedicated button instead of Lock's
+            // toggle landing on it.
+            action == WidgetAction.UNLOCK && car.locked == false -> theme.unlocked
             action == WidgetAction.CLIMATE && car.climateOn == true -> theme.climate
             action == WidgetAction.CHARGE && car.charging == true -> theme.charge
             else -> theme.accentProvider
@@ -2302,6 +2332,13 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
+    /** [field]'s label, adjusted for the car it's actually describing --
+     *  [WidgetInfoField.PERCENT]'s stored label is "Battery", which is wrong
+     *  for a gas or hybrid car with no chargeable pack: that same percent
+     *  number is its FUEL level. Every other field's label is car-agnostic. */
+    private fun fieldLabel(field: WidgetInfoField, car: VehicleSnapshot): String =
+        if (field == WidgetInfoField.PERCENT && !car.hasBattery) "Fuel" else field.label
+
     private fun infoValue(field: WidgetInfoField, car: VehicleSnapshot, render: Render): String? = when (field) {
         WidgetInfoField.RANGE -> car.rangeMi?.let { formatDistance(it.toDouble(), render.metric) }
         WidgetInfoField.PERCENT -> car.percent?.let { "$it%" }
@@ -2331,6 +2368,7 @@ class CarWidget : GlanceAppWidget() {
 
     private fun iconFor(action: WidgetAction): Int = when (action) {
         WidgetAction.LOCK -> R.drawable.ic_shortcut_lock
+        WidgetAction.UNLOCK -> R.drawable.ic_shortcut_unlock
         WidgetAction.CLIMATE -> R.drawable.ic_shortcut_climate
         WidgetAction.CHARGE -> R.drawable.ic_widget_charge
         WidgetAction.FLASH -> R.drawable.ic_widget_flash

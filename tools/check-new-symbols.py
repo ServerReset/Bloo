@@ -26,6 +26,14 @@ for f,lines in added.items():
     imported={m.split(".")[-1] for m in re.findall(r'^import\s+([\w.]+)', src, re.M)}
     declared=set(re.findall(r'\b(?:class|object|interface|enum class|fun)\s+([A-Z]\w*)', src))
     declared|=set(re.findall(r'\bval\s+([A-Z]\w*)', src))
+    # Enum constants: `NAME(args...)` at the top of an enum body reads
+    # exactly like a call to the checker's diff-side pattern below, so a
+    # newly-added constant (e.g. WidgetAction.UNLOCK("unlock", ...)) flagged
+    # itself as "not imported, not declared" -- it's declared, just via enum
+    # entry syntax rather than one of the keywords above. ALL_CAPS_STYLE is
+    # every existing constant's own convention (LOCK, CLIMATE, HORN, ...),
+    # not a guess.
+    declared|=set(re.findall(r'^\s+([A-Z][A-Z0-9_]*)\(', src, re.M))
     # Names already used in the committed version of this file resolve today,
     # whatever the mechanism -- kotlin stdlib (Regex, Pair), a same-package
     # declaration from another module, a typealias. Only a name that is NEW to
