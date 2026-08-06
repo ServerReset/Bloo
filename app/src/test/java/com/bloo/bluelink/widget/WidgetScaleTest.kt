@@ -231,6 +231,37 @@ class WidgetScaleTest {
     }
 
     /**
+     * MapModule's own leading 8dp Spacer plus its Image never together
+     * exceed the room its caller reserved for it via [Scale.mapReserve].
+     *
+     * MapModule used to cap the Image at `room` itself, on top of the
+     * unconditional 8dp Spacer drawn right before it -- so whenever
+     * mapReserve's own `room * 0.35f` cap was the binding constraint (not
+     * `mapHeight + 8.dp`, the case it was clearly meant to pre-pay the
+     * spacer for), the module consumed exactly 8dp more than it was ever
+     * given. Mirrors MapModule's real formula exactly: `imageHeight =
+     * min(mapHeight, (room - 8.dp).coerceAtLeast(0.dp))`, guarded the same
+     * way (`imageHeight >= Scale.MAP_MIN` or draw nothing).
+     */
+    @Test
+    fun `map module never spends more than its reserved room`() {
+        for (size in sizes()) {
+            for (ts in scales) {
+                val room = Scale.ringRoom(size, ts, true, true, 20.dp)
+                val mapRoom = Scale.mapReserve(size, room, wantMap = true)
+                if (mapRoom <= 0.dp) continue
+                val imageHeight = minOf(Scale.mapHeight(size), (mapRoom - 8.dp).coerceAtLeast(0.dp))
+                if (imageHeight < Scale.MAP_MIN) continue
+                val consumed = 8.dp + imageHeight
+                assertTrue(
+                    consumed.value <= mapRoom.value + 0.01f,
+                    "map module spends ${consumed} of reserved ${mapRoom} at $size @${ts}x",
+                )
+            }
+        }
+    }
+
+    /**
      * The two column-shaped compact tiers fit their tile.
      *
      * Both used to cap the ring against an axis that wasn't the one holding

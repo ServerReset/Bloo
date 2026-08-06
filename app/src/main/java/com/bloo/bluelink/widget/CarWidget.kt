@@ -944,14 +944,23 @@ class CarWidget : GlanceAppWidget() {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
             ChargeBarFallback(car, render, ringEdge, ringRoom)
-            // NOT .defaultWeight() -- ringEdge is already sized from ringRoom,
-            // the exact leftover this row has, so its natural height already
-            // fits without being stretched to claim more. A weighted row here
-            // shared the same failure mode as a weighted MapFill ahead of
-            // fixed content elsewhere in this file: on a real device the
+            // NOT .defaultWeight() on the row/column itself -- ringEdge is
+            // already sized from ringRoom, the exact leftover this row has,
+            // so it doesn't need to be stretched to claim more. A weighted
+            // row with real drawn content (the ring, the info text) shares
+            // the same failure mode as a weighted MapFill ahead of fixed
+            // content elsewhere in this file: on a real device the
             // ActionButtons row below it rendered nothing at all, not merely
-            // squeezed -- matched here to XlSquareLayout's own RingWithContent
-            // call, which was already unweighted for the same reason.
+            // squeezed.
+            //
+            // A bare, contentless Spacer(defaultWeight()) right after it is
+            // the safe way to reclaim whatever's left, though -- the same
+            // pattern RailLayout already uses around its own hero content,
+            // proven not to starve the fixed buttons that follow it. Without
+            // this, whenever the ring hits Scale.ring's own 140dp curve
+            // ceiling well below what ringRoom actually budgeted for it, the
+            // slack collected as unclaimed blank space at the very bottom of
+            // the tile instead of here.
             if (render.config.showRing && car.percent != null) {
                 // RingWithContent auto-stacks vertically instead of
                 // squeezing ring+info into a cramped row if the tile's
@@ -968,8 +977,21 @@ class CarWidget : GlanceAppWidget() {
                     InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale))
                 }
             }
+            Spacer(GlanceModifier.defaultWeight())
             Spacer(GlanceModifier.height(8.dp))
-            ActionButtons(car, render, max = 4)
+            // availableHeight pinned to one row's worth -- ringRoom only ever
+            // reserved buttonHeight(size) ONCE for this whole button block,
+            // not a stacked count. Left at its default (the whole tile's
+            // height), ActionButtons' own row-vs-stack capacity check
+            // compared against far more room than was ever actually budgeted
+            // for it, and could pick the stacked column by mistake for any
+            // configuration wider than it is tall -- ballooning the button
+            // block to many times the one row this tier was ever built for.
+            // See ActionButtons' own capacity-check comment for the full
+            // mechanism; confirmed by reconstructing it for a realistic
+            // XL_TALL size with several actions configured, which overflowed
+            // by hundreds of dp before this fix.
+            ActionButtons(car, render, max = 4, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -990,7 +1012,7 @@ class CarWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.height(6.dp))
             InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale), availableWidth = w)
             Spacer(GlanceModifier.height(6.dp))
-            ActionButtons(car, render, max = 4, availableWidth = w)
+            ActionButtons(car, render, max = 4, availableWidth = w, availableHeight = Scale.buttonHeight(size))
         }
         val showsRing = render.config.showRing && car.percent != null
         // A wide tile spends its axis better on a bar than a circle: it runs
@@ -1032,13 +1054,16 @@ class CarWidget : GlanceAppWidget() {
                 // left over. Capped at split.map, the room tallSplit actually
                 // reserved for it once the rows above had theirs.
                 MapModule(render, split.map)
-                ActionButtons(car, render, max = 4, availableWidth = w)
+                // Same availableHeight fix as MediumSquareLayout's own note
+                // -- ringRoom only ever reserved one row's worth for this.
+                ActionButtons(car, render, max = 4, availableWidth = w, availableHeight = Scale.buttonHeight(size))
             }
             return
         }
         // No ring to show at all (off, or no percent yet): the column gets
         // the whole tile, same shape as the bar branch above without a
-        // gauge of any kind.
+        // gauge of any kind. Unbudgeted branch -- content() itself pins
+        // ActionButtons' height too, for the same reason.
         Column(modifier = GlanceModifier.fillMaxSize()) { content(size.width) }
     }
 
@@ -1082,7 +1107,8 @@ class CarWidget : GlanceAppWidget() {
             // buttons rendered absent rather than merely clipped. MapModule
             // already draws nothing when there's no bitmap.
             MapModule(render, split.map)
-            ActionButtons(car, render, max = 4)
+            // Same availableHeight fix as MediumSquareLayout's own note.
+            ActionButtons(car, render, max = 4, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -1154,7 +1180,9 @@ class CarWidget : GlanceAppWidget() {
             // height.
             MapModule(render, split.map)
             Spacer(GlanceModifier.height(10.dp))
-            ActionButtons(car, render, max = 5)
+            // Same availableHeight fix as MediumSquareLayout's own note --
+            // ringRoom only ever reserved one row's worth for this block.
+            ActionButtons(car, render, max = 5, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -1195,11 +1223,29 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
+                // hideFields drops PERCENT: RingImage's own centerText already
+                // bakes "82%" into the ring bitmap right beside this stack --
+                // without this, a user with Battery/Fuel in their chosen info
+                // fields saw that exact number twice on the same tile, the
+                // same duplicate-content bug already guarded against for the
+                // bar-hero tiers' own percent and XlTallLayout's primaryValue.
+                content = { w ->
+                    InfoStack(
+                        car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w,
+                        footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT),
+                    )
+                },
             )
+            // Bare, contentless Spacer -- see MediumSquareLayout's own note:
+            // reclaims whatever Scale.ring's 140dp curve ceiling left
+            // unclaimed once a big enough tile budgeted more than that for
+            // it, without risking the "weighted content starves a later
+            // fixed sibling" failure a weighted RingWithContent had here.
+            Spacer(GlanceModifier.defaultWeight())
             MapModule(render, mapRoom)
             Spacer(GlanceModifier.height(10.dp))
-            ActionButtons(car, render, max = 5)
+            // Same availableHeight fix as MediumSquareLayout's own note.
+            ActionButtons(car, render, max = 5, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -1227,12 +1273,16 @@ class CarWidget : GlanceAppWidget() {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
             Spacer(GlanceModifier.height(10.dp))
-            InfoStack(car, render, max = split.rows, footerShown = true)
+            // hideFields drops PERCENT -- RingImage's own centerText above
+            // already bakes "82%" into the ring, the same duplicate-content
+            // guard LargeSquareLayout's own InfoStack call now carries too.
+            InfoStack(car, render, max = split.rows, footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT))
             // A FIXED-height module, not a weighted MapFill -- see
             // MediumWideLayout's own note: a weighted element ahead of
             // ActionButtons left it with no real room on a real device.
             MapModule(render, split.map)
-            ActionButtons(car, render, max = 5)
+            // Same availableHeight fix as MediumSquareLayout's own note.
+            ActionButtons(car, render, max = 5, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -1281,7 +1331,8 @@ class CarWidget : GlanceAppWidget() {
             // map's own ideal height.
             MapModule(render, split.map)
             Spacer(GlanceModifier.height(14.dp))
-            ActionButtons(car, render, max = WidgetAction.ALL.size)
+            // Same availableHeight fix as MediumSquareLayout's own note.
+            ActionButtons(car, render, max = WidgetAction.ALL.size, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -1338,7 +1389,8 @@ class CarWidget : GlanceAppWidget() {
             // MediumWideLayout's own note: a weighted element ahead of
             // ActionButtons left it with no real room on a real device.
             MapModule(render, split.map)
-            ActionButtons(car, render, max = WidgetAction.ALL.size)
+            // Same availableHeight fix as MediumSquareLayout's own note.
+            ActionButtons(car, render, max = WidgetAction.ALL.size, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -1369,12 +1421,28 @@ class CarWidget : GlanceAppWidget() {
                         StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
                     }
                 },
-                content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
+                // hideFields drops PERCENT -- see LargeSquareLayout's own
+                // note: RingImage's centerText already bakes it into the ring.
+                content = { w ->
+                    InfoStack(
+                        car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w,
+                        footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT),
+                    )
+                },
             )
+            // Bare, contentless Spacer -- see LargeSquareLayout's own note:
+            // reclaims whatever Scale.ring's 140dp curve ceiling left
+            // unclaimed on a big XL_SQUARE tile without risking a weighted
+            // RingWithContent starving the fixed content after it. XL_SQUARE
+            // has no upper size bound, so this gap grows without one too --
+            // confirmed up to 166dp of unclaimed space at 600x600 before
+            // this fix, versus none once this spacer can claim it instead.
+            Spacer(GlanceModifier.defaultWeight())
             // A FIXED-height module, not a weighted MapFill -- see
             // MediumWideLayout's own note.
             MapModule(render, mapRoom)
-            ActionButtons(car, render, max = WidgetAction.ALL.size)
+            // Same availableHeight fix as MediumSquareLayout's own note.
+            ActionButtons(car, render, max = WidgetAction.ALL.size, availableHeight = Scale.buttonHeight(size))
         }
     }
 
@@ -1492,18 +1560,36 @@ class CarWidget : GlanceAppWidget() {
      *  fixed-height siblings. [room] is what the caller has actually got
      *  left for it -- the height used to be [Scale.mapHeight] unconditionally,
      *  which on a cramped square tile was more than the whole column had
-     *  left and pushed the ring beside it to nothing. */
+     *  left and pushed the ring beside it to nothing.
+     *
+     *  [room] is the TOTAL this module may spend, leading Spacer included --
+     *  the image's own height is [room] minus that spacer, not [room]
+     *  itself. This used to hand the Image the whole of [room] as its own
+     *  cap, on top of the Spacer drawn right before it, so whenever the
+     *  caller's own budget was the binding constraint (not [Scale.mapHeight]),
+     *  the module consumed exactly 8dp more than it was ever given -- the
+     *  same silent overflow class fixed everywhere else in this file, just
+     *  reintroduced by a spacer the room math forgot to subtract. Confirmed
+     *  by rebuilding [Scale.mapReserve]/[Scale.ringRoom] for real XL_WIDE
+     *  sizes: the overflow reproduces to exactly 8dp whenever the map's own
+     *  budget is capped below its ideal height, not just at one contrived
+     *  point. */
     @Composable
     private fun MapModule(render: Render, room: Dp) {
         val bmp = render.mapBitmap ?: return
-        if (room < Scale.MAP_MIN) return
+        // The MIN check is against the image's own height, not room itself
+        // -- room includes the leading spacer, and a map judged "worth
+        // drawing" has to mean the picture itself clears the floor, not the
+        // spacer padding it out to look like it does.
+        val imageHeight = minOf(Scale.mapHeight(LocalSize.current), (room - 8.dp).coerceAtLeast(0.dp))
+        if (imageHeight < Scale.MAP_MIN) return
         Spacer(GlanceModifier.height(8.dp))
         Image(
             provider = ImageProvider(bmp),
             contentDescription = "Car location",
             contentScale = ContentScale.Crop,
             modifier = GlanceModifier.fillMaxWidth()
-                .height(minOf(Scale.mapHeight(LocalSize.current), room))
+                .height(imageHeight)
                 .cornerRadius(innerCorner(render.config))
                 .clickable(openAction(LocalContext.current)),
         )
