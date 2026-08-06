@@ -93,25 +93,36 @@ class WidgetScaleTest {
      */
     @Test
     fun `wide medium bar layout fits its tile at every size and text scale`() {
+        // Mirrors MediumWideLayout's own bar branch, including the map --
+        // this used to hand the SAME leftover room to both the info rows
+        // AND the map independently (rows sized from the full
+        // room-minus-bar, then the map ALSO capped at that same full
+        // amount), which this test never caught because it didn't model
+        // the map's contribution to `demand` at all. tallSplit's own
+        // map-then-rows division is what MediumWideLayout now uses, so
+        // this mirrors that instead of a hand-rolled infoRowsIn call.
         var worst = 0f
         var worstAt = ""
         for (size in sizes()) {
             if (tierFor(size) != WidgetTier.MEDIUM_WIDE) continue
             for (ts in scales) {
                 for (hasHeader in listOf(true, false)) {
-                    val avail = content(size)
-                    val barH = Scale.barHeight(size)
-                    val room = Scale.ringRoom(size, ts, hasHeader, false, 18.dp)
-                    val rows = Scale.infoRowsIn(size, (room - barH).coerceAtLeast(0.dp), ts, 2)
-                    val header = if (hasHeader) {
-                        Scale.lineHeight(Scale.titleSp(size).value, ts) +
-                            Scale.lineHeight(Scale.subtitleSp(size).value, ts)
-                    } else 0.dp
-                    val rowsH = Scale.infoBlockHeight(size, rows, ts)
-                    var demand = header + 6.dp + barH + Scale.buttonHeight(size)
-                    if (rows > 0) demand += 6.dp + rowsH
-                    val over = (demand - avail).value
-                    if (over > worst) { worst = over; worstAt = "$size @${ts}x header=$hasHeader" }
+                    for (wantMap in listOf(false, true)) {
+                        val avail = content(size)
+                        val barH = Scale.barHeight(size)
+                        val room = Scale.ringRoom(size, ts, hasHeader, false, 18.dp)
+                        val restAfterBar = (room - barH).coerceAtLeast(0.dp)
+                        val split = Scale.tallSplit(size, restAfterBar, capRows = 2, textScale = ts, wantMap = wantMap)
+                        val header = if (hasHeader) {
+                            Scale.lineHeight(Scale.titleSp(size).value, ts) +
+                                Scale.lineHeight(Scale.subtitleSp(size).value, ts)
+                        } else 0.dp
+                        val rowsH = Scale.infoBlockHeight(size, split.rows, ts)
+                        var demand = header + 6.dp + barH + Scale.buttonHeight(size) + split.map
+                        if (split.rows > 0) demand += 6.dp + rowsH
+                        val over = (demand - avail).value
+                        if (over > worst) { worst = over; worstAt = "$size @${ts}x header=$hasHeader map=$wantMap" }
+                    }
                 }
             }
         }
@@ -414,6 +425,15 @@ class WidgetScaleTest {
      */
     @Test
     fun `wide LARGE and XL tiers fit their bar hero at every size`() {
+        // wantMap sweeps both ways: these two tiers used to hand the map
+        // its own full natural height with NOTHING subtracted from the
+        // budget the hero and rows were sized against (a fixed-height
+        // MapModule avoided the "weighted element swallows a sibling's
+        // room" failure mode, but did nothing to stop the SUM of the
+        // column's own content from exceeding the tile once the map's
+        // height was added on top of an already-fully-allocated ringRoom).
+        // wantMap = true is what makes tallSplit actually reserve room for
+        // it before dividing the rest between hero and rows.
         for (size in sizes()) {
             val tier = tierFor(size)
             if (tier != WidgetTier.LARGE_WIDE && tier != WidgetTier.XL_WIDE) continue
@@ -421,25 +441,67 @@ class WidgetScaleTest {
             val spacers = if (tier == WidgetTier.LARGE_WIDE) 30.dp else 42.dp
             val capRows = if (tier == WidgetTier.LARGE_WIDE) 4 else WidgetInfoField.ALL.size
             for (ts in scales) {
-                val ringRoom = Scale.ringRoom(size, ts, hasHeader = true, hasFooter = true, spacers = spacers)
-                val split = Scale.tallSplit(size, ringRoom, capRows = capRows, textScale = ts, wantMap = false)
-                val barH = Scale.barHeight(size)
-                val heroSp = Scale.heroSpIn(size, split.ring, barH + 4.dp, ts)
-                val heroBlock = if (heroSp == null) {
-                    0.dp
-                } else {
-                    val heroH = Scale.lineHeight(heroSp, 1f)
-                    val subH = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 4.dp
-                    val showSub = heroH + 4.dp + barH + subH <= split.ring
-                    heroH + 4.dp + barH + (if (showSub) subH else 0.dp)
+                for (wantMap in listOf(false, true)) {
+                    val ringRoom = Scale.ringRoom(size, ts, hasHeader = true, hasFooter = true, spacers = spacers)
+                    val split = Scale.tallSplit(size, ringRoom, capRows = capRows, textScale = ts, wantMap = wantMap)
+                    val barH = Scale.barHeight(size)
+                    val heroSp = Scale.heroSpIn(size, split.ring, barH + 4.dp, ts)
+                    val heroBlock = if (heroSp == null) {
+                        0.dp
+                    } else {
+                        val heroH = Scale.lineHeight(heroSp, 1f)
+                        val subH = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 4.dp
+                        val showSub = heroH + 4.dp + barH + subH <= split.ring
+                        heroH + 4.dp + barH + (if (showSub) subH else 0.dp)
+                    }
+                    val header = Scale.lineHeight(Scale.titleSp(size).value, ts) + Scale.lineHeight(Scale.subtitleSp(size).value, ts)
+                    val footer = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 6.dp
+                    val used = header + footer + spacers + heroBlock +
+                        Scale.infoBlockHeight(size, split.rows, ts) + split.map + Scale.buttonHeight(size)
+                    assertTrue(
+                        used.value <= budget.value + 0.5f,
+                        "$tier ${used} exceeds ${budget} at $size @${ts}x map=$wantMap",
+                    )
                 }
-                val header = Scale.lineHeight(Scale.titleSp(size).value, ts) + Scale.lineHeight(Scale.subtitleSp(size).value, ts)
-                val footer = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 6.dp
-                val used = header + footer + spacers + heroBlock + Scale.infoBlockHeight(size, split.rows, ts) + Scale.buttonHeight(size)
-                assertTrue(
-                    used.value <= budget.value + 0.5f,
-                    "$tier ${used} exceeds ${budget} at $size @${ts}x",
-                )
+            }
+        }
+    }
+
+    /**
+     * XL_TALL: the primaryValue line under the ring ("69% · 219 mi") is
+     * real, known-size content that was never subtracted from the budget
+     * tallSplit divides between the ring, the info rows and the map --
+     * ringRoom's own spacers argument only ever covered the fixed spacers
+     * in the column (14 + 8 + 14 = 36.dp), not the text line sitting
+     * between two of them. Rebuilding this arithmetic outside the
+     * codebase found up to 46dp of real overflow on a real XL_TALL size,
+     * enough to push the map and every button off the bottom of the tile's
+     * own bounds -- confirmed here at every size and text scale, map on
+     * and off.
+     */
+    @Test
+    fun `XL tall tier fits its primary-value line at every size`() {
+        for (size in sizes()) {
+            if (tierFor(size) != WidgetTier.XL_TALL) continue
+            val budget = content(size)
+            for (ts in scales) {
+                for (wantMap in listOf(false, true)) {
+                    val primaryValueHeight = Scale.lineHeight(Scale.titleSp(size).value, ts)
+                    val ringRoom = Scale.ringRoom(
+                        size, ts, hasHeader = true, hasFooter = true, spacers = 36.dp + primaryValueHeight,
+                    )
+                    val split = Scale.tallSplit(
+                        size, ringRoom, capRows = WidgetInfoField.ALL.size, textScale = ts, wantMap = wantMap,
+                    )
+                    val header = Scale.lineHeight(Scale.titleSp(size).value, ts) + Scale.lineHeight(Scale.subtitleSp(size).value, ts)
+                    val footer = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 6.dp
+                    val used = header + footer + 14.dp + split.ring + 8.dp + primaryValueHeight + 14.dp +
+                        Scale.infoBlockHeight(size, split.rows, ts) + split.map + Scale.buttonHeight(size)
+                    assertTrue(
+                        used.value <= budget.value + 0.5f,
+                        "XL_TALL ${used} exceeds ${budget} at $size @${ts}x map=$wantMap",
+                    )
+                }
             }
         }
     }

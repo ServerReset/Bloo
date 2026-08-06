@@ -994,11 +994,21 @@ class CarWidget : GlanceAppWidget() {
             val w = size.width - Scale.contentPadding(size) * 2
             val barH = Scale.barHeight(size)
             // What the header, buttons and this layout's own spacers left,
-            // minus the bar itself, is what the info rows get -- so the rows
-            // are a consequence of the room rather than a guess that the bar
-            // then has to fit around.
+            // minus the bar itself, is what the rows and the map split --
+            // tallSplit reserves the map FIRST and hands rows whatever's
+            // left, the same three-way division every tall tier trusts.
+            // This used to hand the SAME leftover to both independently
+            // (rows sized from the full room, then the map ALSO capped at
+            // that same full room) -- fine whenever rows was 0, a real
+            // double-booking once it wasn't, overflowing the tile by
+            // however tall the info rows came out and pushing the button
+            // row past the bottom of it.
             val room = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 18.dp)
-            val rows = Scale.infoRowsIn(size, (room - barH).coerceAtLeast(0.dp), render.theme.textScale, 2)
+            val restAfterBar = (room - barH).coerceAtLeast(0.dp)
+            val split = Scale.tallSplit(
+                size, restAfterBar, capRows = 2, textScale = render.theme.textScale, wantMap = render.mapBitmap != null,
+            )
+            val rows = split.rows
             Column(modifier = GlanceModifier.fillMaxSize()) {
                 HeaderRow(car, render, availableWidth = w)
                 Spacer(GlanceModifier.height(6.dp))
@@ -1011,9 +1021,9 @@ class CarWidget : GlanceAppWidget() {
                 // element here left ActionButtons with no real room at all on
                 // a real device (buttons rendered nothing, not even clipped,
                 // just absent), regardless of how much space was actually
-                // left over. MapModule already draws nothing when there's no
-                // bitmap or the room's too small for one.
-                MapModule(render, room - barH)
+                // left over. Capped at split.map, the room tallSplit actually
+                // reserved for it once the rows above had theirs.
+                MapModule(render, split.map)
                 ActionButtons(car, render, max = 4, availableWidth = w)
             }
             return
@@ -1086,21 +1096,34 @@ class CarWidget : GlanceAppWidget() {
         val showsRing = render.config.showRing && car.percent != null
         // BarHero's own default budget assumes it's the row's only vertical
         // content, true for BannerLayout/CompactWideLayout but not here --
-        // this column also carries a header, footer, info rows and a button
-        // row. ringRoom's own header/footer/button/spacer subtraction gives
-        // the safe leftover (the same budget the ring used to size against);
-        // tallSplit then divides THAT between the info rows and whatever's
-        // left for the hero, the exact division it already does for every
-        // other tall tier -- reused here for its row/leftover split, not its
-        // ring size (map is handled as its own weighted sibling below, so
-        // wantMap is false: nothing here needs tallSplit to pre-reserve it).
+        // this column also carries a header, footer, info rows, a map and a
+        // button row. ringRoom's own header/footer/button/spacer subtraction
+        // gives the safe leftover; tallSplit then divides THAT between the
+        // map, the info rows and whatever's left for the hero, the exact
+        // division every other tall tier already trusts -- reused here for
+        // its whole three-way split, not just its ring size.
+        //
+        // wantMap = true is the fix for a real overflow this tier had: the
+        // map used to be handed its own full natural height with NOTHING
+        // subtracted from the budget for it, on the theory that a fixed-
+        // height MapModule was safe because it wasn't a weighted MapFill.
+        // Fixed-height only avoids the "weighted element swallows a
+        // sibling's room" failure mode -- it does nothing to stop the SUM of
+        // everything in the column from exceeding the tile if the map's own
+        // height was never subtracted from what the hero and rows above it
+        // were sized against. Reported from a real device: a header, a bar,
+        // a map, and then nothing -- the buttons had overflowed off the
+        // bottom of the tile's own allocated bounds.
+        //
         // spacers = 30.dp, not the single-spacer 20.dp another tier might
         // pass: this column has THREE explicit 10.dp Spacers below the
         // header (before the hero, after it, before the buttons), not one,
         // and ringRoom's own spacers argument is the caller's one chance to
         // tell it about all of them at once.
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 30.dp)
-        val split = Scale.tallSplit(size, ringRoom, capRows = 4, textScale = render.theme.textScale, wantMap = false)
+        val split = Scale.tallSplit(
+            size, ringRoom, capRows = 4, textScale = render.theme.textScale, wantMap = render.mapBitmap != null,
+        )
         val rows = split.rows
         val heroAvail = split.ring
         Column(modifier = GlanceModifier.fillMaxSize()) {
@@ -1108,7 +1131,7 @@ class CarWidget : GlanceAppWidget() {
             FooterRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
             if (showsRing) {
-                BarHero(car, render, width = w, avail = heroAvail)
+                BarHero(car, render, width = w, avail = heroAvail, showNameFallback = false)
                 Spacer(GlanceModifier.height(10.dp))
             }
             if (rows > 0) {
@@ -1118,8 +1141,10 @@ class CarWidget : GlanceAppWidget() {
                 )
             }
             // A FIXED-height module, not a weighted MapFill -- see
-            // MediumWideLayout's own note.
-            MapModule(render, Scale.mapHeight(size))
+            // MediumWideLayout's own note -- capped at split.map, the room
+            // tallSplit actually reserved for it, not the map's own ideal
+            // height.
+            MapModule(render, split.map)
             Spacer(GlanceModifier.height(10.dp))
             ActionButtons(car, render, max = 5)
         }
@@ -1207,14 +1232,17 @@ class CarWidget : GlanceAppWidget() {
         val showsRing = render.config.showRing && car.percent != null
         // See LargeWideLayout's own note: BarHero's default budget assumes
         // it's the row's only content, which isn't true here either, and
-        // tallSplit does the row/leftover division instead of a flat
-        // fraction-of-tile row estimate that doesn't know about this
-        // column's own header/footer/button/spacer reservations.
+        // tallSplit does the map/row/leftover three-way split instead of
+        // handing the map its own full natural height with nothing
+        // subtracted from what everything else was budgeted against --
+        // wantMap = true is the fix for the exact overflow LargeWideLayout's
+        // own note describes.
         // spacers = 42.dp: three explicit 14.dp Spacers below the header in
         // this column, same reasoning as LargeWideLayout's own note.
         val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 42.dp)
         val split = Scale.tallSplit(
-            size, ringRoom, capRows = WidgetInfoField.ALL.size, textScale = render.theme.textScale, wantMap = false,
+            size, ringRoom, capRows = WidgetInfoField.ALL.size, textScale = render.theme.textScale,
+            wantMap = render.mapBitmap != null,
         )
         val rows = split.rows
         val heroAvail = split.ring
@@ -1223,7 +1251,7 @@ class CarWidget : GlanceAppWidget() {
             FooterRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
             if (showsRing) {
-                BarHero(car, render, width = w, avail = heroAvail)
+                BarHero(car, render, width = w, avail = heroAvail, showNameFallback = false)
                 Spacer(GlanceModifier.height(14.dp))
             }
             if (rows > 0) {
@@ -1233,8 +1261,9 @@ class CarWidget : GlanceAppWidget() {
                 )
             }
             // A FIXED-height module, not a weighted MapFill -- see
-            // MediumWideLayout's own note.
-            MapModule(render, Scale.mapHeight(size))
+            // MediumWideLayout's own note -- capped at split.map, not the
+            // map's own ideal height.
+            MapModule(render, split.map)
             Spacer(GlanceModifier.height(14.dp))
             ActionButtons(car, render, max = WidgetAction.ALL.size)
         }
@@ -1247,9 +1276,24 @@ class CarWidget : GlanceAppWidget() {
         // into side-by-side columns that would squeeze on a narrow-but-tall
         // dashboard-sized tile.
         val size = LocalSize.current
+        // The primaryValue line under the ring ("69% · 219 mi") is real,
+        // known-size content that was never subtracted from the budget
+        // tallSplit divides between the ring, the info rows and the map --
+        // ringRoom's own spacers argument only ever covered the fixed
+        // Spacer()s in this column (14 + 8 + 14 = 36.dp), not the text line
+        // sitting between two of them. Undercounting it meant ring + rows +
+        // map could together claim EVERYTHING ringRoom reported free, this
+        // line's own height included, overflowing the tile by however tall
+        // it rendered -- confirmed by rebuilding this arithmetic outside the
+        // codebase: up to 46dp on a real XL_TALL size, enough to push the
+        // map and every button off the bottom of the tile's own bounds.
+        val primaryValueHeight = Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale)
         val split = Scale.tallSplit(
             size,
-            Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 28.dp),
+            Scale.ringRoom(
+                size, render.theme.textScale, render.config.showHeader, render.config.showFooter,
+                36.dp + primaryValueHeight,
+            ),
             capRows = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale),
             textScale = render.theme.textScale,
             wantMap = render.mapBitmap != null,
@@ -2126,6 +2170,14 @@ class CarWidget : GlanceAppWidget() {
         // of it, the same double-booking mistake this whole file exists to
         // avoid.
         avail: Dp = LocalSize.current.height - Scale.contentPadding(LocalSize.current) * 2,
+        // False for LargeWideLayout/XlWideLayout, which already show the
+        // car's name via their own HeaderRow above this call. NameAndStat's
+        // fallback repeats it -- "Lanas Whip" once from the header, then
+        // "Lanas Whip / 67% · 219 mi" again right under it -- on any tile
+        // too short for the hero number to fit. Reported from a real
+        // device. BannerLayout/CompactWideLayout have no header of their
+        // own, so the fallback is the ONLY place their name shows and stays on.
+        showNameFallback: Boolean = true,
     ) {
         val theme = render.theme
         val size = LocalSize.current
@@ -2136,8 +2188,10 @@ class CarWidget : GlanceAppWidget() {
             // No percentage to make a hero of, or no room to make it big
             // enough to be one. Either way the bar treatment isn't what this
             // tile wants, so it gets the ordinary name/stat pair rather than a
-            // shrunken imitation of a hero.
-            NameAndStat(car, render, width = width)
+            // shrunken imitation of a hero -- unless the caller already has
+            // its own header, in which case there's simply nothing to draw
+            // here rather than a redundant name.
+            if (showNameFallback) NameAndStat(car, render, width = width)
             return
         }
         val heroH = Scale.lineHeight(heroSp, 1f)
@@ -2192,11 +2246,21 @@ class CarWidget : GlanceAppWidget() {
         // Split at the CHARGE: green is what's in the pack, grey is what
         // isn't, and the gap between them is the level. The limit is a marker
         // ON that bar, drawn below, not a second division of it -- the same
-        // model the phone hero, the watch ring and the live notification use.
+        // model the phone hero, the watch ring and the widget's own ring use.
         //
-        // The gap costs real width, so it is skipped on a narrow slot and at
-        // the extremes, where there is nothing to separate.
-        val gap = if (width >= 60.dp && frac > 0.02f && frac < 0.98f) 3.dp else 0.dp
+        // The common case is the charge sitting AT its own limit -- a car
+        // set to 80% and charged to 80%, which is most of the time this bar
+        // is drawn at all. The split and the dot then land on the same
+        // pixel: a real gap cut into the bar right where the dot's own halo
+        // is also trying to cut one, reading as a ragged double-notch rather
+        // than either device on its own. Ported from the phone's own
+        // ChargeSegmentBar, which found this the same way. Near the split
+        // the gap yields and the dot alone carries it.
+        val atSplit = limit != null && kotlin.math.abs(limit / 100f - frac) < 0.03f
+        // The gap costs real width, so it is skipped on a narrow slot, at
+        // the extremes where there is nothing to separate, and right at the
+        // limit where the dot already marks the same spot.
+        val gap = if (width >= 60.dp && frac > 0.02f && frac < 0.98f && !atSplit) 3.dp else 0.dp
         val usable = (width - gap).coerceAtLeast(0.dp)
         // Floored at the bar's own height when there is ANY charge, so a low
         // one reads as a rounded nub rather than a hairline: below that the
@@ -2230,11 +2294,12 @@ class CarWidget : GlanceAppWidget() {
             // spelled "reserve x of empty space first".
             if (limit != null && width >= 60.dp) {
                 val l = limit / 100f
-                // Exactly the bar's height, NOT taller. The dot lives in a Box
-                // sized to the bar, so anything bigger is clipped by it -- a
-                // marker with its top and bottom shaved off, which is worse
-                // than a slightly smaller circle. It reads as sitting on the
-                // bar because of its ring, not because it overhangs.
+                // Exactly the bar's height, NOT taller: the dot lives in a
+                // Box sized to the bar (see above), which every caller has
+                // already budgeted exactly `height` of room for -- a dot
+                // that reads bigger without actually being taller than the
+                // bar it sits on has to come from its own proportions, not
+                // from claiming more room this composable was never given.
                 val dot = height
                 val x = (usable * l + (if (l > frac) gap else 0.dp) - dot / 2)
                     .coerceIn(0.dp, (width - dot).coerceAtLeast(0.dp))
@@ -2256,7 +2321,14 @@ class CarWidget : GlanceAppWidget() {
                             .cornerRadius(dot / 2)
                             .background(theme.background),
                     ) {
-                        val core = (dot - 5.dp).coerceAtLeast(2.dp)
+                        // A PROPORTION of the dot (0.6x), not dot minus a flat
+                        // 5dp -- the flat version left almost nothing at small
+                        // sizes (an 8dp dot on a small tile's thin bar had a
+                        // 3dp core, reading as a grey smudge rather than a
+                        // ring with a visible centre) while barely mattering
+                        // at large ones. Proportional keeps the ring-to-core
+                        // ratio legible at every bar thickness this scales to.
+                        val core = (dot * 0.6f).coerceAtLeast(3.dp)
                         Box(
                             modifier = GlanceModifier.size(core)
                                 .cornerRadius(core / 2)
