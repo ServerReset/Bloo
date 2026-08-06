@@ -306,6 +306,12 @@ class WidgetScaleTest {
         // layout's own inline spacing constants rather than reaching into
         // the widget class for them.
         val margin = 16.dp
+        // Mirrors CarWidget.kt's own MIN_HERO_RESERVE: a floor reserved for
+        // the hero (ring/glyph) BEFORE the button stack is sized, so a
+        // widget configured with every action doesn't lose its status
+        // entirely to a button stack that ate the whole budget. Subtracted
+        // from what maxStackedButtons sees, same as the real layouts.
+        val heroReserve = 40.dp
         for (size in sizes()) {
             val tier = tierFor(size)
             if (tier != WidgetTier.RAIL && tier != WidgetTier.COMPACT_TALL_NARROW && tier != WidgetTier.COMPACT_TALL) continue
@@ -315,7 +321,9 @@ class WidgetScaleTest {
                     for (wantMap in listOf(false, true)) {
                         when (tier) {
                             WidgetTier.RAIL -> {
-                                val n = Scale.maxStackedButtons(size, budget, overhead = 16.dp, cap = actionCount)
+                                val n = Scale.maxStackedButtons(
+                                    size, (budget - heroReserve).coerceAtLeast(0.dp), overhead = 16.dp, cap = actionCount,
+                                )
                                 val buttonZone = if (n > 0) {
                                     Scale.buttonHeight(size) * n + Scale.buttonGap(size) * (n - 1) + 8.dp
                                 } else {
@@ -333,7 +341,10 @@ class WidgetScaleTest {
                             }
                             WidgetTier.COMPACT_TALL_NARROW -> {
                                 val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts) + 4.dp
-                                val n = Scale.maxStackedButtons(size, budget - nameH, overhead = 8.dp, cap = minOf(actionCount, 4))
+                                val n = Scale.maxStackedButtons(
+                                    size, (budget - nameH - heroReserve).coerceAtLeast(0.dp), overhead = 8.dp,
+                                    cap = minOf(actionCount, 4),
+                                )
                                 val buttonZone = if (n > 0) {
                                     Scale.buttonHeight(size) * n + Scale.buttonGap(size) * (n - 1) + 4.dp
                                 } else {
@@ -352,13 +363,27 @@ class WidgetScaleTest {
                                 )
                             }
                             else -> {
+                                // COMPACT_TALL now stacks its buttons the same way the
+                                // narrow tiers do (was a single row that truncated to
+                                // whatever the WIDTH could fit while ample HEIGHT sat
+                                // empty -- reported from a real device: three of four
+                                // configured buttons shown, a large gap above and below).
                                 val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts)
-                                val buttonZone = Scale.buttonHeight(size) + 12.dp
+                                val n = Scale.maxStackedButtons(
+                                    size, (budget - nameH - heroReserve).coerceAtLeast(0.dp), overhead = 12.dp,
+                                    cap = actionCount,
+                                )
+                                val buttonZone = if (n > 0) {
+                                    Scale.buttonHeight(size) * n + Scale.buttonGap(size) * (n - 1) + 12.dp
+                                } else {
+                                    0.dp
+                                }
                                 val heroRoom = (budget - nameH - buttonZone - margin).coerceAtLeast(0.dp)
                                 val split = Scale.tallSplit(size, heroRoom, capRows = 4, textScale = ts, wantMap = wantMap)
                                 val spacerRing = if (split.ring > 0.dp) 6.dp else 0.dp
+                                val spacerButtons = if (n > 0) 8.dp else 0.dp
                                 val used = nameH + split.ring + spacerRing + Scale.infoBlockHeight(size, split.rows, ts) +
-                                    split.map + buttonZone
+                                    split.map + buttonZone + spacerButtons
                                 assertTrue(
                                     used.value <= budget.value + 0.5f,
                                     "COMPACT_TALL ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount map=$wantMap",
@@ -367,6 +392,54 @@ class WidgetScaleTest {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * LARGE_WIDE and XL_WIDE: rebuilt to run [Scale.heroSpIn]'s bar-hero
+     * treatment the full tile width under the header instead of confining
+     * it to a ring-shaped side column (see CarWidget.kt's own note on why --
+     * the confined version read as an undersized bar with empty space above
+     * and below it, reported from a real device).
+     *
+     * BarHero's own budget check (`heroH + 4.dp + barH + subH <= avail`)
+     * assumes it is handed the REAL remaining room, which used to be a given
+     * when it was the row's only content (Banner/CompactWide) but isn't
+     * automatic here: this column also carries a header, footer, info rows
+     * and a button row. This test mirrors exactly what the two layouts pass
+     * as `avail` (tallSplit's own leftover-after-rows split of ringRoom) and
+     * confirms the resulting hero block, plus everything else stacked in the
+     * column, still fits.
+     */
+    @Test
+    fun `wide LARGE and XL tiers fit their bar hero at every size`() {
+        for (size in sizes()) {
+            val tier = tierFor(size)
+            if (tier != WidgetTier.LARGE_WIDE && tier != WidgetTier.XL_WIDE) continue
+            val budget = content(size)
+            val spacers = if (tier == WidgetTier.LARGE_WIDE) 30.dp else 42.dp
+            val capRows = if (tier == WidgetTier.LARGE_WIDE) 4 else WidgetInfoField.ALL.size
+            for (ts in scales) {
+                val ringRoom = Scale.ringRoom(size, ts, hasHeader = true, hasFooter = true, spacers = spacers)
+                val split = Scale.tallSplit(size, ringRoom, capRows = capRows, textScale = ts, wantMap = false)
+                val barH = Scale.barHeight(size)
+                val heroSp = Scale.heroSpIn(size, split.ring, barH + 4.dp, ts)
+                val heroBlock = if (heroSp == null) {
+                    0.dp
+                } else {
+                    val heroH = Scale.lineHeight(heroSp, 1f)
+                    val subH = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 4.dp
+                    val showSub = heroH + 4.dp + barH + subH <= split.ring
+                    heroH + 4.dp + barH + (if (showSub) subH else 0.dp)
+                }
+                val header = Scale.lineHeight(Scale.titleSp(size).value, ts) + Scale.lineHeight(Scale.subtitleSp(size).value, ts)
+                val footer = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 6.dp
+                val used = header + footer + spacers + heroBlock + Scale.infoBlockHeight(size, split.rows, ts) + Scale.buttonHeight(size)
+                assertTrue(
+                    used.value <= budget.value + 0.5f,
+                    "$tier ${used} exceeds ${budget} at $size @${ts}x",
+                )
             }
         }
     }

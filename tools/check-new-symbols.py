@@ -34,6 +34,34 @@ for f,lines in added.items():
     # every existing constant's own convention (LOCK, CLIMATE, HORN, ...),
     # not a guess.
     declared|=set(re.findall(r'^\s+([A-Z][A-Z0-9_]*)\(', src, re.M))
+    # Kotlin needs no import for a type declared in another file of the SAME
+    # package -- e.g. WidgetInfoField (in WidgetConfig.kt) used unqualified
+    # from WidgetScaleTest.kt, both `package com.bloo.bluelink.widget`. The
+    # checks above only look inside the one file being diffed, so a symbol
+    # whose only declaration lives in a sibling file was never found and
+    # always got flagged, entirely correctly-compiling code included.
+    # Scoped to .kt files that declare the SAME package line -- a real
+    # match on Kotlin's own visibility rule, not a blanket "search the whole
+    # repo" that would hide a genuinely-wrong cross-package reference. A
+    # src/test file's package commonly mirrors a src/main one without living
+    # in the same directory, so this walks the repo rather than just the
+    # diffed file's own directory.
+    pkg_m = re.search(r'^package\s+([\w.]+)', src, re.M)
+    if pkg_m:
+        pkg = pkg_m.group(1)
+        for root, _dirs, files in os.walk("."):
+            if "/.git" in root:
+                continue
+            for sib in files:
+                if not sib.endswith(".kt"):
+                    continue
+                sib_path = os.path.join(root, sib)
+                if os.path.abspath(sib_path) == os.path.abspath(f):
+                    continue
+                sib_src = open(sib_path, errors="ignore").read()
+                if re.search(rf'^package\s+{re.escape(pkg)}\s*$', sib_src, re.M):
+                    declared|=set(re.findall(r'\b(?:class|object|interface|enum class|fun)\s+([A-Z]\w*)', sib_src))
+                    declared|=set(re.findall(r'\bval\s+([A-Z]\w*)', sib_src))
     # Names already used in the committed version of this file resolve today,
     # whatever the mechanism -- kotlin stdlib (Regex, Pair), a same-package
     # declaration from another module, a typealias. Only a name that is NEW to
