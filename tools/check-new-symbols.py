@@ -13,7 +13,7 @@ file has actually brought into scope. Usage:  python3 tools/check-new-symbols.py
 Compare a commit range by editing the git args below.
 """
 import re, subprocess, sys, os
-diff = subprocess.run(["git","diff","HEAD","-U0"],capture_output=True,text=True).stdout
+diff = subprocess.run(["git","diff","HEAD","-U0"],capture_output=True,encoding="utf-8",errors="replace").stdout
 cur=None; added={}
 for line in diff.splitlines():
     if line.startswith("+++ b/"): cur=line[6:]
@@ -22,7 +22,11 @@ for line in diff.splitlines():
 bad=0
 for f,lines in added.items():
     if not os.path.exists(f): continue
-    src=open(f).read()
+    # encoding pinned: these sources are UTF-8 and contain "·", "—" and friends.
+    # Bare open() uses the platform default, which is cp1252 on Windows, and the
+    # checker died with a UnicodeDecodeError before examining a single symbol --
+    # i.e. the one local guard against a red build was itself unusable there.
+    src=open(f, encoding="utf-8").read()
     imported={m.split(".")[-1] for m in re.findall(r'^import\s+([\w.]+)', src, re.M)}
     declared=set(re.findall(r'\b(?:class|object|interface|enum class|fun)\s+([A-Z]\w*)', src))
     declared|=set(re.findall(r'\bval\s+([A-Z]\w*)', src))
@@ -58,7 +62,7 @@ for f,lines in added.items():
                 sib_path = os.path.join(root, sib)
                 if os.path.abspath(sib_path) == os.path.abspath(f):
                     continue
-                sib_src = open(sib_path, errors="ignore").read()
+                sib_src = open(sib_path, encoding="utf-8", errors="ignore").read()
                 if re.search(rf'^package\s+{re.escape(pkg)}\s*$', sib_src, re.M):
                     declared|=set(re.findall(r'\b(?:class|object|interface|enum class|fun)\s+([A-Z]\w*)', sib_src))
                     declared|=set(re.findall(r'\bval\s+([A-Z]\w*)', sib_src))
@@ -67,7 +71,10 @@ for f,lines in added.items():
     # declaration from another module, a typealias. Only a name that is NEW to
     # the file is worth asking about; anything else is noise that trains you to
     # ignore the check, which is worse than not having it.
-    prev = subprocess.run(["git","show",f"HEAD:{f}"],capture_output=True,text=True).stdout
+    # encoding pinned for the same reason as the open() calls above: text=True
+    # decodes with the platform default, so on Windows this died on the first
+    # non-cp1252 byte and left .stdout as None, which then blew up in re.findall.
+    prev = subprocess.run(["git","show",f"HEAD:{f}"],capture_output=True,encoding="utf-8",errors="replace").stdout or ""
     # Same shape as the new-code pattern below (Name( or Name.member() --
     # this was widened to catch qualified calls without widening THIS one to
     # match, so a name used only in qualified form anywhere in the file's
@@ -101,7 +108,7 @@ for f,lines in added.items():
 for f in added:
     if not os.path.exists(f):
         continue
-    lines = open(f).read().split("\n")
+    lines = open(f, encoding="utf-8").read().split("\n")
     for i, ln in enumerate(lines):
         m = re.match(r'\s*@(?:[\w.]+\.)?(\w+)\s*$', ln)
         if not m:
@@ -133,9 +140,9 @@ MODIFIER_EXTENSIONS = {
 for f, lines in added.items():
     if not os.path.exists(f):
         continue
-    src = open(f).read()
+    src = open(f, encoding="utf-8").read()
     imported_members = {m.split(".")[-1] for m in re.findall(r'^import\s+([\w.]+)', src, re.M)}
-    prev = subprocess.run(["git", "show", f"HEAD:{f}"], capture_output=True, text=True).stdout
+    prev = subprocess.run(["git", "show", f"HEAD:{f}"], capture_output=True, encoding="utf-8", errors="replace").stdout or ""
     # Same rationale as the first check: a call already resolving somewhere
     # in the committed file (however it got there) isn't this diff's problem.
     already_used = set(re.findall(r'\.(\w+)\s*\(', prev))
