@@ -204,7 +204,17 @@ class CarWidget : GlanceAppWidget() {
             EmptyState(root, effective.theme)
             return
         }
-        Box(modifier = GlanceModifier.fillMaxSize().cornerRadius(corner)) {
+        // Whole-card tap target UNDER everything else: only specific inner
+        // elements (HeaderRow, RailLayout's own column, a button) carried
+        // their own clickable before this, so the photo/background and every
+        // bit of empty space between modules did nothing at all when tapped
+        // -- reported from a real device, most visible on a tall tile with a
+        // lot of bare photo showing. Buttons and other inner clickables
+        // still take priority for their own bounds; RemoteViews resolves an
+        // overlapping tap to the innermost view that registered one.
+        Box(
+            modifier = GlanceModifier.fillMaxSize().cornerRadius(corner).clickable(openAction(LocalContext.current)),
+        ) {
             if (photo != null) {
                 Image(
                     provider = ImageProvider(photo),
@@ -997,16 +1007,13 @@ class CarWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.height(6.dp))
                     InfoStack(car, render, max = rows, availableWidth = w)
                 }
-                // Same trade as MEDIUM_TALL: the slack above the buttons is
-                // either a map or a spacer, and a map is worth more. Gated on
-                // there being enough of it to be a map rather than a sliver --
-                // this tier is short by definition, so most sizes here will
-                // keep the spacer.
-                if (render.mapBitmap != null && room - barH >= 56.dp) {
-                    MapFill(render, room - barH)
-                } else {
-                    Spacer(GlanceModifier.defaultWeight())
-                }
+                // A FIXED-height module, not a weighted MapFill -- a weighted
+                // element here left ActionButtons with no real room at all on
+                // a real device (buttons rendered nothing, not even clipped,
+                // just absent), regardless of how much space was actually
+                // left over. MapModule already draws nothing when there's no
+                // bitmap or the room's too small for one.
+                MapModule(render, room - barH)
                 ActionButtons(car, render, max = 4, availableWidth = w)
             }
             return
@@ -1043,18 +1050,20 @@ class CarWidget : GlanceAppWidget() {
         // the same room and puts the car's location in it, and collapses to
         // nothing when there's no bitmap, which is when the spacers are the
         // right answer again.
-        val hasMap = render.mapBitmap != null && split.map > 0.dp
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
-            // Weighted spacers ABOVE and below centre what's left, rather
-            // than one trailing spacer shoving it all to the top edge.
-            if (!hasMap) Spacer(GlanceModifier.defaultWeight())
+            Spacer(GlanceModifier.height(8.dp))
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.height(8.dp))
             }
             InfoStack(car, render, max = rows)
-            if (hasMap) MapFill(render, split.map) else Spacer(GlanceModifier.defaultWeight())
+            // A FIXED-height module, not a weighted MapFill -- see
+            // MediumWideLayout's own note: a weighted element ahead of
+            // ActionButtons left it with no real room on a real device,
+            // buttons rendered absent rather than merely clipped. MapModule
+            // already draws nothing when there's no bitmap.
+            MapModule(render, split.map)
             ActionButtons(car, render, max = 4)
         }
     }
@@ -1108,11 +1117,9 @@ class CarWidget : GlanceAppWidget() {
                     hideFields = setOf(WidgetInfoField.PERCENT),
                 )
             }
-            if (render.mapBitmap != null) {
-                MapFill(render, Scale.mapHeight(size))
-            } else {
-                Spacer(GlanceModifier.defaultWeight())
-            }
+            // A FIXED-height module, not a weighted MapFill -- see
+            // MediumWideLayout's own note.
+            MapModule(render, Scale.mapHeight(size))
             Spacer(GlanceModifier.height(10.dp))
             ActionButtons(car, render, max = 5)
         }
@@ -1172,12 +1179,6 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             FooterRow(car, render)
-            // With no map, MapFill below is a weighted spacer -- matching it
-            // here centres what's left instead of pooling every leftover dp
-            // in one void along the bottom edge. On a very tall tile the ring
-            // is bounded by the tile's WIDTH, so there is always leftover to
-            // place. MediumTallLayout already balanced its column this way.
-            if (split.map <= 0.dp) Spacer(GlanceModifier.defaultWeight())
             Spacer(GlanceModifier.height(10.dp))
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -1186,7 +1187,10 @@ class CarWidget : GlanceAppWidget() {
             }
             Spacer(GlanceModifier.height(10.dp))
             InfoStack(car, render, max = split.rows, footerShown = true)
-            MapFill(render, split.map)
+            // A FIXED-height module, not a weighted MapFill -- see
+            // MediumWideLayout's own note: a weighted element ahead of
+            // ActionButtons left it with no real room on a real device.
+            MapModule(render, split.map)
             ActionButtons(car, render, max = 5)
         }
     }
@@ -1228,11 +1232,9 @@ class CarWidget : GlanceAppWidget() {
                     hideFields = setOf(WidgetInfoField.PERCENT),
                 )
             }
-            if (render.mapBitmap != null) {
-                MapFill(render, Scale.mapHeight(size))
-            } else {
-                Spacer(GlanceModifier.defaultWeight())
-            }
+            // A FIXED-height module, not a weighted MapFill -- see
+            // MediumWideLayout's own note.
+            MapModule(render, Scale.mapHeight(size))
             Spacer(GlanceModifier.height(14.dp))
             ActionButtons(car, render, max = WidgetAction.ALL.size)
         }
@@ -1256,8 +1258,6 @@ class CarWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             FooterRow(car, render)
-            // Same balancing spacer as LargeTallLayout's.
-            if (split.map <= 0.dp) Spacer(GlanceModifier.defaultWeight())
             Spacer(GlanceModifier.height(14.dp))
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -1274,7 +1274,10 @@ class CarWidget : GlanceAppWidget() {
                 car, render, max = split.rows, footerShown = true,
                 hideFields = setOf(WidgetInfoField.RANGE, WidgetInfoField.PERCENT),
             )
-            MapFill(render, split.map)
+            // A FIXED-height module, not a weighted MapFill -- see
+            // MediumWideLayout's own note: a weighted element ahead of
+            // ActionButtons left it with no real room on a real device.
+            MapModule(render, split.map)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
         }
     }
@@ -1308,7 +1311,9 @@ class CarWidget : GlanceAppWidget() {
                 },
                 content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w, footerShown = true) },
             )
-            MapFill(render, mapRoom)
+            // A FIXED-height module, not a weighted MapFill -- see
+            // MediumWideLayout's own note.
+            MapModule(render, mapRoom)
             ActionButtons(car, render, max = WidgetAction.ALL.size)
         }
     }
