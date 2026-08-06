@@ -519,9 +519,28 @@ object ChargingLive {
             // a couple of glyphs and nothing more.
             builder.setShortCriticalText("$percent%")
         } else {
-            // Charging confirmed but no percentage yet -- an indeterminate bar
-            // is honest, where ProgressStyle would have to invent a number.
-            builder.setProgress(0, 0, true)
+            // Charging confirmed but no percentage reported yet.
+            //
+            // This used to fall back to the legacy setProgress(0, 0, true)
+            // indeterminate bar -- honest about not having a number, but it
+            // meant the notification posted with NO ProgressStyle at all
+            // for however long the car takes to first report a percentage
+            // (sometimes indefinitely, on a status response missing the
+            // field). "A promotable style" is one of the documented,
+            // non-negotiable conditions for promotion -- setRequestPromoted
+            // Ongoing below was being called on a builder that had already
+            // failed that condition, so the notification could sit un-
+            // promoted through its entire first stretch of updates even
+            // with everything else about the builder correct. A single
+            // all-track segment (no green fill, since there's nothing
+            // charged to report yet) keeps ProgressStyle in play from the
+            // very first post instead of only once a percentage shows up.
+            builder.setStyle(
+                NotificationCompat.ProgressStyle()
+                    .setStyledByProgress(false)
+                    .setProgress(0)
+                    .setProgressSegments(listOf(NotificationCompat.ProgressStyle.Segment(100).setColor(TRACK))),
+            )
         }
         // Asks the system to promote this to a Live Update. Ignored below API
         // 36 and whenever any of the documented conditions isn't met, so it is
