@@ -9,6 +9,7 @@ import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.CredentialStore
+import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
@@ -67,7 +68,11 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         val prefs = settings.notificationPrefs()
-        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked) {
+        // `charging` belongs in this early-exit too -- it's driven by the
+        // same poll below, so leaving it out would mean a user who disabled
+        // every alert but kept the live charging bar got no poll at all,
+        // and therefore a bar that never updates or clears.
+        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked && !prefs.charging) {
             return Result.success()
         }
 
@@ -86,6 +91,30 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     // re-read the same DataStore value once per vehicle per tick.
                     CarAlerts.evaluate(settings, v, status, prefs).forEach {
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
+                    }
+                }
+                // The live charging bar rides the same 30-minute poll so it
+                // tracks the real percentage instead of going stale between
+                // app opens. LiveCharge.update() clears the bar on its own
+                // once `charging` is false, so this is what stops it too.
+                if (prefs.charging) {
+                    val ev = status?.evStatus
+                    // Hand off to the 5-minute chain the instant this worker
+                    // sees charging start -- 30 minutes between ticks is far
+                    // too coarse for a bar meant to look live.
+                    if (ev?.batteryCharge == true) LiveChargePollWorker.kick(applicationContext)
+                    runCatching {
+                        LiveCharge.update(
+                            context = applicationContext,
+                            vin = v.vin,
+                            carName = v.name,
+                            charging = ev?.batteryCharge == true,
+                            percent = ev?.batteryStatus,
+                            minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
+                            pluggedInLabel = ev?.pluggedInLabel,
+                            enabled = true,
+                            chargeLimit = ev?.targetForCurrentPlug(),
+                        )
                     }
                 }
             }

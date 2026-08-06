@@ -16,6 +16,7 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
+import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
@@ -505,6 +506,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setNotifyUnlocked(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyUnlocked(v) }
 
     fun setUnlockedMinutes(m: Int) = viewModelScope.launch { settingsStore.setUnlockedMinutes(m) }
+
+    /** Turning the live charging bar off clears anything already posted at
+     *  once, and kills the poll chain, rather than leaving both to linger
+     *  until they happen to notice the setting changed. */
+    fun setNotifyCharging(v: Boolean) = viewModelScope.launch {
+        settingsStore.setNotifyCharging(v)
+        if (!v) {
+            LiveCharge.cancelAll(getApplication(), _state.value.vehicles.map { it.vin })
+            com.bloo.bluelink.work.LiveChargePollWorker.cancel(getApplication())
+        }
+    }
 
     /** Write the current live status/location maps to disk (survives restart). */
     private fun persistCache() {
@@ -1542,6 +1554,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
         // Refresh Quick Settings tiles too.
         com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
+        refreshLiveChargeBar(vehicles)
+    }
+
+    /**
+     * Brings the live-charge notification (see [LiveCharge]) in step with
+     * whatever the app itself just fetched -- otherwise only the background
+     * workers ever wrote it, and the one moment the user has the freshest
+     * data (having just pulled to refresh, standing in the app) was the one
+     * moment the bar in the shade didn't move. `LiveCharge.update` clears
+     * the bar on its own once a car isn't charging, so this also handles
+     * the instant a refresh shows charging has finished. Also kicks the
+     * 5-minute poll chain the moment the app is first to notice charging
+     * begin, instead of waiting on AlertWorker's 30-minute tick.
+     */
+    private suspend fun refreshLiveChargeBar(vehicles: List<Vehicle>) {
+        if (!settingsStore.notificationPrefs().charging) return
+        val statuses = _state.value.statuses
+        var anyCharging = false
+        vehicles.forEach { v ->
+            val ev = statuses[v.vin]?.evStatus
+            if (ev?.batteryCharge == true) anyCharging = true
+            runCatching {
+                LiveCharge.update(
+                    context = getApplication(),
+                    vin = v.vin,
+                    carName = v.name,
+                    charging = ev?.batteryCharge == true,
+                    percent = ev?.batteryStatus,
+                    minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
+                    pluggedInLabel = ev?.pluggedInLabel,
+                    enabled = true,
+                    chargeLimit = ev?.targetForCurrentPlug(),
+                )
+            }
+        }
+        if (anyCharging) com.bloo.bluelink.work.LiveChargePollWorker.kick(getApplication())
     }
 
     private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {

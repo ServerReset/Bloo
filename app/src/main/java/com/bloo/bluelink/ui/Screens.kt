@@ -333,6 +333,7 @@ import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
+import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
@@ -10582,6 +10583,40 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Notifications
             SettingsCard("Notifications", Icons.Filled.Notifications) {
+                // First, not last: every other switch in this card is an
+                // ALERT the user hopes never fires. This is a live surface
+                // they watch on purpose while the car charges.
+                ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
+                Text(
+                    "A progress bar in the shade and, on Android 16+, in the status bar and " +
+                        "lock screen while the car charges -- with the charge limit marked and " +
+                        "a Stop button.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                // Whether it actually promotes to the status-bar chip is a
+                // system decision this app cannot force -- Android 16+ has a
+                // real API to check the user's per-app toggle for it, though,
+                // so query it instead of guessing.
+                if (notif.charging && Build.VERSION.SDK_INT >= 36) {
+                    val ctx = LocalContext.current
+                    if (!LiveCharge.isPromotable(ctx)) {
+                        Text(
+                            "Not showing in the status bar? Tap to fix",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable { LiveCharge.openLiveUpdateSettings(ctx) }
+                                .padding(vertical = 4.dp)
+                                .padding(bottom = 6.dp),
+                        )
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Spacer(Modifier.height(10.dp))
+
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
                 if (notif.doorOpen) {
@@ -12434,6 +12469,9 @@ private fun SettingsSearchResults(
     }
     add("Open links in app", "browser tab links") {
         ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
+    }
+    add("Live charging updates", "notification charging live progress ongoing bar ev limit") {
+        ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
     }
     add("Service due alerts", "notification reminder service") {
         ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
