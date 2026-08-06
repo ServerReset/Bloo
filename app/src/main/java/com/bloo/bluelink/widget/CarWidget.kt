@@ -1878,6 +1878,12 @@ class CarWidget : GlanceAppWidget() {
             else -> colCapacity > rowCapacity
         }
         val actions = all.take((if (stack) colCapacity else rowCapacity).coerceAtLeast(1))
+        // Stretched to fill the WHOLE reserved zone in stack mode, not
+        // sized to Scale.buttonHeight and centred inside it -- see the
+        // Column branch below for why that room is real, deliberately
+        // budgeted space rather than a leftover guess.
+        val stackHeight = ((availableHeight - gap * (actions.size - 1)) / actions.size).coerceAtLeast(16.dp)
+        val rowHeight = Scale.buttonHeight(size)
         // Labels are all-or-nothing across the row: measured against the
         // LONGEST label present, so the widest one setting cleanly is the
         // condition for any of them appearing.
@@ -1889,12 +1895,25 @@ class CarWidget : GlanceAppWidget() {
             fontWeight = FontWeight.Medium,
         )
         val labelRoom = perButton - (Scale.buttonIcon(size) + 14.dp)
-        val showLabels = Scale.buttonHeight(size) >= 36.dp &&
+        val showLabels = (if (stack) stackHeight else rowHeight) >= 36.dp &&
             actions.all { !wouldOverflow(it.label, labelStyle, labelRoom) }
         // Centred both ways. When a layout hands ActionButtons the whole tile
         // -- the controls-priority tiers, where the buttons ARE the widget --
         // the block belongs in the middle of it, not against the top-left.
         if (stack) {
+            // stackHeight (computed above) stretches every button to fill
+            // the WHOLE reserved zone, not Scale.buttonHeight centred inside
+            // it. Every caller that stacks buttons already reserves
+            // availableHeight specifically FOR them (RailLayout/
+            // CompactTallNarrowLayout/CompactTallLayout and their controls-
+            // priority branches all pass it explicitly alongside
+            // vertical = true) -- so this is real, deliberately budgeted
+            // room, not a leftover guess. Buttons used to sit at a small
+            // fixed height with the extra room showing as bare photo above
+            // and below the stack even on a tile with a generous button
+            // zone. Dividing that same zone evenly instead means two buttons
+            // in a tall RAIL fill it edge to edge; six buttons in the same
+            // zone still divide it evenly, just thinner each.
             Column(
                 modifier = modifier,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1907,6 +1926,7 @@ class CarWidget : GlanceAppWidget() {
                     ActionButton(
                         action, car, render,
                         modifier = GlanceModifier.fillMaxWidth(),
+                        heightOverride = stackHeight,
                         showLabel = showLabels,
                     )
                 }
@@ -1980,6 +2000,11 @@ class CarWidget : GlanceAppWidget() {
         // the caller's own fillMaxSize() modifier should decide the button's
         // size instead of the usual fixed row/column height.
         fixedHeight: Boolean = true,
+        // Overrides Scale.buttonHeight when set -- ActionButtons' own stack
+        // branch uses this to stretch every button to fill its whole
+        // reserved zone rather than sitting at the flat continuous-scale
+        // height with the extra room left as bare photo around the stack.
+        heightOverride: Dp? = null,
         iconSize: Dp = Scale.buttonIcon(LocalSize.current),
         // Whether to name the action beside its icon. Decided by the CALLER
         // for the whole row at once, never per button: labels have different
@@ -2016,7 +2041,7 @@ class CarWidget : GlanceAppWidget() {
             )
         }
         Box(
-            modifier = (if (fixedHeight) modifier.height(Scale.buttonHeight(size)) else modifier)
+            modifier = (if (fixedHeight) modifier.height(heightOverride ?: Scale.buttonHeight(size)) else modifier)
                 .background(bg)
                 .cornerRadius(innerCorner(render.config))
                 .clickable(click),
