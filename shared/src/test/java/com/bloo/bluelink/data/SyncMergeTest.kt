@@ -376,11 +376,14 @@ class SyncDeviceLocalTest {
 
     @Test
     fun `user settings roam between devices`() {
-        // Every notification preference is a genuine user choice and must travel.
+        // Every notification preference is a genuine user choice and must
+        // travel -- including the live charging bar, whose key was added with
+        // that feature and would otherwise have been silently device-only.
         listOf(
             "notify_service", "notify_door", "notify_door_min",
             "notify_running", "notify_running_min",
             "notify_unlocked", "notify_unlocked_min",
+            "notify_charging",
             // A representative spread of the other portable settings.
             "theme_mode", "unit_system", "settings_mode",
         ).forEach {

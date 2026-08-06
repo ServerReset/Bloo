@@ -333,6 +333,7 @@ import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
+import com.bloo.bluelink.data.ChargingLive
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
@@ -10582,6 +10583,43 @@ private fun SettingsScreen(vm: AppViewModel) {
 
             // Notifications
             SettingsCard("Notifications", Icons.Filled.Notifications) {
+                // First, not last. Everything else in this card is an ALERT --
+                // a one-shot "something happened" the user hopes never fires.
+                // This one is a live surface they watch on purpose while the
+                // car charges, so burying it under four alert switches and
+                // their minute fields had it read as an afterthought.
+                ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
+                Text(
+                    "A progress bar in the shade and on the lock screen while the car charges, " +
+                        "filling as it goes, with the charge limit marked and a Stop button.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                // Android decides at post time whether to promote this to a
+                // Live Update -- the treatment that puts it in the status-bar
+                // chip and Samsung's Now bar -- and reports nothing back that
+                // the app can read. Its own docs note the promotability check
+                // ignores the per-app Live Updates switch entirely, so when the
+                // bar posts as an ordinary notification with a correct builder,
+                // that switch is the remaining lever and it is the user's, not
+                // ours. This is the door to it.
+                if (notif.charging && Build.VERSION.SDK_INT >= 36) {
+                    val ctx = LocalContext.current
+                    Text(
+                        "Not showing in the status bar?",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { ChargingLive.openLiveUpdateSettings(ctx) }
+                            .padding(vertical = 4.dp)
+                            .padding(bottom = 6.dp),
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Spacer(Modifier.height(10.dp))
+
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
                 if (notif.doorOpen) {
@@ -12450,6 +12488,10 @@ private fun SettingsSearchResults(
     add("Search on the car screen", "search bubble car screen cover home garage ask command") {
         ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
+    add("Live charging updates", "notification charging live progress ongoing bar ev limit") {
+        ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
+    }
+
     // --- Per-car ---
     state.vehicles.forEach { v ->
         val st = state.statusFor(v)

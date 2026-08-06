@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -309,4 +310,361 @@ object CarAlerts {
     private fun doorId(v: Vehicle) = ("door" + v.vin).hashCode()
     private fun runningId(v: Vehicle) = ("run" + v.vin).hashCode()
     private fun unlockedId(v: Vehicle) = ("unlocked" + v.vin).hashCode()
+}
+
+/**
+ * The live, self-updating charging notification.
+ *
+ * Unlike [CarAlerts], which fires one-shot alerts when a condition first
+ * becomes true, this is an ONGOING notification that exists for exactly as
+ * long as the car is charging and rewrites itself in place as the percentage
+ * climbs -- a progress bar in the shade rather than a stream of alerts. See
+ * [update] for the write path and [ChargingPollWorker] for what keeps it
+ * moving while the app isn't in the foreground.
+ *
+ * ## What "live" means here, precisely
+ *
+ * Two DIFFERENT things both get called "live" and are easy to conflate:
+ *
+ * 1. **Self-updating.** The notification rewrites itself in place as the
+ *    number changes, rather than posting a new one each time. This works on
+ *    every supported OS version (minSdk 26) and needs nothing from the
+ *    system beyond an ordinary ongoing notification -- [update] is called
+ *    on a timer ([ChargingPollWorker]) and just calls `notify()` again with
+ *    the same [idFor] id, which Android always treats as "replace the
+ *    existing one" rather than "post a new one".
+ * 2. **Promoted to a Live Update chip.** Android 16 (API 36)+ can lift an
+ *    ongoing notification with the right shape into the status bar and
+ *    lock screen as its own chip (Google's "Now Bar" on some OEM skins),
+ *    the same visual language as a running timer or a rideshare tracker.
+ *    This is what most people mean by "live update" and what the in-app
+ *    copy promises ("A progress bar in the shade **and on the lock
+ *    screen**"). It is entirely a system decision made at post time, is
+ *    all-or-nothing (there is no partial credit, no API to ask "why
+ *    wasn't I promoted"), and below API 36 it simply never happens -- the
+ *    exact same builder just renders as an ordinary progress notification
+ *    with no chip, which is (1) working correctly, not (2) failing.
+ *
+ * If you're checking whether this feature "works", (1) is verifiable from
+ * this code alone (post it, watch the percentage change). (2) additionally
+ * needs an Android 16+ device and is where the checklist below matters.
+ *
+ * ## The promotion checklist (Android 16+ only)
+ *
+ * Google documents nine conditions for `hasPromotableCharacteristics()` to
+ * return true (developer.android.com, "Create live update notifications").
+ * Each one this file controls is listed with exactly where it's satisfied,
+ * so a future change that accidentally breaks one is traceable back here:
+ *
+ *  | # | Condition                              | Where                                          |
+ *  |---|-----------------------------------------|-------------------------------------------------|
+ *  | 1 | A promotable style (`ProgressStyle`)    | [update], both the `percent != null` branch and the no-percent fallback -- see that method's own doc for why BOTH branches need it |
+ *  | 2 | `setOngoing(true)`                      | [update]                                       |
+ *  | 3 | A non-blank `contentTitle`               | [update] -- always `"$carName is charging"`    |
+ *  | 4 | `setRequestPromotedOngoing(true)`        | [update]                                       |
+ *  | 5 | `POST_PROMOTED_NOTIFICATIONS` manifest permission | the app manifest -- install-time, not a runtime prompt, nothing to request in code |
+ *  | 6 | No custom `RemoteViews`                  | never set here                                 |
+ *  | 7 | Not a group summary                      | never set here                                 |
+ *  | 8 | Not `setColorized(true)`                 | never set here                                 |
+ *  | 9 | Channel importance above `IMPORTANCE_MIN` | [ensureChannel] -- `IMPORTANCE_LOW`, which is one step above the floor |
+ *
+ * A 10th condition exists but is **not controllable from code at all**:
+ * whether the user has the per-app system "Live Updates" toggle switched
+ * on. The docs state outright that `hasPromotableCharacteristics()` does
+ * NOT factor this in -- a notification can satisfy every row above and
+ * still render as an ordinary notification, silently, with nothing in
+ * Logcat and nothing this app can query. [openLiveUpdateSettings] exists
+ * because this is the one lever actually left once the table above is
+ * green, and it is the user's lever, not this code's.
+ *
+ * ## How to tell it's actually promoting, on a real Android 16+ device
+ *
+ * Start a charge (or fake `charging = true` in a debug build) and watch
+ * for a chip in the status bar / lock screen, not just a notification in
+ * the shade. If the shade notification appears correctly (title, bar,
+ * Stop button, updates as the percentage climbs) but no chip ever shows:
+ * the *notification* is working (requirement 1 above, "self-updating") and
+ * the fault is specifically in *promotion* (requirement 2). Check, in
+ * order: (a) the device is genuinely running API 36+ (`Build.VERSION.
+ * SDK_INT`, logged or breakpointed -- promotion is silently skipped below
+ * it, by design, not a bug); (b) the per-app Live Updates system toggle,
+ * via [openLiveUpdateSettings] from Settings > Notifications in-app; (c)
+ * only then suspect the builder itself, and re-check the table above
+ * against whatever changed.
+ *
+ * ## Why it lives on its own channel
+ *
+ * IMPORTANCE_LOW so it never makes a sound or peeks -- a notification that
+ * reposts on every poll would be intolerable on the default channel. LOW
+ * also satisfies condition 9 above (it has to clear IMPORTANCE_MIN, which
+ * LOW does with one full step to spare) while staying quiet.
+ *
+ * Below API 36 the exact same builder degrades by itself: `ProgressStyle`
+ * renders as an ordinary determinate progress bar, and
+ * `setRequestPromotedOngoing` is silently ignored. One code path, not two.
+ */
+object ChargingLive {
+    // Bumped from "bloo_charging" to "bloo_charging_v2". Channel PROPERTIES
+    // are immutable from the app's side once created -- ensureChannel below
+    // only ever calls createNotificationChannel when no channel with this id
+    // exists yet, and Android does not let an app change an existing
+    // channel's importance afterwards, only the user can, in system
+    // settings. This channel has existed under the old id since the very
+    // first version of this feature, through many rebuilds in one long
+    // session; if it was ever created at the wrong importance by an earlier
+    // iteration, or the user silenced/downgraded it while testing any of
+    // those iterations, every later fix to the CODE would have been talking
+    // to a channel the system had already locked in. A fresh id guarantees
+    // today's code is what actually creates it, with nothing earlier able to
+    // have left it in a state this file can't detect or repair. If this was
+    // never actually the problem, the new id costs nothing -- it just means
+    // charging notifications land on a differently-named channel from here on.
+    private const val CHANNEL = "bloo_charging_v2"
+    private const val ACCENT = 0xFF7B83EB.toInt()
+    /** Filled portion of the Live Update bar: the same green the app and
+     *  widget already use for charging, so the chip matches the car card. */
+    private const val CHARGE_GREEN = BlooColors.chargeGreen
+    /** The not-yet-charged remainder. Deliberately dim rather than empty --
+     *  a zero-width remaining segment at 100% is filtered out below. */
+    private const val TRACK = 0x40FFFFFF
+    /** The limit marker on the bar. Light, so it reads against both the green
+     *  fill it sits on below the limit and the dim track above it. */
+    private const val LIMIT_POINT = 0xFFFFFFFF.toInt()
+
+    /** One stable notification id per car, distinct from the alert ids so a
+     *  charging notification never overwrites a door/service alert. */
+    private fun idFor(vin: String) = ("charging" + vin).hashCode()
+
+    private fun ensureChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val mgr = context.getSystemService(NotificationManager::class.java)
+            if (mgr.getNotificationChannel(CHANNEL) == null) {
+                mgr.createNotificationChannel(
+                    NotificationChannel(CHANNEL, "Charging", NotificationManager.IMPORTANCE_LOW)
+                        .apply {
+                            description = "A live progress notification while your car is charging"
+                            setShowBadge(false)
+                        },
+                )
+            }
+        }
+    }
+
+    /**
+     * Posts, updates or clears the charging notification for one car.
+     *
+     * Safe and cheap to call on every poll: when the car isn't charging (or
+     * the feature is off, or permission is missing) it just cancels any
+     * notification already showing, so charging ending always tidies up
+     * rather than leaving a stale bar pinned in the shade.
+     *
+     * [percent] and [minutesToFull] are both optional because a car can
+     * report that it is charging before it reports either -- see the
+     * `percent == null` branch below for how that's handled without giving
+     * up promotion (condition 1 of [ChargingLive]'s own class-level
+     * checklist), which is exactly the branch that used to give it up.
+     */
+    fun update(
+        context: Context,
+        vin: String,
+        carName: String,
+        charging: Boolean,
+        percent: Int?,
+        minutesToFull: Int?,
+        pluggedInLabel: String?,
+        enabled: Boolean,
+        /** The car's charge limit for the plug it's on, if it reported one.
+         *  Drawn as the seam between "will charge" and "won't", matching the
+         *  app hero's own segmented bar. */
+        chargeLimit: Int? = null,
+    ) {
+        val id = idFor(vin)
+        if (!enabled || !charging || !Notifications.hasPermission(context)) {
+            runCatching { NotificationManagerCompat.from(context).cancel(id) }
+            return
+        }
+        ensureChannel(context)
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val pi = launch?.let {
+            PendingIntent.getActivity(
+                context, id, it,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+        // "82% · to 80% · 1h 20m left · Plugged in (AC)" -- built from
+        // whichever pieces the car actually reported, joined so a missing one
+        // leaves no stray separator behind.
+        //
+        // On the history here, because it matters for the next person who
+        // touches this builder: setProgressPoints (the limit marker, below)
+        // was once removed from it on the theory that it was costing the
+        // promotion, since it was the only change between a build confirmed
+        // working on a real device and one confirmed demoted. Removing it did
+        // NOT restore the promotion, so the theory was wrong and the point is
+        // back -- see ChargingLive's own class doc for the checklist this
+        // builder is actually held to, and what the real fault turned out to
+        // be (the no-percent branch below, at the time).
+        val limit = chargeLimit?.takeIf { it in 1..99 }
+        val detail = listOfNotNull(
+            percent?.let { "$it%" },
+            // Only worth saying while it's still ahead of the car: once
+            // charging has reached the limit the number is the same number.
+            limit?.takeIf { percent == null || percent < it }?.let { "to $it%" },
+            minutesToFull?.takeIf { it > 0 }?.let { "${fmtMinutes(it)} left" },
+            pluggedInLabel?.takeIf { it.isNotBlank() && !it.startsWith("Not ") },
+        ).joinToString(" · ")
+
+        val builder = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_bloo)
+            .setColor(ACCENT)
+            .setContentTitle("$carName is charging")
+            .setContentText(detail.ifBlank { "Charging" })
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // Ongoing so it can't be swiped away while charging continues, and
+            // alert-once so rewriting it every poll stays silent.
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .apply { pi?.let { setContentIntent(it) } }
+
+        if (percent != null) {
+            // ProgressStyle is what makes this a promotable Live Update. The
+            // bar is drawn as one filled segment plus one remaining segment,
+            // rather than setProgress's plain track, so the charged portion
+            // carries the accent and the rest reads as headroom.
+            //
+            // TWO segments, split at the CHARGE: green is what's in the pack,
+            // the track is what isn't. The limit is a POINT on that bar, set
+            // below -- not a third segment and not a second division. Every
+            // other surface draws this value the same way now (the phone hero,
+            // the widget's bar and ring, the watch ring): fill to the charge,
+            // track for the rest, a dot at the limit.
+            val style = NotificationCompat.ProgressStyle()
+                .setStyledByProgress(false)
+                .setProgress(percent)
+                .setProgressSegments(
+                    // Built conditionally rather than filtered afterwards:
+                    // a zero-length segment is meaningless, and at 0% or
+                    // 100% one of these is exactly that.
+                    buildList {
+                        if (percent > 0) {
+                            add(NotificationCompat.ProgressStyle.Segment(percent).setColor(CHARGE_GREEN))
+                        }
+                        if (percent < 100) {
+                            add(NotificationCompat.ProgressStyle.Segment(100 - percent).setColor(TRACK))
+                        }
+                    },
+                )
+            // The limit as a point ON the bar, which is exactly what it is on
+            // the phone hero, the widget's bar and ring, and the watch: the
+            // fill is the charge, the point is the target.
+            if (limit != null) {
+                style.setProgressPoints(
+                    listOf(NotificationCompat.ProgressStyle.Point(limit).setColor(LIMIT_POINT)),
+                )
+            }
+            builder.setStyle(style)
+            // The compact text on the status-bar chip, where there is room for
+            // a couple of glyphs and nothing more.
+            builder.setShortCriticalText("$percent%")
+        } else {
+            // Charging confirmed but no percentage reported yet.
+            //
+            // This used to fall back to the legacy setProgress(0, 0, true)
+            // indeterminate bar -- honest about not having a number, but it
+            // meant the notification posted with NO ProgressStyle at all
+            // for however long the car takes to first report a percentage
+            // (sometimes indefinitely, on a status response missing the
+            // field). "A promotable style" is one of the documented,
+            // non-negotiable conditions for promotion -- setRequestPromoted
+            // Ongoing below was being called on a builder that had already
+            // failed that condition, so the notification could sit un-
+            // promoted through its entire first stretch of updates even
+            // with everything else about the builder correct. A single
+            // all-track segment (no green fill, since there's nothing
+            // charged to report yet) keeps ProgressStyle in play from the
+            // very first post instead of only once a percentage shows up.
+            builder.setStyle(
+                NotificationCompat.ProgressStyle()
+                    .setStyledByProgress(false)
+                    .setProgress(0)
+                    .setProgressSegments(listOf(NotificationCompat.ProgressStyle.Segment(100).setColor(TRACK))),
+            )
+        }
+        // Asks the system to promote this to a Live Update. Ignored below API
+        // 36 and whenever any of the documented conditions isn't met, so it is
+        // safe to request unconditionally.
+        builder.setRequestPromotedOngoing(true)
+
+        // Stop-charging is offered inline, since the whole point of a live
+        // notification is acting without opening the app.
+        val stopIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_RUN
+            data = Uri.parse("bloo://charging/$vin/stop")
+            putExtra(AlertActionReceiver.EXTRA_VIN, vin)
+            // CHARGE_OFF, not TOGGLE_CHARGE: if the car finished or was
+            // unplugged between the poll that drew this notification and
+            // the tap, a toggle would START charging again.
+            putExtra(AlertActionReceiver.EXTRA_ACTION, WearAction.CHARGE_OFF)
+            putExtra(AlertActionReceiver.EXTRA_NOTIF_ID, id)
+            putExtra(AlertActionReceiver.EXTRA_LABEL, "Stop")
+        }
+        builder.addAction(
+            0, "Stop charging",
+            PendingIntent.getBroadcast(
+                context, id, stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            ),
+        )
+        runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
+    }
+
+    /**
+     * Opens this app's system notification settings.
+     *
+     * Android decides at post time whether an ongoing notification is promoted
+     * to a Live Update, reports nothing back that an app can read, and -- per
+     * the documentation -- ignores its own promotability check entirely if the
+     * user has Live Updates switched off for the app. So when the bar posts as
+     * an ordinary notification despite the builder being correct, the only
+     * remaining lever is the user's, and the app's job is to hand them the
+     * door rather than to keep guessing at the builder.
+     */
+    fun openLiveUpdateSettings(context: Context) {
+        // The CHANNEL's own settings page, not the app's general notification
+        // list. The "Charging" channel is one row among however many this app
+        // has, and a Live Updates toggle (where the OS exposes one) lives on
+        // the CHANNEL's page, not the app's -- landing the user on the app's
+        // whole list makes them go find and tap the right row themselves.
+        // Falls back to the app-level page (previous behaviour) if the
+        // channel-specific action isn't available, and from there to bare
+        // app-details, same as before.
+        val channelIntent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, CHANNEL)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val appIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(channelIntent) }
+            .recoverCatching { context.startActivity(appIntent) }
+            .onFailure {
+                runCatching {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.fromParts("package", context.packageName, null))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }
+    }
+
+    /** Clears every car's charging notification -- used when the feature is
+     *  switched off in settings, so an already-posted bar disappears at once
+     *  instead of lingering until the next poll. */
+    fun cancelAll(context: Context, vins: List<String>) {
+        val mgr = NotificationManagerCompat.from(context)
+        vins.forEach { vin -> runCatching { mgr.cancel(idFor(vin)) } }
+    }
 }
