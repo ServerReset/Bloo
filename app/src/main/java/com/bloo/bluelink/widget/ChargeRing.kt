@@ -32,9 +32,10 @@ object ChargeRing {
      * @param centerText optional text drawn in the middle (e.g. "82%"); null = none
      * @param centerColor ARGB of the centre text
      * @param strokeFraction ring thickness as a fraction of radius (default 0.16)
-     * @param limitFraction optional 0f..1f charge-limit position; cuts a notch
-     *        clean through the ring there so the stretch the car has been told
-     *        not to fill reads as a separate segment. Null = no limit known.
+     * @param limitFraction optional 0f..1f charge-limit position, drawn as a
+     *        dot sitting in a small gap cut through the ring at that angle --
+     *        the same "mark on the gauge, not a division of it" treatment every
+     *        other surface uses for this value. Null = no limit known.
      */
     fun render(
         sizePx: Int,
@@ -84,10 +85,20 @@ object ChargeRing {
         // the reader working out which is which.
         //
         // Two circles: the outer one clears a little room in the ring so the
-        // marker sits ON it rather than in it, the inner one is the mark. The
-        // inner colour flips with the charge so it stays legible against the
-        // filled arc and the empty track alike.
-        val limit = limitFraction?.takeIf { it > 0.02f && it < 0.99f }
+        // marker sits ON it rather than in it, the inner one is the mark.
+        //
+        // The same 1..99 window every other surface applies to this value (see
+        // ChargeBar, ChargeSegmentBar, the watch ring, LiveCharge): 0 and 100
+        // aren't markers, they're the ends of the gauge. This used to be
+        // `> 0.02f`, which silently drew nothing for a 1% or 2% limit while the
+        // bar next to it drew a dot.
+        //
+        // Bounds sit on the midpoints rather than on 0.01/0.99 exactly: the
+        // caller hands us an Int percent divided by 100f, so the only reachable
+        // values near either end are 0.00, 0.01, 0.99 and 1.00, and testing
+        // against midpoints keeps this correct without comparing floats for
+        // equality at a boundary.
+        val limit = limitFraction?.takeIf { it > 0.005f && it < 0.995f }
         if (limit != null) {
             val radius = (rect.width() / 2f).coerceAtLeast(1f)
             val angle = Math.toRadians((-90f + 360f * limit).toDouble())
@@ -99,7 +110,22 @@ object ChargeRing {
             }
             canvas.drawCircle(cx, cy, outer, clear)
             val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (clamped >= limit) trackColor else arcColor
+                // FIXED colour, never flipped by which side of the fill the mark
+                // lands on. Flipping it to trackColor once the charge passed the
+                // limit made the mark disappear at exactly the state this gauge
+                // is in most often -- a car set to 80% and charged to 80% -- the
+                // same defect the phone's ChargeLimitDot, the widget's own
+                // ChargeBar and the watch ring each fixed by pinning their
+                // colours (see ChargeLimitDot for the full reasoning).
+                //
+                // arcColor rather than a theme role because this file is
+                // deliberately theme-agnostic (plain android.graphics, ARGB ints
+                // in). It is opaque and saturated -- WidgetTheme.forPhoto leaves
+                // accentArgb alone precisely so bitmap arcs stay legible over a
+                // photo -- so the mark reads wherever the arc itself does.
+                // Matching the other surfaces exactly (background halo +
+                // onSurface core) would need those two roles passed in as ints.
+                color = arcColor
             }
             canvas.drawCircle(cx, cy, outer * 0.62f, dot)
         }

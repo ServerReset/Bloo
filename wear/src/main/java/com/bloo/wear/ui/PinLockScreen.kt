@@ -174,6 +174,16 @@ private fun PinKeypad(onDigit: (String) -> Unit, onBackspace: () -> Unit) {
  * shown above the dots and triggers a reject haptic + a brief error tint/shake
  * on the dots + clears any partial entry (used for "wrong PIN" after a failed
  * [onSubmit]).
+ *
+ * [errorNonce] must be incremented by the caller on every failed attempt, and
+ * is what actually drives that reject/clear. Keying it off [error] alone was a
+ * real lockout: `submitPin` reports the identical "Wrong PIN" string for every
+ * attempt before the lockout threshold, Compose's MutableState uses structural
+ * equality, so re-assigning an equal value is not a state change -- the effect
+ * never restarted, [buffer] stayed at PIN_LENGTH, and `onDigit`'s
+ * `buffer.length < PIN_LENGTH` guard then swallowed every subsequent tap. The
+ * first wrong PIN cleared and shook; the second through fourth left the pad
+ * frozen with four filled dots until the user manually backspaced four times.
  */
 @Composable
 fun PinEntryScreen(
@@ -182,13 +192,19 @@ fun PinEntryScreen(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     error: String? = null,
+    errorNonce: Int = 0,
     onCancel: (() -> Unit)? = null,
 ) {
     var buffer by remember { mutableStateOf("") }
     val haptics = LocalHapticFeedback.current
     var showErrorTint by remember { mutableStateOf(false) }
     val shakeX = remember { Animatable(0f) }
-    LaunchedEffect(error) {
+    // Keyed on the attempt COUNTER, not just the message -- see the KDoc: two
+    // consecutive wrong PINs produce the same string, so an `error`-only key
+    // never re-ran and the pad stayed stuck with a full buffer. `error` is kept
+    // in the key list as well so a caller that sets a message without bumping
+    // the counter still gets the reject (the body no-ops when it's null).
+    LaunchedEffect(errorNonce, error) {
         if (error != null) {
             haptics.reject()
             buffer = ""
@@ -305,6 +321,10 @@ fun PinEntryScreen(
 @Composable
 fun PinLockScreen(vm: WearViewModel) {
     var error by remember { mutableStateOf<String?>(null) }
+    // Bumped on every failed attempt so PinEntryScreen's reject/clear fires even
+    // when the message is byte-identical to the last one (it is, for attempts 1-4
+    // -- submitPin only supplies a distinct lockout string on the 5th).
+    var errorNonce by remember { mutableStateOf(0) }
     Box(
         Modifier
             .fillMaxSize()
@@ -313,8 +333,16 @@ fun PinLockScreen(vm: WearViewModel) {
         PinEntryScreen(
             title = "Enter PIN",
             error = error,
+            errorNonce = errorNonce,
             onSubmit = { pin ->
-                vm.submitPin(pin) { ok, lockoutMessage -> error = if (ok) null else (lockoutMessage ?: "Wrong PIN") }
+                vm.submitPin(pin) { ok, lockoutMessage ->
+                    if (ok) {
+                        error = null
+                    } else {
+                        error = lockoutMessage ?: "Wrong PIN"
+                        errorNonce++
+                    }
+                }
             },
         )
     }
@@ -337,6 +365,11 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
     var step by remember { mutableStateOf(if (mode == PinFlowMode.SET) PinFlowStep.ENTER_NEW else PinFlowStep.CONFIRM_CURRENT) }
     var firstEntry by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    // Same reason as PinLockScreen's: CONFIRM_CURRENT sets the identical
+    // "Wrong PIN" on every failed attempt, so the reject/clear needs a changing
+    // key. ENTER_NEW/CONFIRM_NEW don't need it -- their errors always arrive
+    // together with a `step` change, and key(step) rebuilds the pad anyway.
+    var errorNonce by remember { mutableStateOf(0) }
 
     // Wrapped in a ScreenScaffold with timeText = {} so the inherited AppScaffold
     // clock is suppressed here — this overlay is drawn on top of Settings (inside
@@ -361,6 +394,7 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                 PinFlowStep.CONFIRM_CURRENT -> PinEntryScreen(
                     title = "Enter current PIN",
                     error = error,
+                    errorNonce = errorNonce,
                     onCancel = onDone,
                     onSubmit = { pin ->
                         vm.verifyPinForManagement(pin) { ok ->
@@ -373,6 +407,7 @@ fun PinManagementOverlay(vm: WearViewModel, mode: PinFlowMode, onDone: () -> Uni
                                 }
                             } else {
                                 error = "Wrong PIN"
+                                errorNonce++
                             }
                         }
                     },

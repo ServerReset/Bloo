@@ -53,6 +53,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.formatDistance
+import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.bluelink.data.relativeLabel
 import com.bloo.bluelink.ui.ThemeMode
 import com.bloo.bluelink.ui.resolveWidgetAccent
@@ -2506,7 +2507,19 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun StatusGlyph(car: VehicleSnapshot, theme: WidgetTheme, sizeDp: Int) {
         if (sizeDp <= 0) return
-        val locked = car.locked == true
+        // A car that has never reported a lock state renders NOTHING, rather
+        // than resolving `null` into the unlocked branch and putting a confident
+        // red open padlock on the home screen for a state nobody has heard yet.
+        // `infoValue`'s own LOCK case already draws this distinction (it returns
+        // null rather than guessing), and the watch's ToggleStateComplication
+        // omits its icon entirely for the same reason: a definite glyph is
+        // indistinguishable from a confirmed reading.
+        //
+        // Yielding nothing is the same contract Scale.ring and heroSpIn use, and
+        // the callers already handle it -- this is only reached when the ring is
+        // off or percent is unknown, i.e. a tile that has little else to show
+        // either way.
+        val locked = car.locked ?: return
         val res = if (locked) R.drawable.ic_shortcut_lock else R.drawable.ic_shortcut_unlock
         val tint = if (locked) theme.accentProvider else theme.unlocked
         Image(
@@ -2614,7 +2627,13 @@ class CarWidget : GlanceAppWidget() {
     private fun serviceDueLabel(car: VehicleSnapshot, metric: Boolean): String? {
         val last = car.lastServiceMiles ?: return null
         val interval = car.serviceIntervalMiles ?: return null
-        val odo = car.odometer?.filter { it.isDigit() }?.toIntOrNull() ?: return null
+        // Odometer strings can arrive with thousands separators (e.g. "12,345")
+        // and fractional miles; parseOdometerMiles strips/floors them to an Int.
+        // Hand-rolling this with filter { isDigit() } dropped the decimal POINT
+        // too, so "12,345.6" parsed as 123456 -- an odometer ten times too high,
+        // which drove `due` negative, coerced it to 0, and left this field
+        // reading "in 0 mi" forever (a service alert that never clears).
+        val odo = parseOdometerMiles(car.odometer) ?: return null
         val due = (last + interval - odo).coerceAtLeast(0)
         return "in ${formatDistance(due, metric)}"
     }
