@@ -944,19 +944,27 @@ class CarWidget : GlanceAppWidget() {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
             ChargeBarFallback(car, render, ringEdge, ringRoom)
+            // NOT .defaultWeight() -- ringEdge is already sized from ringRoom,
+            // the exact leftover this row has, so its natural height already
+            // fits without being stretched to claim more. A weighted row here
+            // shared the same failure mode as a weighted MapFill ahead of
+            // fixed content elsewhere in this file: on a real device the
+            // ActionButtons row below it rendered nothing at all, not merely
+            // squeezed -- matched here to XlSquareLayout's own RingWithContent
+            // call, which was already unweighted for the same reason.
             if (render.config.showRing && car.percent != null) {
                 // RingWithContent auto-stacks vertically instead of
                 // squeezing ring+info into a cramped row if the tile's
                 // actual measured width can't fit them side by side.
                 RingWithContent(
-                    modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                    modifier = GlanceModifier.fillMaxWidth(),
                     minRowWidth = 140.dp,
                     ringWidth = ringEdge,
                     ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
                     content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale), availableWidth = w) },
                 )
             } else {
-                Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+                Column(modifier = GlanceModifier.fillMaxWidth()) {
                     InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale))
                 }
             }
@@ -1168,8 +1176,16 @@ class CarWidget : GlanceAppWidget() {
             FooterRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
             ChargeBarFallback(car, render, ringEdge, ringRoom - mapRoom)
+            // NOT .defaultWeight() -- same fix as MediumSquareLayout's own
+            // note: ringEdge is already sized from ringRoom - mapRoom, the
+            // real leftover this row has, so it doesn't need to be stretched
+            // to fill anything. A weighted row here is the same failure mode
+            // as a weighted MapFill ahead of fixed content -- ActionButtons
+            // below it rendered nothing at all on a real device, not merely
+            // squeezed. Matched to XlSquareLayout's own RingWithContent call,
+            // which was already unweighted for this exact reason.
             RingWithContent(
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                modifier = GlanceModifier.fillMaxWidth(),
                 minRowWidth = 220.dp,
                 ringWidth = ringEdge,
                 ring = {
