@@ -133,6 +133,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WearWeather
 import com.bloo.bluelink.data.degLabel
@@ -1276,7 +1277,7 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     // 2°F steps, not 1° - the round screen only has room for so many dots before
     // they crowd into an unreadable smear; halving the count (11 vs 21) fixes that.
     val fahrenheit = useFahrenheit(ui)
-    SliderRow("Temp", degLabel(d.tempF.toString(), fahrenheit), d.tempF, 62, 82, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
+    SliderRow("Temp", degLabel(d.tempF.toString(), fahrenheit), d.tempF, CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
     // One tap for the ends of the range, which is where people actually want
     // to be: "as cold as it goes" is a common intent and, on a watch, eleven
     // slider steps of dragging to reach it. The phone understands the same two

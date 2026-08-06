@@ -134,7 +134,7 @@ object TileCommandRunner {
                     // plug types are set together because setChargeTargets
                     // always sends both, and the API reports exactly these two.
                     "charge_limit" -> {
-                        val pct = climateTarget.toIntOrNull()?.coerceIn(50, 100)
+                        val pct = climateTarget.toIntOrNull()?.coerceIn(CHARGE_LIMIT_RANGE)
                             ?: error("Bad charge limit")
                         repo.setChargeTargets(v, pct, pct)
                         "Charge limit set to $pct% on ${v.name}"

@@ -11793,7 +11793,7 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
         Regex("(charge|charging) (limit|target)|limit .*(charge|charging)|charge to \\d{2,3}")
             .containsMatchIn(q) -> {
             val pct = Regex("\\b(\\d{2,3})\\s*%?").find(q)?.groupValues?.get(1)?.toIntOrNull()
-            if (pct != null && pct in 50..100) {
+            if (pct != null && pct in CHARGE_LIMIT_RANGE) {
                 ParsedVehicleCommand("charge_limit", pct.toString(), "Setting charge limit to $pct% on")
             } else {
                 null
