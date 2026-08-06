@@ -364,9 +364,6 @@ class SettingsStore(private val context: Context) {
         val runningMinutes: Int = 10,
         val unlocked: Boolean = true,
         val unlockedMinutes: Int = 10,
-        /** "Live" charging notification -- see [com.bloo.bluelink.data.ChargingLive]'s
-         *  class doc for exactly what that means and how to verify it's working. */
-        val charging: Boolean = true,
     )
 
     /** The single [NotificationPrefs] decode, shared by both the one-shot
@@ -381,7 +378,6 @@ class SettingsStore(private val context: Context) {
             runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
             unlocked = p[booleanPreferencesKey("notify_unlocked")] ?: true,
             unlockedMinutes = p[stringPreferencesKey("notify_unlocked_min")]?.toIntOrNull() ?: 10,
-            charging = p[booleanPreferencesKey("notify_charging")] ?: true,
         )
 
     /** One-shot read of [NotificationPrefs] (vs. the [notifications] Flow below,
@@ -419,9 +415,6 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setUnlockedMinutes(v: Int) =
         editTracked { it[stringPreferencesKey("notify_unlocked_min")] = v.toString() }.let {}
-
-    suspend fun setNotifyCharging(v: Boolean) =
-        editTracked { it[booleanPreferencesKey("notify_charging")] = v }.let {}
 
     // Transient alert bookkeeping (per car), used to fire each alert only once.
     // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a

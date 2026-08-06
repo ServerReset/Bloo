@@ -8,7 +8,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAlerts
-import com.bloo.bluelink.data.ChargingLive
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
@@ -68,11 +67,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         val prefs = settings.notificationPrefs()
-        // `charging` belongs in this gate too: it is driven by the same poll,
-        // so leaving it out meant someone who turned every alert off but kept
-        // the live charging bar got no poll at all, and therefore a bar that
-        // never updated or cleared.
-        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked && !prefs.charging) {
+        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked) {
             return Result.success()
         }
 
@@ -92,31 +87,6 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     CarAlerts.evaluate(settings, v, status, prefs).forEach {
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
                     }
-                }
-                // The live charging bar is refreshed from the same poll, so it
-                // tracks the real percentage rather than being posted once and
-                // going stale. Called even when `status` is null or the car
-                // isn't charging: update() cancels in those cases, which is
-                // what clears the bar when charging finishes.
-                runCatching {
-                    val ev = status?.evStatus
-                    // Hand off to the 5-minute chain the moment charging is
-                    // seen: this worker only ticks every 30 minutes, which is
-                    // far too slow for a progress bar to look live.
-                    if (ev?.batteryCharge == true && prefs.charging) {
-                        ChargingPollWorker.kick(applicationContext)
-                    }
-                    ChargingLive.update(
-                        context = applicationContext,
-                        vin = v.vin,
-                        carName = v.name,
-                        charging = ev?.batteryCharge == true,
-                        percent = ev?.batteryStatus,
-                        minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
-                        pluggedInLabel = ev?.pluggedInLabel,
-                        enabled = prefs.charging,
-                        chargeLimit = ev?.targetForCurrentPlug(),
-                    )
                 }
             }
         }
