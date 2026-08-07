@@ -144,6 +144,35 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
     )
 }
 
+/**
+ * This snapshot, with any status field it does not know filled in from [old].
+ *
+ * The snapshot-to-snapshot counterpart of [merged] (which folds in a live
+ * [VehicleStatus]), for [SnapshotStore.saveVehiclesKeepingStatus]. Same `new ?: old`
+ * rule per field, so a fresh value always wins and an absent one never blanks a
+ * stored one.
+ *
+ * Identity and user-entered fields are deliberately NOT carried forward -- name,
+ * model, powertrain flags, regId, generation, brand, odometer, plate and the
+ * service figures all come from the caller, which just read them. Carrying those
+ * would make a renamed or re-plated car un-updatable.
+ */
+internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnapshot = copy(
+    percent = percent ?: old.percent,
+    rangeMi = rangeMi ?: old.rangeMi,
+    locked = locked ?: old.locked,
+    charging = charging ?: old.charging,
+    climateOn = climateOn ?: old.climateOn,
+    engineOn = engineOn ?: old.engineOn,
+    lat = lat ?: old.lat,
+    lon = lon ?: old.lon,
+    speedMph = speedMph ?: old.speedMph,
+    updated = updated ?: old.updated,
+    chargeLimitPct = chargeLimitPct ?: old.chargeLimitPct,
+    // 0 is this field's "unknown", not a timestamp, so it takes the same rule.
+    fetchedAt = if (fetchedAt > 0L) fetchedAt else old.fetchedAt,
+)
+
 /** The exact shape persisted to disk as a single JSON string under one
  *  DataStore key — kept as one blob (rather than one DataStore entry per
  *  field) so a read or write is always a single atomic operation over the
@@ -218,6 +247,50 @@ class SnapshotStore(private val context: Context) {
      *  Mechanism: preserves the previously-selected VIN if that car is still
      *  present in the new list; otherwise falls back to the first vehicle so
      *  there's always a selection as long as the list isn't empty. */
+    /**
+     * Replace the vehicle LIST while keeping each surviving car's last-known status.
+     *
+     * For the "we just re-fetched the account's vehicles" case, which knows every
+     * car's identity (name, model, odometer, plate) and nothing about its state.
+     * [saveVehicles] replaces the payload wholesale, so calling it with
+     * status-less snapshots wipes percent, range, lock, charge, climate, engine,
+     * location and fetchedAt for every car on disk -- and the widget, the twelve
+     * Quick Settings tiles, the Wear tile and every complication read exactly that
+     * file. The result was that every cold start, every login and every
+     * pull-to-refresh blanked all of them until N sequential network round trips
+     * had completed, one car at a time through statusMutex. fetchedAt = 0 also
+     * trips the widget's own stale gate.
+     *
+     * Not fixed by passing the in-memory status cache instead: that cache is
+     * restored on a SEPARATE viewModelScope.launch from the login path, so
+     * whether it has arrived first is a race. This reads what is actually on
+     * disk, inside the same edit transaction, so there is no window and no
+     * second decode.
+     *
+     * Carry-forward is per field and only where the incoming value is absent, the
+     * same `new ?: old` shape [merged] uses -- so a genuine update always wins and
+     * a missing one can never blank a known value. Identity and user-entered
+     * fields always take the incoming value, since those were just read fresh.
+     *
+     * [saveVehicles] is deliberately left alone: sign-out calls it with an empty
+     * list to clear everything, and the watch's state writer uses it to apply the
+     * phone's authoritative payload. Both want replacement.
+     */
+    suspend fun saveVehiclesKeepingStatus(vehicles: List<VehicleSnapshot>) {
+        if (vehicles.isEmpty()) return
+        context.snapshotDataStore.edit { prefs ->
+            val existing = decode(prefs[Keys.PAYLOAD])
+            val known = existing.vehicles.associateBy { it.vin }
+            val merged = vehicles.map { fresh -> known[fresh.vin]?.let { fresh.keepingStatusOf(it) } ?: fresh }
+            val selected = existing.selectedVin?.takeIf { sel -> merged.any { it.vin == sel } }
+                ?: merged.firstOrNull()?.vin
+            prefs[Keys.PAYLOAD] = json.encodeToString(
+                SnapshotPayload.serializer(),
+                SnapshotPayload(merged, selected),
+            )
+        }
+    }
+
     suspend fun saveVehicles(vehicles: List<VehicleSnapshot>) {
         context.snapshotDataStore.edit { prefs ->
             val existing = decode(prefs[Keys.PAYLOAD])

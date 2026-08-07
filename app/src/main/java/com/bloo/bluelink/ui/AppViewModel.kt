@@ -1094,7 +1094,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder())
-        snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, null) })
+        // saveVehiclesKeepingStatus, not saveVehicles: snapshotOf(v, null) knows every
+        // car's identity and nothing about its state, and saveVehicles replaces the
+        // payload wholesale -- so this line used to blank percent, range, lock, charge,
+        // climate, engine, location and fetchedAt for every car on disk, on every cold
+        // start, login and pull-to-refresh. The widget, all twelve QS tiles, the Wear
+        // tile and every complication read that same file, so they all went to
+        // "unknown" until N sequential fetches finished one car at a time through
+        // statusMutex, and fetchedAt = 0 tripped the widget's stale gate on the way.
+        //
+        // persistSnapshots() below already got this right by passing the in-memory
+        // status cache. Deliberately NOT copying that here: the cache is restored on
+        // its own viewModelScope.launch, so whether it has landed before this line is
+        // a race. The store carries the values forward from disk inside its own edit
+        // transaction instead, which has no window.
+        snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null) })
         val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin)?.let { v.vin to it } }.toMap()
         val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
