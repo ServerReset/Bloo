@@ -5930,11 +5930,25 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, modifier: Modifier = M
     // The marker slides to a new limit as a FRACTION, resolved in the draw scope. It used
     // to be an animated Dp offset on a child Box, which made every frame of that slide a
     // layout pass; the value it wants is a position, and a position costs nothing to draw.
-    val limitFrac by animateFloatAsState(
-        targetValue = (limit ?: 0) / 100f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "chargeLimitDot",
-    )
+    //
+    // Animatable rather than animateFloatAsState, and the reason is a behaviour the old
+    // code got for free: it created its animation INSIDE `if (limit != null)`, so the state
+    // was newly remembered whenever a limit appeared and therefore started AT its target.
+    // A plain animateFloatAsState here sits at 0f while the car is unplugged, so plugging
+    // in would slide the marker across the whole bar from 0% -- an animation of a value
+    // that never had a previous value. So: snap the first time a limit is known, spring
+    // for every change after that.
+    val limitAnim = remember { Animatable(0f) }
+    var limitSeen by remember { mutableStateOf(false) }
+    LaunchedEffect(limit) {
+        val target = (limit ?: return@LaunchedEffect) / 100f
+        if (limitSeen) {
+            limitAnim.animateTo(target, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
+        } else {
+            limitSeen = true
+            limitAnim.snapTo(target)
+        }
+    }
     val trackColor = scheme.onSurface.copy(alpha = 0.16f)
     // The halo is the card's own surface colour, so the marker reads as a small window cut
     // into the bar -- visibly different from BOTH the green fill and the grey track,
@@ -5987,7 +6001,9 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, modifier: Modifier = M
             // value, so at a 95% limit an uncorrected centre puts half the circle past the
             // right edge. The widget's copy of this already clamped and the phone's didn't.
             val outer = ChargeLimitDotSize.toPx() / 2f
-            val cx = (usable * limitFrac + (if (limitFrac > filledFrac) gapPx else 0f))
+            // Read inside the draw lambda, so the slide is draw-phase only.
+            val lf = limitAnim.value
+            val cx = (usable * lf + (if (lf > filledFrac) gapPx else 0f))
                 .coerceIn(outer, (size.width - outer).coerceAtLeast(outer))
             drawChargeLimitDot(Offset(cx, h / 2f), outer, haloColor, coreColor)
         }
