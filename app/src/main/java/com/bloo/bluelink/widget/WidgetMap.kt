@@ -68,6 +68,17 @@ object WidgetMap {
         markerColor: Int,
     ): Bitmap? = withContext(Dispatchers.IO) {
         val edge = sizePx.coerceIn(48, 1024)
+        val key = MapKey(quantize(lat), quantize(lon), edge, markerColor)
+        // Composing this is not cheap: up to four 256x256 PNGs decoded off disk plus a
+        // fresh ARGB_8888 the size of the output, which on a 3x device is around
+        // 450x450, i.e. ~800KB. The tiles themselves are already disk-cached, but the
+        // COMPOSITION was redone from scratch on every single call -- and the calls
+        // come per placed widget, on every repaint: twice per command tap (optimistic
+        // then settled), once per periodic refresh, and again on any resize.
+        //
+        // For a parked car every one of those produced a byte-identical bitmap, which
+        // is the overwhelmingly common case for a map of where your car is.
+        memo?.takeIf { it.key == key }?.let { return@withContext it.bitmap }
         val n = com.bloo.bluelink.data.MapTiles.span(ZOOM)
         val xf = com.bloo.bluelink.data.MapTiles.tileX(lon, ZOOM)
         val yf = com.bloo.bluelink.data.MapTiles.tileY(lat, ZOOM)
@@ -117,8 +128,42 @@ object WidgetMap {
             color = 0xFFFFFFFF.toInt()
         })
         canvas.drawCircle(cx, cy, dotR, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = markerColor })
+        // Published as one object so a concurrent reader can never see a key from one
+        // render paired with the bitmap from another -- provideGlance runs per widget
+        // and those can overlap.
+        memo = Memo(key, out)
         out
     }
+
+    /**
+     * Single-entry memo for the COMPOSED bitmap, keyed on everything render() reads.
+     * Never worse than not having it: on a miss the work is exactly what happened
+     * before, and the bitmap it replaces was being thrown away anyway.
+     *
+     * One entry rather than an LRU on purpose. `edge` comes from the caller as
+     * `(150 * density).toInt()`, which is a constant per device, so widgets differ only
+     * by car -- and two widgets pinned to two DIFFERENT cars would alternate misses,
+     * which is precisely today's behaviour, at the cost of one bitmap instead of two or
+     * three held in a memory-constrained widget process.
+     *
+     * The bitmap is handed out to multiple callers and must never be recycled or drawn
+     * into after publication; nothing here does either.
+     */
+    private data class MapKey(val latQ: Long, val lonQ: Long, val edge: Int, val marker: Int)
+
+    private class Memo(val key: MapKey, val bitmap: Bitmap)
+
+    @Volatile
+    private var memo: Memo? = null
+
+    /**
+     * Quantize a coordinate to the finest granularity that can still move the picture.
+     * At [ZOOM] 13 one tile spans roughly 5km, so the ~450px output is about 11m per
+     * pixel -- and 1e-4 degrees is about 11m. So one step of this key is one pixel:
+     * anything finer could not change a rendered pixel, and anything coarser would make
+     * a moving car's map visibly lag.
+     */
+    private fun quantize(deg: Double): Long = Math.round(deg * 10_000)
 
     /** Floor division into tile indices. The window's edges are doubles that
      *  go negative near the antimeridian, where `toInt()` truncates toward
