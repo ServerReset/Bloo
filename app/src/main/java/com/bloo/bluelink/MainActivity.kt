@@ -1,9 +1,6 @@
 package com.bloo.bluelink
 
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -13,7 +10,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
@@ -36,17 +32,17 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel: AppViewModel by viewModels()
 
-    // App-lock bookkeeping: when we last left the foreground, whether the screen
-    // turned off meanwhile, and whether this is the very first foreground (cold
-    // start, where the ViewModel already decides the lock).
+    // App-lock bookkeeping: when we last left the foreground, and whether this is the
+    // very first foreground (cold start, where the ViewModel already decides the lock).
+    //
+    // There used to be a third piece here -- a screenOffWhileAway flag fed by a
+    // BroadcastReceiver registered for ACTION_SCREEN_OFF, passed to maybeRelock, and
+    // read by nothing. See maybeRelock's own comment for why it was deleted rather
+    // than wired up. Worth removing rather than leaving inert: it was a real
+    // registered system receiver, woken on every screen-off for the whole life of
+    // this Activity, plus the register/unregister lifecycle around it.
     private var backgroundedAt = 0L
-    private var screenOffWhileAway = false
     private var firstStart = true
-    private val screenReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == Intent.ACTION_SCREEN_OFF) screenOffWhileAway = true
-        }
-    }
 
     // Shizuku runtime-permission result → forward to the ViewModel so the update flow
     // can proceed once the user grants it. Registered only while Shizuku is present.
@@ -59,7 +55,7 @@ class MainActivity : FragmentActivity() {
      * see [onStart]/[onStop] for that). Order of operations: configure edge-to-edge system
      * bars, schedule all of the app's background WorkManager jobs (each `schedule()` call is
      * itself idempotent/unique-work-keyed, so calling this on every cold start doesn't create
-     * duplicate schedules), register the screen-off receiver used by the app-lock timer, route
+     * duplicate schedules), route
      * in any shortcut intent that launched this instance, then finally hand off to Compose via
      * [setContent] -- which reads the current [AppViewModel.appearance] as Compose state so the
      * whole UI recomposes live if theme/appearance settings change while it's open.
@@ -83,12 +79,6 @@ class MainActivity : FragmentActivity() {
         // for updates; this is that check running even when the app is closed,
         // presenting a newer build via notification instead of the in-app tile.
         UpdateCheckWorker.schedule(applicationContext)
-        ContextCompat.registerReceiver(
-            this,
-            screenReceiver,
-            IntentFilter(Intent.ACTION_SCREEN_OFF),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
         // Shizuku (optional silent-install path): lift the runtime non-SDK block once
         // so the reflected PackageInstaller/IntentSender constructors are callable, and
         // listen for the permission-grant result. Both are guarded — no-ops (and no
@@ -144,26 +134,22 @@ class MainActivity : FragmentActivity() {
      * launch). [firstStart] distinguishes that initial launch -- where [AppViewModel]'s own
      * init logic already decides whether to show the lock screen -- from every subsequent
      * warm resume, where [viewModel.maybeRelock] re-evaluates using how long the app was
-     * backgrounded ([backgroundedAt]) and whether the screen actually turned off meanwhile
-     * ([screenOffWhileAway], set by [screenReceiver]); both flags are reset for the next cycle.
+     * backgrounded ([backgroundedAt]).
      */
     override fun onStart() {
         super.onStart()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
-            viewModel.maybeRelock(backgroundedAt, screenOffWhileAway)
+            viewModel.maybeRelock(backgroundedAt)
             // The user may have started Shizuku while away (its own app / ADB); re-probe
             // so the "Updates" toggle appears without a cold restart. Off-main-thread.
             viewModel.refreshShizukuAvailable()
         }
         firstStart = false
-        screenOffWhileAway = false
     }
 
-    /** Unregister the screen-off receiver + Shizuku listener so they don't leak past
-     *  this Activity instance. */
+    /** Remove the Shizuku listener so it doesn't leak past this Activity instance. */
     override fun onDestroy() {
-        runCatching { unregisterReceiver(screenReceiver) }
         runCatching { Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener) }
         super.onDestroy()
     }

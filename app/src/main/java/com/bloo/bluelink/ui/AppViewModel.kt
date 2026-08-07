@@ -903,10 +903,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Re-engage the lock when returning to the foreground, honouring the user's
-     * [LockTiming] setting. [backgroundedAtMs] is when the app was last stopped and
-     * [screenOff] whether the screen turned off while it was away.
+     * [LockTiming] setting. [backgroundedAtMs] is when the app was last stopped.
+     *
+     * This used to take a second `screenOff` parameter -- whether the screen turned
+     * off while the app was away -- and never read it. MainActivity computed it with
+     * a registered ACTION_SCREEN_OFF BroadcastReceiver, which is now gone too.
+     *
+     * Deleted rather than wired up, deliberately. Using it would mean re-locking on
+     * screen-off regardless of elapsed time, which contradicts the setting the user
+     * actually chose: LockTiming's options are labelled "1 min", "5 min", "10 min",
+     * so someone who picked ten minutes and pocketed their phone for one has said
+     * what they want. Nothing is weakened by removing it, since it was providing no
+     * protection at all -- if screen-off-locks-immediately is wanted, it is a new
+     * LockTiming option, not a hidden override of the existing ones. This also brings
+     * the signature in line with the watch's own maybeRelock, which takes only the
+     * timestamp.
      */
-    fun maybeRelock(backgroundedAtMs: Long, screenOff: Boolean) {
+    fun maybeRelock(backgroundedAtMs: Long) {
         if (_state.value.locked) return
         viewModelScope.launch {
             val a = settingsStore.appearance.first()

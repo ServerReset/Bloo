@@ -5821,7 +5821,6 @@ private fun <T> ReorderColumn(
     var draggingKey by remember { mutableStateOf<Any?>(null) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
-    var dropRipple by remember { mutableStateOf(0L) }
     // Consumed the instant this key is first read, so navigating back to the
     // garage (or a second car's column composing) later never replays it.
     val playIntro = remember(introKey) {
@@ -5830,15 +5829,12 @@ private fun <T> ReorderColumn(
 
     // Sync with upstream changes only while not actively dragging.
     LaunchedEffect(items) { if (draggingKey == null) order = items }
-    // Ripple animation when a tile is dropped (shows the "weight" of the move).
-    val maxRippleScale = remember { Animatable(0f) }
-    LaunchedEffect(dropRipple) {
-        if (dropRipple != 0L) {
-            maxRippleScale.snapTo(0f)
-            maxRippleScale.animateTo(1f, tween(300))
-            maxRippleScale.animateTo(0f, tween(200))
-        }
-    }
+    // The "drop ripple" animation that used to live here is gone. It was dead twice
+    // over: `dropRipple` was declared and never assigned, so the effect's `!= 0L`
+    // guard could not become true; and even if it had, nothing ever read
+    // maxRippleScale, so no ripple would have been drawn. An Animatable and a
+    // LaunchedEffect that could only ever do nothing, described by a comment
+    // ("shows the 'weight' of the move") for an effect no user has seen.
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
         order.forEachIndexed { index, item ->
