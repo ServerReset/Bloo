@@ -390,6 +390,66 @@ internal object Scale {
         return TallSplit(ring, rows, map, ringRoom.coerceAtLeast(0.dp))
     }
 
+    // ---- The tall-column reservation, shared by RAIL / COMPACT_TALL_NARROW /
+    //      COMPACT_TALL ---------------------------------------------------------
+    //
+    // These two constants and [tallColumn] below were three near-identical copies of the
+    // same arithmetic inside CarWidget's three tall tiers, differing only in four
+    // numbers. The constants were `private` there, so WidgetScaleTest duplicated their
+    // VALUES with a comment saying so ("Mirrors TALL_TIER_MARGIN in CarWidget.kt --
+    // private there") — a silent-drift vector on top of the duplication.
+
+    /** Breathing room kept at the bottom of a tall column so the hero never sits flush
+     *  against the tile edge. */
+    val TALL_TIER_MARGIN = 16.dp
+
+    /** Floor reserved for the hero before buttons are allowed to claim height, so a tall
+     *  tile can't end up as a stack of buttons with no gauge above them. */
+    val MIN_HERO_RESERVE = 40.dp
+
+    /** What a tall column decided: how many stacked buttons, the height they claim
+     *  including their trailing gap, and what is left for the hero. */
+    data class TallColumn(val buttonCount: Int, val buttonZone: Dp, val heroRoom: Dp)
+
+    /**
+     * The reservation every tall tier makes: name (if it shows one), then as many stacked
+     * buttons as fit while leaving [MIN_HERO_RESERVE], then the rest to the hero.
+     *
+     * The four values the three tiers genuinely differ on are parameters; everything else
+     * was identical, and having it in one place is what lets WidgetScaleTest assert on the
+     * numbers the composables actually use instead of re-deriving them. The previous
+     * mirror had already gone stale: the test modelled COMPACT_TALL_NARROW as
+     * `ringRoom(spacers = 8.dp) - name` plus a single `buttonHeight`, a shape that tier
+     * stopped having, so it was asserting against arithmetic no composable ran.
+     *
+     * @param nameHeight 0 for RAIL, which shows no name at all.
+     * @param buttonOverhead what [maxStackedButtons] must keep free — the trailing gap
+     *   plus any spacer the tier always emits.
+     * @param buttonTrailingGap the gap after the last button, included in [TallColumn.buttonZone].
+     */
+    fun tallColumn(
+        size: DpSize,
+        nameHeight: Dp,
+        buttonOverhead: Dp,
+        buttonTrailingGap: Dp,
+        buttonCap: Int,
+    ): TallColumn {
+        val budget = size.height - contentPadding(size) * 2
+        val count = maxStackedButtons(
+            size,
+            (budget - nameHeight - MIN_HERO_RESERVE).coerceAtLeast(0.dp),
+            overhead = buttonOverhead,
+            cap = buttonCap,
+        )
+        val zone = if (count > 0) {
+            buttonHeight(size) * count + buttonGap(size) * (count - 1) + buttonTrailingGap
+        } else {
+            0.dp
+        }
+        val hero = (budget - nameHeight - zone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
+        return TallColumn(count, zone, hero)
+    }
+
     /** How many [InfoStack] rows to actually show.
      *
      *  The stack shares a Column with the header, ring, buttons and

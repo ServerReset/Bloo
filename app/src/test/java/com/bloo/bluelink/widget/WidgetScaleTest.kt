@@ -300,10 +300,25 @@ class WidgetScaleTest {
                         "compact square column ${used} exceeds ${budget} at $size @${ts}x",
                     )
                 } else {
-                    // name + ring + one button row
-                    val room = Scale.ringRoom(size, ts, hasHeader = false, hasFooter = false, spacers = 8.dp) - name
-                    val ring = Scale.ring(size, minOf(room, size.width - 12.dp))
-                    val used = name + 8.dp + ring + Scale.buttonHeight(size)
+                    // COMPACT_TALL_NARROW, via the real Scale.tallColumn the composable
+                    // now calls. This branch used to model the tier as
+                    // `ringRoom(spacers = 8.dp) - name` plus a single `buttonHeight` -- a
+                    // shape CompactTallNarrowLayout stopped having when it moved to
+                    // budget/buttonZone/tallSplit, so it was asserting against arithmetic
+                    // no composable ran and could not fail for any real reason.
+                    val column = Scale.tallColumn(
+                        size,
+                        nameHeight = name + 4.dp,
+                        buttonOverhead = 8.dp,
+                        buttonTrailingGap = 4.dp,
+                        buttonCap = 4,
+                    )
+                    val split = Scale.tallSplit(
+                        size, column.heroRoom, capRows = 1, textScale = ts, wantMap = false,
+                    )
+                    val ring = minOf(split.ring, size.width - 12.dp)
+                    val used = (name + 4.dp) + column.buttonZone + ring +
+                        Scale.infoBlockHeight(size, split.rows, ts)
                     assertTrue(
                         used.value <= budget.value + 0.5f,
                         "compact tall-narrow column ${used} exceeds ${budget} at $size @${ts}x",
@@ -344,17 +359,11 @@ class WidgetScaleTest {
      */
     @Test
     fun `tall narrow tiers fit their tile at every action count`() {
-        // Mirrors TALL_TIER_MARGIN in CarWidget.kt -- private there, so
-        // duplicated here the same way this file already duplicates each
-        // layout's own inline spacing constants rather than reaching into
-        // the widget class for them.
-        val margin = 16.dp
-        // Mirrors CarWidget.kt's own MIN_HERO_RESERVE: a floor reserved for
-        // the hero (ring/glyph) BEFORE the button stack is sized, so a
-        // widget configured with every action doesn't lose its status
-        // entirely to a button stack that ate the whole budget. Subtracted
-        // from what maxStackedButtons sees, same as the real layouts.
-        val heroReserve = 40.dp
+        // Read from Scale, not duplicated. These used to be private vals in CarWidget.kt
+        // with their VALUES copied here and a comment admitting it -- so the test could
+        // keep passing while the widget used different numbers. They are Scale members now.
+        val margin = Scale.TALL_TIER_MARGIN
+        val heroReserve = Scale.MIN_HERO_RESERVE
         for (size in sizes()) {
             val tier = tierFor(size)
             if (tier != WidgetTier.RAIL && tier != WidgetTier.COMPACT_TALL_NARROW && tier != WidgetTier.COMPACT_TALL) continue

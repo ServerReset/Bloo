@@ -482,7 +482,11 @@ class CarWidget : GlanceAppWidget() {
      *  plus the matching bump to each layout's own maxStackedButtons
      *  overhead below, so the button count itself leaves room rather than
      *  relying on this margin alone. */
-    private val TALL_TIER_MARGIN = 16.dp
+    // Moved to Scale.TALL_TIER_MARGIN. It lived here as a private val, which meant
+    // WidgetScaleTest duplicated its VALUE with a comment admitting so -- a silent
+    // drift vector on top of the three copies of the arithmetic that used it. The
+    // reasoning above still applies; it just belongs next to the function that
+    // applies it, so both the composables and the sweep read one definition.
 
     /** Minimum height a tall/narrow tier's hero (ring or glyph) is guaranteed
      *  before the button stack is even sized, so a widget configured with
@@ -496,7 +500,11 @@ class CarWidget : GlanceAppWidget() {
      *  losing the room entirely. [MIN_RING] is 24.dp; this is deliberately
      *  bigger so the ring reads as a real gauge, not the smallest legible
      *  circle. */
-    private val MIN_HERO_RESERVE = 40.dp
+    // Moved to Scale.MIN_HERO_RESERVE. It lived here as a private val, which meant
+    // WidgetScaleTest duplicated its VALUE with a comment admitting so -- a silent
+    // drift vector on top of the three copies of the arithmetic that used it. The
+    // reasoning above still applies; it just belongs next to the function that
+    // applies it, so both the composables and the sweep read one definition.
 
     @Composable
     private fun RailLayout(car: VehicleSnapshot, render: Render) {
@@ -534,7 +542,6 @@ class CarWidget : GlanceAppWidget() {
             }
             return
         }
-        val budget = size.height - Scale.contentPadding(size) * 2
         // Reserved BEFORE the hero content is sized, same reasoning as the
         // map-before-ring fix elsewhere in this file: the thing with a real,
         // guaranteed size requirement has to claim its room first, or a
@@ -551,21 +558,24 @@ class CarWidget : GlanceAppWidget() {
         // buttonCount > 0 -- that spacer isn't part of buttonZone, so a
         // button count chosen without reserving it too overflowed the tile
         // by up to 2dp whenever the map spacer also landed on top.
-        val buttonCount = Scale.maxStackedButtons(
-            size, (budget - MIN_HERO_RESERVE).coerceAtLeast(0.dp), overhead = 16.dp, cap = allActions.size,
+        // Scale.tallColumn: the reservation this tier, CompactTallNarrow and CompactTall
+        // all made with identical arithmetic differing only in these numbers. It lives in
+        // Scale now so WidgetScaleTest can sweep the values the composables actually use
+        // rather than re-deriving them — the previous mirror of this had gone stale.
+        // RAIL passes nameHeight = 0: it shows no name at all.
+        val column = Scale.tallColumn(
+            size, nameHeight = 0.dp, buttonOverhead = 16.dp, buttonTrailingGap = 8.dp,
+            buttonCap = allActions.size,
         )
-        val buttonZone = if (buttonCount > 0) {
-            Scale.buttonHeight(size) * buttonCount + Scale.buttonGap(size) * (buttonCount - 1) + 8.dp
-        } else {
-            0.dp
-        }
+        val buttonCount = column.buttonCount
+        val buttonZone = column.buttonZone
         // A small fixed margin on top of the buttons/name reservations,
         // covering the incidental spacers between modules (the gap before a
         // map, the gap before info rows) that aren't individually budgeted --
         // deliberately generous, the same trade [Scale.infoCap] already
         // makes: a few dp of unused room costs nothing, spilling past the
         // tile does.
-        val heroRoom = (budget - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
+        val heroRoom = column.heroRoom
         // Never on RAIL: a location map needs real width to read as a place
         // rather than a random street fragment, and RAIL's whole point is
         // being under 110dp wide. Reported from a real device -- the map
@@ -798,7 +808,6 @@ class CarWidget : GlanceAppWidget() {
             }
             return
         }
-        val budget = size.height - Scale.contentPadding(size) * 2
         val nameHeight = Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale) + 4.dp
         // Capped by what actually fits after the name, not a flat number --
         // see maxStackedButtons and RailLayout's own note on why.
@@ -807,22 +816,20 @@ class CarWidget : GlanceAppWidget() {
         // Spacer(4.dp) rendered right before ActionButtons below whenever
         // buttonCount > 0 isn't part of buttonZone and has to be reserved
         // here too, or the button count picked leaves no room for it.
-        val buttonCount = Scale.maxStackedButtons(
-            size, (budget - nameHeight - MIN_HERO_RESERVE).coerceAtLeast(0.dp), overhead = 8.dp,
-            cap = allActions.size.coerceAtMost(4),
+        // See RailLayout: one shared Scale.tallColumn instead of three copies.
+        val column = Scale.tallColumn(
+            size, nameHeight = nameHeight, buttonOverhead = 8.dp, buttonTrailingGap = 4.dp,
+            buttonCap = allActions.size.coerceAtMost(4),
         )
-        val buttonZone = if (buttonCount > 0) {
-            Scale.buttonHeight(size) * buttonCount + Scale.buttonGap(size) * (buttonCount - 1) + 4.dp
-        } else {
-            0.dp
-        }
+        val buttonCount = column.buttonCount
+        val buttonZone = column.buttonZone
         // Never on this tier either -- same reasoning as RailLayout's own
         // hasMap: under 150dp wide, a location map reads as an unreadable
         // zoomed-in street fragment rather than a place, and the width it
         // would have claimed is worth more spent on the ring/name/buttons
         // that already fit this tile.
         val hasMap = false
-        val heroRoom = (budget - nameHeight - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
+        val heroRoom = column.heroRoom
         val split = Scale.tallSplit(size, heroRoom, capRows = 1, textScale = render.theme.textScale, wantMap = hasMap)
         // The width cap that already existed here, kept: it's what keeps the
         // circle round on a genuinely narrow tile.
@@ -884,7 +891,6 @@ class CarWidget : GlanceAppWidget() {
             }
             return
         }
-        val budget = size.height - Scale.contentPadding(size) * 2
         val nameHeight = Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale)
         // STACKED, not a single row -- this tier proved out tall, and a
         // single row of buttons truncates to whatever the WIDTH can fit
@@ -902,20 +908,18 @@ class CarWidget : GlanceAppWidget() {
         // on the tier with the largest forced spacers of the three.
         // TALL_TIER_MARGIN cannot cover it: heroRoom clamps at zero, and when
         // it does the margin is never actually subtracted from anything.
-        val buttonCount = Scale.maxStackedButtons(
-            size, (budget - nameHeight - MIN_HERO_RESERVE).coerceAtLeast(0.dp), overhead = 20.dp,
-            cap = allActions.size,
+        // See RailLayout: one shared Scale.tallColumn instead of three copies.
+        val column = Scale.tallColumn(
+            size, nameHeight = nameHeight, buttonOverhead = 20.dp, buttonTrailingGap = 12.dp,
+            buttonCap = allActions.size,
         )
-        val buttonZone = if (buttonCount > 0) {
-            Scale.buttonHeight(size) * buttonCount + Scale.buttonGap(size) * (buttonCount - 1) + 12.dp
-        } else {
-            0.dp
-        }
+        val buttonCount = column.buttonCount
+        val buttonZone = column.buttonZone
         // Never on this tier -- still under 150dp wide (COMPACT_TALL's own
         // gate only proves the HEIGHT is roomy), same reasoning as RailLayout
         // and CompactTallNarrowLayout's own hasMap.
         val hasMap = false
-        val heroRoom = (budget - nameHeight - buttonZone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
+        val heroRoom = column.heroRoom
         val split = Scale.tallSplit(size, heroRoom, capRows = 4, textScale = render.theme.textScale, wantMap = hasMap)
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             FitText(
