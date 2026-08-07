@@ -14,6 +14,8 @@ import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.targetForCurrentPlug
 import kotlinx.coroutines.sync.withLock
@@ -53,6 +55,13 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         // The distinction this worker was missing. "No car is charging" and "I couldn't
         // find out" are not the same answer, and only the first should end the chain.
         var learnedSomething = false
+        // Same defect AlertWorker had, and more visible here: this chain relearns the
+        // battery percentage every 5 minutes during a charge and used to keep all of it
+        // to itself, feeding only the notification. So the widget's charge ring, the
+        // watch and the tiles sat on whatever the phone app last persisted -- a ring
+        // frozen at 43% for the whole session, beside a notification counting up.
+        // Collected and written in one merge below.
+        val fetched = mutableMapOf<String, VehicleStatus>()
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }
                 .getOrNull() ?: continue
@@ -71,6 +80,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 // because the network blipped, which to the user is indistinguishable
                 // from the charge having stopped.
                 if (status == null) continue
+                fetched[v.vin] = status
                 runCatching {
                     LiveCharge.sync(
                         context = applicationContext,
@@ -86,6 +96,11 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 }
             }
         }
+        // Before any of the return paths below, including the retry one: whatever this
+        // tick did learn is worth keeping even if the pass as a whole is being retried.
+        // No-ops on an empty map, which is exactly the !learnedSomething case.
+        runCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
+
         // Nothing came back at all. That's transient, so hand it to WorkManager's own
         // backoff instead of reading silence as "charging finished" -- which is what
         // silently killed the chain before, freezing the bar at its last value until

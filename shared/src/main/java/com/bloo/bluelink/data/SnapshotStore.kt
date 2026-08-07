@@ -258,6 +258,39 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
+    /**
+     * Fold freshly-fetched statuses into the stored snapshots, keyed by VIN, in one
+     * atomic read-modify-write.
+     *
+     * For background pollers, which have a [VehicleStatus] in hand and no snapshot to
+     * build one from. The alternative -- [current], then [merged] per car, then
+     * [updateVehicles] -- costs an extra full decode of the payload and leaves a window
+     * in which another writer (a command's optimistic flip, the app itself) can land
+     * between the read and the write and be silently overwritten. Doing the fold inside
+     * `edit` closes that window and drops the read.
+     *
+     * A VIN with no stored snapshot is skipped, matching [updateVehicles]: a poller
+     * should not be able to invent a car the app has never seen. Per-field semantics
+     * are [merged]'s -- `new ?: old` -- so a partial status can only ADD information,
+     * never blank out a lock or charge state the store already had.
+     */
+    suspend fun mergeStatuses(statuses: Map<String, VehicleStatus>) {
+        if (statuses.isEmpty()) return
+        context.snapshotDataStore.edit { prefs ->
+            val existing = decode(prefs[Keys.PAYLOAD])
+            if (existing.vehicles.isEmpty()) return@edit
+            prefs[Keys.PAYLOAD] = json.encodeToString(
+                SnapshotPayload.serializer(),
+                SnapshotPayload(
+                    existing.vehicles.map { snap ->
+                        statuses[snap.vin]?.let { snap.merged(it) } ?: snap
+                    },
+                    existing.selectedVin,
+                ),
+            )
+        }
+    }
+
     /** Change which car is the "active" one for widgets/tiles, without
      *  touching the vehicle data itself. */
     suspend fun setSelected(vin: String) {

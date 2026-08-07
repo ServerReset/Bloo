@@ -16,6 +16,8 @@ import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.wear.WearBridge
 import kotlinx.coroutines.sync.withLock
@@ -56,12 +58,18 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      * 4. Runs [CarAlerts.evaluate] per vehicle against whatever status was
      *    obtained (possibly null, which `evaluate` itself interprets as "poll
      *    failed, don't guess") and posts every alert it returns.
-     * 5. After all brands/vehicles are processed, unconditionally calls
-     *    [WearBridge.refreshAllSurfaces] once -- this 30-minute alert poll
-     *    already fetched fresh-ish status for every car, so it doubles as a
-     *    general data refresh, letting the watch/widgets/tiles pick up new data
-     *    now instead of waiting for the separate 30-minute
-     *    widget-refresh job.
+     * 5. Folds every successfully-fetched status back into [SnapshotStore] in a
+     *    single write, then calls [WearBridge.refreshAllSurfaces] once, so this
+     *    30-minute poll doubles as a general data refresh for the watch, tiles
+     *    and widgets instead of them waiting on their own schedules.
+     *
+     *    Step 5 used to be only the fan-out, and this doc used to claim on that
+     *    basis that the poll let those surfaces "pick up new data". It did not:
+     *    nothing here ever persisted what it fetched, and refreshAllSurfaces
+     *    republishes from SnapshotStore, so every surface was re-handed whatever
+     *    the phone APP last wrote. The relative timestamps they showed were
+     *    measuring the last time the app was opened, not the last time anything
+     *    spoke to the car.
      * Always returns [Result.success] -- there's no retry path here; a failed
      * fetch for one car/brand is silently absorbed per-item as described above,
      * and the whole thing just runs again on the next periodic tick regardless.
@@ -78,6 +86,21 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             return Result.success()
         }
 
+        // This worker fetches fresh status for every car every 30 minutes and used to
+        // throw all of it away: it read the status, raised alerts, updated the live
+        // charging bar, and never wrote it anywhere. Then it called
+        // WearBridge.refreshAllSurfaces() at the end, which republishes from
+        // SnapshotStore -- so the watch, the QS tiles and the widgets were handed
+        // whatever the phone app last persisted, however old, seconds after the phone
+        // had learned the truth. Every "Updated 4h ago" on a glanceable surface was
+        // reporting the last time the APP was opened, not the last time this worker
+        // spoke to the car.
+        //
+        // Collected here and written ONCE below rather than per car: every write is a
+        // full decode plus re-encode plus commit of the whole vehicle blob and emits on
+        // `payload`, so N per-car writes mean N fsyncs for one poll.
+        val fetched = mutableMapOf<String, VehicleStatus>()
+
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue
             // Share the app-wide status gate so a foregrounded app and this worker
@@ -88,6 +111,11 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 val status = runCatching {
                     BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
                 }.getOrNull()
+                // Keep what we just paid a network round trip for. Only for a car we
+                // actually heard back about: a failed fetch has nothing to contribute,
+                // and this is the exact shape that once deleted the live charging bar
+                // when the network blipped.
+                if (status != null) fetched[v.vin] = status
                 runCatching {
                     // `prefs` is already loaded above; pass it so evaluate() doesn't
                     // re-read the same DataStore value once per vehicle per tick.
@@ -127,6 +155,10 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 }
             }
         }
+        // Persist BEFORE fanning out, so the publish below carries this tick's data
+        // rather than the previous one's. One write for every car, every brand.
+        runCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
+
         // The 30-min alert poll also constitutes a data refresh — fan out to the
         // watch + QS tiles so they don't wait for their own next scheduled update.
         WearBridge.refreshAllSurfaces(applicationContext)
