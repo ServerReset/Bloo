@@ -5150,10 +5150,12 @@ private fun HeroHeader(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = 6.dp),
                     ) {
-                        // ChargeSegmentBar is fillMaxWidth plus a fixed height, so bounding
-                        // the width HERE is what makes it a mini bar. It needs no variant of
-                        // its own and the segment colours stay identical to the big one.
-                        Box(Modifier.width(72.dp)) {
+                        // Full width, not a 72dp stub. ChargeSegmentBar is fillMaxWidth
+                        // plus a fixed height, so weighting it here gives the collapsed
+                        // pebble the real bar -- same segments, same colours, same
+                        // proportions as the expanded one -- with the percentage sat at
+                        // the end of the row rather than squeezed beside a token.
+                        Box(Modifier.weight(1f)) {
                             ChargeSegmentBar(
                                 frac = ((pct ?: 0).coerceIn(0, 100)) / 100f,
                                 limitPct = null,
