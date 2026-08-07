@@ -159,12 +159,22 @@ object ChargeRing {
         return bmp
     }
 
-    /** Convenience: pick the arc colour by state (low → amber, charging → green,
-     *  else the caller's accent), keeping the widget's colour logic in one place. */
-    fun arcColorFor(fraction: Float, charging: Boolean, accent: Int): Int = when {
-        charging -> com.bloo.bluelink.data.BlooColors.chargeGreen
-        fraction <= 0.15f -> com.bloo.bluelink.data.BlooColors.heat
-        fraction <= 0.30f -> com.bloo.bluelink.data.BlooColors.warn
-        else -> accent
-    }
+    /**
+     * The arc colour for a charge level: this widget's palette applied to the shared
+     * bands in [com.bloo.bluelink.data.chargeTier], which the watch's ring and tile
+     * now use too -- the three used to carry three different sets of thresholds.
+     *
+     * Takes a percent rather than the fraction it used to, so the null case reaches
+     * the tier function instead of being flattened to 0 by the caller. An unknown
+     * level was previously `(percent ?: 0) / 100f`, i.e. 0, i.e. CRITICAL -- painting
+     * a confident red arc for a car that had not reported a charge at all.
+     */
+    fun arcColorFor(percent: Int?, charging: Boolean, accent: Int): Int =
+        when (com.bloo.bluelink.data.chargeTier(percent, charging)) {
+            com.bloo.bluelink.data.ChargeTier.CHARGING -> com.bloo.bluelink.data.BlooColors.chargeGreen
+            com.bloo.bluelink.data.ChargeTier.CRITICAL -> com.bloo.bluelink.data.BlooColors.heat
+            com.bloo.bluelink.data.ChargeTier.LOW -> com.bloo.bluelink.data.BlooColors.warn
+            com.bloo.bluelink.data.ChargeTier.NORMAL,
+            com.bloo.bluelink.data.ChargeTier.UNKNOWN -> accent
+        }
 }

@@ -328,6 +328,46 @@ fun degValue(valueF: Double, fahrenheit: Boolean): Int =
  */
 fun useFahrenheit(unitSystem: String?): Boolean = (unitSystem ?: "imperial") != "metric"
 
+/** How urgent a charge or fuel level is, independent of any surface's palette.
+ *  See [chargeTier]. */
+enum class ChargeTier { UNKNOWN, CHARGING, CRITICAL, LOW, NORMAL }
+
+/** At or below this percentage a level is [ChargeTier.CRITICAL]. */
+const val CHARGE_CRITICAL_PCT = 15
+
+/** At or below this percentage (and above [CHARGE_CRITICAL_PCT]) a level is
+ *  [ChargeTier.LOW]. */
+const val CHARGE_LOW_PCT = 30
+
+/**
+ * Which band a charge/fuel level falls in. Charging outranks the level itself, and a
+ * null [percent] is [ChargeTier.UNKNOWN] rather than being folded into a band.
+ *
+ * The three gauges in this app each had their own copy of this and no two agreed:
+ *
+ *  - the widget's ring used `<= 0.15` / `<= 0.30`
+ *  - the watch's tile used `< 15` / `< 30`
+ *  - the watch's home ring had only `< 15` and NO amber band at all
+ *
+ * So a car at exactly 15% was red on the widget and not on either watch surface, and
+ * a car at 20% was amber on the watch's tile while its home screen showed the same
+ * car in the ordinary accent colour. The bands are inclusive here, which is the
+ * widget's reading and the safer one: "15% or less" flags at the number a user would
+ * expect it to.
+ *
+ * Only the bands are shared. Each surface maps them to its own colour system --
+ * Compose theme roles on the watch, ProtoLayout roles on its tile, packed ARGB ints
+ * in the widget -- which is the part that legitimately differs, including what
+ * UNKNOWN should look like.
+ */
+fun chargeTier(percent: Int?, charging: Boolean): ChargeTier = when {
+    charging -> ChargeTier.CHARGING
+    percent == null -> ChargeTier.UNKNOWN
+    percent <= CHARGE_CRITICAL_PCT -> ChargeTier.CRITICAL
+    percent <= CHARGE_LOW_PCT -> ChargeTier.LOW
+    else -> ChargeTier.NORMAL
+}
+
 fun vehicleDisplayName(nickName: String?, modelName: String?, id: String): String =
     nickName?.takeIf { it.isNotBlank() }
         ?: modelName?.takeIf { it.isNotBlank() }

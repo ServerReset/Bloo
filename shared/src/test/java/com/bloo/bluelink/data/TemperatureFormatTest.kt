@@ -252,3 +252,65 @@ class Battery12VTest {
         kotlin.test.assertTrue(b.needsAttention)
     }
 }
+
+/**
+ * Tests for [chargeTier] -- the charge/fuel bands the widget ring, the watch tile and
+ * the watch home ring each used to define for themselves, with no two agreeing.
+ */
+class ChargeTierTest {
+
+    /** Charging outranks the level, however low the level is. */
+    @Test
+    fun chargingWinsOverEveryLevel() {
+        for (p in listOf(0, 5, 15, 30, 50, 100)) {
+            assertEquals(ChargeTier.CHARGING, chargeTier(p, charging = true), "at $p%")
+        }
+        assertEquals(ChargeTier.CHARGING, chargeTier(null, charging = true))
+    }
+
+    /** Unknown is its own band, not folded into a level. The widget used to flatten a
+     *  null percent to 0 before this, which made it CRITICAL -- a confident red arc for
+     *  a car that had never reported a charge. */
+    @Test
+    fun unknownIsItsOwnBand() {
+        assertEquals(ChargeTier.UNKNOWN, chargeTier(null, charging = false))
+    }
+
+    /** The boundaries are INCLUSIVE, which is the disagreement being resolved: the
+     *  widget used `<=` and both watch surfaces used `<`, so a car at exactly 15% was
+     *  red on the widget and not on the watch. */
+    @Test
+    fun boundariesAreInclusive() {
+        assertEquals(ChargeTier.CRITICAL, chargeTier(CHARGE_CRITICAL_PCT, charging = false))
+        assertEquals(ChargeTier.LOW, chargeTier(CHARGE_CRITICAL_PCT + 1, charging = false))
+        assertEquals(ChargeTier.LOW, chargeTier(CHARGE_LOW_PCT, charging = false))
+        assertEquals(ChargeTier.NORMAL, chargeTier(CHARGE_LOW_PCT + 1, charging = false))
+    }
+
+    @Test
+    fun coversTheWholeRangeInOrder() {
+        assertEquals(ChargeTier.CRITICAL, chargeTier(0, charging = false))
+        assertEquals(ChargeTier.CRITICAL, chargeTier(15, charging = false))
+        assertEquals(ChargeTier.LOW, chargeTier(20, charging = false))
+        assertEquals(ChargeTier.LOW, chargeTier(30, charging = false))
+        assertEquals(ChargeTier.NORMAL, chargeTier(31, charging = false))
+        assertEquals(ChargeTier.NORMAL, chargeTier(100, charging = false))
+    }
+
+    /** The bands must be contiguous and non-overlapping across every percentage --
+     *  three hand-written copies is exactly how a gap or an overlap creeps in. */
+    @Test
+    fun bandsAreContiguousAcrossEveryPercentage() {
+        var seen = ChargeTier.CRITICAL
+        for (p in 0..100) {
+            val t = chargeTier(p, charging = false)
+            kotlin.test.assertTrue(
+                t == seen || (seen == ChargeTier.CRITICAL && t == ChargeTier.LOW) ||
+                    (seen == ChargeTier.LOW && t == ChargeTier.NORMAL),
+                "band went backwards or skipped at $p%: $seen -> $t",
+            )
+            seen = t
+        }
+        assertEquals(ChargeTier.NORMAL, seen)
+    }
+}

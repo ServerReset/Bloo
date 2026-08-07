@@ -282,10 +282,15 @@ fun ChargeRing(
     limitPercent: Int? = null,
 ) {
     val ringDesc = percent?.let { "Charge $it percent" } ?: "Charge level unknown"
-    val ringColor = when {
-        charging -> WearColors.chargeGreen
-        (percent ?: 100) < 15 -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
+    // Shared bands (com.bloo.bluelink.data.chargeTier). This ring previously had only
+    // a critical band and no amber one, so a car at 20% showed the ordinary accent here
+    // while the watch's own tile showed the same car in amber.
+    val ringColor = when (com.bloo.bluelink.data.chargeTier(percent, charging)) {
+        com.bloo.bluelink.data.ChargeTier.CHARGING -> WearColors.chargeGreen
+        com.bloo.bluelink.data.ChargeTier.CRITICAL -> MaterialTheme.colorScheme.error
+        com.bloo.bluelink.data.ChargeTier.LOW -> Color(com.bloo.bluelink.data.BlooColors.warn)
+        com.bloo.bluelink.data.ChargeTier.NORMAL,
+        com.bloo.bluelink.data.ChargeTier.UNKNOWN -> MaterialTheme.colorScheme.primary
     }
     // Spring, not tween: ChargeRing was the one hero element animating linearly in
     // an otherwise spring-driven app, so its fill felt mechanical next to every

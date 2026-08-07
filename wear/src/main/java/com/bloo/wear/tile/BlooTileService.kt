@@ -297,7 +297,6 @@ abstract class BlooTileService : TileService() {
         val charging = snap.charging == true
         val climate = snap.climateOn == true
         val pct = snap.percent ?: 0
-        val hasPct = snap.percent != null
         val pctText = "${snap.percent ?: "—"}%"
         val rngText = snap.rangeMi?.let { formatDistance(it, metric) } ?: ""
         // Clarify what the big % means, doubling as the footer. hasBattery (not
@@ -306,12 +305,16 @@ abstract class BlooTileService : TileService() {
 
         // Arc colour: neutral track when unknown, semantic for low/warning,
         // charge-green while charging, accent otherwise.
-        val arcArgb = when {
-            !hasPct -> CLR_TRACK
-            charging -> CLR_CHARGE
-            pct < 15 -> roles.error
-            pct < 30 -> CLR_WARN
-            else -> roles.primary
+        // Shared bands (com.bloo.bluelink.data.chargeTier) rather than this tile's own
+        // `< 15` / `< 30`, which disagreed with the widget's inclusive thresholds at
+        // exactly 15% and 30%. UNKNOWN keeps this surface's own answer: the track
+        // colour, i.e. no visible arc.
+        val arcArgb = when (com.bloo.bluelink.data.chargeTier(snap.percent, charging)) {
+            com.bloo.bluelink.data.ChargeTier.UNKNOWN -> CLR_TRACK
+            com.bloo.bluelink.data.ChargeTier.CHARGING -> CLR_CHARGE
+            com.bloo.bluelink.data.ChargeTier.CRITICAL -> roles.error
+            com.bloo.bluelink.data.ChargeTier.LOW -> CLR_WARN
+            com.bloo.bluelink.data.ChargeTier.NORMAL -> roles.primary
         }
 
         val arc = CircularProgressIndicator.Builder()

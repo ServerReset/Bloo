@@ -2532,7 +2532,7 @@ class CarWidget : GlanceAppWidget() {
         val density = ctx.resources.displayMetrics.density
         val px = (edgeDp * density).toInt().coerceAtLeast(24)
         val frac = (car.percent ?: 0) / 100f
-        val arc = ChargeRing.arcColorFor(frac, car.charging == true, render.theme.accentArgb)
+        val arc = ChargeRing.arcColorFor(car.percent, car.charging == true, render.theme.accentArgb)
         val bmp = ChargeRing.render(
             sizePx = px,
             fraction = frac,
