@@ -55,6 +55,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -591,7 +593,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Mirror appearance/preferences to a paired watch whenever they change,
         // so the watch theme + settings always match the phone live.
         viewModelScope.launch {
-            settingsStore.appearance.collect { a ->
+            // distinctUntilChanged, like the three sibling collectors below -- this was
+            // the one that didn't have it, and it collected the raw store flow rather
+            // than the conflated `appearance` StateFlow this class already exposes.
+            //
+            // DataStore re-emits on ANY key change in the whole file, and
+            // SettingsStore.appearance is a bare .map over that with no dedupe of its
+            // own. So this fired for writes to keys that aren't part of Appearance at
+            // all -- tile_refreshed_$vin, sync_last_ms, plate_$vin, sections_$vin,
+            // climate_presets_$vin -- and every editTracked write also stamps
+            // sync_dirty_keys in the same transaction, so in practice EVERY setter in
+            // the app triggered a full watch settings republish carrying an identical
+            // Appearance. That republish is not cheap: it re-decodes the snapshot
+            // payload, does 3N+5 sequential preference reads, resolves two Material
+            // colour schemes, and makes a blocking Data Layer round trip.
+            //
+            // Appearance is a data class of vals, so structural equality is exactly the
+            // right test for "did anything the watch cares about actually change".
+            settingsStore.appearance.distinctUntilChanged().collect { a ->
                 com.bloo.bluelink.wear.WearBridge.publishSettings(getApplication(), a)
             }
         }
@@ -1629,6 +1648,53 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * How long a text field must be quiet before its change is published to the other
+     * surfaces. Long enough to collapse a whole typed word, short enough that letting go
+     * of the keyboard feels immediate.
+     */
+    private val textFieldPublishDebounceMs = 400L
+
+    /** In-flight debounced publishes, keyed so two fields -- or the same field on two
+     *  cars -- never cancel each other's pending work. */
+    private val pendingPublishes = mutableMapOf<String, Job>()
+
+    /**
+     * Publish to the watch, tiles and widgets after [textFieldPublishDebounceMs] of quiet
+     * on [key], superseding any publish still pending for that same key.
+     *
+     * This exists because three settings are edited through raw `onValueChange` text
+     * fields -- licence plate, last-service miles, service interval -- and each one used
+     * to run the full [persistSnapshots] fan-out on every single typed character. That
+     * is a full snapshot re-encode and disk commit, a blocking Data Layer round trip to
+     * the watch for state plus another for auth, and a poke to all twelve Quick Settings
+     * tile services, each of which then re-reads preferences and re-decodes the whole
+     * snapshot payload to repaint. Typing a seven-character plate did all of that seven
+     * times.
+     *
+     * What is NOT debounced, deliberately: the `_state` update (so the field the user is
+     * typing in stays responsive) and the SettingsStore write itself (so the value is
+     * durable the instant it's typed, and closing the app mid-word cannot lose it). Only
+     * the cross-surface publish waits, and only for as long as the user keeps typing.
+     *
+     * [persistSnapshots] reads `_state`, never the settings store, so a debounced publish
+     * always carries the latest typed value rather than whatever was current when it was
+     * scheduled.
+     *
+     * The map is only ever touched from the main dispatcher -- viewModelScope's default,
+     * and there is no suspension point between the read and the write below -- so a plain
+     * mutableMapOf is safe here. It is also never iterated, which is what made the other
+     * plain map in this class a ConcurrentModificationException waiting to happen.
+     */
+    private fun publishDebounced(key: String) {
+        pendingPublishes[key]?.cancel()
+        pendingPublishes[key] = viewModelScope.launch {
+            delay(textFieldPublishDebounceMs)
+            persistSnapshots()
+            pendingPublishes.remove(key)
+        }
+    }
+
     private suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin]) })
         // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
@@ -1739,10 +1805,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else it.licensePlates + (vin to plate.trim()),
             )
         }
-        // Also republish the snapshot immediately so the watch's Info tile picks
-        // up the new plate right away instead of waiting on the next status
-        // refresh to happen to rebuild it.
-        viewModelScope.launch { settingsStore.setLicensePlate(vin, plate); persistSnapshots() }
+        // Store write immediate (durability), cross-surface publish debounced -- see
+        // publishDebounced. Still republishes rather than waiting for the next status
+        // refresh to happen to rebuild the watch's Info tile; just not once per keypress.
+        viewModelScope.launch { settingsStore.setLicensePlate(vin, plate) }
+        publishDebounced("plate:$vin")
     }
 
     fun setLastServiceMiles(vin: String, miles: Int?) {
@@ -1752,8 +1819,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else it.lastServiceMiles + (vin to miles),
             )
         }
-        // Republish immediately so the watch's Info tile reflects it right away.
-        viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles); persistSnapshots() }
+        // See publishDebounced: write now, publish once the typing stops.
+        viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles) }
+        publishDebounced("lastService:$vin")
     }
 
     fun setServiceIntervalMiles(vin: String, miles: Int?) {
@@ -1763,8 +1831,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else it.serviceIntervalMiles + (vin to miles),
             )
         }
-        // Republish immediately so the watch's Info tile reflects it right away.
-        viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles); persistSnapshots() }
+        // See publishDebounced: write now, publish once the typing stops.
+        viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles) }
+        publishDebounced("serviceInterval:$vin")
     }
 
     /** Toggle one seat-heater/cooler (or steering-wheel-heat) capability flag
