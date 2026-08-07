@@ -2030,7 +2030,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             charging = ev?.batteryCharge ?: snap?.charging,
             pluggedIn = ev?.batteryPlugin?.let { it != 0 },
             chargerLabel = com.bloo.bluelink.data.chargerLabel(ev?.batteryPlugin),
-            timeToFullMin = ev?.remainTime2?.atc?.value?.toInt(),
+            timeToFullMin = ev?.minutesToFull,
             acLimit = ev?.reservChargeInfos?.level(1),
             dcLimit = ev?.reservChargeInfos?.level(0),
             chargeLimit = ev?.targetForCurrentPlug() ?: snap?.chargeLimitPct,

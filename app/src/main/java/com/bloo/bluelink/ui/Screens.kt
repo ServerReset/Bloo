@@ -5360,7 +5360,7 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
     // Charging time + type, shown in the badge slot (replacing parked/driving,
     // which is hidden while charging) so the pebble doesn't grow taller.
-    val chargeMinutes = status?.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+    val chargeMinutes = status?.evStatus?.minutesToFull
     val chargeType = when (status?.evStatus?.batteryPlugin) {
         1 -> "DC"
         2 -> "AC"
@@ -8246,7 +8246,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
 
                 if (plugged) {
                     SectionLabel("Charging")
-                    ev?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+                    ev?.minutesToFull
                         ?.let { StatusRow("Time to full", fmtMinutes(it)) }
                     chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
                     ev?.targetForCurrentPlug()?.let { StatusRow("Charge limit", "$it%") }
@@ -8440,7 +8440,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             if (seats.isNotEmpty()) add(DiagRow("Seat heat/vent active", seats.joinToString(", ")))
         }
         status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
-        status?.evStatus?.remainTime2?.atc?.value?.let { add(DiagRow("Time to full", "${it.toInt()} min")) }
+        status?.evStatus?.minutesToFull?.let { add(DiagRow("Time to full", "$it min")) }
         status?.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
             ?.let { add(DiagRow("Doors open", it.joinToString(", "))) }
         if (status?.trunkOpen == true) add(DiagRow("Trunk", "Open"))

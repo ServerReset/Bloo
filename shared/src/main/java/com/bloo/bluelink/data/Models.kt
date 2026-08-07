@@ -244,6 +244,35 @@ data class EvStatus(
             2 -> "Plugged in (AC)"
             else -> null
         }
+
+    /**
+     * Minutes until the battery is full, or null when the car isn't reporting a
+     * usable estimate.
+     *
+     * Non-positive means "no estimate", not "zero minutes". Cars report 0 here
+     * routinely -- not plugged in, just plugged in and still working it out, or
+     * simply not reporting -- and "0 min to full" is a worse answer than no row at
+     * all. Every consumer already knew that and re-applied `takeIf { it > 0 }`
+     * itself: the notification builder, and three separate places on the watch.
+     * Three of the eight producers applied it too. The phone's diagnostics pebble
+     * was the one path that applied it nowhere, and it was the one path that could
+     * print "Time to full: 0 min".
+     *
+     * So the rule lives here once instead of in nine places and missing from a
+     * tenth. The downstream guards are now redundant but harmless, and left alone.
+     *
+     * The unit question is deliberately NOT answered here. [RemainTime2] documents
+     * these as being "in whatever unit TimeValue.unit encodes (typically minutes)",
+     * and nothing in this codebase has ever read that field -- CanadaApi and
+     * KiaUsaApi both hardcode `TimeValue(value, 1)` when they build one, and
+     * BlueLinkApi deserializes whatever the OEM sends. Treating the value as minutes
+     * is therefore exactly what every call site already did; inventing a mapping for
+     * other unit codes without knowing what they mean would risk hiding estimates
+     * that currently display correctly. If the encoding is ever established, this is
+     * now the single place that has to change.
+     */
+    val minutesToFull: Int?
+        get() = remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
 }
 
 /** Remaining-charge-time estimates, in whatever unit [TimeValue.unit] encodes

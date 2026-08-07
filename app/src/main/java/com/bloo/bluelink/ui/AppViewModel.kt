@@ -1597,7 +1597,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     carName = v.name,
                     charging = ev?.batteryCharge == true,
                     percent = ev?.batteryStatus,
-                    minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
+                    minutesToFull = ev?.minutesToFull,
                     pluggedInLabel = ev?.pluggedInLabel,
                     enabled = true,
                     chargeLimit = ev?.targetForCurrentPlug(),
@@ -2176,7 +2176,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Priority 2 — charging + time to full (EV/PHEV only).
         if (s.hasBattery(v)) {
             if (status.evStatus?.batteryCharge == true) {
-                val mins = status.evStatus?.remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+                val mins = status.evStatus?.minutesToFull
                 parts += if (mins != null) {
                     "It is charging, with about ${fmtTimeToFull(mins)} until fully charged."
                 } else {

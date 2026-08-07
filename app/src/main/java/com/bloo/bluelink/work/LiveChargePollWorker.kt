@@ -66,7 +66,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                         carName = v.name,
                         charging = charging,
                         percent = ev?.batteryStatus,
-                        minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
+                        minutesToFull = ev?.minutesToFull,
                         pluggedInLabel = ev?.pluggedInLabel,
                         enabled = true,
                         chargeLimit = ev?.targetForCurrentPlug(),

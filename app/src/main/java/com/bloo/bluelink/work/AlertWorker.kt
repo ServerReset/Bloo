@@ -110,7 +110,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                             carName = v.name,
                             charging = ev?.batteryCharge == true,
                             percent = ev?.batteryStatus,
-                            minutesToFull = ev?.remainTime2?.atc?.value?.toInt(),
+                            minutesToFull = ev?.minutesToFull,
                             pluggedInLabel = ev?.pluggedInLabel,
                             enabled = true,
                             chargeLimit = ev?.targetForCurrentPlug(),
