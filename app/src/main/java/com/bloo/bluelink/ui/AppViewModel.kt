@@ -38,6 +38,7 @@ import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
@@ -295,6 +296,40 @@ data class UiState(
 
     /** Burns fuel (everything except a pure EV). */
     fun hasFuel(v: Vehicle): Boolean = powertrainOf(v) != Powertrain.EV
+
+    /**
+     * Whether [section] has anything to show for [v] -- the one predicate every list of
+     * pebbles/sections filters through, so they can't disagree about what exists.
+     *
+     * There were four hand-maintained copies of this over in the Screens file -- the
+     * cover-screen tile list, the two-column hotspot slot, the hotspot picker menu, and
+     * PebbleList -- and no two carried the same set of gates. The AI gate was missing from two of
+     * them, so the two-column layout's hotspot slot and its picker offered -- and would
+     * pin -- the AI pebble on a car with AI turned off, while the ordinary pebble list
+     * correctly hid it.
+     *
+     * Two differences between those copies were deliberate and are deliberately NOT
+     * folded in here, because they belong to one caller each:
+     *
+     *  - "charge" is gated on hasBattery only by the cover screen. Everywhere else
+     *    SinglePebble renders a FuelPebble instead for a car with no battery, so the
+     *    section still has something to show. The cover has no such fallback tile.
+     *  - Membership of CompactKnownTiles is the cover's own business.
+     *
+     * Callers keep applying those on top of this.
+     */
+    fun isSectionAvailable(v: Vehicle, section: String): Boolean {
+        if (isPebbleHidden(v.vin, section)) return false
+        return when (section) {
+            "ai" -> aiEnabled
+            // The trip-details feed is EV-only, and Gen5W head units don't serve it at
+            // all, so TripsPebble would render nothing -- leaving a phantom slot with a
+            // spacedBy gap on either side of it.
+            "trips" -> hasBattery(v) && !v.isGen5W
+            "update" -> updateAvailable != null
+            else -> true
+        }
+    }
 
     /**
      * Whether the car is moving/on, for the header. Speed (from a location fix)

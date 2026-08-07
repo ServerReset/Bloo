@@ -4312,12 +4312,12 @@ private fun CompactCar(
                 "summary" -> "main"
                 else -> section.takeIf {
                     it in CompactKnownTiles &&
+                        // Cover-screen-only gate, and the reason isSectionAvailable
+                        // does not carry it: everywhere else SinglePebble falls back to
+                        // a FuelPebble for a car with no battery, so "charge" still has
+                        // something to render. The cover has no such fallback tile.
                         (it != "charge" || hasBattery) &&
-                        (it != "ai" || state.aiEnabled) &&
-                        // Trips: EV-only feed AND not served by Gen5W head units --
-                        // gate on both so a gas car or a Gen5W car shows no empty tile.
-                        (it != "trips" || (hasBattery && !isGen5W)) &&
-                        !state.isPebbleHidden(v.vin, it)
+                        state.isSectionAvailable(v, it)
                 }
             }
         }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
@@ -6157,9 +6157,7 @@ private fun VehicleDetailContent(
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
     val hotspot = state.hotspotFor(v.vin)
         ?.takeIf {
-            it in state.sectionsFor(v) && !state.isPebbleHidden(v.vin, it) &&
-                (it != "trips" || (state.hasBattery(v) && !v.isGen5W)) &&
-                (it != "update" || state.updateAvailable != null)
+            it in state.sectionsFor(v) && state.isSectionAvailable(v, it)
         }
     val hotDrag = remember { HotSeatDrag() }
     val controls: @Composable ColumnScope.() -> Unit = {
@@ -6323,9 +6321,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
     } else {
         var menu by remember { mutableStateOf(false) }
         val options = state.sectionsFor(v).filter {
-            it !in setOf("summary", "controls") && !state.isPebbleHidden(v.vin, it) &&
-                (it != "trips" || (state.hasBattery(v) && !v.isGen5W)) &&
-                (it != "update" || state.updateAvailable != null)
+            it !in setOf("summary", "controls") && state.isSectionAvailable(v, it)
         }
         val hotDrag = LocalHotSeatDrag.current
         val hovered = hotDrag?.overSlot == true
@@ -6531,17 +6527,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
     val hasBattery = state.hasBattery(v)
     val sections = remember(allSections, exclude, state.hiddenPebbles, state.aiEnabled, hasBattery, v.isGen5W, state.updateAvailable) {
         allSections.filter {
-            it !in exclude &&
-                !state.isPebbleHidden(v.vin, it) &&
-                (it != "ai" || state.aiEnabled) &&
-                // Trip history rides on the EV-only trip-details endpoint, so a
-                // gas/PHEV/Kia car has nothing to show here -- gate it off battery.
-                // Also gate off Gen5W: those head units don't serve the feed, so
-                // TripsPebble renders nothing -- if it still entered the list it
-                // would leave a phantom slot with a spacedBy gap on both sides
-                // (the empty-space-between-pebbles bug).
-                (it != "trips" || (hasBattery && !v.isGen5W)) &&
-                (it != "update" || state.updateAvailable != null)
+            it !in exclude && state.isSectionAvailable(v, it)
         }
     }
     val hotDrag = LocalHotSeatDrag.current
