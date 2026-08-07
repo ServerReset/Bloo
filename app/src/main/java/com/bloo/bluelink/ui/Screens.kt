@@ -5129,11 +5129,46 @@ private fun HeroHeader(
             // look right. It never was: the standard framework already answers "what does
             // this pebble say when closed" with `summary`, and a pebble that keeps a chunk
             // of its body visible is by definition not a normal pebble. The slot is gone.
+            // Percent is NOT here: it is on the mini bar below, and putting it in both
+            // places is how the same number gets rendered twice and then drifts -- the bug
+            // I already had to fix on the widget's MEDIUM tiers.
             summary = listOfNotNull(
-                status?.percentFor(hasBattery)?.let { "$it%" },
                 status?.rangeMiFor(hasBattery)?.let { formatDistance(it, metric) },
                 if (charging) "Charging" else null,
             ).joinToString(" · ").ifBlank { null },
+            headerContent = {
+                // Collapsed only: expanded already carries the full readout along the bottom
+                // of the image. Animated with the shared transition so it arrives as the
+                // photo leaves rather than popping in after it.
+                AnimatedVisibility(
+                    visible = !photoExpanded,
+                    enter = collapseEnter(),
+                    exit = collapseExit(),
+                ) {
+                    val pct = status?.percentFor(hasBattery)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 6.dp),
+                    ) {
+                        // ChargeSegmentBar is fillMaxWidth plus a fixed height, so bounding
+                        // the width HERE is what makes it a mini bar. It needs no variant of
+                        // its own and the segment colours stay identical to the big one.
+                        Box(Modifier.width(72.dp)) {
+                            ChargeSegmentBar(
+                                frac = ((pct ?: 0).coerceIn(0, 100)) / 100f,
+                                limitPct = null,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            pct?.let { "$it%" } ?: "--",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            },
         ) {
             // Empty by design. Everything the expanded state adds -- the photo and the
             // readout over its lower edge -- is in `background`, because both need to be
@@ -7870,6 +7905,18 @@ private fun PebbleShell(
     vm: AppViewModel,
     dragHandle: Modifier = Modifier,
     summary: String? = null,
+    /**
+     * Extra content in the header, under the title and [summary].
+     *
+     * A string is all `summary` can be, and the hero wants a graphical readout there when
+     * collapsed: a mini charge bar plus its percentage. This is that slot and nothing more.
+     * It renders inside the header's own text column, so it inherits the header's width,
+     * padding and content colour, and sits above the chevron's row sibling rather than
+     * competing with it for horizontal space.
+     *
+     * Null for every other pebble.
+     */
+    headerContent: (@Composable () -> Unit)? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     headerAction: PebbleHeaderAction? = null,
     forceExpanded: Boolean = false,
@@ -8043,6 +8090,7 @@ private fun PebbleShell(
                                     )
                                 }
                             }
+                            headerContent?.invoke()
                         }
                         if (!forceExpanded) {
                             if (headerAction != null) {
