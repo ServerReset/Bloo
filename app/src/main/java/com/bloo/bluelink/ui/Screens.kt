@@ -571,7 +571,7 @@ fun BlooApp(vm: AppViewModel) {
                         SelectionContainer(Modifier.weight(1f)) {
                             Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
                         }
-                        IconButton(onClick = { clipboard.setText(AnnotatedString(data.visuals.message)) }) {
+                        MorphIconButton(onClick = { clipboard.setText(AnnotatedString(data.visuals.message)) }) {
                             Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
                         }
                         // Swipe-to-dismiss is a raw drag gesture with no
@@ -579,7 +579,7 @@ fun BlooApp(vm: AppViewModel) {
                         // captured by TalkBack's own navigation instead), so a
                         // screen-reader user previously had no way to dismiss
                         // early and had to wait out the auto-hide timeout.
-                        IconButton(onClick = { data.dismiss() }) {
+                        MorphIconButton(onClick = { data.dismiss() }) {
                             Icon(Icons.Filled.Close, contentDescription = "Dismiss")
                         }
                     }
@@ -5605,6 +5605,11 @@ private val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGree
 
 private val SoftDamping get() = com.bloo.uicommon.SoftDamping
 
+// The morph button's two corner states, shared with the watch so both surfaces
+// read as the same control. Aliased the same way SoftDamping above is.
+private val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
+private val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
+
 /** Shared spring stiffness for the Simple/Advanced mode switch's card
  *  expand/collapse (the outer settings column, each card's own
  *  animateContentSize, and the advanced-only cards' enter/exit) -- slower
@@ -6850,7 +6855,9 @@ private fun CustomPaletteSwatch(
             // it was genuinely hard to hit with a finger. IconButton gives
             // both a real (if still compact, given the tight swatch grid)
             // touch target and the Button role for free.
-            IconButton(onClick = { haptics?.click(); onEdit() }, modifier = Modifier.size(28.dp)) {
+            // Manual haptics?.click() dropped: MorphIconButton fires it. This was
+            // the one bare IconButton in the file that remembered to.
+            MorphIconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
                 Icon(
                     Icons.Filled.Settings,
                     contentDescription = "Edit palette",
@@ -7070,7 +7077,7 @@ private fun PaletteEditorDialog(
         title = if (editing == null) "New palette" else "Edit \"${editing.name}\"",
         titleTrailing = if (editing != null) {
             {
-                IconButton(onClick = {
+                MorphIconButton(onClick = {
                     if (confirmDelete) { onDelete(paletteId); onDismiss() } else { confirmDelete = true }
                 }) {
                     Icon(
@@ -7222,7 +7229,7 @@ fun MorphButton(
     val haptics = LocalHaptics.current
     // 50% = a true pill; a lower percent = a rounded rectangle.
     val pct by animateFloatAsState(
-        targetValue = if (active || pressed) 28f else 50f,
+        targetValue = if (active || pressed) MorphedCornerPercent else PillCornerPercent,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphCorner",
     )
@@ -7288,6 +7295,53 @@ fun MorphTextButton(
     ) {
         Text(text, fontWeight = FontWeight.SemiBold)
     }
+}
+
+/**
+ * The morph family's icon-only member.
+ *
+ * [MorphButton] is the wrong tool for a bare icon affordance -- a snackbar
+ * action, a text-field's clear button, a 28dp edit glyph in a swatch grid -- since
+ * it would wrap each one in a filled pill and change the design rather than unify
+ * it. So this keeps [IconButton]'s containerless chrome and 40dp target exactly,
+ * and adds the two things every other member of the family provides and these
+ * were missing:
+ *
+ *  - **The click haptic.** Of the six bare IconButtons in this file, exactly ONE
+ *    remembered to call `haptics?.click()` itself. Every Morph* control fires one;
+ *    a containerless icon is no less of a button to the finger.
+ *  - **A press response.** With no container there is no corner to morph, so the
+ *    equivalent is a scale dip, on the family's own [SoftDamping] spring.
+ *
+ * Same parameter shape as [IconButton] so converting a call site is mechanical.
+ * If you are converting one that already called the haptic by hand, delete that
+ * call -- it fires here now, and two in a row is a stutter, not emphasis.
+ */
+@Composable
+fun MorphIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    content: @Composable () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
+        label = "morphIconPress",
+    )
+    IconButton(
+        onClick = { haptics?.click(); onClick() },
+        // On the button, not the icon: scaling the icon alone shrinks the glyph
+        // inside a target that stays put, which reads as a glitch rather than a
+        // press.
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        enabled = enabled,
+        interactionSource = interactionSource,
+        content = content,
+    )
 }
 
 /**
@@ -12403,7 +12457,7 @@ private fun SearchPill(
                                 },
                             )
                         }
-                        IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
+                        MorphIconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
@@ -12786,7 +12840,20 @@ private fun SettingsSearchResults(
                     )
                     if (ran == null && car != null) {
                         val scope = rememberCoroutineScope()
-                        Button(
+                        // MorphTextButton, not a bare Button: this was the one plain
+                        // Material button left in the app, so it was the only standard
+                        // button that neither morphed on press nor fired the click
+                        // haptic every other button gives. Its label also flips
+                        // "Run it" -> "Working…", which is exactly the content-width
+                        // spring MorphButton exists to animate.
+                        //
+                        // primary/onPrimary passed explicitly because they are what
+                        // Material's Button defaulted to here. MorphTextButton's own
+                        // default is the calmer buttonContainer(), and this is the
+                        // card's primary action -- the conversion should change the
+                        // FEEL, not quietly demote the emphasis.
+                        MorphTextButton(
+                            text = if (running) "Working…" else "Run it",
                             onClick = {
                                 running = true
                                 scope.launch {
@@ -12799,9 +12866,9 @@ private fun SettingsSearchResults(
                                 }
                             },
                             enabled = !running,
-                        ) {
-                            Text(if (running) "Working…" else "Run it")
-                        }
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        )
                     }
                 }
             }
@@ -13852,7 +13919,7 @@ private fun SyncDeviceRow(
             }
         }
         if (isSelf) {
-            IconButton(onClick = onRename) {
+            MorphIconButton(onClick = onRename) {
                 Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
             }
         }

@@ -701,9 +701,20 @@ fun MorphButton(
     val haptics = LocalHapticFeedback.current
     val scheme = MaterialTheme.colorScheme
 
-    // 50% = true pill; 28% = rounded rectangle — phone's exact values with the same spring.
+    // A true pill at rest, a rounded rectangle while active or pressed -- the same
+    // two corner values the phone uses, now from the one shared pair rather than
+    // hard-coded identically in both files.
+    //
+    // The spring is NOT the phone's, and the comment here used to claim it was
+    // ("phone's exact values with the same spring"). The phone runs StiffnessLow;
+    // this runs StiffnessMedium and adds the scale punch below, because on a small
+    // dark watch face the corner change alone did not register as a reaction.
+    // That difference is deliberate, so only the VALUES are shared -- but the
+    // comment asserting otherwise would have sent the next reader to "fix" one of
+    // them to match the other.
     val pct by animateFloatAsState(
-        targetValue = if (active || pressed) 28f else 50f,
+        targetValue = if (active || pressed) com.bloo.uicommon.MorphedCornerPercent
+        else com.bloo.uicommon.PillCornerPercent,
         animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphCorner",
     )
