@@ -101,7 +101,7 @@ class CarWidget : GlanceAppWidget() {
      * Deliberately plain [RemoteViews]: this is not a composable and not a suspend
      * function, so neither Glance content nor the per-car [WidgetTheme] (which needs
      * suspending DataStore reads) is reachable here. The layout leans on
-     * `?android:attr/*` for light/dark, exactly as `car_widget_loading.xml` does --
+     * `?android:attr` for light/dark, exactly as `car_widget_loading.xml` does --
      * and composing a theme at the moment composition has just failed would be the
      * wrong instinct anyway.
      *
