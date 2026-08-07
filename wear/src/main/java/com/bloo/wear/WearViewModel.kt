@@ -42,12 +42,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import java.util.Locale
-import kotlin.coroutines.resume
 
 /** Top-level screen the watch is showing: initial data load, no logged-in
  *  account, or the normal car-list/detail UI. */
@@ -1147,32 +1143,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun reverseGeocode(lat: Double, lon: Double): String? {
-        val geocoder = Geocoder(ctx, Locale.getDefault())
-        // Was a local closure missing the phone's .distinct() -- could render
-        // "Springfield, Springfield" when locality == adminArea. Now shared.
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            withTimeoutOrNull(6000) {
-                suspendCancellableCoroutine { cont ->
-                    geocoder.getFromLocation(lat, lon, 1, object : Geocoder.GeocodeListener {
-                        override fun onGeocode(addresses: MutableList<android.location.Address>) {
-                            if (cont.isActive) cont.resume(addresses.firstOrNull()?.let { com.bloo.bluelink.data.formatPlaceName(it) })
-                        }
-                        override fun onError(message: String?) {
-                            if (cont.isActive) cont.resume(null)
-                        }
-                    })
-                }
-            }
-        } else {
-            withContext(Dispatchers.IO) {
-                withTimeoutOrNull(6000) {
-                    @Suppress("DEPRECATION")
-                    runCatching { geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()?.let { com.bloo.bluelink.data.formatPlaceName(it) } }.getOrNull()
-                }
-            }
-        }
-    }
+    /** Delegates to the shared [com.bloo.bluelink.data.reverseGeocode], which is this
+     *  implementation moved into :shared so the phone stops carrying a worse one. */
+    private suspend fun reverseGeocode(lat: Double, lon: Double): String? =
+        com.bloo.bluelink.data.reverseGeocode(ctx, lat, lon)
 
     /**
      * Push the AC/DC charge-limit sliders to the car. Goes through [command]

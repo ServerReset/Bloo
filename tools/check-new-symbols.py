@@ -92,6 +92,22 @@ for f,lines in added.items():
     }
     for ln in lines:
         code=re.sub(r'//.*','',ln)
+        # An ANNOTATION is not a call. @Suppress("DEPRECATION"), @OptIn(Foo::class)
+        # and friends read as `Name(` to the pattern below, so every one of them was
+        # reported as an unresolved symbol -- and @Suppress("DEPRECATION") is the
+        # house pattern for the legacy-API fallbacks in this codebase (four files use
+        # it), which meant adding one always produced a spurious failure. The
+        # annotation-specific check further down handles imports for these; this scan
+        # is about call targets, so skip them here.
+        #
+        # Matched strictly: the line must be NOTHING BUT an annotation, so a real call
+        # sharing a line with one (`@Suppress("x") val y = Foo()`) is still checked.
+        # `[^)]*` and not `.*` for the argument list: a greedy `.*` runs to the LAST
+        # ")" on the line, so `@Suppress("x") val y = Undefined(1)` matched in full and
+        # the real call went unchecked. Verified by mutation test, which is the only
+        # reason I noticed.
+        if re.match(r'^\s*@(?:file:)?[\w.]+(?:\([^)]*\))?\s*$', code):
+            continue
         # Both "Name(" and "Name.member(" -- a qualified static/object call is
         # just as unresolvable, and missing it is what let an unimported
         # WearPhotoCache.pathFor( through to a red build.
