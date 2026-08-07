@@ -366,6 +366,7 @@ import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
+import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.data.isGen5W
@@ -8280,8 +8281,12 @@ private fun TripRow(trip: EvTrip, metric: Boolean = false) {
             // fields -- without it, one trip read "95 min" here and "1h 35m" there.
             trip.driveMinutes?.let { add(fmtMinutes(it)) }
             trip.idleMinutes?.takeIf { it > 0 }?.let { add("${fmtMinutes(it)} idle") }
-            trip.avgspeed?.value?.let { add("avg ${formatSpeed(it.toDouble(), metric)}") }
-            trip.maxspeed?.value?.let { add("max ${formatSpeed(it.toDouble(), metric)}") }
+            // formatSpeedMph, not formatSpeed: these are mph (EvTrip's KDoc, corroborated
+            // by its sibling `distance` being treated as miles on both surfaces), and
+            // formatSpeed's input is km/h. 62 mph used to render as "38 mph" in imperial
+            // and "62 km/h" in metric. `.value` is already Double, so no toDouble().
+            trip.avgspeed?.value?.let { add("avg ${formatSpeedMph(it, metric)}") }
+            trip.maxspeed?.value?.let { add("max ${formatSpeedMph(it, metric)}") }
         } }
         if (pace.isNotEmpty()) {
             Text(pace.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

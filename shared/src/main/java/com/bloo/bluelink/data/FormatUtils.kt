@@ -413,20 +413,50 @@ fun weatherLabel(code: Int): String = when (code) {
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     if (fahrenheit) "${(tempC * 9 / 5 + 32).roundToInt()}°F" else "${tempC.roundToInt()}°C"
 
+/**
+ * The one mile/kilometre conversion factor, exact.
+ *
+ * There were two: this file used `* 1.609` in four places while CanadaApi's kmToMi
+ * used `* 0.621371`. Those are not reciprocals -- 1 / 0.621371 = 1.609344 -- so a
+ * Canadian metric user's value round-tripped lossily through the API boundary and
+ * back to the screen: 263 km arrived as 163.42 mi, rendered as 262 km. Dividing by
+ * this instead of multiplying by a second constant makes the two directions exact
+ * inverses by construction rather than by whoever typed the most digits.
+ */
+const val KM_PER_MI = 1.609344
+
 /** Format a distance in miles as "mi" or "km" based on the unit system. The
  *  API's distance figures are always miles, so metric users get a multiply
- *  by the fixed 1 mi = 1.609 km conversion factor and a re-labelled unit;
- *  imperial users get the raw value straight through. Both branches truncate
- *  to a whole number via `.toInt()`. */
+ *  by [KM_PER_MI] and a re-labelled unit; imperial users get the raw value.
+ *
+ *  Metric ROUNDS rather than truncates. Truncating compounded with the constant
+ *  mismatch above to turn a 263 km range into "262 km"; with an exact factor a
+ *  half-kilometre of truncation is still the difference between 262.94 and 263. */
 fun formatDistance(mi: Number, metric: Boolean): String =
-    if (metric) "${(mi.toDouble() * 1.609).toInt()} km" else "${mi.toInt()} mi"
+    if (metric) "${(mi.toDouble() * KM_PER_MI).roundToInt()} km" else "${mi.toInt()} mi"
 
 /** Format speed in km/h based on the unit system. Note the input unit here is
  *  km/h (unlike [formatDistance]'s miles input) — imperial mode divides by
  *  1.609 to convert back down to mph, metric mode passes the value straight
  *  through with just a re-labelled unit. */
 fun formatSpeed(kph: Double, metric: Boolean): String =
-    if (metric) "${kph.toInt()} km/h" else "${(kph / 1.609).toInt()} mph"
+    if (metric) "${kph.toInt()} km/h" else "${(kph / KM_PER_MI).toInt()} mph"
+
+/**
+ * Format a speed whose input is MILES per hour, unlike [formatSpeed]'s km/h.
+ *
+ * Both exist because the two speed sources genuinely differ in unit, and having
+ * only the km/h one meant the mph source was silently run through the wrong
+ * conversion: EvTrip's avgspeed/maxspeed are mph (its own KDoc says so, and its
+ * sibling `distance` in the same payload is treated as miles by both the phone and
+ * the watch), so `formatSpeed(62.0, metric = false)` rendered 62 mph as "38 mph"
+ * and metric rendered it as "62 km/h" instead of ~100. Wrong in both modes.
+ *
+ * Named for its input unit rather than overloading, so a call site cannot pick the
+ * wrong one by accident the way an overload set invites.
+ */
+fun formatSpeedMph(mph: Double, metric: Boolean): String =
+    if (metric) "${(mph * KM_PER_MI).roundToInt()} km/h" else "${mph.toInt()} mph"
 
 /** Format trip distance in miles to the user's preferred unit. Same
  *  mi-to-km conversion factor as [formatDistance], but keeps one decimal
@@ -434,7 +464,7 @@ fun formatSpeed(kph: Double, metric: Boolean): String =
  *  are often short enough that whole-number rounding would lose useful
  *  precision. */
 fun formatTripDistance(mi: Double, metric: Boolean): String =
-    if (metric) "%.1f km".format(mi * 1.609) else "%.1f mi".format(mi)
+    if (metric) "%.1f km".format(mi * KM_PER_MI) else "%.1f mi".format(mi)
 
 /** Format efficiency (miles per kWh or km per kWh). Converts the distance
  *  component to km first when metric (same 1.609 factor as the other
@@ -442,7 +472,7 @@ fun formatTripDistance(mi: Double, metric: Boolean): String =
  *  ratio itself — not just the label — is correct for the selected unit
  *  system, not just a relabelled imperial figure. */
 fun formatEfficiency(mi: Double, kwh: Double, metric: Boolean): String {
-    val eff = if (metric) (mi * 1.609) / kwh else mi / kwh
+    val eff = if (metric) (mi * KM_PER_MI) / kwh else mi / kwh
     return "${"%.1f".format(eff)} ${if (metric) "km" else "mi"}/kWh"
 }
 

@@ -566,7 +566,10 @@ class CanadaApi(private val brand: Brand) {
      *  to km only at display time per the user's own unit setting (see
      *  FormatUtils.formatDistance) -- so every raw distance value coming out
      *  of this API needs to be normalized to miles right here. */
-    private fun Double.kmToMi(): Double = this * 0.621371
+    /** Exact inverse of [KM_PER_MI]. Was `* 0.621371`, whose reciprocal is 1.609344 --
+     *  not the 1.609 the formatters used -- so a metric user's own value came back a
+     *  kilometre short after the round trip (263 -> 163.42 mi -> "262 km"). */
+    private fun Double.kmToMi(): Double = this / KM_PER_MI
 
     private fun JsonElement?.path(vararg keys: String): JsonElement? {
         var cur: JsonElement? = this
