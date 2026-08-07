@@ -99,6 +99,19 @@ enum class LockTiming(val label: String) {
 // customized their section order.
 val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climate", "ai", "info", "location", "weather", "trips", "diagnostics")
 
+/**
+ * Collapse key for the hero card's photo, so it rides the same per-car
+ * collapsed-sections set every pebble uses -- persisted, per car, and carried by
+ * Drive sync for free, instead of a parallel preference that would behave subtly
+ * differently from every other collapse in the app.
+ *
+ * Deliberately NOT in [DEFAULT_SECTIONS]: it is not a reorderable pebble, and
+ * sectionOrder() filters saved lists against that list, so this key can never leak
+ * into the pebble-order UI. Nothing filters the COLLAPSED set, which is what lets it
+ * round-trip.
+ */
+const val HERO_PHOTO_SECTION = "hero"
+
 /** Pebbles the user may hide (the others are essential). */
 val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trips", "info", "diagnostics", "ai")
 

@@ -172,6 +172,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Thermostat
@@ -4994,6 +4995,11 @@ private fun HeroHeader(
     dragHandle: Modifier = Modifier,
     height: Dp = 150.dp,
     metric: Boolean = false,
+    /** Whether the photo box is showing. Passed IN rather than collected from the
+     *  view model here: this composable already has `vm`, but subscribing to state
+     *  inside it would recompose the whole hero on every unrelated state change, and
+     *  both call sites already hold the UiState they would read it from. */
+    photoExpanded: Boolean = true,
 ) {
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
     // Play the fade/slide-up entrance only ONCE per car per session, gated on the
@@ -5071,7 +5077,17 @@ private fun HeroHeader(
                 // 16dp was doing. Floored so it stays visibly rounded.
                 val outer = if (cover) corner else PebbleCornerExpanded
                 val innerCorner = (outer - 16.dp).coerceAtLeast(8.dp)
-                HeroVisual(v, imageUrl, if (cover) 210.dp else height, innerCorner)
+                if (cover) {
+                    // The flip cover is always expanded: there the photo IS the content of
+                    // a centred full-screen tile, and there is no room for a toggle strip.
+                    HeroVisual(v, imageUrl, 210.dp, innerCorner)
+                } else {
+                    CollapsibleHeroPhoto(
+                        expanded = photoExpanded,
+                        onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
+                        corner = innerCorner,
+                    ) { HeroVisual(v, imageUrl, height, innerCorner) }
+                }
                 Spacer(Modifier.height(12.dp))
             }
             ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
@@ -5321,6 +5337,74 @@ private fun CarThumb(img: String?, size: Dp, cornerRadius: Dp, iconSize: Dp) {
 @Composable
 private fun rememberPhotoModel(url: String): Any =
     remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
+
+/**
+ * The hero photo plus its collapse control, phone only.
+ *
+ * Expanded, the photo looks exactly as it did before -- the only addition is a small
+ * chevron over its top-end corner, so the default appearance of the card is unchanged.
+ * Collapsed, a slim strip takes the photo's place, which is what makes the state
+ * recoverable: "tap the photo to collapse" alone would leave no way back and no way to
+ * discover the feature.
+ *
+ * State lives in the same per-car collapsedPebbles set as every pebble (see
+ * [com.bloo.bluelink.data.HERO_PHOTO_SECTION]), so it persists across restarts and syncs with the rest of the
+ * layout rather than being a separate preference that drifts from them.
+ */
+@Composable
+private fun CollapsibleHeroPhoto(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    corner: Dp,
+    photo: @Composable () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    val toggle = { haptics?.click(); onToggle() }
+    if (expanded) {
+        Box(Modifier.fillMaxWidth()) {
+            photo()
+            // Over the photo rather than beside it, so an expanded hero keeps exactly the
+            // height it had. A scrim disc because the photo underneath is arbitrary -- a
+            // bare icon is invisible against a light car.
+            Surface(
+                onClick = toggle,
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.42f),
+                contentColor = Color.White,
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowUp,
+                        contentDescription = "Hide photo",
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    } else {
+        Surface(
+            onClick = toggle,
+            shape = RoundedCornerShape(corner),
+            color = buttonContainer(),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().height(34.dp),
+        ) {
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Show photo", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
 
 /** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
@@ -6475,7 +6559,11 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val hMetric = LocalAppearance.current.unitSystem == "metric"
-    HeroHeader(v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm, state.drivingLabel(v), metric = hMetric)
+    HeroHeader(
+        v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
+        state.drivingLabel(v), metric = hMetric,
+        photoExpanded = state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+    )
     // Update tile lives in the "pebbles" column's PebbleList as its own
     // reorderable/pinnable "update" section now, not hardcoded into this
     // fixed critical-info column -- see SinglePebble.
@@ -6620,6 +6708,7 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
         "summary" -> HeroHeader(
             v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
             state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
+            photoExpanded = state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
         )
         // Its own reorderable/pinnable slot now, like every other pebble --
         // only actually present in the list while state.updateAvailable != null
