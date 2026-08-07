@@ -1733,15 +1733,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val ev = status.evStatus
             if (ev?.batteryCharge == true) anyCharging = true
             runCatching {
-                LiveCharge.update(
+                LiveCharge.sync(
                     context = getApplication(),
+                    settings = settingsStore,
                     vin = v.vin,
                     carName = v.name,
                     charging = ev?.batteryCharge == true,
                     percent = ev?.batteryStatus,
                     minutesToFull = ev?.minutesToFull,
                     pluggedInLabel = ev?.pluggedInLabel,
-                    enabled = true,
                     chargeLimit = ev?.targetForCurrentPlug(),
                 )
             }

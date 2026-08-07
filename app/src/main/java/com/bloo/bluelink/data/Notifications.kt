@@ -281,6 +281,59 @@ object LiveCharge {
     }
 
     /**
+     * The one entry point callers should use: applies the dismissal rule, then delegates
+     * to [update].
+     *
+     * There are three callers -- the 5-minute poll worker, the 30-minute alert worker, and
+     * the app's own post-refresh hook -- and every rule about WHEN this notification should
+     * exist has to hold in all three. It previously didn't: each called [update] directly
+     * and each independently got the "I couldn't fetch a status" case wrong, cancelling the
+     * bar because the network blipped. Putting the policy here means the next rule added
+     * lands once.
+     *
+     * Two rules live here:
+     *
+     * Charging ended -> clear the bar and FORGET any dismissal, so the next charging
+     * session shows it again instead of being permanently suppressed by one old swipe.
+     *
+     * Still charging but dismissed -> do nothing at all. Not a cancel: the notification is
+     * already gone, the user removed it, and re-cancelling would be a pointless call.
+     *
+     * Callers must still only call this for a car they actually have a status for --
+     * `charging = false` here genuinely means "the car told us it stopped", never "we
+     * don't know".
+     */
+    suspend fun sync(
+        context: Context,
+        settings: SettingsStore,
+        vin: String,
+        carName: String,
+        charging: Boolean,
+        percent: Int? = null,
+        minutesToFull: Int? = null,
+        pluggedInLabel: String? = null,
+        chargeLimit: Int? = null,
+    ) {
+        if (!charging) {
+            runCatching { settings.setLiveChargeDismissed(vin, false) }
+            update(context, vin, carName, charging = false)
+            return
+        }
+        if (runCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
+        update(
+            context = context,
+            vin = vin,
+            carName = carName,
+            charging = true,
+            percent = percent,
+            minutesToFull = minutesToFull,
+            pluggedInLabel = pluggedInLabel,
+            enabled = true,
+            chargeLimit = chargeLimit,
+        )
+    }
+
+    /**
      * Shows, updates, or cancels [vin]'s live-charge notification to
      * match its current charge state. Reposting under the same [idFor] id is
      * exactly what makes this "live" below API 36 -- see the class doc.
@@ -365,6 +418,21 @@ object LiveCharge {
             context, id, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        // deleteIntent: the only way to learn the user swiped this away. Without it the
+        // next poll silently reposted a bar they had just dismissed, every five minutes
+        // for the length of the charge -- which the Live Updates guidance calls out
+        // specifically. Distinct request code from stopPi so the two PendingIntents don't
+        // collide (same id, same class, different action -> FLAG_UPDATE_CURRENT would
+        // otherwise have one overwrite the other's extras).
+        val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
+            action = AlertActionReceiver.ACTION_LIVE_CHARGE_DISMISSED
+            data = Uri.parse("bloo://live_charge_dismissed/$vin")
+            putExtra(AlertActionReceiver.EXTRA_VIN, vin)
+        }
+        val dismissPi = PendingIntent.getBroadcast(
+            context, id + 1, dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
         val builder = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_bloo)
@@ -378,6 +446,7 @@ object LiveCharge {
             .setRequestPromotedOngoing(true)
             .setStyle(style)
             .addAction(0, "Stop charging", stopPi)
+            .setDeleteIntent(dismissPi)
             .apply { contentPi?.let { setContentIntent(it) } }
             .apply {
                 // A COUNTDOWN CHRONOMETER to the time the car says it will be full.

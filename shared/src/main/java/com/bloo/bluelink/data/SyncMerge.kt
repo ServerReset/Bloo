@@ -84,6 +84,13 @@ object SyncMerge {
      *  ticks (otherwise every 30-min alert poll churned the hash and forced a re-upload). */
     private val DEVICE_LOCAL_PREFIXES = listOf(
         "alert_", "door_since_", "engine_since_", "tile_refreshed_",
+        // live_dismissed_* : "the user swiped THIS device's live charging bar away for
+        //                  the current charging session". Dismissing a notification on
+        //                  a phone says nothing about whether a tablet should show one,
+        //                  and roaming it would suppress the bar on a device the user
+        //                  never touched. Also cleared and re-set constantly during a
+        //                  charge, so exporting it would churn the content hash.
+        "live_dismissed_",
     )
 
     /** Whether [name] is device-local (exact key or dynamic per-VIN prefix) and so must

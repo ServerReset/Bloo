@@ -72,15 +72,15 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 // from the charge having stopped.
                 if (status == null) continue
                 runCatching {
-                    LiveCharge.update(
+                    LiveCharge.sync(
                         context = applicationContext,
+                        settings = settings,
                         vin = v.vin,
                         carName = v.name,
                         charging = charging,
                         percent = ev?.batteryStatus,
                         minutesToFull = ev?.minutesToFull,
                         pluggedInLabel = ev?.pluggedInLabel,
-                        enabled = true,
                         chargeLimit = ev?.targetForCurrentPlug(),
                     )
                 }

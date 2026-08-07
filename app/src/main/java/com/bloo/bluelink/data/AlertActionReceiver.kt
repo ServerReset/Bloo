@@ -49,6 +49,24 @@ class AlertActionReceiver : BroadcastReceiver() {
      *    ("didn't call finish()") ill effect.
      */
     override fun onReceive(context: Context, intent: Intent) {
+        // The live charging bar's deleteIntent: the user swiped it away, so record that
+        // and stop reposting it for this charging session. Handled before the ACTION_RUN
+        // guard below because it carries no command -- see
+        // SettingsStore.liveChargeDismissed for why this is persisted rather than kept
+        // in memory, and LiveCharge.sync for where it's read and cleared.
+        if (intent.action == ACTION_LIVE_CHARGE_DISMISSED) {
+            val vin = intent.getStringExtra(EXTRA_VIN) ?: return
+            val ctx = context.applicationContext
+            val pending = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    runCatching { SettingsStore(ctx).setLiveChargeDismissed(vin, true) }
+                } finally {
+                    pending.finish()
+                }
+            }
+            return
+        }
         if (intent.action != ACTION_RUN) return
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
@@ -80,6 +98,9 @@ class AlertActionReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_RUN = "com.bloo.bluelink.ALERT_ACTION"
+
+        /** Fired by the live charging bar's own deleteIntent when the user dismisses it. */
+        const val ACTION_LIVE_CHARGE_DISMISSED = "com.bloo.bluelink.LIVE_CHARGE_DISMISSED"
         const val EXTRA_VIN = "vin"
         const val EXTRA_ACTION = "action"
         const val EXTRA_NOTIF_ID = "notif_id"

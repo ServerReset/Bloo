@@ -477,6 +477,27 @@ class SettingsStore(private val context: Context) {
         editTracked { it[booleanPreferencesKey("alert_$key")] = value }
     }
 
+    /**
+     * Whether the user swiped away [vin]'s live charging bar during the CURRENT charging
+     * session. Google's Live Updates guidance is explicit that a dismissed Live Update
+     * must not be reposted, and this notification is otherwise re-posted every five
+     * minutes for as long as the charge lasts.
+     *
+     * Persisted rather than kept in memory because the poller is a WorkManager job: the
+     * process is routinely killed between ticks, so an in-memory flag would be forgotten
+     * and the bar would come straight back — which is the behaviour this exists to stop.
+     *
+     * Device-local (see SyncMerge's prefix list): dismissing a notification on a phone
+     * says nothing about what a tablet should show. Cleared when charging ends, so the
+     * next session starts fresh rather than being permanently suppressed by one swipe.
+     */
+    suspend fun liveChargeDismissed(vin: String): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("live_dismissed_$vin")] ?: false
+
+    suspend fun setLiveChargeDismissed(vin: String, value: Boolean) {
+        editTracked { it[booleanPreferencesKey("live_dismissed_$vin")] = value }
+    }
+
     suspend fun setUiScale(value: Float) {
         editTracked { it[Keys.UI_SCALE] = value.toString() }
     }

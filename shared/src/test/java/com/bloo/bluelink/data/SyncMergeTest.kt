@@ -402,6 +402,11 @@ class SyncDeviceLocalTest {
             // Per-VIN runtime state, matched by prefix rather than exact name.
             "alert_door_KMHXX", "door_since_KMHXX", "engine_since_KMHXX",
             "tile_refreshed_KMHXX",
+            // "user swiped THIS device's live charging bar away this session" --
+            // dismissing a notification on a phone says nothing about what a tablet
+            // should show, and it flips constantly during a charge, so exporting it
+            // would churn the portable content hash too.
+            "live_dismissed_KMHXX",
         ).forEach {
             assertTrue(SyncMerge.isDeviceLocal(it), "$it must never leave this device")
         }
@@ -412,7 +417,12 @@ class SyncDeviceLocalTest {
         // "alert_" is a prefix rule, so a future setting merely STARTING with
         // a similar word must not be swept up by it. These are the near-misses
         // that would be easy to introduce without noticing.
-        listOf("alerts_enabled", "doorbell", "engine_type", "tiles_order").forEach {
+        listOf(
+            "alerts_enabled", "doorbell", "engine_type", "tiles_order",
+            // "live_dismissed_" is a prefix too, so a real setting about live updates
+            // must not be swept into device-local and silently stop syncing.
+            "live_updates_enabled", "livecharge_style",
+        ).forEach {
             assertFalse(SyncMerge.isDeviceLocal(it), "$it was wrongly treated as device-local")
         }
     }
