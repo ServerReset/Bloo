@@ -2072,9 +2072,12 @@ class CarWidget : GlanceAppWidget() {
         // button on a tile that size is small, but it's a deliberate trade --
         // and still a real target, whereas a missing button can't be pressed.
         val gap = Scale.buttonGap(size)
-        val minButtonWidth = Scale.minButtonWidth(size)
-        val rowCapacity = ((availableWidth + gap) / (minButtonWidth + gap)).toInt()
-        val colCapacity = ((availableHeight + gap) / (Scale.buttonHeight(size) + gap)).toInt()
+        // Capacity now comes from Scale, so WidgetScaleTest can sweep the numbers this
+        // composable actually draws with. It used to compute them here, where the sweep
+        // could not reach them -- which is why the widget's real button geometry was the
+        // widest untested surface in the file.
+        val rowCapacity = Scale.buttonsAcross(size, availableWidth)
+        val colCapacity = Scale.buttonsDown(size, availableHeight)
         val stack = when {
             // An explicit request still has to fit; it just gets first refusal.
             vertical -> true
@@ -2083,13 +2086,20 @@ class CarWidget : GlanceAppWidget() {
             // Neither fits everything: prefer whichever shows more.
             else -> colCapacity > rowCapacity
         }
-        val actions = all.take((if (stack) colCapacity else rowCapacity).coerceAtLeast(1))
+        val actions = all.take(
+            Scale.buttonsForced(if (stack) colCapacity else rowCapacity, all.size),
+        )
         // Stretched to fill the WHOLE reserved zone in stack mode, not
         // sized to Scale.buttonHeight and centred inside it -- see the
         // Column branch below for why that room is real, deliberately
         // budgeted space rather than a leftover guess.
-        val stackHeight = ((availableHeight - gap * (actions.size - 1)) / actions.size).coerceAtLeast(16.dp)
-        val rowHeight = Scale.buttonHeight(size)
+        // Both clamped to the budget by Scale now. rowHeight was Scale.buttonHeight(size),
+        // which is capped by the whole TILE and knew nothing about a smaller reservation a
+        // tier had handed over; stackHeight ended in .coerceAtLeast(16.dp), so a 10dp
+        // reservation produced a 16dp button. Either way the excess left the tile, because
+        // RemoteViews does not clip an overflowing Column.
+        val stackHeight = Scale.stackedButtonHeight(size, availableHeight, actions.size)
+        val rowHeight = Scale.rowButtonHeight(size, availableHeight)
         // Labels are all-or-nothing across the row: measured against the
         // LONGEST label present, so the widest one setting cleanly is the
         // condition for any of them appearing.

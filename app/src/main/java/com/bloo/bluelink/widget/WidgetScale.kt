@@ -235,6 +235,72 @@ internal object Scale {
      *  across rather than some being dropped -- see ActionButtons. */
     fun minButtonWidth(size: DpSize): Dp = lerp(progress(size), 20f, 44f).dp
 
+    // ---- Action-button capacity ------------------------------------------
+    //
+    // These four moved out of the ActionButtons composable, which is where the
+    // widget's REAL button geometry lived. [maxStackedButtons] above was only ever
+    // consulted by some tiers to pick a reservation; the composable then decided
+    // independently how many buttons to draw and how tall they were, using its own
+    // arithmetic. So the sweep in WidgetScaleTest -- which can only call this file --
+    // could not see the numbers that actually shipped.
+    //
+    // Two of them were also wrong in the same direction: they could exceed the height
+    // the calling tier had budgeted, and RemoteViews does not clip an overflowing
+    // Column, so the excess bleeds past the tile edge rather than being cut off.
+
+    /** How many buttons fit ACROSS [availableWidth], at this tile's minimum button
+     *  width and gap. May be 0 on a very narrow tile -- see [buttonsForced]. */
+    fun buttonsAcross(size: DpSize, availableWidth: Dp): Int {
+        val gap = buttonGap(size)
+        return ((availableWidth + gap).value / (minButtonWidth(size) + gap).value).toInt().coerceAtLeast(0)
+    }
+
+    /** How many buttons fit STACKED in [availableHeight]. May be 0 -- see
+     *  [buttonsForced]. */
+    fun buttonsDown(size: DpSize, availableHeight: Dp): Int {
+        val gap = buttonGap(size)
+        return ((availableHeight + gap).value / (buttonHeight(size) + gap).value).toInt().coerceAtLeast(0)
+    }
+
+    /**
+     * The count actually drawn: at least one, even where [capacity] says none fits.
+     *
+     * Deliberate, and ActionButtons' own comment is the reason -- "a 20dp button on a
+     * tile that size is small, but it's a deliberate trade, and still a real target,
+     * whereas a missing button can't be pressed." Kept exactly as it was. What changes
+     * is that the forced button is no longer allowed to overflow: [rowButtonHeight] and
+     * [stackedButtonHeight] clamp to the budget instead.
+     */
+    fun buttonsForced(capacity: Int, configured: Int): Int =
+        minOf(configured, capacity.coerceAtLeast(1))
+
+    /**
+     * Height of a single ROW of buttons inside [availableHeight].
+     *
+     * Was `buttonHeight(size)` alone, which is capped by the whole TILE
+     * (`size.height - contentPadding * 2`) and knows nothing about the smaller
+     * reservation a tier may have handed over. A tier that budgeted less than the
+     * tile's ideal therefore got a taller row than it reserved, and the difference
+     * left the tile rather than being clipped.
+     */
+    fun rowButtonHeight(size: DpSize, availableHeight: Dp): Dp =
+        minOf(buttonHeight(size), availableHeight.coerceAtLeast(0.dp))
+
+    /**
+     * Height each of [count] STACKED buttons gets inside [availableHeight].
+     *
+     * The 16dp floor is kept -- below it a button stops being a usable target -- but it
+     * can no longer win against the budget. Previously `.coerceAtLeast(16.dp)` was the
+     * last operation, so a 10dp reservation produced a 16dp button and 6dp of overflow.
+     */
+    fun stackedButtonHeight(size: DpSize, availableHeight: Dp, count: Int): Dp {
+        if (count <= 0) return 0.dp
+        val avail = availableHeight.coerceAtLeast(0.dp)
+        val gap = buttonGap(size)
+        val each = (avail - gap * (count - 1)) / count
+        return minOf(each.coerceAtLeast(16.dp), avail)
+    }
+
     /** Gap between buttons, tightened on small tiles for the same reason:
      *  spacing is the cheapest thing to give up when the choice is between
      *  a gap and showing one more control. */
