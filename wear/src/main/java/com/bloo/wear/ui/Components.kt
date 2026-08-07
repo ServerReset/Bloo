@@ -375,6 +375,7 @@ fun ChargeRing(
                 fontWeight = FontWeight.Bold,
                 fontSize = minOf(ceiling, fits).coerceAtLeast(9f).sp,
             ),
+            reduceMotion = LocalReduceMotion.current,
         )
     }
 }
@@ -451,10 +452,14 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
             .aspectRatio(1f)
             .clip(thumbShape)
             .background(placeholder)
-            // Same flat surfaceContainerHigh tone as the SectionCard it sits
-            // inside -- without a border it visually merges with its parent
-            // card while loading/erroring, before the map image gives it any
-            // definition of its own.
+            // This thumb is surfaceContainerHigh and the SectionCard it sits inside
+            // is surfaceContainer -- adjacent tones, one step apart, which at this
+            // size is not enough separation to see. So while loading or erroring,
+            // before the map image gives the thumb any definition of its own, it
+            // visually merges with its parent card; the rim is what keeps its edge.
+            // (This comment used to claim the two tones were the SAME, which they
+            // are not, and which would have made the rim sound load-bearing for a
+            // reason it isn't.)
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), thumbShape)
             .clickable(enabled = isError) { retryKey++ },
         contentAlignment = Alignment.Center,
@@ -840,8 +845,12 @@ fun MorphSegmented(
         onTick = { haptics.tick() },
         modifier = modifier,
         trackHeight = 48.dp,
-        // Every other interactive surface (MorphButton, SectionCard, PinKey)
-        // has a hairline rim; this was the one flat, borderless control left.
+        // Every other raised surface on the watch -- MorphButton, PinKey, and the
+        // non-interactive SectionCard too -- has a hairline rim; this was the one
+        // flat, borderless control left. ("interactive" is deliberately not the
+        // word: SectionCard is a Box precisely BECAUSE it isn't clickable, see its
+        // own comment on why it can't be a Card, so listing it as an interactive
+        // surface contradicted the thing it exists to explain.)
         borderColor = scheme.outline.copy(alpha = 0.18f),
         indicatorVisible = indicatorVisible,
     )

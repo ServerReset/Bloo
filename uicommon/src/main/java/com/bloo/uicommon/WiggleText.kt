@@ -31,13 +31,16 @@ import kotlin.math.sin
  * digits bounce up and down in a travelling wave. Callers must resolve
  * [Color.Unspecified] and merge fontWeight into [style] before calling, so this
  * function always receives a fully-specified style.
+ *
+ * [reduceMotion] has no default, deliberately — see [AnimatedValue], where the
+ * default this used to have cost three call sites.
  */
 @Composable
 fun WiggleText(
     text: String,
     style: TextStyle,
     maxLines: Int = 1,
-    reduceMotion: Boolean = false,
+    reduceMotion: Boolean,
 ) {
     // Fires only when the trimmed text is exactly "67", optionally followed by a
     // single trailing unit character ("67", "67°", "67F", "67C"). Matching the
@@ -92,13 +95,27 @@ fun WiggleText(
 /**
  * Animates value changes with a fade + vertical slide, using [WiggleText] for
  * rendering so the "67 bounce" works inside the transition.
+ *
+ * [reduceMotion] has no default, deliberately. It used to default to false, and
+ * three of the four live call sites took that default: the phone's [StatusRow] --
+ * i.e. nearly every status value the phone displays -- the phone's set-temperature
+ * readout, and the watch's own ring gauge label. All three animated regardless of
+ * whether the user had turned animations off in system accessibility settings,
+ * while the fourth, the watch's own [AnimatedValue] wrapper, honoured it correctly.
+ * Both surfaces already publish the setting as a composition local, so there was
+ * nothing to plumb -- only a default quietly answering a question on behalf of
+ * callers who had never been asked it.
+ *
+ * So callers must now name it. This is the convention [AnimatedSlider] already
+ * follows for its own `reduceMotion`, which is very likely why both of ITS call
+ * sites pass it and none of these did.
  */
 @Composable
 fun AnimatedValue(
     value: String,
     style: TextStyle,
     maxLines: Int = 1,
-    reduceMotion: Boolean = false,
+    reduceMotion: Boolean,
     // Needed for callers that must size this within a Row/Column layout (e.g.
     // a label/value row using Modifier.weight on the value cell) -- without
     // this, AnimatedContent's own layout node had no way to receive that

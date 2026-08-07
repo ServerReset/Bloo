@@ -8834,7 +8834,11 @@ private fun ClimatePebble(
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Set temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                com.bloo.uicommon.AnimatedValue(degLabel(tempF.toString(), fahrenheit), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                com.bloo.uicommon.AnimatedValue(
+                    degLabel(tempF.toString(), fahrenheit),
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                    reduceMotion = LocalReduceMotion.current,
+                )
             }
         }
 
@@ -13373,6 +13377,7 @@ private fun StatusRow(label: String, value: String) {
                     textAlign = TextAlign.End,
                 ),
                 maxLines = 2,
+                reduceMotion = LocalReduceMotion.current,
             )
         }
     }
