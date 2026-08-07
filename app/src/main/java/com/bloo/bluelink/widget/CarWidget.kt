@@ -54,6 +54,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.parseOdometerMiles
+import com.bloo.bluelink.data.serviceDue
 import com.bloo.bluelink.data.relativeLabel
 import com.bloo.bluelink.ui.ThemeMode
 import com.bloo.bluelink.ui.resolveWidgetAccent
@@ -2694,17 +2695,26 @@ class CarWidget : GlanceAppWidget() {
     }
 
     private fun serviceDueLabel(car: VehicleSnapshot, metric: Boolean): String? {
-        val last = car.lastServiceMiles ?: return null
-        val interval = car.serviceIntervalMiles ?: return null
         // Odometer strings can arrive with thousands separators (e.g. "12,345")
         // and fractional miles; parseOdometerMiles strips/floors them to an Int.
         // Hand-rolling this with filter { isDigit() } dropped the decimal POINT
         // too, so "12,345.6" parsed as 123456 -- an odometer ten times too high,
         // which drove `due` negative, coerced it to 0, and left this field
         // reading "in 0 mi" forever (a service alert that never clears).
-        val odo = parseOdometerMiles(car.odometer) ?: return null
-        val due = (last + interval - odo).coerceAtLeast(0)
-        return "in ${formatDistance(due, metric)}"
+        //
+        // The arithmetic itself is the shared serviceDue, which also does the
+        // three null checks this used to spell out. It had been re-inlined here,
+        // one helper away from the parseOdometerMiles the comment above is about --
+        // and re-inlining a shared formatter is exactly how that bug got in.
+        val due = serviceDue(
+            odometerMiles = parseOdometerMiles(car.odometer),
+            lastServiceMiles = car.lastServiceMiles,
+            intervalMiles = car.serviceIntervalMiles,
+        ) ?: return null
+        // Clamped, unlike the phone's and the watch's readouts, which render a
+        // negative as "overdue N mi". A widget field has room for one short phrase,
+        // so it says "in 0 mi" and leans on the app for the detail.
+        return "in ${formatDistance(due.coerceAtLeast(0), metric)}"
     }
 
     private fun iconFor(action: WidgetAction): Int = when (action) {
