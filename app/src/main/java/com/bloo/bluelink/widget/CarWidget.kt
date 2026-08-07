@@ -892,8 +892,17 @@ class CarWidget : GlanceAppWidget() {
         // and below. Same maxStackedButtons treatment RailLayout and
         // CompactTallNarrowLayout already use, so the button count is a
         // consequence of the real vertical budget rather than the width.
+        // overhead = 20.dp: buttonZone's own trailing 12.dp PLUS the forced
+        // Spacer(8.dp) below that renders whenever buttonCount > 0 and is not
+        // part of buttonZone. Same rule RailLayout states (8 + 8 = 16) and
+        // CompactTallNarrowLayout follows (4 + 4 = 8); this tier passed 12,
+        // i.e. the trailing gap alone, so it under-reserved by exactly that
+        // spacer -- the same defect both of those comments describe as fixed,
+        // on the tier with the largest forced spacers of the three.
+        // TALL_TIER_MARGIN cannot cover it: heroRoom clamps at zero, and when
+        // it does the margin is never actually subtracted from anything.
         val buttonCount = Scale.maxStackedButtons(
-            size, (budget - nameHeight - MIN_HERO_RESERVE).coerceAtLeast(0.dp), overhead = 12.dp,
+            size, (budget - nameHeight - MIN_HERO_RESERVE).coerceAtLeast(0.dp), overhead = 20.dp,
             cap = allActions.size,
         )
         val buttonZone = if (buttonCount > 0) {
@@ -919,6 +928,14 @@ class CarWidget : GlanceAppWidget() {
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = split.ring.value.toInt())
                 Spacer(GlanceModifier.height(6.dp))
+            } else {
+                // The glyph every sibling tier falls back to (Rail, both Compact
+                // Tall Narrow and Square, Micro, LargeTall). Without it this tier
+                // showed a name, info rows and buttons and NO status iconography
+                // at all whenever the ring was switched off or percent was
+                // unknown -- while still subtracting MIN_HERO_RESERVE from the
+                // button budget for a hero that never rendered.
+                StatusGlyph(car, render.theme, sizeDp = split.ring.value.toInt())
             }
             if (split.rows > 0) InfoStack(car, render, max = split.rows)
             if (hasMap) {
@@ -971,7 +988,19 @@ class CarWidget : GlanceAppWidget() {
                     minRowWidth = 140.dp,
                     ringWidth = ringEdge,
                     ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
-                    content = { w -> InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale), availableWidth = w) },
+                    // hideFields drops PERCENT: RingImage's own centerText
+                    // already bakes "82%" into the ring beside this stack, so a
+                    // user with Battery/Fuel selected saw the same number twice
+                    // on one tile. The LARGE and XL tiers already carried this
+                    // guard; the two MEDIUM tiers drawing the identical ring did
+                    // not. Only this branch needs it -- the else below has no
+                    // ring, so there the field is the only place it appears.
+                    content = { w ->
+                        InfoStack(
+                            car, render, max = Scale.infoCap(size, 3, render.theme.textScale),
+                            availableWidth = w, hideFields = setOf(WidgetInfoField.PERCENT),
+                        )
+                    },
                 )
             } else {
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
@@ -1094,14 +1123,32 @@ class CarWidget : GlanceAppWidget() {
         // the same room and puts the car's location in it, and collapses to
         // nothing when there's no bitmap, which is when the spacers are the
         // right answer again.
+        val showsRing = render.config.showRing && car.percent != null
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
-            if (render.config.showRing && car.percent != null) {
+            // The bar the gauge falls back to when tallSplit left room for a
+            // gauge but not for a RING: Scale.ring yields 0 below MIN_RING (24dp)
+            // rather than drawing a smudge, and StatusGlyph declines at 0 too, so
+            // without this the tier drew no gauge whatsoever in that case -- a
+            // bar needs 10-14dp where a ring needs 24. Draws only when ringEdge
+            // came back 0, out of room the ring was budgeted and didn't use, so
+            // it can't squeeze anything below it.
+            ChargeBarFallback(car, render, ringEdge, split.ringRoom)
+            if (showsRing) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.height(8.dp))
+            } else {
+                // The same fallback glyph every sibling tier carries.
+                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
-            InfoStack(car, render, max = rows)
+            // PERCENT is dropped only when the ring is actually drawn -- its
+            // centerText bakes the number in, so showing the field too printed it
+            // twice. In the glyph branch nothing else carries it, so it stays.
+            InfoStack(
+                car, render, max = rows,
+                hideFields = if (showsRing) setOf(WidgetInfoField.PERCENT) else emptySet(),
+            )
             // A FIXED-height module, not a weighted MapFill -- see
             // MediumWideLayout's own note: a weighted element ahead of
             // ActionButtons left it with no real room on a real device,
@@ -1268,6 +1315,12 @@ class CarWidget : GlanceAppWidget() {
             HeaderRow(car, render)
             FooterRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
+            // Bar fallback for when tallSplit left room for a gauge but not for
+            // a RING -- see MediumTallLayout's own note. Both branches below
+            // decline at 0 (RingImage and StatusGlyph each early-return), so
+            // without this the tier drew no gauge at all, which is reachable at
+            // 1.4x text on a tile near LARGE's own 240x170 floor.
+            ChargeBarFallback(car, render, ringEdge, split.ringRoom)
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
             } else {
@@ -1371,6 +1424,11 @@ class CarWidget : GlanceAppWidget() {
             HeaderRow(car, render)
             FooterRow(car, render)
             Spacer(GlanceModifier.height(14.dp))
+            // Same bar fallback as LargeTallLayout / MediumTallLayout: this tier
+            // reserves a whole extra text line (primaryValueHeight) on top of
+            // header, footer and buttons, so it runs out of ring room sooner
+            // than its size suggests.
+            ChargeBarFallback(car, render, ringEdge, split.ringRoom)
             if (render.config.showRing && car.percent != null) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
             } else {

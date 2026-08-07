@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -173,8 +174,42 @@ fun MorphSegmented(
             // resting target the instant the drag ends, so there's nothing
             // to snap back to; it clears itself once the real prop catches up.
             var pendingIndex by remember { mutableStateOf<Int?>(null) }
-            LaunchedEffect(selectedIndex) {
-                if (pendingIndex == selectedIndex) pendingIndex = null
+            LaunchedEffect(pendingIndex, selectedIndex) {
+                val pending = pendingIndex ?: return@LaunchedEffect
+                if (pending == selectedIndex) {
+                    // The caller adopted it. restingXPx resolves to the same
+                    // segment either way now, so dropping it here is invisible.
+                    pendingIndex = null
+                    return@LaunchedEffect
+                }
+                // Not adopted YET is the normal case for a frame or two, and is
+                // the whole reason pendingIndex exists. But a controlled caller
+                // that REJECTS the change -- validation, a disabled option, an
+                // unsupported combination -- never moves selectedIndex at all,
+                // and the previous `LaunchedEffect(selectedIndex)` could not fire
+                // then, because its key never changed. pendingIndex stayed set,
+                // restingXPx kept resolving through it, and the indicator sat
+                // parked on a segment the caller had refused -- disagreeing with
+                // the bold label, which reads selectedIndex (see visualIndex
+                // below) -- until some later accepted interaction cleared it.
+                //
+                // Releasing after a grace period covers both cases, and the two
+                // are NOT symmetric: an accepted change clears in the branch
+                // above the moment selectedIndex arrives, cancelling this delay,
+                // so the wait only ever elapses on a rejection.
+                //
+                // That asymmetry is why this is deliberately generous rather than
+                // snappy. Every real caller here routes through a DataStore write
+                // and a Flow re-emission (setUnitSystem, setThemeMode,
+                // setSettingsMode...), so a slow device can take a few hundred ms
+                // to come back -- and cutting the hold short of that would spring
+                // the indicator backwards and then forwards again, which is
+                // exactly the "jumpy when you let go" this whole mechanism exists
+                // to prevent. Undershooting reintroduces a live bug on every
+                // caller; overshooting only delays the correction on a caller that
+                // rejects, of which there are currently none. So: err long.
+                delay(1200)
+                pendingIndex = null
             }
             val restingXPx = (segWidthPx + gapPx) * (pendingIndex ?: selectedIndex)
             // A raw pixel Animatable driving graphicsLayer's translationX, not

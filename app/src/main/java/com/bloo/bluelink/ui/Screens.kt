@@ -2613,7 +2613,13 @@ private fun EmptyScreen(vm: AppViewModel) {
                         .widthIn(max = 360.dp)
                         .graphicsLayer {
                             alpha = contentAlpha.value
-                            translationY = contentOffset.value
+                            // .dp.toPx(), not the raw Animatable value:
+                            // translationY is in PIXELS, so feeding it 16f slid
+                            // this 16px -- about 5dp on a 3x-density phone, and a
+                            // different distance on every device. GraphicsLayerScope
+                            // is a Density, so the conversion is free right here
+                            // (same idiom ReorderColumn's intro slide already uses).
+                            translationY = contentOffset.value.dp.toPx()
                         },
                 ) {
                     // A soft glow behind the icon instead of a bare, flat glyph
@@ -4985,7 +4991,9 @@ private fun HeroHeader(
     Card(
         modifier = Modifier.fillMaxWidth().then(if (cover) Modifier.fillMaxHeight() else Modifier).then(dragHandle).graphicsLayer {
             alpha = heroAlpha.value
-            translationY = heroOffset.value
+            // .dp.toPx() -- translationY is in pixels, so the raw 16f slid this
+            // 16px rather than the 16dp this function's own KDoc claims.
+            translationY = heroOffset.value.dp.toPx()
         }
             // Every other pebble gets this via the shared Pebble() wrapper --
             // the hero card rolls its own Card and was the one card in the
@@ -11200,7 +11208,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                     .padding(start = 12.dp, top = 60.dp, end = 12.dp)
                     .graphicsLayer {
                         alpha = coachAlpha.value
-                        translationY = coachOffset.value
+                        // .dp.toPx() -- see EmptyScreen's own note; the raw -20f
+                        // was 20 PIXELS, not 20dp.
+                        translationY = coachOffset.value.dp.toPx()
                     }
                     .dropShadow(RoundedCornerShape(16.dp)),
             ) {

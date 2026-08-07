@@ -282,8 +282,16 @@ internal object Scale {
         return if (want < MAP_MIN) 0.dp else want
     }
 
-    /** How a tall tier divides its free column. See [tallSplit]. */
-    data class TallSplit(val ring: Dp, val rows: Int, val map: Dp)
+    /** How a tall tier divides its free column. See [tallSplit].
+     *
+     *  [ringRoom] is what was OFFERED to the ring, which is not the same as
+     *  [ring] -- [ringHero] yields 0 below [MIN_RING] rather than drawing a
+     *  smudge, so a caller that wants to put something else in that space (a
+     *  bar, via ChargeBarFallback) needs to know how much space there was, not
+     *  just that the ring declined it. Without this the Tall tiers had no way
+     *  to tell "no room for a gauge" apart from "no room for a RING", and drew
+     *  no gauge at all in the second case. */
+    data class TallSplit(val ring: Dp, val rows: Int, val map: Dp, val ringRoom: Dp)
 
     /**
      * Splits a tall tier's free column between the hero ring, the info rows
@@ -313,8 +321,11 @@ internal object Scale {
         val map = mapReserve(size, room, wantMap)
         val rest = (room - map).coerceAtLeast(0.dp)
         val rows = infoRowsIn(size, rest * 0.45f, textScale, capRows)
-        val ring = ringHero(size, rest - infoBlockHeight(size, rows, textScale))
-        return TallSplit(ring, rows, map)
+        // Hoisted rather than inlined into the ringHero call so it can be
+        // reported back out -- see TallSplit.ringRoom.
+        val ringRoom = rest - infoBlockHeight(size, rows, textScale)
+        val ring = ringHero(size, ringRoom)
+        return TallSplit(ring, rows, map, ringRoom.coerceAtLeast(0.dp))
     }
 
     /** How many [InfoStack] rows to actually show.
