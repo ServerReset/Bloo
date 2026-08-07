@@ -843,109 +843,38 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("tile_refreshed_$vin")] = value.toString() }
     }
 
-    // --- Home-screen widgets -------------------------------------------------
-
-    /** Every per-widget preference suffix, i.e. the set of "widget_<id>_<suffix>"
-     *  keys any widget can write. Defined once here so [clearWidgetConfig] can't
-     *  drift out of sync with the setters as new per-widget settings are added
-     *  (a missed suffix meant a recycled widget id inherited stale config —
-     *  e.g. a near-invisible alpha or the wrong layout). */
-    private val WIDGET_KEY_SUFFIXES = listOf(
-        "vin", "actions", "info", "pending", "auth", "photobg", "loc", "addr", "alpha", "pill", "layout",
-    )
-
-    /** Per-widget assignment: (pinned vin, ordered action keys) or null.
-     *  [widgetId] is Android's AppWidgetManager-assigned id for that specific
-     *  home-screen widget instance, so each placed widget gets its own
-     *  independent set of "widget_<id>_*" keys below — unlike tiles (a fixed
-     *  [TILE_COUNT] slots) an arbitrary number of widgets can exist, hence
-     *  keying by the OS-provided id rather than a small fixed index. Only the
-     *  vin key is required for a widget to count as configured; a missing
-     *  actions key just means no action buttons were chosen (empty list), not
-     *  that the widget is unconfigured. */
-    suspend fun widgetConfig(widgetId: Int): Pair<String, List<String>>? {
-        val p = context.settingsDataStore.data.first()
-        val vin = p[stringPreferencesKey("widget_${widgetId}_vin")]?.takeIf { it.isNotBlank() } ?: return null
-        val actions = p[stringPreferencesKey("widget_${widgetId}_actions")]
-            ?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
-        return vin to actions
-    }
-
-    suspend fun setWidgetConfig(widgetId: Int, vin: String, actions: List<String>) {
-        editTracked {
-            it[stringPreferencesKey("widget_${widgetId}_vin")] = vin
-            it[stringPreferencesKey("widget_${widgetId}_actions")] = actions.joinToString(",")
-        }
-    }
-
-    suspend fun clearWidgetConfig(widgetId: Int) {
-        editTracked {
-            // Remove every per-widget key so a re-used widget id starts clean.
-            WIDGET_KEY_SUFFIXES.forEach { suffix ->
-                it.remove(stringPreferencesKey("widget_${widgetId}_$suffix"))
-                it.remove(booleanPreferencesKey("widget_${widgetId}_$suffix"))
-            }
-        }
-    }
-
-    suspend fun widgetPendingAction(widgetId: Int): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_pending")]?.takeIf { it.isNotBlank() }
-
-    suspend fun setWidgetPendingAction(widgetId: Int, action: String?) {
-        editTracked {
-            val key = stringPreferencesKey("widget_${widgetId}_pending")
-            if (action.isNullOrBlank()) it.remove(key) else it[key] = action
-        }
-    }
-
-    suspend fun widgetRequireAuth(widgetId: Int): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_auth")] ?: true
-
-    suspend fun setWidgetRequireAuth(widgetId: Int, value: Boolean) {
-        editTracked { it[booleanPreferencesKey("widget_${widgetId}_auth")] = value }
-    }
-
-    /** Use the car's set photo as a full-bleed widget background (default off). */
-    suspend fun widgetPhotoBackground(widgetId: Int): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_photobg")] ?: false
-
-    suspend fun setWidgetPhotoBackground(widgetId: Int, value: Boolean) {
-        editTracked { it[booleanPreferencesKey("widget_${widgetId}_photobg")] = value }
-    }
-
-    /** Widget background transparency level (0 = opaque, 9 = very transparent). */
-    suspend fun widgetBackgroundAlpha(widgetId: Int): Int =
-        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_alpha")]
-            ?.toIntOrNull() ?: 0
-
-    suspend fun setWidgetBackgroundAlpha(widgetId: Int, value: Int) {
-        editTracked { it[stringPreferencesKey("widget_${widgetId}_alpha")] = value.coerceIn(0, 9).toString() }
-    }
-
-    /** Show a map/location box on large widgets (default off). */
-    suspend fun widgetShowLocation(widgetId: Int): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_loc")] ?: false
-
-    suspend fun setWidgetShowLocation(widgetId: Int, value: Boolean) {
-        editTracked { it[booleanPreferencesKey("widget_${widgetId}_loc")] = value }
-    }
-
-    /** Much more rounded corners (pill-like) for small widgets (default false). */
-    suspend fun widgetPillShape(widgetId: Int): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("widget_${widgetId}_pill")] ?: false
-
-    suspend fun setWidgetPillShape(widgetId: Int, value: Boolean) {
-        editTracked { it[booleanPreferencesKey("widget_${widgetId}_pill")] = value }
-    }
-
-    /** Layout preference: "info" (show percent/range) or "controls" (show buttons). */
-    suspend fun widgetLayoutMode(widgetId: Int): String =
-        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_layout")]
-            ?: "info"
-
-    suspend fun setWidgetLayoutMode(widgetId: Int, value: String) {
-        editTracked { it[stringPreferencesKey("widget_${widgetId}_layout")] = value.takeIf { it in setOf("info", "controls") } ?: "info" }
-    }
+    // --- Home-screen widgets (removed) ---------------------------------------
+    //
+    // The whole "widget_<id>_*" section is gone: WIDGET_KEY_SUFFIXES plus nineteen
+    // suspend accessors (widgetConfig/setWidgetConfig/clearWidgetConfig,
+    // widgetPendingAction, widgetRequireAuth, widgetPhotoBackground,
+    // widgetBackgroundAlpha, widgetShowLocation, widgetPillShape, widgetLayoutMode,
+    // widgetLocationAddress, and their setters). Every one had zero call sites in
+    // any module and any file type -- checked individually, not in aggregate.
+    //
+    // This was supersession, not rot. Widget config moved to
+    // widget/WidgetConfigStore.kt, which keeps one JSON blob per widget under
+    // widget_cfg_$widgetId in a SEPARATE DataStore file (bloo_widget_config),
+    // deliberately so a widget's layout doesn't roam to other devices via Drive
+    // backup. Its Stored class carries the successors, renamed on the way:
+    // photoBackground, pillShape, backgroundOpacity (was alpha), showMap (was
+    // showLocation), priority (was layoutMode), plus infoFields/actions/vin.
+    // CarWidget, WidgetConfigActivity and CarWidgetReceiver all use that store
+    // exclusively.
+    //
+    // Three had no successor at all -- widgetRequireAuth (per-widget biometric
+    // gating), widgetPendingAction, and widgetLocationAddress. Those are features
+    // that were dropped rather than migrated, so this deletes the last trace of
+    // their persistence layer. Recorded here because that is the one part of this
+    // removal a reader might otherwise mistake for an accident.
+    //
+    // Not addressed here: an upgrading user's DataStore still holds their old
+    // widget_<id>_* keys, and export/import/sync enumerate it generically via
+    // prefs.asMap(), so those keys keep being round-tripped as inert data.
+    // clearWidgetConfig was the only thing that could ever have purged them and it
+    // was itself dead, so nothing is newly stranded by this commit -- it just makes
+    // the situation legible. A one-time key sweep is a data-migration question,
+    // separate from deleting unreachable code.
 
     /** Drive URI for auto-backup; null when not configured. */
     suspend fun syncUri(): String? =
@@ -1530,17 +1459,9 @@ class SettingsStore(private val context: Context) {
         block()
     }
 
-    // The car's last known address + coordinates, refreshed by the Location action
-    // and rendered in the widget's location box.
-    suspend fun widgetLocationAddress(widgetId: Int): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("widget_${widgetId}_addr")]?.takeIf { it.isNotBlank() }
-
-    suspend fun setWidgetLocationAddress(widgetId: Int, address: String?) {
-        editTracked {
-            val key = stringPreferencesKey("widget_${widgetId}_addr")
-            if (address.isNullOrBlank()) it.remove(key) else it[key] = address
-        }
-    }
+    // widgetLocationAddress/setWidgetLocationAddress removed here -- the last two of
+    // the dead widget accessors, sitting apart from the rest of the block. See the
+    // tombstone at the old "Home-screen widgets" section for why all of them went.
 
     // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
 
