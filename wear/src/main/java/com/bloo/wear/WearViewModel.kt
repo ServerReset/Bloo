@@ -14,7 +14,6 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.DoorOpen
-import com.bloo.bluelink.data.EvStatus
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SessionStore
@@ -1021,27 +1020,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Lock/unlock toggle. Delegates entirely to [command], which tries the
-     * relay-to-phone path first (see [command]'s doc comment for the full
-     * relay-vs-standalone mechanism); the lambda here only runs on the
-     * STANDALONE path, i.e. when relaying failed or no phone is reachable.
-     * [st] is the watch's last-known [VehicleStatus] for this car (may be
-     * null if nothing's been fetched yet), used to decide lock vs unlock.
-     * [flip] applies the optimistic local-state update once the standalone
-     * API call itself has returned successfully.
+     * Lock/unlock toggle. Delegates entirely to [command], which relays to the phone
+     * when one is reachable and otherwise runs the command on the watch's own
+     * connection -- see [command]'s doc comment.
+     *
+     * The direction is decided in [toWearCommand] from the state the WATCH is
+     * showing, not from a cached [VehicleStatus]: CarView.locked falls back to the
+     * phone's snapshot when this watch has no live status of its own, so deciding
+     * from `doorLock` could send LOCK while the button in front of the user said
+     * "Unlock".
      */
-    fun toggleLock(vin: String) = command(vin, "doors") { v, repo, _ ->
-        // Same rule as the relay path (see toWearCommand): the direction comes
-        // from the state the WATCH is showing, not from `st`. CarView.locked
-        // falls back to the phone's snapshot when this watch has no live
-        // status of its own, so reading `st?.doorLock` here could send LOCK
-        // while the button in front of the user said "Unlock".
-        if (_ui.value.cars.firstOrNull { it.vin == vin }?.locked == true) {
-            repo.unlock(v); flip(vin) { it.copy(doorLock = false) }
-        } else {
-            repo.lock(v); flip(vin) { it.copy(doorLock = true) }
-        }
-    }
+    fun toggleLock(vin: String) = command(vin, "doors")
 
     // Hyundai/Genesis only -- see Vehicle.supportsHornLights. Passed as
     // `explicit` (not inferred by toWearCommand from the action string) since
@@ -1055,55 +1044,34 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // are on the car, not the wrist) -- with no successMessage, a
         // successful tap gave zero acknowledgement at all.
         successMessage = "Lights flashed",
-    ) { v, repo, _ -> repo.flashLights(v) }
+    )
 
     fun hornAndLights(vin: String) = command(
         vin, "hornLights",
         explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.HORN_AND_LIGHTS),
         successMessage = "Horn & lights sent",
-    ) { v, repo, _ -> repo.hornAndLights(v) }
+    )
 
     /**
-     * Climate on/off toggle -- same relay-first/standalone-fallback dispatch
-     * as [toggleLock] via [command]. The block below only executes on the
-     * standalone path. Turning OFF is unconditional; turning ON is gated by
-     * [VehicleStatus.isDriving] (see the comment on that check below), and
-     * always clears [ClimateDraft.activePresetId] since the resulting
-     * on/off state is a plain manual toggle, not a saved preset being
-     * (re)applied -- see [applyPreset] for the preset-aware equivalent.
+     * Climate on/off toggle -- same dispatch as [toggleLock] via [command]. Direction
+     * comes from the displayed state via [toWearCommand], and the "no remote climate
+     * while the car is moving" gate is applied by
+     * [com.bloo.bluelink.data.WearCommandRunner], which every path now runs through.
+     *
+     * NOTE, because the removed version of this claimed otherwise: this does NOT
+     * clear [ClimateDraft.activePresetId]. A clear used to sit in the dead lambda
+     * here, so it has never actually run, and it is not needed -- every route that
+     * changes the draft away from a preset already clears the id itself (each slider
+     * setter, and smartClimate), so a preset still marked active after a plain
+     * on/off toggle is one whose settings the draft genuinely still holds. Left as
+     * is rather than "restored", since restoring it would be a visible behaviour
+     * change to the preset highlight justified by nothing but a stale comment.
      */
-    fun toggleClimate(vin: String) = command(vin, "climate") { v, repo, st ->
-        // Displayed state, not `st` -- see toggleLock.
-        if (_ui.value.cars.firstOrNull { it.vin == vin }?.climateOn == true) {
-            repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
-            updateDraft(vin) { it.copy(activePresetId = null) }
-        } else {
-            // startClimateStandalone enforces the "no remote climate while
-            // moving" gate (the car rejects it, and this watch-direct path has
-            // no phone UI to apply it) and does the optimistic airCtrlOn flip.
-            val d = _ui.value.draftFor(vin)
-            startClimateStandalone(vin, v, repo, st, d.toRequest())
-            // A manual start isn't a saved preset.
-            updateDraft(vin) { it.copy(activePresetId = null) }
-        }
-    }
+    fun toggleClimate(vin: String) = command(vin, "climate")
 
-    /** Charge start/stop toggle -- same relay-first/standalone-fallback
-     *  dispatch as [toggleLock] via [command]; the block runs only on the
-     *  standalone path. [wasCharging] is read from the last-known status,
-     *  and [flip] optimistically records the inverse right after the
-     *  standalone API call succeeds (see the comment below on why this one
-     *  needed the flip added after the fact). */
-    fun toggleCharge(vin: String) = command(vin, "charge") { v, repo, _ ->
-        // Displayed state, not `st` -- see toggleLock.
-        val wasCharging = _ui.value.cars.firstOrNull { it.vin == vin }?.charging == true
-        if (wasCharging) repo.stopCharge(v) else repo.startCharge(v)
-        // Unlike toggleLock/toggleClimate, this never flipped local state --
-        // on the standalone (no-phone) path the button stayed on its old
-        // state until the follow-up refreshStatus() network round-trip
-        // landed, a visible lag Lock/Climate don't have.
-        flip(vin) { it.copy(evStatus = (it.evStatus ?: EvStatus()).copy(batteryCharge = !wasCharging)) }
-    }
+    /** Charge start/stop toggle -- same dispatch as [toggleLock] via [command].
+     *  Direction comes from the displayed state via [toWearCommand]. */
+    fun toggleCharge(vin: String) = command(vin, "charge")
 
     /** Apply a saved climate preset (start climate with its exact settings). Also
      *  seeds the sliders so the controls reflect what's running. */
@@ -1138,16 +1106,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // carried only the old draft's temp/defrost even when it started.
             explicit = climateOnCommand(vin, r),
             onFailure = { updateDraft(vin) { previousDraft } },
-        ) { v, repo, st ->
-            // Same driving gate as toggleClimate's start branch, enforced by
-            // startClimateStandalone: this is the STANDALONE path (the car's
-            // own direct connection, not relayed through the phone), so it has
-            // to apply the "no remote climate while moving" rule itself --
-            // the throw there is caught by command()'s runCatching, which
-            // surfaces the message and fires onFailure (restoring the
-            // pre-preset draft) instead of ever calling startClimate.
-            startClimateStandalone(vin, v, repo, st, preset.request)
-        }
+        )
     }
 
     /**
@@ -1239,7 +1198,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // Explicit verb: "chargeLimit" fell into toWearCommand's else branch
             // and relayed as a plain REFRESH, so with a phone connected the
             // limits were never actually applied - the phone just re-fetched
-            // status while the block holding setChargeTargets never ran.
+            // status while the block holding setChargeTargets never ran. That
+            // block is now gone along with every other one (see command()); the
+            // explicit verb is what carries ac/dc, and WearCommandRunner's
+            // SET_CHARGE_LIMITS branch is what applies them on either path.
             successMessage = "Charge limits applied",
             explicit = com.bloo.bluelink.data.WearCommand(
                 vin = vin,
@@ -1252,9 +1214,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     _ui.update { it.copy(chargeLimitDrafts = it.chargeLimitDrafts + (vin to previousDraft)) }
                 }
             },
-        ) { v, repo, _ ->
-            repo.setChargeTargets(v, ac, dc)
-        }
+        )
     }
 
     /** Central mutator for a car's [ClimateDraft]: applies [f] to the current
@@ -1726,9 +1686,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 vin, "climate",
                 explicit = com.bloo.bluelink.data.WearCommand(vin, com.bloo.bluelink.data.WearAction.CLIMATE_OFF),
                 onFailure = { updateDraft(vin) { previousDraft } },
-            ) { v, repo, _ ->
-                repo.stopClimate(v); flip(vin) { it.copy(airCtrlOn = false) }
-            }
+            )
         } else {
             updateDraft(vin) { it.copy(tempF = targetF, activePresetId = null) }
             // Smart climate starts at the computed targetF with no defrost,
@@ -1738,15 +1696,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 vin, "climate",
                 explicit = climateOnCommand(vin, smartRequest),
                 onFailure = { updateDraft(vin) { previousDraft } },
-            ) { v, repo, st ->
-                // Third of the three climate-start call sites gated on
-                // isDriving (with toggleClimate and applyPreset) -- same
-                // standalone-only enforcement (via startClimateStandalone),
-                // same reasoning: relayed commands rely on the phone's own
-                // UI/repository to apply this gate, but the standalone path
-                // talks to the car directly and has to check it here itself.
-                startClimateStandalone(vin, v, repo, st, smartRequest)
-            }
+            )
         }
     }
 
@@ -1781,20 +1731,27 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *      OWN execution actually erroring) arrives out-of-band via
      *      [WearCommandEvents.results], wired up in [init] -- there's no
      *      revert path here for that case, only a corrective re-fetch.
-     * 4. If the relay send itself failed (no phone reachable, or the send
-     *    threw), falls back to STANDALONE: runs [block] with the watch's own
-     *    [VehicleRepository] for this car's brand, serialized against
-     *    [BlueLinkGate.statusMutex] (shared with other status-touching calls
-     *    to avoid racing concurrent standalone requests for the same car).
-     *    On success: publishes, shows [successMessage], clears
-     *    [sessionFetched] and kicks a real [refreshStatus] (standalone calls
-     *    don't get an authoritative status back from [block] itself, so this
-     *    pulls the real post-command state). On failure: surfaces the
-     *    error message and invokes [onFailure] so the caller can roll back
-     *    any optimistic draft/UI change it made before calling [command].
+     * 4. This function does NOT run the standalone fallback itself. [WearComms.send]
+     *    does, internally, and reports which path was taken via SendResult -- so all
+     *    that happens here is a branch on that enum. STANDALONE_OK needs no
+     *    optimistic patch (WearComms already wrote one to the snapshot store, which
+     *    flows back in), just a message and a real status pull. STANDALONE_FAILED
+     *    surfaces the error and invokes [onFailure] so the caller can roll back any
+     *    optimistic draft change it made before calling here.
      *
-     * [onFailure] only ever fires on this standalone failure branch -- see
-     * its own inline comment for why the relay branch can't support it.
+     *    This is where a `block` parameter used to be: a suspend lambda each caller
+     *    passed, which this function was documented as invoking on the standalone
+     *    path and in fact never invoked at all. Once WearComms took over the
+     *    fallback, the eight lambdas -- lock/unlock, flash, horn, the climate and
+     *    charge toggles, applyPreset and both smartClimate branches -- became
+     *    unreachable code that still read as the definitive description of how each
+     *    command reaches the car. They and the parameter are gone; the shared runner
+     *    in [com.bloo.bluelink.data.WearCommandRunner] performs every action they
+     *    did, including the momentary verbs, the charge limits, and the isDriving
+     *    climate gate.
+     *
+     * [onFailure] only ever fires on the standalone failure branch -- see its own
+     * inline comment for why the relay branch can't support it.
      */
     private fun command(
         vin: String,
@@ -1807,7 +1764,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // optimistic draft change made for a relayed command can't be
         // reverted here regardless.
         onFailure: (() -> Unit)? = null,
-        block: suspend (Vehicle, VehicleRepository, VehicleStatus?) -> Unit,
     ) {
         val v = vehicles.firstOrNull { it.vin == vin } ?: return
         mark("$vin:$action") {
@@ -1954,43 +1910,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private fun climateOnCommand(vin: String, r: ClimateRequest): com.bloo.bluelink.data.WearCommand =
         r.toWearCommand(vin, com.bloo.bluelink.data.WearAction.CLIMATE_ON)
 
-    /**
-     * The shared STANDALONE (non-relayed) climate-start body used by
-     * [toggleClimate], [applyPreset] and [smartClimate]. Enforces the "no
-     * remote climate while the car is moving" rule the phone's own UI applies
-     * on the relay path -- the standalone path talks to the car directly, so it
-     * has to gate here itself. The [error] throw on a moving car is deliberately
-     * propagated: it's caught by [command]'s runCatching, which surfaces the
-     * message and fires the caller's onFailure (e.g. restoring a pre-preset
-     * draft) instead of ever calling startClimate. On success, optimistically
-     * flips airCtrlOn via [flip].
-     */
-    private suspend fun startClimateStandalone(
-        vin: String,
-        v: Vehicle,
-        repo: VehicleRepository,
-        st: VehicleStatus?,
-        request: ClimateRequest,
-    ) {
-        if (st?.isDriving == true) error("Can't start climate while driving")
-        repo.startClimate(v, request)
-        flip(vin) { it.copy(airCtrlOn = true) }
-    }
-
-    /** The STANDALONE path's optimistic-update primitive (the relay path's
-     *  equivalent is the inline [com.bloo.bluelink.data.WearCommandRunner.optimistic]
-     *  patch inside [command]): applies [change] to this VIN's current
-     *  [VehicleStatus] (or a blank default one if nothing's cached yet) and
-     *  writes the result back into [statuses]. Called by each command
-     *  function's block AFTER its own repository call has returned
-     *  successfully, so the UI updates immediately rather than waiting on
-     *  the follow-up [refreshStatus] call that [command] triggers next. Does
-     *  NOT call [publish] itself -- callers rely on [command]'s own publish()
-     *  right after the block returns. */
-    private fun flip(vin: String, change: (VehicleStatus) -> VehicleStatus) {
-        val cur = statuses[vin] ?: VehicleStatus()
-        statuses = statuses + (vin to change(cur))
-    }
+    // startClimateStandalone() and flip() were removed with the dead `block` lambdas
+    // that were their only callers -- startClimateStandalone from three of them, and
+    // flip from those three plus startClimateStandalone itself.
+    //
+    // Both described real mechanisms that this class no longer performs.
+    // startClimateStandalone was the watch's own copy of the "no remote climate while
+    // the car is moving" gate, needed back when this file talked to the car directly;
+    // WearCommandRunner.execute applies that gate now, for every surface at once.
+    // flip was the standalone path's optimistic-status primitive, and there is no
+    // standalone path in this file any more -- on SendResult.STANDALONE_OK, WearComms
+    // has already written the optimistic state into the snapshot store and it arrives
+    // back through snapshotStore.payload, which is exactly why command() deliberately
+    // does not re-patch the in-memory maps in that branch.
 
     /** Stamp each [vins] entry's "last updated" time to now, so buildCarView's
      *  [CarView.fetchedAt]-based "updated X ago" label tracks each real data
