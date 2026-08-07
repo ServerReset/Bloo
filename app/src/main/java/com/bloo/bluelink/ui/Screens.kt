@@ -317,6 +317,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -8050,11 +8051,30 @@ private fun PebbleShell(
                             // car and no heading structure, TalkBack users could
                             // only reach a given section (Climate, Charge, ...) by
                             // swiping through every row of every pebble above it.
+                            // The header grows and hardens as the pebble opens. Expanded, the
+                            // hero's header sits over a photo, so bigger and higher-contrast
+                            // is legibility rather than flourish -- and it makes opening feel
+                            // like the card is coming forward instead of just getting taller.
+                            //
+                            // Interpolated on the theme's SPATIAL spec (type size is a spatial
+                            // property) so it moves with the same physics as the expansion it
+                            // belongs to, and lerped through real type steps rather than being
+                            // scaled, so every frame is a genuine font size.
+                            val headerT by animateFloatAsState(
+                                targetValue = if (expanded) 1f else 0f,
+                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                label = "pebbleHeaderGrow",
+                            )
+                            val titleStyle = lerp(
+                                MaterialTheme.typography.titleMedium,
+                                MaterialTheme.typography.headlineSmall,
+                                headerT,
+                            )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 title,
                                 modifier = Modifier.weight(1f, fill = false),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = titleStyle,
                                 fontWeight = FontWeight.Bold,
                                 // Cap at one line: at a large display/font size the
                                 // header action button (SplitExpandButton, now width-
@@ -8075,7 +8095,12 @@ private fun PebbleShell(
                                 Text(
                                     it,
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                    // Muted when closed, near-full contrast when open, on the
+                                    // same curve as the title's growth.
+                                    color = LocalContentColor.current.copy(
+                                        alpha = MutedContentAlpha +
+                                            (1f - MutedContentAlpha) * headerT,
+                                    ),
                                     maxLines = 1,
                                 )
                             }
