@@ -195,7 +195,27 @@ enum class WidgetInfoField(val key: String, val label: String) {
     MODEL("model", "Model"),
     // Appended for the same reason as the three above: saved configs sort by
     // ordinal, so a mid-enum insert would reshuffle an existing widget's rows.
-    LIMIT("limit", "Limit");
+    LIMIT("limit", "Limit"),
+
+    // Also appended, same ordinal reason. These three are the last VehicleSnapshot
+    // fields a user would want on the home screen and had no way to put there; the
+    // rest of the snapshot is either already above or internal (vin, regId,
+    // generation, brandIndicator, isEv, hasBattery).
+    //
+    // Keyed "charging" rather than "charge" so the stored key can never be confused
+    // with WidgetAction.CHARGE's "charge". They live in separate config lists, so a
+    // clash would not actually break anything -- this is purely so a reader of the
+    // persisted config can tell which enum a key came from.
+    //
+    // Worth recording what is NOT here and why, since it will be asked again: 12V
+    // battery, tyre pressure, doors/windows open, fuel level and charge-time-remaining
+    // all live on VehicleStatus / EvStatus, which the widget never receives -- it only
+    // ever gets a VehicleSnapshot. Adding those means widening a serialized payload
+    // the watch also reads plus snapshotOf() on the phone: a change across three
+    // surfaces, not a new enum entry.
+    ENGINE("engine", "Engine"),
+    CHARGING("charging", "Charge"),
+    LOCATION("location", "Location");
 
     companion object {
         val DEFAULTS = listOf(RANGE.key, UPDATED.key)

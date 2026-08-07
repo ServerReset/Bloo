@@ -52,6 +52,7 @@ import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.bluelink.data.serviceDue
@@ -2706,6 +2707,23 @@ class CarWidget : GlanceAppWidget() {
         // real, but "80%" beside a car sitting in a driveway reads as a
         // current state rather than a setting.
         WidgetInfoField.LIMIT -> car.chargeLimitPct?.let { "$it%" }
+        // Same null-means-unknown rule as LOCK/CLIMATE above.
+        WidgetInfoField.ENGINE -> car.engineOn?.let { if (it) "Running" else "Off" }
+        // Distinct from the ring, which conveys charging only by colour -- and several
+        // tiers (RAIL, the COMPACT_TALLs, anything in controls-priority) draw no ring at
+        // all, so on those this is the only way to see it.
+        WidgetInfoField.CHARGING -> car.charging?.let { if (it) "Charging" else "Not charging" }
+        // 3 decimals, not coordString's default 5. ~110 m is ample for "which car park
+        // did I leave it in", and the default's "48.85660, 2.35220" is 17 characters --
+        // the widest value any field can produce, which on a narrow tier forces FitText
+        // to shrink the whole row's font. 13 characters is affordable.
+        //
+        // Deliberately still offered even though MapModule shows the same location
+        // graphically: the map is suppressed by design on every Tall and Rail tier (a
+        // real device showed it as "an unreadable, zoomed-in sliver of road" there), so
+        // without this those tiers cannot show location in any form.
+        WidgetInfoField.LOCATION ->
+            car.lat?.let { la -> car.lon?.let { lo -> coordString(la, lo, decimals = 3) } }
     }
 
     private fun serviceDueLabel(car: VehicleSnapshot, metric: Boolean): String? {
