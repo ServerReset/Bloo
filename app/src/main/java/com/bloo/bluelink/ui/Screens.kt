@@ -5068,6 +5068,33 @@ private fun HeroHeader(
             // one -- restating "82% - 241 mi" as header text beside a bar showing the same
             // thing is how the same numbers get rendered twice and then drift, which is a
             // bug I already had to fix on the widget's MEDIUM tiers.
+            // The photo is the card's BACKGROUND now, not a body child, so it runs up
+            // behind the header row and the title and chevron overlay its top. Collapsing
+            // it is the same shared transition as before -- the only change is which layer
+            // it lives on.
+            background = {
+                AnimatedVisibility(
+                    visible = photoExpanded,
+                    enter = collapseEnter(),
+                    exit = collapseExit(),
+                ) {
+                    Box {
+                        HeroVisual(v, imageUrl, height, PebbleCornerExpanded, aspectRatio = 16f / 9f)
+                        // Header text sits on top of an arbitrary photo, and against a light
+                        // car it vanishes. The widget hit exactly this and solved it with a
+                        // luminance check; a top-down scrim is the cheap version and is
+                        // enough here because only the top strip is overlaid.
+                        Spacer(
+                            Modifier.matchParentSize().background(
+                                Brush.verticalGradient(
+                                    0f to Color.Black.copy(alpha = 0.55f),
+                                    0.45f to Color.Transparent,
+                                ),
+                            ),
+                        )
+                    }
+                }
+            },
             persistentContent = {
                 // Survives the collapse and shrinks into it. Same composable, same copy,
                 // one instance -- so the collapsed and expanded readouts cannot disagree.
@@ -5091,8 +5118,11 @@ private fun HeroHeader(
                 }
             },
         ) {
-            // Only the photo collapses.
-            HeroVisual(v, imageUrl, height, (PebbleCornerExpanded - 16.dp).coerceAtLeast(8.dp))
+            // Deliberately empty. The photo moved to `background` so it can sit behind the
+            // header; the bar is persistentContent. What "expanded" now means for this
+            // pebble is that the background image is showing and the bar has been pushed
+            // to the bottom -- the body itself has nothing left to hold.
+            Spacer(Modifier.height(0.dp))
         }
         return
     }
@@ -5424,13 +5454,25 @@ private fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): Exi
 
 /** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
-private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp, corner: Dp = 18.dp) {
+private fun HeroVisual(
+    v: Vehicle,
+    imageUrl: String?,
+    height: Dp,
+    corner: Dp = 18.dp,
+    /** When set, size by aspect ratio instead of [height] -- 16:9 for the hero, so the
+     *  image keeps its shape at any screen width instead of being letterboxed or cropped
+     *  by a fixed dp height. The flip cover still passes a height. */
+    aspectRatio: Float? = null,
+) {
+    val sizeModifier = if (aspectRatio != null) {
+        Modifier.fillMaxWidth().aspectRatio(aspectRatio)
+    } else {
+        Modifier.fillMaxWidth().height(height)
+    }
     if (imageUrl.isNullOrBlank()) {
         val scheme = MaterialTheme.colorScheme
         Box(
-            Modifier
-                .fillMaxWidth()
-                .height(height)
+            sizeModifier
                 .clip(RoundedCornerShape(corner))
                 .background(carTonalBrush(scheme)),
         )
@@ -5444,9 +5486,7 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp, corner: Dp = 1
             model = model,
             contentDescription = v.model,
             contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(height)
+            modifier = sizeModifier
                 .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner))),
         )
     }
@@ -7856,6 +7896,21 @@ private fun PebbleShell(
      * Null for every other pebble, so their layout is byte-identical to before.
      */
     persistentContent: (@Composable ColumnScope.() -> Unit)? = null,
+    /**
+     * Drawn BEHIND the header and the collapsing body, inside the card's clip.
+     *
+     * A pebble is otherwise a plain vertical stack with no z-order, so nothing could sit
+     * under the header. The hero needs that: its photo runs up behind the header row so
+     * the title and the chevron overlay the top of the image.
+     *
+     * Whatever goes here is responsible for its own legibility. Header text lands on top
+     * of it, and over an arbitrary car photo that text disappears -- the widget hit the
+     * same thing and resolved it with a luminance check. A scrim under the text is the
+     * cheap version and is what the hero does.
+     *
+     * Null for every other pebble, so nothing else gains a layer.
+     */
+    background: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -7931,139 +7986,145 @@ private fun PebbleShell(
                 contentColor = contentColorFor(containerColor),
             ),
         ) {
-            // No animateContentSize here (cover-screen tiles fill instead) --
-            // the body below is already wrapped in its own AnimatedVisibility
-            // with expandVertically/shrinkVertically, which smoothly animates
-            // that exact same height delta on its own. Wrapping this Column in
-            // a SECOND, independently-sprung animateContentSize on top of that
-            // made every collapse/expand visibly lag and rubber-band: each
-            // frame of the inner animation is itself a "content size changed"
-            // event the outer animateContentSize then re-animates towards,
-            // compounding two springs where the collapse only needs one.
-            Column(
-                if (fillHeight) Modifier.fillMaxHeight() else Modifier,
-            ) {
-                // Phone only. The cover screen never reaches here: PebbleShell
-                // returns above, through CoverTile, so a pebble on the cover is
-                // the same template as every other page there. What follows is
-                // the collapsible header + animated body card.
-                // Header: tap anywhere to toggle, long-press to drag-reorder. The
-                // action button and chevron handle their own clicks. Fixed min height
-                // so every collapsed pebble lines up.
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .then(
-                            if (forceExpanded) Modifier
-                            else Modifier.clickable {
-                                if (expanded) haptics?.tick() else haptics?.click()
-                                onToggle()
-                            },
-                        )
-                        .then(dragHandle)
-                        .heightIn(min = PebbleHeaderHeight)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            // Box, so `background` can draw BEHIND the header and body. A pebble is
+            // otherwise a plain vertical stack with no z-order, which is why an image
+            // could not sit under the header before this.
+            Box(Modifier.fillMaxWidth()) {
+                background?.invoke(this)
+                // No animateContentSize here (cover-screen tiles fill instead) --
+                // the body below is already wrapped in its own AnimatedVisibility
+                // with expandVertically/shrinkVertically, which smoothly animates
+                // that exact same height delta on its own. Wrapping this Column in
+                // a SECOND, independently-sprung animateContentSize on top of that
+                // made every collapse/expand visibly lag and rubber-band: each
+                // frame of the inner animation is itself a "content size changed"
+                // event the outer animateContentSize then re-animates towards,
+                // compounding two springs where the collapse only needs one.
+                Column(
+                    if (fillHeight) Modifier.fillMaxHeight() else Modifier,
                 ) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        // Same heading fix as SettingsCard: with 8+ pebbles per
-                        // car and no heading structure, TalkBack users could
-                        // only reach a given section (Climate, Charge, ...) by
-                        // swiping through every row of every pebble above it.
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            // Cap at one line: at a large display/font size the
-                            // header action button (SplitExpandButton, now width-
-                            // bounded below) used to squeeze this weighted Column
-                            // so a title like "Location"/"Weather"/"Diagnostics"
-                            // wrapped and visually collided with the button. One
-                            // line + ellipsis keeps the title on its own line.
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.semantics { heading() },
-                        )
-                        if (summary != null) {
-                            AnimatedContent(
-                                targetState = summary,
-                                transitionSpec = {
-                                    (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                                    (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                    // Phone only. The cover screen never reaches here: PebbleShell
+                    // returns above, through CoverTile, so a pebble on the cover is
+                    // the same template as every other page there. What follows is
+                    // the collapsible header + animated body card.
+                    // Header: tap anywhere to toggle, long-press to drag-reorder. The
+                    // action button and chevron handle their own clicks. Fixed min height
+                    // so every collapsed pebble lines up.
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (forceExpanded) Modifier
+                                else Modifier.clickable {
+                                    if (expanded) haptics?.tick() else haptics?.click()
+                                    onToggle()
                                 },
-                                label = "pebbleSummary",
-                            ) { s ->
-                                Text(
-                                    s,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                                    maxLines = 1,
-                                    // Ellipsize a long summary ("Set a location")
-                                    // instead of hard-clipping it to "Set a…".
-                                    overflow = TextOverflow.Ellipsis,
+                            )
+                            .then(dragHandle)
+                            .heightIn(min = PebbleHeaderHeight)
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            // Same heading fix as SettingsCard: with 8+ pebbles per
+                            // car and no heading structure, TalkBack users could
+                            // only reach a given section (Climate, Charge, ...) by
+                            // swiping through every row of every pebble above it.
+                            Text(
+                                title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                // Cap at one line: at a large display/font size the
+                                // header action button (SplitExpandButton, now width-
+                                // bounded below) used to squeeze this weighted Column
+                                // so a title like "Location"/"Weather"/"Diagnostics"
+                                // wrapped and visually collided with the button. One
+                                // line + ellipsis keeps the title on its own line.
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.semantics { heading() },
+                            )
+                            if (summary != null) {
+                                AnimatedContent(
+                                    targetState = summary,
+                                    transitionSpec = {
+                                        (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                                        (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                                    },
+                                    label = "pebbleSummary",
+                                ) { s ->
+                                    Text(
+                                        s,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                        maxLines = 1,
+                                        // Ellipsize a long summary ("Set a location")
+                                        // instead of hard-clipping it to "Set a…".
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                        if (!forceExpanded) {
+                            if (headerAction != null) {
+                                SplitExpandButton(
+                                    action = headerAction,
+                                    expanded = expanded,
+                                    onToggle = onToggle,
+                                )
+                            } else {
+                                MorphExpandButton(
+                                    expanded = expanded,
+                                    onToggle = onToggle,
                                 )
                             }
                         }
                     }
-                    if (!forceExpanded) {
-                        if (headerAction != null) {
-                            SplitExpandButton(
-                                action = headerAction,
-                                expanded = expanded,
-                                onToggle = onToggle,
-                            )
-                        } else {
-                            MorphExpandButton(
-                                expanded = expanded,
-                                onToggle = onToggle,
-                            )
-                        }
+                    // Normal pebbles: animate the body fading + sliding open/closed.
+                    // Collapse springs like the expand does. It used to be a flat 160ms tween
+                    // against a spring open, which is what made closing feel like a snap next
+                    // to a smooth open -- now both halves come from the theme's motion scheme,
+                    // so that symmetry is structural instead of two hand-matched numbers.
+                    AnimatedVisibility(
+                        visible = expanded,
+                        enter = collapseEnter(),
+                        exit = collapseExit(),
+                    ) {
+                        Column(
+                            // AnimatedVisibility only animates the whole block
+                            // appearing and disappearing; content that changes
+                            // WHILE expanded (an install step arriving, notes
+                            // loading) still jumped the card's height. This
+                            // animates those in place too.
+                            Modifier.animateContentSize(
+                                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                            ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            content = content,
+                        )
                     }
-                }
-                // Normal pebbles: animate the body fading + sliding open/closed.
-                // Collapse springs like the expand does. It used to be a flat 160ms tween
-                // against a spring open, which is what made closing feel like a snap next
-                // to a smooth open -- now both halves come from the theme's motion scheme,
-                // so that symmetry is structural instead of two hand-matched numbers.
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = collapseEnter(),
-                    exit = collapseExit(),
-                ) {
-                    Column(
-                        // AnimatedVisibility only animates the whole block
-                        // appearing and disappearing; content that changes
-                        // WHILE expanded (an install step arriving, notes
-                        // loading) still jumped the card's height. This
-                        // animates those in place too.
-                        Modifier.animateContentSize(
-                            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                        ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        content = content,
-                    )
-                }
-                // AFTER the collapsing body, deliberately, and this is what makes the
-                // persistent content appear to MOVE between two places while staying one
-                // node in one call site.
-                //
-                // Collapsed, the body above has zero height, so this sits immediately under
-                // the header -- reading as part of it. Expanded, the body grows and pushes
-                // this to the bottom of the card. Because it is the same node throughout,
-                // the Column re-lays it out continuously as the body's height springs, so
-                // the travel is animated for free and stays in sync with the photo instead
-                // of being a second animation timed to match.
-                //
-                // Rendering it in two places -- once in the header row, once at the bottom --
-                // would have been two call sites, so two nodes, so a cross-fade between two
-                // copies rather than one thing moving. Animating a composable across a
-                // genuine parent change needs LookaheadScope and Modifier.animateBounds;
-                // this gets the same read without it.
-                persistentContent?.let { persistent ->
-                    Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp)) {
-                        persistent()
+                    // AFTER the collapsing body, deliberately, and this is what makes the
+                    // persistent content appear to MOVE between two places while staying one
+                    // node in one call site.
+                    //
+                    // Collapsed, the body above has zero height, so this sits immediately under
+                    // the header -- reading as part of it. Expanded, the body grows and pushes
+                    // this to the bottom of the card. Because it is the same node throughout,
+                    // the Column re-lays it out continuously as the body's height springs, so
+                    // the travel is animated for free and stays in sync with the photo instead
+                    // of being a second animation timed to match.
+                    //
+                    // Rendering it in two places -- once in the header row, once at the bottom --
+                    // would have been two call sites, so two nodes, so a cross-fade between two
+                    // copies rather than one thing moving. Animating a composable across a
+                    // genuine parent change needs LookaheadScope and Modifier.animateBounds;
+                    // this gets the same read without it.
+                    persistentContent?.let { persistent ->
+                        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp)) {
+                            persistent()
+                        }
                     }
                 }
             }
