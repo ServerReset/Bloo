@@ -263,8 +263,31 @@ fun degLabel(valueF: String, fahrenheit: Boolean): String {
     // with just a bare degree sign appended, rather than crashing or hiding
     // the raw value entirely.
     val f = valueF.toDoubleOrNull() ?: return "$valueF°"
-    return if (fahrenheit) "${f.toLong()}°F" else "${((f - 32) * 5 / 9.0).toLong()}°C"
+    return "${degValue(f, fahrenheit)}°${if (fahrenheit) "F" else "C"}"
 }
+
+/**
+ * A °F reading as a whole number in the user's chosen unit, rounded rather than
+ * truncated.
+ *
+ * The rounding is the point of having this. Every conversion written inline
+ * around the app already rounds -- the climate slider both ways, the preset
+ * summary, the widget config preview, the watch's swing label -- and the two
+ * SHARED helpers every surface routes through, [degLabel] and [weatherTemp], were
+ * the only two that truncated. So the functions one place could fix were the ones
+ * getting it wrong, while the scattered copies were right.
+ *
+ * Truncating biases every label downward by up to a full degree, and it bit
+ * hardest exactly where it is least visible: °F values rarely land on whole °C, so
+ * a metric user saw almost every setpoint a degree cold. 75°F is 23.9°C, which
+ * truncated to "23°C".
+ *
+ * Takes Double rather than Int because the API sends these as strings and some
+ * regions send fractions -- Canada reports fractional °F, which truncated in the
+ * Fahrenheit branch too, so "71.6" displayed as "71°F".
+ */
+fun degValue(valueF: Double, fahrenheit: Boolean): Int =
+    if (fahrenheit) valueF.roundToInt() else ((valueF - 32) * 5 / 9.0).roundToInt()
 
 /** Human-readable label for a WMO weather code integer. Mechanism: WMO codes
  *  group many numerically-adjacent values under one user-facing label (e.g.
@@ -286,10 +309,25 @@ fun weatherLabel(code: Int): String = when (code) {
 
 /** Formats a Celsius temperature as °F or °C based on the user preference.
  *  Weather data (unlike car climate data) always arrives as Celsius, so this
- *  is the one conversion point for it; the result is truncated (`.toInt()`,
- *  not rounded) in both branches. */
+ *  is the one conversion point for it.
+ *
+ *  Rounds, in both branches. It used to truncate, and the KDoc here recorded that
+ *  as though it were a decision -- "the result is truncated (`.toInt()`, not
+ *  rounded)" -- without ever saying why, while every other temperature conversion
+ *  in the app rounded. Open-Meteo reports decimals, so truncating made every
+ *  reading on the watch (its only caller) up to a degree cold: 22.8°C showed as
+ *  "22°C". Same fix and same reasoning as [degValue], which the car-side
+ *  [degLabel] now shares.
+ *
+ *  Deliberately NOT routed through [degValue] by converting Celsius to Fahrenheit
+ *  first. That would be algebraically identical and numerically not, which I
+ *  checked rather than assumed: over -40..50°C there are nine half-degree inputs
+ *  where the round trip lands on the wrong side of the tie, because °C -> °F -> °C
+ *  is not exact in binary floating point. 24.5 comes back as 24.499999999999996 and
+ *  rounds to 24 instead of 25; -4.5 comes back as -4.500000000000001 and rounds to
+ *  -5 instead of -4. The metric branch rounds the Celsius it was actually given. */
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
-    if (fahrenheit) "${(tempC * 9 / 5 + 32).toInt()}°F" else "${tempC.toInt()}°C"
+    if (fahrenheit) "${(tempC * 9 / 5 + 32).roundToInt()}°F" else "${tempC.roundToInt()}°C"
 
 /** Format a distance in miles as "mi" or "km" based on the unit system. The
  *  API's distance figures are always miles, so metric users get a multiply

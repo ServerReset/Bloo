@@ -347,6 +347,7 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.degValue
 import com.bloo.bluelink.data.smartClimateTargetF
 import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.Vehicle
@@ -9106,7 +9107,11 @@ private fun ClimatePresetSection(
 /** A compact "79° · Defrost · Heat" summary of what a preset will set. */
 private fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
     val parts = mutableListOf<String>()
-    parts += if (fahrenheit) "${req.tempF}°" else "${Math.round((req.tempF - 32) * 5 / 9.0)}°"
+    // Bare "°" rather than degLabel's "°F"/"°C": this is a compact one-line summary
+    // where the unit is already established by everything around it. The CONVERSION
+    // is shared now though -- this used to re-inline the °F-to-°C arithmetic, so the
+    // rounding rule lived here as well as in degLabel and could drift from it.
+    parts += "${degValue(req.tempF.toDouble(), fahrenheit)}°"
     if (req.defrost) parts += "Defrost"
     val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
     if (seats.any { it.isHeat }) parts += "Heat"
