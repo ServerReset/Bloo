@@ -19,7 +19,11 @@ import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.VehicleSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 /**
@@ -40,6 +44,9 @@ abstract class BlooTileService : TileService() {
     // singleton -- SupervisorJob keeps one failed child coroutine from cancelling the rest.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    /** The while-visible store observer; see [onStartListening]. */
+    private var watchJob: Job? = null
+
     /**
      * Called by the system whenever this tile becomes visible in the Quick Settings shade
      * (shade pulled down, or the tile scrolled into view) -- this is the TileService
@@ -51,6 +58,48 @@ abstract class BlooTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
         scope.launch { render() }
+        // Repaint while visible, instead of relying on someone to poke us.
+        //
+        // requestUpdates() below cannot do it: TileService.requestListeningState is only
+        // honoured for tiles declaring META_DATA_ACTIVE_TILE, and none of Bloo's twelve
+        // do, so all fourteen of its call sites were no-ops. In background mode -- which
+        // deliberately does not collapse the shade -- that meant the user tapped a tile
+        // and then watched it sit unchanged while the command ran.
+        //
+        // Observing the store is the fix rather than declaring the tiles active, because
+        // an ACTIVE tile stops getting onStartListening when the shade opens and only
+        // gets it on click or request. That would have traded "never repaints after a
+        // command" for "never repaints on shade open" -- a different bug, and one needing
+        // a device to evaluate. This keeps the shade-open read AND reacts to changes,
+        // whatever their source: the command worker's optimistic write, a background
+        // poller landing mid-shade, or a sync import.
+        //
+        // Cancelled in onStopListening, because render() touches qsTile and that is only
+        // valid between onStartListening and onStopListening.
+        watchJob = scope.launch {
+            SnapshotStore(applicationContext).payload
+                .drop(1) // the launch above already painted the current value
+                .collect { runCatching { render() } }
+        }
+    }
+
+    /**
+     * The shade closed (or this tile scrolled away): stop observing, since [qsTile] is no
+     * longer safe to touch. Previously not overridden at all.
+     */
+    override fun onStopListening() {
+        watchJob?.cancel()
+        watchJob = null
+        super.onStopListening()
+    }
+
+    /**
+     * The system tears these instances down constantly, and [scope] is tied to THIS
+     * instance -- but nothing cancelled it, so every teardown leaked its children.
+     */
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
     }
 
     /**
@@ -282,13 +331,19 @@ abstract class BlooTileService : TileService() {
         }
 
         /**
-         * Ask the system to refresh all of Bloo's active tiles. [TileService.requestListeningState]
-         * (a static method inherited from the base class) tells the system to re-deliver
-         * [onStartListening] to the named tile service *if* it's currently active/visible --
-         * this doesn't force a tile to appear, it just makes an already-shown tile repaint,
-         * which is how [render] gets re-run after something changes (e.g. a command completes)
-         * without waiting for the user to manually reopen the shade. Any given tile might not
-         * currently be added/visible, so failures here are expected and swallowed per-tile.
+         * Ask the system to refresh Bloo's tiles.
+         *
+         * ⚠ Currently a NO-OP, and its fourteen call sites are too.
+         * [TileService.requestListeningState] is only honoured for tiles that declare
+         * `META_DATA_ACTIVE_TILE`, and none of Bloo's twelve tile services do (checked
+         * every entry in AndroidManifest). This KDoc used to describe it as "how [render]
+         * gets re-run after something changes", which it never was.
+         *
+         * Left in place rather than deleted because it costs nothing, is harmless, and
+         * becomes correct the moment any tile is declared active. What actually repaints a
+         * visible tile now is the store observer in [onStartListening], which does not need
+         * the system's cooperation. Declaring the tiles active instead would stop
+         * [onStartListening] arriving when the shade opens -- see that method's note.
          */
         fun requestUpdates(context: Context) {
             TILE_CLASSES.forEach { cls ->

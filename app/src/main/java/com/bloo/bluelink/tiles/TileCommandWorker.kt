@@ -17,7 +17,14 @@ import com.bloo.bluelink.data.WearCommandRunner
  * immediately after onClick, which would cancel a coroutine started in the
  * service's scope before the network call finishes — that's why tile commands
  * appeared to do nothing. WorkManager gives the command a process-lifetime home,
- * then refreshes the tiles so their state reflects the result.
+ * then re-fetches status so the tiles reflect the result.
+ *
+ * How that reaches the tiles is worth being precise about, because it used to be
+ * described as a direct refresh and was not one: the fetch writes into SnapshotStore,
+ * and a tile that is currently visible observes that store (see
+ * BlooTileService.onStartListening) and repaints itself. The requestUpdates() call is
+ * a no-op on these tiles -- none declares META_DATA_ACTIVE_TILE -- so the store is the
+ * only path. A tile that is NOT visible simply reads the new value next time it is.
  */
 class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 

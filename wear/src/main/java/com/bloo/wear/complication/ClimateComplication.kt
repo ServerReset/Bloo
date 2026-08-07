@@ -13,7 +13,7 @@ import com.bloo.wear.R
 class ClimateComplication : ToggleStateComplication() {
     override val dataSourceName = "ClimateComplication"
     override val title = "Climate"
-    override val action = WearAction.TOGGLE_CLIMATE
+    override fun actionFor(on: Boolean?) = if (on == true) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
     override fun stateOf(snap: VehicleSnapshot) = snap.climateOn
     override fun iconRes(on: Boolean) = R.drawable.ic_shortcut_climate
     override fun text(on: Boolean) = if (on) "On" else "Off"

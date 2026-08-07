@@ -27,7 +27,28 @@ abstract class ToggleStateComplication : SuspendingComplicationDataSourceService
     /** SHORT_TEXT title line (e.g. "Lock"). */
     protected abstract val title: String
     /** The [com.bloo.bluelink.data.WearAction] fired on tap. */
-    protected abstract val action: String
+    /**
+     * The EXPLICIT verb to send for the state this complication actually rendered.
+     *
+     * Not a TOGGLE_* verb, deliberately. A TOGGLE_* is resolved by whoever RECEIVES
+     * it, against THEIR snapshot -- so the direction is decided from the phone's copy
+     * of the state, not the copy the user was looking at on the watch face. That is a
+     * bug that toWearCommand records as reported from a real device: "I press
+     * the button, nothing happens, and the watch says the command succeeded" (a null
+     * snapshot on the phone resolves TOGGLE_LOCK to LOCK, so tapping an already-locked
+     * car sends a redundant lock that succeeds and changes nothing).
+     *
+     * That fix landed in toWearCommand and in the Wear tile, which bakes its direction
+     * in at render time, and not here -- even though a complication is the surface that
+     * sits rendered LONGEST between updates, so its state is the most likely of all of
+     * them to have diverged from the phone's.
+     *
+     * [on] is the same value passed to [iconRes]/[text]/[description], so the verb and
+     * the glyph can never disagree about which direction the tap means. null means the
+     * state was never known; resolve it the way the receiver already would, so that
+     * case is unchanged.
+     */
+    protected abstract fun actionFor(on: Boolean?): String
 
     /** This complication's live on/off state for [snap] (null = unknown). */
     protected abstract fun stateOf(snap: VehicleSnapshot): Boolean?
@@ -72,7 +93,7 @@ abstract class ToggleStateComplication : SuspendingComplicationDataSourceService
             null
         }
         val desc = PlainComplicationText.Builder(if (known) description(isOn) else "State unknown").build()
-        val tap = vin?.let { ComplicationTapReceiver.pendingIntent(this, it, action) }
+        val tap = vin?.let { ComplicationTapReceiver.pendingIntent(this, it, actionFor(on)) }
         return when (type) {
             ComplicationType.SHORT_TEXT ->
                 ShortTextComplicationData.Builder(

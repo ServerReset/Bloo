@@ -13,7 +13,10 @@ import com.bloo.wear.R
 class LockComplication : ToggleStateComplication() {
     override val dataSourceName = "LockComplication"
     override val title = "Lock"
-    override val action = WearAction.TOGGLE_LOCK
+    // Unknown state resolves to LOCK, which is what the receiver's own TOGGLE_LOCK
+    // resolution did for a null snapshot -- so that path is unchanged and only the
+    // known-state cases are fixed.
+    override fun actionFor(on: Boolean?) = if (on == true) WearAction.UNLOCK else WearAction.LOCK
     override fun stateOf(snap: VehicleSnapshot) = snap.locked
     override fun iconRes(on: Boolean) = if (on) R.drawable.ic_shortcut_lock else R.drawable.ic_shortcut_unlock
     override fun text(on: Boolean) = if (on) "Locked" else "Unlocked"
