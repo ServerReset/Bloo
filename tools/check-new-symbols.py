@@ -13,6 +13,22 @@ file has actually brought into scope. Usage:  python3 tools/check-new-symbols.py
 Compare a commit range by editing the git args below.
 """
 import re, subprocess, sys, os
+
+def _is_doc_line(ln):
+    """True for a line that lives inside a KDoc or block comment.
+
+    The two scans below strip `//` but never handled `/** ... */`, so ordinary English
+    in a doc block was read as code. Prose like "a matrix of SPATIAL (bounds, size)"
+    or "resolves to MotionScheme.expressive()" reported as unresolved symbols; that
+    produced six false positives in one session, and a checker whose output you learn
+    to skim is worse than no checker.
+
+    Same test the annotation look-back at the bottom of this file already uses. Costs
+    no real coverage: a line inside a comment block is never executable.
+    """
+    t = ln.strip()
+    return t.startswith(("*", "/*", "*/"))
+
 diff = subprocess.run(["git","diff","HEAD","-U0"],capture_output=True,encoding="utf-8",errors="replace").stdout
 cur=None; added={}
 for line in diff.splitlines():
@@ -99,6 +115,7 @@ for f,lines in added.items():
         "Object", "Class", "Runtime",
     }
     for ln in lines:
+        if _is_doc_line(ln): continue
         code=re.sub(r'//.*','',ln)
         # An ANNOTATION is not a call. @Suppress("DEPRECATION"), @OptIn(Foo::class)
         # and friends read as `Name(` to the pattern below, so every one of them was
@@ -155,6 +172,8 @@ for f in added:
 # through to a red build in WidgetConfigActivity.kt when only .height/.size/
 # .weight had been imported into that file before. Not exhaustive: just the
 # layout modifiers common enough to show up mid-edit without a fresh import.
+
+
 MODIFIER_EXTENSIONS = {
     "width", "height", "size", "padding", "offset", "fillMaxWidth",
     "fillMaxHeight", "fillMaxSize", "weight", "align", "wrapContentSize",
@@ -171,6 +190,7 @@ for f, lines in added.items():
     # in the committed file (however it got there) isn't this diff's problem.
     already_used = set(re.findall(r'\.(\w+)\s*\(', prev))
     for ln in lines:
+        if _is_doc_line(ln): continue
         code = re.sub(r'//.*', '', ln)
         for name in re.findall(r'\.(\w+)\s*\(', code):
             if name in MODIFIER_EXTENSIONS and name not in imported_members and name not in already_used:

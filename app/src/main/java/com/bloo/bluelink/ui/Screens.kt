@@ -30,6 +30,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
@@ -5379,19 +5381,47 @@ private fun rememberPhotoModel(url: String): Any =
  * The spacer is INSIDE the animated block so it collapses with the photo. Left outside,
  * a 12dp gap stayed behind and the collapsed hero had a dead band above its bar.
  */
+/**
+ * The app's collapse/expand transition, supplied by the Material theme.
+ *
+ * M3 Expressive delivers motion as a theme subsystem: MaterialTheme.motionScheme exposes
+ * six spec factories, a 2x3 matrix of SPATIAL (bounds, size, scale, shape -- allowed to
+ * overshoot) against EFFECTS (colour, alpha -- must not) crossed with fast/default/slow.
+ * This app already opts into MaterialExpressiveTheme, so those resolve to
+ * MotionScheme.expressive() and were sitting unused.
+ *
+ * Two things that makes correct, beyond removing hardcoded numbers:
+ *
+ *  - The height is spatial and the fade is effects, which is the split the spec draws.
+ *    Every copy of this transition in this file animated the height with a spring and the
+ *    alpha with a tween. Material's stated rule for choosing is interruption: a spring
+ *    preserves velocity continuity when the target changes mid-flight, a tween is for
+ *    preset choreography. A collapse toggle is re-tappable by definition, so its fade
+ *    wanted a spring too.
+ *  - The durations stop being invented. There were seven copies of this transition with
+ *    fade tweens of 130, 160, 180, 200, 200, 220, 220 and 300ms, and no comment anywhere
+ *    explaining why any of them differed.
+ *
+ * NOT using Modifier.animateContentSize for the height, deliberately: it animates clip
+ * bounds, so collapses commonly snap while expansions look smooth -- exactly the wrong
+ * failure for a large image. AnimatedVisibility + shrinkVertically is the documented
+ * approach for this, and it also removes the node from composition rather than leaving a
+ * faded one occupying space and reachable by TalkBack.
+ */
+@Composable
+private fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
+    fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+        expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), expandFrom = expandFrom)
+
+/** Mirror of [collapseEnter]; see there for why both halves are springs. */
+@Composable
+private fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
+    fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+        shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)
+
 @Composable
 private fun CollapsibleHeroPhoto(expanded: Boolean, photo: @Composable () -> Unit) {
-    AnimatedVisibility(
-        visible = expanded,
-        enter = fadeIn(tween(180)) + expandVertically(
-            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-            expandFrom = Alignment.Top,
-        ),
-        exit = fadeOut(tween(130)) + shrinkVertically(
-            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-            shrinkTowards = Alignment.Top,
-        ),
-    ) {
+    AnimatedVisibility(visible = expanded, enter = collapseEnter(), exit = collapseExit()) {
         Column {
             photo()
             Spacer(Modifier.height(12.dp))
@@ -7951,19 +7981,14 @@ private fun PebbleShell(
                     }
                 }
                 // Normal pebbles: animate the body fading + sliding open/closed.
+                // Collapse springs like the expand does. It used to be a flat 160ms tween
+                // against a spring open, which is what made closing feel like a snap next
+                // to a smooth open -- now both halves come from the theme's motion scheme,
+                // so that symmetry is structural instead of two hand-matched numbers.
                 AnimatedVisibility(
                     visible = expanded,
-                    enter = fadeIn(tween(180)) + expandVertically(
-                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                        expandFrom = Alignment.Top,
-                    ),
-                    // Collapse springs like the expand does. It used to be a
-                    // flat 160ms tween against a spring open, which is what
-                    // made closing feel like a snap next to a smooth open.
-                    exit = fadeOut(tween(130)) + shrinkVertically(
-                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                        shrinkTowards = Alignment.Top,
-                    ),
+                    enter = collapseEnter(),
+                    exit = collapseExit(),
                 ) {
                     Column(
                         // AnimatedVisibility only animates the whole block
