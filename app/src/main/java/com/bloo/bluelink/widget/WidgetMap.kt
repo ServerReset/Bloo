@@ -10,10 +10,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.ln
-import kotlin.math.tan
 
 /**
  * Renders the widget's location map thumbnail to a [Bitmap].
@@ -47,10 +43,11 @@ object WidgetMap {
     // roughly 4x the ground per tile at the same pixel size, reading as
     // "which part of town" rather than "which specific driveway".
     private const val ZOOM = 13
-    private const val TILE_PX = 256
+    private val TILE_PX = com.bloo.bluelink.data.MapTiles.TILE_PX
     // OSM's usage policy requires an identifying User-Agent; a default/missing one
-    // gets a "blocked" tile back. Mirrors WearImage's fix.
-    private const val USER_AGENT = "Bloo-Android/1.0 (https://claude.ai/code)"
+    // gets a "blocked" tile back. Built by MapTiles so all three surfaces send the
+    // same shape -- the phone's was still the unversioned, contactless kind.
+    private val USER_AGENT = com.bloo.bluelink.data.MapTiles.userAgent("Android")
     // Cap on cached tiles — a car driving around would otherwise accrete PNGs in
     // cacheDir forever. At ~12-40KB/tile this stays well under a couple MB.
     private const val MAX_CACHED_TILES = 40
@@ -71,10 +68,9 @@ object WidgetMap {
         markerColor: Int,
     ): Bitmap? = withContext(Dispatchers.IO) {
         val edge = sizePx.coerceIn(48, 1024)
-        val n = 1 shl ZOOM
-        val latRad = Math.toRadians(lat)
-        val xf = (lon + 180.0) / 360.0 * n
-        val yf = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * n
+        val n = com.bloo.bluelink.data.MapTiles.span(ZOOM)
+        val xf = com.bloo.bluelink.data.MapTiles.tileX(lon, ZOOM)
+        val yf = com.bloo.bluelink.data.MapTiles.tileY(lat, ZOOM)
         val xt = xf.toInt()
         val yt = yf.toInt()
 
@@ -98,7 +94,7 @@ object WidgetMap {
             for (tx in floorDiv(left)..floorDiv(left + TILE_PX - 1)) {
                 // Longitude does wrap, so a car near the antimeridian still
                 // gets the tiles on the far side of it rather than a gap.
-                val wrapped = ((tx % n) + n) % n
+                val wrapped = com.bloo.bluelink.data.MapTiles.wrapX(tx, ZOOM)
                 val tile = fetchTile(context, wrapped, ty) ?: continue
                 if (wrapped == xt && ty == yt) haveCentre = true
                 val dl = ((tx * TILE_PX - left) * scale).toFloat()
@@ -140,7 +136,7 @@ object WidgetMap {
             runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull()?.let { return it }
         }
         return runCatching {
-            val url = URL("https://tile.openstreetmap.org/$ZOOM/$x/$y.png")
+            val url = URL(com.bloo.bluelink.data.MapTiles.tileUrl(ZOOM, x, y))
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 setRequestProperty("User-Agent", USER_AGENT)
                 connectTimeout = 6000

@@ -51,7 +51,7 @@ object WearImage {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .header("User-Agent", "Bloo-WearOS/0.1 (https://claude.ai/code)")
+                    .header("User-Agent", com.bloo.bluelink.data.MapTiles.userAgent("WearOS"))
                     .build()
                 chain.proceed(request)
             }

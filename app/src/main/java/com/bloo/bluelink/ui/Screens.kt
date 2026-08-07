@@ -348,6 +348,7 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.degValue
+import com.bloo.bluelink.data.MapTiles
 import com.bloo.bluelink.data.smartClimateTargetF
 import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.Vehicle
@@ -380,15 +381,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.cos
 import kotlin.math.floor
-import kotlin.math.ln
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlin.math.tan
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
 
@@ -9788,13 +9786,12 @@ private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         modifier.background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         val density = LocalDensity.current
-        val tilePx = 256f
+        val tilePx = MapTiles.TILE_PX.toFloat()
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
-        val span = 1 shl zoom
-        val latRad = Math.toRadians(location.latitude)
-        val xTileF = (location.longitude + 180.0) / 360.0 * span
-        val yTileF = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / Math.PI) / 2.0 * span
+        val span = MapTiles.span(zoom)
+        val xTileF = MapTiles.tileX(location.longitude, zoom)
+        val yTileF = MapTiles.tileY(location.latitude, zoom)
         // World-pixel of the box's top-left so the car lands dead-centre.
         val originX = (xTileF * tilePx - wPx / 2f).toFloat()
         val originY = (yTileF * tilePx - hPx / 2f).toFloat()
@@ -9806,13 +9803,18 @@ private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         for (tx in firstX..lastX) {
             for (ty in firstY..lastY) {
                 if (ty < 0 || ty >= span) continue
-                val wrappedX = ((tx % span) + span) % span
+                val wrappedX = MapTiles.wrapX(tx, zoom)
                 val offX = tx * tilePx - originX
                 val offY = ty * tilePx - originY
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data("https://tile.openstreetmap.org/$zoom/$wrappedX/$ty.png")
-                        .setHeader("User-Agent", "Bloo Bluelink companion app")
+                        .data(MapTiles.tileUrl(zoom, wrappedX, ty))
+                        // OSM returns a "blocked" placeholder tile to clients whose
+                        // User-Agent doesn't identify the app. This one used to read
+                        // "Bloo Bluelink companion app" -- no version, no contact URL,
+                        // i.e. still shaped like the string that gets blocked, while
+                        // the widget and watch had already been fixed.
+                        .setHeader("User-Agent", MapTiles.userAgent("Android"))
                         .crossfade(true)
                         .build(),
                     contentDescription = null,

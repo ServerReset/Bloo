@@ -93,12 +93,9 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
-import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.ln
 import kotlin.math.roundToInt
-import kotlin.math.tan
 
 /** The one card corner radius for the watch, so SectionCard, the reorder cards, and
  *  any nested element (map thumbnail) share it and can't drift apart. */
@@ -400,24 +397,21 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
     // key actually changes, so this whole block (including the network-bound
     // URL) is stable across recompositions caused by unrelated state.
     val tile = remember(latKey, lonKey) {
-        // Standard "slippy map" Web Mercator tile projection at fixed zoom 15:
-        // convert lat/lon (degrees) into fractional tile coordinates (xf, yf) in
-        // the 0..n range, where n = 2^zoom is the number of tiles per axis at
-        // this zoom level. `xf` is a simple linear scale of longitude; `yf` uses
-        // the standard Mercator latitude formula (via tan/cos/ln) that maps
-        // latitude non-linearly so the map's y-axis stays visually undistorted.
+        // Fractional tile coordinates for this position at zoom 15, from the
+        // shared Web Mercator projection in MapTiles -- the phone's map and the
+        // widget's thumbnail derive theirs from the same place now, so the three
+        // cannot drift on the maths or on the OSM User-Agent that decides whether
+        // the tile server answers at all.
         val z = 15
-        val n = (1 shl z).toDouble()
-        val latRad = Math.toRadians(lat)
-        val xf = (lon + 180.0) / 360.0 * n
-        val yf = (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * n
+        val xf = com.bloo.bluelink.data.MapTiles.tileX(lon, z)
+        val yf = com.bloo.bluelink.data.MapTiles.tileY(lat, z)
         // Truncating to Int gives the actual tile indices (xt, yt) to fetch;
         // the fractional remainder (xf - xt, yf - yt) is the car's position
         // *within* that tile (0..1 on each axis), used below to place the
         // marker dot at the right pixel offset inside the downloaded image.
         val xt = xf.toInt()
         val yt = yf.toInt()
-        Triple("https://tile.openstreetmap.org/$z/$xt/$yt.png", (xf - xt).toFloat(), (yf - yt).toFloat())
+        Triple(com.bloo.bluelink.data.MapTiles.tileUrl(z, xt, yt), (xf - xt).toFloat(), (yf - yt).toFloat())
     }
     val url = tile.first
     val mx = tile.second
