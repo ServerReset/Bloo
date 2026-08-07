@@ -860,7 +860,24 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // despite Settings' "Refresh all cars" button implying otherwise.
         sessionFetched.clear()
         sessionFetched.addAll(vehicles.map { it.vin })
-        vehicles.forEach { refreshStatus(it.vin, surface = false) }
+        // ONE relay with a blank vin, not one per car. The phone already treats a blank
+        // vin as "every car" -- WearCommandRunner.refresh branches on vin.isBlank(), and
+        // resync two functions down uses the same form.
+        //
+        // Per-car messages were expensive on the far side, not here: each one made the
+        // phone run WearCommandRunner.refresh AND WearBridge.refreshAllSurfaces, and
+        // refreshAllSurfaces re-decodes the snapshot payload twice, does ~3N+5 sequential
+        // preference reads, makes two blocking Data Layer round trips, and repaints all
+        // twelve Quick Settings tiles. Three cars meant three of those, plus three node
+        // lookups and three messages from this side, for one button press.
+        //
+        // markAll rather than a bare launch so each car's own refresh spinner still
+        // lights up -- Settings' "Refresh all cars" button derives its busy state from
+        // whether any car has a "<vin>:refresh" key pending, so a single ":refresh"
+        // key would have left the button looking idle for the whole operation.
+        markAll(vehicles.map { "${it.vin}:refresh" }) {
+            runCatching { WearComms.requestSync(ctx, vin = "", refresh = true) }
+        }
         refreshConnection()
     }
 
@@ -1946,6 +1963,28 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             try { block() } finally {
                 val remaining = (pendingCounts[key] ?: 1) - 1
                 pendingCounts = if (remaining <= 0) pendingCounts - key else pendingCounts + (key to remaining)
+                publish()
+            }
+        }
+    }
+
+    /**
+     * [mark] for several keys around ONE [block] -- for an action that covers every car
+     * with a single request but should still light up each car's own spinner.
+     *
+     * Reference-counted per key exactly as [mark] is, so this composes correctly with a
+     * per-car refresh already in flight for one of the same keys.
+     */
+    private fun markAll(keys: Collection<String>, block: suspend () -> Unit) {
+        keys.forEach { pendingCounts = pendingCounts + (it to (pendingCounts[it] ?: 0) + 1) }
+        publish()
+        viewModelScope.launch {
+            try { block() } finally {
+                keys.forEach {
+                    val remaining = (pendingCounts[it] ?: 1) - 1
+                    pendingCounts =
+                        if (remaining <= 0) pendingCounts - it else pendingCounts + (it to remaining)
+                }
                 publish()
             }
         }
