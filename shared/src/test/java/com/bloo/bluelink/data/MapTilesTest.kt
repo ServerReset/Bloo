@@ -134,3 +134,60 @@ class MapTilesTest {
         assertEquals("https://tile.openstreetmap.org/15/16372/10896.png", MapTiles.tileUrl(15, 16372, 10896))
     }
 }
+
+/**
+ * Tests for [coordString]. The locale ones are the point: the previous implementation
+ * used the default locale, so on a comma-decimal device a coordinate pair came out as
+ * "48,8566, 2,3522" -- four commas, no way to tell the delimiter from the decimal
+ * separators, and unusable if pasted into a map.
+ */
+class CoordStringTest {
+
+    @Test
+    fun formatsToTheRequestedPrecision() {
+        assertEquals("48.85660, 2.35220", coordString(48.8566, 2.3522))
+        assertEquals("48.8566, 2.3522", coordString(48.8566, 2.3522, decimals = 4))
+        assertEquals("49, 2", coordString(48.8566, 2.3522, decimals = 0))
+    }
+
+    @Test
+    fun handlesNegativeAndZeroCoordinates() {
+        assertEquals("-33.8688, 151.2093", coordString(-33.8688, 151.2093, decimals = 4))
+        assertEquals("0.0000, 0.0000", coordString(0.0, 0.0, decimals = 4))
+        assertEquals("-0.1278, -51.0000", coordString(-0.1278, -51.0, decimals = 4))
+    }
+
+    /**
+     * The decimal separator must be a dot no matter what locale the device is set to.
+     * Swapping the default locale under the call is the only way to actually test this --
+     * asserting against the ambient locale would pass on a CI runner set to en_US while
+     * the bug shipped to everyone else.
+     */
+    @Test
+    fun usesADotEvenUnderACommaDecimalLocale() {
+        val original = java.util.Locale.getDefault()
+        try {
+            for (tag in listOf("de-DE", "fr-FR", "es-ES", "pt-BR", "ru-RU")) {
+                java.util.Locale.setDefault(java.util.Locale.forLanguageTag(tag))
+                val s = coordString(48.8566, 2.3522, decimals = 4)
+                assertEquals("48.8566, 2.3522", s, "wrong separator under $tag")
+                // Exactly one comma: the delimiter. More than that means the decimal
+                // separator has collided with it.
+                assertEquals(1, s.count { it == ',' }, "ambiguous comma count under $tag: $s")
+            }
+        } finally {
+            java.util.Locale.setDefault(original)
+        }
+    }
+
+    /** The GeoLocation extension and the raw-pair form must agree -- they exist so the
+     *  watch, which holds bare Doubles, doesn't need its own format string. */
+    @Test
+    fun theExtensionAgreesWithTheRawPairForm() {
+        val loc = GeoLocation(48.8566, 2.3522, null)
+        for (d in listOf(0, 2, 4, 5, 6)) {
+            assertEquals(coordString(48.8566, 2.3522, d), loc.coordString(d), "disagreed at $d decimals")
+        }
+        assertEquals(coordString(48.8566, 2.3522), loc.coordString())
+    }
+}

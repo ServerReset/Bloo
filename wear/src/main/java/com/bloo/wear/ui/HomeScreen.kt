@@ -1745,7 +1745,10 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
         )
     } else {
         Text(
-            "%.4f, %.4f".format(lat, lon),
+            // Shared coordString, not a local format string: it pins Locale.ROOT, so a
+            // comma-decimal locale doesn't render this as "48,8566, 2,3522" with no way
+            // to tell the delimiter from the decimal separators.
+            com.bloo.bluelink.data.coordString(lat, lon, decimals = 4),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

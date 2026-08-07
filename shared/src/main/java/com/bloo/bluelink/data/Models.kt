@@ -512,9 +512,24 @@ fun DoorOpen.openLabels(): List<String> = openPositions(frontLeft, frontRight, b
 /** Human-readable list of which windows are currently open (empty if all closed/unknown). */
 fun WindowOpen.openLabels(): List<String> = openPositions(frontLeft, frontRight, backLeft, backRight)
 
-/** "lat, lon" formatted to [decimals] places. */
-fun GeoLocation.coordString(decimals: Int = 5): String =
-    "%.${decimals}f, %.${decimals}f".format(latitude, longitude)
+/**
+ * "lat, lon" formatted to [decimals] places, in [java.util.Locale.ROOT].
+ *
+ * ROOT and not the default locale, which is what `"%.4f, %.4f".format(...)` gives you.
+ * A single localized number is fine and desirable -- "12,5 km" is correct in German --
+ * but a PAIR joined by ", " is not, because the delimiter then collides with the
+ * decimal separator: 48.8566, 2.3522 rendered as "48,8566, 2,3522", where there is no
+ * way to tell which commas separate the two values. Coordinates are also the one figure
+ * in this app a user is likely to copy out and paste into a map, which wants a dot.
+ *
+ * Every caller was going through the default locale before this, including the watch's
+ * own hand-rolled copy of the format string.
+ */
+fun coordString(lat: Double, lon: Double, decimals: Int = 5): String =
+    String.format(java.util.Locale.ROOT, "%.${decimals}f, %.${decimals}f", lat, lon)
+
+/** [coordString] for a [GeoLocation]. */
+fun GeoLocation.coordString(decimals: Int = 5): String = coordString(latitude, longitude, decimals)
 
 // --- EV trip history (Hyundai/Genesis US evTripDetails) --------------------
 
