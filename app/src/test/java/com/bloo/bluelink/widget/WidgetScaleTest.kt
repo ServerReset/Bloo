@@ -411,8 +411,19 @@ class WidgetScaleTest {
                                 // empty -- reported from a real device: three of four
                                 // configured buttons shown, a large gap above and below).
                                 val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts)
+                                // overhead = 20.dp, matching CompactTallLayout. This read 12
+                                // while the composable had already moved to 20 (12 trailing +
+                                // an 8dp forced spacer), so the test under-modelled the
+                                // reservation and could not have caught a regression back to
+                                // 12 -- which is the exact bug the composable change fixed.
+                                //
+                                // This divergence is the whole reason this file is fragile: it
+                                // MIRRORS the composable's arithmetic instead of calling it, so
+                                // the two can drift silently and the sweep keeps passing. Any
+                                // edit to CompactTallLayout's reservation has to be made here
+                                // too until that arithmetic moves somewhere both can share.
                                 val n = Scale.maxStackedButtons(
-                                    size, (budget - nameH - heroReserve).coerceAtLeast(0.dp), overhead = 12.dp,
+                                    size, (budget - nameH - heroReserve).coerceAtLeast(0.dp), overhead = 20.dp,
                                     cap = actionCount,
                                 )
                                 val buttonZone = if (n > 0) {
