@@ -1967,8 +1967,8 @@ private fun LoginScreen(
                     // even though its sign-in also goes through OTP).
                     AnimatedVisibility(
                         visible = brand.requiresPin,
-                        enter = expandVertically(tween(280)) + fadeIn(tween(280)),
-                        exit = shrinkVertically(tween(220)) + fadeOut(tween(180)),
+                        enter = collapseEnter(Alignment.Bottom),
+                        exit = collapseExit(Alignment.Bottom),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Text("Service PIN", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
@@ -5326,8 +5326,8 @@ private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Mo
     // updateTileDismissed truly hides it.
     AnimatedVisibility(
         visible = info != null && !state.updateTileDismissed,
-        enter = fadeIn(tween(220)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
-        exit = fadeOut(tween(160)) + shrinkVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
+        enter = collapseEnter(Alignment.Bottom),
+        exit = collapseExit(Alignment.Bottom),
     ) {
         if (info == null) return@AnimatedVisibility
         val context = LocalContext.current
@@ -5560,14 +5560,24 @@ private fun rememberPhotoModel(url: String): Any =
  * Two things that makes correct, beyond removing hardcoded numbers:
  *
  *  - The height is spatial and the fade is effects, which is the split the spec draws.
- *    Every copy of this transition in this file animated the height with a spring and the
- *    alpha with a tween. Material's stated rule for choosing is interruption: a spring
- *    preserves velocity continuity when the target changes mid-flight, a tween is for
- *    preset choreography. A collapse toggle is re-tappable by definition, so its fade
- *    wanted a spring too.
- *  - The durations stop being invented. There were seven copies of this transition with
- *    fade tweens of 130, 160, 180, 200, 200, 220, 220 and 300ms, and no comment anywhere
- *    explaining why any of them differed.
+ *    Material's stated rule for choosing is interruption: a spring preserves velocity
+ *    continuity when the target changes mid-flight, a tween is for preset choreography. A
+ *    collapse toggle is re-tappable by definition, so its fade wanted a spring too.
+ *  - The durations stop being invented. Every hand-rolled copy in this file has now been
+ *    migrated here (14 call sites), and between them they had fade tweens of 120, 130,
+ *    150, 160, 180, 180, 200, 220, 220, 240 and 300ms with no comment anywhere explaining
+ *    why any of them differed. Four also SPRANG open and TWEENED shut, which is what made
+ *    closing feel like a snap next to a smooth open; six tweened both halves.
+ *
+ * The one deliberate holdout is `advancedEnter`/`advancedExit` in the settings screen,
+ * which keeps `AdvancedModeStiffness` for the height because it reveals a lot at once and
+ * wants a calmer settle. It takes its FADE from the same effects spec as this.
+ *
+ * [expandFrom] is a parameter and not a constant because it is a layout fact, not a
+ * timing one: a body under a header should grow downward from its top, while a bubble
+ * anchored above the bottom bar should reveal from its bottom. Sites that were on
+ * `expandVertically`'s own default pass [Alignment.Bottom] explicitly so this migration
+ * changed how things MOVE without changing which way they open.
  *
  * NOT using Modifier.animateContentSize for the height, deliberately: it animates clip
  * bounds, so collapses commonly snap while expansions look smooth -- exactly the wrong
@@ -9474,8 +9484,8 @@ private fun ClimatePebble(
         // Show the set temperature when climate is running, with an animated entrance.
         AnimatedVisibility(
             visible = climateOn,
-            enter = fadeIn(tween(300)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), expandFrom = Alignment.Top),
-            exit = fadeOut(tween(200)) + shrinkVertically(tween(200), shrinkTowards = Alignment.Top),
+            enter = collapseEnter(),
+            exit = collapseExit(),
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Set temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -9568,8 +9578,8 @@ private fun ClimatePebble(
         )
         AnimatedVisibility(
             visible = duration > CLIMATE_DURATION_RANGE.last,
-            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
-            exit = fadeOut(tween(120)) + shrinkVertically(tween(120)),
+            enter = collapseEnter(Alignment.Bottom),
+            exit = collapseExit(Alignment.Bottom),
         ) {
             Text(
                 "Sent as ${climateChunksLabel(duration)}, continued automatically",
@@ -9705,8 +9715,8 @@ private fun ClimatePresetSection(
 
     AnimatedVisibility(
         visible = presets.isNotEmpty(),
-        enter = expandVertically(tween(280)) + fadeIn(tween(220)),
-        exit = shrinkVertically(tween(240)) + fadeOut(tween(180)),
+        enter = collapseEnter(Alignment.Bottom),
+        exit = collapseExit(Alignment.Bottom),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Spacer(Modifier.height(4.dp))
@@ -10216,8 +10226,8 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
         val coverGlance = LocalForceExpanded.current
         AnimatedVisibility(
             visible = location == null,
-            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
-            exit = fadeOut(tween(120)) + shrinkVertically(tween(120)),
+            enter = collapseEnter(Alignment.Bottom),
+            exit = collapseExit(Alignment.Bottom),
         ) {
             Text("Tap Locate to query the car's current position.")
         }
@@ -10732,8 +10742,15 @@ private fun SettingsScreen(vm: AppViewModel) {
             // as a calmer, slightly longer settle instead. Shared with
             // CarSettingsCard/SettingsCard's own animateContentSize below so
             // all three settle at the same feel instead of visibly disagreeing.
-            val advancedEnter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
-            val advancedExit = fadeOut(tween(150)) + shrinkVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
+            // The HEIGHT keeps AdvancedModeStiffness -- a deliberately calmer settle than
+            // the theme's, for a disclosure that reveals a lot at once (see below). The
+            // FADE moves to the theme's effects spec, because a tweened alpha over a
+            // sprung height is the split collapseEnter's doc calls out: this toggle is
+            // re-tappable, so its fade wants velocity continuity too.
+            val advancedEnter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+                expandVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
+            val advancedExit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+                shrinkVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
@@ -10860,8 +10877,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                     }
                     AnimatedVisibility(
                         visible = shortcutsExpanded,
-                        enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
-                        exit = fadeOut(tween(150)) + shrinkVertically(tween(160)),
+                        enter = collapseEnter(Alignment.Bottom),
+                        exit = collapseExit(Alignment.Bottom),
                     ) {
                         Column {
                             Spacer(Modifier.height(8.dp))
@@ -11248,8 +11265,8 @@ private fun SettingsScreen(vm: AppViewModel) {
                 }
                 AnimatedVisibility(
                     visible = logsExpanded,
-                    enter = fadeIn(tween(200)) + expandVertically(),
-                    exit = fadeOut(tween(150)) + shrinkVertically(),
+                    enter = collapseEnter(Alignment.Bottom),
+                    exit = collapseExit(Alignment.Bottom),
                 ) {
                     Column {
                         Spacer(Modifier.height(6.dp))
@@ -12038,8 +12055,8 @@ private fun CarSettingsCard(
             }
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn(tween(220)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
-                exit = fadeOut(tween(160)) + shrinkVertically(tween(180)),
+                enter = collapseEnter(Alignment.Bottom),
+                exit = collapseExit(Alignment.Bottom),
             ) {
                 Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SettingsGroup("Powertrain") {
@@ -12748,8 +12765,8 @@ private fun SearchLayer(
         // never has to chase a bubble around the screen.
         AnimatedVisibility(
             visible = open,
-            enter = fadeIn(tween(200)) + expandVertically(spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)),
-            exit = fadeOut(tween(150)) + shrinkVertically(tween(150)),
+            enter = collapseEnter(Alignment.Bottom),
+            exit = collapseExit(Alignment.Bottom),
             modifier = Modifier.align(Alignment.BottomCenter)
                 .padding(bottom = barH + edge + bottomInset + 10.dp),
         ) {
@@ -13500,8 +13517,8 @@ private fun SettingsSearchResults(
         val reply = state.aiSearchReply
         AnimatedVisibility(
             visible = thinking || reply != null,
-            enter = fadeIn(tween(180)) + expandVertically(tween(180)),
-            exit = fadeOut(tween(120)) + shrinkVertically(tween(120)),
+            enter = collapseEnter(Alignment.Bottom),
+            exit = collapseExit(Alignment.Bottom),
         ) {
             Card(
                 resultCardModifier,
