@@ -9,6 +9,13 @@
   show a long-press "Widget settings" entry point for android:configure;
   without it, most stock/Pixel launchers silently omit that affordance even
   though the configure activity is declared.
+
+  previewLayout (API 31+) and previewImage are BOTH declared on purpose. The
+  picker's precedence is generated preview (API 35+) then previewLayout then
+  previewImage then the launcher icon, so declaring both means Android 12+ gets
+  the scalable layout and older hosts still get the drawable. Until previewLayout
+  was added, the chain fell all the way through to previewImage and the picker
+  advertised the entire widget as one static car glyph.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="40dp"
@@ -24,5 +31,6 @@
     android:configure="com.bloo.bluelink.widget.WidgetConfigActivity"
     android:widgetFeatures="reconfigurable"
     android:initialLayout="@layout/car_widget_loading"
+    android:previewLayout="@layout/car_widget_preview"
     android:previewImage="@drawable/ic_car_hero"
     android:description="@string/widget_description" />

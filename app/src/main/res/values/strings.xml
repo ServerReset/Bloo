@@ -4,4 +4,10 @@
     <!-- Shown in place of Glance's generic "Can't show content" when composition fails. -->
     <string name="widget_error_title">Couldn\'t draw the widget</string>
     <string name="widget_error_hint">Tap to open Bloo</string>
+    <!-- Sample content for the widget-picker preview (car_widget_preview.xml). Not
+         shown anywhere in the running app. -->
+    <string name="widget_preview_car">Ioniq 5</string>
+    <string name="widget_preview_status">Locked · Parked</string>
+    <string name="widget_preview_percent">82%</string>
+    <string name="widget_preview_range">241 mi range</string>
 </resources>

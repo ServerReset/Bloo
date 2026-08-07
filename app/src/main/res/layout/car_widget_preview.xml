@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The widget picker preview, at roughly the 3x2 default drop size that
+  targetCellWidth/Height declare.
+
+  Sits in the middle of the preview precedence chain: a generated preview
+  (API 35+) beats this, this beats previewImage (which stays declared for
+  pre-Android-12 hosts and is still the fallback if this cannot be inflated),
+  and both beat the launcher icon. Before this, the chain fell all the way to
+  previewImage, so the picker advertised the whole widget with a single static
+  car glyph.
+
+  Deliberately a static approximation and NOT an attempt to mirror every tier.
+  The real fix is a generated preview, which renders the actual composable and
+  therefore cannot drift from it: that needs GlanceAppWidget.providePreview,
+  which does NOT exist in glance-appwidget 1.1.1 (verified against the resolved
+  artifact, not the docs: the AAR contains no preview classes at all). Glance
+  1.2.0 has been parked at rc01 since Dec 2025. WHEN 1.2 REACHES STABLE, replace
+  this with providePreview and delete this file.
+
+  Same ?android:attr/* approach as car_widget_loading.xml so it is correct in
+  light and dark with no values-night variant.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="?android:attr/colorBackground">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_preview_car"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:maxLines="1" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:text="@string/widget_preview_status"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="11sp"
+        android:maxLines="1" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/widget_preview_percent"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="30sp"
+        android:maxLines="1" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_preview_range"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="11sp"
+        android:maxLines="1" />
+
+    <!-- Stand-in for the action row. Plain Views rather than real buttons: a
+         preview is never interactive, so this only needs to read as "there are
+         controls here". -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+        <View
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="26dp"
+            android:background="?android:attr/colorAccent" />
+        <View
+            android:layout_width="6dp"
+            android:layout_height="1dp" />
+        <View
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="26dp"
+            android:background="?android:attr/colorAccent" />
+        <View
+            android:layout_width="6dp"
+            android:layout_height="1dp" />
+        <View
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="26dp"
+            android:background="?android:attr/colorAccent" />
+    </LinearLayout>
+</LinearLayout>

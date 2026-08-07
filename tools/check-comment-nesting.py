@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Fail if any Kotlin file has unbalanced block comments.
+"""Fail on the two comment hazards that silently break this repo's builds.
+
+Kotlin and XML have OPPOSITE hazards, and this repo's prose style walks into both:
+
+  * Kotlin block comments NEST, so a stray `/*` inside a KDoc swallows the file.
+  * XML comments do NOT nest and forbid `--` outright, so the ' -- ' this repo
+    writes everywhere makes any layout or values comment containing it invalid.
+
+Both have actually happened here, and neither is reported by anything that points
+at a comment.
 
 Kotlin block comments NEST -- unlike Java, C, or JavaScript. So a `/*` appearing
 inside a KDoc block opens a second level, and the next `*/` returns to level 1
@@ -87,6 +96,47 @@ def scan(text):
     return depth, events
 
 
+def scan_xml(text):
+    """XML comments have the opposite hazard to Kotlin's: they do not nest, and
+    a bare '--' anywhere inside one is illegal, so aapt2 rejects the file.
+
+    This repo's prose style uses ' -- ' constantly, which makes the mistake very
+    easy to make while writing a comment in a layout or values file. I have made
+    it twice. The first cost a CI cycle; the second was caught only because I
+    happened to run an ad-hoc well-formedness check by hand, which is not a
+    guard.
+
+    Returns a list of (line, message).
+    """
+    out = []
+    i = 0
+    line = 1
+    n = len(text)
+    while i < n:
+        if text[i] == "\n":
+            line += 1
+            i += 1
+            continue
+        if text.startswith("<!--", i):
+            start_line = line
+            end = text.find("-->", i + 4)
+            body = text[i + 4:end if end >= 0 else n]
+            if end < 0:
+                out.append((start_line, "unterminated XML comment"))
+                return out
+            if "--" in body:
+                out.append((
+                    start_line,
+                    "'--' inside an XML comment -- illegal in XML, aapt2 will reject "
+                    "this file (use ':' or an em dash instead)",
+                ))
+            line += text.count("\n", i, end + 3)
+            i = end + 3
+            continue
+        i += 1
+    return out
+
+
 def main():
     root = Path(__file__).resolve().parent.parent
     failures = []
@@ -121,13 +171,26 @@ def main():
                 "-- the rest of this file is being parsed as comment text"
             )
 
-    print(f"checked {checked} Kotlin files")
+    xml_checked = 0
+    for path in sorted(root.rglob("*.xml")):
+        if any(part in SKIP_DIRS for part in path.parts):
+            continue
+        xml_checked += 1
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        rel = path.relative_to(root).as_posix()
+        for ln, msg in scan_xml(text):
+            failures.append(f"{rel}:{ln}: {msg}")
+
+    print(f"checked {checked} Kotlin files and {xml_checked} XML files")
     if failures:
         print(f"\n{len(failures)} problem(s):")
         for f in failures:
             print("  " + f)
         return 1
-    print("block comments balanced in all files")
+    print("comments clean: Kotlin block comments balanced, no illegal '--' in XML")
     return 0
 
 

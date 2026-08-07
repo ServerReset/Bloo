@@ -2,6 +2,8 @@ package com.bloo.bluelink.widget
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Decodes and blurs a car's photo for use as a widget's full-bleed background
@@ -11,6 +13,17 @@ import android.graphics.BitmapFactory
  * baked into the bitmap once, off the render path -- both steps are memoised
  * so a widget that isn't changing photos doesn't redo this work on every
  * refresh tick.
+ *
+ * Both entry points run on [Dispatchers.IO], for the reason [WidgetMap.render]
+ * already documents: provideGlance is suspend but does NOT guarantee an IO
+ * dispatcher -- Google's own guidance is that it runs on the main thread and any
+ * inline loading needs withContext. WidgetMap got that treatment and this file
+ * did not, so on every cache miss a decodeFile pair plus a bitmap copy plus two
+ * box-blur passes over ~230k pixels ran on the main thread. "Off the render
+ * path" above was true of the CACHING and not of the thread.
+ *
+ * A miss is not rare, either: the cache is process-local and widget processes are
+ * killed aggressively, so the first composition after any restart paid it.
  */
 object WidgetPhoto {
 
@@ -24,12 +37,12 @@ object WidgetPhoto {
      *  memoised by path + last-modified. Full-size photos handed to RemoteViews
      *  throw 'exceeds maximum bitmap memory usage' and blank the widget, so
      *  this always scales down first. */
-    fun decodeCached(path: String, maxPx: Int = 480): Bitmap? {
+    suspend fun decodeCached(path: String, maxPx: Int = 480): Bitmap? = withContext(Dispatchers.IO) {
         val file = java.io.File(path)
-        if (!file.exists()) return null
+        if (!file.exists()) return@withContext null
         val key = "$path:${file.lastModified()}:$maxPx"
-        cache.get(key)?.let { return it }
-        return runCatching {
+        cache.get(key)?.let { return@withContext it }
+        runCatching {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(path, bounds)
             var sample = 1
@@ -49,11 +62,11 @@ object WidgetPhoto {
      * without turning into mush or leaving the source photo's own JPEG
      * block edges showing through.
      */
-    fun blurredCached(source: Bitmap, path: String): Bitmap {
+    suspend fun blurredCached(source: Bitmap, path: String): Bitmap = withContext(Dispatchers.IO) {
         val file = java.io.File(path)
         val key = "blur:$path:${file.lastModified()}"
-        cache.get(key)?.let { return it }
-        return runCatching {
+        cache.get(key)?.let { return@withContext it }
+        runCatching {
             val mutable = source.copy(Bitmap.Config.ARGB_8888, true)
             val radius = (maxOf(mutable.width, mutable.height) / 70).coerceIn(2, 6)
             repeat(2) { boxBlurInPlace(mutable, radius) }
