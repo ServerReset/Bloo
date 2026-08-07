@@ -5075,8 +5075,23 @@ private fun HeroHeader(
             background = {
                 AnimatedVisibility(
                     visible = photoExpanded,
-                    enter = collapseEnter(),
-                    exit = collapseExit(),
+                    // The shared collapse spec PLUS a settle: the photo eases up from 92%
+                    // as it unfolds, so it reads as arriving rather than as a window being
+                    // cranked open. scaleIn/Out is on the SPATIAL spec because scale is a
+                    // spatial property, which also means it shares physics with the height
+                    // change it rides on instead of being a second, differently-timed
+                    // animation laid over it.
+                    //
+                    // Only the hero does this. A pebble body sliding open is content
+                    // appearing; a photo is an object, and objects settle.
+                    enter = collapseEnter() + scaleIn(
+                        initialScale = 0.92f,
+                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    ),
+                    exit = collapseExit() + scaleOut(
+                        targetScale = 0.94f,
+                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    ),
                 ) {
                     Box(Modifier.fillMaxWidth()) {
                         HeroVisual(v, imageUrl, height, PebbleCornerExpanded, aspectRatio = 16f / 9f)
@@ -5153,7 +5168,10 @@ private fun HeroHeader(
                     // is the full width of the column with nothing competing for it, sitting
                     // directly under the text rather than a line below it.
                     val pct = status?.percentFor(hasBattery)
-                    Box(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    // end padding, not just top: the header's weighted text column runs right
+                    // up to the chevron, so a full-width bar finished flush against it. 12dp
+                    // gives the same optical gap the title's ellipsis already leaves.
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp, end = 12.dp)) {
                         ChargeSegmentBar(
                             frac = ((pct ?: 0).coerceIn(0, 100)) / 100f,
                             limitPct = null,
