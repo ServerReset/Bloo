@@ -3,7 +3,6 @@
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalFoundationApi::class,
     ExperimentalLayoutApi::class,
-    ExperimentalSharedTransitionApi::class,
 )
 
 package com.bloo.bluelink.ui
@@ -27,10 +26,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -51,7 +46,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
@@ -290,7 +284,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -5073,12 +5066,6 @@ private fun HeroHeader(
         // separately -- same inputs, two derivations, and therefore two things to keep in
         // step by hand.
         val readout = chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric)
-        // Shared-element identities. Keyed by VIN so two heroes could never collide even if
-        // they ever shared one scope -- they don't today (each PebbleShell makes its own),
-        // but the pager pre-composes a neighbouring car's page, and a key that is only
-        // unique by accident of structure is the kind that breaks when the structure moves.
-        val statsKey = "heroStats:${v.vin}"
-        val barKey = "heroBar:${v.vin}"
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -5148,12 +5135,10 @@ private fun HeroHeader(
                 }
                 // The expanded readout, at the BOTTOM of the card.
                 //
-                // A SIBLING of the photo now, not a child of it. As a child it inherited the
+                // A SIBLING of the photo, not a child of it. As a child it inherited the
                 // photo's scaleIn/scaleOut settle, so the numbers and the bar zoomed with the
-                // image -- which is wrong for text, and worse for a shared element, because
-                // sharedBounds draws the travelling node in the scope's overlay where an
-                // ancestor's scale doesn't reach. Splitting them lets the photo settle as an
-                // object while the readout simply arrives.
+                // image -- wrong for text, which should arrive rather than being flown in.
+                // Split, the photo settles as an object and the readout just closes with it.
                 //
                 // Aligned within the card's own Box rather than placed in the pebble body:
                 // the body is top-aligned in its Column, so a bar there sits under the
@@ -5164,79 +5149,75 @@ private fun HeroHeader(
                 AnimatedVisibility(
                     visible = photoExpanded,
                     modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
-                    // Fade only. The MOVEMENT is sharedBounds' job (see pebbleShared), and
-                    // stacking a second positional transition on top of it would mean two
-                    // springs arguing about where this is.
-                    enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
-                    exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
+                    // SHRINKS, it does not merely fade. This was fade-only, and that was the
+                    // "hangs at the wrong size for a second, then snaps" you saw -- the part
+                    // that survived deleting the shared element, and the actual cause.
+                    //
+                    // A fade-only AnimatedVisibility keeps its FULL layout footprint for the
+                    // whole fade and then drops it in a single frame. This readout is a child
+                    // of the card's Box, so the card's height is the tallest of (photo,
+                    // header, this). The photo shrank away properly, but this stayed ~142dp
+                    // the entire time, holding the card open at a height nothing was drawing
+                    // at any more -- then disappeared between two frames, and the card fell
+                    // to the header's height with nothing to animate it.
+                    //
+                    // Shrinking towards Bottom, and on the SAME shared spec as the photo's
+                    // own collapseExit, so the two heights track each other: the photo starts
+                    // taller and stays proportionally taller for every frame of the close, so
+                    // it keeps deciding the card's height right down to the end and this can
+                    // never pin it. That is what makes the card just close to the right size.
+                    enter = collapseEnter(Alignment.Bottom),
+                    exit = collapseExit(Alignment.Bottom),
                 ) {
                     Box(Modifier.padding(16.dp)) {
-                        // One ChargeFuelBar, with its two pieces marked as the far ends of
-                        // the two shared elements. Collapsing does not swap this readout for
-                        // the header's -- it flies this one up into the header and re-lays it
-                        // out on one line.
-                        ChargeFuelBar(
-                            status, hasBattery, hasFuel, drivingLabel, metric = metric,
-                            statsModifier = Modifier.pebbleShared(this@AnimatedVisibility, statsKey),
-                            barModifier = Modifier.pebbleShared(this@AnimatedVisibility, barKey),
-                        )
+                        ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
                     }
                 }
             },
-            // Collapsed, this is exactly what every other pebble is: header, chevron and a
-            // summary line. No custom slot.
+            // Collapsed: name, percentage and range on ONE row, with the bar directly under
+            // it. Two rows reads as a status line with a gauge under it, which is what it is.
             //
-            // I had invented a `persistentContent` slot so the bar could survive the
-            // collapse, then spent three passes making the resulting half-collapsed card
-            // look right. It never was: the standard framework already answers "what does
-            // this pebble say when closed" with `summary`, and a pebble that keeps a chunk
-            // of its body visible is by definition not a normal pebble. The slot is gone.
-            // Name, percentage and range share ONE row, with the bar directly under it.
-            // It was three stacked lines -- title, then range, then the bar -- which left
-            // the bar sitting oddly low with the whole card padded around it. Two rows reads
-            // as a status line with a gauge under it, which is what it is.
+            // NOT a shared element any more, and this is the third and last attempt at that.
             //
-            // This is the SAME element as the big readout at the bottom of the expanded
-            // card, not a smaller restatement of it: same `statsKey`, same [ChargeReadout],
-            // so it cannot drift and it cannot both be on screen. Collapsing flies it from
-            // there to here and re-lays it out; expanding flies it back.
+            // The ask was one component that moves between the header and the bottom of the
+            // expanded card, so I built it on `sharedBounds`. It produced exactly the defect
+            // you photographed: collapse, hang at the wrong (too big) size for about a
+            // second, then snap to the right size with no animation at all.
             //
-            // Note it is NOT gated on `photoExpanded` at this level. It has to stay in the
-            // composition long enough to animate out, which is what the AnimatedVisibility
-            // inside is for -- returning null here instead would delete the node on the
-            // frame the pebble opens, and a shared element that is gone has nothing to
-            // travel from.
-            titleTrailing = {
-                AnimatedVisibility(
-                    visible = !photoExpanded,
-                    enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
-                    exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
-                ) {
-                    // The 10dp gap from the car name is OUTSIDE pebbleShared, so the shared
-                    // bounds are the text's own and the gap doesn't travel with it.
-                    ChargeStatsLine(
-                        readout,
-                        Modifier
-                            .padding(start = 10.dp)
-                            .pebbleShared(this@AnimatedVisibility, statsKey),
-                    )
-                }
+            // The cause is structural, not a tuning mistake. `RemeasureToBounds` measures the
+            // entering node TO the animating bounds, and those bounds start at the expanded
+            // readout's size -- so the collapsed header was laid out at the expanded size and
+            // the whole pebble sat at that height until the bounds spring converged. When the
+            // enclosing AnimatedVisibility finished, the placeholder went away and the node
+            // dropped to its natural size in one frame. That IS the hang-then-snap. The other
+            // resize mode (ScaleToBounds) trades it for drawing the collapsed line ~2.3x too
+            // large, which is what the previous attempt looked like.
+            //
+            // Either way the shared element is deciding the header's layout height, and a
+            // collapsed pebble's height has to be its content's height immediately. So the
+            // travel is gone. What the original ask was actually about -- the percentage and
+            // range being duplicated -- is still fixed, and fixed at the level that mattered:
+            // ONE [ChargeReadout] derivation feeds both densities, so they cannot drift and
+            // only one is ever on screen.
+            titleTrailing = if (photoExpanded) {
+                null
+            } else {
+                // The 10dp gap from the car name lives here, not in PebbleShell, so a pebble
+                // with no trailing stat doesn't pay for one.
+                { ChargeStatsLine(readout, Modifier.padding(start = 10.dp)) }
             },
             summary = null,
-            headerContent = {
-                // The bar's collapsed home, directly under the title row. Same `barKey` as
-                // the bar at the bottom of the expanded card, so there is one bar in this
-                // card and it moves.
-                //
-                // collapseEnter/collapseExit here and not a plain fade, unlike the two stat
-                // nodes: this one's height is what RESERVES the row in the header, so the
-                // header has to grow and shrink with it. The horizontal travel is still
-                // sharedBounds'.
-                AnimatedVisibility(
-                    visible = !photoExpanded,
-                    enter = collapseEnter(),
-                    exit = collapseExit(),
-                ) {
+            headerContent = if (photoExpanded) {
+                null
+            } else {
+                {
+                    // Deliberately NOT wrapped in an AnimatedVisibility. This bar's height is
+                    // part of the collapsed header's height, so animating it in is animating
+                    // the very number the card is trying to settle at -- which is the same
+                    // mistake the shared element made, in miniature. It appears at its right
+                    // size and the CARD's height change is what animates, via the body's own
+                    // collapseExit and the photo shrinking with it.
+                    //
                     // end padding, not just top: the header's weighted text column runs right
                     // up to the chevron, so a full-width bar finished flush against it. 12dp
                     // gives the same optical gap the title's ellipsis already leaves.
@@ -5244,18 +5225,12 @@ private fun HeroHeader(
                         ChargeSegmentBar(
                             frac = animatedChargeFrac(readout.frac),
                             // Was hardcoded null, so the collapsed bar silently dropped the
-                            // charge-limit marker the expanded one drew. Two nodes of one
-                            // shared element disagreeing about their own content is precisely
-                            // the drift this refactor removes -- both read `readout` now.
+                            // charge-limit marker the expanded one drew. Both read `readout`.
                             limitPct = readout.limitPct,
-                            modifier = Modifier.pebbleShared(this@AnimatedVisibility, barKey),
                         )
                     }
                 }
             },
-            // The one pebble in the app that gets a lookahead scope, and the reason it
-            // exists. See PebbleShell.sharedTransition for why it isn't the default.
-            sharedTransition = true,
         ) {
             // Empty by design. Everything the expanded state adds -- the photo and the
             // readout over its lower edge -- is in `background`, because both need to be
@@ -5656,16 +5631,6 @@ private fun ChargeFuelBar(
     hasFuel: Boolean,
     drivingLabel: String? = null,
     metric: Boolean = false,
-    /**
-     * Applied to the stats block (percent, range, state line).
-     *
-     * The hero threads a `sharedBounds` through here so this block and its collapsed
-     * one-line counterpart ([ChargeStatsLine]) are one travelling element instead of
-     * two that trade places. Plain [Modifier] for every other caller.
-     */
-    statsModifier: Modifier = Modifier,
-    /** Applied to the bar, for the same reason as [statsModifier]. */
-    barModifier: Modifier = Modifier,
 ) {
     // There IS a second density again ([ChargeStatsLine]), but not the `compact` flag this
     // function used to carry: what it shares with the line is the DERIVATION, not the
@@ -5673,7 +5638,7 @@ private fun ChargeFuelBar(
     // one [ChargeReadout].
     val data = chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric)
     Column {
-        ChargeStatsBlock(data, modifier = statsModifier)
+        ChargeStatsBlock(data)
         // Plug-in hybrid: surface the fuel tank too.
         data.fuelPct?.let { fuelPct ->
             Spacer(Modifier.height(4.dp))
@@ -5696,7 +5661,6 @@ private fun ChargeFuelBar(
         ChargeSegmentBar(
             frac = animatedChargeFrac(data.frac),
             limitPct = data.limitPct,
-            modifier = barModifier,
         )
     }
 }
@@ -5857,10 +5821,11 @@ private fun ChargeStatsBlock(
  * The same readout on one line, for the collapsed hero's title row: name, then these
  * numbers, then the chevron.
  *
- * Same [ChargeReadout], so it cannot disagree with [ChargeStatsBlock] about what the
- * car's percentage or range is — and the hero hands both the same `sharedBounds` key,
- * so this is not a second readout that appears when the other leaves. It is the same
- * one, re-laid-out.
+ * Same [ChargeReadout] as [ChargeStatsBlock], so it cannot disagree with it about what the
+ * car's percentage or range is. That -- one derivation, one visible copy -- is the whole of
+ * the de-duplication; an earlier attempt also made the two ends of a `sharedBounds` pair so
+ * the readout would visibly travel between them, and that had to be removed. See the hero's
+ * `titleTrailing` for why.
  *
  * "Charging" is the only part of the state line that survives the squeeze: the
  * minutes-to-full and the AC/DC plug type belong to the expanded density, and on a
@@ -5957,11 +5922,12 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, modifier: Modifier = M
     val haloColor = scheme.surface
     val coreColor = scheme.onSurface
     // DRAWN, not composed. This was a BoxWithConstraints holding a Row of two Boxes plus an
-    // offset child for the marker. BoxWithConstraints is SUBCOMPOSITION, and once the hero
-    // handed this bar to sharedBounds with RemeasureToBounds, every frame of the travel
-    // re-measured it -- a subcomposition per frame, inside a lookahead scope that already
-    // measures twice. That is where the dropped frames in the collapse came from. Four
-    // draw calls in one pass replace it, and nothing here needs to be a layout node.
+    // offset child for the marker, and BoxWithConstraints is SUBCOMPOSITION. That was found
+    // while chasing dropped frames in the hero's collapse -- a shared-element attempt was
+    // re-measuring this bar every frame, so every frame paid a subcomposition. The shared
+    // element is gone, but this stays: four draw calls in one pass, nothing here needs to be
+    // a layout node, and the fill and marker animations now invalidate draw and not
+    // composition. Cheaper in every state, not just mid-transition.
     Canvas(modifier.fillMaxWidth().height(ChargeBarHeight)) {
         val h = size.height
         val radius = CornerRadius(h / 2f)
@@ -8156,10 +8122,10 @@ private fun PebbleShell(
      * Trailing content on the TITLE row -- a headline stat that would otherwise need a
      * third row of its own. Null for every other pebble.
      *
-     * A composable slot rather than a string because the hero's stat is one half of a
-     * shared-element transition: it has to be the SAME node that reappears at the
-     * bottom of the expanded card, which a string cannot be. Owns its own leading gap
-     * (there is no [Spacer] before it here) so that gap travels out with it.
+     * A composable slot rather than a string: the hero puts a styled, derived readout
+     * here ([ChargeStatsLine]), not a caption. It owns its own leading gap -- there is no
+     * [Spacer] before it here -- so a pebble with no trailing stat doesn't pay for one, and
+     * the expanded hero's title isn't squeezed by a gap left behind an absent node.
      */
     titleTrailing: (@Composable () -> Unit)? = null,
     /**
@@ -8192,19 +8158,6 @@ private fun PebbleShell(
      * Null for every other pebble, so nothing else gains a layer.
      */
     background: (@Composable BoxScope.() -> Unit)? = null,
-    /**
-     * Wraps the card's contents in a [SharedTransitionLayout] and publishes its scope
-     * on [LocalPebbleSharedTransition], so [titleTrailing], [headerContent] and
-     * [background] can hand the same `sharedBounds` key to two nodes and have the
-     * framework move one element between them.
-     *
-     * Off by default, and it must stay that way: [SharedTransitionLayout] is a
-     * [androidx.compose.ui.layout.LookaheadScope], which measures its subtree twice.
-     * A car page carries ~30 pebbles, and paying a double measure on every one of them
-     * to give a single card a travelling charge bar is not a trade worth making.
-     * Only the hero passes true.
-     */
-    sharedTransition: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -8280,271 +8233,161 @@ private fun PebbleShell(
                 contentColor = contentColorFor(containerColor),
             ),
         ) {
-            // Either a SharedTransitionLayout or nothing, depending on `sharedTransition`.
-            // The hero needs one so its charge bar and its stats can be ONE node that moves
-            // between the header and the bottom of the card; nothing else pays for it.
-            PebbleSharedScope(sharedTransition) {
-                // Box, so `background` can draw BEHIND the header and body. A pebble is
-                // otherwise a plain vertical stack with no z-order, which is why an image
-                // could not sit under the header before this.
-                Box(Modifier.fillMaxWidth()) {
-                    background?.invoke(this)
-                    // No animateContentSize here (cover-screen tiles fill instead) --
-                    // the body below is already wrapped in its own AnimatedVisibility
-                    // with expandVertically/shrinkVertically, which smoothly animates
-                    // that exact same height delta on its own. Wrapping this Column in
-                    // a SECOND, independently-sprung animateContentSize on top of that
-                    // made every collapse/expand visibly lag and rubber-band: each
-                    // frame of the inner animation is itself a "content size changed"
-                    // event the outer animateContentSize then re-animates towards,
-                    // compounding two springs where the collapse only needs one.
-                    Column(
-                        if (fillHeight) Modifier.fillMaxHeight() else Modifier,
-                    ) {
-                        // Phone only. The cover screen never reaches here: PebbleShell
-                        // returns above, through CoverTile, so a pebble on the cover is
-                        // the same template as every other page there. What follows is
-                        // the collapsible header + animated body card.
-                        // Header: tap anywhere to toggle, long-press to drag-reorder. The
-                        // action button and chevron handle their own clicks. Fixed min height
-                        // so every collapsed pebble lines up.
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .then(
-                                    if (forceExpanded) Modifier
-                                    else Modifier.clickable {
-                                        if (expanded) haptics?.tick() else haptics?.click()
-                                        onToggle()
-                                    },
-                                )
-                                .then(dragHandle)
-                                .heightIn(min = PebbleHeaderHeight)
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                // Same heading fix as SettingsCard: with 8+ pebbles per
-                                // car and no heading structure, TalkBack users could
-                                // only reach a given section (Climate, Charge, ...) by
-                                // swiping through every row of every pebble above it.
-                                // The header grows and hardens as the pebble opens. Expanded, the
-                                // hero's header sits over a photo, so bigger and higher-contrast
-                                // is legibility rather than flourish -- and it makes opening feel
-                                // like the card is coming forward instead of just getting taller.
-                                //
-                                // Interpolated on the theme's SPATIAL spec (type size is a spatial
-                                // property) so it moves with the same physics as the expansion it
-                                // belongs to, and lerped through real type steps rather than being
-                                // scaled, so every frame is a genuine font size.
-                                val headerT by animateFloatAsState(
-                                    targetValue = if (expanded) 1f else 0f,
-                                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                                    label = "pebbleHeaderGrow",
-                                )
-                                val titleStyle = lerp(
-                                    MaterialTheme.typography.titleMedium,
-                                    MaterialTheme.typography.headlineSmall,
-                                    headerT,
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    title,
-                                    modifier = Modifier.weight(1f, fill = false),
-                                    style = titleStyle,
-                                    fontWeight = FontWeight.Bold,
-                                    // Cap at one line: at a large display/font size the
-                                    // header action button (SplitExpandButton, now width-
-                                    // bounded below) used to squeeze this weighted Column
-                                    // so a title like "Location"/"Weather"/"Diagnostics"
-                                    // wrapped and visually collided with the button. One
-                                    // line + ellipsis keeps the title on its own line.
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                // Trailing content on the TITLE row, so a pebble that wants a
-                                // headline stat does not need a third row for it. The hero puts
-                                // its percentage and range here, which is what lets the collapsed
-                                // card be name-and-numbers over a bar instead of three stacked
-                                // lines with the bar stranded at the bottom.
-                                //
-                                // No Spacer before it any more, and no styling applied here: the
-                                // slot owns both. The hero's stat is a shared element that flies
-                                // out of this row to the bottom of the card, so a 10dp gap left
-                                // behind would go on squeezing the expanded title for a node
-                                // that is no longer in the row.
-                                titleTrailing?.invoke()
-                                }
-                                if (summary != null) {
-                                    AnimatedContent(
-                                        targetState = summary,
-                                        transitionSpec = {
-                                            (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                                            (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
-                                        },
-                                        label = "pebbleSummary",
-                                    ) { s ->
-                                        Text(
-                                            s,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                                            maxLines = 1,
-                                            // Ellipsize a long summary ("Set a location")
-                                            // instead of hard-clipping it to "Set a…".
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                                headerContent?.invoke()
-                            }
-                            if (!forceExpanded) {
-                                if (headerAction != null) {
-                                    SplitExpandButton(
-                                        action = headerAction,
-                                        expanded = expanded,
-                                        onToggle = onToggle,
-                                    )
-                                } else {
-                                    MorphExpandButton(
-                                        expanded = expanded,
-                                        onToggle = onToggle,
-                                    )
-                                }
-                            }
-                        }
-                        // Normal pebbles: animate the body fading + sliding open/closed.
-                        // Collapse springs like the expand does. It used to be a flat 160ms tween
-                        // against a spring open, which is what made closing feel like a snap next
-                        // to a smooth open -- now both halves come from the theme's motion scheme,
-                        // so that symmetry is structural instead of two hand-matched numbers.
-                        AnimatedVisibility(
-                            visible = expanded,
-                            enter = collapseEnter(),
-                            exit = collapseExit(),
-                        ) {
-                            Column(
-                                // AnimatedVisibility only animates the whole block
-                                // appearing and disappearing; content that changes
-                                // WHILE expanded (an install step arriving, notes
-                                // loading) still jumped the card's height. This
-                                // animates those in place too.
-                                Modifier.animateContentSize(
-                                    spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                                ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                content = content,
+            // Box, so `background` can draw BEHIND the header and body. A pebble is
+            // otherwise a plain vertical stack with no z-order, which is why an image
+            // could not sit under the header before this.
+            Box(Modifier.fillMaxWidth()) {
+                background?.invoke(this)
+                // No animateContentSize here (cover-screen tiles fill instead) --
+                // the body below is already wrapped in its own AnimatedVisibility
+                // with expandVertically/shrinkVertically, which smoothly animates
+                // that exact same height delta on its own. Wrapping this Column in
+                // a SECOND, independently-sprung animateContentSize on top of that
+                // made every collapse/expand visibly lag and rubber-band: each
+                // frame of the inner animation is itself a "content size changed"
+                // event the outer animateContentSize then re-animates towards,
+                // compounding two springs where the collapse only needs one.
+                Column(
+                    if (fillHeight) Modifier.fillMaxHeight() else Modifier,
+                ) {
+                    // Phone only. The cover screen never reaches here: PebbleShell
+                    // returns above, through CoverTile, so a pebble on the cover is
+                    // the same template as every other page there. What follows is
+                    // the collapsible header + animated body card.
+                    // Header: tap anywhere to toggle, long-press to drag-reorder. The
+                    // action button and chevron handle their own clicks. Fixed min height
+                    // so every collapsed pebble lines up.
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (forceExpanded) Modifier
+                                else Modifier.clickable {
+                                    if (expanded) haptics?.tick() else haptics?.click()
+                                    onToggle()
+                                },
                             )
+                            .then(dragHandle)
+                            .heightIn(min = PebbleHeaderHeight)
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            // Same heading fix as SettingsCard: with 8+ pebbles per
+                            // car and no heading structure, TalkBack users could
+                            // only reach a given section (Climate, Charge, ...) by
+                            // swiping through every row of every pebble above it.
+                            // The header grows and hardens as the pebble opens. Expanded, the
+                            // hero's header sits over a photo, so bigger and higher-contrast
+                            // is legibility rather than flourish -- and it makes opening feel
+                            // like the card is coming forward instead of just getting taller.
+                            //
+                            // Interpolated on the theme's SPATIAL spec (type size is a spatial
+                            // property) so it moves with the same physics as the expansion it
+                            // belongs to, and lerped through real type steps rather than being
+                            // scaled, so every frame is a genuine font size.
+                            val headerT by animateFloatAsState(
+                                targetValue = if (expanded) 1f else 0f,
+                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                label = "pebbleHeaderGrow",
+                            )
+                            val titleStyle = lerp(
+                                MaterialTheme.typography.titleMedium,
+                                MaterialTheme.typography.headlineSmall,
+                                headerT,
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                title,
+                                modifier = Modifier.weight(1f, fill = false),
+                                style = titleStyle,
+                                fontWeight = FontWeight.Bold,
+                                // Cap at one line: at a large display/font size the
+                                // header action button (SplitExpandButton, now width-
+                                // bounded below) used to squeeze this weighted Column
+                                // so a title like "Location"/"Weather"/"Diagnostics"
+                                // wrapped and visually collided with the button. One
+                                // line + ellipsis keeps the title on its own line.
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            // Trailing content on the TITLE row, so a pebble that wants a
+                            // headline stat does not need a third row for it. The hero puts
+                            // its percentage and range here, which is what lets the collapsed
+                            // card be name-and-numbers over a bar instead of three stacked
+                            // lines with the bar stranded at the bottom.
+                            //
+                            // No Spacer before it any more, and no styling applied here:
+                            // the slot owns both. The hero shows this only while collapsed,
+                            // and a 10dp gap left behind when it goes would squeeze the
+                            // expanded title for a node that is no longer in the row.
+                            titleTrailing?.invoke()
+                            }
+                            if (summary != null) {
+                                AnimatedContent(
+                                    targetState = summary,
+                                    transitionSpec = {
+                                        (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                                        (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                                    },
+                                    label = "pebbleSummary",
+                                ) { s ->
+                                    Text(
+                                        s,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                        maxLines = 1,
+                                        // Ellipsize a long summary ("Set a location")
+                                        // instead of hard-clipping it to "Set a…".
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            headerContent?.invoke()
                         }
+                        if (!forceExpanded) {
+                            if (headerAction != null) {
+                                SplitExpandButton(
+                                    action = headerAction,
+                                    expanded = expanded,
+                                    onToggle = onToggle,
+                                )
+                            } else {
+                                MorphExpandButton(
+                                    expanded = expanded,
+                                    onToggle = onToggle,
+                                )
+                            }
+                        }
+                    }
+                    // Normal pebbles: animate the body fading + sliding open/closed.
+                    // Collapse springs like the expand does. It used to be a flat 160ms tween
+                    // against a spring open, which is what made closing feel like a snap next
+                    // to a smooth open -- now both halves come from the theme's motion scheme,
+                    // so that symmetry is structural instead of two hand-matched numbers.
+                    AnimatedVisibility(
+                        visible = expanded,
+                        enter = collapseEnter(),
+                        exit = collapseExit(),
+                    ) {
+                        Column(
+                            // AnimatedVisibility only animates the whole block
+                            // appearing and disappearing; content that changes
+                            // WHILE expanded (an install step arriving, notes
+                            // loading) still jumped the card's height. This
+                            // animates those in place too.
+                            Modifier.animateContentSize(
+                                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                            ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            content = content,
+                        )
                     }
                 }
             }
         }
-    }
-}
-
-/**
- * The [SharedTransitionScope] of the enclosing pebble, or null when that pebble did not
- * ask for one (which is all of them but the hero).
- *
- * A composition local rather than three more parameters: the scope has to reach
- * `titleTrailing`, `headerContent` AND `background`, all of which are already lambdas
- * invoked inside the card, and threading an experimental receiver type through three
- * public-ish slot signatures would put shared-transition plumbing in the API of every
- * pebble in the app to serve one of them.
- *
- * Null-by-default is load-bearing: [pebbleShared] degrades to a plain modifier when it
- * is null, so a slot written against this still renders correctly in a pebble that
- * never opted in.
- */
-private val LocalPebbleSharedTransition = compositionLocalOf<SharedTransitionScope?> { null }
-
-/**
- * Either a [SharedTransitionLayout] publishing its scope on [LocalPebbleSharedTransition],
- * or nothing at all.
- *
- * The `if` is the whole point. [SharedTransitionLayout] is a lookahead scope, so its
- * subtree measures twice; wrapping every pebble unconditionally would spend that on ~30
- * cards per car page to give one of them a travelling charge bar.
- */
-@Composable
-private fun PebbleSharedScope(enabled: Boolean, content: @Composable () -> Unit) {
-    if (!enabled) {
-        content()
-        return
-    }
-    SharedTransitionLayout(Modifier.fillMaxWidth()) {
-        CompositionLocalProvider(LocalPebbleSharedTransition provides this) { content() }
-    }
-}
-
-/**
- * Marks this node as one end of a shared element identified by [key], so the node with
- * the same key in the other visibility state is the SAME element seen at a different
- * size and position — Compose measures both, then animates the bounds between them.
- *
- * Falls back to `this` unchanged when no pebble provided a scope, which is what lets a
- * slot be written once and used in a pebble that never opted in.
- *
- * Both ends RE-MEASURE, so a node's drawn size is always its measured size.
- *
- * The stats used to scale instead, on the reasoning that their two densities are different
- * layouts rather than one layout at two widths. That was exactly the "it collapses, is too
- * big, then snaps to the right size" defect: `ScaleToBounds` lays a node out at its OWN
- * target size and then scales it to fill the CURRENT bounds, so the entering collapsed line
- * was measured small and drawn ~2.3x too large to fill the expanded bounds it starts
- * inside. Its cross-fade (effects spec) completed well before the bounds spring did, so the
- * oversized copy went fully opaque and only then visibly shrank into place.
- *
- * Re-measuring costs a mid-flight reflow -- the collapsed line laid out in a wide box, the
- * expanded block squeezed into a narrow one -- but that happens under the cross-fade, where
- * a wrong LAYOUT is far less legible than a wrong SCALE. It is also why the bar underneath
- * is now drawn rather than composed: re-measuring a BoxWithConstraints every frame meant a
- * subcomposition every frame, which is where the dropped frames came from.
- */
-@Composable
-private fun Modifier.pebbleShared(
-    visibility: AnimatedVisibilityScope,
-    key: String,
-): Modifier {
-    val scope = LocalPebbleSharedTransition.current ?: return this
-    // CRITICALLY DAMPED (dampingRatio = 1f), and deliberately NOT the theme's spatial
-    // spec that every other spatial animation in this file uses.
-    //
-    // The theme's spatial spring is under-damped on purpose: overshoot is what makes a
-    // pebble feel like it springs open. Applied to a Rect it overshoots the target BOUNDS,
-    // which is not liveliness -- it is the element growing past the size it will end up at
-    // and then contracting. That was half of "too big, then snaps".
-    //
-    // Rect.VisibilityThreshold (half a pixel per edge) is the other half. Without it the
-    // spring keeps running on sub-pixel deltas, and if it is still running when the
-    // enclosing AnimatedVisibility finishes, overlay rendering stops mid-flight and the
-    // node jumps to its final bounds. Terminating promptly is what removes that jump.
-    val bounds = remember {
-        spring(
-            dampingRatio = 1f,
-            stiffness = Spring.StiffnessMediumLow,
-            visibilityThreshold = Rect.VisibilityThreshold,
-        )
-    }
-    val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    return with(scope) {
-        // The first two are positional on purpose. The parameter ORDER is verified against
-        // the resolved artifact (compose animation 1.11.4:
-        // `sharedBounds(Modifier, SharedContentState, AnimatedVisibilityScope,
-        // EnterTransition, ExitTransition, BoundsTransform, ResizeMode, ...)`); the
-        // parameter NAMES are not recoverable from a class file, and this API's own naming
-        // is not guessable -- the placeholder-size type is spelled `PlaceholderSize` where
-        // the published reference documents `PlaceHolderSize`.
-        this@pebbleShared.sharedBounds(
-            rememberSharedContentState(key),
-            visibility,
-            enter = fadeIn(fade),
-            exit = fadeOut(fade),
-            boundsTransform = { _, _ -> bounds },
-            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
-        )
     }
 }
 
