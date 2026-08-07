@@ -472,4 +472,102 @@ internal object Scale {
         val room = size.height.value * (1f - 0.62f)
         return (room / rowDp).toInt().coerceIn(1, capMax)
     }
+
+    // --- Horizontal fit ----------------------------------------------------
+    //
+    // Until now everything above was vertical: this object decided how much
+    // room each module got down the tile, while every "will this string fit
+    // ACROSS its slot" decision stayed inside CarWidget's own composables,
+    // where no test could reach it. That is the same gap that let four
+    // vertical budgets ship wrong before they were lifted here.
+    //
+    // Deliberately expressed in primitives -- a length, an sp value, a bold
+    // flag -- rather than in Glance's TextStyle. Two reasons: this file has no
+    // Glance dependency and should keep none so the whole model stays a plain
+    // JVM unit test, and the arithmetic genuinely does not care about anything
+    // else a TextStyle carries. CarWidget keeps thin adapters that unwrap a
+    // TextStyle and delegate here.
+
+    /** Average glyph width as a fraction of font size. Bold sets measurably
+     *  wider at the same size, and every use of this estimate should err
+     *  toward "won't fit" rather than let a title clip, so bold gets its own
+     *  wider ratio instead of one average for everything. */
+    const val GLYPH_RATIO_BOLD = 0.64f
+    const val GLYPH_RATIO_REGULAR = 0.6f
+
+    /** The comfortable floors [fittedSp] won't shrink past: no smaller than
+     *  78% of the style's own size (so a shrunk line still reads as the same
+     *  typographic step as its neighbours), and never below 9sp outright,
+     *  which is about where widget text stops being legible at arm's length. */
+    const val MIN_FONT_SCALE = 0.78f
+    const val MIN_FONT_SP = 9f
+
+    /** The floor once every better option is exhausted and the only remaining
+     *  choice is small-but-whole versus clipped. */
+    const val ABSOLUTE_MIN_SP = 5f
+
+    /** How much of the available width [fittedSp] aims to fill. The remainder
+     *  is deliberate slack: solving for the size that fills the width EXACTLY
+     *  leaves the result on the boundary, where rounding and this estimate's
+     *  own imprecision can tip it a hair over and clip it. */
+    const val FIT_SLACK = 0.96f
+
+    /** Longest token still worth stacking one character per row. Past this the
+     *  column grows taller than the tile, which is just clipping on the other
+     *  axis. */
+    const val MAX_STACK_CHARS = 6
+
+    fun glyphRatio(bold: Boolean): Float = if (bold) GLYPH_RATIO_BOLD else GLYPH_RATIO_REGULAR
+
+    /** Estimated rendered width, in dp, of [length] characters at [sp].
+     *
+     *  An estimate by necessity: RemoteViews gives no text-measurement
+     *  callback the way Compose's `onTextLayout` does, so nothing here can be
+     *  exact. It is used only to pick which rung of the fallback chain to
+     *  take, never to lay out pixel-perfect. */
+    fun textWidth(length: Int, sp: Float, bold: Boolean): Float = length * sp * glyphRatio(bold)
+
+    fun overflows(length: Int, sp: Float, bold: Boolean, maxWidth: Dp): Boolean =
+        textWidth(length, sp, bold) > maxWidth.value
+
+    /** The font size at which [length] characters fit [maxWidth], or null if
+     *  even the floor won't fit. Returns [sp] unchanged when the text already
+     *  fits, so a caller can treat "same value back" as "no change needed".
+     *
+     *  The exact inverse of [overflows], sharing [glyphRatio] with it, so the
+     *  "does this fit" test and the "what size would fit" solve cannot drift
+     *  apart and disagree -- which they could when they were two separate
+     *  bodies of arithmetic. [fitsAfterShrink] asserts it, and
+     *  WidgetFitModelTest sweeps it.
+     *
+     *  [relaxed] drops the comfortable floors for [ABSOLUTE_MIN_SP]. */
+    fun fittedSp(
+        length: Int,
+        sp: Float,
+        bold: Boolean,
+        maxWidth: Dp,
+        relaxed: Boolean = false,
+    ): Float? {
+        if (length <= 0) return null
+        val needed = (maxWidth.value * FIT_SLACK) / (length * glyphRatio(bold))
+        if (needed >= sp) return sp
+        val floor = if (relaxed) ABSOLUTE_MIN_SP else maxOf(sp * MIN_FONT_SCALE, MIN_FONT_SP)
+        if (needed < floor) return null
+        return needed
+    }
+
+    /** Whether [fittedSp]'s answer actually fits -- the property the pair is
+     *  supposed to guarantee. Exposed rather than left inside the test so the
+     *  claim lives next to the code making it. True when the text won't fit at
+     *  any allowed size, since declining to shrink is not a fit failure. */
+    fun fitsAfterShrink(
+        length: Int,
+        sp: Float,
+        bold: Boolean,
+        maxWidth: Dp,
+        relaxed: Boolean = false,
+    ): Boolean {
+        val fitted = fittedSp(length, sp, bold, maxWidth, relaxed) ?: return true
+        return !overflows(length, fitted, bold, maxWidth)
+    }
 }

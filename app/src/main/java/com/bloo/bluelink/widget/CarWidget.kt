@@ -1878,26 +1878,22 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    /** Average glyph width as a fraction of the font size, the one constant
-     *  behind both [wouldOverflow] and its inverse in [shrunkToFit] -- they
-     *  share it so the "does this fit" test and the "what size would fit"
-     *  solve can never drift apart and disagree. Bold type sets measurably
-     *  wider than regular at the same size, and every use of this estimate
-     *  should err toward "won't fit" rather than let a title clip, so bold
-     *  gets its own wider ratio instead of one average for everything. */
-    private fun glyphRatio(style: TextStyle): Float =
-        if (style.fontWeight == FontWeight.Bold) 0.64f else 0.6f
+    /** Whether [style]'s weight counts as bold for width-estimation purposes.
+     *  The single place the Glance TextStyle is reduced to the plain flag
+     *  [Scale]'s fit model takes. */
+    private fun isBold(style: TextStyle): Boolean = style.fontWeight == FontWeight.Bold
 
-    /** Rough estimate of whether [text] in [style] would overflow
-     *  [maxWidth] -- Glance/RemoteViews has no real text-measurement
-     *  callback the way Compose's own `onTextLayout` does, so this is
-     *  deliberately conservative rather than exact; used only to decide
-     *  ahead of time which rung of [FitText]'s fallback chain to take,
-     *  never to lay out pixel-perfect. */
-    private fun wouldOverflow(text: String, style: TextStyle, maxWidth: Dp): Boolean {
-        val sp = style.fontSize?.value ?: 12f
-        return (text.length * sp * glyphRatio(style)) > maxWidth.value
-    }
+    /** The size [Scale] should measure this style at. RemoteViews renders a
+     *  null fontSize at its own default, which this estimate has to guess at;
+     *  12sp matches the smallest style actually declared in this file, so
+     *  guessing wrong errs toward "won't fit" rather than toward clipping. */
+    private fun styleSp(style: TextStyle): Float = style.fontSize?.value ?: 12f
+
+    /** Whether [text] in [style] would overflow [maxWidth]. Thin adapter over
+     *  [Scale.overflows] -- see there for why the estimate is approximate and
+     *  why it lives in Scale now. */
+    private fun wouldOverflow(text: String, style: TextStyle, maxWidth: Dp): Boolean =
+        Scale.overflows(text.length, styleSp(style), isBold(style), maxWidth)
 
     /** Breaks [text] across lines at word boundaries (never mid-word), so a
      *  name like "Lana's Whip Deluxe" reads as real words per line rather
@@ -1928,30 +1924,9 @@ class CarWidget : GlanceAppWidget() {
         return lines
     }
 
-    /** The comfortable floors [shrunkToFit] won't shrink past: no smaller
-     *  than 78% of the style's own size (so a shrunk line still reads as the
-     *  same typographic step as its neighbours rather than a different one),
-     *  and never below 9sp outright, which is about where widget text stops
-     *  being legible at arm's length. */
-    private val MIN_FONT_SCALE = 0.78f
-    private val MIN_FONT_SP = 9f
-
-    /** The floor when [FitText] has exhausted every better option and the
-     *  only remaining choice is small-but-whole versus clipped. Below this
-     *  nothing renders meaningfully at all, so there is nothing to gain by
-     *  going further. */
-    private val ABSOLUTE_MIN_SP = 5f
-
-    /** How much of the available width [shrunkToFit] actually aims to fill.
-     *  The small remainder is deliberate slack so a shrunk line lands inside
-     *  its slot rather than exactly on its edge. */
-    private val FIT_SLACK = 0.96f
-
-    /** Longest token still worth stacking one character per row. A percent
-     *  or a short code stacks to a handful of rows and stays readable; past
-     *  this the column grows taller than the tile it is supposed to fit
-     *  inside, which is just clipping again on the other axis. */
-    private val MAX_STACK_CHARS = 6
+    // MIN_FONT_SCALE, MIN_FONT_SP, ABSOLUTE_MIN_SP, FIT_SLACK and
+    // MAX_STACK_CHARS moved to Scale, which is where the arithmetic using them
+    // now lives. MAX_STACK_CHARS is still read below, as Scale.MAX_STACK_CHARS.
 
     /** [FitText]'s second-choice fallback, for a single token that [wordWrap]
      *  can't help with (no spaces to break on): shrink the type just enough
@@ -1960,26 +1935,18 @@ class CarWidget : GlanceAppWidget() {
      *  where a stack of single letters reads as a puzzle -- and because
      *  stacking grows downward without bound, which is its own overflow.
      *
-     *  [relaxed] drops the comfortable floors for [ABSOLUTE_MIN_SP], used
-     *  only once stacking has been ruled out too. Returns null when even
-     *  that won't fit. */
+     *  [relaxed] drops the comfortable floors, used only once stacking has
+     *  been ruled out too. Returns null when even that won't fit.
+     *
+     *  The solve itself is [Scale.fittedSp]; all this adds is the TextStyle
+     *  round trip. Returning [style] unchanged rather than a copy when nothing
+     *  needs to shrink keeps the identity Glance can skip recomposing on. */
     private fun shrunkToFit(
         text: String, style: TextStyle, maxWidth: Dp, relaxed: Boolean = false,
     ): TextStyle? {
         val sp = style.fontSize?.value ?: return null
-        if (text.isEmpty()) return null
-        // Inverse of wouldOverflow's own estimate, sharing the same ratio:
-        // the font size at which this string would exactly fill maxWidth.
-        // Inverse of wouldOverflow, but aimed at [FIT_SLACK] of the width
-        // rather than all of it. Solving for the size that fills maxWidth
-        // EXACTLY leaves the result sitting right on the boundary, where
-        // rounding and the estimate's own imprecision can tip it a hair over
-        // and clip it -- the one thing this whole path exists to prevent.
-        val needed = (maxWidth.value * FIT_SLACK) / (text.length * glyphRatio(style))
-        if (needed >= sp) return style
-        val floor = if (relaxed) ABSOLUTE_MIN_SP else maxOf(sp * MIN_FONT_SCALE, MIN_FONT_SP)
-        if (needed < floor) return null
-        return style.copy(fontSize = needed.sp)
+        val fitted = Scale.fittedSp(text.length, sp, isBold(style), maxWidth, relaxed) ?: return null
+        return if (fitted >= sp) style else style.copy(fontSize = fitted.sp)
     }
 
     /** The shared "never cut off" contract every user-data label, value and
@@ -2047,7 +2014,7 @@ class CarWidget : GlanceAppWidget() {
             Text(text, style = shrunk, maxLines = 1, modifier = modifier)
             return
         }
-        if (text.length > MAX_STACK_CHARS) {
+        if (text.length > Scale.MAX_STACK_CHARS) {
             // Text too small to read is recoverable by resizing the widget;
             // text cut off the edge is not.
             val forced = shrunkToFit(text, style, maxWidth, relaxed = true)
