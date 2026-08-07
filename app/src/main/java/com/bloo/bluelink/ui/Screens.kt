@@ -755,8 +755,23 @@ private fun OnboardingScreen(vm: AppViewModel) {
     // shrink the step list out from under the page the user is looking at.
     var preConfiguredVins by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pageIndex by remember { mutableIntStateOf(0) }
+    // The freeze has to LATCH. Keying the update on `pageIndex <= 1` alone read as
+    // "only while still on INTRO/SETUP", but that condition becomes true again
+    // every time the user navigates BACK to those pages -- and BackHandler makes
+    // going back the normal way to move around this wizard, not an edge case. So
+    // the snapshot re-took itself from a state.powertrains that now included cars
+    // the user had configured on a CAR page in between, and those cars' steps
+    // vanished from the list: with three unconfigured cars, configuring the first
+    // and then backing up to SETUP dropped its page, so walking forward again went
+    // straight to the second car with no way to reach the first. pageIndex isn't
+    // remapped when the list shrinks either, so the skip was silent.
+    //
+    // Exactly the retroactive shrink the comment above says this is here to
+    // prevent -- the freeze was just never closed.
+    var pastSetup by remember { mutableStateOf(false) }
     LaunchedEffect(state.powertrains.keys, pageIndex) {
-        if (pageIndex <= 1) preConfiguredVins = state.powertrains.keys.toSet()
+        if (pageIndex > 1) pastSetup = true
+        if (!pastSetup) preConfiguredVins = state.powertrains.keys.toSet()
     }
     val steps = remember(state.vehicles, preConfiguredVins) { buildOnboardingSteps(state.vehicles, preConfiguredVins) }
     LaunchedEffect(steps) { if (pageIndex > steps.lastIndex) pageIndex = steps.lastIndex }
@@ -2986,13 +3001,23 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
             view.rootWindowInsets?.displayCutout?.boundingRects?.isNotEmpty() == true
         else false
     }
+    // `compact` is part of the CONDITION, not just of the message choice. It used
+    // to set coverHintShown before testing it, so the once-per-session latch was
+    // spent by any device with a punch-hole -- which is essentially every modern
+    // phone -- while unfolded, showing nothing. Fold/unfold is a configuration
+    // change, and coverHintShown is rememberSaveable precisely to survive one, so
+    // a user who opened the app unfolded and then closed the phone reached the
+    // cover screen with the hint already marked shown and never saw it: the hint
+    // was reliably consumed everywhere except the one screen it exists for.
+    //
+    // The `vehicles.isEmpty()` variant that used to pick a "setup experience"
+    // wording is gone with it -- GarageScreen returns on the first line when
+    // vehicles is empty, so that branch was unreachable and the string it chose
+    // could never appear.
     LaunchedEffect(compact, hasCameraCutout) {
-        if (!coverHintShown && hasCameraCutout) {
+        if (compact && hasCameraCutout && !coverHintShown) {
             coverHintShown = true
-            if (compact && vehicles.isEmpty())
-                vm.reportInfo("Open your phone for the full Bloo setup experience")
-            else if (compact)
-                vm.reportInfo("Open your phone for the full Bloo experience")
+            vm.reportInfo("Open your phone for the full Bloo experience")
         }
     }
     if (compact) {
@@ -4058,10 +4083,15 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
     val vehicles = state.vehicles
     val count = vehicles.size
     // count - 1 goes negative with zero cars, and coerceIn(0, -1) throws
-    // (min > max) before the pager below ever gets a chance to handle an
-    // empty list gracefully -- the caller's own LaunchedEffect already
-    // anticipates this exact case (compact && vehicles.isEmpty()) with its
-    // own message, so it's a real state to guard, not a hypothetical one.
+    // (min > max) before the pager below ever gets a chance to handle an empty
+    // list gracefully. Kept as a crash guard rather than an expected state, and
+    // labelled that way on purpose: it is currently UNREACHABLE from the one
+    // caller -- GarageScreen returns on its first line when vehicles is empty,
+    // and a zero-car app routes to Screen.Empty long before Screen.Garage. This
+    // comment used to cite a `compact && vehicles.isEmpty()` branch in that caller
+    // as proof the state was real; that branch was itself dead for the same
+    // reason, and has been deleted. Two lines of guard against a throwing
+    // coerceIn is still worth keeping; the claim that something reaches it wasn't.
     if (count == 0) {
         EmptyScreen(vm)
         return
@@ -4311,11 +4341,16 @@ private fun CompactCar(
     val coverScrubbing = LocalCoverScrubbing.current
 
     val density = LocalDensity.current
-    // NOTE: nothing here reads the display cutout any more. The per-edge
-    // CLEARANCE math went first (content padding now comes from native
-    // WindowInsets.displayCutout on the tile Box below, which is corner-safe
-    // and recomposition-aware), and the decorative ring that was the last
-    // remaining reader has now gone too -- see where it used to be drawn.
+    // NOTE: nothing here reads the display cutout's boundingRects any more, which
+    // is what this note is actually about -- it used to say "nothing here reads the
+    // display cutout", flatly, which is not true and sends anyone chasing a
+    // cover-screen bump problem to the wrong place. The hand-rolled per-edge
+    // CLEARANCE math went first, and the decorative ring that was the last
+    // remaining rects reader has now gone too (see where it used to be drawn).
+    // Cutout avoidance is still very much present, just native and declarative:
+    // the tile Box below takes the scaffold's merged nav-bar-union-cutout inset,
+    // and the scrubber rail takes WindowInsets.displayCutout on its End side only.
+    // Both are corner-safe and recomposition-aware, which the rects math was not.
 
     // ---- Edge-trace refresh gesture ----
     // Long-press anywhere on the cover screen to trace a line around the edge.
