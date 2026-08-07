@@ -379,6 +379,42 @@ object LiveCharge {
             .setStyle(style)
             .addAction(0, "Stop charging", stopPi)
             .apply { contentPi?.let { setContentIntent(it) } }
+            .apply {
+                // A COUNTDOWN CHRONOMETER to the time the car says it will be full.
+                //
+                // This is what makes the thing actually live, and it is the piece that
+                // was missing. Everything else here only changes when a poll lands, and
+                // the poll is every five minutes -- a progress bar that moves once every
+                // five minutes does not read as live, and the status-bar chip had no text
+                // at all between polls. A chronometer is rendered and ticked by the
+                // system, so it counts down every second at zero cost: no wake-ups, no
+                // network, no reposts.
+                //
+                // Per the Live Updates guide, setWhen is what drives the chip's countdown
+                // and the chronometer shows "as long as it is positive", so this is the
+                // documented route to useful chip text.
+                //
+                // NOT setShortCriticalText, which the guide also suggests. That method is
+                // documented on the platform Notification.Builder, and I could not confirm
+                // it exists on NotificationCompat.Builder in the version this project
+                // pins -- the compat release notes name setRequestPromotedOngoing and
+                // ProgressStyle but not it. Guessing at a method name I cannot verify and
+                // cannot compile locally is how you get a red build or, worse, a silent
+                // no-op. The chronometer is better here anyway: it self-updates, where
+                // short critical text would be frozen between polls exactly like the rest.
+                val minsLeft = minutesToFull?.takeIf { it > 0 }
+                if (minsLeft != null) {
+                    setWhen(System.currentTimeMillis() + minsLeft * 60_000L)
+                    setUsesChronometer(true)
+                    setChronometerCountDown(true)
+                    setShowWhen(true)
+                } else {
+                    // No estimate yet (or already full): suppress the timestamp entirely
+                    // rather than letting the shade render this notification's post time
+                    // as if it meant something about the charge.
+                    setShowWhen(false)
+                }
+            }
 
         // Same TOCTOU reasoning as Notifications.post: permission could be
         // revoked between the hasPermission() check above and this call.

@@ -1,8 +1,11 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -47,6 +50,9 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         if (!settings.notificationPrefs().charging) return Result.success()
 
         var anyStillCharging = false
+        // The distinction this worker was missing. "No car is charging" and "I couldn't
+        // find out" are not the same answer, and only the first should end the chain.
+        var learnedSomething = false
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }
                 .getOrNull() ?: continue
@@ -56,9 +62,15 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 val status = runCatching {
                     BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
                 }.getOrNull()
+                if (status != null) learnedSomething = true
                 val ev = status?.evStatus
                 val charging = ev?.batteryCharge == true
                 if (charging) anyStillCharging = true
+                // Only touch the notification for a car we actually heard back about.
+                // Passing charging=false after a failed fetch would CANCEL a live bar
+                // because the network blipped, which to the user is indistinguishable
+                // from the charge having stopped.
+                if (status == null) continue
                 runCatching {
                     LiveCharge.update(
                         context = applicationContext,
@@ -74,6 +86,15 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 }
             }
         }
+        // Nothing came back at all. That's transient, so hand it to WorkManager's own
+        // backoff instead of reading silence as "charging finished" -- which is what
+        // silently killed the chain before, freezing the bar at its last value until
+        // AlertWorker's next half-hourly tick happened to re-kick it. Bounded by
+        // runAttemptCount so a genuinely broken session can't retry forever; after that
+        // the chain stops and AlertWorker re-kicks it as it always did.
+        if (!learnedSomething) {
+            return if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.success()
+        }
         if (anyStillCharging) scheduleNext(applicationContext)
         return Result.success()
     }
@@ -83,6 +104,22 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         private const val INTERVAL_MINUTES = 5L
         private const val UNIQUE_WORK_NAME = "bloo_live_charge_poll"
 
+        /** How many consecutive all-failed ticks to retry before letting the chain stop
+         *  and waiting for AlertWorker to re-kick it. */
+        private const val MAX_RETRIES = 3
+
+        /**
+         * Every tick is a network poll, so it is useless without connectivity -- and
+         * worse than useless here, because a failed tick used to end the chain outright.
+         * WorkManager defers rather than dropping, so a phone that regains signal
+         * mid-charge picks the poll back up on its own.
+         *
+         * The other periodic jobs in this app already require network; this chain was one
+         * of the two that didn't.
+         */
+        private fun constraints() =
+            Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+
         /**
          * Starts the poll chain right away -- called the moment some other
          * code path (a foreground status fetch, the 30-minute AlertWorker
@@ -91,7 +128,10 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
          * noticing the same charging car a moment later.
          */
         fun kick(context: Context) {
-            val request = OneTimeWorkRequestBuilder<LiveChargePollWorker>().build()
+            val request = OneTimeWorkRequestBuilder<LiveChargePollWorker>()
+                .setConstraints(constraints())
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .build()
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
         }
@@ -101,6 +141,8 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         private fun scheduleNext(context: Context) {
             val request = OneTimeWorkRequestBuilder<LiveChargePollWorker>()
                 .setInitialDelay(INTERVAL_MINUTES, TimeUnit.MINUTES)
+                .setConstraints(constraints())
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, request)

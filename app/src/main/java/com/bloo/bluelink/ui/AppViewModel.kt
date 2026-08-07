@@ -1720,7 +1720,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val statuses = _state.value.statuses
         var anyCharging = false
         vehicles.forEach { v ->
-            val ev = statuses[v.vin]?.evStatus
+            // Only cars we actually hold a status for. LiveCharge.update CANCELS the
+            // notification when told charging = false, and a missing status produced
+            // exactly that -- so opening the app before its own first fetch landed could
+            // delete a live bar a background worker had correctly posted, purely because
+            // this in-memory map was still empty. Third instance of the same mistake;
+            // AlertWorker and the 5-minute poll worker had it too.
+            //
+            // The "charging just finished" case the doc above describes still works: a
+            // fetched status that reports not-charging is present-and-false, not absent.
+            val status = statuses[v.vin] ?: return@forEach
+            val ev = status.evStatus
             if (ev?.batteryCharge == true) anyCharging = true
             runCatching {
                 LiveCharge.update(

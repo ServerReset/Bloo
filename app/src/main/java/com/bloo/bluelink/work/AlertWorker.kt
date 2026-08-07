@@ -99,8 +99,14 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 // tracks the real percentage instead of going stale between
                 // app opens. LiveCharge.update() clears the bar on its own
                 // once `charging` is false, so this is what stops it too.
-                if (prefs.charging) {
-                    val ev = status?.evStatus
+                // `status != null` guard, not just `prefs.charging`. LiveCharge.update
+                // CANCELS the notification when told charging = false, and a failed fetch
+                // produced exactly that: status null -> ev null -> charging false -> the
+                // live bar deleted because the network blipped, which to the user is
+                // indistinguishable from the charge having stopped. Same defect the
+                // 5-minute poll worker had; fixed in both rather than one.
+                if (prefs.charging && status != null) {
+                    val ev = status.evStatus
                     // Hand off to the 5-minute chain the instant this worker
                     // sees charging start -- 30 minutes between ticks is far
                     // too coarse for a bar meant to look live.
