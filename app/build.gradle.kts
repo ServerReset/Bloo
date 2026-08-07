@@ -144,7 +144,7 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha21")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     // Chrome Custom Tabs for opening Hyundai/Genesis links in-app

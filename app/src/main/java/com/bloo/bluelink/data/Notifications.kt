@@ -315,7 +315,18 @@ object LiveCharge {
         chargeLimit: Int? = null,
     ) {
         if (!charging) {
-            runCatching { settings.setLiveChargeDismissed(vin, false) }
+            // Guarded, like the four identical resets in CarAlerts below -- one of which
+            // spells out the reason: an unconditional write costs editTracked a full
+            // copy+diff of every preference plus a whole-file serialize and fsync (edit {}
+            // does not return until the data is durable), even when the value is already
+            // false. This one call site was the exception.
+            //
+            // It is the hot path, not a corner: prefs.charging defaults on, so for V cars
+            // with none charging this fired V full-file writes per 30-minute AlertWorker
+            // tick, plus V more per persistSnapshots() -- which runs up to three times per
+            // command and is also the debounced target for text-field edits, so typing a
+            // license plate cost V durable writes.
+            runCatching { if (settings.liveChargeDismissed(vin)) settings.setLiveChargeDismissed(vin, false) }
             update(context, vin, carName, charging = false)
             return
         }

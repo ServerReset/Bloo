@@ -1715,7 +1715,8 @@ class SettingsStore(private val context: Context) {
             after.keys.forEach { afterNames += it.name }
             before.keys.forEach { k -> if (k.name !in afterNames) touched += k.name }
             // Strip BOTH the exact device-local keys AND the per-VIN device-local
-            // prefixes (alert_/door_since_/engine_since_/tile_refreshed_), matching what
+            // prefixes (see SyncMerge.DEVICE_LOCAL_PREFIXES for the list -- naming them
+            // here just meant this comment fell behind it), matching what
             // the export/hash already exclude via isDeviceLocal — otherwise those
             // transient runtime stamps land in the dirty set and every alert/tile tick
             // fires a redundant full Drive round-trip (the hash is unchanged, so no data
