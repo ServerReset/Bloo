@@ -10807,7 +10807,43 @@ private fun SettingsScreen(vm: AppViewModel) {
                                     )
                                 }
                             } else {
-                                vm.setBiometricLock(false)
+                                // Turning the lock OFF now needs the same
+                                // authentication turning it on does. It used to be a
+                                // bare setBiometricLock(false) -- one tap, no prompt
+                                // -- which had the confirmation on the wrong
+                                // direction: enabling a lock is the harmless half.
+                                //
+                                // Reaching this screen does NOT prove the person
+                                // holding the phone ever authenticated. LockTiming.OFF
+                                // never re-locks after launch at all, and the longest
+                                // grace setting is ten minutes, so an app that is open
+                                // or was recently backgrounded is simply past the lock.
+                                // From there a single unauthenticated tap removed it
+                                // permanently, including on future cold launches --
+                                // turning momentary physical access to an unlocked
+                                // phone into standing access to unlocking someone's
+                                // car, starting its climate, and reading where it is.
+                                //
+                                // No new lockout risk: the overlay that gates entering
+                                // the app uses this same prompt, so anyone who cannot
+                                // satisfy it cannot get in here to begin with, and
+                                // un-enrolling biometrics makes canUseBiometrics()
+                                // false, which stops the lock applying at all. That
+                                // remains the escape hatch it always was.
+                                val activity = context.findFragmentActivity()
+                                if (activity == null) {
+                                    // Fail closed -- keep the lock -- but say so,
+                                    // rather than leaving the control looking stuck.
+                                    vm.reportInfo("Couldn't verify it's you. The lock is still on.")
+                                } else {
+                                    showBiometricPrompt(
+                                        activity = activity,
+                                        title = "Disable fingerprint lock",
+                                        subtitle = "Confirm to stop requiring it",
+                                        onSuccess = { vm.setBiometricLock(false) },
+                                        onError = { },
+                                    )
+                                }
                             }
                         },
                     )
