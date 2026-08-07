@@ -316,6 +316,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -5056,8 +5057,6 @@ private fun HeroHeader(
         // The photo needs no collapse logic of its own any more either: PebbleShell hides
         // the whole body when collapsed, so "no image when collapsed" falls out of the
         // shared component instead of being a rule this function enforces.
-        val pct = status?.percentFor(hasBattery)
-        val range = status?.rangeMiFor(hasBattery)
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -5065,19 +5064,22 @@ private fun HeroHeader(
             title = v.name,
             vm = vm,
             dragHandle = dragHandle,
-            // The collapsed state has to stay worth looking at, so the header carries the
-            // two numbers the hero exists to show. Without this, collapsing the summary
-            // pebble would hide the charge readout and leave only a car name, which is
-            // what would make it feel broken rather than compact. Charging is called out
-            // because it is the one state where the number is actively moving.
-            summary = listOfNotNull(
-                pct?.let { "$it%" },
-                range?.let { formatDistance(it, metric) },
-                if (charging) "Charging" else null,
-            ).joinToString(" · ").ifBlank { null },
+            // No `summary` string. The bar below IS the summary now, and it is the real
+            // one -- restating "82% - 241 mi" as header text beside a bar showing the same
+            // thing is how the same numbers get rendered twice and then drift, which is a
+            // bug I already had to fix on the widget's MEDIUM tiers.
+            persistentContent = {
+                // Survives the collapse and shrinks into it. Same composable, same copy,
+                // one instance -- so the collapsed and expanded readouts cannot disagree.
+                ChargeFuelBar(
+                    status, hasBattery, hasFuel, drivingLabel,
+                    metric = metric,
+                    compact = !photoExpanded,
+                )
+            },
         ) {
+            // Only the photo collapses.
             HeroVisual(v, imageUrl, height, (PebbleCornerExpanded - 16.dp).coerceAtLeast(8.dp))
-            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
         return
     }
@@ -5447,7 +5449,42 @@ private fun HeroVisual(v: Vehicle, imageUrl: String?, height: Dp, corner: Dp = 1
  * glance how much further it'll charge.
  */
 @Composable
-private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: Boolean, drivingLabel: String? = null, metric: Boolean = false) {
+private fun ChargeFuelBar(
+    status: VehicleStatus?,
+    hasBattery: Boolean,
+    hasFuel: Boolean,
+    drivingLabel: String? = null,
+    metric: Boolean = false,
+    /**
+     * Shrink the readout without changing what it says.
+     *
+     * Interpolates the real type scale rather than scaling a rendered bitmap: `t` runs
+     * 0..1 on the theme's SPATIAL spec (size is a spatial property per M3) and the
+     * headline and range styles are lerped between their full and compact steps, so
+     * every intermediate frame draws text at a genuine font size instead of a stretched
+     * texture. graphicsLayer scaling would have been one line and would have looked
+     * soft the whole way through, and permanently soft at rest in the compact state.
+     *
+     * Same composable, same copy, same instance -- only the scale differs, so the
+     * collapsed and expanded readouts cannot drift apart.
+     */
+    compact: Boolean = false,
+) {
+    val t by animateFloatAsState(
+        targetValue = if (compact) 1f else 0f,
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "chargeBarCompact",
+    )
+    val headlineStyle = lerp(
+        MaterialTheme.typography.displayMedium,
+        MaterialTheme.typography.headlineMedium,
+        t,
+    )
+    val rangeStyle = lerp(
+        MaterialTheme.typography.titleLarge,
+        MaterialTheme.typography.titleMedium,
+        t,
+    )
     val fuelPct = status?.fuelLevel
     val pct = status?.percentFor(hasBattery)
     val frac = ((pct ?: 0).coerceIn(0, 100)) / 100f
@@ -5487,14 +5524,14 @@ private fun ChargeFuelBar(status: VehicleStatus?, hasBattery: Boolean, hasFuel: 
             // as its supporting column rather than competing with it.
             RollingNumber(
                 text = pct?.let { "$it%" } ?: "--",
-                style = MaterialTheme.typography.displayMedium,
+                style = headlineStyle,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(
                     text = range?.let { formatDistance(it, metric) } ?: "--",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = rangeStyle,
                     fontWeight = FontWeight.Bold,
                 )
                 val animatedStatusColor by androidx.compose.animation.animateColorAsState(
@@ -7792,6 +7829,20 @@ private fun PebbleShell(
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     headerAction: PebbleHeaderAction? = null,
     forceExpanded: Boolean = false,
+    /**
+     * Content that stays visible in BOTH states, rendered between the header and the
+     * collapsing body.
+     *
+     * Added for the hero, whose charge bar has to survive the collapse: it is the one
+     * readout the card exists for, and a summary STRING could only restate the numbers
+     * in words while losing the bar itself. Putting it here means there is exactly one
+     * ChargeFuelBar instance, in one place in the tree, that resizes -- rather than a
+     * second copy composed into the header and cross-faded against the first, which is
+     * how the same numbers end up rendered twice and drift.
+     *
+     * Null for every other pebble, so their layout is byte-identical to before.
+     */
+    persistentContent: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -7959,6 +8010,9 @@ private fun PebbleShell(
                     }
                 }
                 // Normal pebbles: animate the body fading + sliding open/closed.
+                persistentContent?.let { persistent ->
+                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)) { persistent() }
+                }
                 // Collapse springs like the expand does. It used to be a flat 160ms tween
                 // against a spring open, which is what made closing feel like a snap next
                 // to a smooth open -- now both halves come from the theme's motion scheme,
