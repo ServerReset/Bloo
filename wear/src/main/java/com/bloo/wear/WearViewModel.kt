@@ -129,6 +129,10 @@ data class CarView(
     val seatRl: Int?,
     val seatRr: Int?,
     val battery12vHealth: String?,
+    /** Whether the 12V reading is one to act on -- [com.bloo.bluelink.data.Battery12V]'s
+     *  own needsAttention, so the count and the row colour can't disagree with the
+     *  health label sitting between them. */
+    val battery12vNeedsAttention: Boolean,
     val fuelLevel: Int?,
     val hasLiveStatus: Boolean,
     /** User-entered license plate and service-due tracking, synced from phone
@@ -2088,6 +2092,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             seatRl = seats?.rlSeatHeatState,
             seatRr = seats?.rrSeatHeatState,
             battery12vHealth = s?.battery?.health,
+            battery12vNeedsAttention = s?.battery?.needsAttention == true,
             fuelLevel = s?.fuelLevel,
             hasLiveStatus = s != null,
             licensePlate = snap?.licensePlate,

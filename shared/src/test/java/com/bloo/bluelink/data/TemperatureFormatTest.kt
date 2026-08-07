@@ -207,3 +207,48 @@ class UseFahrenheitTest {
         }
     }
 }
+
+/**
+ * Tests for [Battery12V.needsAttention] -- the rule the watch had hardcoded as
+ * `batSoc < 20` in three separate places while displaying a "Low" label derived from
+ * a different cutoff.
+ */
+class Battery12VTest {
+
+    @Test
+    fun agreesWithTheHealthLabelItIsShownNextTo() {
+        for (soc in 0..100) {
+            val b = Battery12V(batSoc = soc)
+            val expected = b.health == "Low" || b.health == "Needs attention"
+            assertEquals(expected, b.needsAttention, "disagreed at $soc%")
+        }
+    }
+
+    /** The case that was wrong: a reading the label calls "Low" but the old `< 20`
+     *  cutoff treated as fine, so the row read "35% · Low" in ordinary text and was
+     *  left out of the "N to check" count. */
+    @Test
+    fun flagsReadingsTheOldCutoffMissed() {
+        assertEquals("Low", Battery12V(batSoc = 35).health)
+        kotlin.test.assertTrue(Battery12V(batSoc = 35).needsAttention)
+        kotlin.test.assertTrue(Battery12V(batSoc = 49).needsAttention)
+        kotlin.test.assertFalse(Battery12V(batSoc = 50).needsAttention)
+        kotlin.test.assertFalse(Battery12V(batSoc = 80).needsAttention)
+    }
+
+    /** A car reporting no 12V state of charge is not an issue -- unknown must not
+     *  count as a problem, the same yield-nothing rule the rest of the app follows. */
+    @Test
+    fun unknownIsNotAnIssue() {
+        kotlin.test.assertFalse(Battery12V(batSoc = null).needsAttention)
+        kotlin.test.assertEquals(null, Battery12V(batSoc = null).health)
+    }
+
+    /** The explicit bad-state flag counts regardless of how healthy the charge looks. */
+    @Test
+    fun explicitBadStateFlagCountsEvenAtFullCharge() {
+        val b = Battery12V(batSoc = 95, batState = 0)
+        assertEquals("Needs attention", b.health)
+        kotlin.test.assertTrue(b.needsAttention)
+    }
+}

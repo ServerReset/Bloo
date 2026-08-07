@@ -225,6 +225,23 @@ data class Battery12V(
             batSoc >= 50 -> "Fair"
             else -> "Low"
         }
+
+    /**
+     * Whether this 12V reading is one the user should act on -- i.e. exactly the
+     * readings [health] already calls "Low" or "Needs attention".
+     *
+     * Defined in terms of [health] rather than repeating a number, because the number
+     * was the bug. The watch hardcoded `batSoc < 20` twice on one card: once to decide
+     * whether the 12V counted toward "N to check", and once to decide whether to tint
+     * the row red. Both sat directly beside the row's own [health] label. So a 12V at
+     * 35% rendered "35% · Low", in the ordinary text colour, and was not counted --
+     * the same line calling itself Low and treating itself as fine.
+     *
+     * Unknown is not an issue: a car that reports no 12V state of charge yields null
+     * from [health] and false here, rather than being counted as a problem.
+     */
+    val needsAttention: Boolean
+        get() = health == "Low" || health == "Needs attention"
 }
 
 @Serializable

@@ -1182,7 +1182,8 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     // 12V battery hint row
     car.battery12v?.let { v12 ->
         Spacer(Modifier.height(4.dp))
-        val c = if (v12 < 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+        val c = if (car.battery12vNeedsAttention) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.onSurfaceVariant
         StatusRow("12V battery", "$v12%", valueColor = c)
     }
     // Quick actions right on the hero — the two most-used controls, so the first
@@ -1931,7 +1932,7 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
         // A car can report both a per-wheel flag and the aggregate tireWarning
         // for the same physical problem; count that as one issue, not two.
         anyIndividualTire || car.tireWarning,
-        car.battery12v != null && car.battery12v < 20,
+        car.battery12vNeedsAttention,
         car.lowFuel, car.washerLow, car.brakeLow, car.keyFobLow,
     ).count { it }
     StatusRow(
@@ -1956,7 +1957,7 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
     }
     car.battery12v?.let { v12 ->
         val h = car.battery12vHealth?.let { " · $it" } ?: ""
-        StatusRow("12V", "$v12%$h", valueColor = if (v12 < 20) err else null)
+        StatusRow("12V", "$v12%$h", valueColor = if (car.battery12vNeedsAttention) err else null)
     }
     car.fuelLevel?.let { StatusRow("Fuel", "$it%", valueColor = if (car.lowFuel) err else null) }
     if (car.washerLow) StatusRow("Washer", "Low", valueColor = err)
