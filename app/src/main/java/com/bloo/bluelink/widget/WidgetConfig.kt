@@ -150,7 +150,31 @@ enum class WidgetAction(
     // same distinction the app's own quick actions make.
     UNLOCK("unlock", "Unlock", com.bloo.bluelink.data.WearAction.UNLOCK, Kind.TOGGLE),
     REFRESH("refresh", "Refresh", null, Kind.REFRESH),
-    OPEN("open", "Open app", null, Kind.NAV);
+    OPEN("open", "Open app", null, Kind.NAV),
+
+    // Appended for UNLOCK's ordinal reason, which also means these sort after
+    // "Open app" in the rendered button order. Same motivation as UNLOCK too: a
+    // one-way button you can hit without first knowing which way the toggle will
+    // go -- the toggle direction comes from the last snapshot, which on a stale
+    // widget can be the wrong guess.
+    //
+    // No new plumbing was needed for any of these. All four verbs already exist
+    // in the shared WearAction contract, and they are ALREADY the only verbs the
+    // climate/charge path ever executes: resolveToggle turns TOGGLE_CLIMATE into
+    // CLIMATE_ON/CLIMATE_OFF before anything runs, and passes an explicit verb
+    // through untouched (`else -> action`). So stateFor, optimistic, the
+    // "can't start climate while driving" gate and WidgetCommandWorker's revert
+    // all handle them today.
+    //
+    // Kind.TOGGLE is correct rather than MOMENTARY: each has a snapshot field to
+    // flip optimistically and revert if the command fails.
+    //
+    // SET_CHARGE_LIMITS is still excluded -- it needs acLimit/dcLimit values, so
+    // it is a screen, not a button.
+    CLIMATE_ON("climate_on", "Climate on", com.bloo.bluelink.data.WearAction.CLIMATE_ON, Kind.TOGGLE),
+    CLIMATE_OFF("climate_off", "Climate off", com.bloo.bluelink.data.WearAction.CLIMATE_OFF, Kind.TOGGLE),
+    CHARGE_ON("charge_on", "Charge on", com.bloo.bluelink.data.WearAction.CHARGE_ON, Kind.TOGGLE),
+    CHARGE_OFF("charge_off", "Charge off", com.bloo.bluelink.data.WearAction.CHARGE_OFF, Kind.TOGGLE);
 
     enum class Kind { TOGGLE, MOMENTARY, REFRESH, NAV }
 
@@ -161,6 +185,15 @@ enum class WidgetAction(
         val SIMPLE_CHOICES = listOf(LOCK, CLIMATE, CHARGE)
         /** Everything, for ADVANCED mode's multi-select. */
         val ALL = entries.toList()
+
+        /** Every action that only means something on a car with a chargeable pack;
+         *  hidden outright on a gas car (see CarWidget.resolvedActions).
+         *
+         *  A set rather than an `it != CHARGE` test because that test was already
+         *  written once and would have silently kept letting CHARGE_ON/CHARGE_OFF
+         *  through onto a gas car's widget as buttons that do nothing. Anyone adding
+         *  a fourth charge verb needs one edit, here, next to the entries themselves. */
+        val NEEDS_BATTERY = setOf(CHARGE, CHARGE_ON, CHARGE_OFF)
         fun fromKey(key: String?): WidgetAction? = entries.firstOrNull { it.key == key }
     }
 }

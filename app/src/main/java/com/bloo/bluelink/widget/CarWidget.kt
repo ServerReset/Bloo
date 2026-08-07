@@ -2028,7 +2028,9 @@ class CarWidget : GlanceAppWidget() {
         val hornLightsSupported = com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator)
             .let { it != com.bloo.bluelink.data.Brand.KIA && !it.isCanada }
         return render.config.actions.mapNotNull { WidgetAction.fromKey(it) }
-            .filter { it != WidgetAction.CHARGE || car.hasBattery } // hide Charge on non-EV
+            // Hide every charge verb on a car with no chargeable pack, not just the
+            // CHARGE toggle -- see WidgetAction.NEEDS_BATTERY.
+            .filter { it !in WidgetAction.NEEDS_BATTERY || car.hasBattery }
             .filter { (it != WidgetAction.FLASH && it != WidgetAction.HORN) || hornLightsSupported }
             .take(max)
     }
@@ -2244,8 +2246,20 @@ class CarWidget : GlanceAppWidget() {
             // just reached from its own dedicated button instead of Lock's
             // toggle landing on it.
             action == WidgetAction.UNLOCK && car.locked == false -> theme.unlocked
-            action == WidgetAction.CLIMATE && car.climateOn == true -> theme.climate
-            action == WidgetAction.CHARGE && car.charging == true -> theme.charge
+            // CLIMATE_ON/CHARGE_ON swap with their toggles: same live state, reached
+            // from a dedicated button, exactly as UNLOCK sits beside LOCK above.
+            //
+            // CLIMATE_OFF and CHARGE_OFF deliberately do NOT get a swap, even though
+            // UNLOCK's precedent is "light up when the state you'd produce is already
+            // true". The swap exists to flag a NOTABLE live state -- left unlocked,
+            // climate burning power, charging in progress. "Climate off" and "not
+            // charging" are the resting states; there is no theme colour for them
+            // because none is wanted, and inventing one would make a parked, idle car
+            // look like it needed attention.
+            (action == WidgetAction.CLIMATE || action == WidgetAction.CLIMATE_ON) &&
+                car.climateOn == true -> theme.climate
+            (action == WidgetAction.CHARGE || action == WidgetAction.CHARGE_ON) &&
+                car.charging == true -> theme.charge
             else -> theme.accentProvider
         }
         val click = when (action.kind) {
@@ -2758,6 +2772,12 @@ class CarWidget : GlanceAppWidget() {
         WidgetAction.HORN -> R.drawable.ic_widget_horn
         WidgetAction.REFRESH -> R.drawable.ic_widget_refresh
         WidgetAction.OPEN -> R.drawable.ic_shortcut_car
+        // Reusing the toggles' glyphs: there is no separate on/off asset, and drawing
+        // one is not obviously an improvement -- a climate icon plus the word "on" is
+        // clearer than a bespoke glyph a user has to learn. These are also the actions
+        // most likely to be configured WITH labels shown, being explicit by nature.
+        WidgetAction.CLIMATE_ON, WidgetAction.CLIMATE_OFF -> R.drawable.ic_shortcut_climate
+        WidgetAction.CHARGE_ON, WidgetAction.CHARGE_OFF -> R.drawable.ic_widget_charge
     }
 
     // Glance's reified actionStartActivity<T>() overload isn't available here, so
