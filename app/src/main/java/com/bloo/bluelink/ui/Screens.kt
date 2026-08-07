@@ -172,7 +172,6 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Thermostat
@@ -5080,18 +5079,37 @@ private fun HeroHeader(
                 val innerCorner = (outer - 16.dp).coerceAtLeast(8.dp)
                 if (cover) {
                     // The flip cover is always expanded: there the photo IS the content of
-                    // a centred full-screen tile, and there is no room for a toggle strip.
+                    // a centred full-screen tile.
                     HeroVisual(v, imageUrl, 210.dp, innerCorner)
+                    Spacer(Modifier.height(12.dp))
                 } else {
-                    CollapsibleHeroPhoto(
+                    // Carries its own trailing spacer so the gap collapses with it.
+                    CollapsibleHeroPhoto(photoExpanded) {
+                        HeroVisual(v, imageUrl, height, innerCorner)
+                    }
+                }
+            }
+            if (cover) {
+                ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
+            } else {
+                // The toggle sits beside the bar rather than over the photo so it is
+                // visible in BOTH states -- that is what makes the feature discoverable
+                // and what lets the collapsed hero read as a deliberate compact card
+                // instead of a card missing its picture. MorphExpandButton is the app's
+                // own expand control (50dp target, rotating chevron, haptics, and an
+                // "Expanded"/"Collapsed" stateDescription for TalkBack), so this needed
+                // no new component and inherits all of that.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    MorphExpandButton(
                         expanded = photoExpanded,
                         onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
-                        corner = innerCorner,
-                    ) { HeroVisual(v, imageUrl, height, innerCorner) }
+                    )
                 }
-                Spacer(Modifier.height(12.dp))
             }
-            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
     }
 }
@@ -5340,69 +5358,43 @@ private fun rememberPhotoModel(url: String): Any =
     remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
 
 /**
- * The hero photo plus its collapse control, phone only.
+ * The hero photo, animating in and out.
  *
- * Expanded, the photo looks exactly as it did before -- the only addition is a small
- * chevron over its top-end corner, so the default appearance of the card is unchanged.
- * Collapsed, a slim strip takes the photo's place, which is what makes the state
- * recoverable: "tap the photo to collapse" alone would leave no way back and no way to
- * discover the feature.
+ * Rebuilt on the app's own collapse vocabulary after the first attempt got all three
+ * things wrong: the affordance was a 28dp scrim chevron that nobody would find, the
+ * collapsed state was an ad-hoc "Show photo" strip belonging to no design language in
+ * this app, and there was no animation at all -- a bare `if` snapped the photo out of
+ * existence and the card's height with it.
  *
- * State lives in the same per-car collapsedPebbles set as every pebble (see
- * [com.bloo.bluelink.data.HERO_PHOTO_SECTION]), so it persists across restarts and syncs with the rest of the
- * layout rather than being a separate preference that drifts from them.
+ * Now it is the identical enter/exit spec every pebble body uses (see PebbleShell),
+ * springs in both directions on the app's soft damping at medium-low stiffness. The
+ * symmetry is deliberate, and PebbleShell records why: the collapse used to be a flat
+ * tween against a sprung open, "which is what made closing feel like a snap next to a
+ * smooth open".
+ *
+ * No animateContentSize wrapper, for the reason PebbleShell also documents -- expand/
+ * shrinkVertically already animates the height, and a second independently-sprung
+ * animateContentSize on top compounds two springs where the collapse needs one.
+ *
+ * The spacer is INSIDE the animated block so it collapses with the photo. Left outside,
+ * a 12dp gap stayed behind and the collapsed hero had a dead band above its bar.
  */
 @Composable
-private fun CollapsibleHeroPhoto(
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    corner: Dp,
-    photo: @Composable () -> Unit,
-) {
-    val haptics = LocalHaptics.current
-    val toggle = { haptics?.click(); onToggle() }
-    if (expanded) {
-        Box(Modifier.fillMaxWidth()) {
+private fun CollapsibleHeroPhoto(expanded: Boolean, photo: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = expanded,
+        enter = fadeIn(tween(180)) + expandVertically(
+            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+            expandFrom = Alignment.Top,
+        ),
+        exit = fadeOut(tween(130)) + shrinkVertically(
+            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+            shrinkTowards = Alignment.Top,
+        ),
+    ) {
+        Column {
             photo()
-            // Over the photo rather than beside it, so an expanded hero keeps exactly the
-            // height it had. A scrim disc because the photo underneath is arbitrary -- a
-            // bare icon is invisible against a light car.
-            Surface(
-                onClick = toggle,
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.42f),
-                contentColor = Color.White,
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowUp,
-                        contentDescription = "Hide photo",
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-        }
-    } else {
-        Surface(
-            onClick = toggle,
-            shape = RoundedCornerShape(corner),
-            color = buttonContainer(),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth().height(34.dp),
-        ) {
-            Row(
-                Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Show photo", style = MaterialTheme.typography.labelLarge)
-            }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
