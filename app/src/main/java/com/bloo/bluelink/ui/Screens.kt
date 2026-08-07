@@ -5071,11 +5071,24 @@ private fun HeroHeader(
             persistentContent = {
                 // Survives the collapse and shrinks into it. Same composable, same copy,
                 // one instance -- so the collapsed and expanded readouts cannot disagree.
-                ChargeFuelBar(
-                    status, hasBattery, hasFuel, drivingLabel,
-                    metric = metric,
-                    compact = !photoExpanded,
+                //
+                // The width animates with it: narrow while tucked under the header, full
+                // card width once it has been pushed to the bottom. Same spatial spec as
+                // the type scale inside it, so the width, the font sizes and the travel
+                // down the card are all one motion rather than three that happen to
+                // overlap.
+                val barWidth by animateFloatAsState(
+                    targetValue = if (photoExpanded) 1f else 0.62f,
+                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    label = "chargeBarWidth",
                 )
+                Box(Modifier.fillMaxWidth(barWidth)) {
+                    ChargeFuelBar(
+                        status, hasBattery, hasFuel, drivingLabel,
+                        metric = metric,
+                        compact = !photoExpanded,
+                    )
+                }
             },
         ) {
             // Only the photo collapses.
@@ -8010,9 +8023,6 @@ private fun PebbleShell(
                     }
                 }
                 // Normal pebbles: animate the body fading + sliding open/closed.
-                persistentContent?.let { persistent ->
-                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)) { persistent() }
-                }
                 // Collapse springs like the expand does. It used to be a flat 160ms tween
                 // against a spring open, which is what made closing feel like a snap next
                 // to a smooth open -- now both halves come from the theme's motion scheme,
@@ -8034,6 +8044,27 @@ private fun PebbleShell(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         content = content,
                     )
+                }
+                // AFTER the collapsing body, deliberately, and this is what makes the
+                // persistent content appear to MOVE between two places while staying one
+                // node in one call site.
+                //
+                // Collapsed, the body above has zero height, so this sits immediately under
+                // the header -- reading as part of it. Expanded, the body grows and pushes
+                // this to the bottom of the card. Because it is the same node throughout,
+                // the Column re-lays it out continuously as the body's height springs, so
+                // the travel is animated for free and stays in sync with the photo instead
+                // of being a second animation timed to match.
+                //
+                // Rendering it in two places -- once in the header row, once at the bottom --
+                // would have been two call sites, so two nodes, so a cross-fade between two
+                // copies rather than one thing moving. Animating a composable across a
+                // genuine parent change needs LookaheadScope and Modifier.animateBounds;
+                // this gets the same read without it.
+                persistentContent?.let { persistent ->
+                    Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp)) {
+                        persistent()
+                    }
                 }
             }
         }
