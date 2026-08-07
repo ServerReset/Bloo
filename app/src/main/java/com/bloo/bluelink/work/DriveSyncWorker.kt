@@ -9,6 +9,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.glance.appwidget.updateAll
+import com.bloo.bluelink.widget.CarWidget
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.wear.WearBridge
@@ -65,7 +66,7 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             // trailing writes) must not be swallowed into a silent success --
             // surface it and let WorkManager retry with the configured backoff.
             AppLog.log("⚠ Background Drive sync threw: $t")
-            return Result.retry()
+            return retryWhileAttemptsRemain()
         }
         if (outcome.imported) {
             // A live ViewModel would pick up the DataStore change reactively, but
@@ -79,6 +80,13 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
                     WearBridge.publishSettingsNow(ctx, store.appearance.first())
                 }
             }
+            // Restored. Step 3 of this class's KDoc has always promised it, and the
+            // orphaned `updateAll` import was its fossil. It matters: WidgetTheme.resolve
+            // derives the widget's whole palette from Appearance, so an imported theme
+            // change left every placed widget on the old colours until its own next
+            // 30-minute refresh. Its own runCatching, as the doc says, so a failing
+            // widget update cannot swallow the watch publish or fail the worker.
+            runCatching { CarWidget().updateAll(ctx) }
         }
         if (outcome.error != null) {
             AppLog.log("⚠ Background Drive sync: ${outcome.error}")
@@ -90,15 +98,37 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             // permanently-broken cause (revoked permission) just retries a
             // few times with growing delays and gives up until the next
             // periodic tick, which is still bounded and cheap.
-            return Result.retry()
+            //
+            // That last sentence was not true until this was bounded: WorkManager never
+            // gives up on Result.retry(), so a revoked Drive grant retried forever,
+            // each attempt paying performDriveSync's ~15 DataStore reads, a Drive round
+            // trip and (when photos sync) a full per-car JPEG re-encode. Backoff caps
+            // the RATE, not the count. LiveChargePollWorker and TileCommandWorker both
+            // already bound theirs; this is the same shape.
+            return retryWhileAttemptsRemain()
         }
         return Result.success()
     }
+
+    /**
+     * [Result.retry] while attempts remain, otherwise [Result.success].
+     *
+     * Success rather than failure on giving up, deliberately: this is a PERIODIC worker,
+     * and returning failure would cancel the whole periodic chain, so a temporary
+     * problem would permanently stop background sync. Success means "stand down and
+     * wait for the next 2-hour tick", which is what the KDoc above describes.
+     */
+    private fun retryWhileAttemptsRemain(): Result =
+        if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.success()
 
     companion object {
         // Unique work name used below so re-calling schedule() (e.g. on every
         // app start) doesn't stack up duplicate periodic jobs.
         private const val NAME = "bloo_drive_sync"
+
+        /** How many consecutive failures to retry before standing down and waiting for
+         *  the next periodic tick. Matches LiveChargePollWorker.MAX_RETRIES. */
+        private const val MAX_RETRIES = 3
 
         /** Every 2 hours is frequent enough that changes propagate within a normal
          *  day of use, without the battery/data cost of anything tighter for a
