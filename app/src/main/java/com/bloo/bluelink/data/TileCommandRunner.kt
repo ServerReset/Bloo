@@ -32,9 +32,24 @@ object TileCommandRunner {
      * mechanism (locking, optimistic snapshot update, error formatting) lives --
      * neither caller reimplements any of it.
      *
-     * Order of operations (all inside the [BlueLinkGate.statusMutex] critical
-     * section, so the read->decide->dispatch->optimistic-write sequence is
-     * atomic and can't be interleaved with another command or a status poll):
+     * Order of operations. Everything that touches the CAR's backend is inside
+     * the [BlueLinkGate.statusMutex] critical section, so the
+     * read->decide->dispatch->optimistic-write sequence is atomic and can't be
+     * interleaved with another command or a status poll. Exactly one step runs
+     * before the lock is taken, and step 0 is where it and its reasoning live:
+     * 0. Resolve a "smart" climate target, which is the one command argument whose
+     *    resolution needs the NETWORK -- a weather lookup, via
+     *    [prepareSmartClimate]. It runs here, outside the lock, because
+     *    Open-Meteo is not the car's backend: it shares no session, no account,
+     *    and none of the 502-on-overlap behaviour the mutex exists to prevent, so
+     *    serializing it against the car's requests buys nothing and costs
+     *    everything. Inside the lock it was up to 35s -- [WeatherApi]'s own
+     *    connect+read timeouts, generous on purpose -- during which one tile tap
+     *    on a car with no signal blocked the phone UI, the watch, and every other
+     *    surface in the process. Returns null when this command needs no weather,
+     *    and also when
+     *    the lookup simply fails -- step 4 raises the user-facing error in both
+     *    cases, so nothing here has to distinguish them.
      * 1. Acquire [BlueLinkGate.statusMutex] via [withLock] *before* reading any
      *    state or dispatching the command. This is the same app-wide mutex that
      *    [WearCommandRunner.execute] and the phone UI's own command path already
@@ -94,6 +109,11 @@ object TileCommandRunner {
      * happen inside the one critical section.
      */
     suspend fun run(ctx: Context, vin: String, cmd: String, climateTarget: String): Result {
+        // Step 0, before the lock: the weather lookup a "smart" target needs is a
+        // request to Open-Meteo, not to the car, so it has no business inside a
+        // mutex that exists to stop overlapping requests to the CAR. See
+        // prepareSmartClimate.
+        val smart = prepareSmartClimate(ctx, vin, cmd, climateTarget)
         // Same lock WearCommandRunner.execute()/the phone UI's own command path
         // already take -- BlueLink 502s on overlapping requests for the same
         // account, and this was the one command-executing path (Quick Settings
@@ -118,8 +138,8 @@ object TileCommandRunner {
                         else { repo.startCharge(v); "Starting charge" }
                     "charge_on" -> { repo.startCharge(v); "Starting charge" }
                     "charge_off" -> { repo.stopCharge(v); "Stopping charge" }
-                    "climate" -> runClimate(ctx, repo, v, snap, climateTarget)
-                    "climate_on" -> runClimateStart(ctx, repo, v, snap, climateTarget)
+                    "climate" -> runClimate(ctx, repo, v, snap, climateTarget, smart)
+                    "climate_on" -> runClimateStart(ctx, repo, v, snap, climateTarget, smart)
                     "climate_off" -> { repo.stopClimate(v); "Stopping climate" }
                     // No arguments, no state to predict: these two make the car
                     // do something audible/visible and change nothing that any
@@ -178,11 +198,14 @@ object TileCommandRunner {
      *    `fold` turns into a proper failure [Result] message.
      * 3. Resolves what climate request to actually send, based on the tile's
      *    configured `target`:
-     *    - "smart": needs the car's last-known lat/lon (fails if either is
-     *      missing) plus a live weather fetch for that location (fails if the
-     *      fetch fails) to compute a target temperature via
-     *      [smartClimateTargetF]/[ambientFahrenheit] against current ambient
-     *      conditions, with defrost off and the app's default duration.
+     *    - "smart": a target temperature computed from live weather at the car's
+     *      last-known lat/lon via [smartClimateTargetF]/[ambientFahrenheit], with
+     *      defrost off and the app's default duration -- see
+     *      [smartClimateRequest]. Normally this arrives already built, from step
+     *      0's [prepareSmartClimate], because the weather lookup must not happen
+     *      in here; the in-lock fallback and the two cases that reach it are
+     *      documented at the branch itself. Fails if there is no location to ask
+     *      about or no weather to be had.
      *    - any other id that isn't "default": looks up that saved preset by id
      *      in [SettingsStore.climatePresets] for this VIN and uses its stored
      *      [ClimateRequest] verbatim; fails if the preset no longer exists
@@ -198,10 +221,101 @@ object TileCommandRunner {
         v: Vehicle,
         snap: VehicleSnapshot,
         target: String,
+        smart: ClimateRequest?,
     ): String {
         if (snap.climateOn == true) { repo.stopClimate(v); return "Stopping climate" }
-        return runClimateStart(ctx, repo, v, snap, target)
+        return runClimateStart(ctx, repo, v, snap, target, smart)
     }
+
+    /**
+     * The one climate target whose resolution needs the network: build the
+     * "smart" [ClimateRequest] BEFORE [run] takes [BlueLinkGate.statusMutex], so
+     * the weather lookup doesn't hold an app-wide lock on the car's session
+     * hostage. Returns null whenever no such request is needed or one can't be
+     * built; [runClimateStart] is what turns null into the user-facing error.
+     *
+     * The snapshot is read a second time here (the authoritative read is [run]'s,
+     * inside the lock) because two of the three questions this has to answer are
+     * about vehicle state. Both tolerate a stale answer, which is why this read
+     * doesn't need the lock either:
+     * - Is this even a climate START? "climate" is a toggle, so on a car whose
+     *   last-known state is already on it means STOP, and a stop needs no
+     *   temperature. Guessing from the stale snapshot is the point: guessing
+     *   "start" when it's really a stop would make every smart-target stop tap
+     *   wait out a weather fetch it will throw away, which is a worse bug than
+     *   the one being fixed. Guessing "stop" when it's really a start falls back
+     *   to fetching inside the lock in [runClimateStart] -- the very thing this
+     *   function exists to avoid, but on that one tap rather than every tap. So
+     *   this errs toward not fetching.
+     *
+     *   That mis-guess is not merely theoretical, which is why the fallback has to
+     *   stay: the wait between this read and the locked one is the wait for the
+     *   mutex, and whoever is holding it is a command or a status poll, i.e.
+     *   precisely something that may be about to write `climateOn`.
+     * - Where is the car? Only to pick a spot to ask about the weather. A car
+     *   that moved between this read and the locked one moved far too little to
+     *   change the ambient temperature.
+     *
+     * `isDriving` is deliberately NOT checked here even though it would let us
+     * skip the fetch: it is the gate that decides whether the command is allowed
+     * at all, and a stale read of it must never be what a refusal rests on. That
+     * check stays where it is, on the authoritative snapshot inside the lock.
+     */
+    private suspend fun prepareSmartClimate(
+        ctx: Context,
+        vin: String,
+        cmd: String,
+        target: String,
+    ): ClimateRequest? {
+        if (target != "smart") return null
+        if (cmd != "climate" && cmd != "climate_on") return null
+        val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin } ?: return null
+        if (cmd == "climate" && snap.climateOn == true) return null
+        val lat = snap.lat ?: return null
+        val lon = snap.lon ?: return null
+        return WeatherApi.fetch(lat, lon)?.let(::smartClimateRequest)
+    }
+
+    /**
+     * The smart-climate fallback that runs INSIDE [BlueLinkGate.statusMutex],
+     * for the two cases [prepareSmartClimate] couldn't cover: the pre-lock
+     * snapshot said this tap was a climate STOP and the authoritative one
+     * disagrees, or the pre-lock lookup itself failed and this is where the user
+     * finally gets told why. Also raises the "no location" error for a car that
+     * has never reported a position, since that check belongs on the
+     * authoritative snapshot rather than the stale one.
+     *
+     * It has no timeout, which is worth stating outright because a timeout is the
+     * obvious thing to reach for here and it does not work. [WeatherApi.fetch] is
+     * a `withContext` on the IO dispatcher wrapped around OkHttp's BLOCKING
+     * `execute`, with no `callTimeout` and no suspension point inside. Structured
+     * concurrency will not let `withTimeoutOrNull` resume its caller until that
+     * child block has actually finished, and a blocking socket read has no
+     * cancellation check at which to finish early -- so the mutex would still be
+     * held for the full 35s and the only thing gained would be a comment claiming
+     * otherwise. Bounding it for real means putting a `callTimeout` on a client
+     * the phone UI and the watch share as well, which is a bigger change than a
+     * lock-scope fix should make; and it is a good deal less urgent now that the
+     * fetch on every normal tap happens before the lock is taken.
+     */
+    private suspend fun smartClimateInLock(snap: VehicleSnapshot): ClimateRequest {
+        val lat = snap.lat
+        val lon = snap.lon
+        if (lat == null || lon == null) error("No location for smart climate")
+        val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
+        return smartClimateRequest(w)
+    }
+
+    /** The smart-climate request for a given weather reading. Extracted so the
+     *  pre-lock path in [prepareSmartClimate] and the in-lock fallback in
+     *  [runClimateStart] can't drift into choosing different temperatures for the
+     *  same conditions -- see [smartClimateTargetF], which is itself shared with
+     *  the phone UI and the watch so all four agree. */
+    private fun smartClimateRequest(w: Weather): ClimateRequest = ClimateRequest(
+        tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
+        defrost = false,
+        durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
+    )
 
     /**
      * Force-start climate for the "climate_on" command (explicit start phrasing
@@ -217,6 +331,7 @@ object TileCommandRunner {
         v: Vehicle,
         snap: VehicleSnapshot,
         target: String,
+        smart: ClimateRequest?,
     ): String {
         // The car rejects remote climate commands while it's moving (same
         // gate the main phone UI's AppViewModel.isDriving() already applies
@@ -226,17 +341,9 @@ object TileCommandRunner {
         // explanation surfaced to the user.
         if (snap.isDriving) error("Can't start climate while driving")
         val req = when {
-            target == "smart" -> {
-                val lat = snap.lat
-                val lon = snap.lon
-                if (lat == null || lon == null) error("No location for smart climate")
-                val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
-                ClimateRequest(
-                    tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
-                    defrost = false,
-                    durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
-                )
-            }
+            // Normally already resolved before the lock was taken, by
+            // prepareSmartClimate; see smartClimateInLock for when it wasn't.
+            target == "smart" -> smart ?: smartClimateInLock(snap)
             // "temp:64" -- an explicit temperature in Fahrenheit, which is
             // what search produces for "start climate at the coldest
             // temperature on X". Additive to the existing string protocol
