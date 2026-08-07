@@ -976,7 +976,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // or "No vehicles found", which looked like the app had silently
         // signed the user out rather than telling them what actually happened.
         var lastError: String? = null
-        val fetched = repos.values.flatMap { r ->
+        // .toList() FIRST, so the iteration below runs over a snapshot rather than
+        // the live map. It suspends inside the loop -- statusMutex.withLock plus a
+        // network round trip per brand -- and every suspension hands the main thread
+        // to another coroutine that may mutate `repos`: logout() calls
+        // repos.remove(brand), and signing into a new brand makes repoFor() insert
+        // one. Confining the map to the main thread is not enough to make iterating
+        // it safe when the loop body suspends; that is exactly how single-threaded
+        // coroutine code still earns a ConcurrentModificationException. Signing out
+        // of one account while the garage was still loading another's cars was
+        // enough to do it.
+        //
+        // A snapshot is also the behaviour this wants: a brand signed out mid-load
+        // should not have its half-fetched vehicles land in the merged list, and a
+        // brand signed in mid-load gets its own reload from logout()/login()'s own
+        // path anyway.
+        val fetched = repos.values.toList().flatMap { r ->
             runCatching { statusMutex.withLock { r.vehicles() } }.getOrElse { e ->
                 val msg = e.message ?: "Couldn't load vehicles"
                 AppLog.log("⚠ $msg")
