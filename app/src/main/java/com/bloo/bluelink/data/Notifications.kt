@@ -67,6 +67,10 @@ object Notifications {
      * Mechanism, in order:
      * 1. Bails immediately if notification permission isn't granted -- nothing
      *    below runs, so a denied permission is a cheap no-op rather than a crash.
+     *    Returns false when it does, and false on a throw from `notify` too, so a
+     *    caller that persists "the user has been told" can only do so truthfully.
+     *    Most callers rightly ignore the result; the ones that record something
+     *    must not (see [com.bloo.bluelink.work.UpdateCheckWorker]).
      * 2. Lazily ensures the channel exists (see [ensureChannel]).
      * 3. Builds a content [PendingIntent] that reopens the app when the
      *    notification body itself is tapped (not the action buttons), using the
@@ -90,8 +94,8 @@ object Notifications {
      *    permission between the check and this call, and notify() would then
      *    throw a SecurityException that we don't want to crash the caller for.
      */
-    fun post(context: Context, id: Int, title: String, text: String, actions: List<Action> = emptyList()) {
-        if (!hasPermission(context)) return
+    fun post(context: Context, id: Int, title: String, text: String, actions: List<Action> = emptyList()): Boolean {
+        if (!hasPermission(context)) return false
         ensureChannel(context)
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val pi = launch?.let {
@@ -129,7 +133,12 @@ object Notifications {
         }
         // NotificationManagerCompat.notify can throw if permission was revoked
         // between the hasPermission() check above and here; swallow rather than crash.
-        runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
+        //
+        // Returns whether the notification actually went out. Every caller but one ignores
+        // it; UpdateCheckWorker must not, because it records "already told them about this
+        // build" and had been doing so even when this returned early.
+        return runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
+            .isSuccess
     }
 }
 
@@ -519,7 +528,9 @@ object CarAlerts {
      * [com.bloo.bluelink.work.AlertWorker]), but the flag suppresses posting the
      * same alert again on every subsequent tick while the condition remains true.
      * The flag is cleared back to false as soon as the underlying condition goes
-     * away, so the alert is free to fire again next time the condition recurs.
+     * away, so the alert is free to fire again next time the condition recurs --
+     * and that reset happens regardless of [canDeliver], deliberately, so a flag
+     * left set before delivery lapsed cannot outlive the condition it describes.
      * `out` accumulates whichever alerts actually fired on this pass and is
      * returned to the caller for posting/toasting.
      */
@@ -535,6 +546,30 @@ object CarAlerts {
         // value; other callers (AppViewModel) are unchanged, they just don't
         // pass one and this loads it itself, same as before.
         prefs: SettingsStore.NotificationPrefs? = null,
+        /**
+         * Whether the CALLER can actually get an alert in front of the user.
+         *
+         * The fire-once flag means "the user has been told about this", so recording it
+         * when nobody was told is a lie that this function then believes forever. That was
+         * live: [com.bloo.bluelink.work.AlertWorker]'s only delivery channel is a system
+         * notification, and [Notifications.post] silently returns without posting when
+         * POST_NOTIFICATIONS isn't granted -- so with notifications off, a door left open
+         * marked itself alerted and stayed that way for the whole open episode. Worse for
+         * the service-due alert, whose condition never clears on its own: marked once,
+         * suppressed until the user records a service.
+         *
+         * False makes the fire sites below no-ops that touch NO flags -- so the condition
+         * is simply re-evaluated next tick, and it fires for real the moment delivery
+         * becomes possible. The RESET branches deliberately still run either way: a flag
+         * left true because permission lapsed mid-episode would suppress the next genuine
+         * alert once permission came back.
+         *
+         * Defaults true because most callers can always deliver --
+         * [com.bloo.bluelink.ui.AppViewModel.checkAlerts] shows an in-app snackbar as well
+         * as posting, and that needs no permission at all. Only a notification-only caller
+         * should pass anything else.
+         */
+        canDeliver: Boolean = true,
     ): List<Alert> {
         val prefs = prefs ?: settings.notificationPrefs()
         val out = mutableListOf<Alert>()
@@ -555,7 +590,7 @@ object CarAlerts {
             val remaining = serviceDue(odo, last, interval)
             val key = "service_${v.vin}"
             if (remaining != null && remaining <= 0) {
-                if (!settings.alertFired(key)) {
+                if (canDeliver && !settings.alertFired(key)) {
                     out += Alert(serviceId(v), "${v.name} is due for service", "Odometer $odo mi is past the $due mi service interval.")
                     settings.setAlertFired(key, true)
                 }
@@ -584,7 +619,7 @@ object CarAlerts {
                 val since = settings.doorOpenSince(v.vin)
                 if (since == null) {
                     settings.setDoorOpenSince(v.vin, now)
-                } else if (now - since > prefs.doorOpenMinutes * 60_000L && !settings.alertFired(key)) {
+                } else if (canDeliver && now - since > prefs.doorOpenMinutes * 60_000L && !settings.alertFired(key)) {
                     // Been open long enough and haven't already alerted for this
                     // open episode -- fire, offering a one-tap Lock action.
                     out += Alert(
@@ -618,7 +653,7 @@ object CarAlerts {
                 val since = settings.unlockedSince(v.vin)
                 if (since == null) {
                     settings.setUnlockedSince(v.vin, now)
-                } else if (now - since > prefs.unlockedMinutes * 60_000L && !settings.alertFired(key)) {
+                } else if (canDeliver && now - since > prefs.unlockedMinutes * 60_000L && !settings.alertFired(key)) {
                     out += Alert(
                         unlockedId(v),
                         "${v.name} is unlocked",
@@ -647,7 +682,7 @@ object CarAlerts {
                 val since = settings.engineOnSince(v.vin)
                 if (since == null) {
                     settings.setEngineOnSince(v.vin, now)
-                } else if (now - since > prefs.runningMinutes * 60_000L && !settings.alertFired(key)) {
+                } else if (canDeliver && now - since > prefs.runningMinutes * 60_000L && !settings.alertFired(key)) {
                     out += Alert(
                         runningId(v),
                         "${v.name} is running",

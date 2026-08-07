@@ -41,14 +41,20 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
      *    build (or a newer one) on a previous tick, skips posting again --
      *    without this, every ~12h re-check would re-notify about the same
      *    not-yet-installed update indefinitely until the user actually updates.
-     * 4. Records the new run number as notified *before* posting (so a crash
-     *    between recording and posting would under-notify rather than
-     *    over-notify on retry -- the safer failure direction for a "don't nag"
-     *    guard), then posts a notification with a fixed, well-known id
-     *    ([NOTIF_ID]) distinct from any per-VIN alert notification id, so a
-     *    second update notification replaces the first rather than stacking.
-     *    The body text prefers the CI run's own display title when present and
-     *    non-blank, falling back to a generic "Build #N" label otherwise.
+     * 4. Posts a notification with a fixed, well-known id ([NOTIF_ID]) distinct
+     *    from any per-VIN alert notification id, so a second update notification
+     *    replaces the first rather than stacking. The body text prefers the CI
+     *    run's own display title when present and non-blank, falling back to a
+     *    generic "Build #N" label otherwise.
+     * 5. Records the run number as notified only if that post ACTUALLY went out.
+     *    This used to be step 4, recorded before posting on the argument that a
+     *    crash in between should under-notify rather than nag. The argument had the
+     *    wrong failure mode in view: the common case isn't a crash, it's
+     *    POST_NOTIFICATIONS not being granted, which makes [Notifications.post] a
+     *    silent no-op -- so the flag was burned and the build was never announced,
+     *    even after the user turned notifications on. Repeating instead is free
+     *    here, because the fixed [NOTIF_ID] means a repeat replaces its own
+     *    notification rather than adding one.
      */
     override suspend fun doWork(): Result {
         val ctx = applicationContext
@@ -59,14 +65,24 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
         // Only notify once per build -- otherwise every ~12h re-check would nag
         // about the same not-yet-installed update indefinitely.
         if (run.runNumber <= store.lastNotifiedRun()) return Result.success()
-        store.setLastNotifiedRun(run.runNumber)
-        Notifications.post(
+        // Record AFTER a post that actually happened, not before. Notifications.post
+        // returns early without posting when POST_NOTIFICATIONS isn't granted, so writing
+        // the flag first burned the one announcement this build ever gets: the user turns
+        // notifications on an hour later, the next tick sees `900 <= 900`, and build 900 is
+        // never mentioned again.
+        //
+        // This reverses the failure direction the original comment argued for -- a crash
+        // between posting and recording now re-notifies on the next tick. That is the right
+        // way round here, and it costs nothing: NOTIF_ID is fixed, so a repeat REPLACES the
+        // existing notification with identical text rather than stacking a second one.
+        val posted = Notifications.post(
             ctx,
             id = NOTIF_ID,
             title = "Bloo update available",
             text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") +
                 " — open Bloo to download and install.",
         )
+        if (posted) store.setLastNotifiedRun(run.runNumber)
         return Result.success()
     }
 

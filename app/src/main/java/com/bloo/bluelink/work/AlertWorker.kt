@@ -119,7 +119,18 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 runCatching {
                     // `prefs` is already loaded above; pass it so evaluate() doesn't
                     // re-read the same DataStore value once per vehicle per tick.
-                    CarAlerts.evaluate(settings, v, status, prefs).forEach {
+                    //
+                    // canDeliver: a system notification is this worker's ONLY way to reach
+                    // the user -- there is no app on screen to snackbar into. Without it,
+                    // evaluate() marked alerts as fired that Notifications.post then
+                    // silently dropped for want of POST_NOTIFICATIONS, and the fire-once
+                    // flag suppressed them for the rest of the episode. Re-read per tick
+                    // rather than hoisted, so granting permission takes effect on the next
+                    // tick instead of the next process start.
+                    CarAlerts.evaluate(
+                        settings, v, status, prefs,
+                        canDeliver = Notifications.hasPermission(applicationContext),
+                    ).forEach {
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
                     }
                 }
