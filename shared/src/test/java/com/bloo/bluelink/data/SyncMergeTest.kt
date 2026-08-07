@@ -401,6 +401,9 @@ class SyncDeviceLocalTest {
             "seamless_install_shizuku",
             // Per-VIN runtime state, matched by prefix rather than exact name.
             "alert_door_KMHXX", "door_since_KMHXX", "engine_since_KMHXX",
+            // unlocked_since_ was absent from both the list and this test, so the
+            // test could not have caught it. Its sibling timestamps were here.
+            "unlocked_since_KMHXX",
             "tile_refreshed_KMHXX",
             // "user swiped THIS device's live charging bar away this session" --
             // dismissing a notification on a phone says nothing about what a tablet

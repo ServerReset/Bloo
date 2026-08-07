@@ -261,8 +261,14 @@ object WearComms {
                 sendMessage(context, node, WearSync.PATH_SYNC_REQUEST, WearSync.encodeCommand(command).toByteArray())
             // Standalone fallback whenever the phone didn't receive it — matched
             // in aggressiveness to what was asked for (force = refresh).
-            if (!sent) WearCommandRunner.refresh(context, vin, force = refresh)
-            sent
+            //
+            // Returns relayed-OR-refreshed-locally, not just `sent`. `sent = false`
+            // means "the phone wasn't reachable, so we did it ourselves" -- a perfectly
+            // successful refresh -- and returning false for it made the one caller that
+            // surfaces a message unable to tell that from a real failure. Callers that
+            // specifically want "did the PHONE get it" (to say "bring your phone
+            // nearby") ask phoneConnected instead.
+            if (!sent) WearCommandRunner.refresh(context, vin, force = refresh) else true
         }
 
     // ── Published DataItems (watch → phone mirror) ───────────────────────────

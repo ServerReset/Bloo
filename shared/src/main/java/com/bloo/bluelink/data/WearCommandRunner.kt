@@ -180,11 +180,19 @@ object WearCommandRunner {
      * the server's last-known status — light enough for frequent background polls
      * that keep widgets/tiles fresh without draining the car's 12V battery.
      */
-    suspend fun refresh(context: Context, vin: String, force: Boolean = true) {
+    /** Returns whether any car's status was actually obtained. Callers that show a
+     *  failure message need this: it used to return Unit, so the only signal a caller
+     *  could reach was "did the relay to the phone succeed", which is a different
+     *  question and false in the perfectly healthy standalone case. Most callers
+     *  legitimately ignore the result. */
+    suspend fun refresh(context: Context, vin: String, force: Boolean = true): Boolean {
         val store = SnapshotStore(context)
         val targets = store.current().vehicles.let { all ->
             if (vin.isBlank()) all else all.filter { it.vin == vin }
         }
+        // Declared outside the lock only so the success signal below can read it; it is
+        // still populated and written entirely inside it.
+        val merged = mutableListOf<VehicleSnapshot>()
         BlueLinkGate.statusMutex.withLock {
             // One repo instance per brand, reused across that brand's vehicles
             // in this loop -- a fresh KiaRepository per vehicle threw away its
@@ -197,7 +205,6 @@ object WearCommandRunner {
             // commits to disk -- "refresh all" on N cars was paying N of those to change
             // N cars, and emitting N times on SnapshotStore.payload, which made every
             // widget, tile and complication observing it repaint N times per refresh.
-            val merged = mutableListOf<VehicleSnapshot>()
             targets.forEach { snap ->
                 runCatching {
                     val v = snap.toVehicle()
@@ -218,5 +225,8 @@ object WearCommandRunner {
             // flip with the older fetched status.
             store.updateVehicles(merged)
         }
+        // Empty means every car's fetch failed (or there were no cars). Note this is
+        // computed after the lock, from the same list that was written.
+        return merged.isNotEmpty()
     }
 }

@@ -75,15 +75,25 @@ object SyncMerge {
      *   - `alert_*`      : CarAlerts "already fired this episode" flags — importing a
      *                      peer's true flag would suppress THIS device's own
      *                      independent door/engine/service notification.
-     *   - `door_since_*` / `engine_since_*` : the wall-clock timestamp an open/running
-     *                      episode began — comparing it against another device's clock
-     *                      domain makes the elapsed-time threshold fire early/late.
+     *   - `door_since_*` / `engine_since_*` / `unlocked_since_*` : the wall-clock
+     *                      timestamp an open/running/unlocked episode began — comparing
+     *                      it against another device's clock domain makes the
+     *                      elapsed-time threshold fire early/late.
      *   - `tile_refreshed_*` : the per-car tile live-refresh throttle stamp — a peer's
      *                      stamp would wrongly suppress this device's own refresh.
      *  Excluding them also keeps the portable content hash stable across alert/refresh
      *  ticks (otherwise every 30-min alert poll churned the hash and forced a re-upload). */
     private val DEVICE_LOCAL_PREFIXES = listOf(
-        "alert_", "door_since_", "engine_since_", "tile_refreshed_",
+        // unlocked_since_* was missing here while all three of its siblings were
+        // listed. It is the same thing: Notifications sets it to
+        // System.currentTimeMillis() on first observing an unlocked car and then tests
+        // `now - since > unlockedMinutes * 60_000`, so a peer's clock-domain stamp
+        // makes the "unlocked for N minutes" alert fire early or late -- and it churns
+        // the content hash on every lock-state change, costing a Drive round trip per
+        // alert tick. The companion alert_unlocked_* WAS covered, by "alert_", which is
+        // probably why the gap went unnoticed. prefs.unlocked defaults on, so this is
+        // the common configuration rather than an edge case.
+        "alert_", "door_since_", "engine_since_", "unlocked_since_", "tile_refreshed_",
         // live_dismissed_* : "the user swiped THIS device's live charging bar away for
         //                  the current charging session". Dismissing a notification on
         //                  a phone says nothing about whether a tablet should show one,

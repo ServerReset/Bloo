@@ -978,8 +978,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshStatus(vin: String, surface: Boolean = true) {
         mark("$vin:refresh") {
             // Companion-first: ask the phone to refresh and push updated data.
-            val relayed = runCatching { WearComms.requestSync(ctx, vin, refresh = true) }.isSuccess
-            if (!relayed && surface) _ui.update { it.copy(message = "Couldn't refresh") }
+            // getOrDefault(false), not isSuccess: requestSync RETURNS false on failure
+            // rather than throwing, so isSuccess was true whenever the call completed and
+            // "Couldn't refresh" could never appear -- on all three buttons that use this.
+            // The same mistake is recorded as fixed for WearComms.send further down.
+            val refreshed = runCatching { WearComms.requestSync(ctx, vin, refresh = true) }
+                .getOrDefault(false)
+            if (!refreshed && surface) _ui.update { it.copy(message = "Couldn't refresh") }
         }
     }
 
