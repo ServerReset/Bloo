@@ -1673,13 +1673,19 @@ private fun WizardFeatureToggle(
     onChecked: (Boolean) -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = LocalHaptics.current
     Row(
         Modifier
             .fillMaxWidth()
-            // Same fix as ToggleRow: toggleable + Role.Switch on the row, with
-            // the inner Switch's own semantics node cleared, so TalkBack sees
-            // one correctly-announced toggle instead of two focus stops.
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onChecked)
+            // Same fix as ToggleRow: toggleable + Role.Switch on the row, with the
+            // inner track's own semantics node cleared, so TalkBack sees one
+            // correctly-announced toggle instead of two focus stops.
+            .toggleable(value = checked, role = Role.Switch) { next ->
+                // ToggleRow fires these; this row did not, so the one toggle a new
+                // user meets during onboarding was also the only silent one.
+                if (next) haptics?.toggleOn() else haptics?.toggleOff()
+                onChecked(next)
+            }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1688,7 +1694,12 @@ private fun WizardFeatureToggle(
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onChecked, modifier = Modifier.clearAndSetSemantics {})
+        // MorphToggleTrack, not a stock Switch. ToggleRow's docstring calls itself
+        // "the app's one toggle control for boolean settings", built specifically so
+        // there is no "default-Material holdout in an otherwise fully custom UI" --
+        // and this row was that holdout. It clears its own semantics, so the
+        // clearAndSetSemantics the Switch needed here is gone with it.
+        MorphToggleTrack(checked)
     }
 }
 
@@ -7107,14 +7118,11 @@ private fun PaletteEditorDialog(
                 ColorPickerCanvas(primaryColor, { primaryColor = it })
 
                 // Secondary colour (optional)
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("Custom secondary", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = useSecondary, onCheckedChange = { useSecondary = it })
-                }
+                // ToggleRow, not a hand-rolled label+Switch: identical layout and the
+                // same bodyMedium label, but it brings the morph pill track, the
+                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack
+                // semantics that every other boolean setting in the app has.
+                ToggleRow("Custom secondary", useSecondary) { useSecondary = it }
                 AnimatedVisibility(useSecondary) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -7127,14 +7135,11 @@ private fun PaletteEditorDialog(
                 }
 
                 // Tertiary colour (optional)
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("Custom tertiary", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = useTertiary, onCheckedChange = { useTertiary = it })
-                }
+                // ToggleRow, not a hand-rolled label+Switch: identical layout and the
+                // same bodyMedium label, but it brings the morph pill track, the
+                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack
+                // semantics that every other boolean setting in the app has.
+                ToggleRow("Custom tertiary", useTertiary) { useTertiary = it }
                 AnimatedVisibility(useTertiary) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
