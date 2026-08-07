@@ -744,7 +744,11 @@ class CarWidget : GlanceAppWidget() {
         // subtitle line beside the ring too, just the name, and only 2
         // buttons instead of 3.
         val ringEdge = Scale.ring(size, (size.height - 12.dp).coerceAtLeast(18.dp))
-        val showsRing = render.config.showRing && car.percent != null
+        // Not just `showRing && percent != null`: Scale.ring returns 0 when the
+        // column can't fit a legible circle, and RingImage early-returns on that.
+        // Asking the question as "is a ring configured" left the 6dp spacer below
+        // rendering beside nothing on every tile too short for one.
+        val drawsRing = render.config.showRing && car.percent != null && ringEdge > 0.dp
         // The width each weighted child of this Row REALLY gets: whatever is
         // left once the ring and the fixed spacers are taken out, split
         // between the text column and the buttons. The fraction-of-tile
@@ -752,10 +756,22 @@ class CarWidget : GlanceAppWidget() {
         // the slice, and they kept assuming a ring was there even when one
         // isn't drawn, so a widget with the ring switched off still laid its
         // text and buttons out as if a third of the row were missing.
-        val slice = ((size.width - (if (showsRing) ringEdge + 6.dp else 0.dp) - 6.dp) / 2)
+        //
+        // Against the PADDED width, not the raw tile width. BANNER and
+        // COMPACT_WIDE both carry this correction and both spell out why -- the
+        // root has already applied Scale.contentPadding on both sides, so raw
+        // width over-reports by that much and ActionButtons' capacity check
+        // fits one button too many. This tier was written from the same
+        // template and never got it, because its own two-part fix looked
+        // complete: the ring term genuinely does belong here (unlike in those
+        // two, this tile really draws one), which made the missing padding term
+        // easy to overlook while comparing the shape of the formulas rather
+        // than their terms.
+        val w = size.width - Scale.contentPadding(size) * 2
+        val slice = ((w - (if (drawsRing) ringEdge + 6.dp else 0.dp) - 6.dp) / 2)
             .coerceAtLeast(24.dp)
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (showsRing) {
+            if (drawsRing) {
                 RingImage(car, render, edgeDp = ringEdge.value.toInt())
                 Spacer(GlanceModifier.width(6.dp))
             }
@@ -1002,18 +1018,47 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
+    /** The measured width at or above which each square tier puts its info rows
+     *  BESIDE the ring rather than under it (RingWithContent's `minRowWidth`).
+     *
+     *  Hoisted to named constants because each is now read twice: once by
+     *  RingWithContent to choose its branch, and once by [Scale.squareSplit] to
+     *  budget for the branch that will be chosen. Those two reads have to agree
+     *  -- if squareSplit budgets side-by-side while RingWithContent stacks, the
+     *  rows are sized against a band they no longer share with the ring, which
+     *  reinstates exactly the overflow squareSplit exists to remove. As two
+     *  separate literals they would have been free to drift. */
+    private val MEDIUM_SQUARE_ROW_WIDTH = 140.dp
+    private val LARGE_SQUARE_ROW_WIDTH = 220.dp
+    private val XL_SQUARE_ROW_WIDTH = 260.dp
+
     @Composable
     private fun MediumSquareLayout(car: VehicleSnapshot, render: Render) {
         // Same reasoning as the LARGE/XL tiers' own clamp: the header +
         // button rows can leave less than the ring's continuous target size
         // at MEDIUM's own minimum height (150dp).
         val size = LocalSize.current
-        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp)
-        val ringEdge = Scale.ring(size, ringRoom)
+        // 16.dp = the two Spacer(8.dp) in this column.
+        //
+        // Through Scale.squareSplit rather than sizing the ring straight off
+        // ringRoom, because the info rows below used to come from Scale.infoCap --
+        // a fraction of the raw tile height, subtracted from nothing. See
+        // squareSplit's own note: ring + rows + header + buttons overflowed this
+        // column on thousands of sizes, worst 22.4dp right at MEDIUM's own 150x150
+        // minimum at 1.4x text.
+        val split = Scale.squareSplit(
+            size,
+            room = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, false, 16.dp),
+            capRows = 3,
+            textScale = render.theme.textScale,
+            wantMap = false,
+            sideBySide = size.width >= MEDIUM_SQUARE_ROW_WIDTH,
+        )
+        val ringEdge = split.ring
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             Spacer(GlanceModifier.height(8.dp))
-            ChargeBarFallback(car, render, ringEdge, ringRoom)
+            ChargeBarFallback(car, render, ringEdge, split.ringRoom)
             // NOT .defaultWeight() on the row/column itself -- ringEdge is
             // already sized from ringRoom, the exact leftover this row has,
             // so it doesn't need to be stretched to claim more. A weighted
@@ -1037,7 +1082,7 @@ class CarWidget : GlanceAppWidget() {
                 // actual measured width can't fit them side by side.
                 RingWithContent(
                     modifier = GlanceModifier.fillMaxWidth(),
-                    minRowWidth = 140.dp,
+                    minRowWidth = MEDIUM_SQUARE_ROW_WIDTH,
                     ringWidth = ringEdge,
                     ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
                     // hideFields drops PERCENT: RingImage's own centerText
@@ -1049,14 +1094,14 @@ class CarWidget : GlanceAppWidget() {
                     // ring, so there the field is the only place it appears.
                     content = { w ->
                         InfoStack(
-                            car, render, max = Scale.infoCap(size, 3, render.theme.textScale),
+                            car, render, max = split.rows,
                             availableWidth = w, hideFields = setOf(WidgetInfoField.PERCENT),
                         )
                     },
                 )
             } else {
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
-                    InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale))
+                    InfoStack(car, render, max = split.rows)
                 }
             }
             Spacer(GlanceModifier.defaultWeight())
@@ -1294,16 +1339,29 @@ class CarWidget : GlanceAppWidget() {
         // ring/square version of the Wide/Square/Tall split MEDIUM and XL
         // already have, giving LARGE its own third shape too.
         val size = LocalSize.current
-        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 20.dp)
+        // Through Scale.squareSplit so the info rows come out of the same
+        // column budget as the ring instead of Scale.infoCap's fraction of the
+        // raw tile height -- see squareSplit's note for what that overflowed.
+        val split = Scale.squareSplit(
+            size,
+            room = Scale.ringRoom(
+                size, render.theme.textScale,
+                render.config.showHeader, render.config.showFooter, 20.dp,
+            ),
+            capRows = 4,
+            textScale = render.theme.textScale,
+            wantMap = render.mapBitmap != null,
+            sideBySide = size.width >= LARGE_SQUARE_ROW_WIDTH,
+        )
         // Full-width map below the row, so here it competes with the ring for
         // the same column and has to be taken out of the ring's budget first.
-        val mapRoom = Scale.mapReserve(size, ringRoom, render.mapBitmap != null)
-        val ringEdge = Scale.ring(size, ringRoom - mapRoom)
+        val mapRoom = split.map
+        val ringEdge = split.ring
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             FooterRow(car, render)
             Spacer(GlanceModifier.height(10.dp))
-            ChargeBarFallback(car, render, ringEdge, ringRoom - mapRoom)
+            ChargeBarFallback(car, render, ringEdge, split.ringRoom)
             // NOT .defaultWeight() -- same fix as MediumSquareLayout's own
             // note: ringEdge is already sized from ringRoom - mapRoom, the
             // real leftover this row has, so it doesn't need to be stretched
@@ -1314,7 +1372,7 @@ class CarWidget : GlanceAppWidget() {
             // which was already unweighted for this exact reason.
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth(),
-                minRowWidth = 220.dp,
+                minRowWidth = LARGE_SQUARE_ROW_WIDTH,
                 ringWidth = ringEdge,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
@@ -1331,7 +1389,7 @@ class CarWidget : GlanceAppWidget() {
                 // bar-hero tiers' own percent and XlTallLayout's primaryValue.
                 content = { w ->
                     InfoStack(
-                        car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w,
+                        car, render, max = split.rows, availableWidth = w,
                         footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT),
                     )
                 },
@@ -1511,19 +1569,32 @@ class CarWidget : GlanceAppWidget() {
         // width map, distinct from XlWideLayout's value-under-ring emphasis
         // and XlTallLayout's fully stacked column.
         val size = LocalSize.current
-        val ringRoom = Scale.ringRoom(size, render.theme.textScale, render.config.showHeader, render.config.showFooter, 24.dp)
+        // Through Scale.squareSplit so the info rows come out of the same
+        // column budget as the ring instead of Scale.infoCap's fraction of the
+        // raw tile height -- see squareSplit's note for what that overflowed.
+        val split = Scale.squareSplit(
+            size,
+            room = Scale.ringRoom(
+                size, render.theme.textScale,
+                render.config.showHeader, render.config.showFooter, 24.dp,
+            ),
+            capRows = 4,
+            textScale = render.theme.textScale,
+            wantMap = render.mapBitmap != null,
+            sideBySide = size.width >= XL_SQUARE_ROW_WIDTH,
+        )
         // Full-width map below the row, competing with the ring for the same
         // column -- reserved first, as in LargeSquareLayout.
-        val mapRoom = Scale.mapReserve(size, ringRoom, render.mapBitmap != null)
-        val ringEdge = Scale.ring(size, ringRoom - mapRoom)
+        val mapRoom = split.map
+        val ringEdge = split.ring
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             FooterRow(car, render)
             Spacer(GlanceModifier.height(12.dp))
-            ChargeBarFallback(car, render, ringEdge, ringRoom - mapRoom)
+            ChargeBarFallback(car, render, ringEdge, split.ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth(),
-                minRowWidth = 260.dp,
+                minRowWidth = XL_SQUARE_ROW_WIDTH,
                 ringWidth = ringEdge,
                 ring = {
                     if (render.config.showRing && car.percent != null) {
@@ -1536,7 +1607,7 @@ class CarWidget : GlanceAppWidget() {
                 // note: RingImage's centerText already bakes it into the ring.
                 content = { w ->
                     InfoStack(
-                        car, render, max = Scale.infoCap(size, 4, render.theme.textScale), availableWidth = w,
+                        car, render, max = split.rows, availableWidth = w,
                         footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT),
                     )
                 },

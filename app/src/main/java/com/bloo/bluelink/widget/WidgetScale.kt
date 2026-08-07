@@ -473,6 +473,68 @@ internal object Scale {
         return (room / rowDp).toInt().coerceIn(1, capMax)
     }
 
+    data class SquareSplit(val ring: Dp, val rows: Int, val map: Dp, val ringRoom: Dp)
+
+    /**
+     * [tallSplit] for the square tiers, which never got it.
+     *
+     * MEDIUM_SQUARE, LARGE_SQUARE and XL_SQUARE each sized their ring from
+     * [ringRoom] and then, entirely separately, asked [infoCap] how many info
+     * rows to draw. [infoCap] answers from a fraction of the RAW TILE HEIGHT --
+     * which is the precise mistake [ringRoom]'s own docstring exists to record,
+     * still being made for the row count. So the rows were never subtracted from
+     * anything, and ring + rows + header + footer + buttons could sum past the
+     * column they share.
+     *
+     * Swept over the resize range at three text scales, that overflowed 10,422
+     * sizes: worst 37.9dp at 240x211 and 1.4x text, where a 42dp ring sat beside
+     * an 80dp info block in a 42dp band. RemoteViews does not clip an
+     * overflowing Column, so the action buttons simply bleed off the bottom edge.
+     * The three tall tiers were immune the whole time, because [tallSplit]
+     * derives their rows from the real remainder.
+     *
+     * [sideBySide] is what makes this a separate function rather than a call to
+     * [tallSplit]: above its own width threshold a square tier puts the rows
+     * BESIDE the ring (RingWithContent's Row branch) instead of below it. Then
+     * the two share one vertical band and neither subtracts from the other --
+     * the band just has to hold the taller of them. Stacked, they need the
+     * subtraction, plus the 12dp of that branch's own internal spacer.
+     */
+    fun squareSplit(
+        size: DpSize,
+        room: Dp,
+        capRows: Int,
+        textScale: Float,
+        wantMap: Boolean,
+        sideBySide: Boolean,
+    ): SquareSplit {
+        // Reserved before the ring is sized, for tallSplit's reason: Scale.ring
+        // takes everything offered, so anything left to compete with it afterwards
+        // gets nothing.
+        val map = mapReserve(size, room, wantMap)
+        val rest = (room - map).coerceAtLeast(0.dp)
+        if (sideBySide) {
+            return SquareSplit(
+                ring = ring(size, rest),
+                rows = infoRowsIn(size, rest, textScale, capRows),
+                map = map,
+                ringRoom = rest,
+            )
+        }
+        // Same 0.45 ceiling tallSplit uses, so the rows stay a supporting module
+        // and the ring stays the hero on a tile shaped for one.
+        val rows = infoRowsIn(size, rest * 0.45f, textScale, capRows)
+        val ringRoom =
+            (rest - infoBlockHeight(size, rows, textScale) - STACKED_INFO_GAP).coerceAtLeast(0.dp)
+        return SquareSplit(ring(size, ringRoom), rows, map, ringRoom)
+    }
+
+    /** RingWithContent's own gap between the ring and the rows when it stacks
+     *  them -- its `Spacer(height = 8.dp)`, not the `width = 12.dp` one in its
+     *  side-by-side branch, which costs width and so does not belong in a
+     *  vertical budget. Reserved here because no caller was reserving it. */
+    private val STACKED_INFO_GAP = 8.dp
+
     // --- Horizontal fit ----------------------------------------------------
     //
     // Until now everything above was vertical: this object decided how much
