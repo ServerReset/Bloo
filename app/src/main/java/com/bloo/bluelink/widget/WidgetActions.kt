@@ -110,7 +110,9 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         }
         if (action == null) return Result.failure()
 
-        val result = WearCommandRunner.execute(ctx, WearCommand(vin = vin, action = action))
+        // runCarCommand, not execute: stopping climate must also cancel a pending
+        // auto-extend chain, or it restarts the car up to 10 minutes later.
+        val result = com.bloo.bluelink.data.runCarCommand(ctx, WearCommand(vin = vin, action = action))
         if (!result.ok && revert) {
             // Undo the optimistic flip the tap callback applied, by writing back the
             // value it captured beforehand -- not by applying the opposite verb.

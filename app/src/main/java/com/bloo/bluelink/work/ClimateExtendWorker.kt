@@ -137,11 +137,29 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 .enqueueUniqueWork(uniqueName(vin), ExistingWorkPolicy.REPLACE, request)
         }
 
-        /** Cancels any pending auto-extend chain for [vin] -- called whenever
-         *  climate is stopped manually before the chain completes, so a stale
-         *  scheduled command can't silently restart climate after the user
-         *  turned it off (or turned it back on with different settings, which
-         *  goes through [schedule]'s own REPLACE instead of this). */
+        /**
+         * Cancels any pending auto-extend chain for [vin], so a stale scheduled command
+         * cannot silently restart climate after the user turned it off. (Turning it back
+         * ON with different settings goes through [schedule]'s own REPLACE instead.)
+         *
+         * This used to say it was "called whenever climate is stopped manually", and it
+         * was not: it had two callers, both in AppViewModel, so stopping climate from the
+         * QS tile, the widget, the watch, or the "Turn off" button on the car-is-running
+         * notification left the chain armed -- and up to ten minutes later it re-issued
+         * CLIMATE_ON and restarted the car.
+         *
+         * Now reached from all of those: the three that go through
+         * WearCommandRunner.execute do it via [com.bloo.bluelink.data.runCarCommand], and
+         * TileCommandRunner (which calls the repo directly) via its own
+         * stopClimateAndChain. Adding four separate cancel calls was the alternative, and
+         * four copies of one rule is how this drifted in the first place.
+         *
+         * ⚠ Still not covered: the watch's STANDALONE path, which calls WearCommandRunner
+         * from `:wear` and so cannot reference this worker. That path only runs when the
+         * phone is unreachable, and the chain executes on the phone, so an unreachable
+         * phone fires it regardless. Closing it needs a stop marker in the shared snapshot
+         * payload -- a cross-process schema change that wants a device to validate.
+         */
         fun cancel(context: Context, vin: String) {
             WorkManager.getInstance(context).cancelUniqueWork(uniqueName(vin))
         }

@@ -149,7 +149,9 @@ class WearPhoneService : WearableListenerService() {
                     return
                 }
                 scope.launch {
-                    val result = WearCommandRunner.execute(applicationContext, command)
+                    // runCarCommand: this is the watch's normal (relayed) path, so a climate
+                    // stop from the watch cancels the auto-extend chain here.
+                    val result = com.bloo.bluelink.data.runCarCommand(applicationContext, command)
                     if (result.ok) AppLog.log("Phone relay: ${command.action} → ok")
                     else AppLog.log("⚠ Phone relay: ${command.action} → ${result.message}")
                     sendResult(event.sourceNodeId, WearSync.PATH_COMMAND_RESULT, WearSync.encodeResult(result))

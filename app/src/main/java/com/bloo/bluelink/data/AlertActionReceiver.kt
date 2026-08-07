@@ -79,7 +79,9 @@ class AlertActionReceiver : BroadcastReceiver() {
             try {
                 // Clear the original alert immediately so the tap feels responsive.
                 if (notifId != -1) runCatching { NotificationManagerCompat.from(ctx).cancel(notifId) }
-                val result = runCatching { WearCommandRunner.execute(ctx, WearCommand(vin, action)) }
+                // runCarCommand: the "Turn off" button on the car-is-running alert is one of
+                // the climate-stop paths that never cancelled the auto-extend chain.
+                val result = runCatching { runCarCommand(ctx, WearCommand(vin, action)) }
                     .getOrNull()
                 val ok = result?.ok == true
                 val title = if (ok) "$label sent" else "$label failed"

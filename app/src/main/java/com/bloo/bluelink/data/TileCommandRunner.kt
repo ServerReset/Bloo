@@ -140,7 +140,7 @@ object TileCommandRunner {
                     "charge_off" -> { repo.stopCharge(v); "Stopping charge" }
                     "climate" -> runClimate(ctx, repo, v, snap, climateTarget, smart)
                     "climate_on" -> runClimateStart(ctx, repo, v, snap, climateTarget, smart)
-                    "climate_off" -> { repo.stopClimate(v); "Stopping climate" }
+                    "climate_off" -> stopClimateAndChain(ctx, repo, v)
                     // No arguments, no state to predict: these two make the car
                     // do something audible/visible and change nothing that any
                     // surface displays, which is why they need no optimistic
@@ -215,6 +215,22 @@ object TileCommandRunner {
      * 4. Dispatches the resolved request via [repo.startClimate] and reports
      *    "Starting climate".
      */
+    /**
+     * Stop climate AND cancel any pending auto-extend chain.
+     *
+     * Both of this runner's stop paths ("climate_off" and the "climate" toggle landing on
+     * off) go through here so they cannot drift apart. Cancelling matters because
+     * ClimateExtendWorker re-issues CLIMATE_ON every ~10 minutes to stretch a longer
+     * request past the car's per-command ceiling -- so a chain left running after a stop
+     * restarts the car minutes later. This runner calls the repo directly rather than
+     * going through runCarCommand, so it needs its own call.
+     */
+    private suspend fun stopClimateAndChain(ctx: Context, repo: VehicleRepository, v: Vehicle): String {
+        repo.stopClimate(v)
+        runCatching { com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin) }
+        return "Stopping climate"
+    }
+
     private suspend fun runClimate(
         ctx: Context,
         repo: VehicleRepository,
@@ -223,7 +239,7 @@ object TileCommandRunner {
         target: String,
         smart: ClimateRequest?,
     ): String {
-        if (snap.climateOn == true) { repo.stopClimate(v); return "Stopping climate" }
+        if (snap.climateOn == true) return stopClimateAndChain(ctx, repo, v)
         return runClimateStart(ctx, repo, v, snap, target, smart)
     }
 
