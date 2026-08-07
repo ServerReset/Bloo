@@ -89,6 +89,14 @@ for f,lines in added.items():
         "Pair", "Triple", "Regex", "Exception", "RuntimeException", "Error",
         "IllegalStateException", "IllegalArgumentException", "String", "Array",
         "IntArray", "ByteArray", "FloatArray", "BooleanArray", "Comparator",
+        # java.lang is imported implicitly, so these never need an import line and
+        # flagging them is pure noise. System.currentTimeMillis() and Math.toRadians()
+        # in particular are everywhere in this codebase -- they only escaped notice
+        # because the checker reads the DIFF, so they were invisible until a change
+        # happened to land on a line near one.
+        "System", "Math", "Integer", "Long", "Double", "Float", "Boolean",
+        "Character", "Byte", "Short", "Number", "Thread", "StringBuilder",
+        "Object", "Class", "Runtime",
     }
     for ln in lines:
         code=re.sub(r'//.*','',ln)

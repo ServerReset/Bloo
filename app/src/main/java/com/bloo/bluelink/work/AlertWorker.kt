@@ -1,8 +1,10 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -58,7 +60,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      *    [WearBridge.refreshAllSurfaces] once -- this 30-minute alert poll
      *    already fetched fresh-ish status for every car, so it doubles as a
      *    general data refresh, letting the watch/widgets/tiles pick up new data
-     *    now instead of waiting for the separate, less frequent 15-minute
+     *    now instead of waiting for the separate 30-minute
      *    widget-refresh job.
      * Always returns [Result.success] -- there's no retry path here; a failed
      * fetch for one car/brand is silently absorbed per-item as described above,
@@ -127,17 +129,45 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
     companion object {
         /**
-         * Registers the 30-minute periodic alert poll. No network [Constraints]
-         * are set here (unlike the other workers in this app's work package) --
-         * status fetches inside [doWork] are individually wrapped in
-         * [runCatching] and simply produce no alerts for that car if offline, so
-         * there's no need to gate the whole periodic schedule on connectivity.
+         * Registers the 30-minute periodic alert poll, gated on connectivity like the
+         * other workers in this package.
+         *
+         * That constraint was deliberately absent, on the documented grounds that the
+         * status fetches in [doWork] are each wrapped in [runCatching] and "simply
+         * produce no alerts for that car if offline, so there's no need to gate the
+         * whole periodic schedule on connectivity". That is correct about SAFETY and
+         * wrong about COST -- runCatching makes a doomed fetch harmless, not free.
+         * Without the constraint, every 30 minutes forever, an offline device still
+         * wakes, builds a repository per signed-in brand, decodes the whole snapshot
+         * payload, and then attempts `vehicles()` plus one `status()` per car against
+         * clients configured for a 30-second connect and 60-second read timeout --
+         * all of it inside [BlueLinkGate.statusMutex], so it also blocks anything else
+         * that wants the car. In a dead zone or behind a captive portal, where packets
+         * are dropped rather than refused, that is minutes of held wakelock and held
+         * mutex per tick to accomplish nothing.
+         *
+         * A [Constraints] is how you say "don't even wake me": WorkManager simply
+         * defers the run until connectivity exists, then fires it. Nothing about the
+         * per-car runCatching changes; it is still the right guard for a fetch that
+         * fails while online.
+         *
+         * Deliberately NOT adding a battery-not-low constraint. This job is what
+         * surfaces "you left a door open" and "the car is still unlocked", and
+         * suppressing those on a low phone battery would trade the user's car for a
+         * few minutes of screen time.
+         *
          * `enqueueUniquePeriodicWork` with [ExistingPeriodicWorkPolicy.KEEP]
          * means calling `schedule` again (e.g. every app start) leaves an
-         * already-registered job alone rather than resetting its timer.
+         * already-registered job alone rather than resetting its timer. Note that this
+         * also means an install already carrying the unconstrained job keeps it until
+         * the work is cancelled or the app's data is cleared.
          */
         fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<AlertWorker>(30, TimeUnit.MINUTES).build()
+            val request = PeriodicWorkRequestBuilder<AlertWorker>(30, TimeUnit.MINUTES)
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                )
+                .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 "bloo_alerts",
                 ExistingPeriodicWorkPolicy.KEEP,
