@@ -377,7 +377,12 @@ object LiveCharge {
                 if (pct > 0) add(NotificationCompat.ProgressStyle.Segment(pct).setColor(CHARGE_GREEN))
                 if (pct < 100) add(NotificationCompat.ProgressStyle.Segment(100 - pct).setColor(TRACK))
             }
-            style.setStyledByProgress(true)
+            // setStyledByProgress(FALSE), which is what the version confirmed working on
+            // a real device used. True lets the platform style the bar from the progress
+            // VALUE, which overrides the segment colours built right above -- so the
+            // green/track split this code goes to the trouble of computing was being
+            // thrown away. The rebuild flipped it to true with no reason recorded.
+            style.setStyledByProgress(false)
                 .setProgressSegments(segments)
                 .setProgress(pct)
             if (limit != null) {
@@ -440,6 +445,13 @@ object LiveCharge {
             .setContentTitle("$carName is charging")
             .setContentText(detail.ifBlank { "Charging" })
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            // VISIBILITY_PUBLIC, restored from the working version. Without it the
+            // default is VISIBILITY_PRIVATE, and a secured lock screen hides a private
+            // notification's content -- on the lock screen and the always-on display,
+            // which are two of the three places a Live Update is supposed to appear.
+            // The alert builder in this same file sets it; LiveCharge lost it in the
+            // rebuild.
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -448,42 +460,24 @@ object LiveCharge {
             .addAction(0, "Stop charging", stopPi)
             .setDeleteIntent(dismissPi)
             .apply { contentPi?.let { setContentIntent(it) } }
-            .apply {
-                // A COUNTDOWN CHRONOMETER to the time the car says it will be full.
-                //
-                // This is what makes the thing actually live, and it is the piece that
-                // was missing. Everything else here only changes when a poll lands, and
-                // the poll is every five minutes -- a progress bar that moves once every
-                // five minutes does not read as live, and the status-bar chip had no text
-                // at all between polls. A chronometer is rendered and ticked by the
-                // system, so it counts down every second at zero cost: no wake-ups, no
-                // network, no reposts.
-                //
-                // Per the Live Updates guide, setWhen is what drives the chip's countdown
-                // and the chronometer shows "as long as it is positive", so this is the
-                // documented route to useful chip text.
-                //
-                // NOT setShortCriticalText, which the guide also suggests. That method is
-                // documented on the platform Notification.Builder, and I could not confirm
-                // it exists on NotificationCompat.Builder in the version this project
-                // pins -- the compat release notes name setRequestPromotedOngoing and
-                // ProgressStyle but not it. Guessing at a method name I cannot verify and
-                // cannot compile locally is how you get a red build or, worse, a silent
-                // no-op. The chronometer is better here anyway: it self-updates, where
-                // short critical text would be frozen between polls exactly like the rest.
-                val minsLeft = minutesToFull?.takeIf { it > 0 }
-                if (minsLeft != null) {
-                    setWhen(System.currentTimeMillis() + minsLeft * 60_000L)
-                    setUsesChronometer(true)
-                    setChronometerCountDown(true)
-                    setShowWhen(true)
-                } else {
-                    // No estimate yet (or already full): suppress the timestamp entirely
-                    // rather than letting the shade render this notification's post time
-                    // as if it meant something about the charge.
-                    setShowWhen(false)
-                }
-            }
+            // The STATUS BAR CHIP's text, and the piece the rebuild dropped.
+            //
+            // I previously left this out on the grounds that setShortCriticalText is
+            // documented on the platform Notification.Builder and I couldn't confirm it
+            // on NotificationCompat.Builder. That was wrong, and this repo's own history
+            // is the proof: the version that was confirmed promoting on a real device
+            // called exactly this, and that commit built. Reasoning from documentation I
+            // couldn't fully fetch, when a working answer was sitting in git log, is the
+            // mistake -- not the API.
+            //
+            // Deliberately paired with setShowWhen(false), matching that version. The
+            // guide offers setShortCriticalText OR setWhen for chip state; the one known
+            // to have worked here used the former and suppressed the timestamp. A
+            // countdown chronometer is a nicer idea and I had added one, but it is an
+            // unverified change to the exact surface that is broken, so it goes until the
+            // chip is confirmed back.
+            .setShowWhen(false)
+            .apply { percent?.let { setShortCriticalText("${it.coerceIn(0, 100)}%") } }
 
         // Same TOCTOU reasoning as Notifications.post: permission could be
         // revoked between the hasPermission() check above and this call.
