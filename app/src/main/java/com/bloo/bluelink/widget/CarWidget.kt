@@ -2616,7 +2616,7 @@ class CarWidget : GlanceAppWidget() {
                     Spacer(GlanceModifier.width(x))
                     Box(
                         // FIXED colours, not swapped by which side of the fill
-                        // this lands on -- see the phone's ChargeLimitDot for
+                        // this lands on -- see the phone's drawChargeLimitDot for
                         // the full reasoning. Flipping the core between
                         // theme.background and fillColor made the marker a
                         // same-coloured hole once the charge reached the

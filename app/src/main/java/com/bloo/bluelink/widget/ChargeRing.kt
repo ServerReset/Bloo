@@ -114,9 +114,9 @@ object ChargeRing {
                 // lands on. Flipping it to trackColor once the charge passed the
                 // limit made the mark disappear at exactly the state this gauge
                 // is in most often -- a car set to 80% and charged to 80% -- the
-                // same defect the phone's ChargeLimitDot, the widget's own
+                // same defect the phone's drawChargeLimitDot, the widget's own
                 // ChargeBar and the watch ring each fixed by pinning their
-                // colours (see ChargeLimitDot for the full reasoning).
+                // colours (see drawChargeLimitDot for the full reasoning).
                 //
                 // arcColor rather than a theme role because this file is
                 // deliberately theme-agnostic (plain android.graphics, ARGB ints

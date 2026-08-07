@@ -51,6 +51,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
@@ -288,8 +289,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
@@ -5173,7 +5177,7 @@ private fun HeroHeader(
                         // out on one line.
                         ChargeFuelBar(
                             status, hasBattery, hasFuel, drivingLabel, metric = metric,
-                            statsModifier = Modifier.pebbleShared(this@AnimatedVisibility, statsKey, remeasure = false),
+                            statsModifier = Modifier.pebbleShared(this@AnimatedVisibility, statsKey),
                             barModifier = Modifier.pebbleShared(this@AnimatedVisibility, barKey),
                         )
                     }
@@ -5214,7 +5218,7 @@ private fun HeroHeader(
                         readout,
                         Modifier
                             .padding(start = 10.dp)
-                            .pebbleShared(this@AnimatedVisibility, statsKey, remeasure = false),
+                            .pebbleShared(this@AnimatedVisibility, statsKey),
                     )
                 }
             },
@@ -5923,58 +5927,69 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, modifier: Modifier = M
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "chargeSplitGap",
     )
-    BoxWithConstraints(modifier.fillMaxWidth().height(ChargeBarHeight)) {
-        val usable = (maxWidth - gap).coerceAtLeast(0.dp)
+    // The marker slides to a new limit as a FRACTION, resolved in the draw scope. It used
+    // to be an animated Dp offset on a child Box, which made every frame of that slide a
+    // layout pass; the value it wants is a position, and a position costs nothing to draw.
+    val limitFrac by animateFloatAsState(
+        targetValue = (limit ?: 0) / 100f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "chargeLimitDot",
+    )
+    val trackColor = scheme.onSurface.copy(alpha = 0.16f)
+    // The halo is the card's own surface colour, so the marker reads as a small window cut
+    // into the bar -- visibly different from BOTH the green fill and the grey track,
+    // whatever it is sitting on. The core is onSurface. Both FIXED, never swapped by which
+    // side of the fill the marker lands on: see drawChargeLimitDot for why.
+    val haloColor = scheme.surface
+    val coreColor = scheme.onSurface
+    // DRAWN, not composed. This was a BoxWithConstraints holding a Row of two Boxes plus an
+    // offset child for the marker. BoxWithConstraints is SUBCOMPOSITION, and once the hero
+    // handed this bar to sharedBounds with RemeasureToBounds, every frame of the travel
+    // re-measured it -- a subcomposition per frame, inside a lookahead scope that already
+    // measures twice. That is where the dropped frames in the collapse came from. Four
+    // draw calls in one pass replace it, and nothing here needs to be a layout node.
+    Canvas(modifier.fillMaxWidth().height(ChargeBarHeight)) {
+        val h = size.height
+        val radius = CornerRadius(h / 2f)
+        val gapPx = gap.toPx()
+        val usable = (size.width - gapPx).coerceAtLeast(0f)
         // Floored at the bar's own height when there is ANY charge: below that
         // the 50% corner radius eats the whole shape, so 3% and 0% draw the
         // same nothing. Capped at `usable` so the floor can't overrun the bar,
         // and `rest` derived from the result so the two always still sum to it.
-        val filled = if (filledFrac <= 0f) 0.dp else minOf(usable, maxOf(usable * filledFrac, ChargeBarHeight))
-        val rest = (usable - filled).coerceAtLeast(0.dp)
-        Row(Modifier.fillMaxSize()) {
-            if (filled > 0.dp) {
-                Box(
-                    Modifier
-                        .width(filled)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(50))
-                        .background(Brush.horizontalGradient(listOf(ChargeGreenDark, ChargeGreen))),
-                )
-            }
-            if (rest > 0.dp) {
-                if (filled > 0.dp) Spacer(Modifier.width(gap))
-                Box(
-                    Modifier
-                        .width(rest)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(50))
-                        .background(scheme.onSurface.copy(alpha = 0.16f)),
-                )
-            }
+        val filled = if (filledFrac <= 0f) 0f else minOf(usable, maxOf(usable * filledFrac, h))
+        val rest = (usable - filled).coerceAtLeast(0f)
+        if (filled > 0f) {
+            drawRoundRect(
+                // Spans the FILL, not the whole bar, which is what clipping the old
+                // gradient-backed Box to its own width did.
+                brush = Brush.horizontalGradient(
+                    listOf(ChargeGreenDark, ChargeGreen),
+                    startX = 0f,
+                    endX = filled,
+                ),
+                size = Size(filled, h),
+                cornerRadius = radius,
+            )
+        }
+        if (rest > 0f) {
+            drawRoundRect(
+                color = trackColor,
+                topLeft = Offset(filled + (if (filled > 0f) gapPx else 0f), 0f),
+                size = Size(rest, h),
+                cornerRadius = radius,
+            )
         }
         if (limit != null) {
-            // The limit's x, in the bar's own coordinates -- past the split it
-            // has to clear the gap too, or the marker drifts off the value it
-            // is marking by exactly the gap's width.
-            val l = limit / 100f
-            // Clamped to keep the whole dot on the bar. Its centre is the
-            // value, so at a 95% limit the uncorrected offset puts half the
-            // circle past the right edge -- the widget's copy of this already
-            // clamped and the phone's didn't, which is the kind of divergence
-            // that makes "the same marker everywhere" quietly untrue.
-            val half = ChargeLimitDotSize / 2
-            val targetX = (usable * l + (if (l > filledFrac) gap else 0.dp))
-                .coerceIn(half, (maxWidth - half).coerceAtLeast(half))
-            val x by animateDpAsState(
-                targetX,
-                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-                label = "chargeLimitDot",
-            )
-            ChargeLimitDot(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset(x = x - half),
-            )
+            // The limit's x in the bar's own coordinates -- past the split it has to clear
+            // the gap too, or the marker drifts off the value it is marking by exactly the
+            // gap's width. Clamped so the whole dot stays on the bar: its centre is the
+            // value, so at a 95% limit an uncorrected centre puts half the circle past the
+            // right edge. The widget's copy of this already clamped and the phone's didn't.
+            val outer = ChargeLimitDotSize.toPx() / 2f
+            val cx = (usable * limitFrac + (if (limitFrac > filledFrac) gapPx else 0f))
+                .coerceIn(outer, (size.width - outer).coerceAtLeast(outer))
+            drawChargeLimitDot(Offset(cx, h / 2f), outer, haloColor, coreColor)
         }
     }
 }
@@ -5986,7 +6001,9 @@ private val ChargeBarHeight = 18.dp
 private val ChargeLimitDotSize = 14.dp
 
 /**
- * The charge-limit marker: a small circle sitting ON the bar at the limit.
+ * The charge-limit marker: a small circle sitting ON the bar at the limit. A DrawScope
+ * extension rather than a composable, because the bar that hosts it is now drawn in one
+ * pass -- see ChargeSegmentBar for why a layout node per element was costing frames.
  *
  * A dot, not a seam. The bar's own split already means something -- where the
  * charge currently is -- and a second division cannot mean a second thing
@@ -6011,18 +6028,16 @@ private val ChargeLimitDotSize = 14.dp
  * own colour system guarantees contrasts against `surface`. Neither depends
  * on the bar's state, so the dot looks like one thing everywhere on the bar.
  */
-@Composable
-private fun ChargeLimitDot(modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    Box(
-        modifier
-            .size(ChargeLimitDotSize)
-            .clip(CircleShape)
-            .background(scheme.surface)
-            .padding(3.dp)
-            .clip(CircleShape)
-            .background(scheme.onSurface),
-    )
+private fun DrawScope.drawChargeLimitDot(
+    center: Offset,
+    outerRadius: Float,
+    halo: Color,
+    core: Color,
+) {
+    drawCircle(halo, radius = outerRadius, center = center)
+    // 3dp of halo all round, which is what the old composable's padding between its two
+    // clipped circles was. Floored above zero so a very small bar can't erase the core.
+    drawCircle(core, radius = (outerRadius - 3.dp.toPx()).coerceAtLeast(1f), center = center)
 }
 
 // Was a phone-only re-declaration of the same hex values shared/BlooColors.kt
@@ -8456,31 +8471,47 @@ private fun PebbleSharedScope(enabled: Boolean, content: @Composable () -> Unit)
  * Falls back to `this` unchanged when no pebble provided a scope, which is what lets a
  * slot be written once and used in a pebble that never opted in.
  *
- * [remeasure] picks how the node fills the bounds it is travelling through, and the two
- * ends of this card want opposite answers:
+ * Both ends RE-MEASURE, so a node's drawn size is always its measured size.
  *
- * - **The bar: re-measure (default).** A bar re-laid-out at an intermediate width is
- *   simply the same bar, narrower. Scaling it instead would stretch a 50%-radius pill cap
- *   and a horizontal gradient horizontally, which is visibly wrong.
- * - **The stats: scale.** Their two ends are not the same layout at two widths — one is a
- *   `labelLarge` line, the other a `displayMedium` number beside a stacked column. Told to
- *   re-measure, `displayMedium` would be handed a 40dp-tall box halfway through and would
- *   wrap or clip. Scaling lets each end lay out at its OWN size and be drawn to the
- *   travelling bounds, so the two cross-fade cleanly instead of reflowing mid-flight.
+ * The stats used to scale instead, on the reasoning that their two densities are different
+ * layouts rather than one layout at two widths. That was exactly the "it collapses, is too
+ * big, then snaps to the right size" defect: `ScaleToBounds` lays a node out at its OWN
+ * target size and then scales it to fill the CURRENT bounds, so the entering collapsed line
+ * was measured small and drawn ~2.3x too large to fill the expanded bounds it starts
+ * inside. Its cross-fade (effects spec) completed well before the bounds spring did, so the
+ * oversized copy went fully opaque and only then visibly shrank into place.
  *
- * The bounds spring comes from the theme's SPATIAL scheme, because position and size are
- * spatial properties — so this travels on the same physics as the pebble's own
- * expansion, and the cross-fade between the two densities uses the EFFECTS scheme,
- * which must not overshoot.
+ * Re-measuring costs a mid-flight reflow -- the collapsed line laid out in a wide box, the
+ * expanded block squeezed into a narrow one -- but that happens under the cross-fade, where
+ * a wrong LAYOUT is far less legible than a wrong SCALE. It is also why the bar underneath
+ * is now drawn rather than composed: re-measuring a BoxWithConstraints every frame meant a
+ * subcomposition every frame, which is where the dropped frames came from.
  */
 @Composable
 private fun Modifier.pebbleShared(
     visibility: AnimatedVisibilityScope,
     key: String,
-    remeasure: Boolean = true,
 ): Modifier {
     val scope = LocalPebbleSharedTransition.current ?: return this
-    val bounds = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    // CRITICALLY DAMPED (dampingRatio = 1f), and deliberately NOT the theme's spatial
+    // spec that every other spatial animation in this file uses.
+    //
+    // The theme's spatial spring is under-damped on purpose: overshoot is what makes a
+    // pebble feel like it springs open. Applied to a Rect it overshoots the target BOUNDS,
+    // which is not liveliness -- it is the element growing past the size it will end up at
+    // and then contracting. That was half of "too big, then snaps".
+    //
+    // Rect.VisibilityThreshold (half a pixel per edge) is the other half. Without it the
+    // spring keeps running on sub-pixel deltas, and if it is still running when the
+    // enclosing AnimatedVisibility finishes, overlay rendering stops mid-flight and the
+    // node jumps to its final bounds. Terminating promptly is what removes that jump.
+    val bounds = remember {
+        spring(
+            dampingRatio = 1f,
+            stiffness = Spring.StiffnessMediumLow,
+            visibilityThreshold = Rect.VisibilityThreshold,
+        )
+    }
     val fade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     return with(scope) {
         // The first two are positional on purpose. The parameter ORDER is verified against
@@ -8496,13 +8527,7 @@ private fun Modifier.pebbleShared(
             enter = fadeIn(fade),
             exit = fadeOut(fade),
             boundsTransform = { _, _ -> bounds },
-            resizeMode = if (remeasure) {
-                SharedTransitionScope.ResizeMode.RemeasureToBounds
-            } else {
-                // Defaults (FillWidth, Center), which is what a block of text wants: scale
-                // uniformly on the axis that actually changes and stay centred while it does.
-                SharedTransitionScope.ResizeMode.scaleToBounds()
-            },
+            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
         )
     }
 }
