@@ -150,7 +150,7 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
          *
          * Now reached from all of those: the three that go through
          * WearCommandRunner.execute do it via [com.bloo.bluelink.data.runCarCommand], and
-         * TileCommandRunner (which calls the repo directly) via its own
+         * TileCommandRunner, which calls the repo directly, via its own
          * stopClimateAndChain. Adding four separate cancel calls was the alternative, and
          * four copies of one rule is how this drifted in the first place.
          *
