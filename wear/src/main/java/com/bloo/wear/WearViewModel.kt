@@ -16,6 +16,8 @@ import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.DoorOpen
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.isGen5W
+import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.StatusCache
@@ -106,6 +108,10 @@ data class CarView(
     val lon: Double?,
     val locationName: String?,
     val tripsSupported: Boolean,
+    /** Whether this car's backend actually has the flash-lights/horn endpoints --
+     *  [com.bloo.bluelink.data.supportsHornLights], carried here so the UI doesn't
+     *  re-derive it from [brand] and get Canada wrong. */
+    val hornLightsSupported: Boolean,
     val engineOn: Boolean,
     val accessoryOn: Boolean,
     val defrostOn: Boolean,
@@ -2014,8 +2020,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val ev = s?.evStatus
         val coord = s?.vehicleLocation?.coord
         val lamp = s?.tirePressureLamp
-        val gen = v.generation.trim().toIntOrNull() ?: 3
-        val gen5w = v.brand != Brand.KIA && gen < 3
         val seats = s?.seatHeaterVentState
         return CarView(
             vin = v.vin,
@@ -2058,7 +2062,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             lat = coord?.lat ?: snap?.lat,
             lon = coord?.lon ?: snap?.lon,
             locationName = placeNames[v.vin],
-            tripsSupported = !gen5w,
+            // Both of these come from the shared Vehicle accessors rather than being
+            // re-derived here. This file used to compute its own
+            // `v.brand != Brand.KIA && gen < 3`, which drops the `!brand.isCanada`
+            // clause the shared isGen5W has -- it only happened to agree because
+            // CanadaRepository leaves generation blank, so the `?: 3` fallback made
+            // `3 < 3` false. Anything that starts populating a Canada generation would
+            // have flipped the watch's Trips gating and not the phone's.
+            tripsSupported = !v.isGen5W,
+            hornLightsSupported = v.supportsHornLights,
             engineOn = s?.engine == true,
             accessoryOn = s?.acc == true,
             defrostOn = s?.defrost == true,

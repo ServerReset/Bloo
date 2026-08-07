@@ -132,7 +132,6 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
-import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WearWeather
@@ -2123,9 +2122,18 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         pending = "${car.vin}:refresh" in ui.pending,
         onClick = { vm.refreshStatus(car.vin) },
     )
-    // Kia's US API has no equivalent endpoint (see Vehicle.supportsHornLights);
-    // matches what the official Hyundai/Genesis apps show.
-    if (car.brand != Brand.KIA) {
+    // Kia's US API has no equivalent endpoint, and neither does Canada's -- see
+    // Vehicle.supportsHornLights, which is now the single source for this and is
+    // carried onto CarView rather than re-tested here.
+    //
+    // This used to read `car.brand != Brand.KIA`, dropping the `!brand.isCanada`
+    // half. HYUNDAI_CA, GENESIS_CA and KIA_CA are all distinct enum constants, so
+    // all three passed, and all three route to CanadaRepository, which doesn't
+    // override flashLights/hornAndLights and so inherits the interface's empty
+    // defaults. Every Canadian user therefore had Flash and Horn buttons on the
+    // watch that did nothing at all, silently, on every tap -- the exact bug the
+    // widget's own comment says it fixed for itself.
+    if (car.hornLightsSupported) {
         Spacer(Modifier.height(6.dp))
         val hlPending = "${car.vin}:hornLights" in ui.pending
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

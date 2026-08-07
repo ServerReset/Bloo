@@ -239,7 +239,7 @@ class CanadaApi(private val brand: Brand) {
             val id = o["vehicleId"]?.str() ?: return@mapNotNull null
             CanadaVehicleSummary(
                 id = id,
-                name = o["nickName"]?.str() ?: o["modelName"]?.str() ?: id.takeLast(6),
+                name = vehicleDisplayName(o["nickName"]?.str(), o["modelName"]?.str(), id),
                 model = listOfNotNull(o["modelYear"]?.str(), o["modelName"]?.str()).joinToString(" ").ifBlank { "Car" },
                 vin = o["vin"]?.str() ?: id,
                 year = o["modelYear"]?.str()?.toIntOrNull(),

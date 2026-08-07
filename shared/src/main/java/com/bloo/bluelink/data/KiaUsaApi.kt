@@ -266,8 +266,8 @@ class KiaUsaApi {
             val id = o["vehicleIdentifier"]?.str() ?: return@mapNotNull null
             KiaVehicleSummary(
                 id = id,
-                name = o["nickName"]?.str() ?: o["modelName"]?.str() ?: id.takeLast(6),
-                model = o["modelName"]?.str() ?: "Kia",
+                name = vehicleDisplayName(o["nickName"]?.str(), o["modelName"]?.str(), id),
+                model = o["modelName"]?.str()?.takeIf { it.isNotBlank() } ?: "Kia",
                 key = o["vehicleKey"]?.str().orEmpty(),
                 isEv = o["fuelType"]?.int() == 4,
             )

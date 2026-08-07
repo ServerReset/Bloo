@@ -289,6 +289,26 @@ fun degLabel(valueF: String, fahrenheit: Boolean): String {
 fun degValue(valueF: Double, fahrenheit: Boolean): Int =
     if (fahrenheit) valueF.roundToInt() else ((valueF - 32) * 5 / 9.0).roundToInt()
 
+/**
+ * The name to show for a car: its nickname, else its model, else the tail of its
+ * identifier -- with every step guarding against BLANK, not just null.
+ *
+ * That guard is the reason this exists. All three API parsers had their own copy of
+ * this fallback chain and only BlueLinkApi's checked for blankness. The other two
+ * used `?:` alone, and their JSON accessor filters the literal string "null" but
+ * passes an empty string straight through -- so a Kia US or Canada account whose car
+ * has a nickname set to "" got a car named "", on every surface at once: the phone
+ * header, the widget, the tile, the complication and its notifications. Hyundai and
+ * Genesis US were fine, which is why it could sit there.
+ *
+ * The last resort also can't return blank, unlike the copies it replaces: an empty
+ * identifier used to fall through to `"".takeLast(6)`, i.e. nothing at all.
+ */
+fun vehicleDisplayName(nickName: String?, modelName: String?, id: String): String =
+    nickName?.takeIf { it.isNotBlank() }
+        ?: modelName?.takeIf { it.isNotBlank() }
+        ?: id.takeLast(6).ifBlank { "Car" }
+
 /** Human-readable label for a WMO weather code integer. Mechanism: WMO codes
  *  group many numerically-adjacent values under one user-facing label (e.g.
  *  71/73/75/77/85/86 are all "Snow" of varying intensity/type), so each branch

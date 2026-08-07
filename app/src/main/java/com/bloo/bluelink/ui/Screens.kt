@@ -8144,8 +8144,10 @@ private fun TripRow(trip: EvTrip, metric: Boolean = false) {
             }
         }
         val pace = remember(trip, metric) { buildList {
-            trip.driveMinutes?.let { add("$it min") }
-            trip.idleMinutes?.takeIf { it > 0 }?.let { add("$it min idle") }
+            // Same fmtMinutes the watch's Trips screen uses for these two exact
+            // fields -- without it, one trip read "95 min" here and "1h 35m" there.
+            trip.driveMinutes?.let { add(fmtMinutes(it)) }
+            trip.idleMinutes?.takeIf { it > 0 }?.let { add("${fmtMinutes(it)} idle") }
             trip.avgspeed?.value?.let { add("avg ${formatSpeed(it.toDouble(), metric)}") }
             trip.maxspeed?.value?.let { add("max ${formatSpeed(it.toDouble(), metric)}") }
         } }
@@ -8437,7 +8439,10 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             if (seats.isNotEmpty()) add(DiagRow("Seat heat/vent active", seats.joinToString(", ")))
         }
         status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
-        status?.evStatus?.minutesToFull?.let { add(DiagRow("Time to full", "$it min")) }
+        // fmtMinutes, not "$it min" -- the charge pebble's own "Time to full" row a
+        // few hundred lines up already used it, so a 95-minute estimate read
+        // "1h 35m" there and "95 min" here, in the same app on the same screen.
+        status?.evStatus?.minutesToFull?.let { add(DiagRow("Time to full", fmtMinutes(it))) }
         status?.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
             ?.let { add(DiagRow("Doors open", it.joinToString(", "))) }
         if (status?.trunkOpen == true) add(DiagRow("Trunk", "Open"))

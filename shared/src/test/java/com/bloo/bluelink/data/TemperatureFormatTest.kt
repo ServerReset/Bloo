@@ -128,3 +128,46 @@ class TemperatureFormatTest {
         assertEquals("23°C", weatherTemp(22.5, fahrenheit = false))
     }
 }
+
+/**
+ * Tests for [vehicleDisplayName]. Separate class, same file as the temperature ones
+ * because both are FormatUtils fallback rules with the same failure shape: a `?:`
+ * chain that guards null and forgets blank.
+ */
+class VehicleDisplayNameTest {
+
+    @Test
+    fun prefersNicknameThenModelThenIdTail() {
+        assertEquals("Mine", vehicleDisplayName("Mine", "Ioniq 5", "5NMS44"))
+        assertEquals("Ioniq 5", vehicleDisplayName(null, "Ioniq 5", "KM8K2CAB4NU123456"))
+        assertEquals("123456", vehicleDisplayName(null, null, "KM8K2CAB4NU123456"))
+    }
+
+    /**
+     * The whole point. Kia US and Canada's JSON accessor filters the literal string
+     * "null" but passes "" through, so a car with its nickname cleared arrived here as
+     * an empty string and `?:` did not fire -- naming the car "" everywhere at once.
+     */
+    @Test
+    fun treatsBlankAsAbsentAtEveryStep() {
+        assertEquals("Ioniq 5", vehicleDisplayName("", "Ioniq 5", "KM8K2CAB4NU123456"))
+        assertEquals("Ioniq 5", vehicleDisplayName("   ", "Ioniq 5", "KM8K2CAB4NU123456"))
+        assertEquals("123456", vehicleDisplayName("", "", "KM8K2CAB4NU123456"))
+        assertEquals("123456", vehicleDisplayName("  ", "  ", "KM8K2CAB4NU123456"))
+    }
+
+    /** Never returns blank, even given nothing usable at all -- the old chains ended
+     *  in `"".takeLast(6)`, which is still nothing. */
+    @Test
+    fun neverReturnsBlank() {
+        assertEquals("Car", vehicleDisplayName(null, null, ""))
+        assertEquals("Car", vehicleDisplayName("", "", ""))
+        kotlin.test.assertTrue(vehicleDisplayName(null, null, "AB").isNotBlank())
+    }
+
+    /** A short id yields whatever it has rather than padding or failing. */
+    @Test
+    fun handlesIdsShorterThanSixCharacters() {
+        assertEquals("AB12", vehicleDisplayName(null, null, "AB12"))
+    }
+}
