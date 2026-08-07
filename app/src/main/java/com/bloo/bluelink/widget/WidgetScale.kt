@@ -517,6 +517,20 @@ internal object Scale {
      *  little extra room. Set by Content; reserved here. */
     private val PILL_EXTRA_PADDING = 4.dp
 
+    /** Above this short side a pill corner is drawn as an ordinary round one, and
+     *  so takes no extra padding either.
+     *
+     *  Lives here rather than in CarWidget because both the corner radius Content
+     *  draws and the padding every budget subtracts hang off the same threshold,
+     *  and Render -- a nested, non-inner class -- cannot reach CarWidget's own
+     *  members to share a constant with it. */
+    private val PILL_MAX_SHORT_SIDE = 180.dp
+
+    /** Whether a pill-corner CONFIG actually renders as a pill at this size. The
+     *  config half of the question stays in CarWidget, which owns WidgetConfig. */
+    fun pillAppliesAt(size: DpSize): Boolean =
+        minOf(size.width, size.height) < PILL_MAX_SHORT_SIDE
+
     /** The height actually available inside the root padding: the number every
      *  vertical budget has to fit within. */
     fun innerHeight(frame: Frame): Dp =

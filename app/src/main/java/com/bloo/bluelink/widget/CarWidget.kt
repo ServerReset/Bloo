@@ -227,13 +227,8 @@ class CarWidget : GlanceAppWidget() {
          *  every budget subtracts cannot disagree -- they did for all 18 tiers,
          *  which each assumed plain contentPadding. */
         fun pillCorner(size: DpSize): Boolean =
-            config.effectiveCorner == WidgetConfig.CORNER_PILL &&
-                minOf(size.width, size.height) < PILL_CORNER_MAX_SHORT_SIDE
+            config.effectiveCorner == WidgetConfig.CORNER_PILL && Scale.pillAppliesAt(size)
     }
-
-    /** Above this short side a pill corner is drawn as an ordinary round one, so it
-     *  takes no extra padding either. Shared by Content and [Render.pillCorner]. */
-    private val PILL_CORNER_MAX_SHORT_SIDE = 180.dp
 
 
     /** Below this width, [InfoStack] stops putting a value beside its label
@@ -265,7 +260,7 @@ class CarWidget : GlanceAppWidget() {
             WidgetConfig.CORNER_SHARP -> 0.dp
             WidgetConfig.CORNER_ROUND -> 32.dp
             WidgetConfig.CORNER_PILL ->
-                if (minOf(size.width, size.height) < PILL_CORNER_MAX_SHORT_SIDE) 999.dp else 32.dp
+                if (Scale.pillAppliesAt(size)) 999.dp else 32.dp
             else -> 20.dp
         }
         val outerCorner = GlanceModifier.fillMaxSize().cornerRadius(corner)
