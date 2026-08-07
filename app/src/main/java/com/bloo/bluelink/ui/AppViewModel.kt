@@ -340,10 +340,17 @@ data class UiState(
         val status = statusFor(v)
         // If it's charging it's definitely parked — don't show a driving badge.
         if (status?.evStatus?.batteryCharge == true) return null
-        val speed = locations[v.vin]?.speed
         val engine = status?.engine
         return when {
-            speed != null && speed > 0 -> "Driving"
+            // isDriving, NOT a second speed lookup. This used to read
+            // `locations[v.vin]?.speed` on its own, with no fall back to the status's
+            // own vehicleLocation.speed the way isDriving has -- and `locations` is
+            // only populated when the status carried lat AND lon, while speed arrives
+            // independently of them. So a status reporting movement without
+            // coordinates made isDriving true and this label fall through to the
+            // engine flag: the header read "Parked" while the Climate pebble was
+            // simultaneously disabled as "can't start while driving".
+            isDriving(v) -> "Driving"
             engine == true -> "Running"
             engine == false -> "Parked"
             else -> null
@@ -352,10 +359,21 @@ data class UiState(
 
     /** True when the car is moving — used to make climate read-only (the car
      *  rejects remote climate commands while driving). */
-    fun isDriving(v: Vehicle): Boolean {
-        val speed = locations[v.vin]?.speed ?: statusFor(v)?.vehicleLocation?.speed?.value
-        return speed != null && speed > 0
-    }
+    fun isDriving(v: Vehicle): Boolean = (speedOf(v) ?: 0.0) > 0.0
+
+    /**
+     * The car's best-known speed: the tracked location's if we have one, else whatever
+     * the last status reported. One accessor so [isDriving] and [drivingLabel] cannot
+     * disagree about which source wins -- they used to, and the badge and the climate
+     * gate contradicted each other as a result.
+     *
+     * The two orderings are not interchangeable: `locations` is the fresher of the
+     * pair, since a Locate updates it without a full status fetch, but it is only
+     * written when a status carried lat AND lon, so the status is the fallback rather
+     * than the other way round.
+     */
+    fun speedOf(v: Vehicle): Double? =
+        locations[v.vin]?.speed ?: statusFor(v)?.vehicleLocation?.speed?.value
 
     /** Powertrain label for the header. */
     fun powertrainLabel(v: Vehicle): String = when (powertrainOf(v)) {
