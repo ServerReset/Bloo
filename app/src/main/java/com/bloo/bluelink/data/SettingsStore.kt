@@ -285,7 +285,9 @@ class SettingsStore(private val context: Context) {
             auroraColorMode = prefs[Keys.AURORA_COLOR_MODE] ?: "complementary",
             auroraCustomColor = prefs[Keys.AURORA_CUSTOM_COLOR],
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
-            useFahrenheit = (prefs[Keys.UNIT_SYSTEM] ?: "imperial") != "metric",
+            // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being
+            // written out here and on the watch separately.
+            useFahrenheit = useFahrenheit(prefs[Keys.UNIT_SYSTEM]),
             watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
             watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,

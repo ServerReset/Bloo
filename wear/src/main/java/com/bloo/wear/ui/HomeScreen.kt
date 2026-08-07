@@ -2238,11 +2238,26 @@ private fun seatLabel(v: Int?): String? = v?.takeIf { it != 0 }?.let { SeatLevel
 
 // Single source of truth for whether temperature readouts render in Fahrenheit,
 // shared by every card that shows a temperature (Weather, Climate, SmartClimate,
-// Info) so their unit rule can't drift apart. Fahrenheit unless the watch-local
-// unit system is explicitly metric AND the phone hasn't pushed a Fahrenheit
-// preference (`useFahrenheit == false`).
+// Info) so their unit rule can't drift apart.
+//
+// It now reads the watch's OWN unit system -- the same value the seven distance and
+// speed readouts on this surface already use, and the one this watch's Units setting
+// writes -- through the shared rule in FormatUtils, so the phone and the watch cannot
+// disagree about what "metric" means.
+//
+// It used to be `localUnitSystem != "metric" || ui.settings?.useFahrenheit != false`.
+// That OR meant Celsius required the watch to be metric AND the phone to have pushed
+// useFahrenheit == false, so: a watch set to Metric with an imperial phone showed
+// distances in km and temperatures in °F, on the same screen; and a watch that had
+// never been paired had no payload, making `null != false` true, so it showed °F no
+// matter what the user chose. The phone's pushed useFahrenheit was this expression's
+// only reader on the watch and is now unread here -- left on the wire rather than
+// removed, since dropping a serialized field would break older pairings.
+//
+// Fully qualified deliberately: the shared function has the same name as this one,
+// and resolving that by argument type is not something to leave to chance.
 private fun useFahrenheit(ui: WearUi): Boolean =
-    ui.localSettings.unitSystem != "metric" || ui.settings?.useFahrenheit != false
+    com.bloo.bluelink.data.useFahrenheit(ui.localSettings.unitSystem)
 
 /**
  * Reorder this car's pebble *groups* (so the multiple watch tiles a pebble owns

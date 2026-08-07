@@ -171,3 +171,39 @@ class VehicleDisplayNameTest {
         assertEquals("AB12", vehicleDisplayName(null, null, "AB12"))
     }
 }
+
+/**
+ * Tests for [useFahrenheit], the unit-system rule the phone and the watch used to
+ * derive two different ways.
+ */
+class UseFahrenheitTest {
+
+    @Test
+    fun metricMeansCelsiusAndAnythingElseMeansFahrenheit() {
+        kotlin.test.assertFalse(useFahrenheit("metric"))
+        kotlin.test.assertTrue(useFahrenheit("imperial"))
+    }
+
+    /**
+     * Null and unrecognised values default to imperial, matching every other reader of
+     * this setting. This is the case the watch got wrong: with no phone ever paired its
+     * payload was null, and its old `null != false` test made that mean Fahrenheit even
+     * for a watch whose own Units setting the user had put on metric.
+     */
+    @Test
+    fun defaultsToFahrenheitForNullOrUnknown() {
+        kotlin.test.assertTrue(useFahrenheit(null))
+        kotlin.test.assertTrue(useFahrenheit(""))
+        kotlin.test.assertTrue(useFahrenheit("Metric"))
+    }
+
+    /** The rule is exactly "metric means Celsius" -- so it agrees with the
+     *  `unitSystem == "metric"` test that every distance and speed readout uses,
+     *  which is the agreement that was missing. */
+    @Test
+    fun agreesWithTheMetricTestUsedByDistanceReadouts() {
+        for (u in listOf("metric", "imperial", "", "MPH", null)) {
+            assertEquals(u == "metric", !useFahrenheit(u), "disagreed for $u")
+        }
+    }
+}

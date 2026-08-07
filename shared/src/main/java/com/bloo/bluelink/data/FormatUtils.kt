@@ -304,6 +304,30 @@ fun degValue(valueF: Double, fahrenheit: Boolean): Int =
  * The last resort also can't return blank, unlike the copies it replaces: an empty
  * identifier used to fall through to `"".takeLast(6)`, i.e. nothing at all.
  */
+/**
+ * Whether temperatures render in Fahrenheit, from a unit-system string. Imperial is
+ * the default for a null or unrecognised value, matching every other reader of this
+ * setting.
+ *
+ * One rule, because there were two. The phone derived it as
+ * `unitSystem != "metric"`. The watch derived it as
+ * `localUnitSystem != "metric" || phonePayload?.useFahrenheit != false` -- an OR, so
+ * Celsius required the watch to be metric AND the phone to have pushed
+ * `useFahrenheit == false`. Two consequences, both visible on one screen:
+ *
+ *  - A watch set to Metric while the phone stayed imperial showed distances in km
+ *    (those read the watch's own unit system) and temperatures in °F. Same screen,
+ *    two measurement systems.
+ *  - A watch that had never been paired had no payload at all, so
+ *    `null != false` was true and it showed °F however the user had set it.
+ *
+ * The watch now derives temperature from the same watch-local unit system its seven
+ * distance and speed readouts already use, which is also what its own Units setting
+ * writes. That makes units a per-device choice consistently, rather than per-device
+ * for distance and jointly-negotiated for temperature.
+ */
+fun useFahrenheit(unitSystem: String?): Boolean = (unitSystem ?: "imperial") != "metric"
+
 fun vehicleDisplayName(nickName: String?, modelName: String?, id: String): String =
     nickName?.takeIf { it.isNotBlank() }
         ?: modelName?.takeIf { it.isNotBlank() }
