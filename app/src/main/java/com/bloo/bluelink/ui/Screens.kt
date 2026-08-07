@@ -269,6 +269,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.snapshotFlow
@@ -3210,14 +3211,21 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // page composes a whole car's pebble list; making that lazy is
                         // a bigger, reorder-model-sensitive change left for a device.)
                         //
-                        // KEEP THIS AT 1 — do NOT raise it. Because UiState is unstable
-                        // and threaded into every pebble, EVERY in-composition page
-                        // recomposes on every state emission; 1→2 would turn the
-                        // car-switch settle emission's ~3-page recompose into ~5 pages
-                        // (and hold 2 more live compositions). The real switch-cost fix
-                        // is making pebbles skippable (narrow their params off UiState),
-                        // which first needs ReorderColumn's dragHandle made equals-stable
-                        // — a measure-first, device-verified refactor, not a blind edit.
+                        // KEEP THIS AT 1 — do NOT raise it. 1→2 holds two more live
+                        // compositions and widens any state emission that DOES change
+                        // UiState from ~3 pages to ~5.
+                        //
+                        // This used to say "because UiState is unstable" and name
+                        // ReorderColumn's dragHandle as the blocker for making pebbles
+                        // skippable. Both halves are now done: UiState is @Immutable,
+                        // AppViewModel/Appearance/NotificationPrefs are @Stable,
+                        // compose-stability.conf covers the `data` package, and the
+                        // per-item drag Modifier is remembered (see ReorderColumn.handle).
+                        // Skippability is all-or-nothing per call site, so that last
+                        // unstable parameter was undoing all the rest; with it fixed a
+                        // pebble skips whenever the UiState it is handed compares equal.
+                        // currentIndex already lives outside UiState, so a plain
+                        // car-switch settle should now change nothing a pebble reads.
                         beyondViewportPageCount = 1,
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
@@ -6286,6 +6294,12 @@ private fun <T> ReorderColumn(
     introKey: Any = Unit,
     content: @Composable (item: T, dragHandle: Modifier, isDragging: Boolean) -> Unit,
 ) {
+    // The four callback parameters, behind rememberUpdatedState so the per-item drag
+    // Modifier below can be remembered without capturing a stale one. See `handle`.
+    val keyOfNow by rememberUpdatedState(keyOf)
+    val onReorderNow by rememberUpdatedState(onReorder)
+    val onDragMoveNow by rememberUpdatedState(onDragMove)
+    val onDragReleaseNow by rememberUpdatedState(onDragRelease)
     var order by remember { mutableStateOf(items) }
     var draggingKey by remember { mutableStateOf<Any?>(null) }
     var offsetY by remember { mutableFloatStateOf(0f) }
@@ -6342,7 +6356,26 @@ private fun <T> ReorderColumn(
                         .onSizeChanged { heights[k] = it.height },
                 ) {
                     val handleCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-                    val handle = Modifier
+                    // REMEMBERED, and that is the point of this whole block.
+                    //
+                    // Every pebble in the app takes this as a `dragHandle: Modifier`
+                    // parameter. Built inline, the chain below is a NEW instance on every
+                    // recomposition -- three un-remembered lambdas -- so `dragHandle` was
+                    // never `==` to its previous value and NO pebble could ever skip,
+                    // however stable everything else it was handed. That is why marking
+                    // UiState @Immutable and adding compose-stability.conf for the `data`
+                    // package did not produce the skipping they were supposed to: this one
+                    // parameter re-invalidated all ~30 of them anyway. The car-pager comment
+                    // has named it as the blocker for a while; this is it removed.
+                    //
+                    // Safe to remember despite the captures: `order`, `offsetY`,
+                    // `draggingKey` and `heights` are all delegated/remembered snapshot
+                    // state, so the captured object is stable and the lambdas read and write
+                    // the LIVE value when they run. The four caller-supplied callbacks are
+                    // the ones that genuinely change identity per recomposition, and they go
+                    // through rememberUpdatedState above rather than being captured directly.
+                    val handle = remember(k) {
+                        Modifier
                         .onGloballyPositioned { handleCoords.value = it }
                         // The drag gesture below has no TalkBack equivalent at
                         // all -- reordering pebbles/presets/cars was completely
@@ -6352,16 +6385,16 @@ private fun <T> ReorderColumn(
                         // MorphSegmented's drag track), reusing the same reorder
                         // + commit logic the drag path uses.
                         .semantics {
-                            val cur = order.indexOfFirst { keyOf(it) == k }
+                            val cur = order.indexOfFirst { keyOfNow(it) == k }
                             customActions = listOfNotNull(
                                 if (cur > 0) CustomAccessibilityAction("Move up") {
                                     order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
-                                    onReorder(order)
+                                    onReorderNow(order)
                                     true
                                 } else null,
                                 if (cur in 0 until order.lastIndex) CustomAccessibilityAction("Move down") {
                                     order = order.toMutableList().also { it.add(cur + 1, it.removeAt(cur)) }
-                                    onReorder(order)
+                                    onReorderNow(order)
                                     true
                                 } else null,
                             )
@@ -6370,27 +6403,27 @@ private fun <T> ReorderColumn(
                     detectDragGesturesAfterLongPress(
                         onDragStart = { draggingKey = k; offsetY = 0f },
                         onDragEnd = {
-                            val handled = onDragRelease?.invoke(k) ?: false
+                            val handled = onDragReleaseNow?.invoke(k) ?: false
                             draggingKey = null; offsetY = 0f
-                            if (!handled) onReorder(order)
+                            if (!handled) onReorderNow(order)
                         },
-                        onDragCancel = { onDragRelease?.invoke(k); draggingKey = null; offsetY = 0f },
+                        onDragCancel = { onDragReleaseNow?.invoke(k); draggingKey = null; offsetY = 0f },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             offsetY += dragAmount.y
                             handleCoords.value?.takeIf { it.isAttached }?.let {
-                                onDragMove?.invoke(k, it.localToWindow(change.position))
+                                onDragMoveNow?.invoke(k, it.localToWindow(change.position))
                             }
-                            val cur = order.indexOfFirst { keyOf(it) == k }
+                            val cur = order.indexOfFirst { keyOfNow(it) == k }
                             if (cur >= 0) {
                                 if (offsetY > 0 && cur < order.lastIndex) {
-                                    val nextH = heights[keyOf(order[cur + 1])] ?: 0
+                                    val nextH = heights[keyOfNow(order[cur + 1])] ?: 0
                                     if (nextH > 0 && offsetY > nextH / 2f) {
                                         order = order.toMutableList().also { it.add(cur + 1, it.removeAt(cur)) }
                                         offsetY -= nextH
                                     }
                                 } else if (offsetY < 0 && cur > 0) {
-                                    val prevH = heights[keyOf(order[cur - 1])] ?: 0
+                                    val prevH = heights[keyOfNow(order[cur - 1])] ?: 0
                                     if (prevH > 0 && -offsetY > prevH / 2f) {
                                         order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
                                         offsetY += prevH
@@ -6399,6 +6432,7 @@ private fun <T> ReorderColumn(
                             }
                         },
                     )
+                    }
                     }
                     content(item, handle, dragging)
                 }
