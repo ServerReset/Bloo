@@ -5077,7 +5077,7 @@ private fun HeroHeader(
                     enter = collapseEnter(),
                     exit = collapseExit(),
                 ) {
-                    Box {
+                    Box(Modifier.fillMaxWidth()) {
                         HeroVisual(v, imageUrl, height, PebbleCornerExpanded, aspectRatio = 16f / 9f)
                         // Contrast, not decoration. Every overlaid element -- title, subtitle,
                         // chevron, the whole charge readout -- sits on an arbitrary photo, and
@@ -5092,13 +5092,32 @@ private fun HeroHeader(
                         // numbers legible over a bright bonnet.
                         Spacer(
                             Modifier.matchParentSize().background(
+                                // Lighter than the first pass so the photo actually reads as a
+                                // photo. Still never reaches transparent, and still heaviest at
+                                // the top and bottom, because those are the two bands with
+                                // content over them -- the title and chevron up top, the charge
+                                // readout along the bottom. The middle can afford to be clear
+                                // since nothing sits there.
                                 Brush.verticalGradient(
-                                    0f to Color.Black.copy(alpha = 0.78f),
-                                    0.35f to Color.Black.copy(alpha = 0.62f),
-                                    1f to Color.Black.copy(alpha = 0.45f),
+                                    0f to Color.Black.copy(alpha = 0.55f),
+                                    0.30f to Color.Black.copy(alpha = 0.22f),
+                                    0.62f to Color.Black.copy(alpha = 0.28f),
+                                    1f to Color.Black.copy(alpha = 0.62f),
                                 ),
                             ),
                         )
+                        // The readout lives at the BOTTOM of the image, inside the background
+                        // layer, so it lands at the bottom of the expanded card.
+                        //
+                        // Put here rather than in the pebble body on purpose: the body is
+                        // top-aligned in its Column, so a bar there sits under the header, and
+                        // pushing it down would need the Column to fillMaxHeight inside a Box
+                        // whose own height comes from a sibling -- which in a scrollable parent
+                        // (maxHeight = Infinity) is exactly how you get a bad measure. Aligning
+                        // within the image's own Box has no such dependency.
+                        Box(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+                            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
+                        }
                     }
                 }
             },
@@ -5116,10 +5135,10 @@ private fun HeroHeader(
                 if (charging) "Charging" else null,
             ).joinToString(" · ").ifBlank { null },
         ) {
-            // The body is the charge readout. The photo is not here -- it is the card's
-            // `background`, which is what lets it run up behind the header instead of
-            // sitting under it as another child.
-            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
+            // Empty by design. Everything the expanded state adds -- the photo and the
+            // readout over its lower edge -- is in `background`, because both need to be
+            // positioned against the IMAGE rather than stacked under the header.
+            Spacer(Modifier.height(0.dp))
         }
         return
     }
