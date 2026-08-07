@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Bloo</string>
     <string name="widget_description">Car status with quick lock, climate, charge and more.</string>
+    <!-- Shown in place of Glance's generic "Can't show content" when composition fails. -->
+    <string name="widget_error_title">Couldn\'t draw the widget</string>
+    <string name="widget_error_hint">Tap to open Bloo</string>
 </resources>

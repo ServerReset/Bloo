@@ -1,7 +1,10 @@
 package com.bloo.bluelink.widget
 
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -89,6 +92,49 @@ class CarWidget : GlanceAppWidget() {
     // (and every mid-resize size) gets a layout tuned to its exact dimensions,
     // rather than snapping to a handful of Responsive buckets.
     override val sizeMode = SizeMode.Exact
+
+    /**
+     * Replaces Glance's default composition-failure UI, a bare "Can't show content"
+     * that offers the user nothing to do about it, with a themed panel that at least
+     * opens the app on tap.
+     *
+     * Deliberately plain [RemoteViews]: this is not a composable and not a suspend
+     * function, so neither Glance content nor the per-car [WidgetTheme] (which needs
+     * suspending DataStore reads) is reachable here. The layout leans on
+     * `?android:attr/*` for light/dark, exactly as `car_widget_loading.xml` does --
+     * and composing a theme at the moment composition has just failed would be the
+     * wrong instinct anyway.
+     *
+     * Note `errorUiLayout` is NOT the hook to use: in glance-appwidget 1.1.1 it is a
+     * private final field with only an internal getter, so it cannot be overridden --
+     * verified against the resolved 1.1.1 artifact, not the docs.
+     *
+     * The [throwable] is intentionally dropped rather than logged: there is not one
+     * `android.util.Log` call anywhere in `:app` or `:shared`, and quietly starting a
+     * logging convention inside an error handler is not the place to make that call.
+     * It does mean a composition crash stays undiagnosable, which is a real cost --
+     * this is the line to add a log to if that ever needs chasing.
+     */
+    override fun onCompositionError(
+        context: Context,
+        glanceId: GlanceId,
+        appWidgetId: Int,
+        throwable: Throwable,
+    ) {
+        val views = RemoteViews(context.packageName, R.layout.car_widget_error)
+        views.setOnClickPendingIntent(
+            R.id.widget_error_root,
+            PendingIntent.getActivity(
+                context,
+                // Keyed per widget so two failed widgets don't share (and overwrite)
+                // one another's PendingIntent.
+                appWidgetId,
+                Intent(context, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            ),
+        )
+        AppWidgetManager.getInstance(context).updateAppWidget(appWidgetId, views)
+    }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)

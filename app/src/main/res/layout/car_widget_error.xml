@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Shown when Glance fails to compose the widget, replacing the framework's own
+  generic "Can't show content" (see CarWidget.onCompositionError).
+
+  Plain RemoteViews rather than a Glance composable because onCompositionError is
+  not a composable and not suspending: it hands over an appWidgetId and expects
+  an immediate update. That also rules out the per-car resolved WidgetTheme, which
+  needs suspending DataStore reads, so this follows ?android:attr/* exactly as
+  car_widget_loading.xml does: correct in light and dark with no values-night, and
+  no risk of composing a theme while composition is the thing that just failed.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_error_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="8dp"
+    android:background="?android:attr/colorBackground">
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_error_title"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="13sp"
+        android:maxLines="2"
+        android:gravity="center" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="@string/widget_error_hint"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="11sp"
+        android:maxLines="1" />
+</LinearLayout>
