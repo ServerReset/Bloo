@@ -5128,22 +5128,23 @@ private fun HeroHeader(
                         // and never reaches transparent -- heaviest at the top where the
                         // title and chevron are, easing to a floor that still holds the bar's
                         // numbers legible over a bright bonnet.
-                        Spacer(
-                            Modifier.matchParentSize().background(
-                                // Lighter than the first pass so the photo actually reads as a
-                                // photo. Still never reaches transparent, and still heaviest at
-                                // the top and bottom, because those are the two bands with
-                                // content over them -- the title and chevron up top, the charge
-                                // readout along the bottom. The middle can afford to be clear
-                                // since nothing sits there.
-                                Brush.verticalGradient(
-                                    0f to Color.Black.copy(alpha = 0.55f),
-                                    0.30f to Color.Black.copy(alpha = 0.22f),
-                                    0.62f to Color.Black.copy(alpha = 0.28f),
-                                    1f to Color.Black.copy(alpha = 0.62f),
-                                ),
-                            ),
-                        )
+                        // remember-ed: Brush.verticalGradient allocates a stop list, and this
+                        // sits under a card that recomposes on every status change.
+                        // Lighter than the first pass so the photo actually reads as a
+                        // photo. Still never reaches transparent, and still heaviest at
+                        // the top and bottom, because those are the two bands with
+                        // content over them -- the title and chevron up top, the charge
+                        // readout along the bottom. The middle can afford to be clear
+                        // since nothing sits there.
+                        val scrim = remember {
+                            Brush.verticalGradient(
+                                0f to Color.Black.copy(alpha = 0.55f),
+                                0.30f to Color.Black.copy(alpha = 0.22f),
+                                0.62f to Color.Black.copy(alpha = 0.28f),
+                                1f to Color.Black.copy(alpha = 0.62f),
+                            )
+                        }
+                        Spacer(Modifier.matchParentSize().background(scrim))
                     }
                 }
                 // The expanded readout, at the BOTTOM of the card.
@@ -5188,7 +5189,7 @@ private fun HeroHeader(
                         // the header and re-lays them out.
                         ChargeFuelBar(
                             status, hasBattery, hasFuel, drivingLabel, metric = metric,
-                            statsModifier = Modifier.pebbleShared(this@AnimatedVisibility, statsKey),
+                            statsModifier = Modifier.pebbleShared(this@AnimatedVisibility, statsKey, relayout = false),
                             barModifier = Modifier.pebbleShared(this@AnimatedVisibility, barKey),
                         )
                     }
@@ -5217,7 +5218,7 @@ private fun HeroHeader(
                         readout,
                         Modifier
                             .padding(start = 10.dp)
-                            .pebbleShared(this@AnimatedVisibility, statsKey),
+                            .pebbleShared(this@AnimatedVisibility, statsKey, relayout = false),
                     )
                 }
             },
@@ -8500,24 +8501,38 @@ private fun PebbleSharedScope(enabled: Boolean, content: @Composable () -> Unit)
  * `AnimatedVisibility` on the expanded readout keeping its full footprint for the whole fade
  * and then dropping it in one frame. Fixing the real cause is what let this come back.
  *
- * Both ends RE-MEASURE rather than scale, so a node's drawn size is always its measured
- * size. `ScaleToBounds` lays a node out at its OWN target size and then scales it to fill
- * the CURRENT bounds, so the entering collapsed line got drawn ~2.3x too large to fill the
- * expanded bounds it starts inside, and its cross-fade finished long before the bounds
- * spring -- the oversized copy went fully opaque and only then shrank. That is the right
- * mode when both ends are the same content at two sizes (a thumbnail growing into a photo);
- * it is the wrong one when they are two different layouts, as here.
+ * [relayout] is the frame-cost decision, and it is the whole reason this parameter exists.
  *
- * Re-measuring costs a mid-flight reflow instead -- the collapsed line laid out in a wide
- * box, the expanded block squeezed into a narrow one -- and that is the better trade, because
- * the node you actually watch ARRIVE is laid out correctly and only the departing one
- * degrades, under a cross-fade. The expanded block's own text is pinned to one line
- * (see [ChargeStatsBlock]) so that squeeze clips rather than reflows.
+ * `RemeasureToBounds` changes the node's CONSTRAINTS on every frame of the travel, which
+ * defeats Compose's measure caching: every `Text` under it re-runs paragraph layout each
+ * frame, and inside a lookahead scope that happens twice per frame. For the charge bar that
+ * is nothing -- it is a single [Canvas] with no text and its width genuinely should change,
+ * which is the part that looks good. For the stats it was ~8 paragraph layouts a frame across
+ * two `AnimatedContent`s at `displayMedium`, `titleLarge` and `labelLarge`, and that was the
+ * lag.
+ *
+ * So the stats pass `relayout = false`, which selects
+ * `scaleToBounds(ContentScale.None, CenterStart)`. `None` is a `FixedScale(1f)`, so the node
+ * is measured ONCE at its natural size, constraints never change, measurement stays cached,
+ * and the animating bounds only decide where it is DRAWN. It travels; it does not reflow and
+ * it does not scale.
+ *
+ * That also avoids the two ways this went wrong before. A real `ScaleToBounds` (FillWidth)
+ * drew the entering collapsed line ~2.3x too large, because it scales a node laid out at its
+ * own size up to bounds that start at the other end's size -- right for one image at two
+ * sizes, wrong for two different layouts. And re-measuring the stats squeezed the departing
+ * block into a narrowing box, which is why its text is pinned to one line
+ * (see [ChargeStatsBlock]); with `None` that squeeze cannot happen at all.
+ *
+ * The visible trade: the stats do not MORPH from one density to the other, they cross-fade
+ * while travelling together. For two genuinely different layouts that reads better than
+ * scaling one into the other anyway.
  */
 @Composable
 private fun Modifier.pebbleShared(
     visibility: AnimatedVisibilityScope,
     key: String,
+    relayout: Boolean = true,
 ): Modifier {
     val scope = LocalPebbleSharedTransition.current ?: return this
     // CRITICALLY DAMPED (dampingRatio = 1f), and deliberately NOT the theme's spatial
@@ -8554,7 +8569,14 @@ private fun Modifier.pebbleShared(
             enter = fadeIn(fade),
             exit = fadeOut(fade),
             boundsTransform = { _, _ -> bounds },
-            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            resizeMode = if (relayout) {
+                SharedTransitionScope.ResizeMode.RemeasureToBounds
+            } else {
+                SharedTransitionScope.ResizeMode.scaleToBounds(
+                    ContentScale.None,
+                    Alignment.CenterStart,
+                )
+            },
         )
     }
 }
