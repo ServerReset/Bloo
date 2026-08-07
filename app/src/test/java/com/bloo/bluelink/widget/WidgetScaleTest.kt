@@ -111,7 +111,7 @@ class WidgetScaleTest {
                     for (wantMap in listOf(false, true)) {
                         val avail = content(size)
                         val barH = Scale.barHeight(size)
-                        val room = Scale.ringRoom(size, ts, hasHeader, false, 18.dp)
+                        val room = Scale.ringRoom(testFrame(size, ts), hasHeader, false, 18.dp)
                         val restAfterBar = (room - barH).coerceAtLeast(0.dp)
                         val split = Scale.tallSplit(size, restAfterBar, capRows = 2, textScale = ts, wantMap = wantMap)
                         val header = if (hasHeader) {
@@ -138,7 +138,7 @@ class WidgetScaleTest {
     fun `ring is zero or fits the room it was given`() {
         for (size in sizes()) {
             for (ts in scales) {
-                val room = Scale.ringRoom(size, ts, true, true, 12.dp)
+                val room = Scale.ringRoom(testFrame(size, ts), true, true, 12.dp)
                 assertTrue(room.value >= 0f, "negative ring room at $size @${ts}x")
                 val ring = Scale.ring(size, room)
                 assertTrue(
@@ -193,7 +193,7 @@ class WidgetScaleTest {
     fun `tall split fits its column and leaves a usable map`() {
         for (size in sizes()) {
             for (ts in scales) {
-                val room = Scale.ringRoom(size, ts, true, true, 20.dp)
+                val room = Scale.ringRoom(testFrame(size, ts), true, true, 20.dp)
                 for (wantMap in listOf(false, true)) {
                     val s = Scale.tallSplit(size, room, capRows = 5, textScale = ts, wantMap = wantMap)
                     val used = s.ring + s.map + Scale.infoBlockHeight(size, s.rows, ts)
@@ -221,7 +221,7 @@ class WidgetScaleTest {
     fun `reserving a map leaves the ring the larger share`() {
         for (size in sizes()) {
             for (ts in scales) {
-                val room = Scale.ringRoom(size, ts, true, true, 20.dp)
+                val room = Scale.ringRoom(testFrame(size, ts), true, true, 20.dp)
                 val map = Scale.mapReserve(size, room, wantMap = true)
                 assertTrue(
                     map.value <= room.value * 0.35f + 0.01f,
@@ -248,7 +248,7 @@ class WidgetScaleTest {
     fun `map module never spends more than its reserved room`() {
         for (size in sizes()) {
             for (ts in scales) {
-                val room = Scale.ringRoom(size, ts, true, true, 20.dp)
+                val room = Scale.ringRoom(testFrame(size, ts), true, true, 20.dp)
                 val mapRoom = Scale.mapReserve(size, room, wantMap = true)
                 if (mapRoom <= 0.dp) continue
                 val imageHeight = minOf(Scale.mapHeight(size), (mapRoom - 8.dp).coerceAtLeast(0.dp))
@@ -494,7 +494,7 @@ class WidgetScaleTest {
             val capRows = if (tier == WidgetTier.LARGE_WIDE) 4 else WidgetInfoField.ALL.size
             for (ts in scales) {
                 for (wantMap in listOf(false, true)) {
-                    val ringRoom = Scale.ringRoom(size, ts, hasHeader = true, hasFooter = true, spacers = spacers)
+                    val ringRoom = Scale.ringRoom(testFrame(size, ts), hasHeader = true, hasFooter = true, spacers = spacers)
                     val split = Scale.tallSplit(size, ringRoom, capRows = capRows, textScale = ts, wantMap = wantMap)
                     val barH = Scale.barHeight(size)
                     val heroSp = Scale.heroSpIn(size, split.ring, barH + 4.dp, ts)
@@ -540,7 +540,8 @@ class WidgetScaleTest {
                 for (wantMap in listOf(false, true)) {
                     val primaryValueHeight = Scale.lineHeight(Scale.titleSp(size).value, ts)
                     val ringRoom = Scale.ringRoom(
-                        size, ts, hasHeader = true, hasFooter = true, spacers = 36.dp + primaryValueHeight,
+                        testFrame(size, ts), hasHeader = true, hasFooter = true,
+                        spacers = 36.dp + primaryValueHeight,
                     )
                     val split = Scale.tallSplit(
                         size, ringRoom, capRows = WidgetInfoField.ALL.size, textScale = ts, wantMap = wantMap,
@@ -688,3 +689,16 @@ class ActionButtonGeometryTest {
         }
     }
 }
+
+/** [Scale.Frame] for a test that is not exercising the pill corner or the car
+ *  switcher. Both default to absent, which is exactly the behaviour the
+ *  assertions in this file were written against before Frame existed -- so the
+ *  signature change moves no goalposts. The pill and switcher cases are swept
+ *  in WidgetFrameTest instead.
+ */
+internal fun testFrame(
+    size: androidx.compose.ui.unit.DpSize,
+    textScale: Float,
+    pillCorner: Boolean = false,
+    hasSwitcher: Boolean = false,
+): Scale.Frame = Scale.Frame(size, textScale, pillCorner, hasSwitcher)

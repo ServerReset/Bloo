@@ -126,22 +126,23 @@ internal object Scale {
      * user had asked for bigger type.
      */
     fun ringRoom(
-        size: DpSize,
-        textScale: Float,
+        frame: Frame,
         hasHeader: Boolean,
         hasFooter: Boolean,
         spacers: Dp,
     ): Dp {
-        val budget = size.height - contentPadding(size) * 2
-        val header = if (hasHeader) {
-            lineHeight(titleSp(size).value, textScale) + lineHeight(subtitleSp(size).value, textScale)
-        } else 0.dp
-        val footer = if (hasFooter) lineHeight(subtitleSp(size).value, textScale) + 6.dp else 0.dp
+        // All three terms now come from the functions that model what is actually
+        // drawn -- innerHeight knows about the pill corner, headerHeight about the
+        // switcher pill, footerHeight about the real footer font. Each used to be
+        // open-coded here from the size alone, and each was wrong in one case.
+        val header = if (hasHeader) headerHeight(frame) else 0.dp
+        val footer = if (hasFooter) footerHeight(frame) else 0.dp
         // Floors at zero, NOT at some minimum ring size: when the column
         // genuinely has no room left, forcing a 'small' ring anyway just
         // reinstates the overflow at a smaller scale. Scale.ring turns
         // too little room into no ring at all.
-        return (budget - header - footer - buttonHeight(size) - spacers).coerceAtLeast(0.dp)
+        return (innerHeight(frame) - header - footer - buttonHeight(frame.size) - spacers)
+            .coerceAtLeast(0.dp)
     }
 
     fun titleSp(size: DpSize): TextUnit = lerp(progress(size), 11f, 20f).sp
@@ -472,6 +473,74 @@ internal object Scale {
         val room = size.height.value * (1f - 0.62f)
         return (room / rowDp).toInt().coerceIn(1, capMax)
     }
+
+    /**
+     * The per-render facts every vertical budget in this file needs, resolved once
+     * per composition instead of re-derived by each tier.
+     *
+     * This exists because the same three questions were being answered separately
+     * in every tier, and the copies disagreed:
+     *
+     *  - **The padded content box.** `size.height - contentPadding(size) * 2`
+     *    appeared 11 times, plus three literal approximations of it (`- 16.dp` in
+     *    MICRO_TINY, `- 22.dp` in MICRO, `- 12.dp` in COMPACT_WIDE_NARROW), each
+     *    correct at only one point on a curve that spans 12dp to 36dp. And not one
+     *    of the fourteen knew that a PILL corner adds 4dp of padding per side, so
+     *    on a pill widget under 180dp every tier's budget over-reported by 8dp.
+     *  - **The header.** Reserved as two text lines, but HeaderRow is a Row whose
+     *    height is `max(textColumn, switcherPill)`, and the pill is 26..40dp. At
+     *    the 0.8x and 0.9x text settings the pill wins, under-reserving by up to
+     *    4.4dp on a multi-car follow widget. [ringRoom] was not even told whether
+     *    the switcher was there.
+     *  - **The footer.** Reserved from `subtitleSp * textScale`, but FooterRow
+     *    hard-coded 11sp for the stale variant, so reserved and rendered came from
+     *    two unrelated font sizes.
+     *
+     * [hasSwitcher] and [pillCorner] are required, not defaulted. A default here
+     * would be a wrong answer to a question the caller never noticed it was being
+     * asked, which is how the header term came to ignore the pill in the first
+     * place.
+     */
+    data class Frame(
+        val size: DpSize,
+        val textScale: Float,
+        val pillCorner: Boolean,
+        val hasSwitcher: Boolean,
+    )
+
+    /** Padding the root applies on every side. Mirrors the padding modifier in
+     *  CarWidget.Content, the only other place this may be computed. */
+    fun rootPadding(size: DpSize, pillCorner: Boolean): Dp =
+        contentPadding(size) + if (pillCorner) PILL_EXTRA_PADDING else 0.dp
+
+    /** A pill corner curves hard enough that content clips against it without a
+     *  little extra room. Set by Content; reserved here. */
+    private val PILL_EXTRA_PADDING = 4.dp
+
+    /** The height actually available inside the root padding: the number every
+     *  vertical budget has to fit within. */
+    fun innerHeight(frame: Frame): Dp =
+        (frame.size.height - rootPadding(frame.size, frame.pillCorner) * 2).coerceAtLeast(0.dp)
+
+    /** [innerHeight]'s horizontal twin, for the tiers that split a row. */
+    fun innerWidth(frame: Frame): Dp =
+        (frame.size.width - rootPadding(frame.size, frame.pillCorner) * 2).coerceAtLeast(0.dp)
+
+    /** What HeaderRow actually occupies: its two text lines, or the car-switcher
+     *  pill beside them if that is taller. A Row is as tall as its tallest child. */
+    fun headerHeight(frame: Frame): Dp {
+        val text = lineHeight(titleSp(frame.size).value, frame.textScale) +
+            lineHeight(subtitleSp(frame.size).value, frame.textScale)
+        return if (frame.hasSwitcher) maxOf(text, pillSize(frame.size)) else text
+    }
+
+    /** What FooterRow actually occupies: its leading 6dp spacer plus one subtitle
+     *  line. Stale and fresh are the same height by construction now -- the stale
+     *  variant only changes colour, having previously also hard-coded 11sp. */
+    fun footerHeight(frame: Frame): Dp =
+        lineHeight(subtitleSp(frame.size).value, frame.textScale) + FOOTER_GAP
+
+    private val FOOTER_GAP = 6.dp
 
     data class SquareSplit(val ring: Dp, val rows: Int, val map: Dp, val ringRoom: Dp)
 

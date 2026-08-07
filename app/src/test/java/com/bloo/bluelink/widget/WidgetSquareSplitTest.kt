@@ -23,6 +23,11 @@ import kotlin.test.assertTrue
  * rather than a copy of it -- the distinction that matters, because the sweep in
  * [WidgetScaleTest] stayed green through every one of those 10,422 sizes by
  * testing arithmetic the square tiers were not using.
+ *
+ * Every term below comes from [Scale] itself -- [Scale.innerHeight],
+ * [Scale.headerHeight], [Scale.footerHeight] -- rather than being re-derived
+ * here. Re-deriving is how a test drifts from the code it guards, and this file
+ * would otherwise have kept its own copy of three formulas that just moved.
  */
 class WidgetSquareSplitTest {
 
@@ -44,60 +49,66 @@ class WidgetSquareSplitTest {
     /** RingWithContent's own gap when it stacks the rows under the ring. */
     private val stackedGap = 8.dp
 
+    /** The column a square tier renders, given a resolved split. Shared by the
+     *  tests below so there is one model of the stack, not three. */
+    private fun columnHeight(
+        frame: Scale.Frame,
+        spec: TierSpec,
+        split: Scale.SquareSplit,
+        sideBySide: Boolean,
+    ): Dp {
+        val info = Scale.infoBlockHeight(frame.size, split.rows, frame.textScale)
+        // Side by side, the ring and the rows share one band, so the band holds
+        // the taller of them. Stacked they sum, with RingWithContent's own gap
+        // between -- and no gap when the ring came out at zero, since RingImage
+        // renders nothing then.
+        val band = when {
+            sideBySide -> maxOf(split.ring, info)
+            split.ring > 0.dp -> split.ring + stackedGap + info
+            else -> info
+        }
+        return Scale.headerHeight(frame) +
+            (if (spec.hasFooter) Scale.footerHeight(frame) else 0.dp) +
+            spec.spacers + band + split.map + Scale.buttonHeight(frame.size)
+    }
+
     @Test
     fun squareColumnNeverOverflowsItsTile() {
         var checked = 0
         var worst = 0f
         var worstAt = ""
-        for (textScale in listOf(1.0f, 1.2f, 1.4f)) {
-            for (w in 40..320) for (h in 40..320) {
-                val size = DpSize(w.dp, h.dp)
-                val spec = specs[tierFor(size)] ?: continue
-                for (wantMap in listOf(false, true)) {
-                    val sideBySide = size.width >= spec.rowWidth
-                    val room = Scale.ringRoom(
-                        size, textScale, hasHeader = true, hasFooter = spec.hasFooter,
-                        spacers = spec.spacers,
-                    )
-                    val split = Scale.squareSplit(
-                        size, room, spec.capRows, textScale, wantMap, sideBySide,
-                    )
-                    val info = Scale.infoBlockHeight(size, split.rows, textScale)
-                    // Side by side the ring and the rows share one band, so the band
-                    // holds the taller. Stacked they sum, with the gap between them --
-                    // and no gap when the ring came out at zero, since RingImage then
-                    // renders nothing.
-                    val band = if (sideBySide) {
-                        maxOf(split.ring, info)
-                    } else if (split.ring > 0.dp) {
-                        split.ring + stackedGap + info
-                    } else {
-                        info
+        for (textScale in listOf(0.8f, 1.0f, 1.4f)) {
+            // Pill corner and car switcher are swept, not assumed: each adds to what
+            // the column must fit (8dp of extra root padding, and a header pill
+            // taller than its text below 1.0x), and each was invisible to every
+            // budget in this file until Scale.Frame carried it.
+            for (pill in listOf(false, true)) for (switcher in listOf(false, true)) {
+                for (w in 40..320 step 2) for (h in 40..320 step 2) {
+                    val size = DpSize(w.dp, h.dp)
+                    val spec = specs[tierFor(size)] ?: continue
+                    val frame = testFrame(size, textScale, pill, switcher)
+                    for (wantMap in listOf(false, true)) {
+                        val sideBySide = size.width >= spec.rowWidth
+                        val room = Scale.ringRoom(
+                            frame,
+                            hasHeader = true, hasFooter = spec.hasFooter, spacers = spec.spacers,
+                        )
+                        val split = Scale.squareSplit(
+                            size, room, spec.capRows, textScale, wantMap, sideBySide,
+                        )
+                        val over = columnHeight(frame, spec, split, sideBySide).value -
+                            Scale.innerHeight(frame).value
+                        if (over > worst) {
+                            worst = over
+                            worstAt = "${w}x$h @${textScale}x pill=$pill switcher=$switcher " +
+                                "map=$wantMap rows=${split.rows} ring=${split.ring}"
+                        }
+                        checked++
                     }
-                    val header = Scale.lineHeight(Scale.titleSp(size).value, textScale) +
-                        Scale.lineHeight(Scale.subtitleSp(size).value, textScale)
-                    val footer = if (spec.hasFooter) {
-                        Scale.lineHeight(Scale.subtitleSp(size).value, textScale) + 6.dp
-                    } else {
-                        0.dp
-                    }
-                    val total = header + footer + spec.spacers + band + split.map +
-                        Scale.buttonHeight(size)
-                    val budget = size.height - Scale.contentPadding(size) * 2
-                    val over = total.value - budget.value
-                    if (over > worst) {
-                        worst = over
-                        worstAt = "${w}x$h @${textScale}x map=$wantMap rows=${split.rows} " +
-                            "ring=${split.ring} info=$info"
-                    }
-                    checked++
                 }
             }
         }
-        assertTrue(
-            worst <= 0.01f,
-            "square column overflows its tile by ${worst}dp at $worstAt",
-        )
+        assertTrue(worst <= 0.01f, "square column overflows its tile by ${worst}dp at $worstAt")
         // Guards against the sweep silently matching nothing -- if tierFor's
         // boundaries move and no size lands on a square tier any more, the
         // assertion above passes vacuously and this is what notices.
@@ -108,13 +119,13 @@ class WidgetSquareSplitTest {
      *  under the cap -- the exact thing infoCap did not guarantee. */
     @Test
     fun rowCountFitsTheBandItWasGiven() {
-        for (textScale in listOf(1.0f, 1.4f)) {
+        for (textScale in listOf(0.8f, 1.4f)) {
             for (w in 40..320 step 3) for (h in 40..320 step 3) {
                 val size = DpSize(w.dp, h.dp)
                 val spec = specs[tierFor(size)] ?: continue
+                val frame = testFrame(size, textScale, pillCorner = true, hasSwitcher = true)
                 val room = Scale.ringRoom(
-                    size, textScale, hasHeader = true, hasFooter = spec.hasFooter,
-                    spacers = spec.spacers,
+                    frame, hasHeader = true, hasFooter = spec.hasFooter, spacers = spec.spacers,
                 )
                 val split = Scale.squareSplit(
                     size, room, spec.capRows, textScale, wantMap = false,
@@ -134,14 +145,14 @@ class WidgetSquareSplitTest {
      *  `split.ringRoom` on to ChargeBarFallback. */
     @Test
     fun ringFitsItsReportedRoom() {
-        for (textScale in listOf(1.0f, 1.4f)) {
+        for (textScale in listOf(0.8f, 1.4f)) {
             for (w in 40..320 step 5) for (h in 40..320 step 5) {
                 val size = DpSize(w.dp, h.dp)
                 val spec = specs[tierFor(size)] ?: continue
                 for (sideBySide in listOf(false, true)) {
+                    val frame = testFrame(size, textScale)
                     val room = Scale.ringRoom(
-                        size, textScale, hasHeader = true, hasFooter = spec.hasFooter,
-                        spacers = spec.spacers,
+                        frame, hasHeader = true, hasFooter = spec.hasFooter, spacers = spec.spacers,
                     )
                     val split = Scale.squareSplit(
                         size, room, spec.capRows, textScale, wantMap = false, sideBySide,
