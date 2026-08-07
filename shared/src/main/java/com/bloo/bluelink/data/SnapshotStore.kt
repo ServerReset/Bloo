@@ -172,6 +172,28 @@ private val Context.snapshotDataStore by preferencesDataStore(
  * from different processes (the widget refreshing while the watch relay also
  * writes, for instance) don't stomp on each other's writes.
  */
+/**
+ * Apply [updates] onto [existing] by VIN. Extracted from [SnapshotStore.updateVehicles]
+ * so the batch-merge semantics are testable with no Android context in the way.
+ *
+ * Three properties the callers depend on:
+ *  - ORDER is the existing list's. The vehicle order is user-visible (it's the car
+ *    pager's order), so a refresh must never reshuffle it.
+ *  - A VIN in [updates] that isn't in [existing] is IGNORED, not appended. Adding cars
+ *    is saveVehicles' job; a stale update for a car that has since been removed from
+ *    the account must not resurrect it.
+ *  - On a duplicate VIN within [updates], the LAST entry wins, matching what repeated
+ *    single-vehicle writes in the same order would have produced.
+ */
+internal fun mergeVehicleUpdates(
+    existing: List<VehicleSnapshot>,
+    updates: List<VehicleSnapshot>,
+): List<VehicleSnapshot> {
+    if (updates.isEmpty()) return existing
+    val byVin = updates.associateBy { it.vin }
+    return existing.map { byVin[it.vin] ?: it }
+}
+
 class SnapshotStore(private val context: Context) {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -209,13 +231,29 @@ class SnapshotStore(private val context: Context) {
     }
 
     /** Replace a single vehicle's snapshot (e.g. after a widget refresh). */
-    suspend fun updateVehicle(snapshot: VehicleSnapshot) {
+    suspend fun updateVehicle(snapshot: VehicleSnapshot) = updateVehicles(listOf(snapshot))
+
+    /**
+     * Merge several vehicles in ONE store write.
+     *
+     * Every write here costs a full decode of the whole vehicle payload, a full
+     * re-encode of it, and a DataStore commit -- the cost is per WRITE, not per
+     * vehicle, because the payload is one JSON blob. So a "refresh all" that called
+     * [updateVehicle] once per car paid N decodes, N encodes and N fsyncs to change N
+     * cars, where one of each would do. It also produced N emissions on [payload], so
+     * every widget, tile and complication observing it repainted N times for one
+     * refresh.
+     *
+     * A VIN in [snapshots] that isn't in the store is ignored rather than added, which
+     * is [updateVehicle]'s existing behaviour -- adding cars is [saveVehicles]' job.
+     */
+    suspend fun updateVehicles(snapshots: List<VehicleSnapshot>) {
+        if (snapshots.isEmpty()) return
         context.snapshotDataStore.edit { prefs ->
             val existing = decode(prefs[Keys.PAYLOAD])
-            val updated = existing.vehicles.map { if (it.vin == snapshot.vin) snapshot else it }
             prefs[Keys.PAYLOAD] = json.encodeToString(
                 SnapshotPayload.serializer(),
-                SnapshotPayload(updated, existing.selectedVin),
+                SnapshotPayload(mergeVehicleUpdates(existing.vehicles, snapshots), existing.selectedVin),
             )
         }
     }

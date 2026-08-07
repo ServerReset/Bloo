@@ -192,6 +192,12 @@ object WearCommandRunner {
             // Kia cars fired N redundant full-account list calls (each already
             // covering all N cars) instead of one.
             val reposByBrand = mutableMapOf<Brand, VehicleRepository>()
+            // Collected and written ONCE at the end rather than per car. The payload is
+            // a single JSON blob, so each write decodes and re-encodes every vehicle and
+            // commits to disk -- "refresh all" on N cars was paying N of those to change
+            // N cars, and emitting N times on SnapshotStore.payload, which made every
+            // widget, tile and complication observing it repaint N times per refresh.
+            val merged = mutableListOf<VehicleSnapshot>()
             targets.forEach { snap ->
                 runCatching {
                     val v = snap.toVehicle()
@@ -199,9 +205,18 @@ object WearCommandRunner {
                     val repo = reposByBrand.getOrPut(brand) {
                         repositoryFor(brand, SessionStore(context), CredentialStore(context))
                     }
-                    repo.status(v, refresh = force)?.let { store.updateVehicle(snap.merged(it)) }
+                    repo.status(v, refresh = force)?.let { merged += snap.merged(it) }
                 }
             }
+            // Whatever succeeded gets written even if some cars failed -- the per-car
+            // runCatching above means one brand being down must not discard the others,
+            // which is what the old per-car write gave for free.
+            //
+            // Still INSIDE the lock, deliberately. The write itself needs no mutex, but
+            // moving it out would open a window where a command's optimistic write lands
+            // between a status fetch and this write, and this would then overwrite that
+            // flip with the older fetched status.
+            store.updateVehicles(merged)
         }
     }
 }
