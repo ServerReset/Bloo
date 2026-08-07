@@ -412,30 +412,37 @@ class CarWidget : GlanceAppWidget() {
             }
             return
         }
-        val ringEdge = Scale.ring(size, (size.height - 10.dp).coerceAtLeast(16.dp))
         val showsRing = render.config.showRing && car.percent != null
-        // The width each weighted child of this Row REALLY gets: whatever is
-        // left once the ring and the fixed spacers are taken out, split
-        // between the text column and the buttons. The fraction-of-tile
-        // guesses this replaces were wrong twice over -- they under-reported
-        // the slice, and they kept assuming a ring was there even when one
-        // isn't drawn, so a widget with the ring switched off still laid its
-        // text and buttons out as if a third of the row were missing.
-        val slice = ((size.width - (if (showsRing) ringEdge + 8.dp else 0.dp) - 8.dp) / 2)
-            .coerceAtLeast(24.dp)
+        // The width each weighted child of this Row REALLY gets: the padded
+        // content width, less the one fixed 8dp spacer between them, halved.
+        //
+        // Two things were wrong here, in opposite directions:
+        //
+        // It subtracted a ring edge whenever showsRing was true -- but a banner
+        // ALWAYS takes the bar treatment (see below), so no ring is ever drawn on
+        // this tier and that was pure loss. The `if (showsRing && !useBar)` ring
+        // branch it reserved for could not run at all: useBar was assigned
+        // showsRing, so the condition read `showsRing && !showsRing`. On a 300x78
+        // tile with a 52dp ring edge that cost both weighted children ~30dp of
+        // width they actually had, which is what made button labels drop out and
+        // text shrink earlier than it needed to.
+        //
+        // And it measured against the RAW tile width while the root has already
+        // applied Scale.contentPadding on both sides, so it over-reported by that
+        // much -- harmless while the ring subtraction was masking it, but not once
+        // that goes. Removing only the ring term would have handed ActionButtons a
+        // slice wider than the row really has, and its capacity check would then
+        // fit one button too many. Both corrections belong together; `w` is the
+        // same padded width MediumWide and LargeWide already compute.
+        val w = size.width - Scale.contentPadding(size) * 2
+        val slice = ((w - 8.dp) / 2).coerceAtLeast(24.dp)
         // A banner is almost pure width, the shape a bar was built for -- it
         // reads its value from across a room in a fraction of the height a
-        // ring needs. Always preferred here now, not just as a fallback
-        // below RING_WORTH_IT: the circle is for compact/vertical tiles,
-        // this tile is neither.
-        val useBar = showsRing
+        // ring needs. The circle is for compact/vertical tiles, and this tile
+        // is neither, so the bar is not a fallback here -- it is the treatment.
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (showsRing && !useBar) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
-                Spacer(GlanceModifier.width(8.dp))
-            }
             Column(modifier = GlanceModifier.defaultWeight()) {
-                if (useBar) {
+                if (showsRing) {
                     BarHero(car, render, width = slice)
                 } else {
                     NameAndStat(car, render, width = slice)
@@ -444,9 +451,10 @@ class CarWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.width(8.dp))
             // A banner is nearly all width, so the buttons get a real share
             // of it rather than the thin sliver a normal compact row leaves.
-            // The real slice, not a fraction-of-tile guess: this Row splits
-            // whatever is left after the ring between the text column and the
-            // buttons, so that is exactly what the capacity maths should see.
+            // The real slice, not a fraction-of-tile guess: this Row splits its
+            // padded width, less the spacer above, evenly between the text
+            // column and the buttons, so that is exactly what the capacity
+            // maths should see.
             ActionButtons(
                 car, render, max = 4,
                 modifier = GlanceModifier.defaultWeight(),
@@ -719,32 +727,24 @@ class CarWidget : GlanceAppWidget() {
                 return
             }
         }
-        // COMPACT_WIDE's own tier threshold only proves the WIDTH is roomy
-        // (>= 150dp) -- the height is whatever satisfies its aspect-ratio
-        // gate against that width, which can be much shorter than the ring
-        // wants to be. Scale.ring's continuous target is capped by whatever
-        // height is actually available, so the ring can never be taller than
-        // the row it's centered in.
-        val ringEdge = Scale.ring(size, (size.height - 16.dp).coerceAtLeast(20.dp))
         val showsRing = render.config.showRing && car.percent != null
-        // The width each weighted child of this Row REALLY gets: whatever is
-        // left once the ring and the fixed spacers are taken out, split
-        // between the text column and the buttons. The fraction-of-tile
-        // guesses this replaces were wrong twice over -- they under-reported
-        // the slice, and they kept assuming a ring was there even when one
-        // isn't drawn, so a widget with the ring switched off still laid its
-        // text and buttons out as if a third of the row were missing.
-        val slice = ((size.width - (if (showsRing) ringEdge + 10.dp else 0.dp) - 8.dp) / 2)
-            .coerceAtLeast(24.dp)
-        // Same call as BANNER now: this tile is wide, not compact/vertical,
-        // so the bar is preferred outright rather than only as a fallback
-        // once the ring shrinks below RING_WORTH_IT.
-        val useBar = showsRing
+        // The width each weighted child of this Row REALLY gets. Same two
+        // corrections as BannerLayout's own slice -- see there for the long
+        // version. In short: no ring is ever drawn on this tier, because useBar
+        // was assigned showsRing and so the `showsRing && !useBar` ring branch
+        // read `showsRing && !showsRing`; subtracting a ring edge therefore cost
+        // both weighted children width they actually had. And the measurement
+        // has to be against the PADDED content width, not the raw tile width, or
+        // ActionButtons' capacity check is handed a slice wider than the row
+        // really is and fits one button too many.
+        //
+        // The height-capped ringEdge this used to compute went with it: it existed
+        // only to be subtracted here and to feed the unreachable branch.
+        val w = size.width - Scale.contentPadding(size) * 2
+        val slice = ((w - 8.dp) / 2).coerceAtLeast(24.dp)
+        // Same call as BANNER: this tile is wide, not compact/vertical, so the
+        // bar is the treatment here rather than a fallback for a shrinking ring.
         Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            if (showsRing && !useBar) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
-                Spacer(GlanceModifier.width(10.dp))
-            }
             // BUG this fixes: ActionButtons' own default modifier is
             // fillMaxWidth(), which is correct when it's the sole/last child
             // of a Column (every other call site) but wrong here -- as a
@@ -757,7 +757,7 @@ class CarWidget : GlanceAppWidget() {
             // Giving it a weight too makes it share the remaining space
             // fairly with the text column instead of overrunning it.
             Column(modifier = GlanceModifier.defaultWeight()) {
-                if (useBar) {
+                if (showsRing) {
                     BarHero(car, render, width = slice)
                 } else {
                     NameAndStat(car, render, width = slice)
@@ -2094,11 +2094,7 @@ class CarWidget : GlanceAppWidget() {
         // condition for any of them appearing.
         val perButton = if (stack) availableWidth
             else ((availableWidth - gap * (actions.size - 1)) / actions.size).coerceAtLeast(0.dp)
-        val labelStyle = TextStyle(
-            color = render.theme.onAccent,
-            fontSize = (Scale.subtitleSp(size).value * render.theme.textScale).sp,
-            fontWeight = FontWeight.Medium,
-        )
+        val labelStyle = buttonLabelStyle(render.theme)
         val labelRoom = perButton - (Scale.buttonIcon(size) + 14.dp)
         val showLabels = (if (stack) stackHeight else rowHeight) >= 36.dp &&
             actions.all { !wouldOverflow(it.label, labelStyle, labelRoom) }
@@ -2256,11 +2252,7 @@ class CarWidget : GlanceAppWidget() {
             // defrost, or "cool the battery". Where there's room, the button
             // says which.
             if (showLabel) {
-                val labelStyle = TextStyle(
-                    color = theme.onAccent,
-                    fontSize = (Scale.subtitleSp(size).value * theme.textScale).sp,
-                    fontWeight = FontWeight.Medium,
-                )
+                val labelStyle = buttonLabelStyle(theme)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
                         provider = ImageProvider(iconFor(action)),
@@ -2630,6 +2622,25 @@ class CarWidget : GlanceAppWidget() {
     private fun valueStyle(theme: WidgetTheme) = TextStyle(
         color = theme.onSurface,
         fontSize = (Scale.valueSp(LocalSize.current).value * theme.textScale).sp,
+        fontWeight = FontWeight.Medium,
+    )
+
+    /**
+     * The label style on an [ActionButton].
+     *
+     * Here rather than at its two use sites because those two sites are the fit
+     * TEST and the RENDER: [ActionButtons] builds this style to ask whether every
+     * label fits its slot (via [wouldOverflow], which measures character count
+     * against font size) and [ActionButton] rebuilt an identical copy to actually
+     * draw them. Two independent copies of the input to a measurement and the
+     * thing being measured is the one duplication in this file that can't merely
+     * look wrong -- drift either shows labels that don't fit, or hides labels that
+     * would have.
+     */
+    @Composable
+    private fun buttonLabelStyle(theme: WidgetTheme) = TextStyle(
+        color = theme.onAccent,
+        fontSize = (Scale.subtitleSp(LocalSize.current).value * theme.textScale).sp,
         fontWeight = FontWeight.Medium,
     )
 

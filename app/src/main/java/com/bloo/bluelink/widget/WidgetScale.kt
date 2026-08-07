@@ -79,25 +79,17 @@ internal object Scale {
         return if (room < MIN_RING) 0.dp else room
     }
 
-    /**
-     * The ring for a WIDE tier's RingWithContent row -- [ring]'s own 140dp
-     * curve ceiling applies there too, and on a big LARGE/XL wide tile that
-     * left most of the ring's own row empty above and below a comparatively
-     * tiny circle: reported from real devices, a 300dp-tall ring row with a
-     * 140dp ring floating in the middle of it.
-     *
-     * Same "take the room you're given" fix as [ringHero], but bounded by a
-     * FRACTION of the tile's width rather than nearly all of it -- here the
-     * ring shares its row with a whole second column (header/info/buttons),
-     * so it can't claim the width [ringHero] can when it's the only thing on
-     * the row. 0.42 leaves the content column the majority side of the
-     * split RingWithContent already settles into above its minRowWidth
-     * threshold.
-     */
-    fun ringWide(size: DpSize, maxAvailable: Dp): Dp {
-        val room = minOf(maxAvailable, size.width * 0.42f)
-        return if (room < MIN_RING) 0.dp else room
-    }
+    // ringWide() was removed. It bounded a WIDE tier's ring to 0.42 of the tile
+    // width, which fixed a real device report (a 300dp-tall ring row with a 140dp
+    // ring floating in the middle of it) -- but the wide tiers then moved to the
+    // BAR treatment outright (BarHero/ChargeBar running the full width under the
+    // header) rather than a ring in a side column, and nothing called it again.
+    //
+    // Deleted rather than left in place because it was the misleading kind of dead
+    // code: a considered 14-line docstring presenting itself as the live answer to
+    // "how does a wide tile size its ring", for a question the code no longer
+    // asks. Ring-vs-bar is decided by the WidgetTier dispatch in CarWidget.Content;
+    // within a tier, Scale.ring returning 0 is what selects ChargeBarFallback.
 
     /** Estimated height of an [InfoStack] of [rows] rows, so a tall tier
      *  can leave space for it before handing the rest to [ringHero]. */
@@ -230,9 +222,13 @@ internal object Scale {
     /** Height of the horizontal charge bar. */
     fun barHeight(size: DpSize): Dp = lerp(progress(size), 8f, 14f).dp
 
-    /** Below this the ring is a token rather than a gauge, and a wide tile
-     *  is better served by the bar treatment -- see BarHero. */
-    val RING_WORTH_IT = 52.dp
+    // RING_WORTH_IT (52.dp) was removed along with ringWide(). It was the
+    // threshold below which a wide tile fell back from a ring to a bar -- a
+    // decision no tier makes any more, since the wide tiers now take the bar
+    // unconditionally. Nothing read it; three comments in CarWidget referred to
+    // it, all of them saying the bar is "no longer just a fallback below
+    // RING_WORTH_IT", which is exactly why keeping the constant around to be
+    // named by its own obituary was worse than deleting it.
 
     /** Smallest button width worth laying out, scaled by tile size. Small
      *  tiles get a much lower floor so every configured control still fits
