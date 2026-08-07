@@ -5149,11 +5149,22 @@ private fun HeroHeader(
             // It was three stacked lines -- title, then range, then the bar -- which left
             // the bar sitting oddly low with the whole card padded around it. Two rows reads
             // as a status line with a gauge under it, which is what it is.
-            titleTrailing = listOfNotNull(
-                status?.percentFor(hasBattery)?.let { "$it%" },
-                status?.rangeMiFor(hasBattery)?.let { formatDistance(it, metric) },
-                if (charging) "Charging" else null,
-            ).joinToString(" · ").ifBlank { null },
+            // Collapsed only. Expanded, the full readout at the bottom of the image already
+            // states the percentage and the range, and having both visible meant the same
+            // two numbers rendered twice in one card -- the duplication you spotted, and
+            // the same class of bug as the widget's MEDIUM tiers showing percent twice.
+            //
+            // One copy VISIBLE at a time is not yet one copy that MOVES. That needs a real
+            // shared-element transition and is the remaining work; see the commit message.
+            titleTrailing = if (photoExpanded) {
+                null
+            } else {
+                listOfNotNull(
+                    status?.percentFor(hasBattery)?.let { "$it%" },
+                    status?.rangeMiFor(hasBattery)?.let { formatDistance(it, metric) },
+                    if (charging) "Charging" else null,
+                ).joinToString(" · ").ifBlank { null }
+            },
             summary = null,
             headerContent = {
                 // Collapsed only: expanded already carries the full readout along the bottom
