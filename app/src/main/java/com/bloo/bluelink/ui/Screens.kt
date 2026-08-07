@@ -316,7 +316,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -5080,15 +5079,23 @@ private fun HeroHeader(
                 ) {
                     Box {
                         HeroVisual(v, imageUrl, height, PebbleCornerExpanded, aspectRatio = 16f / 9f)
-                        // Header text sits on top of an arbitrary photo, and against a light
-                        // car it vanishes. The widget hit exactly this and solved it with a
-                        // luminance check; a top-down scrim is the cheap version and is
-                        // enough here because only the top strip is overlaid.
+                        // Contrast, not decoration. Every overlaid element -- title, subtitle,
+                        // chevron, the whole charge readout -- sits on an arbitrary photo, and
+                        // against a light car they all disappear. The widget hit the same
+                        // thing and solved it with a luminance check on the resolved accent.
+                        //
+                        // The first attempt scrimmed only the top strip and faded to clear by
+                        // 45%, on the assumption that just the header row was overlaid. It is
+                        // not: the bar is over the image too. So this covers the FULL height
+                        // and never reaches transparent -- heaviest at the top where the
+                        // title and chevron are, easing to a floor that still holds the bar's
+                        // numbers legible over a bright bonnet.
                         Spacer(
                             Modifier.matchParentSize().background(
                                 Brush.verticalGradient(
-                                    0f to Color.Black.copy(alpha = 0.55f),
-                                    0.45f to Color.Transparent,
+                                    0f to Color.Black.copy(alpha = 0.78f),
+                                    0.35f to Color.Black.copy(alpha = 0.62f),
+                                    1f to Color.Black.copy(alpha = 0.45f),
                                 ),
                             ),
                         )
@@ -5096,26 +5103,16 @@ private fun HeroHeader(
                 }
             },
             persistentContent = {
-                // Survives the collapse and shrinks into it. Same composable, same copy,
-                // one instance -- so the collapsed and expanded readouts cannot disagree.
+                // Full width, normal type, both states. The collapsed hero is just a normal
+                // pebble that happens to carry the charge readout.
                 //
-                // The width animates with it: narrow while tucked under the header, full
-                // card width once it has been pushed to the bottom. Same spatial spec as
-                // the type scale inside it, so the width, the font sizes and the travel
-                // down the card are all one motion rather than three that happen to
-                // overlap.
-                val barWidth by animateFloatAsState(
-                    targetValue = if (photoExpanded) 1f else 0.62f,
-                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                    label = "chargeBarWidth",
-                )
-                Box(Modifier.fillMaxWidth(barWidth)) {
-                    ChargeFuelBar(
-                        status, hasBattery, hasFuel, drivingLabel,
-                        metric = metric,
-                        compact = !photoExpanded,
-                    )
-                }
+                // It used to shrink to 62% width and step the type down a size when
+                // collapsed. That was the wrong instinct: it made the collapsed card read
+                // as a special half-broken variant of itself rather than as an ordinary
+                // pebble, which is the whole point of having moved the hero onto
+                // PebbleShell. The state difference is the background image, not a
+                // different-looking bar.
+                ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
             },
         ) {
             // Deliberately empty. The photo moved to `background` so it can sit behind the
@@ -5508,36 +5505,11 @@ private fun ChargeFuelBar(
     hasFuel: Boolean,
     drivingLabel: String? = null,
     metric: Boolean = false,
-    /**
-     * Shrink the readout without changing what it says.
-     *
-     * Interpolates the real type scale rather than scaling a rendered bitmap: `t` runs
-     * 0..1 on the theme's SPATIAL spec (size is a spatial property per M3) and the
-     * headline and range styles are lerped between their full and compact steps, so
-     * every intermediate frame draws text at a genuine font size instead of a stretched
-     * texture. graphicsLayer scaling would have been one line and would have looked
-     * soft the whole way through, and permanently soft at rest in the compact state.
-     *
-     * Same composable, same copy, same instance -- only the scale differs, so the
-     * collapsed and expanded readouts cannot drift apart.
-     */
-    compact: Boolean = false,
 ) {
-    val t by animateFloatAsState(
-        targetValue = if (compact) 1f else 0f,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "chargeBarCompact",
-    )
-    val headlineStyle = lerp(
-        MaterialTheme.typography.displayMedium,
-        MaterialTheme.typography.headlineMedium,
-        t,
-    )
-    val rangeStyle = lerp(
-        MaterialTheme.typography.titleLarge,
-        MaterialTheme.typography.titleMedium,
-        t,
-    )
+    // The `compact` variant that used to live here is gone with the collapsed hero's
+    // shrink-and-narrow behaviour. One size, so there is nothing to keep in sync.
+    val headlineStyle = MaterialTheme.typography.displayMedium
+    val rangeStyle = MaterialTheme.typography.titleLarge
     val fuelPct = status?.fuelLevel
     val pct = status?.percentFor(hasBattery)
     val frac = ((pct ?: 0).coerceIn(0, 100)) / 100f
