@@ -5102,24 +5102,24 @@ private fun HeroHeader(
                     }
                 }
             },
-            persistentContent = {
-                // Full width, normal type, both states. The collapsed hero is just a normal
-                // pebble that happens to carry the charge readout.
-                //
-                // It used to shrink to 62% width and step the type down a size when
-                // collapsed. That was the wrong instinct: it made the collapsed card read
-                // as a special half-broken variant of itself rather than as an ordinary
-                // pebble, which is the whole point of having moved the hero onto
-                // PebbleShell. The state difference is the background image, not a
-                // different-looking bar.
-                ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
-            },
+            // Collapsed, this is exactly what every other pebble is: header, chevron and a
+            // summary line. No custom slot.
+            //
+            // I had invented a `persistentContent` slot so the bar could survive the
+            // collapse, then spent three passes making the resulting half-collapsed card
+            // look right. It never was: the standard framework already answers "what does
+            // this pebble say when closed" with `summary`, and a pebble that keeps a chunk
+            // of its body visible is by definition not a normal pebble. The slot is gone.
+            summary = listOfNotNull(
+                status?.percentFor(hasBattery)?.let { "$it%" },
+                status?.rangeMiFor(hasBattery)?.let { formatDistance(it, metric) },
+                if (charging) "Charging" else null,
+            ).joinToString(" · ").ifBlank { null },
         ) {
-            // Deliberately empty. The photo moved to `background` so it can sit behind the
-            // header; the bar is persistentContent. What "expanded" now means for this
-            // pebble is that the background image is showing and the bar has been pushed
-            // to the bottom -- the body itself has nothing left to hold.
-            Spacer(Modifier.height(0.dp))
+            // The body is the charge readout. The photo is not here -- it is the card's
+            // `background`, which is what lets it run up behind the header instead of
+            // sitting under it as another child.
+            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
         return
     }
@@ -7855,20 +7855,6 @@ private fun PebbleShell(
     headerAction: PebbleHeaderAction? = null,
     forceExpanded: Boolean = false,
     /**
-     * Content that stays visible in BOTH states, rendered between the header and the
-     * collapsing body.
-     *
-     * Added for the hero, whose charge bar has to survive the collapse: it is the one
-     * readout the card exists for, and a summary STRING could only restate the numbers
-     * in words while losing the bar itself. Putting it here means there is exactly one
-     * ChargeFuelBar instance, in one place in the tree, that resizes -- rather than a
-     * second copy composed into the header and cross-faded against the first, which is
-     * how the same numbers end up rendered twice and drift.
-     *
-     * Null for every other pebble, so their layout is byte-identical to before.
-     */
-    persistentContent: (@Composable ColumnScope.() -> Unit)? = null,
-    /**
      * Drawn BEHIND the header and the collapsing body, inside the card's clip.
      *
      * A pebble is otherwise a plain vertical stack with no z-order, so nothing could sit
@@ -8076,27 +8062,6 @@ private fun PebbleShell(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             content = content,
                         )
-                    }
-                    // AFTER the collapsing body, deliberately, and this is what makes the
-                    // persistent content appear to MOVE between two places while staying one
-                    // node in one call site.
-                    //
-                    // Collapsed, the body above has zero height, so this sits immediately under
-                    // the header -- reading as part of it. Expanded, the body grows and pushes
-                    // this to the bottom of the card. Because it is the same node throughout,
-                    // the Column re-lays it out continuously as the body's height springs, so
-                    // the travel is animated for free and stays in sync with the photo instead
-                    // of being a second animation timed to match.
-                    //
-                    // Rendering it in two places -- once in the header row, once at the bottom --
-                    // would have been two call sites, so two nodes, so a cross-fade between two
-                    // copies rather than one thing moving. Animating a composable across a
-                    // genuine parent change needs LookaheadScope and Modifier.animateBounds;
-                    // this gets the same read without it.
-                    persistentContent?.let { persistent ->
-                        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp)) {
-                            persistent()
-                        }
                     }
                 }
             }
