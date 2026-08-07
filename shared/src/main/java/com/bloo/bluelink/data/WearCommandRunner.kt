@@ -85,7 +85,7 @@ object WearCommandRunner {
                     WearAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
                     // Momentary, not stateful -- no snap field to flip, so
                     // these fall through optimistic()/resolveToggle()/
-                    // inverse() below untouched (their `else` branches).
+                    // stateFor() below untouched (their `else` branches).
                     WearAction.FLASH_LIGHTS -> { repo.flashLights(v); snap }
                     WearAction.HORN_AND_LIGHTS -> { repo.hornAndLights(v); snap }
                     else -> return@withLock WearCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
@@ -118,17 +118,46 @@ object WearCommandRunner {
         else -> action
     }
 
-    /** The verb whose [optimistic] write undoes [action]'s — for reverting a
-     *  failed command's optimistic flip. (TOGGLE_* maps to itself since a second
-     *  flip restores the original state.) */
-    fun inverse(action: String): String = when (action) {
-        WearAction.LOCK -> WearAction.UNLOCK
-        WearAction.UNLOCK -> WearAction.LOCK
-        WearAction.CLIMATE_ON -> WearAction.CLIMATE_OFF
-        WearAction.CLIMATE_OFF -> WearAction.CLIMATE_ON
-        WearAction.CHARGE_ON -> WearAction.CHARGE_OFF
-        WearAction.CHARGE_OFF -> WearAction.CHARGE_ON
-        else -> action
+    // inverse() was removed. It returned the verb whose optimistic() write undid
+    // another's, and both revert sites used it as `optimistic(snap, inverse(action))`
+    // to roll back a failed command's flip. That is only an undo when the flip
+    // actually changed something. optimistic() writes an absolute value, so when the
+    // field had been null -- the car has never reported it -- the "undo" invented a
+    // definite false out of nothing, and the widget or tile went on to state plainly
+    // that a car whose doors it knows nothing about is Unlocked. Nothing about the
+    // post-flip snapshot could have told it otherwise; the information was gone
+    // before the revert ran.
+    //
+    // Deleted rather than kept alongside the fix because leaving it would leave two
+    // ways to revert, one of which is wrong in a case the other exists to handle.
+    // Use [stateFor] before the flip and [withState] after the failure.
+
+    /**
+     * The snapshot field [action]'s [optimistic] prediction will overwrite, read
+     * BEFORE that prediction is stored so a failed command can put back exactly what
+     * was there.
+     *
+     * Returns null both for "the car has never reported this" and for verbs that
+     * change no snapshot field at all, and those two cases want the same thing from
+     * [withState] anyway -- put back nothing definite. Accepts TOGGLE_* as well as
+     * the resolved verbs so it can be called on either side of [resolveToggle].
+     */
+    fun stateFor(snap: VehicleSnapshot, action: String): Boolean? = when (action) {
+        WearAction.TOGGLE_LOCK, WearAction.LOCK, WearAction.UNLOCK -> snap.locked
+        WearAction.TOGGLE_CLIMATE, WearAction.CLIMATE_ON, WearAction.CLIMATE_OFF -> snap.climateOn
+        WearAction.TOGGLE_CHARGE, WearAction.CHARGE_ON, WearAction.CHARGE_OFF -> snap.charging
+        else -> null
+    }
+
+    /** Puts a value read by [stateFor] back into the field [action] touches — the
+     *  revert half. Restoring null is meaningful and intended: it returns the field
+     *  to "unknown", which every surface already knows how to render as nothing
+     *  rather than as a state the car never reported. */
+    fun withState(snap: VehicleSnapshot, action: String, value: Boolean?): VehicleSnapshot = when (action) {
+        WearAction.TOGGLE_LOCK, WearAction.LOCK, WearAction.UNLOCK -> snap.copy(locked = value)
+        WearAction.TOGGLE_CLIMATE, WearAction.CLIMATE_ON, WearAction.CLIMATE_OFF -> snap.copy(climateOn = value)
+        WearAction.TOGGLE_CHARGE, WearAction.CHARGE_ON, WearAction.CHARGE_OFF -> snap.copy(charging = value)
+        else -> snap
     }
 
     /** The snapshot a command is expected to produce, for instant optimistic UI. */

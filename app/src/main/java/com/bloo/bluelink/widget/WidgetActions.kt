@@ -46,6 +46,12 @@ class WidgetCommandAction : ActionCallback {
         // flipped snapshot would invert the command — see WearCommandRunner).
         val resolved = WearCommandRunner.resolveToggle(snap, wearAction)
 
+        // Read the field the flip is about to overwrite, while it still holds the
+        // real value. The worker reverts with this rather than by applying an
+        // opposite verb, because an opposite verb can't put back "the car never told
+        // us" -- it would replace an unknown lock state with a definite "unlocked".
+        val previous = WearCommandRunner.stateFor(snap, resolved)
+
         // Only stateful toggles get an optimistic flip; momentary verbs (flash/horn)
         // have no snapshot field to change.
         if (action.kind == WidgetAction.Kind.TOGGLE) {
@@ -53,7 +59,11 @@ class WidgetCommandAction : ActionCallback {
             CarWidget().updateAll(context)
         }
 
-        WidgetCommandWorker.enqueue(context, vin, resolved, revertIfToggle = action.kind == WidgetAction.Kind.TOGGLE)
+        WidgetCommandWorker.enqueue(
+            context, vin, resolved,
+            revertIfToggle = action.kind == WidgetAction.Kind.TOGGLE,
+            previous = previous,
+        )
     }
 }
 
@@ -88,6 +98,10 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         val action = inputData.getString(KEY_ACTION)
         val refresh = inputData.getBoolean(KEY_REFRESH, false)
         val revert = inputData.getBoolean(KEY_REVERT, false)
+        // toBooleanStrictOrNull maps "true"/"false" and leaves anything else null --
+        // which covers both the deliberate "unknown" marker enqueue writes and a
+        // work item enqueued before this key existed. Both mean the same thing here.
+        val previous = inputData.getString(KEY_PREV)?.toBooleanStrictOrNull()
 
         if (refresh) {
             runCatching { WearCommandRunner.refresh(ctx, vin, force = true) }
@@ -98,11 +112,18 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
 
         val result = WearCommandRunner.execute(ctx, WearCommand(vin = vin, action = action))
         if (!result.ok && revert) {
-            // Undo the optimistic flip the tap callback applied.
+            // Undo the optimistic flip the tap callback applied, by writing back the
+            // value it captured beforehand -- not by applying the opposite verb.
+            // Opposite-verb undo works only when the flip changed something, and an
+            // absent value ("the car has never reported its doors") would come back
+            // as a definite false, i.e. the widget confidently showing Unlocked on
+            // the strength of nothing. `previous` may legitimately be null, which
+            // restores the field to unknown, which the widget already renders as
+            // nothing rather than as a state.
             runCatching {
                 val store = SnapshotStore(ctx)
                 store.current().vehicles.firstOrNull { it.vin == vin }?.let {
-                    store.updateVehicle(WearCommandRunner.optimistic(it, WearCommandRunner.inverse(action)))
+                    store.updateVehicle(WearCommandRunner.withState(it, action, previous))
                 }
             }
         }
@@ -118,10 +139,32 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         private const val KEY_ACTION = "action"
         private const val KEY_REFRESH = "refresh"
         private const val KEY_REVERT = "revert"
+        private const val KEY_PREV = "prev"
 
-        fun enqueue(context: Context, vin: String, resolvedAction: String, revertIfToggle: Boolean) {
+        fun enqueue(
+            context: Context,
+            vin: String,
+            resolvedAction: String,
+            revertIfToggle: Boolean,
+            previous: Boolean?,
+        ) {
             val req = OneTimeWorkRequestBuilder<WidgetCommandWorker>()
-                .setInputData(workDataOf(KEY_VIN to vin, KEY_ACTION to resolvedAction, KEY_REVERT to revertIfToggle))
+                .setInputData(
+                    workDataOf(
+                        KEY_VIN to vin,
+                        KEY_ACTION to resolvedAction,
+                        KEY_REVERT to revertIfToggle,
+                        // A String, not a Boolean: the value is tri-state and the
+                        // third state is the entire reason it's being carried. A
+                        // Boolean extra would have to pick a default for "unknown"
+                        // on the way out, which is the bug this replaces.
+                        KEY_PREV to when (previous) {
+                            true -> "true"
+                            false -> "false"
+                            null -> "unknown"
+                        },
+                    ),
+                )
                 .build()
             // Unique per (vin, action) so a double-tap can't fire two concurrent
             // sessions for the same command.

@@ -6,11 +6,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 /**
- * Pure-JVM tests for [WearCommandRunner]'s three pure functions -- [resolveToggle],
- * [optimistic] and [inverse]. They had no coverage at all, which is a poor place for
- * this app to have none: between them they decide whether a tap on a widget button
- * or a watch tile sends LOCK or UNLOCK to somebody's car, and every out-of-process
- * surface routes through them.
+ * Pure-JVM tests for [WearCommandRunner]'s pure functions -- [resolveToggle],
+ * [optimistic], [stateFor] and [withState]. They had no coverage at all, which is a
+ * poor place for this app to have none: between them they decide whether a tap on a
+ * widget button or a watch tile sends LOCK or UNLOCK to somebody's car, and every
+ * out-of-process surface routes through them.
  *
  * The functions themselves take a [VehicleSnapshot] and return a value, so none of
  * this needs Android, DataStore or a network -- same shape as [SyncMergeTest].
@@ -155,79 +155,104 @@ class WearCommandRunnerTest {
         }
     }
 
-    // ---- inverse: reverting a failed command ----
+    // ---- stateFor / withState: reverting a failed command ----
 
+    /** [stateFor] reads the field the action's prediction will overwrite, and reads
+     *  the RIGHT one -- given three same-shaped branches over three same-typed
+     *  fields, a crossed wire here would revert the wrong thing and be invisible in
+     *  every other test. Checked with three distinct values so no two can be
+     *  confused. */
     @Test
-    fun inverseSwapsExplicitVerbsAndIsItsOwnUndo() {
-        val pairs = listOf(
-            WearAction.LOCK to WearAction.UNLOCK,
-            WearAction.CLIMATE_ON to WearAction.CLIMATE_OFF,
-            WearAction.CHARGE_ON to WearAction.CHARGE_OFF,
-        )
-        for ((on, off) in pairs) {
-            assertEquals(off, WearCommandRunner.inverse(on))
-            assertEquals(on, WearCommandRunner.inverse(off))
-            // Applying inverse twice is the identity, which is what makes it usable
-            // as "undo" at all.
-            assertEquals(on, WearCommandRunner.inverse(WearCommandRunner.inverse(on)))
+    fun stateForReadsTheFieldTheActionTouches() {
+        val s = snap(locked = true, climateOn = false, charging = null)
+
+        for (a in listOf(WearAction.TOGGLE_LOCK, WearAction.LOCK, WearAction.UNLOCK)) {
+            assertEquals(true, WearCommandRunner.stateFor(s, a), "wrong field for $a")
+        }
+        for (a in listOf(WearAction.TOGGLE_CLIMATE, WearAction.CLIMATE_ON, WearAction.CLIMATE_OFF)) {
+            assertEquals(false, WearCommandRunner.stateFor(s, a), "wrong field for $a")
+        }
+        for (a in listOf(WearAction.TOGGLE_CHARGE, WearAction.CHARGE_ON, WearAction.CHARGE_OFF)) {
+            assertNull(WearCommandRunner.stateFor(s, a), "wrong field for $a")
+        }
+        // Verbs that touch no stateful field have nothing to capture.
+        for (a in listOf(WearAction.FLASH_LIGHTS, WearAction.SET_CHARGE_LIMITS, WearAction.REFRESH)) {
+            assertNull(WearCommandRunner.stateFor(s, a))
         }
     }
 
-    /** TOGGLE_* is its own inverse, and the momentary verbs invert to themselves
-     *  (there is nothing to undo). */
+    /** [withState] writes back to the same field [stateFor] read from, and leaves
+     *  the other two alone -- the other half of the crossed-wire check above. */
     @Test
-    fun inverseIsIdentityForTogglesAndMomentaryVerbs() {
-        for (action in listOf(
-            WearAction.TOGGLE_LOCK, WearAction.TOGGLE_CLIMATE, WearAction.TOGGLE_CHARGE,
-            WearAction.FLASH_LIGHTS, WearAction.HORN_AND_LIGHTS, WearAction.SET_CHARGE_LIMITS,
-        )) {
-            assertEquals(action, WearCommandRunner.inverse(action))
-        }
+    fun withStateWritesOnlyTheFieldTheActionTouches() {
+        val s = snap(locked = true, climateOn = true, charging = true)
+
+        val l = WearCommandRunner.withState(s, WearAction.LOCK, null)
+        assertNull(l.locked)
+        assertEquals(true, l.climateOn)
+        assertEquals(true, l.charging)
+
+        val c = WearCommandRunner.withState(s, WearAction.CLIMATE_OFF, false)
+        assertEquals(false, c.climateOn)
+        assertEquals(true, c.locked)
+        assertEquals(true, c.charging)
+
+        val ch = WearCommandRunner.withState(s, WearAction.TOGGLE_CHARGE, null)
+        assertNull(ch.charging)
+        assertEquals(true, ch.locked)
+        assertEquals(true, ch.climateOn)
+
+        assertSame(s, WearCommandRunner.withState(s, WearAction.FLASH_LIGHTS, false))
     }
 
     /**
-     * Reverting a failed command with [inverse] restores the original state only
-     * when the original was known. When it was null, the revert invents a definite
-     * `false` out of nothing.
+     * THE reason [stateFor] and [withState] exist, and the bug they replaced.
      *
-     * This test asserts the behaviour as it currently is, and it is asserting a
-     * defect, deliberately: both revert call sites (WidgetActions'
-     * WidgetCommandWorker and WearComms' runStandalone) apply
-     * `optimistic(snap, inverse(action))` to undo a flip, which cannot recover
-     * information [optimistic] threw away. So a car that had never reported its
-     * doors, whose LOCK command then failed, ends up displayed as "Unlocked" --
-     * a confident claim built entirely out of a missing value, on exactly the
-     * surfaces (widget, tile) that have no room to explain themselves.
+     * Both revert sites -- WidgetActions' WidgetCommandWorker and WearComms'
+     * runStandalone -- capture before the optimistic flip and restore after a
+     * failure. This asserts the full round trip holds for EVERY tri-state starting
+     * value, including null.
      *
-     * It matters because null is handled carefully elsewhere on purpose: the
-     * widget's StatusGlyph draws nothing at all rather than guess at an unknown
-     * lock state. This path quietly undoes that protection.
-     *
-     * Fixing it needs the pre-flip value carried through to the revert instead of
-     * being re-derived from a verb -- the widget's across WorkManager input data,
-     * the watch's out of applyOptimistic. When that lands, the null case in this
-     * test should start failing, and the assertions below should become
-     * `assertNull`. The two known-state cases must keep passing either way.
+     * Null is the case that used to break. The revert was
+     * `optimistic(snap, inverse(action))`, which is an undo only when the flip
+     * changed something: on a car that had never reported its doors, the flip wrote
+     * `true` over a null and the inverse wrote `false`, so a failed command left the
+     * widget or tile stating that a car it knew nothing about was unlocked. The
+     * information needed to do better was gone by then -- optimistic() writes an
+     * absolute value. Capturing beforehand is what makes null recoverable, and it is
+     * worth recovering: the widget's StatusGlyph draws nothing at all for an unknown
+     * lock state rather than guess, and the old revert quietly defeated that.
      */
     @Test
-    fun inverseRevertRestoresKnownStateButNotUnknownState() {
-        for (known in listOf(true, false)) {
-            val before = snap(locked = known)
-            val resolved = WearCommandRunner.resolveToggle(before, WearAction.TOGGLE_LOCK)
-            val flipped = WearCommandRunner.optimistic(before, resolved)
-            val reverted = WearCommandRunner.optimistic(flipped, WearCommandRunner.inverse(resolved))
-            assertEquals(known, reverted.locked, "revert lost a known state")
-            assertEquals(before, reverted, "revert should be a full round trip")
-        }
+    fun captureThenRestoreRoundTripsEveryTriState() {
+        for (before in listOf(true, false, null)) {
+            for (toggle in listOf(WearAction.TOGGLE_LOCK, WearAction.TOGGLE_CLIMATE, WearAction.TOGGLE_CHARGE)) {
+                val start = when (toggle) {
+                    WearAction.TOGGLE_LOCK -> snap(locked = before)
+                    WearAction.TOGGLE_CLIMATE -> snap(climateOn = before)
+                    else -> snap(charging = before)
+                }
+                // Exactly the sequence both call sites run.
+                val resolved = WearCommandRunner.resolveToggle(start, toggle)
+                val captured = WearCommandRunner.stateFor(start, resolved)
+                val flipped = WearCommandRunner.optimistic(start, resolved)
+                val reverted = WearCommandRunner.withState(flipped, resolved, captured)
 
-        // The unknown case does NOT round-trip. Pinned so the day someone fixes it,
-        // this test tells them they did.
-        val before = snap(locked = null)
-        val resolved = WearCommandRunner.resolveToggle(before, WearAction.TOGGLE_LOCK)
-        assertEquals(WearAction.LOCK, resolved)
-        val flipped = WearCommandRunner.optimistic(before, resolved)
-        assertEquals(true, flipped.locked)
-        val reverted = WearCommandRunner.optimistic(flipped, WearCommandRunner.inverse(resolved))
-        assertEquals(false, reverted.locked, "current behaviour: unknown reverts to a definite false")
+                assertEquals(before, captured, "$toggle captured the wrong value from $before")
+                assertEquals(start, reverted, "$toggle failed to round-trip from $before")
+            }
+        }
+    }
+
+    /** The optimistic flip must actually CHANGE something, or the revert would have
+     *  nothing to undo and the round-trip test above would pass trivially. */
+    @Test
+    fun theOptimisticFlipAlwaysChangesTheCapturedField() {
+        for (before in listOf(true, false, null)) {
+            val start = snap(locked = before)
+            val resolved = WearCommandRunner.resolveToggle(start, WearAction.TOGGLE_LOCK)
+            val flipped = WearCommandRunner.optimistic(start, resolved)
+            assertEquals(before != true, flipped.locked, "flip from $before went the wrong way")
+        }
     }
 }

@@ -114,6 +114,19 @@ object WearComms {
     }
 
     /**
+     * What [applyOptimistic] produced: the [command] to actually send, and
+     * [previous] -- the snapshot field's value from BEFORE the optimistic flip
+     * overwrote it.
+     *
+     * The two travel together because reverting a failed command needs both, and
+     * only the first was being carried. [previous] is deliberately nullable and a
+     * null is meaningful: it says the car had never reported that field, so a
+     * failure must restore "unknown" rather than invent a definite state. See
+     * [WearCommandRunner.stateFor].
+     */
+    data class Optimistic(val command: WearCommand, val previous: Boolean?)
+
+    /**
      * Just the "resolve TOGGLE_* to an explicit LOCK/UNLOCK etc. and flip the
      * local snapshot" half of [send], split out so a caller that needs the
      * optimistic update to have landed before it does something else (e.g.
@@ -128,28 +141,33 @@ object WearComms {
      * OPPOSITE action (tap Unlock → car re-locks). Resolving here also means the
      * phone relay carries the direction the user actually saw on the watch.
      */
-    suspend fun applyOptimistic(context: Context, command: WearCommand): WearCommand =
+    suspend fun applyOptimistic(context: Context, command: WearCommand): Optimistic =
         withContext(Dispatchers.IO) {
-            var resolved = command
+            var out = Optimistic(command, previous = null)
             runCatching {
                 val store = SnapshotStore(context)
                 store.current().vehicles.firstOrNull { it.vin == command.vin }?.let { snap ->
-                    resolved = command.copy(action = WearCommandRunner.resolveToggle(snap, command.action))
+                    val resolved = command.copy(action = WearCommandRunner.resolveToggle(snap, command.action))
+                    // Captured from `snap`, i.e. BEFORE the flip on the next line
+                    // lands. This is the only moment the real value is still
+                    // available -- optimistic() writes an absolute, so nothing
+                    // afterwards can tell whether the field had been unknown.
+                    out = Optimistic(resolved, WearCommandRunner.stateFor(snap, resolved.action))
                     // Optimistic update so the tile reacts the instant it's tapped.
                     store.updateVehicle(WearCommandRunner.optimistic(snap, resolved.action))
                 }
             }
-            resolved
+            out
         }
 
     /** The network half of [send] — relay an already-[applyOptimistic]-resolved
      *  command to the phone, or run it standalone if the phone is unreachable or
      *  drops the message mid-send. */
-    suspend fun relayCommand(context: Context, resolved: WearCommand): SendResult =
+    suspend fun relayCommand(context: Context, resolved: Optimistic): SendResult =
         withContext(Dispatchers.IO) {
             val node = phoneNodeId(context)
             val relayed = node != null &&
-                sendMessage(context, node, WearSync.PATH_COMMAND, WearSync.encodeCommand(resolved).toByteArray())
+                sendMessage(context, node, WearSync.PATH_COMMAND, WearSync.encodeCommand(resolved.command).toByteArray())
             when {
                 relayed -> SendResult.RELAYED
                 // No phone, or the phone dropped mid-send — fall back to standalone.
@@ -161,19 +179,25 @@ object WearComms {
     /** Execute a command on the watch's own connection and, on failure, post a
      *  native watch notification — the phone isn't there to report the outcome.
      *  On failure this also reverts the optimistic flip [applyOptimistic] made
-     *  earlier by writing the inverse action's optimistic state back into the
-     *  snapshot store, so a UI that already jumped to "locked" because of the
-     *  optimistic update flips back to "unlocked" once the real command is known
-     *  to have failed, instead of showing a state that never actually happened
-     *  on the car. */
-    private suspend fun runStandalone(context: Context, command: WearCommand): Boolean {
+     *  earlier, by writing back the value [Optimistic.previous] captured before that
+     *  flip -- so a UI that already jumped to "locked" returns to whatever was
+     *  actually there once the command is known to have failed, instead of showing a
+     *  state that never happened on the car.
+     *
+     *  It used to revert by applying the inverse verb's optimistic write, which is
+     *  an undo only when the flip changed something. On a car that had never
+     *  reported its doors the flip wrote `true` over a null and the inverse wrote
+     *  `false`, so a failed command left the watch stating that a car it knew
+     *  nothing about was unlocked. Restoring the captured value puts the null back. */
+    private suspend fun runStandalone(context: Context, sent: Optimistic): Boolean {
+        val command = sent.command
         val result = WearCommandRunner.execute(context, command)
         if (!result.ok) {
             AppLog.log("⚠ Watch standalone command failed: ${command.action} → ${result.message}")
             runCatching {
                 val store = SnapshotStore(context)
                 store.current().vehicles.firstOrNull { it.vin == command.vin }?.let {
-                    store.updateVehicle(WearCommandRunner.optimistic(it, WearCommandRunner.inverse(command.action)))
+                    store.updateVehicle(WearCommandRunner.withState(it, command.action, sent.previous))
                 }
             }
             WearNotifications.post(
