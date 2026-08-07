@@ -5041,6 +5041,46 @@ private fun HeroHeader(
     // dead gradient box (no photo) plus a black void below. When on the cover, fill
     // the tile height, centre the content, and drop the empty photo box entirely.
     val cover = LocalForceExpanded.current
+    if (!cover) {
+        // On the phone the hero IS a pebble now, built on the same PebbleShell as every
+        // other one: header with icon, title, summary and the standard chevron, and a body
+        // that collapses with the shared collapseEnter/collapseExit transition.
+        //
+        // This replaces a bespoke Card with a MorphExpandButton bolted beside the charge
+        // bar. That version worked, but it was a card that looked like a pebble and
+        // collapsed like a pebble while sharing none of the mechanism -- so it
+        // re-implemented the shadow, outline, corner, drag-handle plumbing and toggle
+        // placement, and would have drifted from the real pebbles the first time any of
+        // those changed.
+        //
+        // The photo needs no collapse logic of its own any more either: PebbleShell hides
+        // the whole body when collapsed, so "no image when collapsed" falls out of the
+        // shared component instead of being a rule this function enforces.
+        val pct = status?.percentFor(hasBattery)
+        val range = status?.rangeMiFor(hasBattery)
+        PebbleShell(
+            expanded = photoExpanded,
+            onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
+            icon = Icons.Filled.DirectionsCar,
+            title = v.name,
+            vm = vm,
+            dragHandle = dragHandle,
+            // The collapsed state has to stay worth looking at, so the header carries the
+            // two numbers the hero exists to show. Without this, collapsing the summary
+            // pebble would hide the charge readout and leave only a car name, which is
+            // what would make it feel broken rather than compact. Charging is called out
+            // because it is the one state where the number is actively moving.
+            summary = listOfNotNull(
+                pct?.let { "$it%" },
+                range?.let { formatDistance(it, metric) },
+                if (charging) "Charging" else null,
+            ).joinToString(" · ").ifBlank { null },
+        ) {
+            HeroVisual(v, imageUrl, height, (PebbleCornerExpanded - 16.dp).coerceAtLeast(8.dp))
+            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
+        }
+        return
+    }
     Card(
         modifier = Modifier.fillMaxWidth().then(if (cover) Modifier.fillMaxHeight() else Modifier).then(dragHandle).graphicsLayer {
             alpha = heroAlpha.value
@@ -5069,49 +5109,19 @@ private fun HeroHeader(
             // Skip the fixed-height photo box on the cover when there's no photo — it
             // was just a dead gradient rectangle. With it gone, ChargeFuelBar (the
             // actual glance content: %, range, charging state) centres as the hero.
-            if (!(cover && imageUrl.isNullOrBlank())) {
-                // On the flip cover the hero is a full-screen centred tile with room to
-                // spare, so show the car photo bigger there; phone/normal keeps `height`.
-                // Concentric with the card: an inner radius should be the
-                // outer one MINUS the inset between them, otherwise two
-                // near-equal radii at different insets read as a mistake --
-                // which is what a 20dp card around an 18dp photo inset by
-                // 16dp was doing. Floored so it stays visibly rounded.
-                val outer = if (cover) corner else PebbleCornerExpanded
-                val innerCorner = (outer - 16.dp).coerceAtLeast(8.dp)
-                if (cover) {
-                    // The flip cover is always expanded: there the photo IS the content of
-                    // a centred full-screen tile.
-                    HeroVisual(v, imageUrl, 210.dp, innerCorner)
-                    Spacer(Modifier.height(12.dp))
-                } else {
-                    // Carries its own trailing spacer so the gap collapses with it.
-                    CollapsibleHeroPhoto(photoExpanded) {
-                        HeroVisual(v, imageUrl, height, innerCorner)
-                    }
-                }
+            // Cover-only from here down: the phone path returns above as a PebbleShell, so
+            // `cover` is always true inside this Card and the photo always uses the bigger
+            // cover size.
+            //
+            // Concentric with the card: an inner radius should be the outer one MINUS the
+            // inset between them, otherwise two near-equal radii at different insets read as
+            // a mistake -- which is what a 20dp card around an 18dp photo inset by 16dp was
+            // doing. Floored so it stays visibly rounded.
+            if (!imageUrl.isNullOrBlank()) {
+                HeroVisual(v, imageUrl, 210.dp, (corner - 16.dp).coerceAtLeast(8.dp))
+                Spacer(Modifier.height(12.dp))
             }
-            if (cover) {
-                ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
-            } else {
-                // The toggle sits beside the bar rather than over the photo so it is
-                // visible in BOTH states -- that is what makes the feature discoverable
-                // and what lets the collapsed hero read as a deliberate compact card
-                // instead of a card missing its picture. MorphExpandButton is the app's
-                // own expand control (50dp target, rotating chevron, haptics, and an
-                // "Expanded"/"Collapsed" stateDescription for TalkBack), so this needed
-                // no new component and inherits all of that.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    MorphExpandButton(
-                        expanded = photoExpanded,
-                        onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
-                    )
-                }
-            }
+            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
     }
 }
@@ -5360,28 +5370,6 @@ private fun rememberPhotoModel(url: String): Any =
     remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
 
 /**
- * The hero photo, animating in and out.
- *
- * Rebuilt on the app's own collapse vocabulary after the first attempt got all three
- * things wrong: the affordance was a 28dp scrim chevron that nobody would find, the
- * collapsed state was an ad-hoc "Show photo" strip belonging to no design language in
- * this app, and there was no animation at all -- a bare `if` snapped the photo out of
- * existence and the card's height with it.
- *
- * Now it is the identical enter/exit spec every pebble body uses (see PebbleShell),
- * springs in both directions on the app's soft damping at medium-low stiffness. The
- * symmetry is deliberate, and PebbleShell records why: the collapse used to be a flat
- * tween against a sprung open, "which is what made closing feel like a snap next to a
- * smooth open".
- *
- * No animateContentSize wrapper, for the reason PebbleShell also documents -- expand/
- * shrinkVertically already animates the height, and a second independently-sprung
- * animateContentSize on top compounds two springs where the collapse needs one.
- *
- * The spacer is INSIDE the animated block so it collapses with the photo. Left outside,
- * a 12dp gap stayed behind and the collapsed hero had a dead band above its bar.
- */
-/**
  * The app's collapse/expand transition, supplied by the Material theme.
  *
  * M3 Expressive delivers motion as a theme subsystem: MaterialTheme.motionScheme exposes
@@ -5418,16 +5406,6 @@ private fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): Enter
 private fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
     fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
         shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)
-
-@Composable
-private fun CollapsibleHeroPhoto(expanded: Boolean, photo: @Composable () -> Unit) {
-    AnimatedVisibility(visible = expanded, enter = collapseEnter(), exit = collapseExit()) {
-        Column {
-            photo()
-            Spacer(Modifier.height(12.dp))
-        }
-    }
-}
 
 /** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
