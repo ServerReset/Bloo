@@ -5129,13 +5129,16 @@ private fun HeroHeader(
             // look right. It never was: the standard framework already answers "what does
             // this pebble say when closed" with `summary`, and a pebble that keeps a chunk
             // of its body visible is by definition not a normal pebble. The slot is gone.
-            // Percent is NOT here: it is on the mini bar below, and putting it in both
-            // places is how the same number gets rendered twice and then drifts -- the bug
-            // I already had to fix on the widget's MEDIUM tiers.
-            summary = listOfNotNull(
+            // Name, percentage and range share ONE row, with the bar directly under it.
+            // It was three stacked lines -- title, then range, then the bar -- which left
+            // the bar sitting oddly low with the whole card padded around it. Two rows reads
+            // as a status line with a gauge under it, which is what it is.
+            titleTrailing = listOfNotNull(
+                status?.percentFor(hasBattery)?.let { "$it%" },
                 status?.rangeMiFor(hasBattery)?.let { formatDistance(it, metric) },
                 if (charging) "Charging" else null,
             ).joinToString(" · ").ifBlank { null },
+            summary = null,
             headerContent = {
                 // Collapsed only: expanded already carries the full readout along the bottom
                 // of the image. Animated with the shared transition so it arrives as the
@@ -5145,28 +5148,14 @@ private fun HeroHeader(
                     enter = collapseEnter(),
                     exit = collapseExit(),
                 ) {
+                    // Just the gauge. The percentage moved to the title row above, so this
+                    // is the full width of the column with nothing competing for it, sitting
+                    // directly under the text rather than a line below it.
                     val pct = status?.percentFor(hasBattery)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 6.dp),
-                    ) {
-                        // Full width, not a 72dp stub. ChargeSegmentBar is fillMaxWidth
-                        // plus a fixed height, so weighting it here gives the collapsed
-                        // pebble the real bar -- same segments, same colours, same
-                        // proportions as the expanded one -- with the percentage sat at
-                        // the end of the row rather than squeezed beside a token.
-                        Box(Modifier.weight(1f)) {
-                            ChargeSegmentBar(
-                                frac = ((pct ?: 0).coerceIn(0, 100)) / 100f,
-                                limitPct = null,
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            pct?.let { "$it%" } ?: "--",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                            maxLines = 1,
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                        ChargeSegmentBar(
+                            frac = ((pct ?: 0).coerceIn(0, 100)) / 100f,
+                            limitPct = null,
                         )
                     }
                 }
@@ -7907,6 +7896,9 @@ private fun PebbleShell(
     vm: AppViewModel,
     dragHandle: Modifier = Modifier,
     summary: String? = null,
+    /** Trailing text on the TITLE row -- a headline stat that would otherwise need a
+     *  third row of its own. Null for every other pebble. */
+    titleTrailing: String? = null,
     /**
      * Extra content in the header, under the title and [summary].
      *
@@ -8058,8 +8050,10 @@ private fun PebbleShell(
                             // car and no heading structure, TalkBack users could
                             // only reach a given section (Climate, Charge, ...) by
                             // swiping through every row of every pebble above it.
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 title,
+                                modifier = Modifier.weight(1f, fill = false),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 // Cap at one line: at a large display/font size the
@@ -8070,8 +8064,22 @@ private fun PebbleShell(
                                 // line + ellipsis keeps the title on its own line.
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.semantics { heading() },
                             )
+                            // Trailing text on the TITLE row, so a pebble that wants a
+                            // headline stat does not need a third row for it. The hero puts
+                            // its percentage and range here, which is what lets the collapsed
+                            // card be name-and-numbers over a bar instead of three stacked
+                            // lines with the bar stranded at the bottom.
+                            titleTrailing?.let {
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                    maxLines = 1,
+                                )
+                            }
+                            }
                             if (summary != null) {
                                 AnimatedContent(
                                     targetState = summary,
