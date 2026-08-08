@@ -1906,39 +1906,22 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     // identical problem with a roll-up row, so this borrows that pattern.
     val openCount = car.doorsOpen.size + car.windowsOpen.size +
         (if (car.trunkOpen) 1 else 0) + (if (car.hoodOpen) 1 else 0)
-    // hasLiveStatus gate. This was the ONE status card without it, so with no live status
-    // every field below defaulted to false and the card stated that as fact: an emphasised
-    // "Closed up -- All secure" for a car with a door open, plus "Engine Off" for a running
-    // one. DiagnosticsCard, which depends on the same data, is correctly hidden in that state,
-    // so this card was contradicting its absence.
-    //
-    // Only the CLAIMS are gated. VIN, odometer, plate and the service figures below come from
-    // the snapshot rather than a live status, so they stay outside -- an "Info" card that
-    // vanished entirely would lose real information in order to fix a wrong reading. Set temp
-    // IS inside, because it comes from the live status too.
-    if (!car.hasLiveStatus) {
-        Text(
-            "No live status yet. Refresh to see doors, engine and climate.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        StatusRow(
-            if (openCount > 0) "Open" else "Closed up",
-            if (openCount > 0) "$openCount item${if (openCount == 1) "" else "s"}" else "All secure",
-            valueColor = if (openCount > 0) err else null,
-            emphasize = true,
-        )
-        Spacer(Modifier.height(6.dp))
-        StatusRow("Engine", if (car.engineOn) "On" else "Off")
-        car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
-        StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
-        StatusRow("Defrost", if (car.defrostOn) "On" else "Off")
-        StatusRow("Accessory", if (car.accessoryOn) "On" else "Off")
-        val doorsLabel = when {
-            car.doorsOpen.isEmpty() -> "All closed"
-            car.doorsOpen.size == 1 -> car.doorsOpen.first()
-            else -> "${car.doorsOpen.size} open"
+    StatusRow(
+        if (openCount > 0) "Open" else "Closed up",
+        if (openCount > 0) "$openCount item${if (openCount == 1) "" else "s"}" else "All secure",
+        valueColor = if (openCount > 0) err else null,
+        emphasize = true,
+    )
+    Spacer(Modifier.height(6.dp))
+    StatusRow("Engine", if (car.engineOn) "On" else "Off")
+    car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
+    StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
+    StatusRow("Defrost", if (car.defrostOn) "On" else "Off")
+    StatusRow("Accessory", if (car.accessoryOn) "On" else "Off")
+    val doorsLabel = when {
+        car.doorsOpen.isEmpty() -> "All closed"
+        car.doorsOpen.size == 1 -> car.doorsOpen.first()
+        else -> "${car.doorsOpen.size} open"
     }
     StatusRow("Doors", doorsLabel, valueColor = if (car.doorsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
     val winsLabel = when {
@@ -1949,7 +1932,6 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     StatusRow("Windows", winsLabel, valueColor = if (car.windowsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
     if (car.trunkOpen) StatusRow("Trunk", "Open", valueColor = MaterialTheme.colorScheme.error)
     if (car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
-    }
     StatusRow("VIN", car.vin.takeLast(6))
     val metric = ui.localSettings.unitSystem == "metric"
     // car.odometer arrives as a display-formatted string (e.g. "12,345"), so
