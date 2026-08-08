@@ -6141,22 +6141,50 @@ internal fun RollingNumber(
     ) { t -> WiggleText(t, style = style, fontWeight = fontWeight, color = color) }
 }
 
-/** A coarse, self-ticking "x min ago" string for [millis] (null → null). */
+/**
+ * A coarse, self-ticking "x min ago" string for [millis] (null → null).
+ *
+ * Holds the LABEL in state rather than a clock, which is the whole efficiency of it. A
+ * `mutableStateOf` write only invalidates readers when the value actually changes, so a tick
+ * that recomputes "4h ago" and finds "4h ago" costs nothing at all. The previous version kept
+ * `now` in state and returned a value derived from it, so every tick invalidated its caller
+ * unconditionally -- for a car refreshed hours ago that was 120 recompositions an hour, each
+ * producing a byte-identical string, at three or four call sites, times however many car pages
+ * the pager holds live.
+ *
+ * The interval now matches the label's own resolution instead of being a flat 30s. Under a
+ * minute the text really does change every few seconds, so tick at 10s; under an hour it can
+ * only change once a minute; past that it cannot change more than every quarter of an hour.
+ * Strictly more responsive at the fine end and ~30x less work at the coarse end.
+ *
+ * Also gone: `if (now >= 0)`, which was always true (it tested a wall-clock millis) and existed
+ * only to make the composable read the state and thus subscribe to the timer. It worked, but a
+ * condition that cannot be false is a trap for the next reader -- holding the label in state
+ * makes the subscription honest and the guard unnecessary.
+ *
+ * The bucket thresholds themselves stay in shared/relativeLabel(), which owns them; this had
+ * drifted from that once already ("d ago" here vs "day ago" there).
+ */
 @Composable
 internal fun rememberRelativeTime(millis: Long?): String? {
     if (millis == null) return null
-    // Re-derives the bucket thresholds shared/relativeLabel() already owns
-    // (and had already drifted from it -- "d ago" here vs "day ago" there).
-    // `now` exists purely to force a recompute on a timer; relativeLabel()
-    // reads the wall clock itself.
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var label by remember(millis) {
+        mutableStateOf(com.bloo.bluelink.data.relativeLabel(millis))
+    }
     LaunchedEffect(millis) {
         while (true) {
-            now = System.currentTimeMillis()
-            delay(30_000)
+            val age = System.currentTimeMillis() - millis
+            delay(
+                when {
+                    age < 60_000L -> 10_000L
+                    age < 3_600_000L -> 60_000L
+                    else -> 900_000L
+                },
+            )
+            label = com.bloo.bluelink.data.relativeLabel(millis)
         }
     }
-    return if (now >= 0) com.bloo.bluelink.data.relativeLabel(millis) else null
+    return label
 }
 
 /** Small "Updated x ago" caption shown prominently under the car name. */
