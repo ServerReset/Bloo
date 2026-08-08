@@ -1580,7 +1580,7 @@ private data class SeatPosition(
     val cool: (SeatConfig) -> Boolean,
 )
 
-private val SeatPositions = listOf(
+internal val SeatPositions = listOf(
     SeatPosition("Driver", "dh", "dc", { it.driverHeat }, { it.driverCool }),
     SeatPosition("Front passenger", "ph", "pc", { it.passHeat }, { it.passCool }),
     SeatPosition("Rear left", "rlh", "rlc", { it.rearLeftHeat }, { it.rearLeftCool }),
@@ -1765,7 +1765,7 @@ private fun FireworksOverlay(modifier: Modifier = Modifier) {
 
 // --- Login ----------------------------------------------------------------
 
-private val FieldShape = RoundedCornerShape(18.dp)
+internal val FieldShape = RoundedCornerShape(18.dp)
 
 // A synced device not seen this long is flagged as possibly on a different Drive
 // file (the two-files trap) in the sync settings. 2 days is well past any normal
@@ -2480,7 +2480,7 @@ private fun AuroraBackground(
  * phones, flip-phone cover screens and tablets alike.
  */
 @Composable
-private fun LockOverlay(vm: AppViewModel) {
+internal fun LockOverlay(vm: AppViewModel) {
     val context = LocalContext.current
     val compact = isCompactCoverScreen()
     fun authenticate() {
@@ -2568,7 +2568,7 @@ private fun LockOverlay(vm: AppViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EmptyScreen(vm: AppViewModel) {
+internal fun EmptyScreen(vm: AppViewModel) {
     val state by vm.state.collectAsState()
     val scheme = MaterialTheme.colorScheme
 
@@ -2834,7 +2834,7 @@ private const val COVER_SCREEN_WIDTH_DP = 600
 /** True on a folding phone's compact cover screen; false on a full phone,
  *  foldable-unfolded, or tablet screen. See [COVER_SCREEN_HEIGHT_DP]. */
 @Composable
-private fun isCompactCoverScreen(): Boolean {
+internal fun isCompactCoverScreen(): Boolean {
     val cfg = LocalConfiguration.current
     return cfg.screenWidthDp < COVER_SCREEN_WIDTH_DP && cfg.screenHeightDp < COVER_SCREEN_HEIGHT_DP
 }
@@ -2920,7 +2920,7 @@ private fun cameraBumpPadding(): PaddingValues {
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-private fun GarageScreen(state: UiState, vm: AppViewModel) {
+internal fun GarageScreen(state: UiState, vm: AppViewModel) {
     val vehicles = state.vehicles
     if (vehicles.isEmpty()) return
     val appearance = LocalAppearance.current
@@ -4775,7 +4775,7 @@ private fun VerticalPagerDots(
  * drawing under the status bar at all, so it has nothing to scrim.
  */
 @Composable
-private fun StatusBarScrim() {
+internal fun StatusBarScrim() {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val scheme = MaterialTheme.colorScheme
     Box(
@@ -4797,7 +4797,7 @@ private fun StatusBarScrim() {
  *  (the cover screen's title row, at 2dp) keep that footprint down to 52dp on
  *  a ~260dp-tall screen. */
 @Composable
-private fun FloatingIcon(
+internal fun FloatingIcon(
     icon: ImageVector,
     description: String,
     onClick: () -> Unit,
@@ -5304,7 +5304,7 @@ private fun HeroHeader(
  * APK directly instead of opening a browser page.
  */
 @Composable
-private fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Modifier = Modifier) {
+internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Modifier = Modifier) {
     val info = state.updateAvailable
     // Stays visible during the pending-dismiss (undo) window — only the committed
     // updateTileDismissed truly hides it.
@@ -5502,7 +5502,7 @@ private fun carTonalBrush(scheme: ColorScheme): Brush =
  *  else the [carTonalBrush] fallback with a centered car icon. [cornerRadius]
  *  and [iconSize] vary per caller (the settings card vs. the tiles header). */
 @Composable
-private fun CarThumb(img: String?, size: Dp, cornerRadius: Dp, iconSize: Dp) {
+internal fun CarThumb(img: String?, size: Dp, cornerRadius: Dp, iconSize: Dp) {
     val scheme = MaterialTheme.colorScheme
     Box(
         modifier = Modifier.size(size).clip(RoundedCornerShape(cornerRadius)),
@@ -5529,7 +5529,7 @@ private fun CarThumb(img: String?, size: Dp, cornerRadius: Dp, iconSize: Dp) {
 /** The Coil model for a stored car photo: a [java.io.File] for a locally-cropped
  *  absolute path, or the raw URL string for a pasted one. */
 @Composable
-private fun rememberPhotoModel(url: String): Any =
+internal fun rememberPhotoModel(url: String): Any =
     remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
 
 // collapseEnter / collapseExit -- the app's one collapse spec -- now live in UiTokens.kt,
@@ -6110,7 +6110,7 @@ private val LocalPullFraction =
  * direction), falling back to a cross-fade when there's no number to compare.
  */
 @Composable
-private fun RollingNumber(
+internal fun RollingNumber(
     text: String,
     style: TextStyle,
     fontWeight: FontWeight,
@@ -6134,7 +6134,7 @@ private fun RollingNumber(
 
 /** A coarse, self-ticking "x min ago" string for [millis] (null → null). */
 @Composable
-private fun rememberRelativeTime(millis: Long?): String? {
+internal fun rememberRelativeTime(millis: Long?): String? {
     if (millis == null) return null
     // Re-derives the bucket thresholds shared/relativeLabel() already owns
     // (and had already drifted from it -- "d ago" here vs "day ago" there).
@@ -6217,7 +6217,7 @@ private fun Modifier.animatePlacement(): Modifier = composed {
  * [coldStartIntroPlayed].
  */
 @Composable
-private fun <T> ReorderColumn(
+internal fun <T> ReorderColumn(
     items: List<T>,
     keyOf: (T) -> Any,
     onReorder: (List<T>) -> Unit,
@@ -6405,7 +6405,7 @@ private fun <T> ReorderColumn(
  * a Canvas (no Material Slider) so its look is consistent and theme-driven.
  */
 @Composable
-private fun AnimatedSlider(
+internal fun AnimatedSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
@@ -6516,7 +6516,7 @@ private val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }
  *  the hot-seat drag machinery has a single, stable, named host to reason
  *  about/hang [LocalHotSeatDrag] state around rather than an anonymous Box. */
 @Composable
-private fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
+internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
     Box(Modifier.fillMaxSize()) { content() }
 }
 
@@ -7197,7 +7197,7 @@ private fun PrimaryActions(
  * and a ring + check when selected.
  */
 @Composable
-private fun PaletteSwatch(
+internal fun PaletteSwatch(
     palette: ColorPalette,
     selected: Boolean,
     onClick: () -> Unit,
@@ -7252,7 +7252,7 @@ private fun PaletteSwatch(
 
 /** Like [PaletteSwatch] but for user-created [CustomPaletteData] entries. */
 @Composable
-private fun CustomPaletteSwatch(
+internal fun CustomPaletteSwatch(
     palette: CustomPaletteData,
     selected: Boolean,
     onClick: () -> Unit,
@@ -7501,7 +7501,7 @@ private fun ColorPickerCanvas(
 
 /** Dialog to create or edit a [CustomPaletteData]. */
 @Composable
-private fun PaletteEditorDialog(
+internal fun PaletteEditorDialog(
     editing: CustomPaletteData?,
     onSave: (CustomPaletteData) -> Unit,
     onDelete: (String) -> Unit,
@@ -8105,7 +8105,7 @@ private fun StateControl(
  * and the section order is user-configurable in Settings.
  */
 @Composable
-private fun Pebble(
+internal fun Pebble(
     v: Vehicle,
     section: String,
     title: String,
@@ -8143,7 +8143,7 @@ private fun Pebble(
  * card instead of a hand-rolled lookalike.
  */
 @Composable
-private fun PebbleShell(
+internal fun PebbleShell(
     expanded: Boolean,
     onToggle: () -> Unit,
     icon: ImageVector,
@@ -8424,7 +8424,7 @@ private fun PebbleShell(
     }
 }
 
-private class PebbleHeaderAction(
+internal class PebbleHeaderAction(
     val label: String,
     val icon: ImageVector,
     val onClick: () -> Unit,
@@ -8611,7 +8611,7 @@ private fun SplitExpandButton(
  * open, giving a clear visual indicator of state.
  */
 @Composable
-private fun MorphExpandButton(
+internal fun MorphExpandButton(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
@@ -10091,7 +10091,7 @@ private fun vibrancyIndexFor(v: Float): Int =
 /** Shared by the main Appearance card and the settings-search quick-jump
  *  preview so the 5-stop mapping lives in exactly one place. */
 @Composable
-private fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
+internal fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     var indexDraft by remember(appearance.vibrancy) { mutableFloatStateOf(vibrancyIndexFor(appearance.vibrancy).toFloat()) }
     StepRow("Vibrancy", VibrancyLabels[indexDraft.roundToInt().coerceIn(0, 4)])
     AnimatedSlider(
@@ -10432,7 +10432,7 @@ private fun dial(context: Context, number: String) {
  * what you see is what gets saved.
  */
 @Composable
-private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onSave: (String) -> Unit) {
+internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onSave: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var bmp by remember(uriString) { mutableStateOf<Bitmap?>(null) }
@@ -10592,7 +10592,7 @@ private fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onS
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun SettingsScreen(vm: AppViewModel) {
+internal fun SettingsScreen(vm: AppViewModel) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
     val state by vm.state.collectAsState()
@@ -12517,7 +12517,7 @@ private enum class SearchForm { BUBBLE, PILL, BAR }
  *  - Open, anywhere: the bar, because at that point it is a text field.
  */
 @Composable
-private fun SearchLayer(
+internal fun SearchLayer(
     vm: AppViewModel,
     state: UiState,
     appearance: SettingsStore.Appearance,
@@ -13513,7 +13513,7 @@ fun MorphSegmented(
  *  row this was duplicated as in both CarSettingsCard and its settings-search
  *  mirror. */
 @Composable
-private fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSelect: (com.bloo.bluelink.data.Powertrain) -> Unit) {
+internal fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSelect: (com.bloo.bluelink.data.Powertrain) -> Unit) {
     // An icon per option (Gas/Hybrid/PHEV/EV) instead of text-only segments --
     // a quick visual "shape" for each choice, not just a label to read.
     MorphSegmented(
@@ -13827,7 +13827,7 @@ private fun AddTilePill(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SettingsCard(title: String, icon: ImageVector? = null, content: @Composable () -> Unit) {
+internal fun SettingsCard(title: String, icon: ImageVector? = null, content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(PebbleCornerExpanded)
     val outline = LocalAppearance.current.pebbleOutline
     Card(
@@ -13975,7 +13975,7 @@ private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
 // --- Small reusable pieces ------------------------------------------------
 
 @Composable
-private fun StatusRow(label: String, value: String) {
+internal fun StatusRow(label: String, value: String) {
     Row(
         Modifier.fillMaxWidth(),
         // Top-align so that if the value wraps to a 2nd line (a long value at a
@@ -14045,7 +14045,7 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
+internal fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         // Cap at 2 lines so a long label ("Text & layout scale") wraps cleanly at
         // spaces instead of the value (short: "130%") crushing it mid-word at a
@@ -14174,7 +14174,7 @@ private fun MorphToggleTrack(checked: Boolean) {
 
 /** One seat's heat + cool capability toggles, shown as two compact filter chips. */
 @Composable
-private fun SeatConfigRow(
+internal fun SeatConfigRow(
     label: String,
     heat: Boolean,
     cool: Boolean,
@@ -14225,7 +14225,7 @@ private fun CommandButton(
  *  emphasised value on the right (monospaced for the File ID so it reads as a
  *  code to compare across devices). */
 @Composable
-private fun SyncInfoRow(
+internal fun SyncInfoRow(
     label: String,
     value: String,
     valueMono: Boolean = false,
@@ -14261,7 +14261,7 @@ private fun SyncInfoRow(
  * nothing until the first sync populates the registry.
  */
 @Composable
-private fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
+internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     val devices = state.syncDevices
     if (devices.isEmpty()) return
     var renaming by remember { mutableStateOf(false) }
@@ -14488,7 +14488,7 @@ private fun SyncDeviceRow(
  * sync" reads as an actual decision rather than an arbitrary button order.
  */
 @Composable
-private fun DriveSyncSetupDialog(
+internal fun DriveSyncSetupDialog(
     onDismissRequest: () -> Unit,
     onSaveToDrive: () -> Unit,
     onOpenFromDrive: () -> Unit,
