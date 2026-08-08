@@ -322,6 +322,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.lerp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -5076,6 +5077,19 @@ private fun HeroHeader(
         // separately -- same inputs, two derivations, and therefore two things to keep in
         // step by hand.
         val readout = chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric)
+        // 0 collapsed, 1 expanded. The ONE value the readout's morph runs on: type sizes,
+        // gaps, paddings and the header's reservation all lerp on it, so they cannot get out
+        // of step with each other the way separate transitions did.
+        //
+        // Critically damped and terminating on a real threshold, for the same reason the
+        // discarded bounds spring needed it: this drives a SIZE, and the theme's spatial
+        // spring is under-damped by design, so type would overshoot past its target size and
+        // spring back. Text that overshoots reads as a wobble, not as liveliness.
+        val heroT by animateFloatAsState(
+            targetValue = if (photoExpanded) 1f else 0f,
+            animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
+            label = "heroMorph",
+        )
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -5127,32 +5141,34 @@ private fun HeroHeader(
                 // Box whose own height comes from a sibling -- which in a scrollable parent
                 // (maxHeight = Infinity) is exactly how you get a bad measure. Aligning has
                 // no such dependency.
-                AnimatedVisibility(
-                    visible = photoExpanded,
-                    modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
-                    // SHRINKS, it does not merely fade. This was fade-only, and that was the
-                    // "hangs at the wrong size for a second, then snaps" you saw -- the part
-                    // that survived deleting the shared element, and the actual cause.
-                    //
-                    // A fade-only AnimatedVisibility keeps its FULL layout footprint for the
-                    // whole fade and then drops it in a single frame. This readout is a child
-                    // of the card's Box, so the card's height is the tallest of (photo,
-                    // header, this). The photo shrank away properly, but this stayed ~142dp
-                    // the entire time, holding the card open at a height nothing was drawing
-                    // at any more -- then disappeared between two frames, and the card fell
-                    // to the header's height with nothing to animate it.
-                    //
-                    // Shrinking towards Bottom, and on the SAME shared spec as the photo's
-                    // own collapseExit, so the two heights track each other: the photo starts
-                    // taller and stays proportionally taller for every frame of the close, so
-                    // it keeps deciding the card's height right down to the end and this can
-                    // never pin it. That is what makes the card just close to the right size.
-                    enter = collapseEnter(Alignment.Bottom),
-                    exit = collapseExit(Alignment.Bottom),
+                // THE readout. One instance, both states, morphing between them.
+                //
+                // Bottom-anchored and deliberately NOT wrapped in an AnimatedVisibility,
+                // because there is nothing to show or hide any more -- this node exists in
+                // both states. That also retires the footprint bug this slot used to have: a
+                // fade-only AnimatedVisibility held its full ~142dp for the whole fade and
+                // then dropped it in one frame, which was the "hangs at the wrong size, then
+                // snaps". A node that never leaves cannot strand a footprint.
+                //
+                // The TRAVEL is free. The photo above is already animating the card's height,
+                // so anchoring here rides that change from the header down to the base of the
+                // photo with no bounds animation at all. `heroT` drives only the SIZE morph.
+                // That is what three attempts with `sharedBounds` were doing the hard way --
+                // see HeroMorphReadout.
+                //
+                // The paddings lerp, which is what widens the bar: collapsed it stops short
+                // of the chevron, expanded it runs the card's full width.
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(
+                            start = 16.dp,
+                            end = lerp(64.dp, 16.dp, heroT),
+                            bottom = lerp(10.dp, 16.dp, heroT),
+                        ),
                 ) {
-                    Box(Modifier.padding(16.dp)) {
-                        ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
-                    }
+                    HeroMorphReadout(readout, heroT)
                 }
             },
             // Collapsed: name, percentage and range on ONE row, with the bar directly under
@@ -5185,52 +5201,23 @@ private fun HeroHeader(
             // car-swipe frames (see 3cc327a). An animated collapse does not need one: these
             // are ordinary enter/exit transitions on the two nodes, which participate in
             // layout exactly once per frame like everything else.
-            titleTrailing = {
-                AnimatedVisibility(
-                    visible = !photoExpanded,
-                    // Horizontal, because this sits in the title ROW -- its width is the
-                    // footprint the car name gives up to it, so that is what has to animate.
-                    // A fade alone would hold the full width for the whole fade and then drop
-                    // it in one frame, which is the footprint trap from the readout below.
-                    enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-                        expandHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()),
-                    exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-                        shrinkHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()),
-                ) {
-                    // The 10dp gap from the car name lives here, not in PebbleShell, so a
-                    // pebble with no trailing stat does not pay for one.
-                    ChargeStatsLine(readout, Modifier.padding(start = 10.dp))
-                }
-            },
+            // No titleTrailing any more. It used to hold a collapsed COPY of the numbers -- a
+            // one-line ChargeStatsLine in the title row -- while the expanded card held a
+            // second, larger copy at the bottom. There is now ONE readout serving both states
+            // (see the Box above), so the copy is deleted rather than merely hidden.
+            titleTrailing = null,
             summary = null,
             headerContent = {
-                // Vertical: this bar's height is part of the collapsed header's height, so
-                // the shared collapse spec is exactly right for it.
+                // A RESERVATION, not content. The morphing readout is positioned against the
+                // card's Box rather than sitting in this column, so the header has to leave
+                // room for it while collapsed or the title row and the numbers overlap.
                 //
-                // An earlier version of this comment argued for NO animation here, on the
-                // grounds that animating the bar in animates the height the card is trying to
-                // settle at. That was written while chasing the hang-then-snap, and it was
-                // the wrong culprit -- the real cause was the expanded readout's fade-only
-                // exit holding its footprint, fixed separately. The card's height is
-                // max(photo, header), and the photo moves ~200dp against this bar's 22dp, so
-                // the photo keeps deciding the height throughout and this is free to animate.
-                AnimatedVisibility(
-                    visible = !photoExpanded,
-                    enter = collapseEnter(),
-                    exit = collapseExit(),
-                ) {
-                    // end padding, not just top: the header's weighted text column runs right
-                    // up to the chevron, so a full-width bar finished flush against it. 12dp
-                    // gives the same optical gap the title's ellipsis already leaves.
-                    Box(Modifier.fillMaxWidth().padding(top = 4.dp, end = 12.dp)) {
-                        ChargeSegmentBar(
-                            frac = animatedChargeFrac(readout.frac),
-                            // Was hardcoded null, so the collapsed bar silently dropped the
-                            // charge-limit marker the expanded one drew. Both read `readout`.
-                            limitPct = readout.limitPct,
-                        )
-                    }
-                }
+                // A constant height rather than a measured one, and that is safe because the
+                // collapsed readout's height IS constants: a labelLarge line, its gap, and
+                // ChargeBarHeight. Shrinking to zero as the pebble opens, because the expanded
+                // readout sits over the photo instead and the header must stop holding space
+                // it no longer needs -- the same footprint discipline as everything else here.
+                Spacer(Modifier.height(lerp(HeroReadoutReserve, 0.dp, heroT)))
             },
         ) {
             // Empty by design. Everything the expanded state adds -- the photo and the
@@ -5850,38 +5837,93 @@ private fun ChargeStatsBlock(
     }
 }
 
+// ChargeStatsLine was deleted here. It drew the collapsed one-line copy of the
+// percentage and range for the hero's title row, and there is no collapsed copy any
+// more -- HeroMorphReadout below is one set of components that morphs between both
+// densities, so the second implementation has nothing left to render.
+
 /**
- * The same readout on one line, for the collapsed hero's title row: name, then these
- * numbers, then the chevron.
+ * Height the collapsed header must leave for [HeroMorphReadout], which is positioned against
+ * the card rather than placed in the header's column.
  *
- * Same [ChargeReadout] as [ChargeStatsBlock], so it cannot disagree with it about what the
- * car's percentage or range is. That -- one derivation, one visible copy -- is the whole of
- * the de-duplication; an earlier attempt also made the two ends of a `sharedBounds` pair so
- * the readout would visibly travel between them, and that had to be removed. See the hero's
- * `titleTrailing` for why.
+ * A constant is legitimate here because the collapsed readout's height is entirely constants:
+ * a `labelLarge` line (~20dp), the 2dp gap that density lerps to, and [ChargeBarHeight]. It is
+ * derived from the same values the readout lays out from, so the two move together -- and if
+ * that ever stops being true the overlap is immediately visible rather than silent.
+ */
+private val HeroReadoutReserve = 20.dp + 2.dp + ChargeBarHeight
+
+/**
+ * The hero's readout as ONE set of components that morphs between the collapsed and expanded
+ * states, rather than two sets trading places.
  *
- * "Charging" is the only part of the state line that survives the squeeze: the
- * minutes-to-full and the AC/DC plug type belong to the expanded density, and on a
- * single line beside a car name they push the range off the row.
+ * [t] is 0 collapsed, 1 expanded, and everything here is a lerp on it: the percentage's and
+ * range's type sizes, the state line's alpha, the gaps. There is exactly one [RollingNumber]
+ * per number and one [ChargeSegmentBar] in the whole card, so nothing can be duplicated and
+ * nothing can drift.
+ *
+ * NO `SharedTransitionLayout`, and that is the point. Three earlier attempts used
+ * `sharedBounds`, which needs a `LookaheadScope` -- `SharedBoundsNode` implements
+ * `ApproachLayoutModifierNode`, so it participates in layout, and the hero sits on every car
+ * page. With `beyondViewportPageCount = 1` that meant three lookahead scopes measuring twice
+ * at 60Hz during a pager drag, which is what made the car swipe judder. It could not be tuned
+ * out either: `RemeasureToBounds` re-lays out text every frame, and `ScaleToBounds` draws the
+ * entering node at the wrong scale.
+ *
+ * The travel is FREE, and that is the insight the first three attempts missed. The card's
+ * height is ALREADY animating -- the photo grows and shrinks on its own transition. Anchor
+ * this to the card's bottom and it rides that height change from the header down to the base
+ * of the photo with no bounds animation at all. I was animating a position that something
+ * else was already animating for me. Only the SIZE morph needs driving, which is what [t] does.
+ *
+ * Cost per frame, deliberately bounded: two `Text` measures (the two type sizes lerp) plus one
+ * `Canvas`, in a single layout pass. The version that felt laggy was ~8 paragraph layouts
+ * DOUBLED by a lookahead pass.
  */
 @Composable
-private fun ChargeStatsLine(data: ChargeReadout, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            listOfNotNull(data.pctText, data.rangeText).joinToString(" · "),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
-        if (data.charging) {
+private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier = Modifier) {
+    val type = MaterialTheme.typography
+    // Real type steps, lerped -- not a graphicsLayer scale. A scaled 45sp glyph is soft at
+    // every intermediate frame; a lerped font size is genuinely that size at every frame.
+    // Affordable only because there is no lookahead pass doubling it.
+    val pctStyle = lerp(type.labelLarge, type.displayMedium, t)
+    val rangeStyle = lerp(type.labelLarge, type.titleLarge, t)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t))) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            RollingNumber(data.pctText, pctStyle, FontWeight.Bold)
+            // Collapsed, the two numbers sit side by side as a status line; expanded, the
+            // percentage carries the card and the range moves to its own column on the right.
+            // One lerped weight does both, so there is no arrangement to switch between.
+            Spacer(Modifier.weight(0.001f + t))
+            Column(horizontalAlignment = Alignment.End) {
+                RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
+                // Only the expanded density has room for the state line, so it fades in rather
+                // than appearing. Not present at all at t = 0, so it reserves no height there.
+                if (t > 0.01f) {
+                    val animatedStatusColor by androidx.compose.animation.animateColorAsState(
+                        data.statusColor, animationSpec = tween(300), label = "statusLineColor",
+                    )
+                    Text(
+                        data.statusLine,
+                        style = type.labelLarge,
+                        color = animatedStatusColor.copy(alpha = t),
+                        fontWeight = if (data.emphasizeStatus) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+        }
+        // Plug-in hybrid's fuel line: expanded only, same reasoning as the state line.
+        data.fuelPct?.takeIf { t > 0.5f }?.let { fuelPct ->
             Text(
-                " · Charging",
-                style = MaterialTheme.typography.labelLarge,
-                color = data.statusColor,
-                fontWeight = FontWeight.Bold,
+                "Fuel $fuelPct%",
+                style = type.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = (t - 0.5f) * 2f),
                 maxLines = 1,
             )
         }
+        ChargeSegmentBar(frac = animatedChargeFrac(data.frac), limitPct = data.limitPct)
     }
 }
 
