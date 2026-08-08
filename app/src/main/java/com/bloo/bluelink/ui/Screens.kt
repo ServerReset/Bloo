@@ -5532,53 +5532,8 @@ private fun CarThumb(img: String?, size: Dp, cornerRadius: Dp, iconSize: Dp) {
 private fun rememberPhotoModel(url: String): Any =
     remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
 
-/**
- * The app's collapse/expand transition, supplied by the Material theme.
- *
- * M3 Expressive delivers motion as a theme subsystem: MaterialTheme.motionScheme exposes
- * six spec factories, a 2x3 matrix of SPATIAL (bounds, size, scale, shape -- allowed to
- * overshoot) against EFFECTS (colour, alpha -- must not) crossed with fast/default/slow.
- * This app already opts into MaterialExpressiveTheme, so those resolve to
- * MotionScheme.expressive() and were sitting unused.
- *
- * Two things that makes correct, beyond removing hardcoded numbers:
- *
- *  - The height is spatial and the fade is effects, which is the split the spec draws.
- *    Material's stated rule for choosing is interruption: a spring preserves velocity
- *    continuity when the target changes mid-flight, a tween is for preset choreography. A
- *    collapse toggle is re-tappable by definition, so its fade wanted a spring too.
- *  - The durations stop being invented. Every hand-rolled copy in this file has now been
- *    migrated here (14 call sites), and between them they had fade tweens of 120, 130,
- *    150, 160, 180, 180, 200, 220, 220, 240 and 300ms with no comment anywhere explaining
- *    why any of them differed. Four also SPRANG open and TWEENED shut, which is what made
- *    closing feel like a snap next to a smooth open; six tweened both halves.
- *
- * The one deliberate holdout is `advancedEnter`/`advancedExit` in the settings screen,
- * which keeps `AdvancedModeStiffness` for the height because it reveals a lot at once and
- * wants a calmer settle. It takes its FADE from the same effects spec as this.
- *
- * [expandFrom] is a parameter and not a constant because it is a layout fact, not a
- * timing one: a body under a header should grow downward from its top, while a bubble
- * anchored above the bottom bar should reveal from its bottom. Sites that were on
- * `expandVertically`'s own default pass [Alignment.Bottom] explicitly so this migration
- * changed how things MOVE without changing which way they open.
- *
- * NOT using Modifier.animateContentSize for the height, deliberately: it animates clip
- * bounds, so collapses commonly snap while expansions look smooth -- exactly the wrong
- * failure for a large image. AnimatedVisibility + shrinkVertically is the documented
- * approach for this, and it also removes the node from composition rather than leaving a
- * faded one occupying space and reachable by TalkBack.
- */
-@Composable
-private fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
-    fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-        expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), expandFrom = expandFrom)
-
-/** Mirror of [collapseEnter]; see there for why both halves are springs. */
-@Composable
-private fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
-    fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-        shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)
+// collapseEnter / collapseExit -- the app's one collapse spec -- now live in UiTokens.kt,
+// with the reasoning that goes with them. 14 call sites in this file still use them.
 
 /**
  * The car photo plus the contrast scrim that makes text on top of it legible. ONE
@@ -6041,12 +5996,6 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, modifier: Modifier = M
     }
 }
 
-/** The bar's height, and the limit marker's diameter, shared by every surface
- *  that draws this bar so the proportions read as one component rather than
- *  five near-misses. */
-private val ChargeBarHeight = 18.dp
-private val ChargeLimitDotSize = 14.dp
-
 /**
  * The charge-limit marker: a small circle sitting ON the bar at the limit. A DrawScope
  * extension rather than a composable, because the bar that hosts it is now drawn in one
@@ -6087,26 +6036,7 @@ private fun DrawScope.drawChargeLimitDot(
     drawCircle(core, radius = (outerRadius - 3.dp.toPx()).coerceAtLeast(1f), center = center)
 }
 
-// Was a phone-only re-declaration of the same hex values shared/BlooColors.kt
-// already centralizes (bit-identical today, one edit away from silently
-// diverging like chargerLabel's text had).
-private val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
-private val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
-
-private val SoftDamping get() = com.bloo.uicommon.SoftDamping
-
-// The morph button's two corner states, shared with the watch so both surfaces
-// read as the same control. Aliased the same way SoftDamping above is.
-private val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
-private val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
-
-/** Shared spring stiffness for the Simple/Advanced mode switch's card
- *  expand/collapse (the outer settings column, each card's own
- *  animateContentSize, and the advanced-only cards' enter/exit) -- slower
- *  than [Spring.StiffnessLow] for a slightly longer, calmer settle, paired
- *  with [SoftDamping] for minimal bounce. All of these must share one spec
- *  or the pieces visibly settle at different times/feels. */
-private const val AdvancedModeStiffness = 130f
+// Colours, sizes and motion specs shared across screens live in UiTokens.kt.
 
 /**
  * The shared floating/card edge: the app's default frosted rim ([frostedRim]).
@@ -8493,22 +8423,6 @@ private fun PebbleShell(
         }
     }
 }
-
-/** Gap between settings cards. Lives inside [SettingsCard] as bottom padding rather than
- *  in the parent's arrangement, so a card collapsing to zero height takes its gap with it --
- *  see the comment at that padding for what went wrong when the parent owned it. */
-private val SettingsCardGap = 10.dp
-
-/** The app's muted/secondary-text alpha, applied over LocalContentColor. */
-private const val MutedContentAlpha = 0.7f
-
-/** Shared control height: a collapsed pebble matches the lock/unlock button. */
-private val ControlHeight = 76.dp
-
-/** Uniform collapsed-header height so every pebble lines up at the same size. */
-private val PebbleHeaderHeight = ControlHeight
-private val PebbleCornerCollapsed = 38.dp
-private val PebbleCornerExpanded = 20.dp
 
 private class PebbleHeaderAction(
     val label: String,

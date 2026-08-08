@@ -1,0 +1,137 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
+package com.bloo.bluelink.ui
+
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+// No `motionScheme` import: it is a member of the MaterialTheme object (verified as
+// MaterialTheme.getMotionScheme in the resolved material3 AAR), as are defaultEffectsSpec
+// and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+
+/**
+ * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one
+ * screen has to agree on.
+ *
+ * Extracted from Screens.kt, which is 14.6k lines and 28% of this codebase. That extraction
+ * is worth being honest about: the empirical literature does NOT support splitting a large
+ * file to reduce defects (every study that controls for size either reverses the effect or
+ * dissolves it, and none performs a refactoring intervention at all), and the build-speed
+ * argument does not survive verification either. What a split does buy is navigability, and
+ * it is the prerequisite for any further split of that file, because Kotlin's top-level
+ * `private` is FILE-scoped -- so shared helpers have to become `internal` and live somewhere
+ * common BEFORE any screen can move out from under them.
+ *
+ * This file is therefore deliberately the least interesting one: no logic, no layout, just
+ * the values that would silently diverge if each screen kept its own copy. That is not
+ * hypothetical here -- `AdvancedModeStiffness` below already drifted from the shared collapse
+ * spec while it was buried at line ~10,700 of the monolith.
+ *
+ * `internal`, not `public`: it is the narrowest visibility that survives a file boundary.
+ */
+
+// ---- Colour -------------------------------------------------------------------
+
+// Was a phone-only re-declaration of the same hex values shared/BlooColors.kt already
+// centralizes (bit-identical today, one edit away from silently diverging like
+// chargerLabel's text had).
+internal val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
+internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
+
+/** The app's muted/secondary-text alpha, applied over LocalContentColor. */
+internal const val MutedContentAlpha = 0.7f
+
+// ---- Sizing -------------------------------------------------------------------
+
+/** Shared control height: a collapsed pebble matches the lock/unlock button. */
+internal val ControlHeight = 76.dp
+
+/** Uniform collapsed-header height so every pebble lines up at the same size. */
+internal val PebbleHeaderHeight = ControlHeight
+internal val PebbleCornerCollapsed = 38.dp
+internal val PebbleCornerExpanded = 20.dp
+
+/** The charge bar's height, and the limit marker's diameter, shared by every surface that
+ *  draws this bar so the proportions read as one component rather than five near-misses. */
+internal val ChargeBarHeight = 18.dp
+internal val ChargeLimitDotSize = 14.dp
+
+/** Gap between settings cards. Lives inside SettingsCard as bottom padding rather than in
+ *  the parent's arrangement, so a card collapsing to zero height takes its gap with it --
+ *  see the comment at that padding for what went wrong when the parent owned it. */
+internal val SettingsCardGap = 10.dp
+
+// ---- Motion -------------------------------------------------------------------
+
+// Aliases onto :uicommon so the phone and the watch read as the same controls.
+internal val SoftDamping get() = com.bloo.uicommon.SoftDamping
+
+// The morph button's two corner states, shared with the watch so both surfaces read as the
+// same control. Aliased the same way SoftDamping above is.
+internal val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
+internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
+
+/** Shared spring stiffness for the Simple/Advanced mode switch's card expand/collapse (the
+ *  outer settings column, each card's own animateContentSize, and the advanced-only cards'
+ *  enter/exit) -- slower than Spring.StiffnessLow for a slightly longer, calmer settle,
+ *  paired with [SoftDamping] for minimal bounce. All of these must share one spec or the
+ *  pieces visibly settle at different times/feels. */
+internal const val AdvancedModeStiffness = 130f
+
+/**
+ * The app's collapse/expand transition, supplied by the Material theme.
+ *
+ * M3 Expressive delivers motion as a theme subsystem: MaterialTheme.motionScheme exposes six
+ * spec factories, a 2x3 matrix of SPATIAL (bounds, size, scale, shape -- allowed to
+ * overshoot) against EFFECTS (colour, alpha -- must not) crossed with fast/default/slow.
+ * This app already opts into MaterialExpressiveTheme, so those resolve to
+ * MotionScheme.expressive() and were sitting unused.
+ *
+ * Two things that makes correct, beyond removing hardcoded numbers:
+ *
+ *  - The height is spatial and the fade is effects, which is the split the spec draws.
+ *    Material's stated rule for choosing is interruption: a spring preserves velocity
+ *    continuity when the target changes mid-flight, a tween is for preset choreography. A
+ *    collapse toggle is re-tappable by definition, so its fade wanted a spring too.
+ *  - The durations stop being invented. Every hand-rolled copy has been migrated here (14
+ *    call sites), and between them they had fade tweens of 120, 130, 150, 160, 180, 180,
+ *    200, 220, 220, 240 and 300ms with no comment anywhere explaining why any of them
+ *    differed. Four also SPRANG open and TWEENED shut, which is what made closing feel like
+ *    a snap next to a smooth open; six tweened both halves.
+ *
+ * The one deliberate holdout is `advancedEnter`/`advancedExit` in the settings screen, which
+ * keeps [AdvancedModeStiffness] for the height because it reveals a lot at once and wants a
+ * calmer settle. It takes its FADE from the same effects spec as this.
+ *
+ * [expandFrom] is a parameter and not a constant because it is a layout fact, not a timing
+ * one: a body under a header should grow downward from its top, while a bubble anchored
+ * above the bottom bar should reveal from its bottom. Sites that were on
+ * `expandVertically`'s own default pass [Alignment.Bottom] explicitly so this migration
+ * changed how things MOVE without changing which way they open.
+ *
+ * NOT using Modifier.animateContentSize for the height, deliberately: it animates clip
+ * bounds, so collapses commonly snap while expansions look smooth -- exactly the wrong
+ * failure for a large image. AnimatedVisibility + shrinkVertically is the documented
+ * approach, and it also removes the node from composition rather than leaving a faded one
+ * occupying space and reachable by TalkBack.
+ */
+@Composable
+internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
+    fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+        expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), expandFrom = expandFrom)
+
+/** Mirror of [collapseEnter]; see there for why both halves are springs. */
+@Composable
+internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
+    fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+        shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)
