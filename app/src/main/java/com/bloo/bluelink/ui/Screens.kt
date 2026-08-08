@@ -5175,23 +5175,50 @@ private fun HeroHeader(
             // The original ask -- the percentage and range rendered twice -- stays fixed, and
             // at the level that actually mattered: ONE [ChargeReadout] derivation feeds both
             // densities, so they cannot drift and only one is ever on screen.
-            titleTrailing = if (photoExpanded) {
-                null
-            } else {
-                // The 10dp gap from the car name lives here, not in PebbleShell, so a pebble
-                // with no trailing stat does not pay for one.
-                { ChargeStatsLine(readout, Modifier.padding(start = 10.dp)) }
+            // Both collapsed slots stay NON-NULL and gate with AnimatedVisibility inside.
+            // `if (photoExpanded) null else { … }` deletes the node on the frame the pebble
+            // opens, so there is nothing left to play an exit -- which is why these two
+            // popped in and out with no animation at all after the shared element came out.
+            //
+            // No shared element here, deliberately. The travel needed a
+            // SharedTransitionLayout, which is a LookaheadScope, and that is what cost the
+            // car-swipe frames (see 3cc327a). An animated collapse does not need one: these
+            // are ordinary enter/exit transitions on the two nodes, which participate in
+            // layout exactly once per frame like everything else.
+            titleTrailing = {
+                AnimatedVisibility(
+                    visible = !photoExpanded,
+                    // Horizontal, because this sits in the title ROW -- its width is the
+                    // footprint the car name gives up to it, so that is what has to animate.
+                    // A fade alone would hold the full width for the whole fade and then drop
+                    // it in one frame, which is the footprint trap from the readout below.
+                    enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+                        expandHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()),
+                    exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+                        shrinkHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()),
+                ) {
+                    // The 10dp gap from the car name lives here, not in PebbleShell, so a
+                    // pebble with no trailing stat does not pay for one.
+                    ChargeStatsLine(readout, Modifier.padding(start = 10.dp))
+                }
             },
             summary = null,
-            headerContent = if (photoExpanded) {
-                null
-            } else {
-                {
-                    // No AnimatedVisibility: this bar's height IS part of the collapsed
-                    // header's height, so animating it in animates the number the card is
-                    // trying to settle at. It appears at its right size; the CARD's height
-                    // change is what animates, via the photo's own collapseExit.
-                    //
+            headerContent = {
+                // Vertical: this bar's height is part of the collapsed header's height, so
+                // the shared collapse spec is exactly right for it.
+                //
+                // An earlier version of this comment argued for NO animation here, on the
+                // grounds that animating the bar in animates the height the card is trying to
+                // settle at. That was written while chasing the hang-then-snap, and it was
+                // the wrong culprit -- the real cause was the expanded readout's fade-only
+                // exit holding its footprint, fixed separately. The card's height is
+                // max(photo, header), and the photo moves ~200dp against this bar's 22dp, so
+                // the photo keeps deciding the height throughout and this is free to animate.
+                AnimatedVisibility(
+                    visible = !photoExpanded,
+                    enter = collapseEnter(),
+                    exit = collapseExit(),
+                ) {
                     // end padding, not just top: the header's weighted text column runs right
                     // up to the chevron, so a full-width bar finished flush against it. 12dp
                     // gives the same optical gap the title's ellipsis already leaves.
