@@ -7956,18 +7956,24 @@ fun MorphIconButton(
 ) {
     val haptics = LocalHaptics.current
     val pressed by interactionSource.collectIsPressedAsState()
-    // `val scale = animateFloatAsState(...)`, NOT `by`. The delegated form reads the animation
-    // in COMPOSITION, so every frame of the press dip recomposed this button and its `content`
-    // lambda -- for a value whose only consumer is the graphicsLayer block below. Holding the
-    // State and dereferencing it inside that lambda moves the read to the DRAW phase: the
-    // animation still runs at full frame rate, but composition and layout are skipped entirely.
+    // Already optimal, and worth a note so nobody "fixes" it: `by` here costs nothing, because
+    // what decides the phase of a snapshot read is WHERE the getter runs, not whether the
+    // property is delegated. `scale` is referenced only inside the graphicsLayer BLOCK below,
+    // so the read happens when Compose invokes that block -- composition and layout are
+    // skipped. Google's own guidance shows exactly this shape (`val color by animateColorBetween(...)`
+    // read inside `drawBehind { }`).
     //
-    // This control is the one used everywhere, so the saving is per-icon-button-press across
-    // the app. 42 sites in :app use the delegated form; this is the pattern to copy for any
-    // whose value is consumed only by graphicsLayer/drawBehind/layout. Do NOT convert one whose
-    // value feeds a Modifier argument, a style, or a size -- those are composition reads by
-    // nature, and hiding the read does not change that.
-    val scale = animateFloatAsState(
+    // I briefly rewrote this to `val scale = animateFloatAsState(...)` plus `scale.value`,
+    // believing the delegated form forced a composition read. It does not; the two are
+    // identical here. Reverted, because a comment asserting a difference that does not exist
+    // teaches the next reader a false rule.
+    //
+    // The real audit question for the ~61 `by animate*AsState` sites in this project is not
+    // `by` vs `=`. It is whether the value is read in the composable BODY (recomposes every
+    // frame -- e.g. passed to `Modifier.padding(...)`, a `TextStyle`, or a size) or inside a
+    // lambda modifier like `graphicsLayer {}` / `offset {}` / `drawBehind {}` (already
+    // deferred, nothing to do). This site is the second kind.
+    val scale by animateFloatAsState(
         targetValue = if (pressed) 0.88f else 1f,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphIconPress",
@@ -7977,11 +7983,7 @@ fun MorphIconButton(
         // On the button, not the icon: scaling the icon alone shrinks the glyph
         // inside a target that stays put, which reads as a glitch rather than a
         // press.
-        modifier = modifier.graphicsLayer {
-            val k = scale.value
-            scaleX = k
-            scaleY = k
-        },
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
         enabled = enabled,
         interactionSource = interactionSource,
         content = content,
