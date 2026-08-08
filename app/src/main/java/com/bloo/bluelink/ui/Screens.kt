@@ -5847,12 +5847,26 @@ private fun animatedChargeFrac(target: Float): Float {
  * Smoothness is the whole design here, because the previous version's numbers morphed roughly.
  * Two deliberate choices:
  *
- *  - The type size is FIXED (`labelLarge`) and the shrink is a `graphicsLayer` SCALE. Lerping a
- *    font size means a genuine text re-layout every frame, and across a short spring that reads
- *    as a handful of discrete jumps rather than a glide -- the same reason the pebble title
- *    needed a slower, bouncier spring. A scale is draw-phase only: no measure, no layout, and
- *    every intermediate frame is a real fraction rather than the nearest whole sp. Text scaled
- *    DOWN stays crisp; it is upscaling that goes soft, and this only ever shrinks.
+ *  - The type size is FIXED (`labelLarge`) and the shrink is a `graphicsLayer` SCALE. This is
+ *    what Compose itself does for animated type: the official recommendation for animating a
+ *    font size is `sharedBounds(resizeMode = scaleToBounds())` plus `skipToLookaheadSize()`,
+ *    i.e. graphically scale a layout measured ONCE rather than re-measure per frame.
+ *
+ *    The cost being avoided is worse than "a re-layout": a `Text` measures through
+ *    `ParagraphLayoutCache`, which is SINGLE-SLOT (one `style` field, `paragraph = null` on
+ *    invalidate). A font size that changes every frame therefore misses that cache on every
+ *    frame -- 100% invalidation, not cache pressure. The 8-entry LRU people cite is
+ *    `TextMeasurer`'s, on the explicit Canvas/drawText path, which a `Text` never touches.
+ *
+ *    Scale is safe HERE specifically because nothing depends on this Row's size -- it shrinks
+ *    towards the chevron and no sibling needs to move. That is the actual precondition, and
+ *    it is why [HeroMorphReadout] does the opposite; see there. `graphicsLayer` does not
+ *    change measured size or placement, so where siblings MUST respond, a scale is wrong.
+ *
+ *    (An earlier version of this comment claimed lerping reads as "discrete jumps" and that
+ *    upscaled glyphs "go soft". Neither is a verified mechanism, and the soft-glyph claim in
+ *    particular was the stated reason [HeroMorphReadout] does the opposite thing -- two
+ *    comments in one file asserting opposite universal rules. The rule is dependent layout.)
  *  - `transformOrigin` pins the RIGHT edge, so the numbers shrink towards the chevron they sit
  *    beside instead of drifting away from the name as they go.
  *
@@ -5927,9 +5941,24 @@ private fun HeroCollapsedStats(data: ChargeReadout, t: Float, modifier: Modifier
 @Composable
 private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier = Modifier) {
     val type = MaterialTheme.typography
-    // Real type steps, lerped -- not a graphicsLayer scale. A scaled 45sp glyph is soft at
-    // every intermediate frame; a lerped font size is genuinely that size at every frame.
-    // Affordable only because there is no lookahead pass doubling it.
+    // Real type steps, lerped -- not a graphicsLayer scale -- and the reason is DEPENDENT
+    // LAYOUT, not glyph quality. This Column's height must genuinely grow as the numbers do:
+    // the state line below has to be pushed down and the card's content has to reserve the
+    // space. `graphicsLayer` explicitly does not affect that -- it "does not change the
+    // measured size or placement", so siblings would stay put and the scaled digits would
+    // draw OVER them. [HeroCollapsedStats] can scale precisely because nothing depends on its
+    // size; this cannot.
+    //
+    // So this pays a real cost, knowingly: a `Text` measures through the SINGLE-SLOT
+    // ParagraphLayoutCache, so a per-frame font size misses it every frame. Bounded to two
+    // Text nodes in one layout pass, with no lookahead pass doubling it.
+    //
+    // (The previous claim here -- that "a scaled 45sp glyph is soft at every intermediate
+    // frame" -- was not a verified mechanism, and it contradicted HeroCollapsedStats' comment
+    // arguing the reverse. If this ever needs to become free, the move is Compose's own:
+    // sharedBounds with scaleToBounds + skipToLookaheadSize, which scales a layout measured
+    // once. That was tried and reverted for a different reason -- the lookahead cost on every
+    // pager page -- documented in this function's KDoc above.)
     // Still lerped, but over a much shorter journey than before: the collapsed end of this
     // node is no longer a labelLarge line beside the name (HeroCollapsedStats does that now),
     // so this only has to grow in from a slightly smaller version of itself. Fewer distinct

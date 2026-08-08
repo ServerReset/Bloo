@@ -119,11 +119,31 @@ internal const val AdvancedModeStiffness = 130f
  * `expandVertically`'s own default pass [Alignment.Bottom] explicitly so this migration
  * changed how things MOVE without changing which way they open.
  *
- * NOT using Modifier.animateContentSize for the height, deliberately: it animates clip
- * bounds, so collapses commonly snap while expansions look smooth -- exactly the wrong
- * failure for a large image. AnimatedVisibility + shrinkVertically is the documented
- * approach, and it also removes the node from composition rather than leaving a faded one
- * occupying space and reachable by TalkBack.
+ * NOT using Modifier.animateContentSize for the height, deliberately -- but not for the
+ * reason this comment used to give. It claimed animateContentSize "animates clip bounds, so
+ * collapses commonly snap": that mechanism is wrong. Clipping is a DRAW-phase operation and
+ * cannot drive layout; animateContentSize animates the size the node REPORTS, and the same
+ * "clip bounds" phrasing in the official docs is descriptive shorthand. (With
+ * `clip = false` on shrinkVertically the footprint still shrinks, which is the proof.)
+ *
+ * The real reasons to prefer AnimatedVisibility + shrinkVertically here:
+ *  - it is the documented approach for this, and shrinkVertically animates the reported
+ *    layout size while measuring the child ONCE at unchanged incoming constraints -- so a
+ *    large image and any text inside it are progressively sliced rather than reflowed;
+ *  - it REMOVES the node from composition at the end, instead of leaving a fully transparent
+ *    one occupying space and reachable by TalkBack.
+ *
+ * Worth knowing if either token is ever "simplified" to fade-only: expand/shrinkVertically
+ * are ALREADY AnimatedVisibility's defaults, so passing fade alone is an explicit opt-OUT of
+ * continuous sizing. fadeOut builds a config whose changeSize is null, which leaves
+ * sizeAnimation null and makes the measure path report the child's FULL measuredSize on every
+ * frame -- then AnimatedVisibility drops it in a single frame once every animation in its
+ * Transition finishes. That is precisely the "hangs at the wrong size, then snaps" this
+ * project already paid for once. scaleIn/scaleOut do NOT help: they keep the full footprint.
+ *
+ * Related trap, since heroT is an animate*AsState living OUTSIDE these transitions:
+ * AnimatedVisibility can only wait for animations in its OWN Transition, so an independent
+ * animation is invisible to it and its content can be removed before that one finishes.
  */
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
