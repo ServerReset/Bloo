@@ -5112,37 +5112,7 @@ private fun HeroHeader(
                         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
                     ),
                 ) {
-                    Box(Modifier.fillMaxWidth()) {
-                        HeroVisual(v, imageUrl, height, PebbleCornerExpanded, aspectRatio = 16f / 9f)
-                        // Contrast, not decoration. Every overlaid element -- title, subtitle,
-                        // chevron, the whole charge readout -- sits on an arbitrary photo, and
-                        // against a light car they all disappear. The widget hit the same
-                        // thing and solved it with a luminance check on the resolved accent.
-                        //
-                        // The first attempt scrimmed only the top strip and faded to clear by
-                        // 45%, on the assumption that just the header row was overlaid. It is
-                        // not: the bar is over the image too. So this covers the FULL height
-                        // and never reaches transparent -- heaviest at the top where the
-                        // title and chevron are, easing to a floor that still holds the bar's
-                        // numbers legible over a bright bonnet.
-                        // remember-ed: Brush.verticalGradient allocates a stop list, and this
-                        // sits under a card that recomposes on every status change.
-                        // Lighter than the first pass so the photo actually reads as a
-                        // photo. Still never reaches transparent, and still heaviest at
-                        // the top and bottom, because those are the two bands with
-                        // content over them -- the title and chevron up top, the charge
-                        // readout along the bottom. The middle can afford to be clear
-                        // since nothing sits there.
-                        val scrim = remember {
-                            Brush.verticalGradient(
-                                0f to Color.Black.copy(alpha = 0.55f),
-                                0.30f to Color.Black.copy(alpha = 0.22f),
-                                0.62f to Color.Black.copy(alpha = 0.28f),
-                                1f to Color.Black.copy(alpha = 0.62f),
-                            )
-                        }
-                        Spacer(Modifier.matchParentSize().background(scrim))
-                    }
+                    HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f)
                 }
                 // The expanded readout, at the BOTTOM of the card.
                 //
@@ -5264,26 +5234,30 @@ private fun HeroHeader(
             ),
         shape = heroShape,
     ) {
-        Column(
-            Modifier.padding(16.dp).then(if (cover) Modifier.fillMaxHeight() else Modifier),
-            verticalArrangement = if (cover) Arrangement.Center else Arrangement.Top,
-        ) {
-            // Skip the fixed-height photo box on the cover when there's no photo — it
-            // was just a dead gradient rectangle. With it gone, ChargeFuelBar (the
-            // actual glance content: %, range, charging state) centres as the hero.
-            // Cover-only from here down: the phone path returns above as a PebbleShell, so
-            // `cover` is always true inside this Card and the photo always uses the bigger
-            // cover size.
-            //
-            // Concentric with the card: an inner radius should be the outer one MINUS the
-            // inset between them, otherwise two near-equal radii at different insets read as
-            // a mistake -- which is what a 20dp card around an 18dp photo inset by 16dp was
-            // doing. Floored so it stays visibly rounded.
-            if (!imageUrl.isNullOrBlank()) {
-                HeroVisual(v, imageUrl, 210.dp, (corner - 16.dp).coerceAtLeast(8.dp))
-                Spacer(Modifier.height(12.dp))
+        // Cover-only from here down: the phone path returned above as a PebbleShell.
+        //
+        // Rebuilt on the SAME structure the phone's expanded hero uses -- photo as the
+        // card's background with the shared contrast scrim over it, and the readout
+        // overlaid along its lower edge -- instead of the stacked
+        // photo-then-gap-then-readout Column it was. It used to be the one hero that
+        // looked like a different design: an inset, separately-rounded photo with the
+        // numbers in a box underneath, while the phone had gone to a full-bleed image
+        // with the readout on top of it.
+        //
+        // What it deliberately does NOT share is the collapse: there is no chevron and no
+        // photoExpanded here, because a cover tile is one full-screen glance with nothing
+        // to collapse into. So it takes the expanded half of the phone's hero and stops.
+        Box(Modifier.fillMaxSize()) {
+            // Fills the tile rather than sitting at 16:9. On the phone the aspect ratio is
+            // what stops a fixed dp height from letterboxing across screen widths; here the
+            // tile's own height IS the frame, so cropping to fill it is what a full-screen
+            // glance wants. No photo set -> HeroVisual draws the brand gradient, which fills
+            // the same way, so the tile is never a dead inset rectangle.
+            HeroPhotoBackdrop(v, imageUrl, height = height, corner = corner, fill = true)
+            // Aligned to the card's own Box, exactly as the phone's expanded readout is.
+            Box(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+                ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
             }
-            ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
         }
     }
 }
@@ -5579,6 +5553,51 @@ private fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): Exi
     fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
         shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)
 
+/**
+ * The car photo plus the contrast scrim that makes text on top of it legible. ONE
+ * definition, used by the phone hero's expanded background and by the flip cover's tile.
+ *
+ * Contrast, not decoration. Every element overlaid on the hero -- title, chevron, the whole
+ * charge readout -- sits on an arbitrary car photo, and against a light car they all
+ * disappear. The widget hit the same problem and solved it with a luminance check on the
+ * resolved accent; a scrim is the cheap version and is what the hero does.
+ *
+ * The gradient covers the FULL height and never reaches transparent. An earlier version
+ * scrimmed only the top strip and faded to clear by 45%, on the assumption that only the
+ * header row was overlaid -- it is not, the readout is over the image too. Heaviest at the
+ * top and bottom because those are the two bands that carry content (title and chevron up
+ * top, the charge readout along the bottom); the middle can afford to be clear because
+ * nothing sits there, which is what lets the photo still read as a photo.
+ *
+ * remember-ed: Brush.verticalGradient allocates a stop list, and this sits inside a card
+ * that recomposes on every status change.
+ *
+ * [aspectRatio] null means size by [height] -- the flip cover, whose tile height is given.
+ */
+@Composable
+private fun HeroPhotoBackdrop(
+    v: Vehicle,
+    imageUrl: String?,
+    height: Dp,
+    aspectRatio: Float? = null,
+    corner: Dp = PebbleCornerExpanded,
+    /** See [HeroVisual.fill] -- the flip cover fills its tile. */
+    fill: Boolean = false,
+) {
+    Box(if (fill) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
+        HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio, fill = fill)
+        val scrim = remember {
+            Brush.verticalGradient(
+                0f to Color.Black.copy(alpha = 0.55f),
+                0.30f to Color.Black.copy(alpha = 0.22f),
+                0.62f to Color.Black.copy(alpha = 0.28f),
+                1f to Color.Black.copy(alpha = 0.62f),
+            )
+        }
+        Spacer(Modifier.matchParentSize().background(scrim))
+    }
+}
+
 /** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
 private fun HeroVisual(
@@ -5586,15 +5605,19 @@ private fun HeroVisual(
     imageUrl: String?,
     height: Dp,
     corner: Dp = 18.dp,
-    /** When set, size by aspect ratio instead of [height] -- 16:9 for the hero, so the
-     *  image keeps its shape at any screen width instead of being letterboxed or cropped
-     *  by a fixed dp height. The flip cover still passes a height. */
+    /** When set, size by aspect ratio instead of [height] -- 16:9 for the phone hero, so
+     *  the image keeps its shape at any screen width instead of being letterboxed or
+     *  cropped by a fixed dp height. */
     aspectRatio: Float? = null,
+    /** Fill the parent in BOTH axes, ignoring [height] and [aspectRatio] -- the flip cover,
+     *  whose tile height is the frame, so cropping to fill it is what a full-screen glance
+     *  wants. Requires a bounded parent, which the cover tile is (its Card fills height). */
+    fill: Boolean = false,
 ) {
-    val sizeModifier = if (aspectRatio != null) {
-        Modifier.fillMaxWidth().aspectRatio(aspectRatio)
-    } else {
-        Modifier.fillMaxWidth().height(height)
+    val sizeModifier = when {
+        fill -> Modifier.fillMaxSize()
+        aspectRatio != null -> Modifier.fillMaxWidth().aspectRatio(aspectRatio)
+        else -> Modifier.fillMaxWidth().height(height)
     }
     if (imageUrl.isNullOrBlank()) {
         val scheme = MaterialTheme.colorScheme
