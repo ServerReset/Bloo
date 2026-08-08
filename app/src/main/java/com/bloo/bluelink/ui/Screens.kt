@@ -334,6 +334,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -5163,10 +5164,35 @@ private fun HeroHeader(
                     Modifier
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
+                        // These three insets are DERIVED from the header's own geometry, not
+                        // picked. Collapsed, this node has to land exactly in the slot the
+                        // header reserved for it, and my first numbers did not -- the
+                        // percentage sat on top of the car icon and clipped the title's
+                        // descenders, because the readout is positioned against the CARD while
+                        // the reserve lives inside the header's TEXT COLUMN. Two coordinate
+                        // systems, and I had not made them agree.
+                        //
+                        // The header (PebbleShell) is: padding(horizontal = 16, vertical = 6),
+                        // Icon(20), Spacer(10), then the weighted text column. So:
+                        //
+                        //  start  16 + 20 + 10 = 46dp -- the text column's left edge, so the
+                        //         percentage lines up under the car NAME instead of over the
+                        //         icon. Expanded there is no icon to clear, so 16dp.
+                        //  end    the chevron is ~48dp inside the row's own 16dp padding, so
+                        //         76dp leaves it clear with a small optical gap. This was 64dp,
+                        //         which is why the bar ran under the chevron.
+                        //  bottom the header is exactly PebbleHeaderHeight (76dp): title (24)
+                        //         + heroReadoutReserve() (~40 at default font scale) + 12 of
+                        //         vertical padding. Content
+                        //         is centre-aligned, so the title occupies y 6..30 and the
+                        //         reserve y 30..70. This node is 40dp tall, so bottom = 6
+                        //         puts its top at 76 - 6 - 40 = 30 -- the reserve's top edge,
+                        //         exactly. It was 10dp, i.e. 4dp high, which is precisely the
+                        //         overlap with the title.
                         .padding(
-                            start = 16.dp,
-                            end = lerp(64.dp, 16.dp, heroT),
-                            bottom = lerp(10.dp, 16.dp, heroT),
+                            start = lerp(46.dp, 16.dp, heroT),
+                            end = lerp(76.dp, 16.dp, heroT),
+                            bottom = lerp(6.dp, 16.dp, heroT),
                         ),
                 ) {
                     HeroMorphReadout(readout, heroT)
@@ -5218,7 +5244,7 @@ private fun HeroHeader(
                 // ChargeBarHeight. Shrinking to zero as the pebble opens, because the expanded
                 // readout sits over the photo instead and the header must stop holding space
                 // it no longer needs -- the same footprint discipline as everything else here.
-                Spacer(Modifier.height(lerp(HeroReadoutReserve, 0.dp, heroT)))
+                Spacer(Modifier.height(lerp(heroReadoutReserve(), 0.dp, heroT)))
             },
         ) {
             // Empty by design. Everything the expanded state adds -- the photo and the
@@ -5778,7 +5804,28 @@ private fun animatedChargeFrac(target: Float): Float {
  * derived from the same values the readout lays out from, so the two move together -- and if
  * that ever stops being true the overlap is immediately visible rather than silent.
  */
-private val HeroReadoutReserve = 20.dp + 2.dp + ChargeBarHeight
+@Composable
+private fun heroReadoutReserve(): Dp {
+    // MEASURED from the type, not guessed. This was `20.dp + 2.dp + ChargeBarHeight`, and the
+    // 20 was my estimate of a labelLarge line. That holds at the default font scale and breaks
+    // above it: the reserve would stay 40dp while the numbers grew, and they would climb back
+    // over the car name -- the exact overlap this constant exists to prevent, reappearing for
+    // anyone who has enlarged their font. The app has its own UI-scale setting too.
+    //
+    // 2.dp is the collapsed end of the readout's own `spacedBy(lerp(2.dp, 6.dp, t))`, and
+    // ChargeBarHeight is the bar's fixed height, so every term now comes from the same place
+    // the readout lays out from.
+    val lineHeight = MaterialTheme.typography.labelLarge.lineHeight
+    val line = if (lineHeight == TextUnit.Unspecified) {
+        // No lineHeight declared on the style: fall back to the font size, which is the
+        // floor a single line can occupy.
+        val size = MaterialTheme.typography.labelLarge.fontSize
+        if (size == TextUnit.Unspecified) 20.dp else with(LocalDensity.current) { size.toDp() }
+    } else {
+        with(LocalDensity.current) { lineHeight.toDp() }
+    }
+    return line + 2.dp + ChargeBarHeight
+}
 
 /**
  * The hero's readout as ONE set of components that morphs between the collapsed and expanded
