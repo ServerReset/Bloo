@@ -515,8 +515,26 @@ fun vehicleStateLabel(
  *  coerceAtLeast(0) / >= comparisons depending on how they present it. */
 fun serviceDue(odometerMiles: Int?, lastServiceMiles: Int?, intervalMiles: Int?): Int? {
     if (odometerMiles == null || lastServiceMiles == null || intervalMiles == null) return null
-    return (lastServiceMiles + intervalMiles) - odometerMiles
+    return nextServiceMiles(lastServiceMiles, intervalMiles) - odometerMiles
 }
+
+/**
+ * The ABSOLUTE odometer reading a service falls due at.
+ *
+ * Trivial arithmetic, and shared anyway for one reason: [serviceDue] is defined as
+ * `nextServiceMiles - odometer`, so the relative countdown ("in N mi") and the absolute
+ * figure ("at N mi") are two views of ONE number and must never disagree. The phone and the
+ * watch each recomputed `last + interval` inline for the absolute view while calling the
+ * shared helper for the relative one -- so the formula lived in three places and only two of
+ * them were the shared one. [serviceDue] now routes through this, which is what makes the
+ * agreement structural instead of coincidental.
+ *
+ * This file already records what happens otherwise: the widget's service field re-inlined
+ * this arithmetic, and its own comment concludes "re-inlining a shared formatter is exactly
+ * how that bug got in".
+ */
+fun nextServiceMiles(lastServiceMiles: Int, intervalMiles: Int): Int =
+    lastServiceMiles + intervalMiles
 
 /** Parse the API's odometer field (a possibly-comma-grouped, possibly-decimal
  *  string like "12,345.6") into whole miles, or null if blank/unparseable.

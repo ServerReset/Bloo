@@ -3103,6 +3103,21 @@ private fun SettingsSearchResults(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        // The interval, which had no search entry while "Last service" above did. The two
+        // are only meaningful TOGETHER -- the service pebble's whole output is
+        // `last + interval` -- so search let you set one half of a sum and hid the other,
+        // leaving a "next due" figure that could not be corrected from here. Both fields
+        // sit side by side in the per-car section; only the index had one of them.
+        add("Service interval · ${v.name}", "service interval maintenance mileage due ${v.name}") {
+            OutlinedTextField(
+                value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
+                onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
+                label = { Text("Interval (mi)") },
+                singleLine = true, shape = FieldShape,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 
     // Matches render FIRST (top of this composable's output), the AI answer

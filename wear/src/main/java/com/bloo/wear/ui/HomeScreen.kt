@@ -141,6 +141,7 @@ import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.bluelink.data.serviceDue
+import com.bloo.bluelink.data.nextServiceMiles
 import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.wear.CarView
 import com.bloo.wear.WearRemote
@@ -1975,7 +1976,7 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     // ("in N mi"); when it isn't, it falls back to just stating the
     // absolute due mileage ("at N mi") instead of hiding the row entirely.
     if (lastSvc != null && interval != null) {
-        val nextDue = lastSvc + interval
+        val nextDue = nextServiceMiles(lastSvc, interval)
         val remaining = serviceDue(odoInt, lastSvc, interval)
         StatusRow(
             "Service due",

@@ -120,6 +120,33 @@ dependencies {
     implementation(project(":uicommon"))
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
+    // play-services-wearable drags in androidx.fragment 1.0.0 transitively (via
+    // play-services-basement). This module never touches Fragment's API, but Activity's
+    // bundled `InvalidFragmentVersionForActivityResult` lint check inspects the RESOLVED
+    // fragment version, and it is fatal-severity -- so `lintVitalRelease` (which AGP runs
+    // as part of assembleRelease, and only for release variants) failed the whole release
+    // build with "Upgrade Fragment version to at least 1.3.0". The check is right on the
+    // substance: Fragment before 1.3.0 did not call super.onRequestPermissionsResult and
+    // used invalid request codes, which breaks exactly the two ActivityResult launchers
+    // this module registers (MainActivity's permission request, Components' voice input).
+    //
+    // A constraint, not an `implementation`: raising the transitive version is the entire
+    // requirement, and declaring a dependency on a library we do not use would be a lie
+    // about intent -- and adds an unused artifact to a WATCH APK. :app needs no equivalent
+    // because it already pins fragment-ktx:1.8.5 directly.
+    //
+    // This build was already broken before shrinking was enabled; assembleRelease simply
+    // never ran on a push, and no v* tag had ever been pushed to make the release job run.
+    constraints {
+        implementation("androidx.fragment:fragment:1.8.5") {
+            because(
+                "androidx.activity's fatal InvalidFragmentVersionForActivityResult lint " +
+                    "check requires >= 1.3.0; play-services-basement resolves 1.0.0. " +
+                    "Matches the version :app pins.",
+            )
+        }
+    }
+
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.activity:activity-compose:1.9.3")

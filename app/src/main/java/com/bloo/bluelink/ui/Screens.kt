@@ -381,6 +381,7 @@ import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.serviceDue
+import com.bloo.bluelink.data.nextServiceMiles
 import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
@@ -8933,7 +8934,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val plate = state.licensePlates[v.vin]
     val lastSvc = state.lastServiceMiles[v.vin]
     val interval = state.serviceIntervalMiles[v.vin]
-    val nextDue = if (lastSvc != null && interval != null) lastSvc + interval else null
+    val nextDue = if (lastSvc != null && interval != null) nextServiceMiles(lastSvc, interval) else null
     val remaining = serviceDue(odoInt, lastSvc, interval)
 
     val ev = status?.evStatus

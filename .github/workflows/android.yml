@@ -57,6 +57,23 @@ jobs:
       - name: Build release APKs (runs R8 -- the only check on proguard-rules.pro)
         run: ./gradlew assembleRelease --stacktrace
 
+      # assembleRelease also runs lintVitalRelease (AGP does this for release variants
+      # only), whose FATAL-severity findings abort the build. Those reports are the one
+      # diagnostic this workflow produces that cannot be reconstructed from the run
+      # status, and the first thing anyone will want when this step goes red -- so keep
+      # them even, especially, on failure.
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: |
+            app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.txt
+            wear/build/reports/lint-results-*.html
+            wear/build/reports/lint-results-*.txt
+          if-no-files-found: ignore
+
       - name: Upload phone APK
         uses: actions/upload-artifact@v4
         with:
