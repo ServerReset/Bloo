@@ -124,10 +124,17 @@ object WearBridge {
      *  tiles, and the watch) after a data change - the single place that knows
      *  which surfaces exist, called from the workers/services that mutate state. */
     suspend fun refreshAllSurfaces(context: Context) {
-        runCatching { publishNow(context) }
+        // One decode, threaded through both publishes -- the same fix as [publishAll], for the
+        // same two reasons. `current()` is a DataStore read plus a full JSON decode of every
+        // vehicle, and this ran two of them; and reading once makes the state payload and the
+        // per-VIN settings payload agree by construction instead of being two independent
+        // reads a concurrent write could land between. This one matters more than publishAll's
+        // because it is far hotter: eight AppViewModel call sites plus three in this file.
+        val snapshot = runCatching { SnapshotStore(context).current() }.getOrNull()
+        runCatching { publishNow(context, snapshot) }
         runCatching {
             val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
-            publishSettingsNow(context, appearance)
+            publishSettingsNow(context, appearance, snapshot)
         }
         runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }
