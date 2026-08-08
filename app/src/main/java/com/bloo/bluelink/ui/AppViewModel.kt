@@ -77,6 +77,11 @@ private const val WEATHER_TTL_MS = 15 * 60 * 1000L
 // per keystroke.
 private const val AUTO_PUSH_DEBOUNCE_MS = 2000L
 
+// How long after launch the orphaned-car-photo sweep runs. Pure housekeeping with
+// nothing waiting on it, so it yields to the garage load, the first status fetches,
+// the first Drive pass and composition rather than competing with them.
+private const val PHOTO_SWEEP_DELAY_MS = 8000L
+
 // How long the update tile lingers with an "Undo" strip after "Not now" before
 // the dismiss commits — the call-back window.
 private const val UPDATE_DISMISS_UNDO_MS = 4500L
@@ -1432,6 +1437,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // that collector already fires runDriveSyncNow() once on launch (distinctUntil-
         // Changed passes the first emission through). An earlier explicit initial-pull
         // block here was removed as a redundant second pass on the same driveSyncMutex.
+
+        // Sweep car photos no pref points at any more, once per launch. The crop screen
+        // writes a fresh timestamped file each time and only overwrites the img_$vin pref,
+        // so every re-crop stranded the previous full-resolution image on disk forever.
+        //
+        // Delayed rather than immediate: this is pure housekeeping with nothing waiting on
+        // it, and launch is the one moment the process is contended (garage load, status
+        // fetches, the first Drive pass, composition). Reading DataStore and stat-ing a
+        // directory is cheap, but not free, and there is no reason for it to compete.
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(PHOTO_SWEEP_DELAY_MS)
+            runCatching { settingsStore.pruneOrphanPhotos() }
+        }
     }
 
     /**

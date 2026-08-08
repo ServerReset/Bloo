@@ -17,12 +17,14 @@ import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -1994,6 +1996,13 @@ class SettingsStore(private val context: Context) {
      *  enough for the hero card / cover-screen tile it's actually shown at. */
     private val SYNCED_PHOTO_MAX_DIM = 640
 
+    /** How recently a file in `cars/` must have been written to be spared by
+     *  [pruneOrphanPhotos]. Only guards the crop screen's write-file-then-write-pref
+     *  window, which is sub-millisecond; ten minutes is absurdly generous on purpose,
+     *  because the cost of waiting is one stale file until the next launch and the cost
+     *  of being wrong is deleting the photo the user just chose. */
+    private val MIN_ORPHAN_AGE_MS = 10 * 60 * 1000L
+
     /** Reads every `img_$vin` pref that points at a local file (a remote URL
      *  needs no embedding -- it already loads the same way on any device) and
      *  returns `{vin: base64 JPEG}` for [exportSettingsJson]'s "photos" field.
@@ -2075,6 +2084,46 @@ class SettingsStore(private val context: Context) {
                 vin to file.absolutePath
             }.getOrNull()
         }.toMap()
+    }
+
+    /**
+     * Delete car photos on disk that no preference points at any more.
+     *
+     * The crop screen writes `cars/car_<vin>_<millis>.<ext>` -- a FRESH timestamped name
+     * every time -- and only overwrites the `img_$vin` pref. So every re-crop left the
+     * previous file behind forever. Ten passes at the crop slider on one car is ten
+     * full-resolution images, none of them reachable. (applySyncPhotos writes a fixed
+     * `car_<vin>_synced.jpg` instead, which is why it does not leak; its path is stored in
+     * the same pref, so it is correctly seen as referenced here.)
+     *
+     * Safe by construction, and deliberately NOT the per-VIN pref garbage collection the
+     * same leak invites. `img_$vin` is the ONLY preference that holds a local photo path
+     * (`photo_$vin` looks like a second one but is a Wear DataMap asset key, not a pref),
+     * so a file absent from that set cannot be displayed by anything -- there is no code
+     * path that could reach it. Crucially this makes the decision independent of the
+     * VEHICLE LIST: purging prefs for "cars that disappeared" would risk destroying a
+     * user's plate, service history and presets whenever one brand's fetch failed and its
+     * cars merely looked absent. This asks a question that cannot be wrong instead.
+     *
+     * [MIN_ORPHAN_AGE_MS] guards the one race: a file written by the crop screen
+     * microseconds before its pref write lands. Nothing else in the app writes here.
+     */
+    suspend fun pruneOrphanPhotos(): Int = withContext(Dispatchers.IO) {
+        val dir = java.io.File(context.filesDir, "cars")
+        if (!dir.isDirectory) return@withContext 0
+        val referenced = context.settingsDataStore.data.first().asMap()
+            .filterKeys { it.name.startsWith("img_") }
+            .values.filterIsInstance<String>()
+            .filter { it.startsWith("/") }
+            .toSet()
+        val cutoff = System.currentTimeMillis() - MIN_ORPHAN_AGE_MS
+        var freed = 0
+        dir.listFiles()?.forEach { f ->
+            if (!f.isFile || f.absolutePath in referenced || f.lastModified() > cutoff) return@forEach
+            if (runCatching { f.delete() }.getOrDefault(false)) freed++
+        }
+        if (freed > 0) AppLog.log("Cleaned up $freed orphaned car photo(s)")
+        freed
     }
 
     /**
