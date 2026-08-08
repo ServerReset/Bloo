@@ -185,7 +185,30 @@ object WearCommandRunner {
      *  could reach was "did the relay to the phone succeed", which is a different
      *  question and false in the perfectly healthy standalone case. Most callers
      *  legitimately ignore the result. */
-    suspend fun refresh(context: Context, vin: String, force: Boolean = true): Boolean {
+    suspend fun refresh(
+        context: Context,
+        vin: String,
+        force: Boolean = true,
+        /**
+         * Receives every VehicleStatus this call actually fetched, keyed by VIN.
+         *
+         * Exists for the WATCH. `refresh` folds each status into the snapshot and drops the
+         * rest, which is all the phone needs -- it keeps its own StatusCache. The watch has no
+         * other source: its `statuses` map's only inbound path was `statusCache.load()`, and
+         * nothing in the wear module ever called `statusCache.save()`, so the map was
+         * permanently empty and every statuses-only field was dead. The Diagnostics tile never
+         * appeared, `alertCount` was always 0 so the Alerts tile never appeared with a door
+         * open, and ~25 diagnostics fields were always null -- while THIS function was
+         * fetching all of it and throwing it away.
+         *
+         * A callback rather than a changed return type, deliberately: the four other callers
+         * (tile worker, widget receiver, widget actions, WearPhoneService) are unaffected and
+         * do not have to know. And NOT a StatusCache write in here, because the phone calls
+         * this too and its cache also holds locations/placeNames -- a read-modify-write from
+         * here would race the phone's own saves and could blank them.
+         */
+        onStatuses: (suspend (Map<String, VehicleStatus>) -> Unit)? = null,
+    ): Boolean {
         val store = SnapshotStore(context)
         val targets = store.current().vehicles.let { all ->
             if (vin.isBlank()) all else all.filter { it.vin == vin }
@@ -193,6 +216,9 @@ object WearCommandRunner {
         // Declared outside the lock only so the success signal below can read it; it is
         // still populated and written entirely inside it.
         val merged = mutableListOf<VehicleSnapshot>()
+        // The full statuses, for [onStatuses]. The snapshot fold above keeps only the handful
+        // of fields VehicleSnapshot carries; this keeps the whole thing.
+        val fetched = mutableMapOf<String, VehicleStatus>()
         BlueLinkGate.statusMutex.withLock {
             // One repo instance per brand, reused across that brand's vehicles
             // in this loop -- a fresh KiaRepository per vehicle threw away its
@@ -212,7 +238,10 @@ object WearCommandRunner {
                     val repo = reposByBrand.getOrPut(brand) {
                         repositoryFor(brand, SessionStore(context), CredentialStore(context))
                     }
-                    repo.status(v, refresh = force)?.let { merged += snap.merged(it) }
+                    repo.status(v, refresh = force)?.let {
+                        merged += snap.merged(it)
+                        fetched[v.vin] = it
+                    }
                 }
             }
             // Whatever succeeded gets written even if some cars failed -- the per-car
@@ -225,6 +254,10 @@ object WearCommandRunner {
             // flip with the older fetched status.
             store.updateVehicles(merged)
         }
+        // Outside the lock: the callback is the caller's code and must not run holding the
+        // app-wide status mutex. Only when something was actually fetched, so a total failure
+        // cannot be mistaken for "fetched nothing, so clear everything".
+        if (fetched.isNotEmpty()) onStatuses?.invoke(fetched)
         // Empty means every car's fetch failed (or there were no cars). Note this is
         // computed after the lock, from the same list that was written.
         return merged.isNotEmpty()

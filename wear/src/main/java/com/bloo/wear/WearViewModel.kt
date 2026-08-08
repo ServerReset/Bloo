@@ -884,7 +884,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // whether any car has a "<vin>:refresh" key pending, so a single ":refresh"
         // key would have left the button looking idle for the whole operation.
         markAll(vehicles.map { "${it.vin}:refresh" }) {
-            runCatching { WearComms.requestSync(ctx, vin = "", refresh = true) }
+            // onStatuses fires only on the STANDALONE fallback, where this watch did the fetch
+            // itself and is the only thing holding the result. On the relayed path the phone
+            // fetched and will publish a snapshot, so there is nothing to retain here.
+            runCatching {
+                WearComms.requestSync(ctx, vin = "", refresh = true) { retainStatuses(it) }
+            }
         }
         refreshConnection()
     }
@@ -1946,6 +1951,38 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  [CarView.fetchedAt]-based "updated X ago" label tracks each real data
      *  arrival (snapshot push, standalone command success, relayed refresh)
      *  instead of being frozen at whatever the on-disk cache seeded in bootstrap. */
+    /**
+     * Keep the statuses a standalone refresh just fetched -- in memory AND on disk.
+     *
+     * This is the missing inbound path for [statuses]. Its only writer that could INSERT a VIN
+     * was `statusCache.load()`, and nothing in this module ever called `statusCache.save()`, so
+     * the map was permanently empty: the Diagnostics tile never appeared, `alertCount` was
+     * always 0 so the Alerts tile never appeared even with a door open, and roughly 25
+     * diagnostics fields were always null. All of it was being fetched by
+     * WearCommandRunner.refresh and dropped on the floor.
+     *
+     * MERGED, not replaced: a per-VIN refresh must not evict the other cars. `locations` is
+     * carried through from whatever the cache already held -- this watch has no locations map
+     * of its own, and passing emptyMap() would quietly wipe the phone-published ones on every
+     * standalone refresh.
+     */
+    private suspend fun retainStatuses(fetchedStatuses: Map<String, VehicleStatus>) {
+        if (fetchedStatuses.isEmpty()) return
+        statuses = statuses + fetchedStatuses
+        val now = System.currentTimeMillis()
+        fetchedAt = fetchedAt + fetchedStatuses.keys.associateWith { now }
+        runCatching {
+            val existing = statusCache.load()
+            statusCache.save(
+                statuses = statuses,
+                locations = existing.locations,
+                placeNames = placeNames,
+                fetched = fetchedAt,
+            )
+        }
+        publish()
+    }
+
     private fun markFetched(vins: Collection<String>) {
         if (vins.isEmpty()) return
         val now = System.currentTimeMillis()

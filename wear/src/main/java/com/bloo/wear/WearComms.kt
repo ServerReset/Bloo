@@ -253,7 +253,14 @@ object WearComms {
      * compensating standalone attempt. `force = refresh` keeps the fallback's
      * own aggressiveness matched to what was actually asked for either way.
      */
-    suspend fun requestSync(context: Context, vin: String, refresh: Boolean): Boolean =
+    suspend fun requestSync(
+        context: Context,
+        vin: String,
+        refresh: Boolean,
+        /** Passed straight to [WearCommandRunner.refresh] on the standalone fallback path --
+         *  see there. Null on the relayed path, where the phone did the fetching. */
+        onStatuses: (suspend (Map<String, com.bloo.bluelink.data.VehicleStatus>) -> Unit)? = null,
+    ): Boolean =
         withContext(Dispatchers.IO) {
             val node = phoneNodeId(context)
             val command = WearCommand(vin = vin, action = if (refresh) WearAction.REFRESH else WearAction.RESYNC)
@@ -268,7 +275,7 @@ object WearComms {
             // surfaces a message unable to tell that from a real failure. Callers that
             // specifically want "did the PHONE get it" (to say "bring your phone
             // nearby") ask phoneConnected instead.
-            if (!sent) WearCommandRunner.refresh(context, vin, force = refresh) else true
+            if (!sent) WearCommandRunner.refresh(context, vin, force = refresh, onStatuses = onStatuses) else true
         }
 
     // ── Published DataItems (watch → phone mirror) ───────────────────────────
