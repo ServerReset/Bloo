@@ -9049,8 +9049,12 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
     val metric = a.unitSystem == "metric"
     val rows = remember(status, fahrenheit, metric) { buildList {
         status?.tirePressureLamp?.let { tp ->
-            val psiSuffix = status.tirePressure?.all?.takeIf { it > 0 }?.let { " · $it psi" } ?: ""
-            add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning$psiSuffix" else "OK$psiSuffix"))
+            // No psi suffix. `TirePressure.all` was only ever populated FROM the warning lamp --
+            // Kia read `tirePressure.all` (a 0/1 indicator) and Canada read
+            // `tirePressureLamp.tirePressureLampAll` outright -- so this rendered "Warning · 1
+            // psi" and "OK · 0 psi". No producer in this app has ever supplied a real
+            // pressure, and both assignments are now deleted, so there is nothing to suffix.
+            add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning" else "OK"))
             tp.frontLeft?.let { add(DiagRow("Front left", warn(it), indent = true)) }
             tp.frontRight?.let { add(DiagRow("Front right", warn(it), indent = true)) }
             tp.rearLeft?.let { add(DiagRow("Rear left", warn(it), indent = true)) }

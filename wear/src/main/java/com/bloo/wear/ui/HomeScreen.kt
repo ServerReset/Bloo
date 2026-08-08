@@ -1945,9 +1945,10 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
         emphasize = true,
     )
     Spacer(Modifier.height(6.dp))
-    if (car.tireAll != null) {
-        StatusRow("Tire avg", "${car.tireAll} psi")
-    }
+    // "Tire avg N psi" removed. `tireAll` came from VehicleStatus.tirePressure, which was only
+    // ever populated from the warning LAMP -- so this read "Tire avg 0 psi" with the lamp off
+    // and "Tire avg 1 psi" with it on, directly above "Tires: Check pressure". Both producers
+    // are fixed, so tireAll is now always null.
     if (anyIndividualTire) {
         if (car.tireFl) StatusRow("Tire FL", "Check", valueColor = err)
         if (car.tireFr) StatusRow("Tire FR", "Check", valueColor = err)
@@ -1955,7 +1956,10 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
         if (car.tireRr) StatusRow("Tire RR", "Check", valueColor = err)
     } else if (car.tireWarning) {
         StatusRow("Tires", "Check pressure", valueColor = err)
-    } else if (car.tireAll == null) {
+    } else {
+        // Was gated on `car.tireAll == null`, so a non-null lamp-as-pressure value SUPPRESSED
+        // the correct "Tires OK" row. With tireAll always null that gate is vacuous; the honest
+        // reading -- no individual warnings and no general warning -- is just OK.
         StatusRow("Tires", "OK")
     }
     car.battery12v?.let { v12 ->

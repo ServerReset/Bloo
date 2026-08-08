@@ -303,7 +303,14 @@ class CanadaApi(private val brand: Brand) {
             batteryStatus = ev["batteryStatus"].int(),
             batteryPlugin = (ev["batteryPlugin"] ?: vs["batteryPlugin"]).int(),
             drvDistance = run {
-                val range = vs.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
+                // `ev` FIRST, falling back to the top-level status object -- the same shape
+                // `batteryPlugin` three lines above already uses, and for the same reason: CA
+                // puts some EV fields under evStatus and some beside it. This read was
+                // top-level ONLY, so EvStatus.drvDistance was always empty for a Canadian EV
+                // and every surface that shows electric range fell back to nothing.
+                val range = ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
+                    ?: ev.path("drvDistance", "0", "rangeByFuel", "evModeRange")
+                    ?: vs.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
                     ?: vs.path("drvDistance", "0", "rangeByFuel", "evModeRange")
                 range?.path("value").dbl()?.kmToMi()
                     ?.let { listOf(DrvDistance(RangeByFuel(Dte(it, range.path("unit").int())))) }
@@ -374,8 +381,6 @@ class CanadaApi(private val brand: Brand) {
             breakOilStatus = vs["breakOilStatus"].flag(),
             smartKeyBatteryWarning = vs["smartKeyBatteryWarning"].flag(),
             fuelLevel = vs["fuelLevel"].int(),
-            tirePressure = vs["tirePressureLamp"].let { (it as? JsonObject)?.get("tirePressureLampAll").int() }
-                ?.let { TirePressure(all = it) },
         )
     }
 

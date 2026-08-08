@@ -112,7 +112,9 @@ data class CarView(
     val accessoryOn: Boolean,
     val defrostOn: Boolean,
     val tempSetting: String?,
-    val tireAll: Int?,
+    // tireAll was deleted here. It carried VehicleStatus.tirePressure.all, which was only
+    // ever populated from the tyre warning LAMP, and its one reader rendered it as "N psi".
+    // Both producers and that reader are gone, so this was write-only.
     val tireFl: Boolean,
     val tireFr: Boolean,
     val tireRl: Boolean,
@@ -2128,7 +2130,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             accessoryOn = s?.acc == true,
             defrostOn = s?.defrost == true,
             tempSetting = s?.airTemp?.value,
-            tireAll = s?.tirePressure?.all,
             tireFl = (lamp?.frontLeft ?: 0) != 0,
             tireFr = (lamp?.frontRight ?: 0) != 0,
             tireRl = (lamp?.rearLeft ?: 0) != 0,

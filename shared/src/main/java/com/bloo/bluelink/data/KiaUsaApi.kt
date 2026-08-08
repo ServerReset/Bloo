@@ -415,7 +415,6 @@ class KiaUsaApi {
             tirePressureLamp = vs.path("tirePressure", "all").int()?.let {
                 TirePressureLamp(tirePressureLampAll = it)
             },
-            tirePressure = vs.path("tirePressure", "all").int()?.let { TirePressure(all = it) },
             airTemp = climate.path("airTemp", "value").str()?.let {
                 TempValue(it, climate.path("airTemp", "unit").int())
             },
