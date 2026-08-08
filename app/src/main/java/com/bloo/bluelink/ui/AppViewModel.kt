@@ -1404,8 +1404,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // performDriveSync stays the single source of truth.
         viewModelScope.launch {
             var pushJob: kotlinx.coroutines.Job? = null
+            // No .distinctUntilChanged() here: dirtyKeysFlow already dedupes, on the key set
+            // AND a fingerprint of those keys' values. Deduping on the bare set a second time
+            // would re-introduce exactly what that fixes -- re-editing one key after a failed
+            // push yields an identical set, so the retry never got scheduled.
             settingsStore.dirtyKeysFlow
-                .distinctUntilChanged()
                 .collect { dirty ->
                     // Empty = nothing pending (or a sync just cleared it) — cancel any
                     // scheduled push and wait for the next real change.
@@ -1836,6 +1839,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val hasBattery = _state.value.hasBattery(v)
         val percent = status?.percentFor(hasBattery)
         val range = status?.rangeMiFor(hasBattery)
+        // A fix that did NOT ride along on the status. `locate()` prefers the GPS carried
+        // by a status refresh, but falls back to `repoFor(v).location(v)` (findMyCar) and
+        // stores that in `_state.locations` only -- and Canada's repo has no GPS on its
+        // status at all, so that fallback is its ONLY source. Reading `status` alone meant
+        // every surface fed from a snapshot -- widget map, watch map, the location info
+        // field -- showed no position for a car whose location the phone was displaying on
+        // screen at that moment. Status wins when it has a coord (it is same-fetch fresh);
+        // this is the fallback, not an override.
+        //
+        // Chosen as ONE fix rather than per-field `?:`, so a status carrying a lat but no
+        // lon cannot combine with a cached lon into coordinates that were never a real
+        // position. Same all-or-nothing shape `locate()` uses to build `statusLoc`.
+        val fix = status?.vehicleLocation?.coord?.let { c ->
+            val la = c.lat
+            val lo = c.lon
+            if (la != null && lo != null) {
+                GeoLocation(la, lo, status.vehicleLocation?.speed?.value)
+            } else null
+        } ?: _state.value.locations[v.vin]
         return VehicleSnapshot(
             vin = v.vin,
             name = v.name,
@@ -1851,9 +1873,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             charging = status?.evStatus?.batteryCharge,
             climateOn = status?.airCtrlOn,
             engineOn = status?.engine,
-            lat = status?.vehicleLocation?.coord?.lat,
-            lon = status?.vehicleLocation?.coord?.lon,
-            speedMph = status?.vehicleLocation?.speed?.value,
+            lat = fix?.latitude,
+            lon = fix?.longitude,
+            speedMph = fix?.speed,
             updated = status?.dateTime,
             // A non-null status is freshly-fetched data; null means we're building a
             // placeholder snapshot with no live status yet (leave fetchedAt unknown).
@@ -2671,6 +2693,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 loadCarWeather(v, force = true)
                 persistCache()
+                // persistCache() writes the PHONE's own status cache (statusCache) so the
+                // next cold start shows this fix. It does not touch SnapshotStore, which is
+                // what the widget, the watch and the QS tiles read -- so Locate updated the
+                // map on screen and nothing else, until the next status refresh happened to
+                // run persistSnapshots() for another reason. Publish it here too.
+                persistSnapshots()
             }
             hadCached -> _state.update {
                 it.copy(message = "Showing last-known location. A live locate is over today's limit. Try again later.", messageType = "info")

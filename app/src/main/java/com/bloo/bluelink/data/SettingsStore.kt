@@ -18,6 +18,7 @@ import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -1811,8 +1812,33 @@ class SettingsStore(private val context: Context) {
      *  ViewModel observes this to auto-push to Drive shortly after ANY change
      *  (setting toggle, pebble/section reorder, per-car config…), so sync feels
      *  automatic instead of only firing on a refresh or the periodic worker.
-     *  Emits the empty set once the last upload clears it. */
-    val dirtyKeysFlow: Flow<Set<String>> = context.settingsDataStore.data.map { it.dirtyKeySet() }
+     *  Emits the empty set once the last upload clears it.
+     *
+     *  Deduplicated HERE, on the key set *and a fingerprint of those keys' current values*,
+     *  rather than by a plain `distinctUntilChanged()` at the collector. That is the whole
+     *  point: the dirty set is a lossy projection of "something changed", so editing the
+     *  same key twice leaves it byte-identical. A collector deduplicating on the set alone
+     *  therefore saw no second change -- which is fine while the first push is still pending
+     *  (it uploads current values anyway), but not when that push FAILED: the set stayed
+     *  `{k}`, the re-edit of `k` produced `{k}` again, no emission, and the change sat
+     *  unsynced until a data refresh or the 2-hour worker. The value fingerprint restores
+     *  the promise the first sentence above makes.
+     *
+     *  Fingerprinted by hash, not by retaining the values: `distinctUntilChanged` holds its
+     *  last value for comparison, and dirty values include multi-kilobyte JSON blobs
+     *  (climate presets, custom palettes). A hash collision would suppress one emission --
+     *  a delayed sync, backstopped by the periodic worker -- not a wrong one. */
+    val dirtyKeysFlow: Flow<Set<String>> = context.settingsDataStore.data
+        .map { prefs ->
+            val keys = prefs.dirtyKeySet()
+            // One name -> value map, not a scan per dirty key. Tombstoned keys are absent
+            // from prefs and fingerprint as null, so a delete and a later restore of the
+            // same key are correctly distinct.
+            val byName = prefs.asMap().entries.associate { it.key.name to it.value }
+            keys to keys.sorted().joinToString(" ") { "$it=${byName[it]}" }.hashCode()
+        }
+        .distinctUntilChanged()
+        .map { it.first }
 
     /** Clear [keys] from the dirty set via set-difference, leaving any key
      *  marked dirty after the calling upload's body was snapshotted still
@@ -1923,14 +1949,35 @@ class SettingsStore(private val context: Context) {
      *  needs no embedding -- it already loads the same way on any device) and
      *  returns `{vin: base64 JPEG}` for [exportSettingsJson]'s "photos" field.
      *  Downscales to [SYNCED_PHOTO_MAX_DIM] first; a corrupt/missing file for
-     *  one car is skipped rather than failing the whole export. */
+     *  one car is skipped rather than failing the whole export.
+     *
+     *  Memoized on the file's identity (see [syncPhotoCache]) because this is not the
+     *  once-per-manual-export call it looks like: it runs on every Drive sync pass, and
+     *  auto-push fires one of those ~2s after ANY tracked pref edit. Dragging pebbles or
+     *  nudging a slider therefore paid a full decode + rescale + JPEG re-compress +
+     *  base64 for every car, to produce bytes identical to last time. */
     private fun encodeSyncPhotos(prefs: androidx.datastore.preferences.core.Preferences): Map<String, JsonPrimitive> =
         prefs.asMap().keys.mapNotNull { key ->
             if (!key.name.startsWith("img_")) return@mapNotNull null
             val vin = key.name.removePrefix("img_")
             val path = prefs[stringPreferencesKey(key.name)]?.takeIf { it.startsWith("/") } ?: return@mapNotNull null
+            // Path plus mtime plus length. The crop screen and applySyncPhotos both write
+            // each car to a FIXED per-vin filename (deliberately, so repeated syncs
+            // overwrite in place instead of accumulating orphans), so the path alone cannot
+            // tell a new photo from the old one -- mtime and length are what move.
+            val file = java.io.File(path)
+            val stamp = "$path:${file.lastModified()}:${file.length()}"
+            syncPhotoCache[vin]?.let { (cachedStamp, cachedB64) ->
+                if (cachedStamp == stamp) return@mapNotNull vin to JsonPrimitive(cachedB64)
+            }
             val bytes = runCatching { downscaledJpegBytes(path) }.getOrNull() ?: return@mapNotNull null
-            vin to JsonPrimitive(Base64.encodeToString(bytes, Base64.NO_WRAP))
+            val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+            // Bounded by garage size in normal use (one entry per vin, a changed photo
+            // replaces its own entry). The clear() is a backstop for a pathological garage,
+            // and costs only a re-encode.
+            if (syncPhotoCache.size >= MAX_CACHED_SYNC_PHOTOS) syncPhotoCache.clear()
+            syncPhotoCache[vin] = stamp to b64
+            vin to JsonPrimitive(b64)
         }.toMap()
 
     /** Downscale-decodes [path] to at most [SYNCED_PHOTO_MAX_DIM] on its longest
@@ -2138,3 +2185,21 @@ class SettingsStore(private val context: Context) {
         return true
     }
 }
+
+/**
+ * `vin -> (file stamp, base64 JPEG)` memo for `SettingsStore.encodeSyncPhotos`.
+ *
+ * Top-level rather than a field, because [SettingsStore] is CONSTRUCTED AD HOC at a dozen
+ * call sites (`SettingsStore(context).appearance.first()` and friends) -- an instance field
+ * would be a fresh empty map on most of those calls and would cache nothing. This is a pure
+ * memo of a deterministic function of a file's bytes, so process scope is the correct scope,
+ * and there is nothing to invalidate on sign-out or car removal: the stamp does that.
+ *
+ * ConcurrentHashMap because sync runs off the main thread and two passes can overlap. A torn
+ * read here would at worst re-encode; a ConcurrentModificationException would fail a sync.
+ */
+private val syncPhotoCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String>>()
+
+/** Entry cap for [syncPhotoCache]. A 640px quality-78 JPEG base64s to roughly 60-110 KB, so
+ *  this bounds the memo near a megabyte for a garage far larger than any real one. */
+private const val MAX_CACHED_SYNC_PHOTOS = 12
