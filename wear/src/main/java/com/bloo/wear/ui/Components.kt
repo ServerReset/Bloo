@@ -744,7 +744,17 @@ fun MorphButton(
         // commit → the heavier Confirm feel; every other button (navigation,
         // pickers, plain actions) gets the lighter tap so opening a submenu no
         // longer feels as weighty as committing a state change.
-        onClick = { if (toggled == true || (active && toggled == null)) haptics.click() else haptics.tap(); onClick() },
+        //
+        // `toggled == false`, not `== true`. `toggled` is the state the button is IN, so
+        // testing it for true asked "is it already on" and gave the heavy Confirm to the tap
+        // that turns something OFF -- exactly inverted from the rule above, for every toggle
+        // in the app. Checked all seven call sites: lock, climate (x2), charge, PIN lock and
+        // Aurora (x2) all pass the current state, so destination = "about to turn on" =
+        // `toggled == false` uniformly.
+        //
+        // The `active && toggled == null` clause is unchanged: it covers a plain highlighted
+        // action and a toggle whose state is genuinely UNKNOWN, neither of which this changes.
+        onClick = { if (toggled == false || (active && toggled == null)) haptics.click() else haptics.tap(); onClick() },
         enabled = enabled && !pending,
         interactionSource = interaction,
         modifier = modifier.fillMaxWidth()

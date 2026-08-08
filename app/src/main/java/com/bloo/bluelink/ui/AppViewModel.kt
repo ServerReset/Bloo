@@ -3334,6 +3334,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  restore step into [UiState.defaultClimatePresets]. */
     fun setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
         settingsStore.setDefaultClimatePreset(vin, id)
+        // The STATE write, which was missing. UiState.defaultClimatePresets is populated
+        // exactly once per process, inside bootstrapDriveSync -- which is guarded by an
+        // AtomicBoolean and so never runs again. So this wrote to disk and nothing on screen
+        // changed: the one-tap climate Start button kept using the OLD default for the rest of
+        // the session, and the setting only appeared to take effect after a restart.
+        _state.update {
+            it.copy(
+                defaultClimatePresets = if (id == null) {
+                    it.defaultClimatePresets - vin
+                } else {
+                    it.defaultClimatePresets + (vin to id)
+                },
+            )
+        }
     }
 
     /** Manual "Sync now": force a full Drive push/pull right now. Available

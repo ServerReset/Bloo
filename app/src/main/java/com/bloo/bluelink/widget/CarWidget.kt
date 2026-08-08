@@ -2182,7 +2182,12 @@ class CarWidget : GlanceAppWidget() {
         // the whole tile, but a caller where ActionButtons is a weighted
         // sibling (sharing a Row with a ring/text column) knows its own
         // slice is narrower than that and should say so.
-        availableWidth: Dp = LocalSize.current.width,
+        // Scale.innerWidth, not the raw tile width. The line below already used the padded
+        // Scale.innerHeight, so these two defaults disagreed about what "available" means --
+        // every caller that overrode neither fed the row-capacity check a width the row does
+        // not have (the root padding, plus the pill corner's extra 4dp per side on the tiers
+        // that get one). Scale.Frame exists precisely so this cannot be open-coded.
+        availableWidth: Dp = Scale.innerWidth(render.frame(LocalSize.current)),
         // The height this row/column actually has. Needed for the same reason
         // as availableWidth -- see the capacity note below.
         availableHeight: Dp = Scale.innerHeight(render.frame(LocalSize.current)),
