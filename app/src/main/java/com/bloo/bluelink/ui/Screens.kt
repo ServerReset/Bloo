@@ -7076,7 +7076,14 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
     // UiState so it recomposes on every emission — without this the filter re-allocated
     // the visible-section list on every refresh/command tick for the visible car.
     val hasBattery = state.hasBattery(v)
-    val sections = remember(allSections, exclude, state.hiddenPebbles, state.aiEnabled, hasBattery, v.isGen5W, state.updateAvailable) {
+    // state.updateTileDismissed is in the key because isSectionAvailable now reads it: without
+    // it this memo would keep the stale section list and the dismissed tile's phantom slot
+    // would survive until some unrelated key changed. Every input the predicate reads has to be
+    // a key, which is the contract this line already follows for the other six.
+    val sections = remember(
+        allSections, exclude, state.hiddenPebbles, state.aiEnabled, hasBattery, v.isGen5W,
+        state.updateAvailable, state.updateTileDismissed,
+    ) {
         allSections.filter {
             it !in exclude && state.isSectionAvailable(v, it)
         }

@@ -2115,7 +2115,15 @@ class SettingsStore(private val context: Context) {
         val label = runCatching {
             android.location.Geocoder(context, java.util.Locale.getDefault())
                 .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->
-                    listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct().joinToString(", ")
+                    listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct()
+                        .joinToString(", ")
+                        // .ifBlank, because the `?: "My location"` below only catches a NULL
+                        // geocode. An Address whose locality, subAdminArea AND adminArea are
+                        // all null -- offshore, or a sparse country -- makes joinToString
+                        // return "", which is non-null, so it sailed past the fallback and
+                        // setWeatherLocation stored a label of no label at all. The
+                        // forward-geocode path in AppViewModel already guards this way.
+                        .ifBlank { "My location" }
                 }
         }.getOrNull() ?: "My location"
         setWeatherLocation(loc.latitude, loc.longitude, label)

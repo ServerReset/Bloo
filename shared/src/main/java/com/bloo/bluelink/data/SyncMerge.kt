@@ -67,6 +67,11 @@ object SyncMerge {
         // Whether THIS device installs updates silently via Shizuku — a device-local
         // capability (Shizuku may not be present elsewhere), so it must not roam.
         "seamless_install_shizuku",
+        // Which car is on screen RIGHT NOW. Transient per-device view state, not a setting:
+        // it is written through editTracked on every car swipe, so it was dirty-tracked,
+        // auto-pushed to Drive, and then roamed -- changing the car on the phone yanked the
+        // tablet to the same car, and every swipe cost a sync round trip.
+        "last_vehicle_vin",
     )
 
     /** Per-VIN keys whose NAMES carry a dynamic suffix (the VIN), so they can't be

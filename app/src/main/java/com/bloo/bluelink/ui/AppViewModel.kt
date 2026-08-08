@@ -328,7 +328,11 @@ data class UiState(
             // all, so TripsPebble would render nothing -- leaving a phantom slot with a
             // spacedBy gap on either side of it.
             "trips" -> hasBattery(v) && !v.isGen5W
-            "update" -> updateAvailable != null
+            // `!updateTileDismissed` too: UpdateAvailableTile renders nothing once dismissed,
+            // so the section stayed "available" and left a zero-height slot with a spacedBy gap
+            // on either side of it -- the same phantom-slot shape the "trips" line above
+            // documents guarding against.
+            "update" -> updateAvailable != null && !updateTileDismissed
             else -> true
         }
     }
@@ -2395,7 +2399,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return parts.joinToString(" ")
         }
         // Priority 1 — doors.
-        parts += "The doors are ${if (status.doorLock == true) "locked" else "unlocked"}."
+        // Only when the car has actually REPORTED it. `doorLock == true` collapsed null into
+        // "unlocked", so a car that has never reported its doors had "The doors are unlocked."
+        // fed to the AI as a fact -- and the summary then tells the user their car is unlocked.
+        status.doorLock?.let { parts += "The doors are ${if (it) "locked" else "unlocked"}." }
         // Priority 2 — charging + time to full (EV/PHEV only).
         if (s.hasBattery(v)) {
             if (status.evStatus?.batteryCharge == true) {
@@ -2416,7 +2423,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (s.hasBattery(v)) status.evStatus?.batteryStatus?.let { parts += "The drive battery is at $it%." }
         if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
         status.rangeMiFor(s.hasBattery(v))?.let { parts += "Estimated driving range is $it miles." }
-        parts += "Climate is ${if (status.airCtrlOn == true) "on" else "off"}."
+        status.airCtrlOn?.let { parts += "Climate is ${if (it) "on" else "off"}." }
         status.battery?.batSoc?.let { parts += "The 12V starter battery is at $it%." }
         v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "The odometer reads $it miles." }
         s.placeNames[v.vin]?.let { parts += "Last known location: $it." }

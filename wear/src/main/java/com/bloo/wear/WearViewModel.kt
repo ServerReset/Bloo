@@ -573,6 +573,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                             this[snap.vin] = s.copy(
                                 doorLock = snap.locked ?: s.doorLock,
                                 airCtrlOn = snap.climateOn ?: s.airCtrlOn,
+                                // engine was missing from this fold-in while its two
+                                // neighbours were here, so a phone-reported engine state never
+                                // reached a cached VehicleStatus.
+                                engine = snap.engineOn ?: s.engine,
                                 evStatus = s.evStatus?.let { ev ->
                                     ev.copy(batteryCharge = snap.charging ?: ev.batteryCharge)
                                 },
@@ -2126,7 +2130,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // have flipped the watch's Trips gating and not the phone's.
             tripsSupported = !v.isGen5W,
             hornLightsSupported = v.supportsHornLights,
-            engineOn = s?.engine == true,
+            // `?: snap?.engineOn` -- the phone's snapshot carries engineOn, and this was the
+            // one field with that fallback available and unused. `accessoryOn` and `defrostOn`
+            // below look identical but have no snapshot equivalent to fall back TO, so they
+            // stay as they are; the asymmetry is the payload's, not an oversight here.
+            //
+            // Without it, a running car published by the phone made the watch FACE tile paint
+            // its "running" accent while the app one swipe away said "Engine Off" -- two
+            // surfaces of the same app disagreeing off the same snapshot.
+            engineOn = s?.engine ?: snap?.engineOn ?: false,
             accessoryOn = s?.acc == true,
             defrostOn = s?.defrost == true,
             tempSetting = s?.airTemp?.value,
