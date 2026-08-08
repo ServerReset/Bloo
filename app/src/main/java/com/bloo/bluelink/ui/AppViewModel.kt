@@ -1144,14 +1144,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // this is network work that can take seconds, and a snapshot read before it would
         // be stale by the time it was used if the user changed a setting meanwhile.
         val prefs = settingsStore.snapshot()
-        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
+        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
+        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
         val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
+        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
         val firstRun = !settingsStore.onboardingSeen()
         val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin) }.map { it.vin }
         // On first open all pebbles start expanded regardless of any stored state.
@@ -1231,14 +1231,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val prefs = settingsStore.snapshot()
         val vehicles = _state.value.vehicles
         if (vehicles.isEmpty()) return
-        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
+        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
+        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
         val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
+        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
         // These fields used to be omitted here (only loadGarageInner read them),
         // so an imported change to pebble visibility, collapse state, hotspots,
         // Quick-tile config, or the shortcut set wrote DataStore but never reached

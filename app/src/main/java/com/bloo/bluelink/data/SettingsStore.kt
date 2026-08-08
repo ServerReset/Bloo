@@ -669,8 +669,15 @@ class SettingsStore(private val context: Context) {
      * passenger-heat=true the first time this is read, without any explicit
      * one-time migration step or version bump.
      */
-    suspend fun seatConfig(vin: String): SeatConfig {
-        val p = context.settingsDataStore.data.first()
+    suspend fun seatConfig(vin: String): SeatConfig =
+        seatConfig(vin, context.settingsDataStore.data.first())
+
+    /**
+     * Reads THIRTEEN keys plus an older grouped-flag format, which is exactly why it takes a
+     * Preferences: thirteen reads for one car became thirteen DataStore round trips, and
+     * loadGarage does this per car.
+     */
+    fun seatConfig(vin: String, p: Preferences): SeatConfig {
         fun b(key: String): Boolean? = p[booleanPreferencesKey(key)]
         // Migration: older builds stored grouped front/rear flags.
         val oldFrontHeat = b("seat_fh_$vin")
@@ -733,8 +740,11 @@ class SettingsStore(private val context: Context) {
      * user's list, so a newly-added section lands in a sensible relative spot
      * instead of always being tacked onto the end.
      */
-    suspend fun sectionOrder(vin: String): List<String> {
-        val saved = context.settingsDataStore.data.first()[stringPreferencesKey("sections_$vin")]
+    suspend fun sectionOrder(vin: String): List<String> =
+        sectionOrder(vin, context.settingsDataStore.data.first())
+
+    fun sectionOrder(vin: String, p: Preferences): List<String> {
+        val saved = p[stringPreferencesKey("sections_$vin")]
             ?.split(",")?.filter { it.isNotBlank() }
         val valid = saved?.filter { it in DEFAULT_SECTIONS } ?: emptyList()
         if (valid.isEmpty()) return DEFAULT_SECTIONS
@@ -1612,8 +1622,11 @@ class SettingsStore(private val context: Context) {
     }
 
     /** User-named climate presets for a car. */
-    suspend fun climatePresets(vin: String): List<ClimatePreset> {
-        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("climate_presets_$vin")] ?: return emptyList()
+    suspend fun climatePresets(vin: String): List<ClimatePreset> =
+        climatePresets(vin, context.settingsDataStore.data.first())
+
+    fun climatePresets(vin: String, p: Preferences): List<ClimatePreset> {
+        val raw = p[stringPreferencesKey("climate_presets_$vin")] ?: return emptyList()
         return decodeJsonOr(climateJson, presetListSerializer, raw, emptyList())
     }
 
