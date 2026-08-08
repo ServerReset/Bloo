@@ -22,9 +22,10 @@ import com.bloo.bluelink.data.WearCommandRunner
  * How that reaches the tiles is worth being precise about, because it used to be
  * described as a direct refresh and was not one: the fetch writes into SnapshotStore,
  * and a tile that is currently visible observes that store (see
- * BlooTileService.onStartListening) and repaints itself. The requestUpdates() call is
- * a no-op on these tiles -- none declares META_DATA_ACTIVE_TILE -- so the store is the
- * only path. A tile that is NOT visible simply reads the new value next time it is.
+ * BlooTileService.onStartListening) and repaints itself. The store is the ONLY path: this
+ * worker used to also call a requestUpdates() helper, which was a no-op because none of the
+ * tiles declares META_DATA_ACTIVE_TILE, and that helper is now deleted. A tile that is NOT
+ * visible simply reads the new value the next time it is.
  */
 class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
@@ -36,7 +37,6 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
                 WearCommandRunner.refresh(applicationContext, vin)
                 AppLog.log("Tile refresh for $vin")
             }.onFailure { AppLog.log("⚠ Tile refresh failed: ${it.message}") }
-            runCatching { BlooTileService.requestUpdates(applicationContext) }
             // A status refresh is read-only, so a transient network hiccup is safe
             // to retry a bounded number of times. If it keeps failing we give up
             // (success) rather than leaving a silent background refresh stuck.
@@ -48,7 +48,6 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
         }
         val target = inputData.getString(KEY_TARGET) ?: "default"
         val result = TileCommandRunner.run(applicationContext, vin, cmd, target)
-        runCatching { BlooTileService.requestUpdates(applicationContext) }
         // Don't mask a failed command as success: TileCommandRunner already logs
         // the ⚠ line, and returning failure() surfaces it to WorkManager instead
         // of the old always-success behaviour. A mutating car command is not

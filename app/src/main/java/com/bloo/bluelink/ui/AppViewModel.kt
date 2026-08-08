@@ -919,7 +919,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // watch's own signOutAll (snapshotStore.saveVehicles(emptyList())).
                 runCatching { statusCache.clear() }
                 runCatching { snapshotStore.saveVehicles(emptyList()) }
-                runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication()) }
                 // Preserve everything that is NOT account state across the full reset.
                 //
                 // This already preserved the four device-capability probes, with a comment
@@ -1753,7 +1752,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
         // Refresh Quick Settings tiles too.
-        com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
         refreshLiveChargeBar(vehicles)
     }
 
@@ -2434,7 +2432,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             settingsStore.setTileConfig(index, vin, cmd)
-            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
         }
     }
 
@@ -2446,7 +2443,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             settingsStore.setTileLabel(index, label)
-            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
         }
     }
 
@@ -2457,7 +2453,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             settingsStore.setTileClimateTarget(index, target)
-            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
         }
     }
 
@@ -2473,7 +2468,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(tileBackground = value) }
         viewModelScope.launch {
             settingsStore.setTileBackground(value)
-            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
         }
     }
 
@@ -2482,7 +2476,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(tileLiveRefresh = value) }
         viewModelScope.launch {
             settingsStore.setTileLiveRefresh(value)
-            com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication())
         }
     }
 
@@ -2902,7 +2895,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 persistSnapshots()
                 // Keep the Quick Settings tiles' state/icon in sync with the car.
-                runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication()) }
                 // Auto-AI: a command changed the car's state, refresh the summary.
                 _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
             } catch (e: Exception) {

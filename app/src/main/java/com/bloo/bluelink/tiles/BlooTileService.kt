@@ -60,11 +60,13 @@ abstract class BlooTileService : TileService() {
         scope.launch { render() }
         // Repaint while visible, instead of relying on someone to poke us.
         //
-        // requestUpdates() below cannot do it: TileService.requestListeningState is only
-        // honoured for tiles declaring META_DATA_ACTIVE_TILE, and none of Bloo's twelve
-        // do, so all fourteen of its call sites were no-ops. In background mode -- which
-        // deliberately does not collapse the shade -- that meant the user tapped a tile
-        // and then watched it sit unchanged while the command ran.
+        // Nothing can poke us from outside: TileService.requestListeningState is only
+        // honoured for tiles declaring META_DATA_ACTIVE_TILE, and none of Bloo's twelve do.
+        // There used to be a requestUpdates() helper pretending otherwise, with thirteen
+        // no-op call sites; it is deleted (see the tombstone in the companion object). In
+        // background mode -- which deliberately does not collapse the shade -- its absence
+        // meant the user tapped a tile and then watched it sit unchanged while the command
+        // ran.
         //
         // Observing the store is the fix rather than declaring the tiles active, because
         // an ACTIVE tile stops getting onStartListening when the shade opens and only
@@ -330,26 +332,27 @@ abstract class BlooTileService : TileService() {
             }.getOrDefault(false)
         }
 
-        /**
-         * Ask the system to refresh Bloo's tiles.
-         *
-         * ⚠ Currently a NO-OP, and its fourteen call sites are too.
-         * [TileService.requestListeningState] is only honoured for tiles that declare
-         * `META_DATA_ACTIVE_TILE`, and none of Bloo's twelve tile services do (checked
-         * every entry in AndroidManifest). This KDoc used to describe it as "how [render]
-         * gets re-run after something changes", which it never was.
-         *
-         * Left in place rather than deleted because it costs nothing, is harmless, and
-         * becomes correct the moment any tile is declared active. What actually repaints a
-         * visible tile now is the store observer in [onStartListening], which does not need
-         * the system's cooperation. Declaring the tiles active instead would stop
-         * [onStartListening] arriving when the shade opens -- see that method's note.
-         */
-        fun requestUpdates(context: Context) {
-            TILE_CLASSES.forEach { cls ->
-                runCatching { requestListeningState(context, ComponentName(context, cls)) }
-            }
-        }
+        // requestUpdates() was deleted here, along with all thirteen of its call sites.
+        //
+        // It never worked. TileService.requestListeningState is documented in AOSP as
+        // applying "only to tiles that have META_DATA_ACTIVE_TILE defined as true on their
+        // TileService Manifest declaration, and will do nothing otherwise" -- and none of
+        // Bloo's twelve declare it (every entry in AndroidManifest checked).
+        //
+        // It was previously left in place on the reasoning that it "costs nothing, is
+        // harmless, and becomes correct the moment any tile is declared active". Both
+        // halves of that turned out to be wrong. It is not free: each call looped all
+        // twelve classes issuing a StatusBarManager binder transaction that the system
+        // then discards, so thirteen call sites -- several on paths that run on every
+        // state change -- meant a steady trickle of IPC doing nothing. And it can never
+        // become correct, because declaring a tile ACTIVE is a change this app must not
+        // make: AOSP says the system binds active tiles "only when a click needs to
+        // occur", so they stop being refreshed when the shade opens. Bloo's process is
+        // usually dead, so active tiles would show stale state to anyone who just pulls
+        // down the shade -- strictly worse than today.
+        //
+        // What actually repaints a visible tile is the store observer in onStartListening,
+        // which needs no cooperation from the system. See that method.
     }
 }
 

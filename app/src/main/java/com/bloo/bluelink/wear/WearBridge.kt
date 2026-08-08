@@ -136,7 +136,6 @@ object WearBridge {
             val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
             publishSettingsNow(context, appearance, snapshot)
         }
-        runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }
 
     /**
@@ -186,7 +185,6 @@ object WearBridge {
             val presets = vins.associateWith { store.climatePresets(it) }.filterValues { it.isNotEmpty() }
             publishPresetsNow(context, presets)
         }
-        runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }
 
     /**
@@ -463,6 +461,5 @@ object WearBridge {
 
     /** Refresh watch tiles (no state re-fetch). */
     private suspend fun updateAllSurfaces(context: Context) {
-        runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(context) }
     }
 }
