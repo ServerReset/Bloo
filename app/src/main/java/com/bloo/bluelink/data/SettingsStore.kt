@@ -1127,9 +1127,30 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** A primary designation made on THIS device that hasn't been uploaded yet.
+     *
+     *  Separate from [syncPrimaryDeviceId] because that pref carries two different
+     *  meanings which must not be conflated: "what the file says" (cached for offline
+     *  Settings display) and "what I want the file to say". Reading the cache as a write
+     *  intent is what stopped the primary from ever changing -- see [performDriveSync]. */
+    private suspend fun syncPrimaryPending(): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("sync_primary_pending")]?.takeIf { it.isNotBlank() }
+
+    private suspend fun setSyncPrimaryPending(id: String?) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("sync_primary_pending")
+            if (id.isNullOrBlank()) it.remove(k) else it[k] = id
+        }
+    }
+
     /** Designate the primary device (source of truth). Persists locally; the value
-     *  is written into the Drive file on the next [performDriveSync] upload. */
+     *  is written into the Drive file on the next [performDriveSync] upload.
+     *
+     *  Records the choice TWICE, deliberately: as a pending write intent (consumed by the
+     *  next successful upload) and in the display cache (so Settings reflects the tap
+     *  immediately rather than after a round trip). */
     suspend fun setPrimaryDevice(id: String) {
+        setSyncPrimaryPending(id)
         setSyncPrimaryCache(id)
     }
 
@@ -1150,6 +1171,10 @@ class SettingsStore(private val context: Context) {
             it.remove(booleanPreferencesKey("sync_pull_primary"))
             it.remove(stringPreferencesKey("sync_devices_cache"))
             it.remove(stringPreferencesKey("sync_primary_cache"))
+            // The pending designation too: it named a primary for the OLD file's device
+            // registry, and re-asserting it against a different file's registry is exactly
+            // the stale-state bug this function exists to prevent.
+            it.remove(stringPreferencesKey("sync_primary_pending"))
             // Drop the cached file id too — the new file has its own (or will mint
             // one). Keeping the old id would show a stale/mismatched File ID.
             it.remove(stringPreferencesKey("sync_file_id"))
@@ -1325,7 +1350,20 @@ class SettingsStore(private val context: Context) {
         // Best-available registry/primary for the outcome even if the upload half
         // doesn't run (failed download) — the UI still updates from what we read.
         var outcomeDevices: List<SyncMerge.SyncDevice> = remoteMeta?.devices ?: emptyList()
-        val primaryToWrite: String? = syncPrimaryDeviceId() ?: remoteMeta?.primaryDeviceId
+        // Precedence, and the order matters: an un-uploaded designation made HERE wins, then
+        // whatever the file says, and only then this device's cached copy.
+        //
+        // It used to read `syncPrimaryDeviceId() ?: remoteMeta?.primaryDeviceId` -- the local
+        // CACHE ahead of the file. But that cache is also where every pass stores the value it
+        // just wrote (see setSyncPrimaryCache below), so "the primary I once saw" was
+        // indistinguishable from "the primary I am asking for", and each device re-asserted
+        // its own copy forever. The primary could therefore never be MOVED: designate the
+        // tablet on the tablet, it uploads primary=tablet, then the phone's next pass reads
+        // that, ignores it in favour of its own cached primary=phone, and writes it back. Both
+        // devices sit there each believing it is primary, and the user's choice silently
+        // reverts. A pending intent is one-shot, so the file converges after one pass.
+        val pendingPrimary = syncPrimaryPending()
+        val primaryToWrite: String? = pendingPrimary ?: remoteMeta?.primaryDeviceId ?: syncPrimaryDeviceId()
         // Never write on a failed read: a download error means we couldn't see
         // the remote file's real contents this pass, so uploading now would
         // truncate-overwrite whatever is actually there with our local state --
@@ -1426,6 +1464,11 @@ class SettingsStore(private val context: Context) {
                 // Cache the registry + primary for offline Settings display.
                 setSyncedDevicesCache(outcomeDevices)
                 setSyncPrimaryCache(primaryToWrite)
+                // Consume the one-shot designation -- but ONLY now, inside the successful-
+                // upload branch. Clearing it any earlier (on read, or on a failed upload)
+                // would drop the user's choice on the floor without it ever reaching the
+                // file; from the next pass on, the file's own value governs.
+                if (pendingPrimary != null) setSyncPrimaryPending(null)
             }
         }
         val error = uploadError ?: downloadError?.takeIf { remoteContent == null }
@@ -1835,7 +1878,13 @@ class SettingsStore(private val context: Context) {
             // from prefs and fingerprint as null, so a delete and a later restore of the
             // same key are correctly distinct.
             val byName = prefs.asMap().entries.associate { it.key.name to it.value }
-            keys to keys.sorted().joinToString(" ") { "$it=${byName[it]}" }.hashCode()
+            // NUL separator below, and written as the ESCAPE rather than the character. A pref
+            // value can hold any printable text (names, JSON blobs, file paths), so a space or
+            // comma separator would let two different key/value sets fingerprint alike; NUL
+            // cannot occur in one. Kotlin also accepts the raw byte, which is the trap: it
+            // compiles, and then grep classifies this whole file as binary and prints no
+            // matching lines at all. tools/check-control-chars.py now fails on it.
+            keys to keys.sorted().joinToString("\u0000") { "$it=${byName[it]}" }.hashCode()
         }
         .distinctUntilChanged()
         .map { it.first }

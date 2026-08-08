@@ -64,6 +64,10 @@ object SyncMerge {
         // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
         "sync_device_id", "sync_device_name", "sync_last_hash", "sync_synced_ever",
         "sync_devices_cache", "sync_pull_primary", "sync_primary_cache", "sync_file_id",
+        // A primary designation made on THIS device and not yet uploaded. Emphatically
+        // device-local: it is a one-shot write intent, and letting it roam would hand every
+        // other device the same intent and restart the tug-of-war it exists to end.
+        "sync_primary_pending",
         // Whether THIS device installs updates silently via Shizuku — a device-local
         // capability (Shizuku may not be present elsewhere), so it must not roam.
         "seamless_install_shizuku",
