@@ -1906,32 +1906,56 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     // identical problem with a roll-up row, so this borrows that pattern.
     val openCount = car.doorsOpen.size + car.windowsOpen.size +
         (if (car.trunkOpen) 1 else 0) + (if (car.hoodOpen) 1 else 0)
-    StatusRow(
+    // hasLiveStatus, per row. This was the ONE status card without that gate, so with no live
+    // status every field it reads defaulted to false and the card stated that as fact: an
+    // emphasised "Closed up -- All secure" for a car with a door open, and "Engine Off" for a
+    // running one. DiagnosticsCard depends on the same data and IS hidden in that state, so
+    // this card was contradicting its absence.
+    //
+    // Guarded row by row rather than wrapped in one if/else block, deliberately. The block
+    // version failed to compile and I could not find the error by inspection -- braces and
+    // parens balanced, hasLiveStatus was already used elsewhere in this file, the bytes were
+    // clean UTF-8 -- so CI bisected it to that hunk. Per-row guards add no nesting and need no
+    // re-indentation of existing code, which removes the whole class of structural mistake I
+    // could not see.
+    //
+    // Only the CLAIMS are gated. VIN, odometer, plate and the service figures further down come
+    // from the snapshot, not the live status, so an Info card that vanished entirely would lose
+    // real information to fix a wrong reading. Set temp IS gated -- it comes from the status.
+    val live = car.hasLiveStatus
+    if (!live) {
+        Text(
+            "No live status yet. Refresh to see doors, engine and climate.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (live) StatusRow(
         if (openCount > 0) "Open" else "Closed up",
         if (openCount > 0) "$openCount item${if (openCount == 1) "" else "s"}" else "All secure",
         valueColor = if (openCount > 0) err else null,
         emphasize = true,
     )
-    Spacer(Modifier.height(6.dp))
-    StatusRow("Engine", if (car.engineOn) "On" else "Off")
-    car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
-    StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
-    StatusRow("Defrost", if (car.defrostOn) "On" else "Off")
-    StatusRow("Accessory", if (car.accessoryOn) "On" else "Off")
+    if (live) Spacer(Modifier.height(6.dp))
+    if (live) StatusRow("Engine", if (car.engineOn) "On" else "Off")
+    if (live) car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
+    if (live) StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
+    if (live) StatusRow("Defrost", if (car.defrostOn) "On" else "Off")
+    if (live) StatusRow("Accessory", if (car.accessoryOn) "On" else "Off")
     val doorsLabel = when {
         car.doorsOpen.isEmpty() -> "All closed"
         car.doorsOpen.size == 1 -> car.doorsOpen.first()
         else -> "${car.doorsOpen.size} open"
     }
-    StatusRow("Doors", doorsLabel, valueColor = if (car.doorsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
+    if (live) StatusRow("Doors", doorsLabel, valueColor = if (car.doorsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
     val winsLabel = when {
         car.windowsOpen.isEmpty() -> "All closed"
         car.windowsOpen.size == 1 -> car.windowsOpen.first()
         else -> "${car.windowsOpen.size} open"
     }
-    StatusRow("Windows", winsLabel, valueColor = if (car.windowsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
-    if (car.trunkOpen) StatusRow("Trunk", "Open", valueColor = MaterialTheme.colorScheme.error)
-    if (car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
+    if (live) StatusRow("Windows", winsLabel, valueColor = if (car.windowsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
+    if (live && car.trunkOpen) StatusRow("Trunk", "Open", valueColor = MaterialTheme.colorScheme.error)
+    if (live && car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
     StatusRow("VIN", car.vin.takeLast(6))
     val metric = ui.localSettings.unitSystem == "metric"
     // car.odometer arrives as a display-formatted string (e.g. "12,345"), so
