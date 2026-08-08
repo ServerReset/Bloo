@@ -1693,6 +1693,24 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
     val dc = draft.dc ?: car.dcLimit ?: 90
     val isDirty = (draft.ac != null && draft.ac != car.acLimit) ||
                   (draft.dc != null && draft.dc != car.dcLimit)
+    // Apply may only send values that are either the USER's choice or the CAR's own report --
+    // never the 80/90 display fallback.
+    //
+    // `isDirty` alone was not enough. It closes the stray-tap case the KDoc above describes
+    // (no draft at all), but not this one: with neither limit reported, dragging ONE slider
+    // makes isDirty true, and Apply then sends the OTHER slider's guess as though the user had
+    // chosen it. applyChargeLimits sends `draft ?: car.limit ?: 80/90`, so on a car that has
+    // never reported its limits that guess reaches setChargeTargets and becomes real.
+    //
+    // A previous fix removed the worse version of this (`draft ?: 80/90`, which overrode even a
+    // reported limit -- see applyChargeLimits' comment). This is the remainder: the guess can
+    // still win when the car genuinely has not told us.
+    //
+    // Note the whole card is far less likely to be in this state now that a standalone refresh
+    // retains its fetched statuses, but companion-only pairing still has no per-limit source --
+    // the phone's snapshot carries a single chargeLimitPct, not separate AC and DC.
+    val acKnown = draft.ac != null || car.acLimit != null
+    val dcKnown = draft.dc != null || car.dcLimit != null
     // Every other slider card in this file (Climate/Comfort) commits each
     // drag instantly with no separate save step, so this card's Apply-button
     // model needs its own explanation up front -- not just a dirty flag that
@@ -1717,8 +1735,17 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
         // before the user has ever touched them -- without this, a stray tap
         // on "Apply limits" could push that guessed value to the car even
         // though nothing was actually changed.
-        enabled = isDirty,
+        enabled = isDirty && acKnown && dcKnown,
     )
+    if (isDirty && !(acKnown && dcKnown)) {
+        // Say why the button is dead rather than leaving the user tapping it. Without this the
+        // guard reads as a bug: the slider moved, so something clearly changed.
+        Text(
+            "This car hasn't reported its charge limits yet. Refresh, then set both.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /**
