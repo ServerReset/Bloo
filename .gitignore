@@ -12,3 +12,9 @@ app/build/
 build/
 .claude/
 __pycache__/
+
+# Throwaway refactor scripts written into the repo root during a session.
+# The real, kept tooling lives in tools/ and is committed deliberately; anything
+# else at the root matching this is scratch that `git add -A` would otherwise
+# sweep in -- three of them reached commits before this rule existed.
+/*.py
