@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
@@ -43,12 +44,16 @@ import java.util.concurrent.TimeUnit
  * the write is just a local no-op). `.setUrgent()` asks the system to push it as soon as
  * possible rather than batching/deferring for battery. `Tasks.await(...)` bridges the
  * Play Services `Task` (a callback-based future) into this suspend function by blocking
- * the calling coroutine's thread until it completes -- safe here because [scope] runs on
- * [Dispatchers.IO], never the main thread. On the watch side, [WearSync] decodes each
- * path's payload; changing an item's *content* is what actually triggers the watch's
- * DataClient listener, which is why [publishNow] stamps a fresh timestamp on every push
- * even when the underlying vehicle data hasn't changed -- otherwise a byte-identical
- * payload would be silently coalesced/skipped by the Data Layer.
+ * the calling coroutine's thread until it completes. [putItem] therefore forces
+ * [Dispatchers.IO] itself. This comment used to claim the blocking was safe "because [scope]
+ * runs on Dispatchers.IO, never the main thread" -- true of the fire-and-forget [publish]
+ * path, and NOT of the suspend functions called straight off `viewModelScope`, which is
+ * where it crashed.
+ *
+ * On the watch side, [WearSync] decodes each path's payload; changing an item's *content* is
+ * what actually triggers the watch's DataClient listener, which is why [publishNow] stamps a
+ * fresh timestamp on every push even when the underlying vehicle data hasn't changed --
+ * otherwise a byte-identical payload would be silently coalesced/skipped by the Data Layer.
  */
 object WearBridge {
 
@@ -72,14 +77,36 @@ object WearBridge {
      * thing a retry fixes. And when it doesn't, a watch quietly showing stale
      * data with nothing in the log is the worst possible outcome to debug.
      */
-    private suspend fun putItem(context: Context, path: String, build: PutDataMapRequest.() -> Unit) {
+    private suspend fun putItem(
+        context: Context,
+        path: String,
+        build: PutDataMapRequest.() -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        // withContext(IO) is not tidiness, it is a crash fix. `Tasks.await` calls
+        // `Preconditions.checkNotMainThread()` unconditionally and throws
+        // IllegalStateException, and this object's own class comment claimed it was safe
+        // "because [scope] runs on Dispatchers.IO, never the main thread" -- which is only
+        // true of the fire-and-forget `publish()` path. These are SUSPEND functions, and four
+        // of publishAuth's call sites are plain calls from `viewModelScope.launch`, i.e. on
+        // Dispatchers.Main.immediate.
+        //
+        // The worst of them is logout()'s, which is the ONE without a runCatching around it:
+        // signing out of the last account threw here, uncaught, inside viewModelScope --
+        // whose SupervisorJob hands an uncaught exception to the thread's default handler.
+        // That is a crash on sign-out. The other three swallowed it silently, which is its own
+        // problem: a revoked auth bundle never reached the watch, so a watch that had just
+        // been signed out on the phone went on issuing standalone car commands with the old
+        // tokens.
+        //
+        // Fixed HERE rather than at each call site so no future caller has to know: every
+        // publish* funnels through this one function.
         val request = PutDataMapRequest.create(path).apply(build).asPutDataRequest().setUrgent()
         var lastError: Throwable? = null
         repeat(PUBLISH_ATTEMPTS) { attempt ->
             val outcome = runCatching {
                 Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
             }
-            if (outcome.isSuccess) return
+            if (outcome.isSuccess) return@withContext
             lastError = outcome.exceptionOrNull()
             if (attempt < PUBLISH_ATTEMPTS - 1) delay(PUBLISH_RETRY_MS shl attempt)
         }

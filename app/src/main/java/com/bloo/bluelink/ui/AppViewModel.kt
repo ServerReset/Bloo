@@ -919,6 +919,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // watch's own signOutAll (snapshotStore.saveVehicles(emptyList())).
                 runCatching { statusCache.clear() }
                 runCatching { snapshotStore.saveVehicles(emptyList()) }
+                // `sessionFetched` is add-only and lives for the ViewModel's life, and
+                // [ensureStatus] returns immediately for any VIN in it. Left uncleared here,
+                // signing out and back in within the same process meant every car's
+                // ensureStatus short-circuited against a set describing a session whose
+                // statusCache and snapshot we had just wiped two lines above -- so the garage
+                // sat showing unknown lock, charge and range for every car, with no spinner
+                // and no error, until the user found pull-to-refresh.
+                //
+                // Belongs exactly here, beside the other two things being cleared because the
+                // account is gone. The watch's own signOutAll already resets its equivalent.
+                sessionFetched.clear()
                 // Preserve everything that is NOT account state across the full reset.
                 //
                 // This already preserved the four device-capability probes, with a comment
@@ -1121,21 +1132,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder())
-        // saveVehiclesKeepingStatus, not saveVehicles: snapshotOf(v, null) knows every
-        // car's identity and nothing about its state, and saveVehicles replaces the
-        // payload wholesale -- so this line used to blank percent, range, lock, charge,
-        // climate, engine, location and fetchedAt for every car on disk, on every cold
-        // start, login and pull-to-refresh. The widget, all twelve QS tiles, the Wear
-        // tile and every complication read that same file, so they all went to
-        // "unknown" until N sequential fetches finished one car at a time through
-        // statusMutex, and fetchedAt = 0 tripped the widget's stale gate on the way.
-        //
-        // persistSnapshots() below already got this right by passing the in-memory
-        // status cache. Deliberately NOT copying that here: the cache is restored on
-        // its own viewModelScope.launch, so whether it has landed before this line is
-        // a race. The store carries the values forward from disk inside its own edit
-        // transaction instead, which has no window.
-        snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null) })
         // ONE Preferences read for every per-car setting below, instead of one read per
         // getter per car -- twelve of them, so 36 round trips on a three-car account,
         // all returning the identical object. See SettingsStore.snapshot().
@@ -1200,6 +1196,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // copy() above; it lives in its own flow now (see currentIndex), so it
         // has to be set alongside rather than within.
         _currentIndex.value = index
+        // The disk write for the whole garage. MOVED to here from just after `applyOrder`
+        // above, and the move IS a fix.
+        //
+        // Why saveVehiclesKeepingStatus and not saveVehicles: snapshotOf(v, null) knows every
+        // car's identity and nothing about its state, and saveVehicles replaces the payload
+        // wholesale -- it used to blank percent, range, lock, charge, climate, engine,
+        // location and fetchedAt for every car on disk on every cold start, login and
+        // pull-to-refresh, and fetchedAt = 0 tripped the widget's stale gate on the way.
+        // persistSnapshots() gets the same result by passing the in-memory status cache;
+        // deliberately NOT copied here, because that cache is restored on its own
+        // viewModelScope.launch and whether it has landed by now is a race. The store carries
+        // the values forward from disk inside its own edit transaction, which has no window.
+        //
+        // Why it had to move DOWN here:
+        //
+        // snapshotOf() reads `_state.value.hasBattery(v)`, which reads the `powertrains` map
+        // that the _state.update just above is what populates. Run BEFORE it -- where this
+        // line used to be -- every car was written to disk with hasBattery = false, and
+        // keepingStatusOf carries the STATUS fields forward but not this one, so the false
+        // stuck.
+        //
+        // The widget, all twelve QS tiles, the Wear tile and the complications read that same
+        // file, so an EV got its gauge labelled "Fuel" and its battery-only actions dropped.
+        // persistSnapshots() later repairs it -- but only when a status fetch actually returns
+        // something, because it sits inside `s?.let`. With cars asleep (null status) or the
+        // network down, the wrong value stood for the whole session.
+        //
+        // Still saveVehiclesKeepingStatus, and still snapshotOf(it, null): the store carries
+        // the status fields forward inside its own edit transaction, which has no race
+        // against the separately-launched cache restore. That reasoning was already right.
+        snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null) })
         // One-time: now that vehicles (and their default climate presets) are
         // known, start the Drive auto-sync bootstrap + collector.
         bootstrapDriveSync()
