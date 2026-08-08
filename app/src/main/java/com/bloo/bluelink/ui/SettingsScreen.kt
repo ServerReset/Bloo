@@ -1378,7 +1378,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
                                     Spacer(Modifier.height(8.dp))
                                     OutlinedTextField(
                                         value = appearance.auroraCustomColor ?: "",
-                                        onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(Regex("#[0-9A-Fa-f]{0,6}")) } ?: appearance.auroraCustomColor) },
+                                        onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(RxHexColorDraft) } ?: appearance.auroraCustomColor) },
                                         label = { Text("Hex colour") },
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth(),
@@ -2244,14 +2244,14 @@ private class ParsedVehicleCommand(val cmd: String, val climateTarget: String = 
  * because the car is called an Ioniq 5.
  */
 private fun parseClimateTemperature(q: String, metric: Boolean): Int? {
-    if (Regex("coldest|as cold as|max(imum)? (cold|cool)|lowest temp|full (cold|cool)").containsMatchIn(q)) {
+    if (RxColdest.containsMatchIn(q)) {
         return CLIMATE_TEMP_RANGE_F.first
     }
-    if (Regex("warmest|hottest|as (warm|hot) as|max(imum)? (heat|warm)|highest temp|full heat").containsMatchIn(q)) {
+    if (RxWarmest.containsMatchIn(q)) {
         return CLIMATE_TEMP_RANGE_F.last
     }
-    val m = Regex("\\b(?:at|to)\\s*(\\d{2,3})\\s*°?\\s*([fc])?\\b").find(q)
-        ?: Regex("\\b(\\d{2,3})\\s*°?\\s*(?:degrees?\\b|([fc])\\b)").find(q)
+    val m = RxTempAtTo.find(q)
+        ?: RxTempDegrees.find(q)
         ?: return null
     val n = m.groupValues[1].toIntOrNull() ?: return null
     val unit = m.groupValues.drop(2).firstOrNull { it.isNotBlank() }
@@ -2277,18 +2277,18 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
     // Defrost implies climate at full heat -- "clear the windscreen" is a
     // request about ice, not about a number, so it picks its own temperature
     // unless the query also named one.
-    val wantsDefrost = Regex("defrost|defog|demist|clear (the )?(wind(screen|shield)|glass|ice)|de-ice").containsMatchIn(q)
+    val wantsDefrost = RxDefrost.containsMatchIn(q)
     return when {
         // Unlock before lock: "unlock" contains "lock".
-        Regex("\\bunlock\\b|\\bopen (the |my )?(car|doors?)\\b|let me in").containsMatchIn(q) ->
+        RxUnlock.containsMatchIn(q) ->
             ParsedVehicleCommand("unlock", label = "Unlocking")
-        Regex("\\block\\b|secure (the |my )?car|lock (it|up)\\b").containsMatchIn(q) ->
+        RxLock.containsMatchIn(q) ->
             ParsedVehicleCommand("lock", label = "Locking")
-        Regex("smart climate|smart (ac|a/c|heat|clim)").containsMatchIn(q) ->
+        RxSmartClimate.containsMatchIn(q) ->
             ParsedVehicleCommand("climate_on", "smart", "Starting smart climate for")
         // Defrost on its own is a start-climate request, so it is matched
         // before the generic stop/start climate patterns below.
-        wantsDefrost && !Regex("stop|turn off|cancel").containsMatchIn(q) -> {
+        wantsDefrost && !RxNegation.containsMatchIn(q) -> {
             val f = temp ?: CLIMATE_TEMP_RANGE_F.last
             ParsedVehicleCommand(
                 "climate_on",
@@ -2296,7 +2296,7 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
                 "Defrosting",
             )
         }
-        Regex("(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)")
+        RxClimateOff
             .containsMatchIn(q) -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
         Regex(
             "(start|turn on|run|fire up|kick on) (the )?(climate|ac|a/c|heat(er)?|aircon|air con)" +
@@ -2314,22 +2314,22 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
             }
         // Charge LIMIT before charge start/stop: "set the charge limit to 80"
         // contains "charg", and the limit is the more specific request.
-        Regex("(charge|charging) (limit|target)|limit .*(charge|charging)|charge to \\d{2,3}")
+        RxChargeLimit
             .containsMatchIn(q) -> {
-            val pct = Regex("\\b(\\d{2,3})\\s*%?").find(q)?.groupValues?.get(1)?.toIntOrNull()
+            val pct = RxPercent.find(q)?.groupValues?.get(1)?.toIntOrNull()
             if (pct != null && pct in CHARGE_LIMIT_RANGE) {
                 ParsedVehicleCommand("charge_limit", pct.toString(), "Setting charge limit to $pct% on")
             } else {
                 null
             }
         }
-        Regex("(flash|blink) (the )?(lights|headlights)|lights? (on|flash)").containsMatchIn(q) ->
+        RxFlashLights.containsMatchIn(q) ->
             ParsedVehicleCommand("lights", label = "Flashing lights on")
-        Regex("\\bhonk\\b|sound (the )?horn|\\bhorn\\b|beep (the )?(car|horn)|find (my|the) car").containsMatchIn(q) ->
+        RxHorn.containsMatchIn(q) ->
             ParsedVehicleCommand("horn", label = "Sounding horn on")
-        Regex("(stop|turn off|cancel|halt|end) (the )?charg|unplug").containsMatchIn(q) ->
+        RxChargeStop.containsMatchIn(q) ->
             ParsedVehicleCommand("charge_off", label = "Stopping charge for")
-        Regex("(start|begin|turn on|resume) (the )?charg|charge (it|the car|my car)( now)?|top (it )?up")
+        RxChargeStart
             .containsMatchIn(q) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
         else -> null
     }
@@ -2945,6 +2945,44 @@ private fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: 
         }
     }
 }
+/**
+ * Every CONSTANT search/command pattern, compiled once at class init instead of per call.
+ *
+ * `Regex(...)` parses its pattern and builds a matcher every time it is CONSTRUCTED, and all
+ * of these were constructed inside the functions using them. Two distinct costs:
+ *
+ *  - The token splitter ran inside SettingsSearchResults, a composable whose `query`
+ *    parameter changes on every KEYSTROKE -- a regex compiled per character typed, on the
+ *    input path, with the keyboard up. That is the one a user can feel.
+ *  - The command-parser vocabulary was ~17 compilations per parse, on every submitted query.
+ *
+ * File scope rather than `remember`: the patterns are constant, so that is their correct
+ * lifetime, and a `remember` would still recompile once per composition that mis-keyed it.
+ * Any pattern built from a runtime value (a vehicle's own name) is left where it is, since
+ * it genuinely cannot be constant.
+ *
+ * Generated by extracting the literals from this file rather than by retyping them: doing it
+ * by hand through two layers of escaping mangled the degree sign and several `\b` anchors.
+ */
+private val RxHexColorDraft = Regex("#[0-9A-Fa-f]{0,6}")
+private val RxColdest = Regex("coldest|as cold as|max(imum)? (cold|cool)|lowest temp|full (cold|cool)")
+private val RxWarmest = Regex("warmest|hottest|as (warm|hot) as|max(imum)? (heat|warm)|highest temp|full heat")
+private val RxTempAtTo = Regex("\\b(?:at|to)\\s*(\\d{2,3})\\s*°?\\s*([fc])?\\b")
+private val RxTempDegrees = Regex("\\b(\\d{2,3})\\s*°?\\s*(?:degrees?\\b|([fc])\\b)")
+private val RxDefrost = Regex("defrost|defog|demist|clear (the )?(wind(screen|shield)|glass|ice)|de-ice")
+private val RxUnlock = Regex("\\bunlock\\b|\\bopen (the |my )?(car|doors?)\\b|let me in")
+private val RxLock = Regex("\\block\\b|secure (the |my )?car|lock (it|up)\\b")
+private val RxSmartClimate = Regex("smart climate|smart (ac|a/c|heat|clim)")
+private val RxNegation = Regex("stop|turn off|cancel")
+private val RxClimateOff = Regex("(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)")
+private val RxChargeLimit = Regex("(charge|charging) (limit|target)|limit .*(charge|charging)|charge to \\d{2,3}")
+private val RxPercent = Regex("\\b(\\d{2,3})\\s*%?")
+private val RxFlashLights = Regex("(flash|blink) (the )?(lights|headlights)|lights? (on|flash)")
+private val RxHorn = Regex("\\bhonk\\b|sound (the )?horn|\\bhorn\\b|beep (the )?(car|horn)|find (my|the) car")
+private val RxChargeStop = Regex("(stop|turn off|cancel|halt|end) (the )?charg|unplug")
+private val RxChargeStart = Regex("(start|begin|turn on|resume) (the )?charg|charge (it|the car|my car)( now)?|top (it )?up")
+private val RxSearchTokens = Regex("[^a-z0-9%]+")
+
 
 /**
  * Live search over both app settings and per-car data/fields. Tokenises the
@@ -2964,7 +3002,7 @@ private fun SettingsSearchResults(
      *  the top few the right answer rather than an arbitrary one. */
     limit: Int = Int.MAX_VALUE,
 ) {
-    val tokens = query.lowercase().split(Regex("[^a-z0-9%]+"))
+    val tokens = query.lowercase().split(RxSearchTokens)
         .filter { it.isNotBlank() && it !in SearchStopwords }
 
     val entries = ArrayList<SearchEntry>()
