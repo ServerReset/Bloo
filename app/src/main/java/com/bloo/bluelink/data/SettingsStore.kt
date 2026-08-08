@@ -31,7 +31,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 // A corruption handler so a settings file damaged by an interrupted write / power
 // loss resets to empty prefs instead of rethrowing IOException out of every read
@@ -1872,14 +1871,23 @@ class SettingsStore(private val context: Context) {
     suspend fun importSettingsJson(json: String): String? {
         val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }
             .getOrElse { return "Invalid settings file" }
-        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") {
+        // `as? JsonPrimitive` / `as? JsonObject`, never `?.jsonPrimitive` / `?.jsonObject`.
+        // The kotlinx accessors THROW IllegalArgumentException when the element is not of
+        // that kind, and these twelve guards (three functions × four keys) exist precisely
+        // to vet a HAND-EDITABLE, version-skewed file — the one place where `_format`
+        // plausibly arrives as an object, or `prefs` as an array. Throwing out of a function
+        // documented to *return an error message* (and out of two documented to return
+        // false) turned "this is not a Bloo backup" into a crash. [SyncMerge.parseBackup]
+        // already vets the identical keys with safe casts and promises "never throws on a
+        // hand-edited or version-skewed file"; these disagreed with it.
+        if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") {
             return "Not a Bloo settings backup"
         }
-        val version = root["_version"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1
+        val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
         if (version > BACKUP_VERSION) {
             return "This backup was made with a newer version of Bloo — update the app first"
         }
-        if (root["prefs"]?.jsonObject == null) return "Settings file has no data"
+        if ((root["prefs"] as? JsonObject) == null) return "Settings file has no data"
         // Which keys to put (by type) and which to tombstone is decided by the
         // pure, unit-tested [SyncMerge.parseBackup]: real JSON strings and bare
         // numbers become string prefs, bare booleans become boolean prefs, and
@@ -1887,7 +1895,7 @@ class SettingsStore(private val context: Context) {
         // The four guards above already validated format/version/prefs, so this is
         // non-null; the ?: keeps the same "no data" message defensively.
         val plan = SyncMerge.parseBackup(json) ?: return "Settings file has no data"
-        val photoPaths = applySyncPhotos(root["photos"]?.jsonObject)
+        val photoPaths = applySyncPhotos(root["photos"] as? JsonObject)
         editTracked { mut ->
             plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
             plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
@@ -1989,8 +1997,8 @@ class SettingsStore(private val context: Context) {
         // below applies the same guards, but doing them here keeps the AppLog line
         // and the distinct "skip import, keep syncing" semantics intact.
         val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return false
-        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") return false
-        val version = root["_version"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1
+        if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return false
+        val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
         if (version > BACKUP_VERSION) {
             // A newer device wrote this — rather than misapply a format we don't
             // recognize, skip the import half this round (the upload half still
@@ -1998,12 +2006,12 @@ class SettingsStore(private val context: Context) {
             AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping import")
             return false
         }
-        if (root["prefs"]?.jsonObject == null) return false
+        if ((root["prefs"] as? JsonObject) == null) return false
         // Photos are guarded by the pre-pass `protect` snapshot only (an
         // img_$vin changed locally since the last sync keeps its local file),
         // computed here outside the transaction exactly as before -- writing the
         // decoded JPEGs to disk is plain file IO, not part of the DataStore edit.
-        val photoPaths = applySyncPhotos(root["photos"]?.jsonObject, protect)
+        val photoPaths = applySyncPhotos(root["photos"] as? JsonObject, protect)
         context.settingsDataStore.edit { mut ->
             // Re-read the dirty set from THIS transaction's live prefs, not just the
             // protect snapshot taken before the pass started: a local edit that
@@ -2051,17 +2059,17 @@ class SettingsStore(private val context: Context) {
      */
     private suspend fun adoptSettingsJson(json: String): Boolean {
         val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return false
-        if (root["_format"]?.jsonPrimitive?.contentOrNull != "bloo-settings") return false
-        val version = root["_version"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1
+        if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return false
+        val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
         if (version > BACKUP_VERSION) {
             AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping adopt")
             return false
         }
-        if (root["prefs"]?.jsonObject == null) return false
+        if ((root["prefs"] as? JsonObject) == null) return false
         // Protect the user's own local car photos across a join-adopt (only these).
         val localImgKeys = context.settingsDataStore.data.first().asMap().keys
             .map { it.name }.filter { it.startsWith("img_") }.toSet()
-        val photoPaths = applySyncPhotos(root["photos"]?.jsonObject, protect = localImgKeys)
+        val photoPaths = applySyncPhotos(root["photos"] as? JsonObject, protect = localImgKeys)
         // Unguarded plan: the file wins for every portable pref/tombstone.
         val plan = SyncMerge.parseBackup(json) ?: return false
         context.settingsDataStore.edit { mut ->
