@@ -5614,8 +5614,21 @@ private fun HeroVisual(
         // A transparent PNG renders edge-to-edge with no opaque box, so it blends
         // seamlessly into the pebble (fit, not crop, so the whole subject shows).
         val transparent = imageUrl.endsWith(".png", ignoreCase = true)
+        // crossfade, so the car photo ARRIVES instead of popping. This is the one hero
+        // element that had no animation of any kind: the pebble's collapse animates, the
+        // readout's numbers roll, the bar's fill springs -- and then the photo itself
+        // appeared between two frames. The map tiles below already did this; the hero,
+        // the largest image in the app and the one the eye lands on first, did not.
+        //
+        // Coil skips the fade for memory-cache hits by design, which is exactly right
+        // here: a first load fades in, but scrolling back to an already-decoded photo
+        // does not re-fade, so this cannot turn into a flicker on the car pager.
+        val context = LocalContext.current
         AsyncImage(
-            model = model,
+            model = ImageRequest.Builder(context)
+                .data(model)
+                .crossfade(true)
+                .build(),
             contentDescription = v.model,
             contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
             modifier = sizeModifier
