@@ -321,6 +321,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.lerp
@@ -5182,8 +5183,8 @@ private fun HeroHeader(
                         //         76dp leaves it clear with a small optical gap. This was 64dp,
                         //         which is why the bar ran under the chevron.
                         //  bottom the header is exactly PebbleHeaderHeight (76dp): title (24)
-                        //         + heroReadoutReserve() (~40 at default font scale) + 12 of
-                        //         vertical padding. Content
+                        //         + the bar row in headerContent + 12 of vertical padding.
+                        //         Content
                         //         is centre-aligned, so the title occupies y 6..30 and the
                         //         reserve y 30..70. This node is 40dp tall, so bottom = 6
                         //         puts its top at 76 - 6 - 40 = 30 -- the reserve's top edge,
@@ -5232,19 +5233,57 @@ private fun HeroHeader(
             // one-line ChargeStatsLine in the title row -- while the expanded card held a
             // second, larger copy at the bottom. There is now ONE readout serving both states
             // (see the Box above), so the copy is deleted rather than merely hidden.
-            titleTrailing = null,
+            // ROW 1 of the collapsed card: the numbers, on the same line as the car name.
+            //
+            // They were positioned under the title before, which made the collapsed card three
+            // rows (name / numbers / bar) and left the numbers hanging under the name with the
+            // bar below that. Two rows is what this card is: a status line, and a gauge.
+            //
+            // In the header's own row rather than absolutely positioned, so the name and the
+            // numbers share one baseline by LAYOUT rather than by me computing an inset that
+            // matches -- which is exactly what I got wrong twice, most recently printing "74%"
+            // on top of the car icon.
+            //
+            // These fade and shrink out on `heroT` as the card opens, because the expanded
+            // readout at the bottom states the same two numbers much larger. Both read from ONE
+            // `readout`, so they cannot disagree about the car even while both are partly
+            // visible mid-morph.
+            titleTrailing = if (heroT > 0.99f) {
+                null
+            } else {
+                { HeroCollapsedStats(readout, heroT) }
+            },
             summary = null,
             headerContent = {
-                // A RESERVATION, not content. The morphing readout is positioned against the
-                // card's Box rather than sitting in this column, so the header has to leave
-                // room for it while collapsed or the title row and the numbers overlap.
+                // ROW 2 of the collapsed card: the charge bar, directly under the status line.
                 //
-                // A constant height rather than a measured one, and that is safe because the
-                // collapsed readout's height IS constants: a labelLarge line, its gap, and
-                // ChargeBarHeight. Shrinking to zero as the pebble opens, because the expanded
-                // readout sits over the photo instead and the header must stop holding space
-                // it no longer needs -- the same footprint discipline as everything else here.
-                Spacer(Modifier.height(lerp(heroReadoutReserve(), 0.dp, heroT)))
+                // Real content now, not the reservation this used to be. With the numbers back
+                // on the title row (above), the only thing the header still has to make room
+                // for is the bar -- and the simplest way to reserve exactly the right height
+                // for a bar is to put the bar there.
+                //
+                // Its height collapses to zero on `heroT` so the header stops holding the space
+                // as the card opens, where the expanded readout over the photo takes over. The
+                // bar itself is a single Canvas, so re-measuring it every frame of that is
+                // cheap -- see ChargeSegmentBar.
+                val h = lerp(4.dp + ChargeBarHeight, 0.dp, heroT)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(h)
+                        // end padding, not just top: the header's weighted text column runs
+                        // right up to the chevron, so a full-width bar finished flush against
+                        // it. 12dp gives the same optical gap the title's ellipsis leaves.
+                        .padding(top = lerp(4.dp, 0.dp, heroT), end = 12.dp)
+                        .graphicsLayer { alpha = 1f - heroT },
+                ) {
+                    if (h > 1.dp) {
+                        ChargeSegmentBar(
+                            frac = animatedChargeFrac(readout.frac),
+                            limitPct = readout.limitPct,
+                        )
+                    }
+                }
             },
         ) {
             // Empty by design. Everything the expanded state adds -- the photo and the
@@ -5795,37 +5834,11 @@ private fun animatedChargeFrac(target: Float): Float {
 // more -- HeroMorphReadout below is one set of components that morphs between both
 // densities, so the second implementation has nothing left to render.
 
-/**
- * Height the collapsed header must leave for [HeroMorphReadout], which is positioned against
- * the card rather than placed in the header's column.
- *
- * A constant is legitimate here because the collapsed readout's height is entirely constants:
- * a `labelLarge` line (~20dp), the 2dp gap that density lerps to, and [ChargeBarHeight]. It is
- * derived from the same values the readout lays out from, so the two move together -- and if
- * that ever stops being true the overlap is immediately visible rather than silent.
- */
-@Composable
-private fun heroReadoutReserve(): Dp {
-    // MEASURED from the type, not guessed. This was `20.dp + 2.dp + ChargeBarHeight`, and the
-    // 20 was my estimate of a labelLarge line. That holds at the default font scale and breaks
-    // above it: the reserve would stay 40dp while the numbers grew, and they would climb back
-    // over the car name -- the exact overlap this constant exists to prevent, reappearing for
-    // anyone who has enlarged their font. The app has its own UI-scale setting too.
-    //
-    // 2.dp is the collapsed end of the readout's own `spacedBy(lerp(2.dp, 6.dp, t))`, and
-    // ChargeBarHeight is the bar's fixed height, so every term now comes from the same place
-    // the readout lays out from.
-    val lineHeight = MaterialTheme.typography.labelLarge.lineHeight
-    val line = if (lineHeight == TextUnit.Unspecified) {
-        // No lineHeight declared on the style: fall back to the font size, which is the
-        // floor a single line can occupy.
-        val size = MaterialTheme.typography.labelLarge.fontSize
-        if (size == TextUnit.Unspecified) 20.dp else with(LocalDensity.current) { size.toDp() }
-    } else {
-        with(LocalDensity.current) { lineHeight.toDp() }
-    }
-    return line + 2.dp + ChargeBarHeight
-}
+// heroReadoutReserve() was deleted here. It measured the height the collapsed header had to
+// leave for an absolutely-positioned readout. The collapsed card is now two ordinary rows --
+// the numbers beside the name in the header's own row, the bar under them in headerContent --
+// so the header reserves the right space by CONTAINING the content instead of by computing a
+// height that has to match it. That removes the class of bug this constant kept producing.
 
 /**
  * The hero's readout as ONE set of components that morphs between the collapsed and expanded
@@ -5854,15 +5867,82 @@ private fun heroReadoutReserve(): Dp {
  * `Canvas`, in a single layout pass. The version that felt laggy was ~8 paragraph layouts
  * DOUBLED by a lookahead pass.
  */
+/**
+ * Row 1 of the COLLAPSED hero: percentage and range, beside the car name.
+ *
+ * Smoothness is the whole design here, because the previous version's numbers morphed roughly.
+ * Two deliberate choices:
+ *
+ *  - The type size is FIXED (`labelLarge`) and the shrink is a `graphicsLayer` SCALE. Lerping a
+ *    font size means a genuine text re-layout every frame, and across a short spring that reads
+ *    as a handful of discrete jumps rather than a glide -- the same reason the pebble title
+ *    needed a slower, bouncier spring. A scale is draw-phase only: no measure, no layout, and
+ *    every intermediate frame is a real fraction rather than the nearest whole sp. Text scaled
+ *    DOWN stays crisp; it is upscaling that goes soft, and this only ever shrinks.
+ *  - `transformOrigin` pins the RIGHT edge, so the numbers shrink towards the chevron they sit
+ *    beside instead of drifting away from the name as they go.
+ *
+ * Alpha leads the scale (`1 - t` squared) so the numbers are mostly gone before the expanded
+ * readout's much larger copy of the same figures fades in underneath -- two sets of the same
+ * digits at similar weight, both half-visible, is what actually looked wrong.
+ */
+@Composable
+private fun HeroCollapsedStats(data: ChargeReadout, t: Float, modifier: Modifier = Modifier) {
+    val fade = (1f - t).coerceIn(0f, 1f)
+    val contentColor = LocalContentColor.current
+    Row(
+        modifier
+            .padding(start = 10.dp)
+            .graphicsLayer {
+                alpha = fade * fade
+                val k = 0.7f + 0.3f * fade
+                scaleX = k
+                scaleY = k
+                transformOrigin = TransformOrigin(1f, 0.5f)
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            data.pctText,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            // Charging shows in the colour, because this row has no space for the word -- the
+            // same cue the expanded readout spells out in its state line.
+            color = if (data.charging) ChargeGreen else contentColor,
+            maxLines = 1,
+        )
+        data.rangeText?.let {
+            Text(
+                " · $it",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
 @Composable
 private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier = Modifier) {
     val type = MaterialTheme.typography
     // Real type steps, lerped -- not a graphicsLayer scale. A scaled 45sp glyph is soft at
     // every intermediate frame; a lerped font size is genuinely that size at every frame.
     // Affordable only because there is no lookahead pass doubling it.
-    val pctStyle = lerp(type.labelLarge, type.displayMedium, t)
-    val rangeStyle = lerp(type.labelLarge, type.titleLarge, t)
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t))) {
+    // Still lerped, but over a much shorter journey than before: the collapsed end of this
+    // node is no longer a labelLarge line beside the name (HeroCollapsedStats does that now),
+    // so this only has to grow in from a slightly smaller version of itself. Fewer distinct
+    // font sizes crossed per spring means fewer visible steps, which is the roughness fix.
+    val pctStyle = lerp(type.headlineSmall, type.displayMedium, t)
+    val rangeStyle = lerp(type.titleMedium, type.titleLarge, t)
+    Column(
+        modifier
+            // Fades in on the BACK half of the morph (t squared), so the collapsed status line
+            // beside the name is essentially gone before this larger copy of the same two
+            // numbers becomes legible. Both being half-visible at once is what read as rough.
+            .graphicsLayer { alpha = t * t },
+        verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t)),
+    ) {
         Row(verticalAlignment = Alignment.Bottom) {
             // Collapsed there is no room for the state line below, so the PERCENTAGE carries
             // the charging cue by taking the charge colour, and fades back to normal content
@@ -8412,9 +8492,25 @@ internal fun PebbleShell(
                             // property) so it moves with the same physics as the expansion it
                             // belongs to, and lerped through real type steps rather than being
                             // scaled, so every frame is a genuine font size.
+                            // A slow, lightly-bouncy spring, NOT the theme's default spatial
+                            // spec. That default is tuned for a card's whole bounds, and driving
+                            // a TYPE STEP with it read as rough: it is quick enough that a
+                            // 16sp -> 24sp change lands in a handful of frames, and each of
+                            // those frames is a genuine re-layout at a new font size, so what
+                            // you see is a few discrete jumps rather than a glide.
+                            //
+                            // dampingRatio 0.62 gives a real overshoot -- the name grows a
+                            // touch past its target and settles back -- and StiffnessVeryLow
+                            // stretches it over enough frames for the intermediate sizes to
+                            // read as motion instead of steps. Both halves matter: bounce with
+                            // a fast spring is still steppy, and a slow spring without bounce
+                            // is just a slower version of the same flat move.
                             val headerT by animateFloatAsState(
                                 targetValue = if (expanded) 1f else 0f,
-                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                animationSpec = spring(
+                                    dampingRatio = 0.62f,
+                                    stiffness = Spring.StiffnessVeryLow,
+                                ),
                                 label = "pebbleHeaderGrow",
                             )
                             val titleStyle = lerp(
