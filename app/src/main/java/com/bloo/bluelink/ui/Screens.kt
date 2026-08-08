@@ -5842,33 +5842,6 @@ private fun animatedChargeFrac(target: Float): Float {
 // height that has to match it. That removes the class of bug this constant kept producing.
 
 /**
- * The hero's readout as ONE set of components that morphs between the collapsed and expanded
- * states, rather than two sets trading places.
- *
- * [t] is 0 collapsed, 1 expanded, and everything here is a lerp on it: the percentage's and
- * range's type sizes, the state line's alpha, the gaps. There is exactly one [RollingNumber]
- * per number and one [ChargeSegmentBar] in the whole card, so nothing can be duplicated and
- * nothing can drift.
- *
- * NO `SharedTransitionLayout`, and that is the point. Three earlier attempts used
- * `sharedBounds`, which needs a `LookaheadScope` -- `SharedBoundsNode` implements
- * `ApproachLayoutModifierNode`, so it participates in layout, and the hero sits on every car
- * page. With `beyondViewportPageCount = 1` that meant three lookahead scopes measuring twice
- * at 60Hz during a pager drag, which is what made the car swipe judder. It could not be tuned
- * out either: `RemeasureToBounds` re-lays out text every frame, and `ScaleToBounds` draws the
- * entering node at the wrong scale.
- *
- * The travel is FREE, and that is the insight the first three attempts missed. The card's
- * height is ALREADY animating -- the photo grows and shrinks on its own transition. Anchor
- * this to the card's bottom and it rides that height change from the header down to the base
- * of the photo with no bounds animation at all. I was animating a position that something
- * else was already animating for me. Only the SIZE morph needs driving, which is what [t] does.
- *
- * Cost per frame, deliberately bounded: two `Text` measures (the two type sizes lerp) plus one
- * `Canvas`, in a single layout pass. The version that felt laggy was ~8 paragraph layouts
- * DOUBLED by a lookahead pass.
- */
-/**
  * Row 1 of the COLLAPSED hero: percentage and range, beside the car name.
  *
  * Smoothness is the whole design here, because the previous version's numbers morphed roughly.
@@ -5924,6 +5897,33 @@ private fun HeroCollapsedStats(data: ChargeReadout, t: Float, modifier: Modifier
     }
 }
 
+/**
+ * The hero's readout as ONE set of components that morphs between the collapsed and expanded
+ * states, rather than two sets trading places.
+ *
+ * [t] is 0 collapsed, 1 expanded, and everything here is a lerp on it: the percentage's and
+ * range's type sizes, the state line's alpha, the gaps. There is exactly one [RollingNumber]
+ * per number and one [ChargeSegmentBar] in the whole card, so nothing can be duplicated and
+ * nothing can drift.
+ *
+ * NO `SharedTransitionLayout`, and that is the point. Three earlier attempts used
+ * `sharedBounds`, which needs a `LookaheadScope` -- `SharedBoundsNode` implements
+ * `ApproachLayoutModifierNode`, so it participates in layout, and the hero sits on every car
+ * page. With `beyondViewportPageCount = 1` that meant three lookahead scopes measuring twice
+ * at 60Hz during a pager drag, which is what made the car swipe judder. It could not be tuned
+ * out either: `RemeasureToBounds` re-lays out text every frame, and `ScaleToBounds` draws the
+ * entering node at the wrong scale.
+ *
+ * The travel is FREE, and that is the insight the first three attempts missed. The card's
+ * height is ALREADY animating -- the photo grows and shrinks on its own transition. Anchor
+ * this to the card's bottom and it rides that height change from the header down to the base
+ * of the photo with no bounds animation at all. I was animating a position that something
+ * else was already animating for me. Only the SIZE morph needs driving, which is what [t] does.
+ *
+ * Cost per frame, deliberately bounded: two `Text` measures (the two type sizes lerp) plus one
+ * `Canvas`, in a single layout pass. The version that felt laggy was ~8 paragraph layouts
+ * DOUBLED by a lookahead pass.
+ */
 @Composable
 private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier = Modifier) {
     val type = MaterialTheme.typography
@@ -7956,7 +7956,18 @@ fun MorphIconButton(
 ) {
     val haptics = LocalHaptics.current
     val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
+    // `val scale = animateFloatAsState(...)`, NOT `by`. The delegated form reads the animation
+    // in COMPOSITION, so every frame of the press dip recomposed this button and its `content`
+    // lambda -- for a value whose only consumer is the graphicsLayer block below. Holding the
+    // State and dereferencing it inside that lambda moves the read to the DRAW phase: the
+    // animation still runs at full frame rate, but composition and layout are skipped entirely.
+    //
+    // This control is the one used everywhere, so the saving is per-icon-button-press across
+    // the app. 42 sites in :app use the delegated form; this is the pattern to copy for any
+    // whose value is consumed only by graphicsLayer/drawBehind/layout. Do NOT convert one whose
+    // value feeds a Modifier argument, a style, or a size -- those are composition reads by
+    // nature, and hiding the read does not change that.
+    val scale = animateFloatAsState(
         targetValue = if (pressed) 0.88f else 1f,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphIconPress",
@@ -7966,7 +7977,11 @@ fun MorphIconButton(
         // On the button, not the icon: scaling the icon alone shrinks the glyph
         // inside a target that stays put, which reads as a glitch rather than a
         // press.
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        modifier = modifier.graphicsLayer {
+            val k = scale.value
+            scaleX = k
+            scaleY = k
+        },
         enabled = enabled,
         interactionSource = interactionSource,
         content = content,
