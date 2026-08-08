@@ -96,9 +96,17 @@ object WearBridge {
         }
     }
 
-    /** Publish the on-disk snapshots as a Data Layer item (phone → watch). */
-    suspend fun publishNow(context: Context) {
-        val data = SnapshotStore(context).current()
+    /**
+     * Publish the on-disk snapshots as a Data Layer item (phone → watch).
+     *
+     * [snapshot] lets a caller that has ALREADY decoded the snapshot hand it over instead of
+     * paying for a second decode. `current()` is a DataStore read plus a full JSON decode of
+     * every vehicle, and [publishAll] used to trigger three of them in a row -- here, in
+     * [publishSettingsNow], and once more for its own VIN list. Null (the default) keeps every
+     * other caller reading for itself, exactly as before.
+     */
+    suspend fun publishNow(context: Context, snapshot: SnapshotStore.SnapshotData? = null) {
+        val data = snapshot ?: SnapshotStore(context).current()
         val payload = WearStatePayload(
             vehicles = data.vehicles,
             selectedVin = data.selectedVin,
@@ -149,15 +157,25 @@ object WearBridge {
      */
     suspend fun publishAll(context: Context) {
         com.bloo.bluelink.data.AppLog.log("Watch: full resync requested")
-        runCatching { publishNow(context) }
+        // Decoded ONCE and threaded through all three publishes below. `current()` is a
+        // DataStore read plus a full JSON decode of the whole vehicle list, and this function
+        // used to trigger three of them: publishNow's, publishSettingsNow's, and the VIN list
+        // for presets. Reading once also makes the three payloads consistent with each other
+        // by construction rather than by luck -- they were three independent reads that a
+        // concurrent write could land between.
+        //
+        // Its own runCatching, null on failure, so a snapshot read that throws still leaves
+        // each publish to read for itself exactly as it did before.
+        val snapshot = runCatching { SnapshotStore(context).current() }.getOrNull()
+        runCatching { publishNow(context, snapshot) }
         runCatching { publishAuth(context) }
         runCatching {
             val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
-            publishSettingsNow(context, appearance)
+            publishSettingsNow(context, appearance, snapshot)
         }
         runCatching {
             val store = com.bloo.bluelink.data.SettingsStore(context)
-            val vins = SnapshotStore(context).current().vehicles.map { it.vin }
+            val vins = (snapshot ?: SnapshotStore(context).current()).vehicles.map { it.vin }
             val presets = vins.associateWith { store.climatePresets(it) }.filterValues { it.isNotEmpty() }
             publishPresetsNow(context, presets)
         }
@@ -206,7 +224,12 @@ object WearBridge {
      * a setting changes and defensively on every periodic refresh, in case an
      * earlier push was missed.
      */
-    suspend fun publishSettingsNow(context: Context, appearance: SettingsStore.Appearance) {
+    suspend fun publishSettingsNow(
+        context: Context,
+        appearance: SettingsStore.Appearance,
+        /** See [publishNow] -- an already-decoded snapshot, to skip a redundant decode. */
+        snapshot: SnapshotStore.SnapshotData? = null,
+    ) {
         val dark = when (appearance.themeMode) {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK, ThemeMode.AMOLED -> true
@@ -239,7 +262,7 @@ object WearBridge {
         // Each car's pebble order (and which pebbles the user hid) so the watch
         // lays its tiles out to match and drops what the phone hides.
         val store = SettingsStore(context)
-        val vins = SnapshotStore(context).current().vehicles.map { it.vin }
+        val vins = (snapshot ?: SnapshotStore(context).current()).vehicles.map { it.vin }
         val pebbleOrders = vins.associateWith { store.sectionOrder(it) }
         val hiddenSections = vins.associateWith { store.hiddenSections(it) }
         val seatConfigs = vins.associateWith { vin ->
