@@ -1614,11 +1614,51 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      * aurora off on the watch with the phone out of range, and the watch stops
      * believing the phone about the aurora until you restart the app.
      */
+    /**
+     * The settings payload to apply a watch-side edit ON TOP OF -- the synced one when the
+     * phone has pushed anything, otherwise a fresh all-defaults payload.
+     *
+     * The three watch-side setters below used to write `u.settings?.copy(...)`. On a watch
+     * that has NEVER been pushed to (signed in standalone, no phone ever paired) `settings`
+     * is null, `null?.copy` is null, and so the Aurora and AI toggles did nothing at all:
+     * they read `ui.settings?.auroraEnabled == true` (false), tapped, wrote null over null,
+     * failed to reach a phone, dropped the override, and drew "Off" again. Not a lost
+     * setting -- a control that could not move. SettingsScreen's own comment says it shows
+     * these rows standalone precisely so they work "against the watch's own local values".
+     *
+     * Substituting a defaults payload is behaviour-neutral for every current reader of
+     * `ui.settings`, which is why it's safe to make it non-null here: BlooWearTheme keys
+     * only off `settings?.colors` (null in a defaults payload, so the theme is unchanged),
+     * `uiScale` is read as `?: 1f` which is the default, and `aiEnabled`/`settingsMode` are
+     * read as `== true` / `== "advanced"` against defaults of `false` / `"simple"`.
+     */
+    private fun WearUi.baseSettings(): com.bloo.bluelink.data.WearSettingsPayload =
+        settings ?: com.bloo.bluelink.data.WearSettingsPayload()
+
     private fun holdOverride(key: String, value: Any?, push: suspend () -> Boolean) {
         _ui.update { u -> u.copy(settingsOverride = u.settingsOverride + (key to value)) }
         viewModelScope.launch {
             val ok = runCatching { push() }.getOrDefault(false)
-            if (!ok) _ui.update { u -> u.copy(settingsOverride = u.settingsOverride - key) }
+            if (!ok) {
+                // The phone didn't take it. Persist the flip to the watch's OWN store rather
+                // than only dropping the override, because on a standalone watch the push can
+                // never succeed -- and these three settings are watch-local visuals (the
+                // aurora background, the AI gate), which SettingsScreen deliberately surfaces
+                // "against the watch's own local values" when there's no phone to defer to.
+                // Without this they lived in memory for one session and were forgotten.
+                //
+                // The write re-emits through the WearSettingsStore collector above, which sees
+                // the stored value now MATCH the override and retires it cleanly -- so the
+                // override still goes away, just not by discarding what the user asked for.
+                // A paired phone stays the source of truth: its next settings push overwrites
+                // this exactly as it did before.
+                _ui.value.settings?.let { s ->
+                    runCatching {
+                        WearSettingsStore(ctx).save(com.bloo.bluelink.data.WearSync.encodeSettings(s))
+                    }
+                }
+                _ui.update { u -> u.copy(settingsOverride = u.settingsOverride - key) }
+            }
         }
     }
 
@@ -1626,14 +1666,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  toggle and AI tile react instantly; the phone's echo (or a future
      *  settings push) settles it for real. */
     fun setAiEnabled(enabled: Boolean) {
-        _ui.update { u -> u.copy(settings = u.settings?.copy(aiEnabled = enabled)) }
+        _ui.update { u -> u.copy(settings = u.baseSettings().copy(aiEnabled = enabled)) }
         holdOverride("aiEnabled", enabled) { WearComms.publishAiToggle(ctx, enabled) }
     }
 
     /** Turn the watch's own aurora background on/off. Same optimistic-update +
      *  phone-echo pattern as [setAiEnabled]. */
     fun setAuroraEnabled(enabled: Boolean) {
-        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraEnabled = enabled)) }
+        _ui.update { u -> u.copy(settings = u.baseSettings().copy(auroraEnabled = enabled)) }
         holdOverride("auroraEnabled", enabled) { WearComms.publishAuroraToggle(ctx, enabled) }
     }
 
@@ -1643,8 +1683,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  it currently is) so this never accidentally turns the background on
      *  or off as a side effect of just changing its colour. */
     fun setAuroraColorMode(mode: String) {
-        val enabled = _ui.value.settings?.auroraEnabled ?: return
-        _ui.update { u -> u.copy(settings = u.settings?.copy(auroraColorMode = mode)) }
+        // No `?: return` on a null settings payload. That early return made this a silent
+        // no-op on a watch that has never received a phone push, which is the one case where
+        // the colour mode is the watch's own business -- see [baseSettings].
+        val enabled = _ui.value.settings?.auroraEnabled ?: false
+        _ui.update { u -> u.copy(settings = u.baseSettings().copy(auroraColorMode = mode)) }
         holdOverride("auroraColorMode", mode) { WearComms.publishAuroraToggle(ctx, enabled, colorMode = mode) }
     }
 
