@@ -1572,7 +1572,7 @@ private fun WizardSeatsPage(
 /** The four seat positions, each pairing its persisted heat/cool flag keys with
  *  the matching [SeatConfig] fields — the seat matrix lives here once instead of
  *  being hand-written at each of the three places seats are configured. */
-private data class SeatPosition(
+internal data class SeatPosition(
     val label: String,
     val heatKey: String,
     val coolKey: String,
