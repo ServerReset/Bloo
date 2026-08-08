@@ -590,8 +590,20 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 // resync, a periodic push) claim "Updated just now" about car state the phone
                 // had fetched hours earlier. See markFetchedFrom.
                 markFetchedFrom(data.vehicles)
-                if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage()
-                else publish()
+                // Compare VIN SETS, not just emptiness. `vehicles` is only ever rebuilt by
+                // loadGarage(), and this gate only called it when the list was EMPTY -- so once
+                // non-empty, garage membership was frozen for the activity's lifetime. A car
+                // added on the phone never appeared, and a car REMOVED on the phone left a
+                // ghost pager page with a stale name and blank data that `command()` still
+                // happily accepted and relayed lock/climate for.
+                val incoming = data.vehicles.map { it.vin }
+                if (sessionStore.loggedInBrands().isNotEmpty() &&
+                    vehicles.map { it.vin } != incoming
+                ) {
+                    loadGarage()
+                } else {
+                    publish()
+                }
             }
         }
         // Cold-start update check -- see runUpdateCheck's own doc comment.
