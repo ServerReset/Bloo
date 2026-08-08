@@ -6057,7 +6057,7 @@ private fun DrawScope.drawChargeLimitDot(
  * param is retained for call-site compatibility but is no longer used.
  */
 @Composable
-private fun Modifier.appGlassRim(
+internal fun Modifier.appGlassRim(
     shape: Shape,
     @Suppress("UNUSED_PARAMETER") tint: Color = MaterialTheme.colorScheme.surfaceContainer,
 ): Modifier = this.frostedRim(shape)
@@ -6074,7 +6074,7 @@ private fun Modifier.appGlassRim(
  * (all defaults) so a reader outside the provider degrades gracefully rather than
  * crashing — but every real screen is inside the provider.
  */
-private val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearance() }
+internal val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearance() }
 
 private val LocalForceExpanded = staticCompositionLocalOf { false }
 
@@ -6474,7 +6474,7 @@ private fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: 
  * hard-clipping it at the bounds. The fade only appears on an edge that has more
  * content past it, and eases in as you scroll toward it.
  */
-private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modifier = this
+internal fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
