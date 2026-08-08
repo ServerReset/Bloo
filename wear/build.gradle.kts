@@ -147,6 +147,14 @@ dependencies {
         }
     }
 
+    // Same reasoning as :app, minus one leg of it. minSdk here is 30, so the API 24-27
+    // window where profileinstaller is the ONLY delivery mechanism does not apply. What does
+    // apply is distribution: this APK is sideloaded, never installed by Play, so the
+    // install-time profile pass Play would perform never happens for anybody -- and the
+    // Compose baseline profiles AGP merged into the watch APK sit unused until background
+    // dexopt gets round to them. ~30 KB to stop discarding them.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.activity:activity-compose:1.9.3")
