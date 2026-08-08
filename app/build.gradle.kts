@@ -133,6 +133,30 @@ dependencies {
     // watch's remote commands.
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
+    // Installs the baseline profile packaged at assets/dexopt/baseline.prof so ART can
+    // partially AOT-compile ahead of first use, instead of interpreting everything until
+    // background dexopt eventually happens.
+    //
+    // We ship no profile of our own (generating one needs a device or emulator running
+    // Macrobenchmark, and CI has neither) -- but AGP already MERGES the baseline profiles
+    // that Compose and the other AndroidX AARs ship into the APK, and without this library
+    // that merged asset is inert on the devices that need it most. Per Google's own
+    // compilation-behaviour table, on API 24-27 "Baseline Profiles are installed by
+    // androidx.profileinstaller on the first run WHEN THE APP MODULE DEFINES THIS
+    // DEPENDENCY"; from API 28 it is Play that applies them at install time. minSdk here is
+    // 26, so two supported API levels had no delivery mechanism at all.
+    //
+    // It matters above 27 too, for a reason specific to how this app is distributed: the
+    // same docs warn that "non-Google-Play-Store app distribution channels might not support
+    // using Baseline Profiles at installation", and Bloo is sideloaded from a GitHub
+    // Release. So the install-time path Play would provide never runs for anyone, on any API
+    // level, and this is what puts the profile in place for the next dexopt pass.
+    //
+    // Depends on the release build being minified, which it now is -- the docs are explicit
+    // that "your release build should always have isMinifyEnabled = true", since R8 rewrites
+    // the profile's rules to match the shrunk code.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
