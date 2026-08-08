@@ -920,16 +920,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching { statusCache.clear() }
                 runCatching { snapshotStore.saveVehicles(emptyList()) }
                 runCatching { com.bloo.bluelink.tiles.BlooTileService.requestUpdates(getApplication()) }
-                // Preserve device-capability probe results across the full state
-                // reset -- they're device capabilities, not account state, and were
-                // only probed once in init. Dropping them hid the AI/Shizuku UI on a
-                // capable device after signing back in within the same session.
+                // Preserve everything that is NOT account state across the full reset.
+                //
+                // This already preserved the four device-capability probes, with a comment
+                // giving the right rule -- "they're device capabilities, not account state" --
+                // and then applied it to four fields when nine more qualify. Signing out of
+                // a car account says nothing about which Drive file this DEVICE backs up to,
+                // or whether this user picked Advanced settings.
+                //
+                // The Drive fields are the ones that actually broke something. The debounced
+                // settings push gates on `_state.value.syncUri == null` (see the
+                // dirtyKeysFlow collector), so wiping it here silently stops Drive sync for
+                // the rest of the process even though the URI is still on disk -- and
+                // `thisDeviceId`/`syncDeviceName`/`syncPrimaryId` are this device's identity
+                // in the sync registry, which a car sign-out has no business resetting.
+                // It recovers on the next sign-in, because loadGarage re-reads the store,
+                // but "recovers if you sign back in" is not the same as "works".
+                //
+                // `settingsMode` is the visible one: sign out and the Settings screen drops
+                // from Advanced back to Simple.
+                //
+                // Deliberately NOT preserved: defaultClimatePresets, which is keyed per VIN
+                // and therefore genuinely account state.
+                val keep = _state.value
                 _state.value = UiState(
                     screen = Screen.Login,
-                    aiSupported = _state.value.aiSupported,
-                    aiEnabled = _state.value.aiEnabled,
-                    aiAuto = _state.value.aiAuto,
-                    shizukuAvailable = _state.value.shizukuAvailable,
+                    aiSupported = keep.aiSupported,
+                    aiEnabled = keep.aiEnabled,
+                    aiAuto = keep.aiAuto,
+                    shizukuAvailable = keep.shizukuAvailable,
+                    settingsMode = keep.settingsMode,
+                    syncUri = keep.syncUri,
+                    lastSyncMs = keep.lastSyncMs,
+                    syncWifiOnly = keep.syncWifiOnly,
+                    syncError = keep.syncError,
+                    syncDevices = keep.syncDevices,
+                    syncPrimaryId = keep.syncPrimaryId,
+                    thisDeviceId = keep.thisDeviceId,
+                    syncDeviceName = keep.syncDeviceName,
                 )
             } else {
                 _state.update { it.copy(accounts = remaining) }
