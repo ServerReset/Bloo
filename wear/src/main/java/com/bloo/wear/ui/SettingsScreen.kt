@@ -374,14 +374,17 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                         var draft by remember(ui.localSettings.fontScale) {
                             mutableStateOf(ui.localSettings.fontScale)
                         }
+                        // "%.2f", not "%.1f": the slider steps by 0.05, so at one decimal
+                        // place 0.85/0.90/0.95 rendered as "0.9×", "0.9×", "1.0×" -- three
+                        // positions, two labels, and a committed value the user never saw.
                         Text(
-                            "${"%.1f".format(draft)}×",
+                            "${"%.2f".format(draft)}×",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Spacer(Modifier.height(4.dp))
                         SliderRow(
                             label = "Scale",
-                            valueLabel = "${"%.1f".format(draft)}×",
+                            valueLabel = "${"%.2f".format(draft)}×",
                             value = ((draft - 0.8f) / 0.05f).roundToInt(),
                             min = 0,
                             max = 12,

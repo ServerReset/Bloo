@@ -1189,6 +1189,10 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     // Quick actions right on the hero — the two most-used controls, so the first
     // screen is actionable without swiping to a dedicated tile.
     Spacer(Modifier.height(8.dp))
+    // Collapsed deliberately, and ONLY for the label/verb: an unknown lock state still has to
+    // put a word on the button, and it has to be the same word toWearCommand will act on. The
+    // STATE carriers below (active/toggled/contentDescription) use `car.locked` directly, since
+    // those are claims about the car rather than a choice of verb.
     val locked = car.locked == true
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         MorphButton(
@@ -1207,16 +1211,29 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             // used to also need to match a separate dedicated Lock tile a
             // swipe below, which duplicated this exact button; that tile has
             // since been removed as redundant.)
-            active = !locked,
+            // `car.locked == false`, not `!locked`. `locked` is `car.locked == true`, so an
+            // unknown lock state collapsed to false and this highlighted the button as though
+            // the car were definitely UNLOCKED. Tri-state here: highlight only when the car has
+            // actually reported itself unlocked.
+            active = car.locked == false,
             activeColor = MaterialTheme.colorScheme.primary,
             pending = "${car.vin}:doors" in ui.pending,
             onClick = { vm.toggleLock(car.vin) },
             modifier = Modifier.weight(1f),
-            toggled = locked,
+            // Nullable all the way through -- MorphButton's `toggled` is Boolean? and feeds
+            // ToggleableState, so passing the real tri-state lets TalkBack say "indeterminate"
+            // instead of asserting "off".
+            toggled = car.locked,
             // Half-width weighted pair: the icon + gap starved the label. Drop
             // it so "Unlock" fits in full; the highlight carries the state.
             showIcon = false,
-            contentDescription = if (locked) "Locked. Unlock" else "Unlocked. Lock",
+            contentDescription = when (car.locked) {
+                true -> "Locked. Unlock"
+                false -> "Unlocked. Lock"
+                // Was "Unlocked. Lock" for this case too, so a screen reader stated a car's
+                // doors were unlocked when the car had never said so.
+                null -> "Lock state unknown. Lock"
+            },
         )
         MorphButton(
             // Same rule: what the tap does. "Climate" on a car whose climate
