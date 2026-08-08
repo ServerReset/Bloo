@@ -43,6 +43,20 @@ jobs:
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      # The release variant is the ONLY thing that runs R8. Both modules shipped
+      # `isMinifyEnabled = false` alongside declared proguardFiles for the whole life of
+      # the project, so every keep rule in them was dead configuration that read like
+      # protection -- and nothing here would have noticed. With shrinking now on, this
+      # step is what turns "the rules parse and R8 resolves every reference it keeps"
+      # into a build-time answer instead of a runtime surprise.
+      #
+      # It is NOT a proof the release APK works: there is no emulator here, so nothing
+      # ever RUNS it. That gap is why renaming stays off (-dontobfuscate) -- see
+      # app/proguard-rules.pro. Verifying behaviour still needs a human installing the
+      # artifact below.
+      - name: Build release APKs (runs R8 -- the only check on proguard-rules.pro)
+        run: ./gradlew assembleRelease --stacktrace
+
       - name: Upload phone APK
         uses: actions/upload-artifact@v4
         with:
@@ -55,6 +69,18 @@ jobs:
         with:
           name: bloo-wear-apk
           path: wear/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      # The shrunk APKs, so the release build can actually be installed and exercised --
+      # which is the only way to confirm no keep is missing. Separate artifacts from the
+      # debug ones above; those stay the default download for day-to-day sideloading.
+      - name: Upload release APKs (R8-shrunk, for on-device verification)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bloo-release-apks
+          path: |
+            app/build/outputs/apk/release/*.apk
+            wear/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       # GitHub's own generate_release_notes only lists merged PRs since the

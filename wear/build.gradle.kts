@@ -41,7 +41,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            isMinifyEnabled = false
+            // Shrinking on, renaming off -- see wear/proguard-rules.pro. Kept at parity
+            // with :app on purpose; a watch APK is the surface where a runtime-only
+            // stripping failure is least visible and least reportable.
+            isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

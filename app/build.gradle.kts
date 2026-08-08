@@ -46,7 +46,13 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            isMinifyEnabled = false
+            // Shrinking on, renaming off (-dontobfuscate lives in proguard-rules.pro,
+            // with the reasoning). This file's proguardFiles have been declared since
+            // the project was created while minify stayed false, so every rule in them
+            // -- including the serializer keeps -- was dead configuration that looked
+            // like protection. isShrinkResources is deliberately NOT enabled: it can
+            // drop resources that are only ever referenced by name.
+            isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
