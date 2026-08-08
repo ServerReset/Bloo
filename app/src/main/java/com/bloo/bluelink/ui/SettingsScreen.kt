@@ -382,7 +382,6 @@ import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
 import com.bloo.bluelink.data.climateChunks
-import com.bloo.bluelink.data.isPluggedIn
 import com.bloo.uicommon.topFadeScrim
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.Dispatchers

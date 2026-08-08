@@ -387,7 +387,7 @@ import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
 import com.bloo.bluelink.data.climateChunks
-import com.bloo.bluelink.data.isPluggedIn
+import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.uicommon.topFadeScrim
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.Dispatchers
@@ -3742,7 +3742,7 @@ private fun RowScope.CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel
     val ev = status?.evStatus
     val locked = status?.doorLock
     val charging = ev?.batteryCharge == true
-    val plugged = ev?.isPluggedIn == true || charging
+    val plugged = ev.isPluggedOrCharging
     val climateOn = status?.airCtrlOn == true
     val enabled = !state.loading
     CoverActionButton(
@@ -8938,7 +8938,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val remaining = serviceDue(odoInt, lastSvc, interval)
 
     val ev = status?.evStatus
-    val plugged = ev?.isPluggedIn == true || ev?.batteryCharge == true
+    val plugged = ev.isPluggedOrCharging
 
     val infoSummary = if (status?.doorLock == true) "Locked" else "Unlocked"
     val coverGlance = LocalForceExpanded.current
@@ -10126,7 +10126,7 @@ private fun ChargeLimitPill(
 private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val ev = status?.evStatus
     val charging = ev?.batteryCharge == true
-    val plugged = ev?.isPluggedIn == true || charging
+    val plugged = ev.isPluggedOrCharging
     val pending = state.isPending(v.vin, "charge")
     val limitPending = state.isPending(v.vin, "chargeLimit")
     val summary = when {

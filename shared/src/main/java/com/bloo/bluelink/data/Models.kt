@@ -494,6 +494,26 @@ fun EvStatus.targetForCurrentPlug(): Int? = when (batteryPlugin) {
  *  [EvStatus.pluggedInLabel]); a missing plug value is treated as unplugged. */
 val EvStatus.isPluggedIn: Boolean get() = (batteryPlugin ?: 0) != 0
 
+/**
+ * True when a charger is connected OR the car is actively charging.
+ *
+ * The `|| batteryCharge` half is not redundant with [isPluggedIn]: some cars report
+ * charging while `batteryPlugin` still reads 0 (a plug value that has not caught up, or a
+ * DC session the field does not describe), and "can I start/stop a charge" must say yes in
+ * that state. That is why every caller wrote the OR -- and wrote it separately, three times
+ * in one file: CoverActionBar, ChargePebble and the charge status row each derived
+ * `ev?.isPluggedIn == true || charging` inline.
+ *
+ * Shared because a duplicated PREDICATE is this codebase's most repeated defect: the pebble
+ * visibility check existed in four copies and two of them had silently lost a clause. These
+ * three still agreed; they are unified before they stop agreeing, not after.
+ *
+ * Nullable receiver so a null EvStatus (non-EV car, or no status fetched yet) answers false
+ * at the call site without each one repeating a `?:` or an `== true`.
+ */
+val EvStatus?.isPluggedOrCharging: Boolean
+    get() = this != null && (isPluggedIn || batteryCharge == true)
+
 /** Shared mechanism behind [DoorOpen.openLabels]/[WindowOpen.openLabels]:
  *  both door and window state use the identical 0=closed/1=open per-position
  *  encoding, so this one helper turns the four raw Int? flags into a list of
