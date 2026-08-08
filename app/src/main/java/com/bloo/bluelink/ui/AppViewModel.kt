@@ -1137,26 +1137,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // a race. The store carries the values forward from disk inside its own edit
         // transaction instead, which has no window.
         snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null) })
+        // ONE Preferences read for every per-car setting below, instead of one read per
+        // getter per car -- twelve of them, so 36 round trips on a three-car account,
+        // all returning the identical object. See SettingsStore.snapshot().
+        //
+        // Taken HERE and not at the top of the function, deliberately: everything above
+        // this is network work that can take seconds, and a snapshot read before it would
+        // be stale by the time it was used if the user changed a setting meanwhile.
+        val prefs = settingsStore.snapshot()
         val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
-        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin)?.let { v.vin to it } }.toMap()
+        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
-        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
-        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin) }.filterValues { it.isNotBlank() }
-        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
-        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
+        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
+        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
+        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
+        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
         val firstRun = !settingsStore.onboardingSeen()
         val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin) }.map { it.vin }
         // On first open all pebbles start expanded regardless of any stored state.
         val collapsed = if (firstRun) emptySet()
-        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
-        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
-        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
+        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
+        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
+        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
-        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it) }
-        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it) }
-        val tileBackground = settingsStore.tileBackground()
-        val tileLiveRefresh = settingsStore.tileLiveRefresh()
+        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it, prefs) }
+        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it, prefs) }
+        val tileBackground = settingsStore.tileBackground(prefs)
+        val tileLiveRefresh = settingsStore.tileLiveRefresh(prefs)
         val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
@@ -1219,15 +1227,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * import, until some unrelated event happened to trigger a full reload.
      */
     private suspend fun refreshLocalCarConfig() {
+        // ONE Preferences read for every per-car setting below, instead of one per
+        // getter per car. See SettingsStore.snapshot().
+        val prefs = settingsStore.snapshot()
         val vehicles = _state.value.vehicles
         if (vehicles.isEmpty()) return
         val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin) }
-        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin)?.let { v.vin to it } }.toMap()
+        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin) }
-        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin)?.let { v.vin to it } }.toMap()
-        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin) }.filterValues { it.isNotBlank() }
-        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin)?.let { v.vin to it } }.toMap()
-        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin)?.let { v.vin to it } }.toMap()
+        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
+        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
+        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
+        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin) }
         // These fields used to be omitted here (only loadGarageInner read them),
         // so an imported change to pebble visibility, collapse state, hotspots,
@@ -1238,14 +1249,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // loadGarageInner exactly (incl. its firstRun empty-collapsed rule).
         val firstRun = !settingsStore.onboardingSeen()
         val collapsed = if (firstRun) emptySet()
-        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin).map { "${v.vin}:$it" } }.toSet()
-        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin).map { "${v.vin}:$it" } }.toSet()
-        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin)?.let { v.vin to it } }.toMap()
+        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
+        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
+        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
-        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it) }
-        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it) }
-        val tileBackground = settingsStore.tileBackground()
-        val tileLiveRefresh = settingsStore.tileLiveRefresh()
+        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it, prefs) }
+        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it, prefs) }
+        val tileBackground = settingsStore.tileBackground(prefs)
+        val tileLiveRefresh = settingsStore.tileLiveRefresh(prefs)
         val shortcutSet = settingsStore.enabledShortcuts()
         _state.update {
             it.copy(

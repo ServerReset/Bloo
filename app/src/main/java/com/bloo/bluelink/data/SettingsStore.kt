@@ -572,8 +572,10 @@ class SettingsStore(private val context: Context) {
 
     // --- Per-car identity + service (the API has no service-history fields) ---
 
-    suspend fun licensePlate(vin: String): String =
-        context.settingsDataStore.data.first()[stringPreferencesKey("plate_$vin")] ?: ""
+    suspend fun licensePlate(vin: String): String = licensePlate(vin, context.settingsDataStore.data.first())
+
+    fun licensePlate(vin: String, p: Preferences): String =
+        p[stringPreferencesKey("plate_$vin")] ?: ""
 
     suspend fun setLicensePlate(vin: String, value: String) {
         editTracked {
@@ -582,8 +584,10 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun lastServiceMiles(vin: String): Int? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
+    suspend fun lastServiceMiles(vin: String): Int? = lastServiceMiles(vin, context.settingsDataStore.data.first())
+
+    fun lastServiceMiles(vin: String, p: Preferences): Int? =
+        p[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
 
     suspend fun setLastServiceMiles(vin: String, value: Int?) {
         editTracked {
@@ -592,8 +596,10 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun serviceIntervalMiles(vin: String): Int? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
+    suspend fun serviceIntervalMiles(vin: String): Int? = serviceIntervalMiles(vin, context.settingsDataStore.data.first())
+
+    fun serviceIntervalMiles(vin: String, p: Preferences): Int? =
+        p[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
 
     suspend fun setServiceIntervalMiles(vin: String, value: Int?) {
         editTracked {
@@ -619,8 +625,26 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Optional user-set photo URL per vehicle (empty = use the default gradient). */
-    suspend fun imageUrl(vin: String): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("img_$vin")]?.takeIf { it.isNotBlank() }
+    /**
+     * ONE Preferences snapshot, for a caller about to read many keys at once.
+     *
+     * Every getter here inlines its own `data.first()`, which after the first read is served
+     * from memory but is still a collect-and-cancel round trip on the DataStore actor, and
+     * they are sequential suspends. `loadGarageInner` made twelve of them PER CAR -- 36 on a
+     * three-car account, on the cold-start critical path, every one returning the identical
+     * object -- and `refreshLocalCarConfig` did it again on every settings import.
+     *
+     * Pair this with the `Preferences`-taking overloads: read once, pass it down. Those
+     * overloads exist so the KEY and the DEFAULT stay written exactly once, in the getter --
+     * a caller that reached for the raw key itself would be the drift this store exists to
+     * prevent.
+     */
+    suspend fun snapshot(): Preferences = context.settingsDataStore.data.first()
+
+    suspend fun imageUrl(vin: String): String? = imageUrl(vin, context.settingsDataStore.data.first())
+
+    fun imageUrl(vin: String, p: Preferences): String? =
+        p[stringPreferencesKey("img_$vin")]?.takeIf { it.isNotBlank() }
 
     suspend fun setImageUrl(vin: String, url: String) {
         editTracked {
@@ -744,8 +768,10 @@ class SettingsStore(private val context: Context) {
     private fun csv(p: androidx.datastore.preferences.core.Preferences, key: String): Set<String> =
         p[stringPreferencesKey(key)]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-    suspend fun collapsedSections(vin: String): Set<String> =
-        csv(context.settingsDataStore.data.first(), "collapsed_$vin")
+    suspend fun collapsedSections(vin: String): Set<String> = collapsedSections(vin, context.settingsDataStore.data.first())
+
+    fun collapsedSections(vin: String, p: Preferences): Set<String> =
+        csv(p, "collapsed_$vin")
 
     /** Toggles [section] in or out of [vin]'s collapsed set: reads the current
      *  CSV-encoded set, adds or removes the section, then re-encodes and writes
@@ -761,8 +787,10 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun hiddenSections(vin: String): Set<String> =
-        csv(context.settingsDataStore.data.first(), "hidden_$vin")
+    suspend fun hiddenSections(vin: String): Set<String> = hiddenSections(vin, context.settingsDataStore.data.first())
+
+    fun hiddenSections(vin: String, p: Preferences): Set<String> =
+        csv(p, "hidden_$vin")
 
     /** Same read-modify-write pattern as [setSectionCollapsed], for the
      *  independent "hidden" set (a hidden section is fully removed from view;
@@ -832,8 +860,10 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Optional user-chosen label shown on the tile (null → derive from state). */
-    suspend fun tileLabel(index: Int): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("tile_${index}_label")]?.takeIf { it.isNotBlank() }
+    suspend fun tileLabel(index: Int): String? = tileLabel(index, context.settingsDataStore.data.first())
+
+    fun tileLabel(index: Int, p: Preferences): String? =
+        p[stringPreferencesKey("tile_${index}_label")]?.takeIf { it.isNotBlank() }
 
     suspend fun setTileLabel(index: Int, label: String?) {
         editTracked {
@@ -843,8 +873,10 @@ class SettingsStore(private val context: Context) {
     }
 
     /** What the climate tile runs: "default", "smart", or a preset id. */
-    suspend fun tileClimateTarget(index: Int): String =
-        context.settingsDataStore.data.first()[stringPreferencesKey("tile_${index}_climate")]
+    suspend fun tileClimateTarget(index: Int): String = tileClimateTarget(index, context.settingsDataStore.data.first())
+
+    fun tileClimateTarget(index: Int, p: Preferences): String =
+        p[stringPreferencesKey("tile_${index}_climate")]
             ?.takeIf { it.isNotBlank() } ?: "default"
 
     suspend fun setTileClimateTarget(index: Int, target: String?) {
@@ -855,8 +887,10 @@ class SettingsStore(private val context: Context) {
     }
 
     /** When true, tiles run the command in the background; else they open the app. */
-    suspend fun tileBackground(): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("tile_background")] ?: false
+    suspend fun tileBackground(): Boolean = tileBackground(context.settingsDataStore.data.first())
+
+    fun tileBackground(p: Preferences): Boolean =
+        p[booleanPreferencesKey("tile_background")] ?: false
 
     suspend fun setTileBackground(value: Boolean) {
         editTracked { it[booleanPreferencesKey("tile_background")] = value }
@@ -864,8 +898,10 @@ class SettingsStore(private val context: Context) {
 
     /** When true, a tile kicks a throttled status refresh when it becomes visible,
      *  so its lock/climate state stays live (at some battery/rate-limit cost). */
-    suspend fun tileLiveRefresh(): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("tile_live_refresh")] ?: false
+    suspend fun tileLiveRefresh(): Boolean = tileLiveRefresh(context.settingsDataStore.data.first())
+
+    fun tileLiveRefresh(p: Preferences): Boolean =
+        p[booleanPreferencesKey("tile_live_refresh")] ?: false
 
     suspend fun setTileLiveRefresh(value: Boolean) {
         editTracked { it[booleanPreferencesKey("tile_live_refresh")] = value }
@@ -1501,8 +1537,10 @@ class SettingsStore(private val context: Context) {
 
     // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
 
-    suspend fun hotspot(vin: String): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("hotspot_$vin")]?.takeIf { it.isNotBlank() }
+    suspend fun hotspot(vin: String): String? = hotspot(vin, context.settingsDataStore.data.first())
+
+    fun hotspot(vin: String, p: Preferences): String? =
+        p[stringPreferencesKey("hotspot_$vin")]?.takeIf { it.isNotBlank() }
 
     suspend fun setHotspot(vin: String, section: String?) {
         editTracked {
@@ -1517,8 +1555,10 @@ class SettingsStore(private val context: Context) {
      *  only distinguishes EV vs. gas, so the app asks the user to disambiguate
      *  hybrid/PHEV during car setup and stores their answer here; callers fall
      *  back to whatever the API-derived guess was when this is null. */
-    suspend fun powertrain(vin: String): Powertrain? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("ptrain_$vin")]
+    suspend fun powertrain(vin: String): Powertrain? = powertrain(vin, context.settingsDataStore.data.first())
+
+    fun powertrain(vin: String, p: Preferences): Powertrain? =
+        p[stringPreferencesKey("ptrain_$vin")]
             ?.let { runCatching { Powertrain.valueOf(it) }.getOrNull() }
 
     suspend fun setPowertrain(vin: String, value: Powertrain) {
