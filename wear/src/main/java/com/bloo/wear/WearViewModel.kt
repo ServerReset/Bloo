@@ -578,10 +578,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 }
-                // Fresh data just landed for these VINs -- advance their "last
-                // updated" stamps so buildCarView's fetchedAt label tracks it
-                // (covers both the loadGarage and the plain publish path below).
-                markFetched(data.vehicles.map { it.vin })
+                // Data just landed for these VINs -- but it is the PHONE's data, carrying the
+                // phone's own per-car fetch times, so take those rather than the clock. This
+                // used to stamp `now`, which made every re-publish (a settings change, a
+                // resync, a periodic push) claim "Updated just now" about car state the phone
+                // had fetched hours earlier. See markFetchedFrom.
+                markFetchedFrom(data.vehicles)
                 if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage()
                 else publish()
             }
@@ -896,7 +898,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 val requested = runCatching { WearComms.requestSync(ctx, "", refresh = false) }.getOrDefault(false)
                 runCatching { WearComms.pullLatest(ctx) }
                 snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
-                markFetched(snapshots.keys)
+                // Same as the publish path: this READ the store, it did not fetch anything, so
+                // the honest stamp is each snapshot's own fetchedAt and not the clock. Note
+                // `requestSync` above asked with refresh = false, so even a successful round
+                // trip only re-sends what the phone already had.
+                markFetchedFrom(snapshots.values)
                 refreshConnection()
                 if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
                 if (!requested) _ui.update { it.copy(message = "Bring your phone nearby to sync") }
@@ -1938,6 +1944,31 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (vins.isEmpty()) return
         val now = System.currentTimeMillis()
         fetchedAt = fetchedAt + vins.associateWith { now }
+    }
+
+    /**
+     * Stamp each snapshot's "last updated" from the snapshot's OWN [VehicleSnapshot.fetchedAt]
+     * rather than from the clock.
+     *
+     * For anything that ARRIVES rather than is fetched, `markFetched`'s "now" is a lie. The
+     * phone re-publishes its on-disk snapshot on all sorts of occasions -- a settings change,
+     * a full resync, a periodic push -- and the car data inside it can be hours old. Stamping
+     * `now` on receipt made the watch say "Updated just now" about data the phone had itself
+     * labelled 09:14. The user then trusts a lock state or a charge percentage that is stale,
+     * which is the whole reason the label exists.
+     *
+     * VINs whose snapshot has never been fetched (`fetchedAt == 0L`, the default) are skipped
+     * entirely rather than defaulted to now: no stamp renders as no claim, which is honest,
+     * and it is the same treatment the widget already gives a zero here with its own
+     * `takeIf { it > 0 }`.
+     *
+     * [markFetched] stays for the paths where the watch genuinely just changed the displayed
+     * state itself -- a standalone command's optimistic flip -- where the clock IS the answer.
+     */
+    private fun markFetchedFrom(snaps: Collection<com.bloo.bluelink.data.VehicleSnapshot>) {
+        val real = snaps.mapNotNull { s -> s.fetchedAt.takeIf { it > 0L }?.let { s.vin to it } }
+        if (real.isEmpty()) return
+        fetchedAt = fetchedAt + real
     }
 
     /** Nudge every pool Tile and the watch-face complications to re-read the
