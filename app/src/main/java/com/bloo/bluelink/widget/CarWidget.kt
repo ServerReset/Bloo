@@ -1894,6 +1894,13 @@ class CarWidget : GlanceAppWidget() {
             .mapNotNull { WidgetInfoField.fromKey(it) }
             .filterNot { footerShown && it == WidgetInfoField.UPDATED }
             .filterNot { it in hideFields }
+            // FILTER before TAKE. Taking first meant a field the car has not reported consumed
+            // one of the `max` rows and was then dropped, so a tier with room for three stats
+            // could render one -- and the fields that DID have values were the ones hidden,
+            // because they sorted after the empty ones. infoValue is a plain non-composable
+            // function, so calling it here is free of composition concerns, and filtering
+            // before take can never yield MORE than max rows.
+            .filter { infoValue(it, car, render) != null }
             .take(max)
         val narrow = availableWidth < NARROW_WIDTH
         // Two columns once the slot is wide enough for both halves to still

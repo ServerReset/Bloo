@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.flow.first
 import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.widget.CarWidget
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearSeatConfig
 import com.bloo.bluelink.data.WearSettingsPayload
@@ -163,6 +164,12 @@ object WearBridge {
             val appearance = com.bloo.bluelink.data.SettingsStore(context).appearance.first()
             publishSettingsNow(context, appearance, snapshot)
         }
+        // The home widget. This function's own KDoc has always promised a fan-out to "home
+        // widget, QS tiles, and the watch" and only ever did the watch -- WidgetTheme.resolve
+        // derives the widget's whole palette from Appearance, so an appearance change left
+        // every placed widget on the old colours until its own 30-minute refresh. Its own
+        // runCatching so a failing widget update cannot swallow the publishes above.
+        runCatching { CarWidget().updateAll(context) }
     }
 
     /**
@@ -473,7 +480,11 @@ object WearBridge {
             val outcome = store.performDriveSync()
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)
-            updateAllSurfaces(context)
+            // Was `updateAllSurfaces(context)`, a private function with a LITERALLY EMPTY
+            // body -- so importing settings from Drive published them to the watch (above) and
+            // then fanned out to nothing. Only the widget is needed here: a settings import
+            // does not change vehicle state, so publishNow has nothing new to say.
+            runCatching { CarWidget().updateAll(context) }
             outcome
         }.getOrElse { e ->
             // Fall back to the real last-known sync time (not 0L/"never") on a
@@ -487,6 +498,6 @@ object WearBridge {
     }
 
     /** Refresh watch tiles (no state re-fetch). */
-    private suspend fun updateAllSurfaces(context: Context) {
-    }
+    // updateAllSurfaces was deleted here. Its body was empty, and its one caller (driveSync)
+    // now updates the widget directly.
 }

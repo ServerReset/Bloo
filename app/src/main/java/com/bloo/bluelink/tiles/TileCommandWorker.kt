@@ -33,15 +33,20 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val cmd = inputData.getString(KEY_CMD) ?: return Result.failure()
         if (cmd == CMD_REFRESH) {
-            val refreshed = runCatching {
+            // `refresh` returns FALSE for a failed fetch and only throws on something
+            // unexpected, so testing runCatching's success treated every failure as a success:
+            // with the phone offline the log said "Tile refresh for <vin>" and the worker
+            // returned success without retrying. Take the Boolean it actually returns.
+            val ok = runCatching {
                 WearCommandRunner.refresh(applicationContext, vin)
-                AppLog.log("Tile refresh for $vin")
             }.onFailure { AppLog.log("⚠ Tile refresh failed: ${it.message}") }
+                .getOrDefault(false)
+            AppLog.log(if (ok) "Tile refresh for $vin" else "⚠ Tile refresh got nothing for $vin")
             // A status refresh is read-only, so a transient network hiccup is safe
             // to retry a bounded number of times. If it keeps failing we give up
             // (success) rather than leaving a silent background refresh stuck.
             return when {
-                refreshed.isSuccess -> Result.success()
+                ok -> Result.success()
                 runAttemptCount < MAX_ATTEMPTS -> Result.retry()
                 else -> Result.success()
             }
