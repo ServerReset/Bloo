@@ -8444,6 +8444,11 @@ private fun PebbleShell(
     }
 }
 
+/** Gap between settings cards. Lives inside [SettingsCard] as bottom padding rather than
+ *  in the parent's arrangement, so a card collapsing to zero height takes its gap with it --
+ *  see the comment at that padding for what went wrong when the parent owned it. */
+private val SettingsCardGap = 10.dp
+
 /** The app's muted/secondary-text alpha, applied over LocalContentColor. */
 private const val MutedContentAlpha = 0.7f
 
@@ -10688,10 +10693,18 @@ private fun SettingsScreen(vm: AppViewModel) {
                 expandVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
             val advancedExit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
                 shrinkVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
-            ) {
+            // No `Arrangement.spacedBy` -- SettingsCard carries the gap itself, see there.
+            //
+            // And no `animateContentSize` either. It used to wrap this Column on the
+            // reasoning that all three settles should share one feel, but every child that
+            // changes height here already animates its own (advancedEnter/advancedExit's
+            // expandVertically/shrinkVertically, plus SettingsCard's own inner
+            // animateContentSize). Stacking a second, independently-sprung height animation
+            // over those makes each frame of the inner ones a fresh "content size changed"
+            // event for the outer one to chase, so the Column lags behind its own content
+            // and then catches up -- which is the other half of what looked like a snap.
+            // PebbleShell documents the identical trap; this is the same mistake, here.
+            Column {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts", Icons.Filled.Person) {
                 if (state.accounts.isEmpty()) {
@@ -13856,6 +13869,22 @@ private fun SettingsCard(title: String, icon: ImageVector? = null, content: @Com
     Card(
         Modifier
             .fillMaxWidth()
+            // The inter-card gap lives HERE, inside the card, and not as the parent
+            // Column's `Arrangement.spacedBy`. That is not a style preference, it is the
+            // fix for the Advanced->Simple collapse leaving gaps behind.
+            //
+            // spacedBy inserts its spacing between EVERY pair of children regardless of
+            // their height, so each of the seven advanced sections -- an AnimatedVisibility
+            // shrunk all the way to zero height -- still contributed a full 10dp. Up to
+            // 70dp of gap between cards that were no longer there, held for the whole
+            // (deliberately slow) shrink, and then removed in one frame when the nodes left
+            // composition. That is the "extra space between the cards, then it snaps".
+            //
+            // As the card's own bottom padding it is part of the content AnimatedVisibility
+            // measures, so it shrinks with the card instead of outliving it. Before
+            // dropShadow in the chain, so the shadow still draws inside the gap rather than
+            // being inset by it.
+            .padding(bottom = SettingsCardGap)
             // The same shadow and optional rim every pebble in the app gets.
             // Settings was the one screen whose cards were bare Material
             // Cards -- flat, cornered differently from everything else, with
