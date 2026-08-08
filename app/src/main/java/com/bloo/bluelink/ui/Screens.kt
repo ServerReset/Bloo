@@ -321,6 +321,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -5641,37 +5642,17 @@ private fun ChargeFuelBar(
     drivingLabel: String? = null,
     metric: Boolean = false,
 ) {
-    // There IS a second density again ([ChargeStatsLine]), but not the `compact` flag this
-    // function used to carry: what it shares with the line is the DERIVATION, not the
-    // layout, so there are no two sets of sizes to keep in sync -- only two arrangements of
-    // one [ChargeReadout].
-    val data = chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric)
-    Column {
-        ChargeStatsBlock(data)
-        // Plug-in hybrid: surface the fuel tank too.
-        data.fuelPct?.let { fuelPct ->
-            Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Filled.LocalGasStation,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "Fuel $fuelPct%",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        ChargeSegmentBar(
-            frac = animatedChargeFrac(data.frac),
-            limitPct = data.limitPct,
-        )
-    }
+    // Now literally [HeroMorphReadout] held at its expanded end. There is ONE readout
+    // implementation in the app, and every surface that shows this -- the hero on the phone,
+    // the flip cover's tile, the EV Charge pebble -- renders that same one.
+    //
+    // This function had grown a near-duplicate of it: a ChargeStatsBlock with the same Row,
+    // the same weighted spacer, the same two RollingNumbers at the same two type steps, then
+    // the same fuel row and the same bar. Two implementations of one readout is how the
+    // collapsed bar ended up silently dropping the charge-limit marker the expanded one drew,
+    // and how the morph pass dropped the fuel icon this file had always had. `t = 1f` is a
+    // constant, so nothing here animates -- the morph is inert at its endpoint.
+    HeroMorphReadout(chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric), t = 1f)
 }
 
 /**
@@ -5777,65 +5758,11 @@ private fun animatedChargeFrac(target: Float): Float {
     return frac
 }
 
-/**
- * The readout at full density: percentage at display scale, range and state stacked
- * to its right. What the expanded hero (and the cover tile, and the charge pebble)
- * shows.
- *
- * Every text in here is capped to ONE line, which matters mid-flight rather than at rest:
- * the hero hands this block to `sharedBounds` with `RemeasureToBounds`, so on its way out to
- * the collapsed header it is measured into a progressively narrower box. Uncapped, a
- * `displayMedium` percentage would wrap onto two lines on the way. Clipping is the right
- * failure for a node that is fading away; reflowing is not.
- *
- * The two [RollingNumber]s get that for free -- `uicommon.WiggleText` already defaults to
- * `maxLines = 1` -- so only the state line, a plain [Text], had to say so itself.
- */
-@Composable
-private fun ChargeStatsBlock(
-    data: ChargeReadout,
-    modifier: Modifier = Modifier,
-) {
-    Row(modifier, verticalAlignment = Alignment.Bottom) {
-        // Roll the headline number when it changes.
-        // The charge/fuel percentage is the single most-glanced number in the
-        // app, so it carries the hero at display scale; range and state read
-        // as its supporting column rather than competing with it.
-        RollingNumber(
-            text = data.pctText,
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.weight(1f))
-        Column(horizontalAlignment = Alignment.End) {
-            RollingNumber(
-                text = data.rangeText ?: "--",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            val animatedStatusColor by androidx.compose.animation.animateColorAsState(
-                data.statusColor, animationSpec = tween(300), label = "statusLineColor",
-            )
-            AnimatedContent(
-                targetState = data.statusLine,
-                transitionSpec = {
-                    (fadeIn(tween(180)) + slideInVertically { it / 2 }) togetherWith
-                    (fadeOut(tween(120)) + slideOutVertically { -it / 2 })
-                },
-                label = "statusLine",
-            ) { line ->
-                Text(
-                    line,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = animatedStatusColor,
-                    fontWeight = if (data.emphasizeStatus) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            }
-        }
-    }
-}
+// ChargeStatsBlock was deleted here. It was the expanded-density readout, and it had become
+// a near-duplicate of HeroMorphReadout's t = 1 end: the same Row, the same weighted spacer,
+// the same two RollingNumbers at the same two type steps. ChargeFuelBar now calls
+// HeroMorphReadout directly, so there is exactly ONE readout implementation serving the
+// phone hero, the flip cover's tile and the EV Charge pebble.
 
 // ChargeStatsLine was deleted here. It drew the collapsed one-line copy of the
 // percentage and range for the hero's title row, and there is no collapsed copy any
@@ -5890,7 +5817,23 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
     val rangeStyle = lerp(type.labelLarge, type.titleLarge, t)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t))) {
         Row(verticalAlignment = Alignment.Bottom) {
-            RollingNumber(data.pctText, pctStyle, FontWeight.Bold)
+            // Collapsed there is no room for the state line below, so the PERCENTAGE carries
+            // the charging cue by taking the charge colour, and fades back to normal content
+            // colour as the card opens -- by which point the explicit
+            // "Charging · 25 min · DC" line has taken the job over.
+            //
+            // This is a regression I introduced with the morph and then found: the old
+            // collapsed ChargeStatsLine appended " · Charging", and gating the state line on
+            // `t > 0` removed the only way to tell a charging car from a parked one without
+            // opening the card. A colour costs no height, which is what the collapsed density
+            // has none of.
+            val contentColor = LocalContentColor.current
+            RollingNumber(
+                data.pctText,
+                pctStyle,
+                FontWeight.Bold,
+                if (data.charging) lerp(ChargeGreen, contentColor, t) else contentColor,
+            )
             // Collapsed, the two numbers sit side by side as a status line; expanded, the
             // percentage carries the card and the range moves to its own column on the right.
             // One lerped weight does both, so there is no arrangement to switch between.
@@ -5914,14 +5857,25 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
                 }
             }
         }
-        // Plug-in hybrid's fuel line: expanded only, same reasoning as the state line.
+        // Plug-in hybrid's fuel tank: expanded only, same reasoning as the state line. Fades
+        // in over the back half of the morph so it does not compete with the numbers growing.
+        //
+        // The pump icon is here because dropping it was a second regression in my first pass
+        // at this morph -- ChargeFuelBar has always drawn one, and "Fuel 40%" on its own reads
+        // as another battery figure in a card that is otherwise all battery.
         data.fuelPct?.takeIf { t > 0.5f }?.let { fuelPct ->
-            Text(
-                "Fuel $fuelPct%",
-                style = type.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = (t - 0.5f) * 2f),
-                maxLines = 1,
-            )
+            val fuelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                .copy(alpha = ((t - 0.5f) * 2f).coerceIn(0f, 1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.LocalGasStation,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = fuelColor,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("Fuel $fuelPct%", style = type.bodyMedium, color = fuelColor, maxLines = 1)
+            }
         }
         ChargeSegmentBar(frac = animatedChargeFrac(data.frac), limitPct = data.limitPct)
     }
