@@ -3208,17 +3208,19 @@ private fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // compositions and widens any state emission that DOES change
                         // UiState from ~3 pages to ~5.
                         //
-                        // This used to say "because UiState is unstable" and name
-                        // ReorderColumn's dragHandle as the blocker for making pebbles
-                        // skippable. Both halves are now done: UiState is @Immutable,
-                        // AppViewModel/Appearance/NotificationPrefs are @Stable,
-                        // compose-stability.conf covers the `data` package, and the
-                        // per-item drag Modifier is remembered (see ReorderColumn.handle).
-                        // Skippability is all-or-nothing per call site, so that last
-                        // unstable parameter was undoing all the rest; with it fixed a
-                        // pebble skips whenever the UiState it is handed compares equal.
-                        // currentIndex already lives outside UiState, so a plain
-                        // car-switch settle should now change nothing a pebble reads.
+                        // This used to say "because UiState is unstable". It is not: it is
+                        // @Immutable, as are Appearance/NotificationPrefs, AppViewModel is
+                        // @Stable, and compose-stability.conf covers the `data` package.
+                        //
+                        // The REAL remaining cost is the opposite of instability. Because
+                        // UiState is @Immutable it is diffed with its generated equals(),
+                        // which compares every field -- so any one changed field makes the
+                        // whole object unequal and every pebble taking it whole recomposes.
+                        // Do NOT "fix" that by dropping @Immutable: an unstable object is
+                        // compared by reference instead, which is strictly less permissive.
+                        // The fix is to pass pebbles narrower parameters than the whole
+                        // UiState. currentIndex already lives outside it, so a plain
+                        // car-switch settle should change nothing a pebble reads.
                         beyondViewportPageCount = 1,
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
@@ -6320,17 +6322,29 @@ private fun <T> ReorderColumn(
                         .onSizeChanged { heights[k] = it.height },
                 ) {
                     val handleCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-                    // REMEMBERED, and that is the point of this whole block.
+                    // REMEMBERED, so this is ONE instance for the item's lifetime.
                     //
-                    // Every pebble in the app takes this as a `dragHandle: Modifier`
-                    // parameter. Built inline, the chain below is a NEW instance on every
-                    // recomposition -- three un-remembered lambdas -- so `dragHandle` was
-                    // never `==` to its previous value and NO pebble could ever skip,
-                    // however stable everything else it was handed. That is why marking
-                    // UiState @Immutable and adding compose-stability.conf for the `data`
-                    // package did not produce the skipping they were supposed to: this one
-                    // parameter re-invalidated all ~30 of them anyway. The car-pager comment
-                    // has named it as the blocker for a while; this is it removed.
+                    // Every pebble takes this as a `dragHandle: Modifier`. Built inline, the
+                    // chain below is rebuilt on every recomposition, and a child can only skip
+                    // if its arguments compare equal -- so a fresh chain means a changed
+                    // argument. `Modifier` is a @Stable type, so it is compared with equals(),
+                    // and each element's equals() compares its lambda by reference.
+                    //
+                    // ⚠ HONEST CAVEAT, because I first wrote this comment claiming more than
+                    // it can. The reasoning I used -- "one unstable parameter makes the whole
+                    // composable non-skippable" -- is PRE-strong-skipping framing and is
+                    // outdated on this toolchain. Strong skipping has been the default since
+                    // Kotlin 2.0.20 and this project is on 2.2.20: an unstable parameter no
+                    // longer blocks skipping, it is just compared by reference instead of
+                    // equals(). Worse for my claim, Kotlin 2.0.20+ also auto-remembers lambdas
+                    // declared inside a composable, keyed on their captures -- so the three
+                    // lambdas below may well have been memoized already, making this remember
+                    // belt-and-braces rather than the unlock the commit said it was.
+                    //
+                    // Kept anyway: one remembered instance is strictly stronger than relying
+                    // on per-lambda auto-remember plus every element's equals(), and it costs
+                    // nothing. But do NOT treat this as the reason pebbles now skip. The
+                    // measured lever is passing narrower parameters than the whole UiState.
                     //
                     // Safe to remember despite the captures: `order`, `offsetY`,
                     // `draggingKey` and `heights` are all delegated/remembered snapshot
