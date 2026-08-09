@@ -1164,6 +1164,7 @@ class CarWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.fillMaxWidth(),
                     minRowWidth = MEDIUM_SQUARE_ROW_WIDTH,
                     ringWidth = ringEdge,
+                    frame = render.frame(LocalSize.current),
                     ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
                     // hideFields drops PERCENT: RingImage's own centerText
                     // already bakes "82%" into the ring beside this stack, so a
@@ -1455,6 +1456,7 @@ class CarWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.fillMaxWidth(),
                 minRowWidth = LARGE_SQUARE_ROW_WIDTH,
                 ringWidth = ringEdge,
+                frame = render.frame(LocalSize.current),
                 ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -1675,6 +1677,7 @@ class CarWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.fillMaxWidth(),
                 minRowWidth = XL_SQUARE_ROW_WIDTH,
                 ringWidth = ringEdge,
+                frame = render.frame(LocalSize.current),
                 ring = {
                     if (render.config.showRing && car.percent != null) {
                         RingImage(car, render, edgeDp = ringEdge.value.toInt())
@@ -2373,23 +2376,41 @@ class CarWidget : GlanceAppWidget() {
         modifier: GlanceModifier,
         minRowWidth: Dp,
         ringWidth: Dp,
+        /** Needed for [Scale.innerWidth] -- the padded content box, which is what `content`
+         *  actually gets. Cannot be derived from LocalSize alone: rootPadding depends on the
+         *  frame's pill corner. */
+        frame: Scale.Frame,
         ring: @Composable () -> Unit,
         content: @Composable (Dp) -> Unit,
     ) {
+        // TWO widths, deliberately, and they are not interchangeable.
+        //
+        // `tileWidth` is the raw tile and stays the BRANCH test: minRowWidth was tuned against
+        // the raw width, so testing the padded width instead would silently flip the row/column
+        // choice on every tile sitting near the threshold -- a layout change dressed up as a bug
+        // fix.
+        //
+        // `inner` is the padded content box, and it is what `content` is handed. That was the
+        // bug: content received the raw width, so a label was judged against space the root
+        // padding had already taken. This function's own KDoc states the requirement -- "needs
+        // that real number to decide whether its own text/buttons fit, because measuring against
+        // the full tile width would let a label sail past the wrap threshold and get clipped in a
+        // column half that wide" -- and the code handed over the full tile width.
         val tileWidth = LocalSize.current.width
+        val inner = Scale.innerWidth(frame)
         if (tileWidth >= minRowWidth) {
             Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) { ring() }
                 Spacer(GlanceModifier.width(12.dp))
                 Column(modifier = GlanceModifier.defaultWeight()) {
-                    content((tileWidth - ringWidth - 12.dp).coerceAtLeast(24.dp))
+                    content((inner - ringWidth - 12.dp).coerceAtLeast(24.dp))
                 }
             }
         } else {
             Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
                 ring()
                 Spacer(GlanceModifier.height(8.dp))
-                content(tileWidth)
+                content(inner)
             }
         }
     }
