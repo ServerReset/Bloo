@@ -64,6 +64,18 @@ internal val PebbleCornerExpanded = 20.dp
 /** The charge bar's height, and the limit marker's diameter, shared by every surface that
  *  draws this bar so the proportions read as one component rather than five near-misses. */
 internal val ChargeBarHeight = 18.dp
+
+/**
+ * Gap between the hero's collapsed readout and the bottom edge of its card.
+ *
+ * Named because it is needed in TWO places that must agree: the readout's own bottom padding,
+ * and the height the header reserves so its title does not sit on top of the readout. When it
+ * was a bare `6.dp` at the padding site only, the reservation accounted for the readout's
+ * content but not for this inset, so the reserved space was one gap short of what the node
+ * actually occupies. Two copies of a spatial constant is how this slot has gone wrong every
+ * previous time; one name means the reservation cannot drift from the thing it reserves for.
+ */
+internal val HeroReadoutBottomInset = 6.dp
 internal val ChargeLimitDotSize = 14.dp
 
 /** Gap between settings cards. Lives inside SettingsCard as bottom padding rather than in

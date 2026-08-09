@@ -5187,18 +5187,22 @@ private fun HeroHeader(
                         //  end    the chevron is ~48dp inside the row's own 16dp padding, so
                         //         76dp leaves it clear with a small optical gap. This was 64dp,
                         //         which is why the bar ran under the chevron.
-                        //  bottom the header is exactly PebbleHeaderHeight (76dp): title (24)
-                        //         + the bar row in headerContent + 12 of vertical padding.
-                        //         Content
-                        //         is centre-aligned, so the title occupies y 6..30 and the
-                        //         reserve y 30..70. This node is 40dp tall, so bottom = 6
-                        //         puts its top at 76 - 6 - 40 = 30 -- the reserve's top edge,
-                        //         exactly. It was 10dp, i.e. 4dp high, which is precisely the
-                        //         overlap with the title.
+                        //  bottom  Derived, not tuned. The readout is bottom-anchored in the
+                        //          card's Box, and the header reserves
+                        //          collapsedReadoutHeight + HeroReadoutBottomInset for it, so
+                        //          the two line up by construction rather than by a pixel budget
+                        //          that has to be re-checked whenever the type changes.
+                        //
+                        //          The comment removed from here did a hand arithmetic proof
+                        //          ("title occupies y 6..30 and the reserve y 30..70, this node
+                        //          is 40dp tall") against a 40dp reserve. The code beside it
+                        //          reserved 4.dp + ChargeBarHeight = 22dp. Whichever was once
+                        //          true, they had stopped agreeing, which is exactly the failure
+                        //          a derived value removes.
                         .padding(
                             start = lerp(46.dp, 16.dp, heroT),
                             end = lerp(76.dp, 16.dp, heroT),
-                            bottom = lerp(6.dp, 16.dp, heroT),
+                            bottom = lerp(HeroReadoutBottomInset, 16.dp, heroT),
                         ),
                 ) {
                     HeroMorphReadout(readout, heroT)
@@ -5278,7 +5282,11 @@ private fun HeroHeader(
                 val collapsedReadoutHeight = with(LocalDensity.current) {
                     MaterialTheme.typography.titleMedium.lineHeight.toDp() + 2.dp + ChargeBarHeight
                 }
-                val h = lerp(4.dp + collapsedReadoutHeight, 0.dp, heroT)
+                // + the readout's own bottom inset. The readout occupies
+                // collapsedReadoutHeight of CONTENT and then sits HeroReadoutBottomInset above
+                // the card's edge, so reserving only the content left the reservation one gap
+                // short and the readout's top edge crossed into the title's row.
+                val h = lerp(collapsedReadoutHeight + HeroReadoutBottomInset, 0.dp, heroT)
                 // No graphicsLayer: there is nothing here to fade any more. An alpha on an
                 // empty Box is a layer allocation per frame for no pixels.
                 Spacer(Modifier.fillMaxWidth().height(h))
