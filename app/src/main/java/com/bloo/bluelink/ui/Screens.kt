@@ -5986,18 +5986,19 @@ private fun HeroMorphReadout(
                 FontWeight.Bold,
                 if (data.charging) lerp(ChargeGreen, contentColor, t) else contentColor,
             )
-            // The 8dp is the word space between the two numbers when collapsed.
-            Spacer(Modifier.width(8.dp))
-            // The weighted spacer only EXISTS once the card starts opening, and that is the fix
-            // for the range sitting far right while collapsed. A weight of 0.001f is not "almost
-            // nothing" -- it was the Row's only weighted child, so it absorbed ALL the remaining
-            // width regardless of how small the number was, and pushed the range to the far edge.
-            // Weight is a share of the leftover, not a length.
+            // ONE lerped gap, and NO weighted spacer. This is the third arrangement here and the
+            // reason the previous two failed is the same fact both times: a weighted child takes
+            // ALL the leftover width, however small its weight. So `weight(0.001f + t)` pinned the
+            // range to the far edge at rest, and gating it on `t > 0.02f` merely moved the problem
+            // -- the range stayed right-aligned the whole way down and then SNAPPED left the frame
+            // the spacer stopped existing. That is the "goes to the right side then snaps to the
+            // left" on collapse: not an animation that needed tuning, a child appearing and
+            // disappearing.
             //
-            // Omitted entirely at rest, so the Row packs its three items together next to the
-            // name. The threshold is low enough that the spacer appears with a near-zero share
-            // and grows from there, so nothing jumps when it arrives.
-            if (t > 0.02f) Spacer(Modifier.weight(t))
+            // A fixed width cannot do that. The two numbers stay adjacent in BOTH states and the
+            // space between them just breathes a little as the card opens, so there is no
+            // arrangement change left to be discontinuous.
+            Spacer(Modifier.width(lerp(8.dp, 14.dp, t)))
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
                 // Height LERPED rather than the node being dropped, which is what made the
