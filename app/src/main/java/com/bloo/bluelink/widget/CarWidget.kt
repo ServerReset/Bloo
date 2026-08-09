@@ -2578,8 +2578,22 @@ class CarWidget : GlanceAppWidget() {
             // 44sp number directly above it. The sub-line's job here is to say
             // what primaryValue's version of this layout couldn't fit -- whose
             // car it is, and how far it goes.
+            // The NAME is gated on showNameFallback too, which it was not before. That flag
+            // was added for the fallback path above -- the no-room-for-a-hero case -- and this
+            // sub-line, on the path where the hero number DID fit, kept printing the name
+            // unconditionally. So LargeWideLayout/XlWideLayout drew "Lanas Whip" in their own
+            // HeaderRow and then "Lanas Whip · 246 mi" again directly under the big number:
+            // exactly the duplication the flag was introduced to stop, on the sibling branch it
+            // never reached.
+            //
+            // The RANGE stays either way. The hero number says the percentage and nothing else,
+            // so the range is the one thing here that is not already on screen -- and unlike the
+            // name it is not something the header draws. (An InfoStack row CAN be configured to
+            // show range as well, but those fields are user-chosen from ten options, so dropping
+            // it here unconditionally would remove information on every tile that has not opted
+            // into that row.)
             val sub = listOfNotNull(
-                car.name.takeIf { it.isNotBlank() },
+                car.name.takeIf { it.isNotBlank() && showNameFallback },
                 car.rangeMi?.let { formatDistance(it.toDouble(), render.metric) },
             ).joinToString(" · ").takeIf { showSub && it.isNotBlank() }
             if (sub != null) {
