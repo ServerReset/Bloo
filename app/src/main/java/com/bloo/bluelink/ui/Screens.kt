@@ -297,6 +297,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
@@ -5223,16 +5224,11 @@ private fun HeroHeader(
                         // Collapsed, the numbers start after the name; expanded, they own the
                         // left edge. Only this Row shifts -- the bar underneath does not.
                         numbersStart = lerp(
-                            // titleWidthPx is measured at headlineSmall, because PebbleShell now
-                            // draws the name at that size and SCALES it down. The name's visible
-                            // width when collapsed is therefore width * that same ratio, and both
-                            // sides derive the ratio from the same two type steps rather than
-                            // agreeing on a constant.
-                            with(LocalDensity.current) {
-                                val ratio = MaterialTheme.typography.titleMedium.fontSize.toPx() /
-                                    MaterialTheme.typography.headlineSmall.fontSize.toPx()
-                                (titleWidthPx * ratio).toDp()
-                            } + 10.dp,
+                            // NO ratio applied here any more. PebbleShell now reports the title's
+                            // DRAWN width (its layout modifier reports the scaled size), so this is
+                            // already the visible width of the name. Multiplying by the ratio a
+                            // second time would place the numbers a third of a name too far left.
+                            with(LocalDensity.current) { titleWidthPx.toDp() } + 10.dp,
                             0.dp,
                             heroT,
                         ),
@@ -8645,10 +8641,28 @@ internal fun PebbleShell(
                                 title,
                                 modifier = Modifier
                                     .weight(1f, fill = false)
-                                    // Reports the width at headlineSmall; the DRAWN width is that
-                                    // times titleScale. The hero applies the same ratio when it
-                                    // offsets its numbers, so both derive from one measurement.
+                                    // Reports the DRAWN size, which is what everything outside
+                                    // needs. graphicsLayer scales the drawing and leaves the
+                                    // measured size alone, so without this the title's box stayed
+                                    // headline-TALL while its glyphs were title-sized: the name
+                                    // floated high in an over-tall row while the hero's readout
+                                    // stayed bottom-anchored to the card, and the numbers sat
+                                    // below the name's line instead of on it.
+                                    //
+                                    // Measure once at headlineSmall, then report width and height
+                                    // multiplied by the same scale the layer draws with, and place
+                                    // the (still full-size) content centred on that smaller box so
+                                    // scaling about its left-centre keeps the glyphs where the box
+                                    // says they are.
                                     .onSizeChanged { onTitleWidth?.invoke(it.width) }
+                                    .layout { measurable, constraints ->
+                                        val placeable = measurable.measure(constraints)
+                                        val w = (placeable.width * titleScale).roundToInt()
+                                        val h = (placeable.height * titleScale).roundToInt()
+                                        layout(w, h) {
+                                            placeable.place(0, (h - placeable.height) / 2)
+                                        }
+                                    }
                                     .graphicsLayer {
                                         scaleX = titleScale
                                         scaleY = titleScale
