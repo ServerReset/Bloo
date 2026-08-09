@@ -5101,6 +5101,10 @@ private fun HeroHeader(
             title = v.name,
             vm = vm,
             dragHandle = dragHandle,
+            // The ONLY pebble that grows its title. Here the title is the car's NAME and the
+            // card becomes a photo of that car, so the name scaling up reads as the card taking
+            // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.
+            growTitleOnExpand = true,
             // No `summary` string. The bar below IS the summary now, and it is the real
             // one -- restating "82% - 241 mi" as header text beside a bar showing the same
             // thing is how the same numbers get rendered twice and then drift, which is a
@@ -8391,6 +8395,22 @@ internal fun PebbleShell(
      * Null for every other pebble.
      */
     headerContent: (@Composable () -> Unit)? = null,
+    /**
+     * Whether the TITLE grows when this pebble expands.
+     *
+     * False for every pebble but the hero, and that is the point. The growth used to be
+     * unconditional, so "Location", "Weather", "Diagnostics" and the rest all swelled from
+     * titleMedium to headlineSmall on expand. On the hero it reads as the car's name taking
+     * over the card it now fills; on a utility pebble it is just a heading changing size for
+     * no reason, four of them doing it at once, and it fights the body content appearing
+     * underneath.
+     *
+     * Also the only one where the cost is justified: the growth lerps a real font size, so
+     * every frame misses the SINGLE-SLOT ParagraphLayoutCache and re-lays the text out. One
+     * node doing that on one card is affordable; making it the default charged every pebble
+     * for an effect only one of them wanted.
+     */
+    growTitleOnExpand: Boolean = false,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     headerAction: PebbleHeaderAction? = null,
     forceExpanded: Boolean = false,
@@ -8552,19 +8572,27 @@ internal fun PebbleShell(
                             // read as motion instead of steps. Both halves matter: bounce with
                             // a fast spring is still steppy, and a slow spring without bounce
                             // is just a slower version of the same flat move.
+                            // Only animates for the pebble that asked (the hero). For the
+                            // rest the target is a constant 0, so the spring never leaves its
+                            // resting value, titleStyle stays titleMedium, and the per-frame
+                            // font-size relayout never happens at all.
                             val headerT by animateFloatAsState(
-                                targetValue = if (expanded) 1f else 0f,
+                                targetValue = if (expanded && growTitleOnExpand) 1f else 0f,
                                 animationSpec = spring(
                                     dampingRatio = 0.62f,
                                     stiffness = Spring.StiffnessVeryLow,
                                 ),
                                 label = "pebbleHeaderGrow",
                             )
-                            val titleStyle = lerp(
-                                MaterialTheme.typography.titleMedium,
-                                MaterialTheme.typography.headlineSmall,
-                                headerT,
-                            )
+                            val titleStyle = if (!growTitleOnExpand) {
+                                MaterialTheme.typography.titleMedium
+                            } else {
+                                lerp(
+                                    MaterialTheme.typography.titleMedium,
+                                    MaterialTheme.typography.headlineSmall,
+                                    headerT,
+                                )
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 title,
