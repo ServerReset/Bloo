@@ -1393,7 +1393,12 @@ class SettingsStore(private val context: Context) {
             val prefsSnapshot = context.settingsDataStore.data.first()
             val prefsMap: Map<String, Any> = prefsSnapshot.asMap().entries.associate { it.key.name to it.value }
             val photos = encodeSyncPhotos(prefsSnapshot).mapValues { it.value.content }
-            val localHash = SyncMerge.portableContentHash(prefsMap, uploadedDirtyKeys, photos)
+            // ONE set, used by both the hash and the body -- see portableContentHash's param
+            // doc for why passing it to only one of them corrupts the change gate.
+            val carriedTombstones = remoteJson?.let { SyncMerge.parseRemoved(it) } ?: emptySet()
+            val localHash = SyncMerge.portableContentHash(
+                prefsMap, uploadedDirtyKeys, photos, priorRemoved = carriedTombstones,
+            )
             val self = selfSyncDevice(now)
             outcomeDevices = SyncMerge.mergeDevices(remoteMeta?.devices ?: emptyList(), self, now)
             val driveBody = SyncMerge.buildExportForDrive(
@@ -1406,6 +1411,18 @@ class SettingsStore(private val context: Context) {
                 knownDevices = remoteMeta?.devices ?: emptyList(),
                 nowMs = now,
                 fileId = resolvedFileId,
+                // Carry the remote file's OWN tombstones forward. Without this a `_removed`
+                // entry lived for exactly one upload: it is derived from the dirty set, and
+                // clearDirtyKeys empties that on success, so the next push -- any unrelated edit,
+                // ~2s later -- rebuilt the body without it. A peer that had not synced inside
+                // that single window still held the deleted key, re-uploaded it, and the deletion
+                // was undone on the device that made it.
+                //
+                // Read straight from remoteJson rather than through parseBackup, because this
+                // runs on the UPLOAD half, which happens even when the import half was skipped
+                // (nothing newer, or an unreadable prefs block) -- exactly the passes that still
+                // have to keep republishing the tombstone.
+                priorRemoved = carriedTombstones,
             )
             val body = "$now\n$driveBody"
             uploaded = runCatching {

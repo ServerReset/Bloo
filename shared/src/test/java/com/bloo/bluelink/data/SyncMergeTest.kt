@@ -193,6 +193,85 @@ class SyncMergeTest {
         assertEquals("freshValue", plan.stringPuts["readded"])
     }
 
+    // --- Tombstone DURABILITY: the missed-window peer ---
+    //
+    // The bug these pin: `_removed` was derived only from the uploading device's CURRENT dirty
+    // set, and clearDirtyKeys empties that on every successful upload. So a tombstone existed in
+    // the Drive file for exactly ONE upload. Any peer that did not sync inside that single window
+    // never learned about the deletion, kept the key, and re-uploaded it -- resurrecting a
+    // deleted plate/photo/preset on the device that deleted it.
+    //
+    // The durable behaviour is: an export carries forward the tombstones already in the remote
+    // file, so a deletion keeps being advertised until every peer has dropped the key.
+
+    // 6a. A tombstone survives an upload that has NO dirty keys of its own. This is the exact
+    //     case that lost deletions: the second push after a delete, triggered by any unrelated
+    //     edit, rebuilt the body from an empty dirty set and silently omitted `_removed`.
+    @Test
+    fun priorTombstoneSurvivesAnUploadWithNoDirtyKeys() {
+        val json = SyncMerge.buildExport(
+            prefs = mapOf("kept" to "value"),
+            dirtyKeys = emptySet(),
+            priorRemoved = setOf("weather_lat", "weather_lon"),
+        )
+        val plan = assertNotNull(SyncMerge.parseBackup(json))
+        assertTrue(plan.removes.contains("weather_lat"), "carried-forward tombstone was dropped")
+        assertTrue(plan.removes.contains("weather_lon"), "carried-forward tombstone was dropped")
+        assertEquals("value", plan.stringPuts["kept"])
+    }
+
+    // 6b. Carrying tombstones forward must not make a deletion permanent. A key the user SET
+    //     again is present in prefs, so it must win over its own stale tombstone -- otherwise
+    //     re-adding a plate on any device would be undone on the next sync, forever.
+    @Test
+    fun priorTombstoneYieldsToAKeyThatCameBack() {
+        val json = SyncMerge.buildExport(
+            prefs = mapOf("plate_VIN1" to "ABC 123"),
+            dirtyKeys = setOf("plate_VIN1"),
+            priorRemoved = setOf("plate_VIN1"),
+        )
+        val plan = assertNotNull(SyncMerge.parseBackup(json))
+        assertFalse(plan.removes.contains("plate_VIN1"), "a re-added key must not stay tombstoned")
+        assertEquals("ABC 123", plan.stringPuts["plate_VIN1"])
+    }
+
+    // 6c. Device-local keys can never travel, including via a carried-forward tombstone -- a
+    //     hand-edited or version-skewed file must not be able to smuggle one in this way.
+    @Test
+    fun priorTombstoneNeverCarriesDeviceLocalKeys() {
+        val json = SyncMerge.buildExport(
+            prefs = mapOf("kept" to "value"),
+            dirtyKeys = emptySet(),
+            priorRemoved = setOf("sync_uri", "sync_dirty_keys", "last_vehicle_vin", "portable_one"),
+        )
+        val plan = assertNotNull(SyncMerge.parseBackup(json))
+        assertFalse(plan.removes.contains("sync_uri"))
+        assertFalse(plan.removes.contains("sync_dirty_keys"))
+        assertFalse(plan.removes.contains("last_vehicle_vin"))
+        assertTrue(plan.removes.contains("portable_one"), "a portable carried tombstone should survive")
+    }
+
+    // 6d. The Drive export carries them too, not just the portable one -- performDriveSync uses
+    //     buildExportForDrive, so a fix that only reached buildExport would fix nothing in
+    //     practice.
+    @Test
+    fun driveExportAlsoCarriesPriorTombstones() {
+        val json = SyncMerge.buildExportForDrive(
+            prefs = mapOf("kept" to "value"),
+            dirtyKeys = emptySet(),
+            photos = emptyMap(),
+            hash = "h",
+            primaryDeviceId = null,
+            selfDevice = dev,
+            knownDevices = emptyList(),
+            nowMs = 5000L,
+            fileId = "file-1",
+            priorRemoved = setOf("svc_last_VIN1"),
+        )
+        val plan = assertNotNull(SyncMerge.parseBackup(json))
+        assertTrue(plan.removes.contains("svc_last_VIN1"))
+    }
+
     // --- Content-hash gate + device registry (the two-device convergence fix) ---
 
     private val dev = SyncMerge.SyncDevice(id = "uuid-A", name = "Adi's S24", model = "SM-S921", appVersion = "1.0", lastSeenMs = 1000L)

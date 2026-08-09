@@ -203,10 +203,31 @@ object SyncMerge {
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
         photos: Map<String, String>,
+        priorRemoved: Set<String>,
         extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit,
     ): JsonObject {
         val entries = portablePrefsObject(prefs)
-        val removed = tombstones(prefs, dirtyKeys)
+        // Local tombstones UNIONED with the ones already in the remote file.
+        //
+        // Without the union a tombstone lived for exactly ONE upload. `tombstones()` reads the
+        // current dirty set, and a successful upload clears it -- so the very next push, triggered
+        // by any unrelated edit, rebuilt the body from an empty dirty set and omitted `_removed`
+        // entirely. Any peer that had not synced inside that single window still held the key,
+        // re-uploaded it, and the deletion was undone on the device that made it. Plates, car
+        // photos, service history, weather location, climate presets: every setter that REMOVES a
+        // key rather than blanking it.
+        //
+        // Filtered so carrying forward cannot make a deletion permanent or smuggle a local key:
+        //  - a key PRESENT in prefs wins over its own stale tombstone, so re-adding a value works
+        //    (otherwise re-setting a plate would be undone on the next sync, forever);
+        //  - device-local keys can never travel, even via a hand-edited `_removed`.
+        //
+        // Known tradeoff, stated rather than hidden: the tombstone set grows with the number of
+        // keys ever deleted and has no TTL. Trimming it needs a per-tombstone timestamp, which
+        // this format has nowhere to put, and an unbounded-but-tiny list of dead key NAMES is a
+        // far better failure than resurrecting a user's deleted data.
+        val removed = (tombstones(prefs, dirtyKeys) + priorRemoved)
+            .filterNotTo(LinkedHashSet()) { it in prefs.keys || isDeviceLocal(it) }
         return buildJsonObject {
             put("_format", JsonPrimitive("bloo-settings"))
             put("_version", JsonPrimitive(BACKUP_VERSION))
@@ -224,8 +245,17 @@ object SyncMerge {
      * `prefs`/`photos`/`_removed` only, no device metadata. Used by the manual
      * share-to-file feature and as the content [portableContentHash] hashes.
      */
-    fun buildExport(prefs: Map<String, Any>, dirtyKeys: Set<String>, photos: Map<String, String> = emptyMap()): String =
-        backupJson.encodeToString(JsonObject.serializer(), buildRoot(prefs, dirtyKeys, photos) {})
+    fun buildExport(
+        prefs: Map<String, Any>,
+        dirtyKeys: Set<String>,
+        photos: Map<String, String> = emptyMap(),
+        /** Tombstones already advertised by the file being replaced -- see [buildRoot]. */
+        priorRemoved: Set<String> = emptySet(),
+    ): String =
+        backupJson.encodeToString(
+            JsonObject.serializer(),
+            buildRoot(prefs, dirtyKeys, photos, priorRemoved) {},
+        )
 
     /**
      * The **Drive** export: the portable content plus the Drive-sync-only metadata.
@@ -247,9 +277,12 @@ object SyncMerge {
         // the SAME File ID for one Drive file (a per-device SAF URI can't). The
         // caller passes the remote file's id if present, else a freshly-minted one.
         fileId: String,
+        /** Tombstones already advertised by the remote file, carried forward so a deletion
+         *  survives longer than one upload -- see [buildRoot]. */
+        priorRemoved: Set<String> = emptySet(),
     ): String {
         val devices = mergeDevices(knownDevices, selfDevice, nowMs)
-        val root = buildRoot(prefs, dirtyKeys, photos) {
+        val root = buildRoot(prefs, dirtyKeys, photos, priorRemoved) {
             put("_hash", JsonPrimitive(hash))
             put("_fileId", JsonPrimitive(fileId))
             if (primaryDeviceId != null) put("_primaryDeviceId", JsonPrimitive(primaryDeviceId))
@@ -287,6 +320,12 @@ object SyncMerge {
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
         photos: Map<String, String> = emptyMap(),
+        /** Must be the SAME set passed to [buildExportForDrive]. The hash is documented as being
+         *  computed over the exact content uploaded, and `_removed` is part of that content -- so
+         *  once tombstones are carried forward, omitting them here would leave `_hash` describing
+         *  a file that no longer exists. Callers that pass one and not the other break the
+         *  invariant silently. */
+        priorRemoved: Set<String> = emptySet(),
     ): String {
         val us = Char(31) // unit separator: between a key and its value
         val rs = Char(30) // record separator: between entries
@@ -299,7 +338,11 @@ object SyncMerge {
             .sortedBy { it.key }
             .forEach { sb.append(it.key).append(us).append(it.value.toString()).append(rs) }
         sb.append(gs)
-        tombstones(prefs, dirtyKeys).sorted().forEach { sb.append(it).append(rs) }
+        // Same union+filter as buildRoot, so the hash and the body agree by construction.
+        (tombstones(prefs, dirtyKeys) + priorRemoved)
+            .filterNot { it in prefs.keys || isDeviceLocal(it) }
+            .sorted()
+            .forEach { sb.append(it).append(rs) }
         sb.append(gs)
         photos.entries.sortedBy { it.key }.forEach { sb.append(it.key).append(us).append(it.value).append(rs) }
         return sha256Hex(sb.toString())
@@ -368,6 +411,23 @@ object SyncMerge {
      * `_removed` into [MergePlan.removes] — excluding [DEVICE_LOCAL_KEYS] from both
      * puts and removes.
      */
+    /**
+     * Just the `_removed` list from a backup, for carrying tombstones forward.
+     *
+     * Separate from [parseBackup] deliberately: performDriveSync needs this on the UPLOAD half,
+     * which runs even when the import half was skipped (nothing newer, or an unreadable prefs
+     * block). Going through parseBackup would tie the two together and lose the tombstones in
+     * exactly the passes that still have to republish them. Never throws.
+     */
+    fun parseRemoved(json: String): Set<String> = runCatching {
+        val root = backupJson.parseToJsonElement(json) as? JsonObject ?: return emptySet()
+        (root["_removed"] as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+            ?.filterNot { isDeviceLocal(it) }
+            ?.toSet()
+            ?: emptySet()
+    }.getOrDefault(emptySet())
+
     fun parseBackup(json: String): MergePlan? {
         val root = runCatching { backupJson.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
         if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return null
