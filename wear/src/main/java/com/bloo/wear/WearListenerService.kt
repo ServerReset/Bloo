@@ -119,13 +119,24 @@ class WearListenerService : WearableListenerService() {
                         WearSync.PATH_PRESETS -> WearStateWriter.persistPresets(applicationContext, raw)
                         WearSync.PATH_CLIMATE -> WearStateWriter.persistClimate(applicationContext, raw)
                         WearSync.PATH_EXTRAS -> {
-                            WearStateWriter.persistExtras(applicationContext, raw)
-                            // The photos ride in the same item as Assets, whose
-                            // bytes have to be pulled explicitly -- an Asset in
-                            // a DataMap is a handle, not a payload. The VIN list
-                            // comes from the JSON we just persisted, so a car
-                            // removed on the phone stops being fetched here on
-                            // the same beat rather than one publish later.
+                            // ORDER MATTERS, and it is the opposite of what it was.
+                            //
+                            // The photos ride in the same item as Assets, whose bytes have to be
+                            // pulled explicitly -- an Asset in a DataMap is a handle, not a
+                            // payload. The VIN list is decoded from `raw` directly, so it does
+                            // NOT depend on the payload having been persisted first: a car
+                            // removed on the phone still stops being fetched on the same beat.
+                            //
+                            // persistExtras used to run FIRST, and that defeated the only signal
+                            // the UI has that a photo changed. SummaryCard keys its decode on
+                            // `extras.images[vin]`, so persisting the JSON makes the extras flow
+                            // emit and the decode re-run -- at which point ingest has not yet
+                            // written the new bytes, so it decodes the OLD file. Nothing fires
+                            // again once the bytes land, because the key had already changed.
+                            // The watch kept the previous photo until the app was restarted.
+                            //
+                            // Assets first, THEN persist: by the time the UI is told the images
+                            // map changed, the file it is about to read is the new one.
                             val vins = runCatching { WearSync.decodeExtras(raw).images.keys }
                                 .getOrDefault(emptySet())
                             // prune runs even when vins is empty -- removing
@@ -135,6 +146,7 @@ class WearListenerService : WearableListenerService() {
                             // on the watch forever.
                             if (vins.isNotEmpty()) WearPhotoCache.ingest(applicationContext, vins, dataMap)
                             WearPhotoCache.prune(applicationContext, vins)
+                            WearStateWriter.persistExtras(applicationContext, raw)
                         }
                         // Other paths (pebble order, local prefs, AI/aurora
                         // toggles) are published by the watch itself, not the
