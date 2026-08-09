@@ -280,6 +280,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
@@ -5279,9 +5280,14 @@ private fun HeroHeader(
                 // 24.sp survives. Checked rather than assumed, because the failure would be a
                 // crash in the hero rather than a layout being a few dp out. If a future
                 // typography ever sets lineHeight = TextUnit.Unspecified, guard this.
-                val collapsedReadoutHeight = with(LocalDensity.current) {
-                    MaterialTheme.typography.titleMedium.lineHeight.toDp() + 2.dp + ChargeBarHeight
-                }
+                // The BAR only -- deliberately NOT the numbers row above it.
+                //
+                // Reserving the readout's whole height pushed it clear of the title and the
+                // collapsed pill became THREE rows: name / numbers / bar. It must be two: name
+                // and numbers sharing one row, bar underneath. The numbers row is the same
+                // height as the title (both titleMedium), so reserving only what sits BELOW it
+                // lets the bottom-anchored readout land its numbers on the title's own row.
+                val collapsedReadoutHeight = 2.dp + ChargeBarHeight
                 // + the readout's own bottom inset. The readout occupies
                 // collapsedReadoutHeight of CONTENT and then sits HeroReadoutBottomInset above
                 // the card's edge, so reserving only the content left the reservation one gap
@@ -5935,32 +5941,51 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
             // opening the card. A colour costs no height, which is what the collapsed density
             // has none of.
             val contentColor = LocalContentColor.current
+            // Two lerped spacers, and this is what puts the numbers BESIDE the name instead
+            // of under it. Collapsed (t=0) the LEADING spacer takes the row, so the pair packs
+            // to the right of the title; expanded (t=1) the MIDDLE one takes it, so the
+            // percentage carries the left and the range moves to its own column on the right.
+            // Both weights stay positive at every t, so nothing is added or removed from the
+            // Row mid-animation -- the arrangement interpolates instead of switching.
+            Spacer(Modifier.weight(1.001f - t))
             RollingNumber(
                 data.pctText,
                 pctStyle,
                 FontWeight.Bold,
                 if (data.charging) lerp(ChargeGreen, contentColor, t) else contentColor,
             )
-            // Collapsed, the two numbers sit side by side as a status line; expanded, the
-            // percentage carries the card and the range moves to its own column on the right.
-            // One lerped weight does both, so there is no arrangement to switch between.
             Spacer(Modifier.weight(0.001f + t))
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
-                // Only the expanded density has room for the state line, so it fades in rather
-                // than appearing. Not present at all at t = 0, so it reserves no height there.
-                if (t > 0.01f) {
-                    val animatedStatusColor by androidx.compose.animation.animateColorAsState(
-                        data.statusColor, animationSpec = tween(300), label = "statusLineColor",
-                    )
-                    Text(
-                        data.statusLine,
-                        style = type.labelLarge,
-                        color = animatedStatusColor.copy(alpha = t),
-                        fontWeight = if (data.emphasizeStatus) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
+                // Height LERPED rather than the node being dropped, which is what made the
+                // mileage "go to the top and then snap down". This Column is bottom-aligned in
+                // the Row, so its bottom edge is the status line's bottom while the line exists
+                // and the RANGE's bottom the instant it stops existing. Removing it at t < 0.01
+                // therefore teleported the range down by a whole line, in one frame, at the very
+                // end of the collapse -- after the eye had already followed it upward.
+                //
+                // Now the slot's height interpolates to zero, so the range descends smoothly to
+                // its collapsed position and there is no discontinuity to see. clipToBounds
+                // because the Text inside keeps its own intrinsic height as the slot shrinks.
+                val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }
+                Box(
+                    Modifier
+                        .height(lerp(0.dp, statusSlot, t))
+                        .clipToBounds(),
+                ) {
+                    if (t > 0.01f) {
+                        val animatedStatusColor by androidx.compose.animation.animateColorAsState(
+                            data.statusColor, animationSpec = tween(300), label = "statusLineColor",
+                        )
+                        Text(
+                            data.statusLine,
+                            style = type.labelLarge,
+                            color = animatedStatusColor.copy(alpha = t),
+                            fontWeight = if (data.emphasizeStatus) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
                 }
             }
         }
