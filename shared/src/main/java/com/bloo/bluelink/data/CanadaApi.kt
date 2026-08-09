@@ -243,11 +243,25 @@ class CanadaApi(private val brand: Brand) {
                 model = listOfNotNull(o["modelYear"]?.str(), o["modelName"]?.str()).joinToString(" ").ifBlank { "Car" },
                 vin = o["vin"]?.str() ?: id,
                 year = o["modelYear"]?.str()?.toIntOrNull(),
-                // fuelKindCode's exact enumeration isn't documented in the reference
-                // project; 4 matches the "pure EV" code Kia US's own fuelType field
-                // uses (see KiaUsaApi.toVehicle), a reasonable best-effort guess
-                // pending a real Canada EV account to confirm against.
-                isEv = o["fuelKindCode"]?.int() == 4,
+                // fuelKindCode's exact enumeration still isn't documented in the reference
+                // project. 4 matches the "pure EV" code Kia US's own fuelType field uses
+                // (KiaUsaApi.toVehicle), which is where that guess came from.
+                //
+                // Now accepts a LETTER code too, because the numeric-only test had a silent,
+                // total failure mode: if Canada reports this field as a string -- and Hyundai's
+                // own US endpoint does exactly that for the same question
+                // (`isEv = evStatus.equals("E", ignoreCase = true)` in BlueLinkApi) -- then
+                // `.int()` returns null (it is `intOrNull`), the comparison is false, and EVERY
+                // Canadian car including a pure EV parses as a petrol car. That hides the whole
+                // charging half of the app for those users, with no error anywhere.
+                //
+                // Deliberately ADDITIVE rather than a swap: I could not verify Canada's actual
+                // field type, and replacing one unverified guess with another would just move
+                // the failure. A numeric 4 still matches; a JSON number also stringifies to "4",
+                // which no letter code equals, so the two tests cannot collide.
+                isEv = o["fuelKindCode"].let { fk ->
+                    fk?.int() == 4 || fk?.str()?.trim()?.uppercase() in setOf("E", "EV")
+                },
             )
         }
     }
