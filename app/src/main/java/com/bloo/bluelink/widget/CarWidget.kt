@@ -1216,10 +1216,26 @@ class CarWidget : GlanceAppWidget() {
         // header's name, the info rows, and the button row all judge their
         // own fit against the real space beside the ring rather than the
         // whole tile.
+        // Rows bounded by what is actually LEFT, the way the sibling branch below does it, rather
+        // than by Scale.infoCap's flat 38% of raw tile height. This is the no-gauge path, so the
+        // column holds exactly a header, the rows and a button row plus two 6dp spacers -- every
+        // term of that is a Scale function, so the remainder is computable instead of guessable.
+        //
+        // infoCap knew nothing about the header or the buttons, so whenever it came out tighter it
+        // dropped rows that fit and the tile showed less than it had room for. Where it came out
+        // LOOSER, the branch's own comment conceded the problem ("Unbudgeted branch"): nothing was
+        // stopping the rows from pushing the buttons off the bottom.
+        val rowsRoom = (
+            Scale.innerHeight(frame) - Scale.headerHeight(frame) - Scale.buttonHeight(size) - 12.dp
+            ).coerceAtLeast(0.dp)
         val content: @Composable (Dp) -> Unit = { w ->
             HeaderRow(car, render, availableWidth = w)
             Spacer(GlanceModifier.height(6.dp))
-            InfoStack(car, render, max = Scale.infoCap(size, 3, render.theme.textScale), availableWidth = w)
+            InfoStack(
+                car, render,
+                max = Scale.infoRowsIn(size, rowsRoom, render.theme.textScale, 3),
+                availableWidth = w,
+            )
             Spacer(GlanceModifier.height(6.dp))
             ActionButtons(car, render, max = 4, availableWidth = w, availableHeight = Scale.buttonHeight(size))
         }
@@ -1273,7 +1289,12 @@ class CarWidget : GlanceAppWidget() {
         // the whole tile, same shape as the bar branch above without a
         // gauge of any kind. Unbudgeted branch -- content() itself pins
         // ActionButtons' height too, for the same reason.
-        Column(modifier = GlanceModifier.fillMaxSize()) { content(size.width) }
+        // innerWidth, not size.width. The ring branch above hands its column
+        // Scale.innerWidth(frame); this one handed over the RAW tile width, so the header's name,
+        // the info rows and the button row all judged their own fit against space the root padding
+        // had already taken -- two sibling branches of one function disagreeing about what "the
+        // width available" means.
+        Column(modifier = GlanceModifier.fillMaxSize()) { content(Scale.innerWidth(frame)) }
     }
 
     @Composable

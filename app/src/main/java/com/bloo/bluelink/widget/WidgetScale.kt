@@ -466,13 +466,19 @@ internal object Scale {
      *  ring, buttons and footer claim -- deliberately generous, since
      *  showing one row fewer is a far smaller cost than spilling off the
      *  tile. */
-    fun infoCap(size: DpSize, capMax: Int, textScale: Float): Int {
-        // A row is one value line plus its 2dp spacer; ~1.35x font size
-        // approximates the line height RemoteViews gives it.
-        val rowDp = valueSp(size).value * textScale * 1.35f + 2f
-        val room = size.height.value * (1f - 0.62f)
-        return (room / rowDp).toInt().coerceIn(1, capMax)
-    }
+    // infoCap() was deleted here. It answered "how many info rows fit?" from a flat fraction of
+    // the RAW tile height -- `size.height * 0.38` -- subtracted from nothing. It knew nothing
+    // about the header, the gauge, the button row or the map reserve on the tile it was asked
+    // about, so it was wrong in both directions: tighter than the truth on tiles that had room
+    // (rows silently dropped, the tile showing less than it could) and looser on tiles that did
+    // not (rows pushing the button row off the bottom).
+    //
+    // Every caller now derives the row count from what is ACTUALLY left -- infoRowsIn() over a
+    // remainder built from innerHeight minus the things that really occupy it, or a plain per-tier
+    // maximum where a split already computed the remainder. Nothing calls this any more.
+    //
+    // Deleted rather than left available, because it reads like the obvious helper for exactly the
+    // question it answers badly, and this file's history is largely tiers that trusted it.
 
     /**
      * The per-render facts every vertical budget in this file needs, resolved once
