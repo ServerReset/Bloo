@@ -8628,10 +8628,16 @@ internal fun PebbleShell(
                                 MaterialTheme.typography.titleMedium.fontSize.toPx() /
                                     MaterialTheme.typography.headlineSmall.fontSize.toPx()
                             }
+                            // Plain arithmetic, not lerp(): this file imports the Color, TextStyle
+                            // and Dp overloads of `lerp` but NOT the Float one from
+                            // androidx.compose.ui.util, so a Float call does not resolve -- which
+                            // is exactly how the first attempt at this broke the build. Spelling
+                            // out the interpolation removes the dependency on which overload
+                            // happens to be in scope.
                             val titleScale = if (!growTitleOnExpand) {
                                 collapsedTitleScale
                             } else {
-                                lerp(collapsedTitleScale, 1f, headerT)
+                                collapsedTitleScale + (1f - collapsedTitleScale) * headerT
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
