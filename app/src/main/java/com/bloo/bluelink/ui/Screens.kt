@@ -5207,20 +5207,27 @@ private fun HeroHeader(
                         //          true, they had stopped agreeing, which is exactly the failure
                         //          a derived value removes.
                         .padding(
-                            // Collapsed: clear the car icon (46dp) AND the name itself, plus a
-                            // gap, so the numbers read as part of the name's line instead of a
-                            // right-aligned column of their own. Expanded: the readout owns the
-                            // card's lower-left, so a flat 16dp.
-                            start = lerp(
-                                46.dp + with(LocalDensity.current) { titleWidthPx.toDp() } + 10.dp,
-                                16.dp,
-                                heroT,
-                            ),
+                            // Clears the car icon, and NOTHING more. Putting the name's width in
+                            // here pushed the whole Column across -- including the BAR, which
+                            // then started under the percentage instead of spanning the card.
+                            // The name-clearing offset belongs to the numbers Row alone; it is
+                            // passed to HeroMorphReadout as `numbersStart` below.
+                            start = lerp(46.dp, 16.dp, heroT),
                             end = lerp(76.dp, 16.dp, heroT),
                             bottom = lerp(HeroReadoutBottomInset, 16.dp, heroT),
                         ),
                 ) {
-                    HeroMorphReadout(readout, heroT)
+                    HeroMorphReadout(
+                        readout,
+                        heroT,
+                        // Collapsed, the numbers start after the name; expanded, they own the
+                        // left edge. Only this Row shifts -- the bar underneath does not.
+                        numbersStart = lerp(
+                            with(LocalDensity.current) { titleWidthPx.toDp() } + 10.dp,
+                            0.dp,
+                            heroT,
+                        ),
+                    )
                 }
             },
             // Collapsed: name, percentage and range on ONE row, with the bar directly under
@@ -5905,7 +5912,14 @@ private fun animatedChargeFrac(target: Float): Float {
  * DOUBLED by a lookahead pass.
  */
 @Composable
-private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier = Modifier) {
+private fun HeroMorphReadout(
+    data: ChargeReadout,
+    t: Float,
+    modifier: Modifier = Modifier,
+    /** Start inset for the NUMBERS row only, so it can sit after the car name while the bar
+     *  below still spans the card. Zero for [ChargeFuelBar], which has no name beside it. */
+    numbersStart: Dp = 0.dp,
+) {
     val type = MaterialTheme.typography
     // Real type steps, lerped -- not a graphicsLayer scale -- and the reason is DEPENDENT
     // LAYOUT, not glyph quality. This Column's height must genuinely grow as the numbers do:
@@ -5945,7 +5959,7 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
         modifier,
         verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t)),
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
+        Row(Modifier.padding(start = numbersStart), verticalAlignment = Alignment.Bottom) {
             // Collapsed there is no room for the state line below, so the PERCENTAGE carries
             // the charging cue by taking the charge colour, and fades back to normal content
             // colour as the card opens -- by which point the explicit
