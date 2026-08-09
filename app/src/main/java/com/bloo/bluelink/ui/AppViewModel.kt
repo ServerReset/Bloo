@@ -1259,8 +1259,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // the status fields forward inside its own edit transaction, which has no race
         // against the separately-launched cache restore. That reasoning was already right.
         snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null) })
-        // One-time: now that vehicles (and their default climate presets) are
-        // known, start the Drive auto-sync bootstrap + collector.
+        // Per-load, and it must run whether or not bootstrapDriveSync below does any work: on a
+        // cold start whose FIRST garage load returned nothing, that guard was already consumed by
+        // the empty path, so its call here is a no-op and this is the only thing that fills the
+        // per-car default climate presets.
+        seedDefaultClimatePresets()
+        // One-time: start the Drive auto-sync bootstrap + collector.
         bootstrapDriveSync()
         // Keep the app-icon long-press shortcuts in sync with the current cars.
         com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet)
@@ -1358,6 +1362,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * refresh fired ALL of them at once: redundant network calls and concurrent
      * writes to the same Drive file racing each other.
      */
+    /**
+     * Seeds [UiState.defaultClimatePresets] from the CURRENT vehicle list.
+     *
+     * Lives outside [bootstrapDriveSync] because it is per-GARAGE-LOAD work, and that function
+     * is once-per-PROCESS (an AtomicBoolean). The two were the same block, and the empty/failed
+     * cold-start path calls bootstrapDriveSync BEFORE any vehicle exists -- deliberately, so the
+     * sync collector still starts. That consumed the guard, so this map was computed from an
+     * empty list and the later call on the real load was a documented no-op: every car's default
+     * climate preset silently fell back to "smart" for the whole process, ignoring what the user
+     * had chosen, until an app restart whose first garage load happened to succeed.
+     *
+     * Two different lifetimes had been given one guard. Splitting them is the fix.
+     */
+    private suspend fun seedDefaultClimatePresets() {
+        val vehicles = _state.value.vehicles
+        if (vehicles.isEmpty()) return
+        val presets = vehicles.associate { v ->
+            v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
+        }
+        _state.update { it.copy(defaultClimatePresets = presets) }
+    }
+
     private fun bootstrapDriveSync() {
         if (!driveSyncBootstrapped.compareAndSet(false, true)) return
         // Restore auto-sync Drive URI and last sync timestamp from preferences.
@@ -1385,10 +1411,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             val wifiOnly = settingsStore.syncWifiOnly()
             val settingsMode = settingsStore.settingsMode()
-            val vehicles = _state.value.vehicles
-            val defaultPresets = vehicles.associate { v ->
-                v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
-            }
             // Restore the cached device registry + primary + this-device identity so
             // Settings shows "your devices" immediately on launch, before (and even
             // without) the first live sync of the session.
@@ -1397,10 +1419,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val myDeviceId = settingsStore.syncDeviceId()
             val myDeviceName = settingsStore.syncDeviceName()
             val fileFingerprint = settingsStore.syncFileFingerprint()
+            // Still seeded from here for the normal cold start (vehicles are already in state by
+            // the time this coroutine runs), and now ALSO from loadGarage so a first load that
+            // returned nothing cannot leave it empty for the process.
+            seedDefaultClimatePresets()
             _state.update {
                 it.copy(
                     syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly,
-                    settingsMode = settingsMode, defaultClimatePresets = defaultPresets,
+                    // defaultClimatePresets is NOT set here any more -- see
+                    // seedDefaultClimatePresets. It is per-garage-load, and this block runs once
+                    // per process.
+                    settingsMode = settingsMode,
                     syncDevices = cachedDevices, syncPrimaryId = cachedPrimary,
                     thisDeviceId = myDeviceId, syncDeviceName = myDeviceName,
                     syncFileFingerprint = fileFingerprint,
