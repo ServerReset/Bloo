@@ -5269,6 +5269,12 @@ private fun HeroHeader(
                 // the bar. Choosing a number here instead of deriving it is how this slot
                 // produced a mismatch every time it was a constant -- the deleted
                 // heroReadoutReserve() was exactly that, and the tombstone above says so.
+                // TextUnit.toDp() THROWS on an Unspecified or Em value, so this depends on
+                // titleMedium keeping an sp lineHeight. It does: expressiveTypography() builds
+                // from Typography() and `.copy(fontFamily, fontWeight)` only, so the default
+                // 24.sp survives. Checked rather than assumed, because the failure would be a
+                // crash in the hero rather than a layout being a few dp out. If a future
+                // typography ever sets lineHeight = TextUnit.Unspecified, guard this.
                 val collapsedReadoutHeight = with(LocalDensity.current) {
                     MaterialTheme.typography.titleMedium.lineHeight.toDp() + 2.dp + ChargeBarHeight
                 }
