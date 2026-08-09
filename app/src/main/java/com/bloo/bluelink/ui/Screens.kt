@@ -5249,46 +5249,33 @@ private fun HeroHeader(
             // matches -- which is exactly what I got wrong twice, most recently printing "74%"
             // on top of the car icon.
             //
-            // These fade and shrink out on `heroT` as the card opens, because the expanded
-            // readout at the bottom states the same two numbers much larger. Both read from ONE
-            // `readout`, so they cannot disagree about the car even while both are partly
-            // visible mid-morph.
-            titleTrailing = if (heroT > 0.99f) {
-                null
-            } else {
-                { HeroCollapsedStats(readout, heroT) }
-            },
+            // No titleTrailing. There is now exactly ONE readout in this card and it is
+            // [HeroMorphReadout], anchored at the bottom of the Box below -- so the percentage
+            // and range are not also rendered here.
+            //
+            // What was here was a SECOND copy of the same two numbers (HeroCollapsedStats),
+            // crossfaded against the expanded copy on heroT. Two sets trading places is what
+            // the morph actually was, whatever the comments claimed, and crossfading two
+            // renderings of the same digits at similar weight is precisely what read as rough.
+            titleTrailing = null,
             summary = null,
             headerContent = {
-                // ROW 2 of the collapsed card: the charge bar, directly under the status line.
+                // A RESERVATION, not content. The bar itself lives in the one readout at the
+                // bottom of the card; this only stops the header's text column from sitting on
+                // top of it while the card is short.
                 //
-                // Real content now, not the reservation this used to be. With the numbers back
-                // on the title row (above), the only thing the header still has to make room
-                // for is the bar -- and the simplest way to reserve exactly the right height
-                // for a bar is to put the bar there.
-                //
-                // Its height collapses to zero on `heroT` so the header stops holding the space
-                // as the card opens, where the expanded readout over the photo takes over. The
-                // bar itself is a single Canvas, so re-measuring it every frame of that is
-                // cheap -- see ChargeSegmentBar.
-                val h = lerp(4.dp + ChargeBarHeight, 0.dp, heroT)
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(h)
-                        // end padding, not just top: the header's weighted text column runs
-                        // right up to the chevron, so a full-width bar finished flush against
-                        // it. 12dp gives the same optical gap the title's ellipsis leaves.
-                        .padding(top = lerp(4.dp, 0.dp, heroT), end = 12.dp)
-                        .graphicsLayer { alpha = 1f - heroT },
-                ) {
-                    if (h > 1.dp) {
-                        ChargeSegmentBar(
-                            frac = animatedChargeFrac(readout.frac),
-                            limitPct = readout.limitPct,
-                        )
-                    }
+                // Derived from the same tokens the readout composes with, not picked: its
+                // collapsed height is the pct line (titleMedium) plus the inter-row gap plus
+                // the bar. Choosing a number here instead of deriving it is how this slot
+                // produced a mismatch every time it was a constant -- the deleted
+                // heroReadoutReserve() was exactly that, and the tombstone above says so.
+                val collapsedReadoutHeight = with(LocalDensity.current) {
+                    MaterialTheme.typography.titleMedium.lineHeight.toDp() + 2.dp + ChargeBarHeight
                 }
+                val h = lerp(4.dp + collapsedReadoutHeight, 0.dp, heroT)
+                // No graphicsLayer: there is nothing here to fade any more. An alpha on an
+                // empty Box is a layer allocation per frame for no pixels.
+                Spacer(Modifier.fillMaxWidth().height(h))
             },
         ) {
             // Empty by design. Everything the expanded state adds -- the photo and the
@@ -5845,75 +5832,16 @@ private fun animatedChargeFrac(target: Float): Float {
 // so the header reserves the right space by CONTAINING the content instead of by computing a
 // height that has to match it. That removes the class of bug this constant kept producing.
 
-/**
- * Row 1 of the COLLAPSED hero: percentage and range, beside the car name.
- *
- * Smoothness is the whole design here, because the previous version's numbers morphed roughly.
- * Two deliberate choices:
- *
- *  - The type size is FIXED (`labelLarge`) and the shrink is a `graphicsLayer` SCALE. This is
- *    what Compose itself does for animated type: the official recommendation for animating a
- *    font size is `sharedBounds(resizeMode = scaleToBounds())` plus `skipToLookaheadSize()`,
- *    i.e. graphically scale a layout measured ONCE rather than re-measure per frame.
- *
- *    The cost being avoided is worse than "a re-layout": a `Text` measures through
- *    `ParagraphLayoutCache`, which is SINGLE-SLOT (one `style` field, `paragraph = null` on
- *    invalidate). A font size that changes every frame therefore misses that cache on every
- *    frame -- 100% invalidation, not cache pressure. The 8-entry LRU people cite is
- *    `TextMeasurer`'s, on the explicit Canvas/drawText path, which a `Text` never touches.
- *
- *    Scale is safe HERE specifically because nothing depends on this Row's size -- it shrinks
- *    towards the chevron and no sibling needs to move. That is the actual precondition, and
- *    it is why [HeroMorphReadout] does the opposite; see there. `graphicsLayer` does not
- *    change measured size or placement, so where siblings MUST respond, a scale is wrong.
- *
- *    (An earlier version of this comment claimed lerping reads as "discrete jumps" and that
- *    upscaled glyphs "go soft". Neither is a verified mechanism, and the soft-glyph claim in
- *    particular was the stated reason [HeroMorphReadout] does the opposite thing -- two
- *    comments in one file asserting opposite universal rules. The rule is dependent layout.)
- *  - `transformOrigin` pins the RIGHT edge, so the numbers shrink towards the chevron they sit
- *    beside instead of drifting away from the name as they go.
- *
- * Alpha leads the scale (`1 - t` squared) so the numbers are mostly gone before the expanded
- * readout's much larger copy of the same figures fades in underneath -- two sets of the same
- * digits at similar weight, both half-visible, is what actually looked wrong.
- */
-@Composable
-private fun HeroCollapsedStats(data: ChargeReadout, t: Float, modifier: Modifier = Modifier) {
-    val fade = (1f - t).coerceIn(0f, 1f)
-    val contentColor = LocalContentColor.current
-    Row(
-        modifier
-            .padding(start = 10.dp)
-            .graphicsLayer {
-                alpha = fade * fade
-                val k = 0.7f + 0.3f * fade
-                scaleX = k
-                scaleY = k
-                transformOrigin = TransformOrigin(1f, 0.5f)
-            },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            data.pctText,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            // Charging shows in the colour, because this row has no space for the word -- the
-            // same cue the expanded readout spells out in its state line.
-            color = if (data.charging) ChargeGreen else contentColor,
-            maxLines = 1,
-        )
-        data.rangeText?.let {
-            Text(
-                " · $it",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = contentColor,
-                maxLines = 1,
-            )
-        }
-    }
-}
+// HeroCollapsedStats() was deleted here. It rendered a SECOND copy of the percentage and range
+// beside the car name, crossfading against HeroMorphReadout's copy on heroT. Two renderings of
+// the same digits at similar weight, both half-visible mid-morph, is what actually read as
+// rough -- and no amount of tuning the two alphas fixes a duplicate. There is now one readout,
+// visible in both states, that moves and changes shape; see HeroMorphReadout.
+//
+// Its scale-not-lerp argument was still correct for what it was doing, and is preserved where
+// it now applies: nothing depended on ITS size, whereas the surviving readout's Column height
+// must grow, which is why that one lerps real type steps.
+
 
 /**
  * The hero's readout as ONE set of components that morphs between the collapsed and expanded
@@ -5950,7 +5878,7 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
     // the state line below has to be pushed down and the card's content has to reserve the
     // space. `graphicsLayer` explicitly does not affect that -- it "does not change the
     // measured size or placement", so siblings would stay put and the scaled digits would
-    // draw OVER them. [HeroCollapsedStats] can scale precisely because nothing depends on its
+    // draw OVER them. [HeroCollapsedStats] (now deleted) could scale precisely because nothing depended on its
     // size; this cannot.
     //
     // So this pays a real cost, knowingly: a `Text` measures through the SINGLE-SLOT
@@ -5958,23 +5886,27 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
     // Text nodes in one layout pass, with no lookahead pass doubling it.
     //
     // (The previous claim here -- that "a scaled 45sp glyph is soft at every intermediate
-    // frame" -- was not a verified mechanism, and it contradicted HeroCollapsedStats' comment
+    // frame" -- was not a verified mechanism, and it contradicted the since-deleted
+    // HeroCollapsedStats' comment
     // arguing the reverse. If this ever needs to become free, the move is Compose's own:
     // sharedBounds with scaleToBounds + skipToLookaheadSize, which scales a layout measured
     // once. That was tried and reverted for a different reason -- the lookahead cost on every
     // pager page -- documented in this function's KDoc above.)
-    // Still lerped, but over a much shorter journey than before: the collapsed end of this
-    // node is no longer a labelLarge line beside the name (HeroCollapsedStats does that now),
-    // so this only has to grow in from a slightly smaller version of itself. Fewer distinct
-    // font sizes crossed per spring means fewer visible steps, which is the roughness fix.
-    val pctStyle = lerp(type.headlineSmall, type.displayMedium, t)
-    val rangeStyle = lerp(type.titleMedium, type.titleLarge, t)
+    // The journey is titleMedium -> displayMedium, and it is real: this is the only readout
+    // now, so its collapsed end has to be legible at collapsed density rather than merely
+    // small enough to hide. Each frame is a genuine font size, which is the cost documented
+    // above and the reason the header reserves a height derived from titleMedium.
+    // Collapsed end is titleMedium, matching the height the header reserves for it. It used
+    // to be headlineSmall because this node was invisible at t = 0 and only had to look right
+    // once grown; now that it is the ONLY readout, its collapsed size is a real design value.
+    val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
+    val rangeStyle = lerp(type.bodyMedium, type.titleLarge, t)
     Column(
-        modifier
-            // Fades in on the BACK half of the morph (t squared), so the collapsed status line
-            // beside the name is essentially gone before this larger copy of the same two
-            // numbers becomes legible. Both being half-visible at once is what read as rough.
-            .graphicsLayer { alpha = t * t },
+        // NO alpha ramp. This node is present and fully visible in BOTH states, which is the
+        // whole point: one bar and one pair of numbers that move and change shape, rather than
+        // two copies crossfading. The `t * t` fade that was here existed only to hide this copy
+        // while a second one was drawn in the header.
+        modifier,
         verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t)),
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
