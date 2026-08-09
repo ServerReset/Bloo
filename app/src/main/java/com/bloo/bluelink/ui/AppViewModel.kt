@@ -1602,6 +1602,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = force)
                 when (result) {
                     is com.bloo.bluelink.update.UpdateCheckResult.Available -> {
+                        // Cancel the undo-window job, not just its flags. Clearing
+                        // updatePendingDismiss below without cancelling left the countdown
+                        // RUNNING, and when it elapsed it set updateTileDismissed = true and hid
+                        // the tile -- the exact opposite of what the comment a few lines down
+                        // promises ("a refresh mid-countdown just keeps the tile"). So a refresh
+                        // during the undo window appeared to keep the tile, then silently lost it
+                        // seconds later.
+                        //
+                        // undoDismissUpdate() has always done both, which is what made the
+                        // asymmetry easy to miss: the same intent expressed correctly in one place
+                        // and half-expressed in another.
+                        updateDismissJob?.cancel()
                         _state.update {
                             // A previously-downloaded APK is only still good if it's
                             // for this same build -- a newer one showing up means the
