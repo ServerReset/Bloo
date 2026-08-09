@@ -48,17 +48,45 @@ object Notifications {
     }
 
     /**
-     * Whether Bloo is currently allowed to post notifications. Runtime notification
-     * permission (POST_NOTIFICATIONS) was only introduced in Android 13 (Tiramisu);
-     * on older versions notifications are always allowed at the OS level, so this
-     * short-circuits to `true` there without ever touching the permission API. On
-     * 13+ it defers to [ContextCompat.checkSelfPermission] to read the current
-     * grant state.
+     * Whether Bloo can actually get a notification in front of the user.
+     *
+     * THREE things have to be true, and this used to test only the first:
+     *  1. the API 33+ runtime POST_NOTIFICATIONS grant (older versions have no such
+     *     permission, hence the short-circuit);
+     *  2. notifications not blocked for the whole app -- possible on EVERY API level,
+     *     including the ones where step 1 short-circuits to true;
+     *  3. the alerts channel not blocked individually (API 26+), which a user can do
+     *     from the notification's own long-press menu without touching app settings.
+     *
+     * Why it matters more than a normal capability check: `notify()` does NOT throw for
+     * 2 or 3. It succeeds, the notification never appears, and [post] therefore returned
+     * true -- so every caller that persists "the user has been told" recorded a delivery
+     * that never happened. CarAlerts' fired-flags only clear when the condition clears,
+     * so a door-left-open could mark itself alerted and go unmentioned for the whole
+     * episode; service-due is worse, since its condition never clears on its own.
+     *
+     * That failure mode is already in this file's history -- `canDeliver` and post()'s
+     * Boolean return exist precisely to stop flags being written for undelivered
+     * notifications. They were just resting on a permission check that answered a
+     * narrower question than the one being asked.
      */
-    fun hasPermission(context: Context): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+    fun hasPermission(context: Context): Boolean {
+        val runtimeGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
+        if (!runtimeGranted) return false
+        val mgr = NotificationManagerCompat.from(context)
+        if (!mgr.areNotificationsEnabled()) return false
+        // Channel-level block. runCatching because this reads a system service and the
+        // channel may not exist yet -- an absent channel is NOT a block (ensureChannel
+        // creates it on the way to posting), so absence must answer true.
+        return runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val ch = mgr.getNotificationChannel(CHANNEL)
+                ch == null || ch.importance != NotificationManager.IMPORTANCE_NONE
+            } else true
+        }.getOrDefault(true)
+    }
 
     /**
      * Builds and posts a single alert notification under the shared "bloo_alerts"
