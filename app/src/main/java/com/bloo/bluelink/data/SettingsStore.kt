@@ -2152,11 +2152,39 @@ class SettingsStore(private val context: Context) {
             return false
         }
         if ((root["prefs"] as? JsonObject) == null) return false
-        // Photos are guarded by the pre-pass `protect` snapshot only (an
-        // img_$vin changed locally since the last sync keeps its local file),
-        // computed here outside the transaction exactly as before -- writing the
-        // decoded JPEGs to disk is plain file IO, not part of the DataStore edit.
-        val photoPaths = applySyncPhotos(root["photos"] as? JsonObject, protect)
+        // Photos are guarded by the pre-pass `protect` snapshot (an img_$vin changed locally
+        // since the last sync keeps its local file), PLUS every photo this device chose itself.
+        //
+        // `protect` alone was not enough, and the gap destroyed originals. Once a device has
+        // successfully uploaded its own photo, clearDirtyKeys drops img_$vin from the dirty set
+        // -- so on the very next pass the key is no longer protected. A peer that imported the
+        // photo re-uploads it, this device's hash gate opens, and applySyncPhotos then writes the
+        // peer's TRANSPORT copy over the originating device's own pref.
+        //
+        // The transport copy is lossy by design: encodeSyncPhotos re-encodes to a 640px JPEG at
+        // quality 78. CropScreen goes out of its way to save an alpha source as a 1080px PNG
+        // ("Preserve transparency ... so the background stays see-through"), and JPEG cannot
+        // carry alpha at all. So the device that chose a transparent PNG ended up displaying a
+        // flattened, black-backgrounded, twice-compressed 640px JPEG of it.
+        //
+        // And it was unrecoverable rather than merely wrong, because of pruneOrphanPhotos, which
+        // I added earlier on this branch: once img_$vin points at car_$vin_synced.jpg, the
+        // original crop is referenced by nothing and the sweep deletes it. Before that sweep
+        // existed the original at least survived on disk. A leak-fix turned a degradation into
+        // data loss -- worth remembering as a class of mistake, not just this instance.
+        //
+        // Scoped so a genuine peer update still lands: only photos whose path is NOT the synced
+        // filename are protected. A device whose photo already came from sync keeps accepting
+        // newer synced photos; a device that chose its own original never has it overwritten by
+        // a re-encode of itself. adoptSettingsJson already protected ALL local img keys and says
+        // why -- this is the same reasoning, one import path later.
+        val ownPhotoKeys = context.settingsDataStore.data.first().asMap()
+            .filterKeys { it.name.startsWith("img_") }
+            .filterValues { v ->
+                (v as? String)?.let { it.startsWith("/") && !it.endsWith("_synced.jpg") } == true
+            }
+            .keys.map { it.name }.toSet()
+        val photoPaths = applySyncPhotos(root["photos"] as? JsonObject, protect + ownPhotoKeys)
         context.settingsDataStore.edit { mut ->
             // Re-read the dirty set from THIS transaction's live prefs, not just the
             // protect snapshot taken before the pass started: a local edit that
