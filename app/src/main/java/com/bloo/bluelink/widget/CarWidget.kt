@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
@@ -139,7 +141,8 @@ class CarWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         val config = WidgetConfigStore(context).get(appWidgetId)
-        val data = SnapshotStore(context).current()
+        val snapshots = SnapshotStore(context)
+        val data = snapshots.current()
         // A pinned widget shows ITS car or nothing — never silently swap to another.
         // Only a "follow" widget (null vin) tracks the app's currently-selected car.
         val car = if (config.vin != null) {
@@ -183,8 +186,49 @@ class CarWidget : GlanceAppWidget() {
             photoBitmap = photoBitmap,
         )
         provideContent {
+            // Observe the snapshot store INSIDE the composition, which is what
+            // GlanceAppWidget's own KDoc instructs: "load initial data before calling
+            // provideContent, and then observe your sources of data within the composition
+            // (e.g. collectAsState). This ensures that your widget will continue to update
+            // while the composition is active."
+            //
+            // Without this, `updateAll()` on a data change could silently do nothing.
+            // update() only calls session.updateGlance() when a session was already running,
+            // and updateGlance() merely re-reads GLANCE STATE -- the content flow is held as
+            // `remember { widget.runGlance(...) }`, so the suspend body above is never
+            // re-invoked. Every value it computed stays frozen for the life of the session.
+            //
+            // That is not theoretical here. Tapping a widget action writes an optimistic
+            // snapshot and calls updateAll(), then the real status lands seconds later and
+            // calls updateAll() again -- inside the same session (~45s after provideContent,
+            // ~5s on a dozing device). The SECOND update was the one carrying the truth, and
+            // it was the one dropped. Symptom: "I sent a command from the widget and it never
+            // updated."
+            val live by snapshots.payload.collectAsState(initial = data)
+            val liveCar = if (config.vin != null) {
+                live.vehicles.firstOrNull { it.vin == config.vin }
+            } else {
+                live.selected
+            }
+            // Staleness is recomputed from the live fetchedAt, not carried over: the whole
+            // point of a live update is that the age changed.
+            val liveStale = liveCar?.fetchedAt?.takeIf { it > 0 }?.let {
+                System.currentTimeMillis() - it > com.bloo.bluelink.data.STALE_STATUS_MS
+            } ?: false
             GlanceTheme {
-                Content(render)
+                // theme, mapBitmap and photoBitmap deliberately keep their cold-path values.
+                // All three need I/O, which Glance composables cannot do, and all three are
+                // keyed to the car's IDENTITY rather than its data -- which does not change
+                // within a session (switching cars goes through WidgetSwitchCarAction, and
+                // that starts a new one). What changes live is the numbers, and those are
+                // exactly what this passes through.
+                Content(
+                    render.copy(
+                        car = liveCar ?: render.car,
+                        stale = liveStale,
+                        multiCar = live.vehicles.size > 1,
+                    ),
+                )
             }
         }
     }
