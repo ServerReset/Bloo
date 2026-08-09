@@ -54,9 +54,20 @@ object WearPhotoAssets {
     private fun stampFor(path: String, f: File) = "$path:${f.lastModified()}:${f.length()}"
 
     /**
-     * Decodes, downscales and compresses [vin]'s photo at [path], or null if
-     * there is nothing usable there or nothing has changed since the last
-     * call (see the cache doc above).
+     * Decodes, downscales and compresses [vin]'s photo at [path], returning the
+     * [Asset] to publish. Null ONLY when there is nothing usable at [path] --
+     * missing file, zero length, or an undecodable image.
+     *
+     * Emphatically NOT null when nothing has changed: an unchanged photo returns
+     * the CACHED asset, which is the whole point of the cache. This doc used to
+     * say "or null if ... nothing has changed since the last call", describing
+     * behaviour that would be a serious bug, because the caller treats null as
+     * "skip this car" (`?: return@forEach` in WearBridge.publishExtrasNow). Had
+     * it actually behaved that way, the asset key would be absent from the
+     * DataMap on every publish after the first and the watch would LOSE each car
+     * photo the moment any unrelated extra changed. Left as a warning rather
+     * than silently corrected: anyone "aligning the code to the doc" here would
+     * introduce exactly that.
      *
      * Two-pass decode: the bounds-only pass reads the header to pick an integer
      * `inSampleSize`, so the full-resolution bitmap is never allocated. A phone
