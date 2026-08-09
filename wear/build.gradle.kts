@@ -183,9 +183,36 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Wear OS Tile (the swipeable tile outside the app) via ProtoLayout.
-    implementation("androidx.wear.tiles:tiles:1.4.1")
-    implementation("androidx.wear.protolayout:protolayout:1.2.1")
-    implementation("androidx.wear.protolayout:protolayout-material:1.2.1")
+    //
+    // Was tiles 1.4.1 / protolayout 1.2.1 -- both 2024-10-16, two minor generations behind
+    // the 1.6.2 / 1.4.2 stables. The reason to move is a specific, live bug rather than
+    // freshness: tiles 1.4.1 predates the fix for a SecurityException thrown when an app
+    // whose targetSdk is above 34 requests a tile update while running on API 34. This app
+    // targets 36 and the watch minSdk is 30, so API 34 watches are squarely in range.
+    //
+    // It does not crash here, but only by accident: refreshWearGlanceables wraps both
+    // getUpdater() and requestUpdate() in runCatching, so the SecurityException is swallowed
+    // -- and the tile then simply never refreshes on those watches, silently, forever. A
+    // caught exception that turns a feature off is worse than one that reports itself.
+    // Google names the same fix twice in the 1.5.0 notes ("Critical bug fix for any clients
+    // targeting SDK higher than 34 and requesting a tile update on API 34") and again in the
+    // Wear OS 5.1 known issues, which prescribe exactly this upgrade.
+    //
+    // Verified safe for the two things that could have made it a chore:
+    //  - 1.6.0/1.4.0 raise compileSdk to 35 and default minSdk 21->23. This module is on
+    //    compileSdk 37 / minSdk 30, so both are already satisfied.
+    //  - protolayout 1.4.1 newly ENFORCES 2048px / 20MB image limits. This tile's resources
+    //    are all AndroidImageResourceByResId (drawables), never InlineImageResource, and the
+    //    car photos the phone sends are capped at 480px on its side -- so nothing here is
+    //    near either limit.
+    //
+    // Also unblocks onRecentInteractionEventsAsync (tiles 1.5.0+), which matters because at
+    // targetSdk 36 on Wear OS 6 the deprecated onTileEnterEvent/onTileLeaveEvent stop
+    // working. This app never used them, so nothing is broken today -- but on 1.4.1 there was
+    // no supported way to observe swipe-on/swipe-off at all, and now there is.
+    implementation("androidx.wear.tiles:tiles:1.6.2")
+    implementation("androidx.wear.protolayout:protolayout:1.4.2")
+    implementation("androidx.wear.protolayout:protolayout-material:1.4.2")
     implementation("com.google.guava:guava:33.0.0-android")
 
     // Watch-face complications (charge % slot, ranged value slot).
