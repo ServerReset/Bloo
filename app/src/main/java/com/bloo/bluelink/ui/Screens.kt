@@ -10218,16 +10218,25 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     // never actually been what it was seeded to -- and vice versa.
     var acLimit by remember(v.vin) { mutableIntStateOf(80) }
     var dcLimit by remember(v.vin) { mutableIntStateOf(90) }
-    var limitsSeeded by remember(v.vin) { mutableStateOf(false) }
+    // Seeded INDEPENDENTLY, one latch each. A single `limitsSeeded` flag was set as soon as
+    // EITHER limit arrived, and the effect then returned early forever -- so a car that reports
+    // its AC target first and its DC target on a later poll (or not in the same payload) left
+    // dcLimit pinned to the hardcoded 90 and could never pick the real one up.
+    //
+    // That is not a display bug. The note above records that both pills' "Set" sends BOTH values
+    // together, because setChargeLimits writes them as a pair -- so tapping Set on the AC pill
+    // pushed a DC limit of 90 to the CAR, a value the user never chose and the car may never have
+    // had. Latching per limit shrinks that to the case where a limit has genuinely never been
+    // reported, instead of the far commoner case where it merely arrived second.
+    //
+    // Worth knowing together with the open Canada finding: CanadaApi never populates
+    // reservChargeInfos at all, so on those cars NEITHER latch ever closes and Set still sends
+    // 80/90. Fixing that needs Canada's charge-limit endpoint, which this does not touch.
+    var acSeeded by remember(v.vin) { mutableStateOf(false) }
+    var dcSeeded by remember(v.vin) { mutableStateOf(false) }
     LaunchedEffect(v.vin, ev?.reservChargeInfos) {
-        if (limitsSeeded) return@LaunchedEffect
-        val realAc = ev?.reservChargeInfos?.level(1)
-        val realDc = ev?.reservChargeInfos?.level(0)
-        if (realAc != null || realDc != null) {
-            realAc?.let { acLimit = it }
-            realDc?.let { dcLimit = it }
-            limitsSeeded = true
-        }
+        if (!acSeeded) ev?.reservChargeInfos?.level(1)?.let { acLimit = it; acSeeded = true }
+        if (!dcSeeded) ev?.reservChargeInfos?.level(0)?.let { dcLimit = it; dcSeeded = true }
     }
 
     Pebble(
