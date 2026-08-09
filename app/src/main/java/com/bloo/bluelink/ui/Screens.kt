@@ -5091,18 +5091,16 @@ private fun HeroHeader(
         // discarded bounds spring needed it: this drives a SIZE, and the theme's spatial
         // spring is under-damped by design, so type would overshoot past its target size and
         // spring back. Text that overshoots reads as a wobble, not as liveliness.
-        // The name's measured width, so the collapsed readout can sit immediately AFTER it.
-        // The readout is positioned in the card, not inside the title Row, so nothing else can
-        // tell it where the name ends -- and a hardcoded offset would be wrong for every
-        // different car name and every font-size setting.
-        var titleWidthPx by remember { mutableIntStateOf(0) }
         val heroT by animateFloatAsState(
             targetValue = if (photoExpanded) 1f else 0f,
             animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
             label = "heroMorph",
         )
         PebbleShell(
-            onTitleWidth = { titleWidthPx = it },
+            // The collapsed numbers, laid out BY the title Row so they sit on the car name's
+            // line without any arithmetic. Null once expanded, so the row stops reserving for a
+            // node that has faded out.
+            titleTrailing = if (heroT > 0.35f) null else { { HeroCollapsedNumbers(readout, heroT) } },
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = Icons.Filled.DirectionsCar,
@@ -5223,15 +5221,11 @@ private fun HeroHeader(
                         heroT,
                         // Collapsed, the numbers start after the name; expanded, they own the
                         // left edge. Only this Row shifts -- the bar underneath does not.
-                        numbersStart = lerp(
-                            // NO ratio applied here any more. PebbleShell now reports the title's
-                            // DRAWN width (its layout modifier reports the scaled size), so this is
-                            // already the visible width of the name. Multiplying by the ratio a
-                            // second time would place the numbers a third of a name too far left.
-                            with(LocalDensity.current) { titleWidthPx.toDp() } + 10.dp,
-                            0.dp,
-                            heroT,
-                        ),
+                        // Zero: this copy only ever shows EXPANDED, where it owns the card's
+                        // lower-left. The collapsed numbers are the header's, so nothing here has
+                        // to be offset past the car name any more -- which also retires the
+                        // measured-title-width plumbing that offset needed.
+                        numbersStart = 0.dp,
                     )
                 }
             },
@@ -5916,6 +5910,47 @@ private fun animatedChargeFrac(target: Float): Float {
  * `Canvas`, in a single layout pass. The version that felt laggy was ~8 paragraph layouts
  * DOUBLED by a lookahead pass.
  */
+/**
+ * The COLLAPSED percentage and range, drawn as trailing content on the pebble's own title Row.
+ *
+ * This exists because six attempts to place these numbers next to the car name by arithmetic --
+ * bottom-anchoring plus a derived lift, a measured title width, a scaled ratio -- all landed
+ * slightly off, in one direction or the other. The title Row can lay them out beside the name
+ * exactly, for free, because that is what a Row does. PebbleShell's `titleTrailing` slot was
+ * built for precisely this and its KDoc still said so while nothing used it.
+ *
+ * The cost, stated plainly: the numbers now have TWO instances -- this one and the expanded one in
+ * [HeroMorphReadout]. The charge BAR is still a single instance. Two text copies that are never
+ * both visible is a better trade than one copy whose position has to be computed from four
+ * unrelated paddings, and the earlier roughness came from the two copies overlapping at similar
+ * opacity, which the disjoint alpha ranges here and in [HeroMorphReadout] prevent.
+ */
+@Composable
+private fun HeroCollapsedNumbers(data: ChargeReadout, t: Float) {
+    // Gone by t = 0.35, where the expanded copy starts appearing.
+    val fade = (1f - t / 0.35f).coerceIn(0f, 1f)
+    if (fade <= 0f) return
+    val style = MaterialTheme.typography.titleMedium
+    Row(
+        Modifier.graphicsLayer { alpha = fade },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            data.pctText,
+            style = style,
+            fontWeight = FontWeight.Bold,
+            // Charging shows in the COLOUR here: this row has no space for the word, and the
+            // expanded readout spells it out in its state line instead.
+            color = if (data.charging) ChargeGreen else LocalContentColor.current,
+            maxLines = 1,
+        )
+        data.rangeText?.let {
+            Spacer(Modifier.width(8.dp))
+            Text(it, style = style, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
 @Composable
 private fun HeroMorphReadout(
     data: ChargeReadout,
@@ -5964,24 +5999,14 @@ private fun HeroMorphReadout(
         modifier,
         verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t)),
     ) {
-        // Lifted onto the car name's line when collapsed.
-        //
-        // The geometry, because the number is derived rather than dialled in: the header reserves
-        // gap + bar + inset, and the readout is bottom-anchored inset from the card's base -- so
-        // the numbers row's BOTTOM lands exactly where the header's content ends, which is one row
-        // BELOW the name band. Shifting up by the row's own height puts its bottom on the title's
-        // bottom, and since both are titleMedium they then share a line.
-        //
-        // `offset {}` and not padding: the lambda form is read in the LAYOUT phase and shifts only
-        // this Row, so the bar underneath does not move with it. A padding would have pushed the
-        // bar up too, straight back into the name.
-        val nameLineLift = with(LocalDensity.current) {
-            MaterialTheme.typography.titleMedium.lineHeight.toDp().toPx()
-        }
+        // Fades IN on the back half only. The collapsed numbers are drawn by the header's own
+        // title Row (see HeroCollapsedNumbers), because that is the only way to guarantee they sit
+        // on the name's line -- so this copy must be invisible until that one has gone, or both
+        // are on screen at once and the morph reads as a double image.
         Row(
             Modifier
                 .padding(start = numbersStart)
-                .offset { IntOffset(0, -(nameLineLift * (1f - t)).roundToInt()) },
+                .graphicsLayer { alpha = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f) },
             verticalAlignment = Alignment.Bottom,
         ) {
             // Collapsed there is no room for the state line below, so the PERCENTAGE carries
@@ -8413,15 +8438,10 @@ internal fun PebbleShell(
      * the expanded hero's title isn't squeezed by a gap left behind an absent node.
      */
     titleTrailing: (@Composable () -> Unit)? = null,
-    /**
-     * Reports the TITLE's measured width in px whenever it changes.
-     *
-     * Only the hero uses it. Its collapsed readout is one node positioned in the CARD, not a
-     * child of this title Row, so "put the numbers next to the name" is not something layout can
-     * do for it -- it needs the name's actual width. Guessing a constant would break on every
-     * different car name and font size, which is the class of bug this file keeps paying for.
-     */
-    onTitleWidth: ((Int) -> Unit)? = null,
+    // onTitleWidth was deleted here. It reported the title's measured width so the hero could
+    // offset its collapsed readout past the car name. That whole approach is gone: the numbers are
+    // now trailing content ON this Row (see HeroCollapsedNumbers), so the Row positions them and
+    // nothing needs to know how wide the name is.
     /**
      * Extra content in the header, under the title and [summary].
      *
@@ -8660,20 +8680,18 @@ internal fun PebbleShell(
                                 title,
                                 modifier = Modifier
                                     .weight(1f, fill = false)
-                                    // Reports the DRAWN size, which is what everything outside
-                                    // needs. graphicsLayer scales the drawing and leaves the
-                                    // measured size alone, so without this the title's box stayed
-                                    // headline-TALL while its glyphs were title-sized: the name
-                                    // floated high in an over-tall row while the hero's readout
-                                    // stayed bottom-anchored to the card, and the numbers sat
-                                    // below the name's line instead of on it.
+                                    // Reports the DRAWN size. graphicsLayer scales the drawing and
+                                    // leaves the measured size alone, so without this the title's
+                                    // box stayed headline-TALL while its glyphs were title-sized --
+                                    // which made the row taller than the text in it and pushed
+                                    // everything beside the name out of line.
                                     //
                                     // Measure once at headlineSmall, then report width and height
                                     // multiplied by the same scale the layer draws with, and place
                                     // the (still full-size) content centred on that smaller box so
                                     // scaling about its left-centre keeps the glyphs where the box
-                                    // says they are.
-                                    .onSizeChanged { onTitleWidth?.invoke(it.width) }
+                                    // says they are. This is what lets `titleTrailing` sit against
+                                    // the name's real edge rather than a headline-sized box.
                                     .layout { measurable, constraints ->
                                         val placeable = measurable.measure(constraints)
                                         val w = (placeable.width * titleScale).roundToInt()
