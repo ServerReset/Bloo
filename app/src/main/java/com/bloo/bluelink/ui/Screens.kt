@@ -5097,10 +5097,6 @@ private fun HeroHeader(
             label = "heroMorph",
         )
         PebbleShell(
-            // The collapsed numbers, laid out BY the title Row so they sit on the car name's
-            // line without any arithmetic. Null once expanded, so the row stops reserving for a
-            // node that has faded out.
-            titleTrailing = if (heroT > 0.35f) null else { { HeroCollapsedNumbers(readout, heroT) } },
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = Icons.Filled.DirectionsCar,
@@ -5259,30 +5255,21 @@ private fun HeroHeader(
             // car-swipe frames (see 3cc327a). An animated collapse does not need one: these
             // are ordinary enter/exit transitions on the two nodes, which participate in
             // layout exactly once per frame like everything else.
-            // No titleTrailing any more. It used to hold a collapsed COPY of the numbers -- a
-            // one-line ChargeStatsLine in the title row -- while the expanded card held a
-            // second, larger copy at the bottom. There is now ONE readout serving both states
-            // (see the Box above), so the copy is deleted rather than merely hidden.
-            // ROW 1 of the collapsed card: the numbers, on the same line as the car name.
+            // ROW 1 of the collapsed card: the percentage and range, on the car name's own line.
             //
-            // They were positioned under the title before, which made the collapsed card three
-            // rows (name / numbers / bar) and left the numbers hanging under the name with the
-            // bar below that. Two rows is what this card is: a status line, and a gauge.
+            // In the header's own Row rather than positioned by me. Six attempts to compute this
+            // inset -- a bottom anchor, a derived lift, the measured title width, the type-step
+            // ratio -- each landed slightly off, the last of them printing the numbers ABOVE the
+            // name. A Row aligns its children by construction, which is the whole reason this slot
+            // exists; its KDoc named the hero as the user while nothing used it.
             //
-            // In the header's own row rather than absolutely positioned, so the name and the
-            // numbers share one baseline by LAYOUT rather than by me computing an inset that
-            // matches -- which is exactly what I got wrong twice, most recently printing "74%"
-            // on top of the car icon.
-            //
-            // No titleTrailing. There is now exactly ONE readout in this card and it is
-            // [HeroMorphReadout], anchored at the bottom of the Box below -- so the percentage
-            // and range are not also rendered here.
-            //
-            // What was here was a SECOND copy of the same two numbers (HeroCollapsedStats),
-            // crossfaded against the expanded copy on heroT. Two sets trading places is what
-            // the morph actually was, whatever the comments claimed, and crossfading two
-            // renderings of the same digits at similar weight is precisely what read as rough.
-            titleTrailing = null,
+            // Yes, this means the NUMBERS have two instances (this one and the expanded copy in
+            // [HeroMorphReadout]) -- the honest cost of layout-instead-of-arithmetic. The charge
+            // BAR is still a single instance, which was the part worth protecting. And the
+            // roughness the two-copy version originally had came from both being visible at
+            // similar opacity: this one is gone by t = 0.35 and the expanded copy starts appearing
+            // there, so they never overlap.
+            titleTrailing = if (heroT > 0.35f) null else { { HeroCollapsedNumbers(readout, heroT) } },
             summary = null,
             headerContent = {
                 // A RESERVATION, not content. The bar itself lives in the one readout at the
