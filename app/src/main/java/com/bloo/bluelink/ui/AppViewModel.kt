@@ -1726,6 +1726,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     statusLoc?.let { loc ->
                         reverseGeocode(loc)?.let { place ->
                             _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
+                            // Re-persist. The persistCache() above ran BEFORE this geocode, and
+                            // statusCache.save writes placeNames alongside locations -- so the
+                            // cache had just paired the newest coordinates with the PREVIOUS
+                            // fetch's label, and on a car's first ever geocode with no label at
+                            // all. Next cold start then showed the wrong place, or none, beside
+                            // a correct position.
+                            //
+                            // Additive rather than moving the earlier call: that one must stay
+                            // where it is so a status still reaches disk even if the geocode
+                            // never returns (no network, unsupported locale, nothing at those
+                            // coordinates -- all routine). This second write only happens when a
+                            // label actually arrived, so the common no-location path pays nothing.
+                            persistCache()
                         }
                     }
                     // Only mark fetched once a non-null status actually arrived, so
