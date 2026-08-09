@@ -5090,12 +5090,18 @@ private fun HeroHeader(
         // discarded bounds spring needed it: this drives a SIZE, and the theme's spatial
         // spring is under-damped by design, so type would overshoot past its target size and
         // spring back. Text that overshoots reads as a wobble, not as liveliness.
+        // The name's measured width, so the collapsed readout can sit immediately AFTER it.
+        // The readout is positioned in the card, not inside the title Row, so nothing else can
+        // tell it where the name ends -- and a hardcoded offset would be wrong for every
+        // different car name and every font-size setting.
+        var titleWidthPx by remember { mutableIntStateOf(0) }
         val heroT by animateFloatAsState(
             targetValue = if (photoExpanded) 1f else 0f,
             animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
             label = "heroMorph",
         )
         PebbleShell(
+            onTitleWidth = { titleWidthPx = it },
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = Icons.Filled.DirectionsCar,
@@ -5201,7 +5207,15 @@ private fun HeroHeader(
                         //          true, they had stopped agreeing, which is exactly the failure
                         //          a derived value removes.
                         .padding(
-                            start = lerp(46.dp, 16.dp, heroT),
+                            // Collapsed: clear the car icon (46dp) AND the name itself, plus a
+                            // gap, so the numbers read as part of the name's line instead of a
+                            // right-aligned column of their own. Expanded: the readout owns the
+                            // card's lower-left, so a flat 16dp.
+                            start = lerp(
+                                46.dp + with(LocalDensity.current) { titleWidthPx.toDp() } + 10.dp,
+                                16.dp,
+                                heroT,
+                            ),
                             end = lerp(76.dp, 16.dp, heroT),
                             bottom = lerp(HeroReadoutBottomInset, 16.dp, heroT),
                         ),
@@ -5920,7 +5934,9 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
     // to be headlineSmall because this node was invisible at t = 0 and only had to look right
     // once grown; now that it is the ONLY readout, its collapsed size is a real design value.
     val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
-    val rangeStyle = lerp(type.bodyMedium, type.titleLarge, t)
+    // titleMedium collapsed, NOT bodyMedium: it sits on the car name's own line, so it has to
+    // be the name's size to read as the same line of text. bodyMedium made it a caption.
+    val rangeStyle = lerp(type.titleMedium, type.titleLarge, t)
     Column(
         // NO alpha ramp. This node is present and fully visible in BOTH states, which is the
         // whole point: one bar and one pair of numbers that move and change shape, rather than
@@ -5941,19 +5957,17 @@ private fun HeroMorphReadout(data: ChargeReadout, t: Float, modifier: Modifier =
             // opening the card. A colour costs no height, which is what the collapsed density
             // has none of.
             val contentColor = LocalContentColor.current
-            // Two lerped spacers, and this is what puts the numbers BESIDE the name instead
-            // of under it. Collapsed (t=0) the LEADING spacer takes the row, so the pair packs
-            // to the right of the title; expanded (t=1) the MIDDLE one takes it, so the
-            // percentage carries the left and the range moves to its own column on the right.
-            // Both weights stay positive at every t, so nothing is added or removed from the
-            // Row mid-animation -- the arrangement interpolates instead of switching.
-            Spacer(Modifier.weight(1.001f - t))
             RollingNumber(
                 data.pctText,
                 pctStyle,
                 FontWeight.Bold,
                 if (data.charging) lerp(ChargeGreen, contentColor, t) else contentColor,
             )
+            // A FIXED gap plus a weighted one. The weighted spacer alone collapsed to ~0 at
+            // t=0 and rendered "74%246 mi" with the numbers touching. The 8dp is the word space
+            // between them collapsed; the weighted one pushes the range out to its own column as
+            // the card expands.
+            Spacer(Modifier.width(8.dp))
             Spacer(Modifier.weight(0.001f + t))
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
@@ -8355,6 +8369,15 @@ internal fun PebbleShell(
      */
     titleTrailing: (@Composable () -> Unit)? = null,
     /**
+     * Reports the TITLE's measured width in px whenever it changes.
+     *
+     * Only the hero uses it. Its collapsed readout is one node positioned in the CARD, not a
+     * child of this title Row, so "put the numbers next to the name" is not something layout can
+     * do for it -- it needs the name's actual width. Guessing a constant would break on every
+     * different car name and font size, which is the class of bug this file keeps paying for.
+     */
+    onTitleWidth: ((Int) -> Unit)? = null,
+    /**
      * Extra content in the header, under the title and [summary].
      *
      * A string is all `summary` can be, and the hero wants a graphical readout there when
@@ -8567,7 +8590,9 @@ internal fun PebbleShell(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 title,
-                                modifier = Modifier.weight(1f, fill = false),
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .onSizeChanged { onTitleWidth?.invoke(it.width) },
                                 style = titleStyle,
                                 fontWeight = FontWeight.Bold,
                                 // Cap at one line: at a large display/font size the

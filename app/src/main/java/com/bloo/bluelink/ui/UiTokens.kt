@@ -75,7 +75,7 @@ internal val ChargeBarHeight = 18.dp
  * actually occupies. Two copies of a spatial constant is how this slot has gone wrong every
  * previous time; one name means the reservation cannot drift from the thing it reserves for.
  */
-internal val HeroReadoutBottomInset = 6.dp
+internal val HeroReadoutBottomInset = 14.dp
 internal val ChargeLimitDotSize = 14.dp
 
 /** Gap between settings cards. Lives inside SettingsCard as bottom padding rather than in
