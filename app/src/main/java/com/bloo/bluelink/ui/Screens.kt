@@ -5223,7 +5223,16 @@ private fun HeroHeader(
                         // Collapsed, the numbers start after the name; expanded, they own the
                         // left edge. Only this Row shifts -- the bar underneath does not.
                         numbersStart = lerp(
-                            with(LocalDensity.current) { titleWidthPx.toDp() } + 10.dp,
+                            // titleWidthPx is measured at headlineSmall, because PebbleShell now
+                            // draws the name at that size and SCALES it down. The name's visible
+                            // width when collapsed is therefore width * that same ratio, and both
+                            // sides derive the ratio from the same two type steps rather than
+                            // agreeing on a constant.
+                            with(LocalDensity.current) {
+                                val ratio = MaterialTheme.typography.titleMedium.fontSize.toPx() /
+                                    MaterialTheme.typography.headlineSmall.fontSize.toPx()
+                                (titleWidthPx * ratio).toDp()
+                            } + 10.dp,
                             0.dp,
                             heroT,
                         ),
@@ -5977,12 +5986,18 @@ private fun HeroMorphReadout(
                 FontWeight.Bold,
                 if (data.charging) lerp(ChargeGreen, contentColor, t) else contentColor,
             )
-            // A FIXED gap plus a weighted one. The weighted spacer alone collapsed to ~0 at
-            // t=0 and rendered "74%246 mi" with the numbers touching. The 8dp is the word space
-            // between them collapsed; the weighted one pushes the range out to its own column as
-            // the card expands.
+            // The 8dp is the word space between the two numbers when collapsed.
             Spacer(Modifier.width(8.dp))
-            Spacer(Modifier.weight(0.001f + t))
+            // The weighted spacer only EXISTS once the card starts opening, and that is the fix
+            // for the range sitting far right while collapsed. A weight of 0.001f is not "almost
+            // nothing" -- it was the Row's only weighted child, so it absorbed ALL the remaining
+            // width regardless of how small the number was, and pushed the range to the far edge.
+            // Weight is a share of the leftover, not a length.
+            //
+            // Omitted entirely at rest, so the Row packs its three items together next to the
+            // name. The threshold is low enough that the spacer appears with a near-zero share
+            // and grows from there, so nothing jumps when it arrives.
+            if (t > 0.02f) Spacer(Modifier.weight(t))
             Column(horizontalAlignment = Alignment.End) {
                 RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
                 // Height LERPED rather than the node being dropped, which is what made the
@@ -8592,21 +8607,46 @@ internal fun PebbleShell(
                                 ),
                                 label = "pebbleHeaderGrow",
                             )
-                            val titleStyle = if (!growTitleOnExpand) {
-                                MaterialTheme.typography.titleMedium
+                            // Drawn at the LARGER size always and SCALED down, rather than
+                            // lerping the font size. The lerp was the choppiness: a Text
+                            // measures through ParagraphLayoutCache, which is single-slot, so a
+                            // font size that changes every frame misses it every frame -- 100%
+                            // invalidation, a full text relayout per frame, and the visible
+                            // result is a few discrete steps rather than a glide. Scaling a
+                            // layout measured ONCE is what Compose itself recommends for
+                            // animated type, and it is draw-phase only.
+                            //
+                            // headlineSmall is the base and it scales DOWN, never up: text
+                            // scaled down stays crisp, upscaling is what goes soft.
+                            //
+                            // transformOrigin pins the LEFT edge so the name grows out of its
+                            // own start position instead of drifting sideways from the centre.
+                            val titleStyle = MaterialTheme.typography.headlineSmall
+                            // Ratio of the two real type steps, so the collapsed size still
+                            // equals titleMedium exactly rather than a hand-picked number.
+                            val collapsedTitleScale = with(LocalDensity.current) {
+                                MaterialTheme.typography.titleMedium.fontSize.toPx() /
+                                    MaterialTheme.typography.headlineSmall.fontSize.toPx()
+                            }
+                            val titleScale = if (!growTitleOnExpand) {
+                                collapsedTitleScale
                             } else {
-                                lerp(
-                                    MaterialTheme.typography.titleMedium,
-                                    MaterialTheme.typography.headlineSmall,
-                                    headerT,
-                                )
+                                lerp(collapsedTitleScale, 1f, headerT)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 title,
                                 modifier = Modifier
                                     .weight(1f, fill = false)
-                                    .onSizeChanged { onTitleWidth?.invoke(it.width) },
+                                    // Reports the width at headlineSmall; the DRAWN width is that
+                                    // times titleScale. The hero applies the same ratio when it
+                                    // offsets its numbers, so both derive from one measurement.
+                                    .onSizeChanged { onTitleWidth?.invoke(it.width) }
+                                    .graphicsLayer {
+                                        scaleX = titleScale
+                                        scaleY = titleScale
+                                        transformOrigin = TransformOrigin(0f, 0.5f)
+                                    },
                                 style = titleStyle,
                                 fontWeight = FontWeight.Bold,
                                 // Cap at one line: at a large display/font size the
