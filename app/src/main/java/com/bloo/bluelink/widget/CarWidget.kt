@@ -1289,7 +1289,13 @@ class CarWidget : GlanceAppWidget() {
         val split = Scale.tallSplit(
             size,
             Scale.ringRoom(frame, render.config.showHeader, false, 16.dp),
-            capRows = Scale.infoCap(size, 3, render.theme.textScale),
+            // The per-tier MAXIMUM, not Scale.infoCap. tallSplit already bounds rows by the real
+            // remaining space (infoRowsIn over `rest`), so passing infoCap here stacked a SECOND
+            // bound computed from a flat 38% of the RAW tile height -- a heuristic that knows
+            // nothing about this tile's header, ring, buttons or map. Whenever it was the tighter
+            // of the two it removed rows that demonstrably fit, so tiles showed less than they had
+            // room for. One real bound plus a hard cap, instead of a real bound plus a guess.
+            capRows = 3,
             textScale = render.theme.textScale,
             wantMap = render.mapBitmap != null,
         )
@@ -1500,7 +1506,13 @@ class CarWidget : GlanceAppWidget() {
         val split = Scale.tallSplit(
             size,
             Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 20.dp),
-            capRows = Scale.infoCap(size, 4, render.theme.textScale),
+            // The per-tier MAXIMUM, not Scale.infoCap. tallSplit already bounds rows by the real
+            // remaining space (infoRowsIn over `rest`), so passing infoCap here stacked a SECOND
+            // bound computed from a flat 38% of the RAW tile height -- a heuristic that knows
+            // nothing about this tile's header, ring, buttons or map. Whenever it was the tighter
+            // of the two it removed rows that demonstrably fit, so tiles showed less than they had
+            // room for. One real bound plus a hard cap, instead of a real bound plus a guess.
+            capRows = 4,
             textScale = render.theme.textScale,
             wantMap = render.mapBitmap != null,
         )
@@ -1608,7 +1620,13 @@ class CarWidget : GlanceAppWidget() {
         val split = Scale.tallSplit(
             size,
             Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 36.dp + primaryValueHeight),
-            capRows = Scale.infoCap(size, WidgetInfoField.ALL.size, render.theme.textScale),
+            // The per-tier MAXIMUM, not Scale.infoCap. tallSplit already bounds rows by the real
+            // remaining space (infoRowsIn over `rest`), so passing infoCap here stacked a SECOND
+            // bound computed from a flat 38% of the RAW tile height -- a heuristic that knows
+            // nothing about this tile's header, ring, buttons or map. Whenever it was the tighter
+            // of the two it removed rows that demonstrably fit, so tiles showed less than they had
+            // room for. One real bound plus a hard cap, instead of a real bound plus a guess.
+            capRows = WidgetInfoField.ALL.size,
             textScale = render.theme.textScale,
             wantMap = render.mapBitmap != null,
         )
