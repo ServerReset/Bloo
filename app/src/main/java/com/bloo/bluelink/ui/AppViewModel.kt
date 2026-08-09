@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -644,6 +645,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 .collect { s -> _state.update { it.copy(climateSync = s.byVin) } }
         }
         // Mirror weather / car photos / AI summaries to the watch.
+        //
+        // `.drop(1)` is NOT cosmetic and must not be removed. `_state` is
+        // `MutableStateFlow(UiState())`, so its first emission is definitionally the
+        // constructor default -- homeWeather null, carWeather/imageUrls/aiSummaries all empty --
+        // and `distinctUntilChanged` passes a first emission through unconditionally. So every
+        // cold start of the phone app published WearExtras(null, {}, {}, {}) to the watch before
+        // the garage or weather had loaded anything.
+        //
+        // On the watch that is destructive, not merely empty. WearListenerService reads
+        // `decodeExtras(raw).images.keys` as the set of cars that still have a photo and calls
+        // `WearPhotoCache.prune(context, vins)` UNCONDITIONALLY -- correctly, because removing
+        // the last car has to reclaim its file. An empty set therefore means "no car has a
+        // photo", and prune deleted every cached photo on the watch. Weather and AI cards blanked
+        // at the same time, and AI summaries are memory-only on the phone (never persisted), so
+        // those were gone until regenerated.
+        //
+        // This is why the watch kept losing car photos: the phone told it to, on launch, every
+        // time. The watch side was right; the publisher was lying to it.
+        //
+        // Dropping only the FIRST emission keeps the genuine all-empty case working: after
+        // sign-out, state really is empty and that publish must still reach the watch to clear
+        // it -- that arrives as a later emission, not the initial one.
         viewModelScope.launch {
             _state.map { s ->
                 com.bloo.bluelink.data.WearExtras(
@@ -652,7 +675,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     images = s.imageUrls,
                     ai = s.aiSummaries,
                 )
-            }.distinctUntilChanged().collect { extras ->
+            }.distinctUntilChanged().drop(1).collect { extras ->
                 com.bloo.bluelink.wear.WearBridge.publishExtras(getApplication(), extras)
             }
         }

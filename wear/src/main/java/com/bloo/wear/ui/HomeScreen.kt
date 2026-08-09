@@ -1090,11 +1090,30 @@ private fun AlertsCard(car: CarView) {
 @Composable
 private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard(null) {
     val alertCount = car.alertCount
-    // The car's own photo, if the phone has sent one. Loaded from the watch's
-    // cache and remembered per VIN + file stamp, so switching cars does not
-    // re-decode and a re-published identical photo does not either.
+    // The car's own photo, if the phone has sent one. Loaded from the watch's cache.
+    //
+    // Keyed on the phone's PATH for this car as well as the VIN, and the second key is the
+    // fix. The comment here used to claim the decode was "remembered per VIN + file stamp" --
+    // there was no stamp in the key, only `car.vin`. So when the phone pushed a NEW photo for a
+    // car already on screen, WearPhotoCache wrote the new bytes to the same `$vin.jpg` and this
+    // produceState never re-ran: the watch kept showing the old image until the app was
+    // restarted or the car was switched away and back. Changing a car photo on the phone
+    // appeared to do nothing on the watch.
+    //
+    // `extras.images[vin]` is the phone-side path, and it is a signal that actually moves: the
+    // crop screen writes every new photo to a fresh `car_${'$'}vin_${'$'}millis.jpg`, so a user-picked
+    // photo changes this string and re-keys the decode. It costs nothing -- extras is already
+    // collected into `ui` and this card already reads it in eleven other places -- and it needs
+    // no I/O in composition, unlike stat-ing the file on every recomposition.
+    //
+    // Known gap, stated rather than hidden: a photo arriving via Drive sync lands at the fixed
+    // `car_${'$'}vin_synced.jpg`, so replacing a synced photo with another synced photo does not move
+    // this key. That path still needs a restart. Fixing it properly means plumbing
+    // WearPhotoCache.ingest's return value -- it already reports which VINs changed and the
+    // caller discards it -- through an event to the UI.
     val ctx = LocalContext.current
-    val photo by produceState<android.graphics.Bitmap?>(initialValue = null, car.vin) {
+    val photoKey = ui.extras.images[car.vin]
+    val photo by produceState<android.graphics.Bitmap?>(initialValue = null, car.vin, photoKey) {
         value = withContext(Dispatchers.IO) {
             WearPhotoCache.pathFor(ctx, car.vin)?.let {
                 runCatching { android.graphics.BitmapFactory.decodeFile(it) }.getOrNull()
