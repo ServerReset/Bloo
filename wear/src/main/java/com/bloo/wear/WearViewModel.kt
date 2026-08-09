@@ -384,6 +384,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // Coords we've already attempted to reverse-geocode (per session), keyed by vin.
     private val geocoded = mutableSetOf<String>()
 
+    /**
+     * vin -> the rounded coordinates its current place name was resolved AT.
+     *
+     * The guard used to be `vin in geocoded || placeNames.containsKey(vin)`, keyed on the VIN
+     * alone, so a name resolved once was never recomputed. Drive from one side of town to the
+     * other and the watch kept labelling the NEW position with the place the car was first
+     * geocoded at -- a place name and a set of coordinates on the same card, disagreeing.
+     *
+     * Rounded to ~3 decimals (about 110m) so ordinary GPS jitter, and a car re-reporting the same
+     * parking spot, do not re-hit the geocoder; a real move does. Stored as rounded Longs rather
+     * than a formatted string deliberately -- a "%.3f" key would be locale-dependent, which is
+     * the exact bug coordString already had to be fixed for.
+     */
+    private val geocodedAt = mutableMapOf<String, Pair<Long, Long>>()
+
     private val _ui = MutableStateFlow(WearUi())
     val ui = _ui.asStateFlow()
 
@@ -1173,7 +1188,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      * hard timeout, and is a no-op where no geocoder backend is available.
      */
     fun ensurePlaceName(vin: String, lat: Double, lon: Double) {
-        if (vin in geocoded || placeNames.containsKey(vin)) return
+        // Keyed on WHERE, not just which car -- see [geocodedAt]. `geocoded` is now purely an
+        // in-flight marker; `geocodedAt` is the "already resolved, for this position" record.
+        val at = Math.round(lat * 1000) to Math.round(lon * 1000)
+        if (geocodedAt[vin] == at) return
+        if (vin in geocoded) return
         if (!Geocoder.isPresent()) return
         geocoded.add(vin)
         viewModelScope.launch {
@@ -1185,11 +1204,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // app session, with the Location card silently falling back to
             // raw lat/lon and never retrying.
             val name = runCatching { reverseGeocode(lat, lon) }.getOrNull()
+            // Always release the in-flight marker; success is now recorded by geocodedAt instead.
+            // That keeps the fix this comment describes (a thrown geocoder error used to leave the
+            // vin stuck forever) while making a MOVE retryable, which the old success-marker
+            // could not express.
+            geocoded.remove(vin)
             if (!name.isNullOrBlank()) {
+                geocodedAt[vin] = at
                 placeNames = placeNames + (vin to name)
                 publish()
-            } else {
-                geocoded.remove(vin)
             }
         }
     }
