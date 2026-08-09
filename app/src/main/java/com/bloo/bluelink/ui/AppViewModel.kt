@@ -2014,7 +2014,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> current
         }
         _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
-        viewModelScope.launch { settingsStore.setSeatFlag(v.vin, field, value) }
+        viewModelScope.launch {
+            settingsStore.setSeatFlag(v.vin, field, value)
+            // Republish, for the same reason setPowertrain does. The watch's Comfort card shows
+            // only the seat/wheel controls the car actually has, driven by
+            // WearSettingsPayload.seatConfigs -- and WearBridge builds that field by reading the
+            // store per VIN directly, NOT from `appearance`.
+            //
+            // That is why the appearance collector cannot cover this: it is
+            // `settingsStore.appearance.distinctUntilChanged()`, and a seat flag does not change
+            // appearance, so it never emits. Without this call the watch kept offering a heated
+            // seat the user had just told the phone the car does not have, until something
+            // unrelated happened to touch appearance.
+            runCatching {
+                com.bloo.bluelink.wear.WearBridge.publishSettingsNow(
+                    getApplication(),
+                    settingsStore.appearance.first(),
+                )
+            }
+        }
     }
 
     /** Toggle a pebble (detail section) open/closed for a car (persisted). */
