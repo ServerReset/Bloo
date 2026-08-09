@@ -1268,7 +1268,20 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             modifier = Modifier.weight(1f),
             toggled = car.climateOn == true,
             showIcon = false,
-            contentDescription = if (car.climateOn == true) "Climate on. Stop climate" else "Climate off. Start climate",
+            // Three states, not two. `== true` announced "Climate off" as a FACT when the car
+            // has not reported climate at all -- and a screen-reader user gets only this string,
+            // with none of the visual hedging a sighted user can infer from a dimmed control. It
+            // is the same unknown-stated-as-fact class as the Plug row, and it matters more here
+            // because the words are the entire interface.
+            //
+            // The visible label and `active`/`toggled` still collapse unknown to the "start"
+            // affordance, deliberately: a button has to offer one action and a toggle has to
+            // render one position. Only the spoken description can afford to say it does not know.
+            contentDescription = when (car.climateOn) {
+                true -> "Climate on. Stop climate"
+                false -> "Climate off. Start climate"
+                null -> "Climate state unknown. Start climate"
+            },
         )
     }
 }

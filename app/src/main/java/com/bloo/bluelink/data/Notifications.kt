@@ -437,6 +437,12 @@ object LiveCharge {
             putExtra(AlertActionReceiver.EXTRA_VIN, vin)
             putExtra(AlertActionReceiver.EXTRA_ACTION, WearAction.CHARGE_OFF)
             putExtra(AlertActionReceiver.EXTRA_NOTIF_ID, id)
+            // The confirmation must NOT land on `id`. That is this bar's own id, and
+            // LiveCharge.sync posts, updates and cancels it on every 5-minute poll -- so a
+            // confirmation posted there gets cancelled by the next poll, or replaced by a
+            // reposted bar, and in the meantime LiveCharge believes its bar is showing when what
+            // is actually showing is a "Stop charging sent" message.
+            putExtra(AlertActionReceiver.EXTRA_CONFIRM_ID, ("live_charge_confirm_$vin").hashCode())
             putExtra(AlertActionReceiver.EXTRA_LABEL, "Stop charging")
         }
         val stopPi = PendingIntent.getBroadcast(

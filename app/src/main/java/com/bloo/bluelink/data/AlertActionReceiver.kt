@@ -71,6 +71,11 @@ class AlertActionReceiver : BroadcastReceiver() {
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
         val notifId = intent.getIntExtra(EXTRA_NOTIF_ID, -1)
+        // Where the "sent"/"failed" confirmation goes. Defaults to notifId, which is what the
+        // door/engine/service ALERTS want -- see the reuse comment below. The live charging bar
+        // passes its own value instead, because its id belongs to a notification that manages
+        // ITSELF on a 5-minute poll.
+        val confirmId = intent.getIntExtra(EXTRA_CONFIRM_ID, notifId)
         val label = intent.getStringExtra(EXTRA_LABEL) ?: "Command"
         val ctx = context.applicationContext
 
@@ -90,8 +95,16 @@ class AlertActionReceiver : BroadcastReceiver() {
                 } else {
                     result?.message ?: "Couldn't reach the car. Try again from the app."
                 }
-                // Reuse the same id so the follow-up replaces the (now-cancelled) alert.
-                if (notifId != -1) Notifications.post(ctx, notifId, title, text)
+                // Reuse the same id so the follow-up replaces the (now-cancelled) alert. That
+                // is correct for an alert, whose id nobody else owns -- but NOT for the live
+                // charging bar, which LiveCharge.sync posts, updates and cancels under
+                // `idFor(vin)` on every poll. Posting the confirmation there made the two fight
+                // over one slot: the confirmation took the bar's id, and the next poll either
+                // cancelled the user's confirmation or replaced it with a reposted bar. Worse,
+                // LiveCharge's own notion of "a bar is showing for this vin" was then describing
+                // a notification that is not a bar. `confirmId` lets the live-charge path opt out
+                // while every alert keeps the replace-in-place behaviour it was written for.
+                if (confirmId != -1) Notifications.post(ctx, confirmId, title, text)
             } finally {
                 pending.finish()
             }
@@ -106,6 +119,10 @@ class AlertActionReceiver : BroadcastReceiver() {
         const val EXTRA_VIN = "vin"
         const val EXTRA_ACTION = "action"
         const val EXTRA_NOTIF_ID = "notif_id"
+
+        /** Optional: id for the "sent"/"failed" confirmation, when it must NOT reuse
+         *  [EXTRA_NOTIF_ID]. Absent means reuse, which is what the alerts want. */
+        const val EXTRA_CONFIRM_ID = "confirm_notif_id"
         const val EXTRA_LABEL = "label"
     }
 }
