@@ -1674,7 +1674,19 @@ private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
     Spacer(Modifier.height(4.dp))
     car.percent?.let { StatusRow("Battery", "$it%") }
     car.rangeMi?.let { StatusRow("Range", formatDistance(it, metric)) }
-    StatusRow("Plug", car.chargerLabel ?: (if (car.pluggedIn == true) "Plugged in" else "Unplugged"))
+    // `== true` collapsed unknown into "Unplugged", stating as fact something the car never
+    // reported -- and contradicting this same card's own button, which reads `car.charging ==
+    // true` and so could say "Stop" (charging) directly above a row claiming the cable was out.
+    // This card's KDoc already promises the correct behaviour: "each status row below it is
+    // conditionally rendered only when the underlying value is non-null ... so a car that hasn't
+    // reported, say, a timeToFullMin simply omits that row rather than showing a placeholder."
+    // The Plug row was the one that did not honour it.
+    val plugLabel = car.chargerLabel ?: when (car.pluggedIn) {
+        true -> "Plugged in"
+        false -> "Unplugged"
+        null -> null
+    }
+    plugLabel?.let { StatusRow("Plug", it) }
     car.timeToFullMin?.takeIf { it > 0 }?.let { StatusRow("Time to full", fmtMinutes(it)) }
 }
 

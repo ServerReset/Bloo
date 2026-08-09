@@ -286,7 +286,30 @@ class WearPhoneService : WearableListenerService() {
                     WearSync.PATH_LOCAL -> {
                         val payload = WearSync.decodeLocal(raw) ?: return@forEach
                         val store = SettingsStore(applicationContext)
-                        store.setUiScale(payload.uiScale.coerceIn(0.8f, 1.4f))
+                        // NOT store.setUiScale(payload.uiScale). That was a feedback loop and it
+                        // squared the watch's own text-size slider.
+                        //
+                        // The watch fills this field with its LOCAL fontScale -- WearComms
+                        // .publishLocalSettings takes it as a parameter literally named
+                        // `uiScale`, and WearViewModel passes `ls.fontScale` into it. Writing it
+                        // here made it the PHONE's appearance uiScale, which the phone then
+                        // publishes straight back down in PATH_SETTINGS. MainActivity multiplies
+                        // `phoneScale * localScale` believing them independent, so the watch's
+                        // slider arrived on both sides of that product: set it to 1.2 and text
+                        // rendered at 1.44.
+                        //
+                        // The 1.4 cap in MainActivity was written to stop "two maxed sliders"
+                        // compounding to ~1.82. There were never two sliders -- it was one value
+                        // squared, and the cap hid it by clamping every setting above ~1.18 to
+                        // the same result.
+                        //
+                        // It was also wrong in the other direction: adjusting TEXT SIZE ON THE
+                        // WATCH silently changed the phone app's own UI scale.
+                        //
+                        // The correct pattern is three lines below, for the PIN lock: a
+                        // watch-originated value is stored as a "backup record only ...
+                        // one-directional (watch -> phone) and never pushed back down". uiScale
+                        // is pushed back down, so it cannot be stored there.
                         payload.unitSystem?.let { store.setUnitSystem(it) }
                         // Backup record only -- see WearLocalPayload's doc comment
                         // for why this is one-directional (watch -> phone) and
