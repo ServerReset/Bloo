@@ -5964,7 +5964,26 @@ private fun HeroMorphReadout(
         modifier,
         verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t)),
     ) {
-        Row(Modifier.padding(start = numbersStart), verticalAlignment = Alignment.Bottom) {
+        // Lifted onto the car name's line when collapsed.
+        //
+        // The geometry, because the number is derived rather than dialled in: the header reserves
+        // gap + bar + inset, and the readout is bottom-anchored inset from the card's base -- so
+        // the numbers row's BOTTOM lands exactly where the header's content ends, which is one row
+        // BELOW the name band. Shifting up by the row's own height puts its bottom on the title's
+        // bottom, and since both are titleMedium they then share a line.
+        //
+        // `offset {}` and not padding: the lambda form is read in the LAYOUT phase and shifts only
+        // this Row, so the bar underneath does not move with it. A padding would have pushed the
+        // bar up too, straight back into the name.
+        val nameLineLift = with(LocalDensity.current) {
+            MaterialTheme.typography.titleMedium.lineHeight.toDp().toPx()
+        }
+        Row(
+            Modifier
+                .padding(start = numbersStart)
+                .offset { IntOffset(0, -(nameLineLift * (1f - t)).roundToInt()) },
+            verticalAlignment = Alignment.Bottom,
+        ) {
             // Collapsed there is no room for the state line below, so the PERCENTAGE carries
             // the charging cue by taking the charge colour, and fades back to normal content
             // colour as the card opens -- by which point the explicit
