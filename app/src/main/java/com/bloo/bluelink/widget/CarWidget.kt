@@ -1772,10 +1772,12 @@ class CarWidget : GlanceAppWidget() {
     @Composable
     private fun HeaderRow(
         car: VehicleSnapshot, render: Render,
-        // Same reasoning as InfoStack's own availableWidth -- the header
-        // sits inside RingWithContent's narrower column at the wide MEDIUM
-        // tier, not across the whole tile.
-        availableWidth: Dp = LocalSize.current.width,
+        // The width the header's text column has. Defaults to the real inner width (tile
+        // minus root padding) -- NOT the raw tile width, which over-reported by up to 18dp
+        // per side and let the name render wider than the padded box. The wide-MEDIUM tier
+        // overrides it with its own narrower RingWithContent column width; those callers were
+        // already correct, this only fixes the ones that took the default.
+        availableWidth: Dp = Scale.innerWidth(render.frame(LocalSize.current)),
     ) {
         // Gated here rather than at each of the dozen call sites, so the
         // option can't be honoured by some tiers and quietly ignored by
@@ -1790,8 +1792,11 @@ class CarWidget : GlanceAppWidget() {
         val textWidth = (availableWidth - pillReserve - 4.dp).coerceAtLeast(16.dp)
         Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(LocalContext.current)), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.defaultWeight()) {
-                FitText(car.name, titleStyle(render.theme), maxWidth = textWidth)
-                FitText(statusSubtitle(car), subtitleStyle(render.theme), maxWidth = textWidth)
+                // singleLine: Scale.headerHeight reserves exactly one title + one subtitle
+                // line, so neither may wrap -- a wrapped name would make the header 3 lines
+                // and overflow that reservation. FitText shrinks to fit one line instead.
+                FitText(car.name, titleStyle(render.theme), maxWidth = textWidth, singleLine = true)
+                FitText(statusSubtitle(car), subtitleStyle(render.theme), maxWidth = textWidth, singleLine = true)
             }
             // Follow-selected widgets get a car switcher chevron. Via
             // Render.hasSwitcher so Scale.headerHeight reserves for exactly the
@@ -1824,10 +1829,14 @@ class CarWidget : GlanceAppWidget() {
                 subtitleStyle(render.theme).copy(color = ColorProvider(Color(BlooColors.warn)))
             else subtitleStyle(render.theme)
             val text = if (render.stale) "Updated $updated · may be stale" else "Updated $updated"
+            // innerWidth + singleLine: the footer sits inside Content's root padding, and
+            // Scale.footerHeight reserves exactly one subtitle line for it -- so it must fit
+            // the real inner width on one line, not wrap. See FitText's singleLine note.
             FitText(
                 text,
                 style,
-                maxWidth = LocalSize.current.width - 8.dp,
+                maxWidth = Scale.innerWidth(render.frame(LocalSize.current)),
+                singleLine = true,
                 modifier = GlanceModifier.clickable(
                     actionRunCallback<WidgetRefreshAction>(actionParametersOf(WidgetKeys.VIN to car.vin)),
                 ),
