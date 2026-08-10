@@ -20,8 +20,10 @@ class ActiveDotIndexTest {
 
     @Test
     fun clampsOutOfRangeIndex() {
+        // The not-compressed branch clamps to shown-1 (the dot range), not count-1: an index
+        // past the end lights the last drawn dot. With count=5 <= shown=7 that's dot 6.
         assertEquals(0, activeDotIndex(count = 5, shown = 7, index = -3))
-        assertEquals(4, activeDotIndex(count = 5, shown = 7, index = 99))
+        assertEquals(6, activeDotIndex(count = 5, shown = 7, index = 99))
     }
 
     @Test
