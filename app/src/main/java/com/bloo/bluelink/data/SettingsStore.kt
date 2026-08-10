@@ -1774,24 +1774,12 @@ class SettingsStore(private val context: Context) {
         editTracked { it.remove(Keys.CAR_PALETTE_IDS) }
     }
 
-    /** Serialise all custom palettes to a JSON string for export/share. */
-    suspend fun exportPalettesJson(): String =
-        context.settingsDataStore.data.first()[Keys.CUSTOM_PALETTES] ?: "[]"
-
-    /**
-     * Merge custom palettes parsed from [json] into the saved set (new ids only).
-     * Returns an error message on failure, or null on success.
-     */
-    suspend fun importPalettesJson(json: String): String? {
-        val parsed = runCatching { paletteJson.decodeFromString(paletteListSerializer, json) }
-            .getOrElse { return "Invalid palette file" }
-        val existing = readCustomPalettes()
-        val merged = existing + parsed.filter { new -> existing.none { it.id == new.id } }
-        editTracked {
-            it[Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, merged)
-        }
-        return null
-    }
+    // exportPalettesJson() / importPalettesJson() were deleted here: no callers. Custom palettes
+    // travel through the full settings backup and Drive sync like every other pref (they live
+    // under Keys.CUSTOM_PALETTES, which the backup already carries), so a standalone
+    // palette-only import/export was never wired to any UI. The helpers they used
+    // (readCustomPalettes, paletteJson, paletteListSerializer) remain live for the per-palette
+    // save/delete paths above.
 
     // --- Full settings backup --------------------------------------------
 

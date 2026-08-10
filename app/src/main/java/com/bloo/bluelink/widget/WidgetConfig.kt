@@ -83,7 +83,7 @@ data class WidgetConfig(
         const val THEME_AUTO = "auto"
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
-        val THEMES = listOf(THEME_AUTO, THEME_LIGHT, THEME_DARK)
+        // (no THEMES aggregate: nothing enumerates the theme options; the picker lists them itself)
 
         const val PRIORITY_INFO = "info"
         const val PRIORITY_CONTROLS = "controls"
@@ -92,7 +92,7 @@ data class WidgetConfig(
         const val CORNER_SOFT = "soft"
         const val CORNER_ROUND = "round"
         const val CORNER_PILL = "pill"
-        val CORNERS = listOf(CORNER_SHARP, CORNER_SOFT, CORNER_ROUND, CORNER_PILL)
+        // (no CORNERS aggregate: nothing enumerates the corner options; the picker lists them itself)
 
         /** Smallest opacity offered. Fully transparent would leave a widget
          *  that looks broken rather than styled -- text and buttons floating

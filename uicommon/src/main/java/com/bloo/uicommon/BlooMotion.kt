@@ -10,9 +10,10 @@ package com.bloo.uicommon
  */
 const val SoftDamping = 0.82f
 
-/** Damping ratio for expressive "press punch" motions (button squeeze, PIN key) —
- *  a lively bounce. Same as Spring.DampingRatioMediumBouncy, named for intent. */
-const val ExpressiveDamping = 0.5f
+// ExpressiveDamping (= 0.5f) was deleted here: no callers. Every "press punch" spring in the app
+// hard-codes Spring.DampingRatioMediumBouncy or a literal 0.5f directly, so this named constant
+// only implied a centralisation that did not exist. If bounce damping is ever genuinely unified,
+// reintroduce it AND route the call sites through it in the same change.
 
 /** Damping ratio for gentle crossfades of colour/opacity — no visible overshoot. */
 const val GentleDamping = 0.9f

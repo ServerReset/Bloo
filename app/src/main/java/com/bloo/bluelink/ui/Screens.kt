@@ -6512,7 +6512,6 @@ internal fun <T> ReorderColumn(
             // changes (instead of reusing nodes by slot, which looks janky).
             key(k) {
                 val dragging = draggingKey == k
-                val dragState = draggingKey != null
                 val lift by animateFloatAsState(
                     targetValue = if (dragging) 1.08f else 1f,
                     animationSpec = if (dragging) spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)

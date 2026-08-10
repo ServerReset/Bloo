@@ -5,9 +5,16 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.lerp
 
 /**
- * Shared color utilities between phone and watch. Both apps apply the same
- * M3-expressive treatment to their ColorScheme (push accent hue, blend
- * secondary/tertiary), so the derived colours are consistent.
+ * Colour helper shared between the phone and watch Compose UIs.
+ *
+ * NOT to be confused with `com.bloo.bluelink.data.BlooColors` in :shared, which is a set of
+ * packed-ARGB Int CONSTANTS usable from non-Compose surfaces (Glance widget, Protolayout tile).
+ * This one holds Compose `Color` FUNCTIONS and depends on androidx.compose.ui.graphics, so it
+ * cannot live in :shared and the two cannot merge. The name collision is deliberate-ish history;
+ * import the right one for the surface.
+ *
+ * Foundation-only by design: no Material dependency, so it takes and returns bare `Color` and
+ * never `MaterialTheme` colours.
  */
 object BlooColors {
     /**
@@ -23,28 +30,10 @@ object BlooColors {
         else lerp(surface, onSurface, 0.20f)
     }
 
-    /**
-     * Determine the foreground colour (text/icon) on top of [accent] — dark on
-     * light accents, white on dark. The luminance cutoff at 0.5 matches the
-     * way M3 expressive themes typically reason about this.
-     */
-    fun onAccent(accent: Color): Color =
-        if (accent.luminance() > 0.5f) Color(0xFF383838.toInt()) else Color.White
-
-    /** A muted version of [accent] for secondary surfaces (e.g. inactive chips). */
-    fun accentMuted(accent: Color): Color {
-        val hsv = FloatArray(3)
-        android.graphics.Color.colorToHSV(accent.toArgbInt(), hsv)
-        hsv[1] = (hsv[1] * 0.55f).coerceIn(0.1f, 0.5f)
-        hsv[2] = (hsv[2] * 0.55f).coerceAtLeast(0.18f)
-        return Color(android.graphics.Color.HSVToColor(hsv))
-    }
-
-    private fun Color.toArgbInt(): Int {
-        val a = (alpha * 255).toInt()
-        val r = (red * 255).toInt()
-        val g = (green * 255).toInt()
-        val b = (blue * 255).toInt()
-        return (a shl 24) or (r shl 16) or (g shl 8) or b
-    }
+    // onAccent() and accentMuted() (plus a private Color.toArgbInt() only accentMuted used) were
+    // deleted here: nothing on either surface ever called them. The object's old doc claimed all
+    // three were "shared utilities between phone and watch", but only buttonContainer ever was.
+    // The widget derives its own on-accent tone inline (CarWidget WidgetTheme.build) with a
+    // different dark value, so routing it through a shared onAccent would have changed its colour,
+    // not just its call site -- another reason this was dead rather than merely uncalled.
 }

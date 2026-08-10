@@ -134,11 +134,9 @@ enum class Brand(
     }
 }
 
-// Strict lookup by exact enum `name`: returns null (rather than defaulting to
-// HYUNDAI like [Brand.fromName]) when `name` is null or doesn't match any entry.
-// Use this when a missing/unknown brand should be handled by the caller.
-fun Brand.Companion.fromNameOrNull(name: String?): Brand? =
-    runCatching { name?.let { Brand.valueOf(it) } }.getOrNull()
+// Brand.Companion.fromNameOrNull was deleted here: no callers anywhere. It was a strict
+// null-returning counterpart to fromName (which defaults to HYUNDAI); nothing needed the strict
+// variant. Re-add from git history if a caller ever wants "unknown brand -> caller handles it".
 
 /** The telematics brand a vehicle belongs to. */
 val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)
