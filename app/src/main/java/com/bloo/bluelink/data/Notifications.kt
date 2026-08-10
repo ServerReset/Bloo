@@ -247,7 +247,12 @@ object LiveCharge {
     // full step to spare.
     private const val CHANNEL = "bloo_live_charge"
     private const val ACCENT = BlooColors.brandAccent
-    private const val CHARGE_GREEN = 0xFF34C759.toInt()
+    // The one shared charge green (BlooColors.chargeGreen), same as the widget ring, the QS
+    // and watch tiles, and the watch app. This used to be its own 0xFF34C759 -- a brighter,
+    // Apple-style green that had drifted from the canonical token, so the live-charge bar (the
+    // one charge surface that actively interrupts the user) showed a different green from every
+    // glanceable surface. Consolidated so a future palette change moves all of them together.
+    private const val CHARGE_GREEN = BlooColors.chargeGreen
     private const val TRACK = 0x40FFFFFF
     private const val LIMIT_POINT = 0xFFFFFFFF.toInt()
 
