@@ -349,10 +349,10 @@ fun AnimatedSlider(
 /**
  * Quantizes [v] to the nearest of [steps] evenly-spaced increments across
  * [range]. With `steps` intermediate stops, the range is divided into
- * `steps + 1` equal-sized increments (so a slider with 1 step has 2 valid
- * positions: start and end; 0 steps means no quantization at all, just a
- * plain clamp to the range). Works by dividing the offset from range.start by
- * the increment size, rounding to the nearest whole increment, then
+ * `steps + 1` equal-sized increments (so a slider with 1 step has 3 valid
+ * positions: start, midpoint and end; 0 steps means no quantization at all,
+ * just a plain clamp to the range). Works by dividing the offset from
+ * range.start by the increment size, rounding to the nearest whole increment, then
  * multiplying back and clamping — the same "round to nearest multiple"
  * technique used for indexFor()-style quantization elsewhere in this module.
  */
