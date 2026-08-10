@@ -38,7 +38,7 @@ Generated from a full read of every one of the 91 Kotlin files (giant files slic
 | [app/Screens-part2-garage-carousel.md](app/Screens-part2-garage-carousel.md) | Garage screen, car carousel/grid, hero tile, compact/cover-screen tiles, pebble-list plumbing. |
 | [app/Screens-part3-pebbles.md](app/Screens-part3-pebbles.md) | The detail "pebble" composables: charge, fuel, climate, location/map, trips, diagnostics, info, weather. |
 | [app/Screens-part4-settings-search.md](app/Screens-part4-settings-search.md) | Settings screen sections, AI search, and `parseVehicleCommand` (natural-language → car command). **Home of two HIGH bugs — see its Gotchas.** |
-| [app/widget-BlooWidget.md](app/widget-BlooWidget.md) | The Glance home-screen widget: tier dispatcher, each tile tier, blur cache, color/background resolution. |
+| [app/widget-CarWidget.md](app/widget-CarWidget.md) | The Glance home-screen widget: grid model, 18-tier dispatcher, the `Scale`/`WidgetLayout` sizing split, each tier layout, settings, click routing. Supersedes `widget-BlooWidget.md`. |
 | [app/widget-workers-and-config.md](app/widget-workers-and-config.md) | `WidgetCommandWorker`, `WidgetRefreshWorker`, `WidgetAction`, config/auth activities, receiver. |
 | [app/qs-tiles.md](app/qs-tiles.md) | Quick Settings tiles: `BlooTileService`, `TileActionActivity`, `TileCommandWorker`, and `TileCommandRunner`. |
 | [app/wear-bridge-phone-side.md](app/wear-bridge-phone-side.md) | `WearBridge` (publish to watch) + `WearPhoneService`/listener (receive watch commands, run them). |
