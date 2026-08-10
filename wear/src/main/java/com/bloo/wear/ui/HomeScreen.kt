@@ -869,15 +869,10 @@ private fun CurvedDots(
 ) {
     if (count <= 1) return
     val shown = min(count, cap)
-    val idx = activeIndex()
-    val active = if (count <= shown) {
-        // Fewer items than dots: index maps 1:1, just clamp for safety.
-        idx.coerceIn(0, shown - 1)
-    } else {
-        // More items than dots: rescale activeIndex's position in [0, count-1]
-        // onto [0, shown-1] and round to the nearest whole dot.
-        ((idx.toFloat() / (count - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
-    }
+    // The index -> lit-dot mapping is the shared, unit-tested activeDotIndex (fewer items than
+    // dots: 1:1 clamp; more: rescale [0,count-1] onto [0,shown-1], first/last item always
+    // lighting the first/last dot). See FormatUtils.activeDotIndex.
+    val active = com.bloo.bluelink.data.activeDotIndex(count, shown, activeIndex())
     val selected = MaterialTheme.colorScheme.primary
     val unselected = MaterialTheme.colorScheme.outlineVariant
     CurvedLayout(modifier = Modifier.fillMaxSize(), anchor = anchor, anchorType = AnchorType.Center) {

@@ -573,3 +573,20 @@ fun shouldRelockAfter(elapsedMs: Long, timingKey: String): Boolean = when (timin
     "10min" -> elapsedMs >= 600_000L
     else -> true
 }
+
+/**
+ * Which of [shown] page-indicator dots to light for item [index] out of [count] total.
+ *
+ * When there are no more items than dots the mapping is 1:1 (just clamped). When there are MORE
+ * items than dots, [index]'s position in `[0, count-1]` is rescaled onto `[0, shown-1]` and
+ * rounded to the nearest dot -- so the first item always lights the first dot and the last the
+ * last, with the middle items sharing the dots between. Extracted from the watch's CurvedDots
+ * so this off-by-one-prone integer mapping (the `count-1` divisor, the endpoint behaviour) can
+ * be unit-tested; the composable owns only the drawing. Returns 0 for a degenerate
+ * count/shown <= 1 (the caller draws nothing then anyway).
+ */
+fun activeDotIndex(count: Int, shown: Int, index: Int): Int {
+    if (shown <= 1 || count <= 1) return 0
+    if (count <= shown) return index.coerceIn(0, shown - 1)
+    return ((index.toFloat() / (count - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
+}
