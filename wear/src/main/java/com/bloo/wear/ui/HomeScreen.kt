@@ -88,6 +88,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
@@ -695,25 +696,22 @@ private fun BoxScope.HoldRefreshRing(progress: () -> Float) {
         val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
         val topLeft = Offset(inset, inset)
         // Faint full-circle track so the sweep reads against the bezel, then the
-        // filling arc from 12 o'clock (-90°) clockwise.
-        drawArc(
-            color = trackColor,
-            startAngle = -90f,
-            sweepAngle = 360f,
-            useCenter = false,
-            topLeft = topLeft,
-            size = arcSize,
-            style = Stroke(width = stroke, cap = StrokeCap.Round),
-        )
-        drawArc(
-            color = ringColor,
-            startAngle = -90f,
-            sweepAngle = 360f * p,
-            useCenter = false,
-            topLeft = topLeft,
-            size = arcSize,
-            style = Stroke(width = stroke, cap = StrokeCap.Round),
-        )
+        // filling arc from 12 o'clock (-90°) clockwise. Both arcs share every geometry
+        // arg -- start, origin, box, round stroke -- and differ only in colour and sweep,
+        // so a local lambda holds the shared shape and the two calls are one line each.
+        val arc: (Color, Float) -> Unit = { c, sweep ->
+            drawArc(
+                color = c,
+                startAngle = -90f,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+        }
+        arc(trackColor, 360f)
+        arc(ringColor, 360f * p)
     }
 }
 
