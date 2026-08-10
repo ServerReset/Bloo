@@ -508,4 +508,26 @@ class SyncDeviceLocalTest {
             assertFalse(SyncMerge.isDeviceLocal(it), "$it was wrongly treated as device-local")
         }
     }
+
+    // A hand-edited backup that lists the SAME key in both `prefs` and `_removed` must keep the
+    // present value, not delete it. Every applier runs the puts then the removes, so without the
+    // reader dropping such a key from `removes`, the put would be immediately undone -- the exact
+    // opposite of buildRoot's own "a present value wins over its stale tombstone" rule, which it
+    // applies on the WRITE side. Bloo's own exports never dual-list; a hand-edited file can.
+    @Test
+    fun keyInBothPrefsAndRemovedKeepsTheValue() {
+        val json = """
+            {"_format":"bloo-settings","_version":1,
+             "prefs":{"plate_ABC":"7XYZ123","notify_charging":true},
+             "_removed":["plate_ABC","notify_charging","genuinely_gone"]}
+        """.trimIndent()
+        val plan = assertNotNull(SyncMerge.parseBackup(json))
+        // The two keys present in prefs win -- kept as puts, dropped from removes.
+        assertEquals("7XYZ123", plan.stringPuts["plate_ABC"])
+        assertEquals(true, plan.boolPuts["notify_charging"])
+        assertFalse(plan.removes.contains("plate_ABC"), "a key present in prefs must not also be removed")
+        assertFalse(plan.removes.contains("notify_charging"), "a key present in boolPuts must not also be removed")
+        // A key ONLY in _removed is still a genuine tombstone.
+        assertTrue(plan.removes.contains("genuinely_gone"))
+    }
 }

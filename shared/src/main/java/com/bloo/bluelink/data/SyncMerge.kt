@@ -452,7 +452,15 @@ object SyncMerge {
                 else -> stringPuts[name] = prim.content
             }
         }
-        val removes = removed.filterNotTo(LinkedHashSet()) { isDeviceLocal(it) }
+        // A key present in prefs wins over its own tombstone -- the SAME rule buildRoot applies
+        // when writing (`it in prefs.keys` is filtered out of `_removed`), enforced here on the
+        // read side too. Bloo's own exports never list a key in both, but the format is
+        // hand-editable, and without this filter a key in both `prefs` and `_removed` would be
+        // DELETED: every applier runs the puts THEN the removes, so the remove would undo the
+        // put -- the exact opposite of buildRoot's "a present value wins" guarantee.
+        val removes = removed.filterNotTo(LinkedHashSet()) {
+            isDeviceLocal(it) || it in stringPuts || it in boolPuts
+        }
         return MergePlan(stringPuts, boolPuts, removes)
     }
 
