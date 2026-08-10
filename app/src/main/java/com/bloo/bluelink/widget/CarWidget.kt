@@ -2542,9 +2542,27 @@ class CarWidget : GlanceAppWidget() {
             // enough to be one. Either way the bar treatment isn't what this
             // tile wants, so it gets the ordinary name/stat pair rather than a
             // shrunken imitation of a hero -- unless the caller already has
-            // its own header, in which case there's simply nothing to draw
-            // here rather than a redundant name.
-            if (showNameFallback) NameAndStat(car, render, width = width)
+            // its own header, in which case a NAME would duplicate it.
+            //
+            // A NUMBER wouldn't, though, and dropping to genuinely nothing
+            // here was its own real bug: [Scale.ringHero]'s room-available
+            // gate (24dp, tuned for a CIRCLE) is looser than what BarHero's
+            // OWN heroSpIn floor actually needs (~35dp, HERO_MIN_SP scaled
+            // plus the bar's own reserve) -- so a caller could clear the
+            // first gate, hand this a real but insufficient `avail`, and get
+            // silence instead of either treatment. Confirmed by simulating
+            // this exact arithmetic outside the codebase: every nominal
+            // LARGE_WIDE grid size at 3 rows (250x180 through 460x180) landed
+            // in precisely this gap -- a widget with a real percentage to
+            // show, and genuine (if modest) vertical room, rendering neither
+            // the hero number nor any fallback at all.
+            when {
+                showNameFallback -> NameAndStat(car, render, width = width)
+                pct != null && avail >= Scale.lineHeight(Scale.subtitleSp(size).value, theme.textScale) + 4.dp ->
+                    PrimaryInfoLine(car, render, maxWidth = width)
+                // Truly no room for anything, or no percent to show at all.
+                else -> {}
+            }
             return
         }
         val heroH = Scale.lineHeight(heroSp, 1f)
