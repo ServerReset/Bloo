@@ -10314,9 +10314,10 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     // had. Latching per limit shrinks that to the case where a limit has genuinely never been
     // reported, instead of the far commoner case where it merely arrived second.
     //
-    // Worth knowing together with the open Canada finding: CanadaApi never populates
-    // reservChargeInfos at all, so on those cars NEITHER latch ever closes and Set still sends
-    // 80/90. Fixing that needs Canada's charge-limit endpoint, which this does not touch.
+    // Canada is the extreme case of this: CanadaApi never populates reservChargeInfos at all,
+    // so on those cars neither latch could ever close. That is exactly why the pills below are
+    // hidden for Canada (see Brand.supportsChargeLimits) -- the seeding here would never fire,
+    // Set would only ever send the 80/90 defaults, so the whole editable control is suppressed.
     var acSeeded by remember(v.vin) { mutableStateOf(false) }
     var dcSeeded by remember(v.vin) { mutableStateOf(false) }
     LaunchedEffect(v.vin, ev?.reservChargeInfos) {
@@ -10357,24 +10358,31 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
         if (plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
-        ChargeLimitPill(
-            label = "AC (home) limit",
-            icon = Icons.Filled.Power,
-            limit = acLimit,
-            pending = limitPending,
-            enabled = enabled,
-            onValueChange = { acLimit = it },
-            onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
-        )
-        ChargeLimitPill(
-            label = "DC (fast) limit",
-            icon = Icons.Filled.Bolt,
-            limit = dcLimit,
-            pending = limitPending,
-            enabled = enabled,
-            onValueChange = { dcLimit = it },
-            onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
-        )
+        // Charge-limit editing is shown only for brands that can actually report the
+        // targets. Canada can't (reservChargeInfos is always null), so the sliders would
+        // sit on the 80/90 display defaults and "Set" would push a value the user never
+        // chose to the car -- so we hide them entirely there. Start/Stop and the charging
+        // hero above stay; only the editable limits go. See Brand.supportsChargeLimits.
+        if (v.brand.supportsChargeLimits) {
+            ChargeLimitPill(
+                label = "AC (home) limit",
+                icon = Icons.Filled.Power,
+                limit = acLimit,
+                pending = limitPending,
+                enabled = enabled,
+                onValueChange = { acLimit = it },
+                onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
+            )
+            ChargeLimitPill(
+                label = "DC (fast) limit",
+                icon = Icons.Filled.Bolt,
+                limit = dcLimit,
+                pending = limitPending,
+                enabled = enabled,
+                onValueChange = { dcLimit = it },
+                onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
+            )
+        }
         // The charge-port toggle lives in the controls pebble, next to lock/unlock.
     }
 }

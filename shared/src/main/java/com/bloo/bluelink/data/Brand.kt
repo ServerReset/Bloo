@@ -101,6 +101,22 @@ enum class Brand(
      *  rather than [BlueLinkApi]/[KiaUsaApi]. */
     val isCanada: Boolean get() = this == HYUNDAI_CA || this == GENESIS_CA || this == KIA_CA
 
+    /**
+     * Whether this brand can report AC/DC charge-limit targets, and therefore
+     * whether the editable charge-limit controls are worth showing.
+     *
+     * False for Canada: [CanadaApi] has no verified read endpoint for the targets,
+     * so `EvStatus.reservChargeInfos` is always null on those cars (see the KNOWN-GAP
+     * comment in CanadaApi.parseStatus). Every *reading* surface already self-hides on
+     * that null -- the hero marker, the "Charge limit" status row, the widget dot -- but
+     * the *editable* controls (the phone's ChargePebble pills, the watch's LimitsCard)
+     * render regardless and seed themselves from the 80/90 display defaults, so their
+     * "Set/Apply" could push a value the user never chose and the car never had. Hiding
+     * them for Canada is the honest state: we can neither show the real limit nor safely
+     * set one. If a real CA charge-target endpoint is ever wired up, flip this one line.
+     */
+    val supportsChargeLimits: Boolean get() = !isCanada
+
     companion object {
         // Looks up an enum entry by its exact `name` (e.g. "KIA"); falls back to
         // HYUNDAI (the original, pre-multi-brand default) if `name` is null or

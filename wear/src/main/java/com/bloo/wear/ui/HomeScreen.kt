@@ -359,7 +359,12 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
         val show = when (key) {
             // Always shown so you can save the first preset from the watch.
             WearTiles.PRESETS -> true
-            WearTiles.CHARGE, WearTiles.LIMITS -> car.hasBattery
+            WearTiles.CHARGE -> car.hasBattery
+            // Charge-LIMIT editing needs a brand that reports the targets. Canada never does
+            // (reservChargeInfos is always null), so LimitsCard's Apply is permanently dead
+            // and its "hasn't reported yet" hint could never clear -- hide the tile there.
+            // Charging Start/Stop (CHARGE, above) still works. See Brand.supportsChargeLimits.
+            WearTiles.LIMITS -> car.hasBattery && car.brand.supportsChargeLimits
             WearTiles.LOCATION -> car.lat != null && car.lon != null
             // Weather + Smart Climate: shown when we HAVE weather (phone-pushed or
             // watch-fetched), OR when standalone and the car has a known location so
