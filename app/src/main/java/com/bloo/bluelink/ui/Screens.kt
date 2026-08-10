@@ -9357,15 +9357,12 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         if (status?.hoodOpen == true) add(DiagRow("Hood", "Open"))
         if (status?.doorLock == false && status.engine != true) add(DiagRow("Lock", "Car is unlocked while parked"))
     } }
-    // Surface a warning affordance if any diagnostic reports a problem.
-    val hasWarning = remember(status) {
-        (status?.tirePressureLamp?.hasWarning == true) ||
-        status?.lowFuelLight == true || status?.washerFluidStatus == true ||
-        status?.breakOilStatus == true || status?.smartKeyBatteryWarning == true
-    }
     val diagSummary = remember(rows) { if (rows.isEmpty()) "No data" else "${rows.count { !it.indent }} checks" }
-    // Count of actual problems (same five predicates as hasWarning) for the cover
-    // health-verdict hero below. diagSummary is a *checks* count, not an issue count.
+    // The count of actual problems, for the cover health-verdict hero below. diagSummary is a
+    // *checks* count, not an issue count. The warning affordance is then just "any problem at
+    // all" -- issueCount > 0 -- rather than a second hand-kept copy of these five predicates,
+    // which is what this used to be (a parallel `hasWarning` ||-chain that had to stay in sync
+    // with this list by hand). One source now; they can't drift.
     val issueCount = remember(status) {
         listOf(
             status?.tirePressureLamp?.hasWarning == true,
@@ -9375,6 +9372,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
             status?.smartKeyBatteryWarning == true,
         ).count { it }
     }
+    val hasWarning = issueCount > 0
     Pebble(
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
         summary = diagSummary,
