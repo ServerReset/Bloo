@@ -1243,19 +1243,14 @@ class CarWidget : GlanceAppWidget() {
         // and the map's reserve, instead of a fixed curve plus a trailing
         // void -- see Scale.tallSplit for why the map has to be taken out
         // before the ring is sized rather than after.
-        val split = Scale.tallSplit(
-            size,
-            Scale.ringRoom(frame, render.config.showHeader, false, 16.dp),
-            // The per-tier MAXIMUM, not Scale.infoCap. tallSplit already bounds rows by the real
-            // remaining space (infoRowsIn over `rest`), so passing infoCap here stacked a SECOND
-            // bound computed from a flat 38% of the RAW tile height -- a heuristic that knows
-            // nothing about this tile's header, ring, buttons or map. Whenever it was the tighter
-            // of the two it removed rows that demonstrably fit, so tiles showed less than they had
-            // room for. One real bound plus a hard cap, instead of a real bound plus a guess.
-            capRows = 3,
-            textScale = render.theme.textScale,
+        // WidgetLayout.ringHeroPlan owns this tier's spacer allowance (16dp) and capRows 3 (a
+        // real per-tier maximum, not an infoCap fraction of raw tile height) -- the same plan the
+        // sweep calls. MEDIUM_TALL has no footer and no primaryValue line.
+        val split = WidgetLayout.ringHeroPlan(
+            WidgetTier.MEDIUM_TALL, frame,
+            showHeader = render.config.showHeader, showFooter = false,
             wantMap = render.mapBitmap != null,
-        )
+        ).split
         val rows = split.rows
         val ringEdge = split.ring
         // Whatever is left after the header, ring, stats and buttons goes to
@@ -1461,19 +1456,13 @@ class CarWidget : GlanceAppWidget() {
         // side-by-side split would leave the info column cramped.
         val size = LocalSize.current
         val frame = render.frame(size)
-        val split = Scale.tallSplit(
-            size,
-            Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 20.dp),
-            // The per-tier MAXIMUM, not Scale.infoCap. tallSplit already bounds rows by the real
-            // remaining space (infoRowsIn over `rest`), so passing infoCap here stacked a SECOND
-            // bound computed from a flat 38% of the RAW tile height -- a heuristic that knows
-            // nothing about this tile's header, ring, buttons or map. Whenever it was the tighter
-            // of the two it removed rows that demonstrably fit, so tiles showed less than they had
-            // room for. One real bound plus a hard cap, instead of a real bound plus a guess.
-            capRows = 4,
-            textScale = render.theme.textScale,
+        // WidgetLayout.ringHeroPlan owns this tier's spacer allowance (20dp) and capRows 4 -- the
+        // same plan the sweep calls. LARGE_TALL has a footer, no primaryValue line.
+        val split = WidgetLayout.ringHeroPlan(
+            WidgetTier.LARGE_TALL, frame,
+            showHeader = render.config.showHeader, showFooter = render.config.showFooter,
             wantMap = render.mapBitmap != null,
-        )
+        ).split
         val ringEdge = split.ring
         // Matches RingOrGlyph's own guard: the ring (which bakes "82%" into its centre) draws
         // only when both hold; otherwise the icon-only glyph shows and carries no number.
@@ -1578,20 +1567,15 @@ class CarWidget : GlanceAppWidget() {
         // it rendered -- confirmed by rebuilding this arithmetic outside the
         // codebase: up to 46dp on a real XL_TALL size, enough to push the
         // map and every button off the bottom of the tile's own bounds.
-        val primaryValueHeight = Scale.lineHeight(Scale.titleSp(size).value, render.theme.textScale)
-        val split = Scale.tallSplit(
-            size,
-            Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 36.dp + primaryValueHeight),
-            // The per-tier MAXIMUM, not Scale.infoCap. tallSplit already bounds rows by the real
-            // remaining space (infoRowsIn over `rest`), so passing infoCap here stacked a SECOND
-            // bound computed from a flat 38% of the RAW tile height -- a heuristic that knows
-            // nothing about this tile's header, ring, buttons or map. Whenever it was the tighter
-            // of the two it removed rows that demonstrably fit, so tiles showed less than they had
-            // room for. One real bound plus a hard cap, instead of a real bound plus a guess.
-            capRows = WidgetInfoField.ALL.size,
-            textScale = render.theme.textScale,
+        // WidgetLayout.ringHeroPlan owns this tier's 36dp base spacer allowance PLUS the extra
+        // title line it reserves for the primaryValue ("69% . 219 mi") drawn under the ring --
+        // undercounting that line once overflowed the tile by up to 46dp. capRows is all info
+        // fields. The sweep calls the same plan.
+        val split = WidgetLayout.ringHeroPlan(
+            WidgetTier.XL_TALL, frame,
+            showHeader = render.config.showHeader, showFooter = render.config.showFooter,
             wantMap = render.mapBitmap != null,
-        )
+        ).split
         val ringEdge = split.ring
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)

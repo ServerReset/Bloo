@@ -488,17 +488,17 @@ class WidgetScaleTest {
             val budget = content(size)
             for (ts in scales) {
                 for (wantMap in listOf(false, true)) {
-                    val primaryValueHeight = Scale.lineHeight(Scale.titleSp(size).value, ts)
-                    val ringRoom = Scale.ringRoom(
-                        testFrame(size, ts), hasHeader = true, hasFooter = true,
-                        spacers = 36.dp + primaryValueHeight,
+                    // The split AND the reserved primaryValue line both come from the same
+                    // WidgetLayout.ringHeroPlan the composable renders from (header+footer on,
+                    // its common case). The render-tree spacers (14/8/14) are the composable's
+                    // Column layout, modelled here.
+                    val plan = WidgetLayout.ringHeroPlan(
+                        WidgetTier.XL_TALL, testFrame(size, ts), showHeader = true, showFooter = true, wantMap = wantMap,
                     )
-                    val split = Scale.tallSplit(
-                        size, ringRoom, capRows = WidgetInfoField.ALL.size, textScale = ts, wantMap = wantMap,
-                    )
+                    val split = plan.split
                     val header = Scale.lineHeight(Scale.titleSp(size).value, ts) + Scale.lineHeight(Scale.subtitleSp(size).value, ts)
                     val footer = Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 6.dp
-                    val used = header + footer + 14.dp + split.ring + 8.dp + primaryValueHeight + 14.dp +
+                    val used = header + footer + 14.dp + split.ring + 8.dp + plan.primaryValueHeight + 14.dp +
                         Scale.infoBlockHeight(size, split.rows, ts) + split.map + Scale.buttonHeight(size)
                     assertTrue(
                         used.value <= budget.value + 0.5f,

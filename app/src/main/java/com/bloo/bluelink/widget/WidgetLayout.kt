@@ -222,4 +222,58 @@ internal object WidgetLayout {
         val split = Scale.tallSplit(frame.size, ringRoom, capRows = spec.capRows, textScale = frame.textScale, wantMap = wantMap)
         return WidePlan(split)
     }
+
+    // ---- Centred-ring tall tiers (MEDIUM_TALL / LARGE_TALL / XL_TALL) -----------
+    //
+    // A ring (or glyph) centred full-width above the info stack, with rows + map + button row
+    // below, sized by ringRoom(spacers) -> tallSplit. Same shape as the wide bar tiers but with
+    // a ring hero instead of a bar. XL_TALL is the variant: it draws a primaryValue text line
+    // ("69% . 219 mi") under the ring, whose height must be reserved in the spacer allowance --
+    // so its allowance is a base plus that line, computed here from the frame.
+
+    private data class RingHeroSpec(
+        val hasFooter: Boolean,
+        /** Fixed spacer allowance; XL_TALL adds one title line on top (see [reservesPrimaryValue]). */
+        val baseSpacers: Dp,
+        /** True for XL_TALL: reserve an extra title-height line for the primaryValue under the ring. */
+        val reservesPrimaryValue: Boolean,
+        val capRows: Int,
+    )
+
+    private val MEDIUM_TALL = RingHeroSpec(hasFooter = false, baseSpacers = 16.dp, reservesPrimaryValue = false, capRows = 3)
+    private val LARGE_TALL = RingHeroSpec(hasFooter = true, baseSpacers = 20.dp, reservesPrimaryValue = false, capRows = 4)
+    private val XL_TALL = RingHeroSpec(hasFooter = true, baseSpacers = 36.dp, reservesPrimaryValue = true, capRows = WidgetInfoField.ALL.size)
+
+    private fun ringHeroSpecFor(tier: WidgetTier): RingHeroSpec? = when (tier) {
+        WidgetTier.MEDIUM_TALL -> MEDIUM_TALL
+        WidgetTier.LARGE_TALL -> LARGE_TALL
+        WidgetTier.XL_TALL -> XL_TALL
+        else -> null
+    }
+
+    /** The resolved centred-ring tall budget: the [Scale.TallSplit] over the tier's ringRoom
+     *  (ring size = `split.ring`), plus the primaryValue line height reserved for XL_TALL (0 for
+     *  the others) so the composable can draw and space it from the same number. */
+    data class RingHeroPlan(val split: Scale.TallSplit, val primaryValueHeight: Dp)
+
+    /** Plan a centred-ring tall tier (MEDIUM/LARGE/XL_TALL). ringRoom subtracts header/footer per
+     *  the live config; XL_TALL additionally reserves one title line for its primaryValue. */
+    fun ringHeroPlan(
+        tier: WidgetTier,
+        frame: Scale.Frame,
+        showHeader: Boolean,
+        showFooter: Boolean,
+        wantMap: Boolean,
+    ): RingHeroPlan {
+        val spec = ringHeroSpecFor(tier)
+            ?: error("WidgetLayout.ringHeroPlan called with non-ring-hero tier $tier")
+        val primaryValueHeight = if (spec.reservesPrimaryValue) {
+            Scale.lineHeight(Scale.titleSp(frame.size).value, frame.textScale)
+        } else {
+            0.dp
+        }
+        val ringRoom = Scale.ringRoom(frame, showHeader, spec.hasFooter && showFooter, spec.baseSpacers + primaryValueHeight)
+        val split = Scale.tallSplit(frame.size, ringRoom, capRows = spec.capRows, textScale = frame.textScale, wantMap = wantMap)
+        return RingHeroPlan(split, primaryValueHeight)
+    }
 }
