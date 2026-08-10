@@ -538,6 +538,91 @@ class WidgetScaleTest {
             }
         }
     }
+
+    /**
+     * The three SQUARE tiers fit their whole column, header and footer on.
+     *
+     * These were the one tier family with no direct full-column sweep: the
+     * `tall`/`wide` families each had one above, but the square tiers were only
+     * ever guarded indirectly through [Scale.squareSplit]'s own internal
+     * invariant test (`ring + rows + map <= room`). That proves the SPLIT is
+     * sound, not that the tier ASSEMBLES soundly -- the header, footer, the
+     * per-branch spacers and the single-row button reservation stacked on top of
+     * the split were never checked to fit the tile together. This mirrors each
+     * square layout's real Column: [Scale.squareSplit] with the same room,
+     * capRows, sideBySide threshold and spacer count each composable passes, then
+     * everything the Column actually stacks. `sideBySide` is swept both ways so
+     * both RingWithContent branches (rows beside the ring vs stacked under it)
+     * are covered -- the stacked branch is the one that has to fit rows AND ring
+     * in the band, so it is where an assembly overflow would surface.
+     *
+     * showHeader/showFooter both sweep on/off: [ringRoom] takes the header and
+     * footer out of the column only when they are shown, so a tile with them off
+     * has MORE room, not less -- but the composable still emits the same spacer
+     * literals, and this confirms the tighter (shown) case is the binding one.
+     */
+    @Test
+    fun `square tiers fit their whole column at every size`() {
+        for (size in sizes()) {
+            val tier = tierFor(size)
+            val rowWidth = when (tier) {
+                WidgetTier.MEDIUM_SQUARE -> 140.dp
+                WidgetTier.LARGE_SQUARE -> 220.dp
+                WidgetTier.XL_SQUARE -> 260.dp
+                else -> continue
+            }
+            // Per-tier constants read straight off the composables:
+            //  MEDIUM_SQUARE: ringRoom(header, footer=false, 16), no footer, capRows 3,
+            //    two 8dp spacers already folded into the 16 spacer arg; column draws
+            //    header + 8 + ringRow + weightSpacer + 8 + buttons(one row).
+            //  LARGE_SQUARE: ringRoom(header, footer, 20), capRows 4, column draws
+            //    header + footer + 10 + ringRow + weightSpacer + map + 10 + buttons.
+            //  XL_SQUARE:   ringRoom(header, footer, 24), capRows 4, column draws
+            //    header + footer + 12 + ringRow + weightSpacer + map + buttons.
+            val spacerArg = when (tier) {
+                WidgetTier.MEDIUM_SQUARE -> 16.dp
+                WidgetTier.LARGE_SQUARE -> 20.dp
+                else -> 24.dp
+            }
+            val capRows = if (tier == WidgetTier.MEDIUM_SQUARE) 3 else 4
+            val hasFooterTier = tier != WidgetTier.MEDIUM_SQUARE
+            val wantMapTier = tier != WidgetTier.MEDIUM_SQUARE // MEDIUM_SQUARE never draws a map
+            val budget = content(size)
+            for (ts in scales) {
+                for (showHeader in listOf(true, false)) {
+                    for (showFooter in if (hasFooterTier) listOf(true, false) else listOf(false)) {
+                        for (wantMap in if (wantMapTier) listOf(false, true) else listOf(false)) {
+                            val room = Scale.ringRoom(testFrame(size, ts), showHeader, showFooter, spacerArg)
+                            val split = Scale.squareSplit(
+                                size, room, capRows = capRows, textScale = ts, wantMap = wantMap,
+                                sideBySide = size.width >= rowWidth,
+                            )
+                            // The ring row is as tall as the taller of the ring and the info
+                            // block when they sit side by side; when stacked, squareSplit has
+                            // already subtracted the rows from the ring's room, so ring +
+                            // rows + its own 8dp internal gap is the row's real height.
+                            val sideBySide = size.width >= rowWidth
+                            val rowsH = Scale.infoBlockHeight(size, split.rows, ts)
+                            val ringRow = if (sideBySide) maxOf(split.ring, rowsH)
+                                else split.ring + rowsH + (if (split.rows > 0) 8.dp else 0.dp)
+                            val header = if (showHeader) {
+                                Scale.lineHeight(Scale.titleSp(size).value, ts) +
+                                    Scale.lineHeight(Scale.subtitleSp(size).value, ts)
+                            } else 0.dp
+                            val footer = if (showFooter) {
+                                Scale.lineHeight(Scale.subtitleSp(size).value, ts) + 6.dp
+                            } else 0.dp
+                            val used = header + footer + spacerArg + ringRow + split.map + Scale.buttonHeight(size)
+                            assertTrue(
+                                used.value <= budget.value + 0.5f,
+                                "$tier ${used} exceeds ${budget} at $size @${ts}x header=$showHeader footer=$showFooter map=$wantMap",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
