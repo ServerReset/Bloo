@@ -348,6 +348,21 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
 }
 
 /** The ordered tiles actually shown for this car (conditions resolved once). */
+/**
+ * Label for an open-items list (doors/windows): "All closed" when empty, the single item's name
+ * when exactly one, else "N open". The InfoCard rows for doors and windows built this same `when`
+ * twice, byte-for-byte.
+ *
+ * NOT shared with AlertsCard.openSummary, which is deliberately different: that one has no
+ * empty-case arm because it is only ever called inside `if (isNotEmpty())`, so folding it in here
+ * would either add a dead arm there or drop the "All closed" case these rows need.
+ */
+private fun openLabel(items: List<String>): String = when {
+    items.isEmpty() -> "All closed"
+    items.size == 1 -> items.first()
+    else -> "${items.size} open"
+}
+
 private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
     val hasAlerts = car.alertCount > 0
     val out = ArrayList<String>()
@@ -1987,18 +2002,8 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     if (live) StatusRow("Climate", if (car.climateOn == true) "On" else "Off")
     if (live) StatusRow("Defrost", if (car.defrostOn) "On" else "Off")
     if (live) StatusRow("Accessory", if (car.accessoryOn) "On" else "Off")
-    val doorsLabel = when {
-        car.doorsOpen.isEmpty() -> "All closed"
-        car.doorsOpen.size == 1 -> car.doorsOpen.first()
-        else -> "${car.doorsOpen.size} open"
-    }
-    if (live) StatusRow("Doors", doorsLabel, valueColor = if (car.doorsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
-    val winsLabel = when {
-        car.windowsOpen.isEmpty() -> "All closed"
-        car.windowsOpen.size == 1 -> car.windowsOpen.first()
-        else -> "${car.windowsOpen.size} open"
-    }
-    if (live) StatusRow("Windows", winsLabel, valueColor = if (car.windowsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
+    if (live) StatusRow("Doors", openLabel(car.doorsOpen), valueColor = if (car.doorsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
+    if (live) StatusRow("Windows", openLabel(car.windowsOpen), valueColor = if (car.windowsOpen.isNotEmpty()) MaterialTheme.colorScheme.error else null)
     if (live && car.trunkOpen) StatusRow("Trunk", "Open", valueColor = MaterialTheme.colorScheme.error)
     if (live && car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
     StatusRow("VIN", car.vin.takeLast(6))
