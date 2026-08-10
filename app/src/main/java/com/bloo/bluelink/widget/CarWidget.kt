@@ -2266,8 +2266,20 @@ class CarWidget : GlanceAppWidget() {
             else ((availableWidth - gap * (actions.size - 1)) / actions.size).coerceAtLeast(0.dp)
         val labelStyle = buttonLabelStyle(render.theme)
         val labelRoom = perButton - (Scale.buttonIcon(size) + 14.dp)
-        val showLabels = (if (stack) stackHeight else rowHeight) >= 36.dp &&
+        // AUTO keeps the original all-or-nothing room check: label only when the row
+        // (or stack) is tall enough AND every configured button's own longest label
+        // actually fits. ALWAYS/OFF are a user override of that judgement -- ALWAYS is
+        // still safe to force even on a cramped tile because ActionButton renders the
+        // label through FitLine now, not a bare Text, so a forced label SHRINKS to the
+        // real per-button room rather than running past the button's edge (RemoteViews
+        // doesn't clip). OFF just skips the room math entirely.
+        val roomForLabels = (if (stack) stackHeight else rowHeight) >= 36.dp &&
             actions.all { !wouldOverflow(it.label, labelStyle, labelRoom) }
+        val showLabels = when (render.config.buttonLabels) {
+            WidgetConfig.BUTTON_LABELS_ALWAYS -> true
+            WidgetConfig.BUTTON_LABELS_OFF -> false
+            else -> roomForLabels
+        }
         // Centred both ways. When a layout hands ActionButtons the whole tile
         // -- the controls-priority tiers, where the buttons ARE the widget --
         // the block belongs in the middle of it, not against the top-left.
@@ -2299,6 +2311,7 @@ class CarWidget : GlanceAppWidget() {
                         modifier = GlanceModifier.fillMaxWidth(),
                         heightOverride = stackHeight,
                         showLabel = showLabels,
+                        labelMaxWidth = labelRoom.coerceAtLeast(0.dp),
                     )
                 }
             }
@@ -2314,6 +2327,7 @@ class CarWidget : GlanceAppWidget() {
                         action, car, render,
                         modifier = GlanceModifier.defaultWeight(),
                         showLabel = showLabels,
+                        labelMaxWidth = labelRoom.coerceAtLeast(0.dp),
                     )
                 }
             }
@@ -2401,6 +2415,12 @@ class CarWidget : GlanceAppWidget() {
         // leaving "Climate" and "Charge" as bare glyphs in the same row. All
         // or none is the only version that reads as designed.
         showLabel: Boolean = false,
+        // The room the label text itself has to work with -- icon size and the spacer
+        // already subtracted by the caller (see ActionButtons' labelRoom). Only matters
+        // when showLabel is true; the callers that never pass one (the MICRO tier's
+        // single-button controls mode, the small controls-priority row) never set
+        // showLabel either, so the generous default is inert there.
+        labelMaxWidth: Dp = 200.dp,
     ) {
         val theme = render.theme
         val size = LocalSize.current
@@ -2461,7 +2481,14 @@ class CarWidget : GlanceAppWidget() {
                         modifier = GlanceModifier.size(iconSize),
                     )
                     Spacer(GlanceModifier.width(6.dp))
-                    Text(action.label, style = labelStyle, maxLines = 1)
+                    // FitLine, not a bare Text: BUTTON_LABELS_ALWAYS forces showLabel
+                    // true regardless of ActionButtons' own room check, so this has to
+                    // be the one thing in the file that CAN'T overflow -- it shrinks
+                    // the label to labelMaxWidth instead, the same fallback chain every
+                    // other label in the widget already trusts (RemoteViews doesn't
+                    // clip, so "forced on" and "silently unreadable" are the same bug
+                    // if this were still a plain Text).
+                    FitLine(action.label, labelStyle, labelMaxWidth, GlanceModifier, Alignment.Start)
                 }
             } else {
                 Image(

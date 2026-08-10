@@ -78,6 +78,18 @@ data class WidgetConfig(
     val accent: String? = null,
     /** Theme override for this widget: "auto" (system), "light", or "dark". */
     val theme: String = THEME_AUTO,
+    /** Whether action buttons name themselves alongside their icon: [BUTTON_LABELS_AUTO]
+     *  (the default -- show a label only when every configured button's own has real room,
+     *  the same all-or-nothing rule this always used), [BUTTON_LABELS_ALWAYS] (show one no
+     *  matter how tight -- FitText's own wrap/shrink/stack chain keeps it legible rather than
+     *  clipped, so this trades density for always naming the action, never overflow), or
+     *  [BUTTON_LABELS_OFF] (icon only, buying the room a label would have taken back for
+     *  bigger buttons -- the look every icon-button UI defaults to when density matters more
+     *  than a caption). An icon alone is a guess (a snowflake could be climate, defrost, or
+     *  "cool the battery"), which is the reason AUTO exists at all; this is for a user who has
+     *  already learned the icons and wants the tile back, or the opposite: someone who'd
+     *  rather see "Lock" spelled out even on a tile where AUTO would have dropped it. */
+    val buttonLabels: String = BUTTON_LABELS_AUTO,
 ) {
     companion object {
         const val THEME_AUTO = "auto"
@@ -93,6 +105,11 @@ data class WidgetConfig(
         const val CORNER_ROUND = "round"
         const val CORNER_PILL = "pill"
         // (no CORNERS aggregate: nothing enumerates the corner options; the picker lists them itself)
+
+        const val BUTTON_LABELS_AUTO = "auto"
+        const val BUTTON_LABELS_ALWAYS = "always"
+        const val BUTTON_LABELS_OFF = "off"
+        // (no BUTTON_LABELS aggregate: nothing enumerates the options; the picker lists them itself)
 
         /** Smallest opacity offered. Fully transparent would leave a widget
          *  that looks broken rather than styled -- text and buttons floating
