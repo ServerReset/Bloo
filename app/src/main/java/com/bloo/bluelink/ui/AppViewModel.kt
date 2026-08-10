@@ -231,8 +231,10 @@ data class UiState(
     /** True while the update APK is being downloaded in-app (see
      *  AppViewModel.downloadUpdateInBackground). */
     val updateDownloading: Boolean = false,
-    /** 0-1 while [updateDownloading], or null before/after (indeterminate). */
-    val updateDownloadProgress: Float? = null,
+    // Download progress (0-1) is NOT here: it ticks per 64KB chunk, which would recompose every
+    // pebble on the live pager pages hundreds of times per download. It lives in
+    // AppViewModel.updateDownloadProgress (a StateFlow) and is collected only by the tile that
+    // shows it. updateDownloading (this low-frequency boolean) stays and gates that display.
     /** True once the update APK has finished downloading and is sitting in
      *  the cache ready to hand to the installer -- lets the update tile's
      *  button do "tap to download, tap again to install". Reset by a fresh
@@ -515,6 +517,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val _currentIndex = MutableStateFlow(0)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
+
+    /**
+     * APK download progress (0-1 while downloading, null before/after), split out of
+     * [UiState] for the same reason as [currentIndex]: it updates on every 64KB chunk of a
+     * multi-MB download, and while it lived in the monolithic UiState each of those hundreds
+     * of ticks forced an equals-diff and recomposition of every pebble on the live pager
+     * pages -- exactly while the user is watching the tile. Collected only by
+     * UpdateAvailableTile, so a chunk now invalidates just the progress bar and percent text.
+     */
+    private val _updateDownloadProgress = MutableStateFlow<Float?>(null)
+    val updateDownloadProgress: StateFlow<Float?> = _updateDownloadProgress.asStateFlow()
 
     private val statusInFlight = mutableSetOf<String>()
 
@@ -2230,13 +2243,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // dismiss can't fire mid-download and strand the finished APK behind a hidden tile.
         updateDismissJob?.cancel()
         updateDismissJob = null
-        _state.update { it.copy(updateDownloading = true, updateDownloadProgress = 0f, updatePendingDismiss = false, updateTileDismissed = false) }
+        // Progress starts at 0f, not null: a server with no Content-Length never fires
+        // onProgress (UpdateApi gates on total > 0), so leaving it null would flip the bar from
+        // determinate-0% to indeterminate. Kept the exact value sequence the UiState field had.
+        _updateDownloadProgress.value = 0f
+        _state.update { it.copy(updateDownloading = true, updatePendingDismiss = false, updateTileDismissed = false) }
         viewModelScope.launch {
             val dest = apkCacheFile()
             val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
-                _state.update { it.copy(updateDownloadProgress = progress) }
+                _updateDownloadProgress.value = progress
             }
-            _state.update { it.copy(updateDownloading = false, updateDownloadProgress = null, updateApkReady = ok) }
+            _updateDownloadProgress.value = null
+            _state.update { it.copy(updateDownloading = false, updateApkReady = ok) }
             if (!ok) {
                 _state.update { it.copy(message = "Download failed. Check your connection and try again.") }
             }

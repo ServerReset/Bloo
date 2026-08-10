@@ -5374,6 +5374,11 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
     ) {
         if (info == null) return@AnimatedVisibility
         val context = LocalContext.current
+        // Download progress is collected from its own StateFlow rather than read off UiState,
+        // so a per-chunk tick invalidates only this tile's bar/percent, not every pebble on the
+        // live pager pages. state.updateDownloading (the boolean that gates the display below)
+        // stays on UiState -- it changes twice per download, not hundreds of times.
+        val downloadProgress by vm.updateDownloadProgress.collectAsState()
         val hasDirectDownload = info.run.phoneApkUrl != null
         val current = vm.currentBuildNumber
         // Build delta: "build 812 → build 828" when we know the installed build,
@@ -5407,7 +5412,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             headerAction = PebbleHeaderAction(
                 label = when {
                     state.updateInstalling -> "Installing…"
-                    state.updateDownloading -> state.updateDownloadProgress?.let { "${(it * 100).roundToInt()}%" } ?: "Downloading…"
+                    state.updateDownloading -> downloadProgress?.let { "${(it * 100).roundToInt()}%" } ?: "Downloading…"
                     state.updateApkReady -> if (seamless) "Install now" else "Install"
                     hasDirectDownload -> "Update"
                     else -> "Open"
@@ -5442,7 +5447,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                 state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "Installing silently via Shizuku…", scheme.onSurfaceVariant)
                 state.updateDownloading -> Triple(
                     Icons.Filled.Download,
-                    state.updateDownloadProgress?.let { "Downloading ${(it * 100).roundToInt()}%" } ?: "Downloading…",
+                    downloadProgress?.let { "Downloading ${(it * 100).roundToInt()}%" } ?: "Downloading…",
                     scheme.onSurfaceVariant,
                 )
                 state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "Downloaded · installs silently via Shizuku", ChargeGreen)
@@ -5456,7 +5461,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             }
             // Live download progress bar.
             if (state.updateDownloading) {
-                val p = state.updateDownloadProgress
+                val p = downloadProgress
                 if (p != null) {
                     LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
                 } else {
