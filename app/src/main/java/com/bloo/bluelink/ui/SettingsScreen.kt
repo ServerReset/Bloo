@@ -1106,51 +1106,15 @@ internal fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
                 if (notif.doorOpen) {
-                    var minutes by remember(notif.doorOpenMinutes) { mutableStateOf(notif.doorOpenMinutes.toString()) }
-                    OutlinedTextField(
-                        value = minutes,
-                        onValueChange = {
-                            minutes = it.filter(Char::isDigit)
-                            minutes.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setDoorOpenMinutes)
-                        },
-                        label = { Text("Door-open minutes") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
+                    MinutesField(notif.doorOpenMinutes, "Door-open minutes", vm::setDoorOpenMinutes)
                 }
                 ToggleRow("Car-running alerts", notif.running) { vm.setNotifyRunning(it) }
                 if (notif.running) {
-                    var runMin by remember(notif.runningMinutes) { mutableStateOf(notif.runningMinutes.toString()) }
-                    OutlinedTextField(
-                        value = runMin,
-                        onValueChange = {
-                            runMin = it.filter(Char::isDigit)
-                            runMin.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setRunningMinutes)
-                        },
-                        label = { Text("Running minutes") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
+                    MinutesField(notif.runningMinutes, "Running minutes", vm::setRunningMinutes)
                 }
                 ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
                 if (notif.unlocked) {
-                    var unlockedMin by remember(notif.unlockedMinutes) { mutableStateOf(notif.unlockedMinutes.toString()) }
-                    OutlinedTextField(
-                        value = unlockedMin,
-                        onValueChange = {
-                            unlockedMin = it.filter(Char::isDigit)
-                            unlockedMin.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(vm::setUnlockedMinutes)
-                        },
-                        label = { Text("Unlocked minutes") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
+                    MinutesField(notif.unlockedMinutes, "Unlocked minutes", vm::setUnlockedMinutes)
                 }
                 Text(
                     "Background checks run roughly every 30 minutes, so alerts may " +
@@ -1952,24 +1916,12 @@ private fun CarSettingsCard(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = state.lastServiceMiles[v.vin]?.toString() ?: "",
-                                    onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                                    label = { Text("Last service (mi)") },
-                                    singleLine = true,
-                                    shape = FieldShape,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f),
-                                )
-                                OutlinedTextField(
-                                    value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
-                                    onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                                    label = { Text("Interval (mi)") },
-                                    singleLine = true,
-                                    shape = FieldShape,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f),
-                                )
+                                MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.weight(1f)) {
+                                    vm.setLastServiceMiles(v.vin, it)
+                                }
+                                MilesField(state.serviceIntervalMiles[v.vin], "Interval (mi)", Modifier.weight(1f)) {
+                                    vm.setServiceIntervalMiles(v.vin, it)
+                                }
                             }
                         }
 
@@ -1998,6 +1950,50 @@ private fun CarSettingsCard(
             }
         }
     }
+}
+
+/**
+ * A digits-only "minutes" field for the notification-delay settings, clamped to 1..120.
+ * It owns the edit buffer: [initial] seeds it and re-seeds whenever the persisted value
+ * changes (via `remember(initial)`), while [onSet] fires only for an in-range number, so
+ * a half-typed or out-of-range value is shown but never persisted. The three delay fields
+ * (door-open, running, unlocked) differ only in seed, label and setter.
+ */
+@Composable
+private fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
+    var text by remember(initial) { mutableStateOf(initial.toString()) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = {
+            text = it.filter(Char::isDigit)
+            text.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(onSet)
+        },
+        label = { Text(label) },
+        singleLine = true,
+        shape = FieldShape,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+    )
+}
+
+/**
+ * A digits-only mileage field. The service card lays two of these side by side (each
+ * `Modifier.weight(1f)`) while the search index surfaces the same two one at a time
+ * (`Modifier.fillMaxWidth()`), so the width sits with the caller; everything else --
+ * the digit filter, number keyboard, single line and [FieldShape] -- is identical and
+ * lives here so the four copies can't drift apart.
+ */
+@Composable
+private fun MilesField(value: Int?, label: String, modifier: Modifier, onSet: (Int?) -> Unit) {
+    OutlinedTextField(
+        value = value?.toString() ?: "",
+        onValueChange = { onSet(it.filter(Char::isDigit).toIntOrNull()) },
+        label = { Text(label) },
+        singleLine = true,
+        shape = FieldShape,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = modifier,
+    )
 }
 
 /** A titled, boxed sub-group inside the per-car settings card, for hierarchy. */
@@ -3099,14 +3095,9 @@ private fun SettingsSearchResults(
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
         }
         add("Last service · ${v.name}", "service maintenance mileage ${v.name}") {
-            OutlinedTextField(
-                value = state.lastServiceMiles[v.vin]?.toString() ?: "",
-                onValueChange = { vm.setLastServiceMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                label = { Text("Last service (mi)") },
-                singleLine = true, shape = FieldShape,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.fillMaxWidth()) {
+                vm.setLastServiceMiles(v.vin, it)
+            }
         }
         // The interval, which had no search entry while "Last service" above did. The two
         // are only meaningful TOGETHER -- the service pebble's whole output is
@@ -3114,14 +3105,9 @@ private fun SettingsSearchResults(
         // leaving a "next due" figure that could not be corrected from here. Both fields
         // sit side by side in the per-car section; only the index had one of them.
         add("Service interval · ${v.name}", "service interval maintenance mileage due ${v.name}") {
-            OutlinedTextField(
-                value = state.serviceIntervalMiles[v.vin]?.toString() ?: "",
-                onValueChange = { vm.setServiceIntervalMiles(v.vin, it.filter(Char::isDigit).toIntOrNull()) },
-                label = { Text("Interval (mi)") },
-                singleLine = true, shape = FieldShape,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            MilesField(state.serviceIntervalMiles[v.vin], "Interval (mi)", Modifier.fillMaxWidth()) {
+                vm.setServiceIntervalMiles(v.vin, it)
+            }
         }
     }
 
