@@ -48,6 +48,42 @@ internal enum class WidgetTier {
  * room for what that tier draws. Falling through to [WidgetTier.MICRO] --
  * which is glyph-only, no text at all -- is correct ONLY for tiles barely
  * past the manifest's 40dp floor. WidgetTierTest enforces exactly that.
+ *
+ * ## The BANNER gate is GRID-driven, not aspect-driven
+ *
+ * Every other band above is still keyed on raw dp thresholds tuned against
+ * screenshots, but BANNER exists for one specific, nameable shape: a widget
+ * placed at [WidgetGrid.MIN_ROWS] -- ONE cell tall, [WidgetGrid.MIN_COLS] to
+ * [WidgetGrid.MAX_COLS] cells wide (a "2x1" through "7x1" strip, in the
+ * terms a user resizing the widget actually thinks in -- see [WidgetGrid]).
+ * The old gate (`w >= 220 && h < 110 && w >= h * 3`) approximated that shape
+ * with an aspect-ratio test, and the approximation had a real hole: it also
+ * required `w >= 220`, so a 2- or 3-column-wide strip (nominally 110dp/180dp
+ * wide) never matched it at all. `110x40` -- literally [WidgetGrid.MIN_COLS]
+ * columns by one row -- fell through every other band and landed on
+ * [WidgetTier.MICRO_TINY], the icon-only floor meant for tiles barely past
+ * the manifest's absolute minimum, not a widget with 110dp of real width to
+ * work with. `180x40` (3 columns) fared little better, landing on
+ * [WidgetTier.COMPACT_WIDE_NARROW] -- a layout built around ~100-150dp of
+ * vertical room for a ring beside a name column, not a 40dp-tall strip.
+ * Both were reported as "looks broken/cut off at small widths" from real
+ * device screenshots.
+ *
+ * The fix states the actual rule directly instead of approximating it:
+ * ANY tile shorter than one compact cell ([WidgetTier.COMPACT_SQUARE]'s own
+ * `short >= 80` floor, so the handoff between the two is gapless) is a
+ * one-row strip and gets [WidgetTier.BANNER] -- which already scales its
+ * content continuously by the REAL measured width (see [CarWidget.BannerLayout]),
+ * so a 2-column-wide strip and a 7-column-wide one both render cleanly from
+ * the same composable, just with a different button/info capacity. The
+ * `w >= 80` floor keeps the true bottom corner (a tile close to the
+ * manifest's 40dp absolute floor on both axes) on [WidgetTier.MICRO_TINY]
+ * where it belongs -- swept in WidgetTierTest, which is what caught the
+ * off-by-nothing gap an EARLIER version of this exact fix left between "no
+ * longer counts as one row" and "wide enough for [WidgetTier.COMPACT_SQUARE]":
+ * a `70..79`dp-wide sliver at `h` just above the row-1 ceiling matched
+ * neither BANNER nor COMPACT_SQUARE and regressed to MICRO on a 2dp grow,
+ * exactly the "growing must never demote" invariant this file exists to hold.
  */
 internal fun tierFor(size: DpSize): WidgetTier {
     val w = size.width.value
@@ -70,16 +106,19 @@ internal fun tierFor(size: DpSize): WidgetTier {
             aspect < 0.8f -> WidgetTier.MEDIUM_TALL
             else -> WidgetTier.MEDIUM_SQUARE
         }
-        // The aspect extremes, which the launcher genuinely allows: the
-        // manifest permits 40dp on one axis and 640dp on the other, so a
-        // 640x40 strip is a 16:1 tile. Those used to land in COMPACT_WIDE /
-        // COMPACT_TALL, which are built around a ring beside a text column
-        // beside buttons -- a shape that assumes far more of the short axis
-        // than a strip has. BANNER and RAIL are single-file layouts built for
-        // exactly that case. Both are gated on the short side staying small,
-        // so a merely-wide-and-roomy tile (640x200) still gets LARGE_WIDE
-        // rather than being flattened into a strip.
-        w >= 220f && h < 110f && w >= h * 3f -> WidgetTier.BANNER
+        // See the "BANNER gate is GRID-driven" doc above: any tile shorter
+        // than one compact cell is a one-row strip, at ANY column count from
+        // WidgetGrid.MIN_COLS up -- not just the wide ones the old aspect
+        // gate happened to catch.
+        h < 80f && w >= 80f -> WidgetTier.BANNER
+        // RAIL is the narrow-tall mirror of BANNER, but is NOT grid-driven
+        // the same way: WidgetGrid's own declared floor is 2 COLUMNS wide
+        // (110dp nominal), which already lands cleanly on COMPACT_SQUARE /
+        // COMPACT_TALL_NARROW / COMPACT_TALL (see WidgetTierTest's grid
+        // sweep) -- there is no equivalent hole to close on this axis within
+        // the 2..7 column, 1..7 row grid the widget actually offers. RAIL
+        // stays a safety net for a genuinely narrower real launcher
+        // configuration (sub-110dp) outside that declared range.
         h >= 220f && w < 110f && h >= w * 3f -> WidgetTier.RAIL
         // Loosened from the old w/h >= 150 gate -- a tile like 145x100 is
         // genuinely wide and had real unused room, but missed every band

@@ -78,19 +78,59 @@ class WidgetTierTest {
     }
 
     @Test
-    fun `the strip tiers only take genuinely strip-shaped tiles`() {
-        // BANNER and RAIL drop things the other tiers keep (a header, and in
-        // RAIL's case all text), which is only an honest trade when the short
-        // axis really has no room. A merely-large wide tile must not be
-        // flattened into a strip and lose its layout.
+    fun `RAIL only takes genuinely strip-shaped tiles`() {
+        // RAIL drops everything the other tiers keep (a header, and all
+        // text), which is only an honest trade when the short axis really
+        // has no room. A merely-large tall tile must not be flattened into a
+        // strip and lose its layout. (BANNER has its own rule now -- see
+        // `BANNER covers every one-row strip regardless of width` below --
+        // since it's grid-driven, not aspect-driven.)
         val misrouted = sizes()
-            .filter { (w, h) -> tier(w, h) == WidgetTier.BANNER || tier(w, h) == WidgetTier.RAIL }
-            .filter { (w, h) -> minOf(w, h) >= 110 || maxOf(w.toFloat() / h, h.toFloat() / w) < 3f }
+            .filter { (w, h) -> tier(w, h) == WidgetTier.RAIL }
+            .filter { (w, h) -> minOf(w, h) >= 110 || h.toFloat() / w < 3f }
             .toList()
         assertTrue(
             misrouted.isEmpty(),
-            "non-strip sizes routed to BANNER/RAIL: ${misrouted.take(5).map { "${it.first}x${it.second}" }}",
+            "non-strip sizes routed to RAIL: ${misrouted.take(5).map { "${it.first}x${it.second}" }}",
         )
+    }
+
+    @Test
+    fun `BANNER covers every one-row strip regardless of width`() {
+        // The whole point of the grid-driven BANNER gate: a tile shorter
+        // than one compact cell (80dp) is a one-row strip AT ANY width from
+        // WidgetGrid's own 80dp floor up -- not just the wide ones the old
+        // aspect-ratio gate happened to catch. This is the direct regression
+        // test for the "110x40 fell through to MICRO_TINY" and "180x40 fell
+        // through to COMPACT_WIDE_NARROW" bugs -- both nominal grid sizes
+        // (2 and 3 columns by 1 row) now land on BANNER, which is what
+        // WidgetGrid's own nominal-size table describes them as.
+        for (cols in WidgetGrid.MIN_COLS..WidgetGrid.MAX_COLS) {
+            val nominal = WidgetGrid.nominalSize(cols, WidgetGrid.MIN_ROWS)
+            assertEquals(
+                WidgetTier.BANNER, tierFor(nominal),
+                "${cols}x${WidgetGrid.MIN_ROWS} (nominal ${nominal.width.value}x${nominal.height.value}) " +
+                    "should be BANNER, was ${tierFor(nominal)}",
+            )
+        }
+    }
+
+    @Test
+    fun `every nominal grid cell from 2x1 to 7x7 lands on a real layout, never an icon`() {
+        // The full space this rework exists to cover: every (cols, rows)
+        // pair WidgetGrid names, at its own nominal dp size, must resolve to
+        // a tier that actually draws something -- never MICRO/MICRO_TINY,
+        // which show a glyph and nothing else. This is the direct sweep of
+        // the "2 by 1, 3 by 1, ... 7 by 7" size list the widget is meant to
+        // support cleanly.
+        val holes = mutableListOf<String>()
+        for (cols in WidgetGrid.MIN_COLS..WidgetGrid.MAX_COLS) {
+            for (rows in WidgetGrid.MIN_ROWS..WidgetGrid.MAX_ROWS) {
+                val t = tierFor(WidgetGrid.nominalSize(cols, rows))
+                if (t == WidgetTier.MICRO || t == WidgetTier.MICRO_TINY) holes += "${cols}x$rows -> $t"
+            }
+        }
+        assertTrue(holes.isEmpty(), "grid cells with no real layout: $holes")
     }
 
     @Test
