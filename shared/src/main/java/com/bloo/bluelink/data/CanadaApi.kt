@@ -336,18 +336,22 @@ class CanadaApi(private val brand: Brand) {
                 etc3 = ev.path("remainTime2", "etc3", "value").dbl()?.let { TimeValue(it, 1) },
             ).takeIf { it.atc != null || it.etc1 != null || it.etc3 != null },
             // KNOWN GAP: reservChargeInfos (the AC/DC charge-LIMIT targets) is left null for
-            // Canada, so the phone's charge-limit dot never shows and the watch seeds its
-            // limit sliders from the 80/90 defaults. The CA status body (rltmvhclsts /
-            // lstvhclsts) does NOT carry the targets inline -- unlike KiaUsaApi, which merges
-            // them from a separate read (evc/gts, see KiaUsaApi.chargeTargets). The CA read
-            // counterpart is believed to be evc/selsoc (the community myUVO/CA client's
-            // _get_charge_limits; note the CA write side already here, setChargeTargets ->
-            // evc/setsoc, uses field "level" not Kia's "targetSOClevel"). That endpoint's
-            // exact shape can't be confirmed from this repo (no CA fixtures, CI can't hit the
-            // network), so it is deliberately NOT added on inference -- doing so would ship an
-            // unverified API contract. Fix when a real CA account can confirm evc/selsoc's
-            // response, then merge it in status() with the same runCatching best-effort wrapper
-            // KiaUsaApi uses, so a bad path degrades to today's behaviour rather than regressing.
+            // Canada. Because of that, the UI now hides the editable charge-limit controls on
+            // CA cars (Brand.supportsChargeLimits = !isCanada) rather than show sliders seeded
+            // from the 80/90 defaults, and every reading surface self-hides on the null too. So
+            // this is currently a graceful "feature absent", not a broken control -- but the
+            // underlying data is still missing. The CA status body (rltmvhclsts / lstvhclsts)
+            // does NOT carry the targets inline, unlike KiaUsaApi, which merges them from a
+            // separate read (evc/gts, see KiaUsaApi.chargeTargets). The CA read counterpart is
+            // believed to be evc/selsoc (the community myUVO/CA client's _get_charge_limits;
+            // note the CA write side already here, setChargeTargets -> evc/setsoc, uses field
+            // "level" not Kia's "targetSOClevel"). That endpoint's exact shape can't be
+            // confirmed from this repo (no CA fixtures, CI can't hit the network), so it is
+            // deliberately NOT added on inference -- doing so would ship an unverified API
+            // contract. To re-enable the controls: confirm evc/selsoc's response against a real
+            // CA account, merge it in status() with the same runCatching best-effort wrapper
+            // KiaUsaApi uses (a bad path then degrades to today's behaviour), and flip
+            // Brand.supportsChargeLimits back on.
         )
         return VehicleStatus(
             doorLock = vs["doorLock"].flag(),
