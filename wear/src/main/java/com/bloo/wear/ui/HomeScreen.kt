@@ -134,6 +134,8 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
+import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WearWeather
 import com.bloo.bluelink.data.degLabel
@@ -1747,8 +1749,8 @@ private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
 @Composable
 private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge limits", Icons.Filled.Bolt) {
     val draft = ui.chargeDraftFor(car.vin)
-    val ac = draft.ac ?: car.acLimit ?: 80
-    val dc = draft.dc ?: car.dcLimit ?: 90
+    val ac = draft.ac ?: car.acLimit ?: DEFAULT_AC_CHARGE_LIMIT_PCT
+    val dc = draft.dc ?: car.dcLimit ?: DEFAULT_DC_CHARGE_LIMIT_PCT
     val isDirty = (draft.ac != null && draft.ac != car.acLimit) ||
                   (draft.dc != null && draft.dc != car.dcLimit)
     // Apply may only send values that are either the USER's choice or the CAR's own report --

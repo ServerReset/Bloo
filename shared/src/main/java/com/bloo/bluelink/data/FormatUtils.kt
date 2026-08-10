@@ -164,6 +164,17 @@ val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L
 const val DEFAULT_CLIMATE_TEMP_F = 72
 const val DEFAULT_CLIMATE_DURATION_MIN = 10
 
+/** The charge-limit targets used until a car's real targets load in: 80% for AC
+ *  (a daily home/level-2 ceiling), 90% for DC (fast-charging past that is
+ *  inefficient). One conceptual pair, previously typed as bare 80/90 literals at
+ *  four sites -- WearCommand's wire defaults, applyChargeLimits' and LimitsCard's
+ *  `?: 80/90` fallbacks on the watch, and ChargePebble's seed on the phone -- the
+ *  same hand-copied-constant shape that already caused a real drift bug (the phone
+ *  once defaulted BOTH to 80%, so a "Set" before the DC target loaded pushed it
+ *  low). Since both pills send both values together, the two halves must agree. */
+const val DEFAULT_AC_CHARGE_LIMIT_PCT = 80
+const val DEFAULT_DC_CHARGE_LIMIT_PCT = 90
+
 /** Charger-plug type label for [EvStatus.batteryPlugin]. Was defined
  *  separately on phone and watch and had already drifted ("AC (level 2)" vs
  *  "AC") despite mapping the exact same wire value. */

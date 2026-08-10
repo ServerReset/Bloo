@@ -317,8 +317,8 @@ data class WearCommand(
     val seatRearLeft: Int = 0,
     val seatRearRight: Int = 0,
     /** Targets for [WearAction.SET_CHARGE_LIMITS]. */
-    val acLimit: Int = 80,
-    val dcLimit: Int = 90,
+    val acLimit: Int = DEFAULT_AC_CHARGE_LIMIT_PCT,
+    val dcLimit: Int = DEFAULT_DC_CHARGE_LIMIT_PCT,
 )
 
 /** The phone's reply after attempting a [WearCommand]. */

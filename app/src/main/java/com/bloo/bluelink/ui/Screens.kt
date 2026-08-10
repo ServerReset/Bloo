@@ -348,8 +348,10 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
+import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
@@ -10301,18 +10303,16 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
     }
 
     // Separate AC (home / level-2) and DC (fast) charge-limit targets, each
-    // seeded to a healthy default until the car's real targets load in --
-    // 80% for AC (a daily ceiling), 90% for DC (fast-charging past that is
-    // inefficient anyway; matches the default the watch/shared side already
-    // uses -- see WearCommand's acLimit/dcLimit defaults in WearSync.kt --
-    // this used to default BOTH to 80%, so tapping "Set" before the real DC
-    // target loaded could silently push a DC target lower than intended).
+    // seeded to a healthy default until the car's real targets load in. The
+    // seeds are the shared DEFAULT_*_CHARGE_LIMIT_PCT constants, so the phone
+    // seed can't drift from the watch/wire defaults (this once defaulted BOTH
+    // to 80%, so tapping "Set" before the real DC target loaded pushed it low).
     // Both pills' "Set" sends BOTH values together (setChargeLimits(v,
     // acLimit, dcLimit)), so leaving one un-seeded at a wrong default meant
     // tapping "Set" on just the AC pill silently reset a DC target that had
     // never actually been what it was seeded to -- and vice versa.
-    var acLimit by remember(v.vin) { mutableIntStateOf(80) }
-    var dcLimit by remember(v.vin) { mutableIntStateOf(90) }
+    var acLimit by remember(v.vin) { mutableIntStateOf(DEFAULT_AC_CHARGE_LIMIT_PCT) }
+    var dcLimit by remember(v.vin) { mutableIntStateOf(DEFAULT_DC_CHARGE_LIMIT_PCT) }
     // Seeded INDEPENDENTLY, one latch each. A single `limitsSeeded` flag was set as soon as
     // EITHER limit arrived, and the effect then returned early forever -- so a car that reports
     // its AC target first and its DC target on a later poll (or not in the same payload) left

@@ -1241,8 +1241,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // taps Apply, and the DC limit drops from the displayed 100 to 90.
         val car = u.cars.firstOrNull { it.vin == vin }
         val draft = u.chargeDraftFor(vin)
-        val ac = draft.ac ?: car?.acLimit ?: 80
-        val dc = draft.dc ?: car?.dcLimit ?: 90
+        val ac = draft.ac ?: car?.acLimit ?: com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
+        val dc = draft.dc ?: car?.dcLimit ?: com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
         // Applied - drop this car's draft so the sliders track the car's fresh state.
         // Kept so a standalone (no-phone) failure can restore it: dropping the
         // draft synchronously here, before the command even runs, meant a
