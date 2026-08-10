@@ -9123,7 +9123,11 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
     val ev = status?.evStatus
     val plugged = ev.isPluggedOrCharging
 
-    val infoSummary = if (status?.doorLock == true) "Locked" else "Unlocked"
+    // Tri-state: null (unknown -- no status yet, or the car hasn't reported lock state) must
+    // NOT read as "Unlocked". A null summary is omitted by Pebble, so the header simply carries
+    // no lock word until we actually know -- rather than asserting a state as fact in visible
+    // text and to TalkBack. Matches CoverMainTile / StateControl, which already handle unknown.
+    val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
     val coverGlance = LocalForceExpanded.current
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary) {
         // COVER SCREEN only: lead with a big lock-state hero. On the cover the info
@@ -9131,13 +9135,31 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
         // buried as one row among ~15). A large icon + word makes it the glance
         // value. Phone is untouched (coverGlance = LocalForceExpanded, false there).
         if (coverGlance && status != null) {
-            val locked = status.doorLock == true
-            CoverHero(
-                icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                value = if (locked) "Locked" else "Unlocked",
-                iconTint = if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                valueColor = if (locked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-            )
+            // Three-way: an unknown lock state (doorLock == null) shows a neutral "Unknown"
+            // glance rather than a red "Unlocked", which would assert as fact a state the car
+            // never reported. Locked/unlocked keep their existing icon + colour treatment.
+            when (status.doorLock) {
+                true -> CoverHero(
+                    icon = Icons.Filled.Lock,
+                    value = "Locked",
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    valueColor = MaterialTheme.colorScheme.onSurface,
+                )
+                false -> CoverHero(
+                    icon = Icons.Filled.LockOpen,
+                    value = "Unlocked",
+                    iconTint = MaterialTheme.colorScheme.error,
+                    valueColor = MaterialTheme.colorScheme.error,
+                )
+                null -> CoverHero(
+                    // Info (the pebble's own glyph, already imported) rather than a lock icon:
+                    // showing either padlock would imply a state we don't have.
+                    icon = Icons.Filled.Info,
+                    value = "Lock state unknown",
+                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    valueColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
@@ -9145,7 +9167,9 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
             else -> {
                 SectionLabel("Status")
                 status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
-                StatusRow("Doors", if (status.doorLock == true) "Locked" else "Unlocked")
+                // Absent when the lock state is unknown, matching the engine row above --
+                // "Unlocked" was being shown for a car that simply hadn't reported it.
+                status.doorLock?.let { StatusRow("Doors", if (it) "Locked" else "Unlocked") }
                 status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
                     ?.let { StatusRow("Doors open", it.joinToString(", ")) }
                 status.windowOpen?.openLabels()?.takeIf { it.isNotEmpty() }
