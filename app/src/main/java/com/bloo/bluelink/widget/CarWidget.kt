@@ -2024,21 +2024,12 @@ class CarWidget : GlanceAppWidget() {
         }
         Column {
             fields.forEach { field ->
-                val value = infoValue(field, car, render) ?: return@forEach
-                if (narrow) {
-                    Column(modifier = GlanceModifier.fillMaxWidth()) {
-                        FitText(fieldLabel(field, car), subtitleStyle(render.theme), maxWidth = availableWidth - 4.dp)
-                        FitText(value, valueStyle(render.theme), maxWidth = availableWidth - 4.dp)
-                    }
-                } else {
-                    Row(modifier = GlanceModifier.fillMaxWidth()) {
-                        FitText(
-                            fieldLabel(field, car), subtitleStyle(render.theme),
-                            maxWidth = availableWidth * 0.5f, modifier = GlanceModifier.defaultWeight(),
-                        )
-                        FitText(value, valueStyle(render.theme), maxWidth = availableWidth * 0.45f)
-                    }
-                }
+                // InfoRow is the same label/value block this used to inline. It recomputes
+                // narrow from its width arg, and here width == availableWidth, so
+                // `width < NARROW_WIDTH` equals this stack's own `narrow` -- identical output,
+                // one definition. (The paired branch above already routes through InfoRow; the
+                // single-column branch was the one copy that had drifted back inline.)
+                InfoRow(field, car, render, availableWidth)
                 Spacer(GlanceModifier.height(2.dp))
             }
         }
