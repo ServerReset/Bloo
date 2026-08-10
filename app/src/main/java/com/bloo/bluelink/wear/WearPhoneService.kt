@@ -2,6 +2,7 @@ package com.bloo.bluelink.wear
 
 import com.bloo.bluelink.data.Ai
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.AiSummaryStore
 import com.bloo.bluelink.data.ClimateSyncStore
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
@@ -412,6 +413,13 @@ class WearPhoneService : WearableListenerService() {
                     "${snap.percent?.let { " Battery is at $it%." } ?: ""}${snap.rangeMi?.let { " Range is $it miles." } ?: ""}",
             )
         }.getOrNull() ?: return WearAiResult(vin, ok = false, message = "Couldn't generate a summary")
+
+        // Persist to the store the ViewModel mirrors into _state.aiSummaries (see
+        // AiSummaryStore). Without this, the next phone-side state change republishes the
+        // whole extras payload from _state -- which never held this watch-requested summary
+        // -- and silently drops it. Written before the extras publish so it survives even if
+        // the read below times out.
+        AiSummaryStore(ctx).put(vin, summary)
 
         // Read the current extras item, patch the ai map, republish. A false return means the
         // read timed out, in which case the summary reached no watch -- surface that to the

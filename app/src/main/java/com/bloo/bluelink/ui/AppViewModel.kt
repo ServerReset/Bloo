@@ -645,6 +645,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             com.bloo.bluelink.data.ClimateSyncStore(getApplication()).flow
                 .collect { s -> _state.update { it.copy(climateSync = s.byVin) } }
         }
+        // Mirror AI summaries the WATCH requested (WearPhoneService writes them to
+        // AiSummaryStore because it has no live ViewModel). Merged, not replaced: a
+        // phone-generated summary already in _state must survive, and the watch store
+        // only ever holds the watch-requested ones. Folding into _state is what lets the
+        // extras republish below carry the summary to the watch (and the phone show it).
+        viewModelScope.launch {
+            com.bloo.bluelink.data.AiSummaryStore(getApplication()).flow
+                .collect { fromWatch -> _state.update { it.copy(aiSummaries = it.aiSummaries + fromWatch) } }
+        }
         // Mirror weather / car photos / AI summaries to the watch.
         //
         // `.drop(1)` is NOT cosmetic and must not be removed. `_state` is
