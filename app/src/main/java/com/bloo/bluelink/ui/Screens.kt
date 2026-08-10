@@ -2093,15 +2093,7 @@ private fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                     if (otp.sentTo == "SMS") "We texted you a one-time code."
                     else "We emailed you a one-time code.",
                 )
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = { code = it },
-                    label = { Text("Code") },
-                    singleLine = true,
-                    shape = FieldShape,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                OtpCodeField(code) { code = it }
             }
         },
         buttons = {
@@ -2138,15 +2130,7 @@ private fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewModel
                 "We emailed a one-time code" +
                     (otp.challenge.email?.let { " to $it" } ?: "") + " to verify this sign-in.",
             )
-            OutlinedTextField(
-                value = code,
-                onValueChange = { code = it },
-                label = { Text("Code") },
-                singleLine = true,
-                shape = FieldShape,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            OtpCodeField(code) { code = it }
         },
         buttons = {
             MorphButton(
@@ -2158,6 +2142,25 @@ private fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewModel
             }
             MorphTextButton("Cancel", vm::canadaCancelOtp, enabled = !loading, modifier = Modifier.fillMaxWidth())
         },
+    )
+}
+
+/**
+ * The one-time-code entry field shared by [KiaOtpDialog] and [CanadaOtpDialog]. Both
+ * hoist their own `code` state (the Verify button reads it), so this takes the value
+ * and its setter rather than owning the buffer -- everything else (the "Code" label,
+ * single line, number keyboard, [FieldShape] and full width) is identical.
+ */
+@Composable
+private fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = code,
+        onValueChange = onCodeChange,
+        label = { Text("Code") },
+        singleLine = true,
+        shape = FieldShape,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
