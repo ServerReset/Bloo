@@ -977,23 +977,7 @@ private fun OnboardingIntroPage() {
         Triple(Icons.Filled.SwapHoriz, "Multiple cars", "Swipe between every car on your account"),
     )
     highlights.forEach { (icon, title, body) ->
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = scheme.surfaceContainerHigh,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                Modifier.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
-                Column {
-                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                }
-            }
-        }
+        OnboardingTipCard(icon, title, body)
     }
 }
 
@@ -1188,6 +1172,52 @@ private fun OnboardingSetupCard(
  *  single dedicated screen -- reuses the exact same persisted-flag wiring as
  *  [CarFeatureWizard]'s per-feature pages, just consolidated into one page
  *  per vehicle instead of three. */
+/**
+ * A single tinted "tip" card: a rounded [surfaceContainerHigh] surface holding a
+ * primary-tinted icon beside a bold title and a muted one-line body. The onboarding
+ * intro and crash-course pages each render a list of these; the card chrome was
+ * copied verbatim between them, so it lives here and each page just maps its own
+ * `Triple(icon, title, body)` list onto it.
+ */
+@Composable
+private fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = scheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/**
+ * The three-line header every setup-wizard page opens with: a primary-coloured
+ * eyebrow, a large title, and a supporting paragraph. Emitted as bare siblings (NOT
+ * wrapped in a Column) because the callers place them as direct children of a Column
+ * with its own `Arrangement.spacedBy`, which spaces the header lines and the gap to
+ * the page content below -- an inner Column would collapse that spacing. The title is
+ * pinned to `onSurface` (== `onBackground` in every scheme this app produces), so all
+ * four pages render pixel-identically to how they did when hand-rolled.
+ */
+@Composable
+private fun WizardPageHeader(eyebrow: String, title: String, body: String) {
+    val scheme = MaterialTheme.colorScheme
+    Text(eyebrow, style = MaterialTheme.typography.labelLarge, color = scheme.primary, fontWeight = FontWeight.Bold)
+    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = scheme.onSurface)
+    Text(body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+}
+
 @Composable
 private fun OnboardingCarPage(
     vehicle: com.bloo.bluelink.data.Vehicle?,
@@ -1197,22 +1227,10 @@ private fun OnboardingCarPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     if (vehicle == null) return
-    Text(
+    WizardPageHeader(
         "Set up",
-        style = MaterialTheme.typography.labelLarge,
-        color = scheme.primary,
-        fontWeight = FontWeight.Bold,
-    )
-    Text(
         vehicle.name,
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Black,
-        color = scheme.onSurface,
-    )
-    Text(
         "Bloo cannot read powertrain or feature info from the API. Set them once here so the right controls appear.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = scheme.onSurfaceVariant,
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1286,23 +1304,7 @@ private fun OnboardingCrashCoursePage() {
         Triple(Icons.Filled.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
     )
     tips.forEach { (icon, title, body) ->
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = scheme.surfaceContainerHigh,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                Modifier.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
-                Column {
-                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                }
-            }
-        }
+        OnboardingTipCard(icon, title, body)
     }
 }
 
@@ -1475,22 +1477,11 @@ private fun WizardPowertrainPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     if (vehicle == null) return
-    Text(
+    WizardPageHeader(
         "Powertrain",
-        style = MaterialTheme.typography.labelLarge,
-        color = scheme.primary,
-        fontWeight = FontWeight.Bold,
-    )
-    Text(
         "What powers the ${vehicle.name}?",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Black,
-    )
-    Text(
         "Bloo uses this to show the right status tiles: battery percentage for EVs, " +
             "fuel level for gas, or both for plug-in hybrids.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = scheme.onSurfaceVariant,
     )
     val current = state.powertrainOf(vehicle)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1541,21 +1532,10 @@ private fun WizardSeatsPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     if (vehicle == null) return
-    Text(
+    WizardPageHeader(
         "Seat comfort",
-        style = MaterialTheme.typography.labelLarge,
-        color = scheme.primary,
-        fontWeight = FontWeight.Bold,
-    )
-    Text(
         "What does the ${vehicle.name} have?",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Black,
-    )
-    Text(
         "Bloo shows only the controls your car actually supports. Skip any seats you don't have.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = scheme.onSurfaceVariant,
     )
     Column(
         Modifier
@@ -1645,21 +1625,10 @@ private fun WizardSteeringPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     if (vehicle == null) return
-    Text(
+    WizardPageHeader(
         "Climate features",
-        style = MaterialTheme.typography.labelLarge,
-        color = scheme.primary,
-        fontWeight = FontWeight.Bold,
-    )
-    Text(
         "Any extras on the ${vehicle.name}?",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Black,
-    )
-    Text(
         "Enable what the car actually has. These control which options appear in the climate command.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = scheme.onSurfaceVariant,
     )
     Column(
         Modifier
@@ -1775,6 +1744,25 @@ private fun FireworksOverlay(modifier: Modifier = Modifier) {
 // --- Login ----------------------------------------------------------------
 
 internal val FieldShape = RoundedCornerShape(18.dp)
+
+/**
+ * The app's borderless, surface-filled text-field colours: a [scheme.surface] fill in
+ * every state and transparent borders, so a field reads as a filled pill rather than an
+ * outlined box. Used by the login form and the rename-device dialog, which sit ~9,000
+ * lines apart and had each hand-built the identical `colors()` call. `disabledContainer`
+ * is kept surface-coloured (neither caller ever disables its field, so it never renders,
+ * but this keeps the login form byte-identical to before). */
+@Composable
+private fun borderlessFieldColors(): androidx.compose.material3.TextFieldColors {
+    val scheme = MaterialTheme.colorScheme
+    return OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = scheme.surface,
+        unfocusedContainerColor = scheme.surface,
+        disabledContainerColor = scheme.surface,
+        focusedBorderColor = Color.Transparent,
+        unfocusedBorderColor = Color.Transparent,
+    )
+}
 
 // A synced device not seen this long is flagged as possibly on a different Drive
 // file (the two-files trap) in the sync settings. 2 days is well past any normal
@@ -1897,13 +1885,7 @@ private fun LoginScreen(
                         .padding(top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    val fieldColors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = scheme.surface,
-                        unfocusedContainerColor = scheme.surface,
-                        disabledContainerColor = scheme.surface,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                    )
+                    val fieldColors = borderlessFieldColors()
 
                     Text(
                         "Region",
@@ -10040,6 +10022,32 @@ private fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
 }
 
 /**
+ * The animated corner shapes for a two-segment "split pill" -- one where the two
+ * halves meet at a gap. Returns `(left, right)`: each half is pill-rounded on its
+ * OUTER edge and takes a small nub radius on the INNER edge facing the gap, and both
+ * morph to a shared rounded-rectangle radius when [morphed] (pressed/applied). The
+ * preset pill and the charge-limit pill are the two split pills in the app and had
+ * byte-identical corner plumbing; this owns the two `animateDpAsState`s and the
+ * mirrored shapes so their motion can't drift.
+ */
+@Composable
+private fun rememberSplitPillShapes(morphed: Boolean): Pair<Shape, Shape> {
+    val outer by animateDpAsState(
+        if (morphed) 16.dp else 50.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "splitPillOuter",
+    )
+    val inner by animateDpAsState(
+        if (morphed) 16.dp else 10.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "splitPillInner",
+    )
+    val left = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner)
+    val right = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer)
+    return left to right
+}
+
+/**
  * A two-segment split button for a saved preset, styled after M3 Expressive
  * connected-button group #5: a wider "start" half and a narrow "delete" half,
  * each a pill on its outer edge with a smaller radius on the inner edge. The two
@@ -10064,18 +10072,9 @@ private fun PresetPill(
     val leftInteraction = remember { MutableInteractionSource() }
     val leftPressed by leftInteraction.collectIsPressedAsState()
     val morphed = active || leftPressed
-    // Outer corner: full pill when idle, rounded-rectangle when applied/pressed.
-    val outer by animateDpAsState(
-        if (morphed) 16.dp else 50.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "presetOuter",
-    )
-    // Inner corner (facing the gap): small nub when idle, matches outer when applied.
-    val inner by animateDpAsState(
-        if (morphed) 16.dp else 10.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "presetInner",
-    )
+    // Outer edge = full pill when idle, rounded-rectangle when applied/pressed;
+    // inner edge (facing the gap) = small nub when idle, matching outer when applied.
+    val (leftShape, rightShape) = rememberSplitPillShapes(morphed)
     val leftBg by androidx.compose.animation.animateColorAsState(
         if (active) MaterialTheme.colorScheme.primary else buttonContainer(),
         spring(stiffness = Spring.StiffnessMediumLow),
@@ -10108,7 +10107,7 @@ private fun PresetPill(
             interactionSource = leftInteraction,
             color = leftBg,
             contentColor = leftFg,
-            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+            shape = leftShape,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         ) {
             Row(
@@ -10148,7 +10147,7 @@ private fun PresetPill(
             },
             color = deleteBg,
             contentColor = deleteFg,
-            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+            shape = rightShape,
             modifier = Modifier.fillMaxHeight(),
         ) {
             Box(
@@ -10187,16 +10186,7 @@ private fun ChargeLimitPill(
     val leftInteraction = remember { MutableInteractionSource() }
     val leftPressed by leftInteraction.collectIsPressedAsState()
 
-    val outer by animateDpAsState(
-        if (leftPressed) 16.dp else 50.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "limitOuter",
-    )
-    val inner by animateDpAsState(
-        if (leftPressed) 16.dp else 10.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "limitInner",
-    )
+    val (leftShape, rightShape) = rememberSplitPillShapes(leftPressed)
     val rightBg by androidx.compose.animation.animateColorAsState(
         if (pending) MaterialTheme.colorScheme.primary else buttonContainer(),
         spring(stiffness = Spring.StiffnessMediumLow),
@@ -10220,7 +10210,7 @@ private fun ChargeLimitPill(
                 enabled = enabled,
                 color = buttonContainer(),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+                shape = leftShape,
                 // Both the current value and what tapping actually does (bump
                 // by 10%, wrapping at 100%) were purely visual -- TalkBack
                 // announced only the label text with no indication this half
@@ -10259,7 +10249,7 @@ private fun ChargeLimitPill(
                 enabled = enabled && !pending,
                 color = rightBg,
                 contentColor = rightFg,
-                shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+                shape = rightShape,
                 modifier = Modifier.fillMaxHeight(),
             ) {
                 Box(
@@ -11330,12 +11320,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     placeholder = { Text(Build.MODEL ?: "This device") },
                     singleLine = true,
                     shape = FieldShape,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = scheme.surface,
-                        unfocusedContainerColor = scheme.surface,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                    ),
+                    colors = borderlessFieldColors(),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
                 )
