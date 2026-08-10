@@ -239,18 +239,22 @@ object WearComms {
      * connection whenever the phone can't be reached at all — no paired node, or
      * the message send itself failed/timed out.
      *
-     * @return true only if the phone itself actually received the request. This
-     * is deliberately NOT "true if we got fresh data by any means" —
-     * [WearViewModel.resync] relies on this exact meaning to tell the user
-     * "bring your phone nearby to sync" specifically when the phone wasn't
-     * reachable, even though the standalone fallback below may well have quietly
-     * gotten them a partial update anyway. The fallback itself used to only run
-     * when [refresh] was true (a forced live pull); the lighter [refresh] ==
-     * false case (just "resend whatever you already have," used by
-     * [WearViewModel.resync]) had no fallback at all — a failed send there
-     * silently did nothing, dropping the request on the floor with no
-     * compensating standalone attempt. `force = refresh` keeps the fallback's
-     * own aggressiveness matched to what was actually asked for either way.
+     * @return relayed-OR-refreshed-locally: true if the phone received the request, OR (when
+     * the phone was unreachable) if the standalone fallback below got fresh data itself. This
+     * is the right answer for the [refresh] == true callers ([WearViewModel.refreshStatus] /
+     * [WearViewModel.refreshAll]), which want "did we end up with fresh data by any means" to
+     * decide whether to show "Couldn't refresh".
+     *
+     * It is NOT "did the phone receive it", so a caller that specifically needs phone
+     * reachability (e.g. [WearViewModel.resync], to say "bring your phone nearby") must ask
+     * [phoneNodeId] itself rather than read this return -- resync does exactly that. (An earlier
+     * version had resync trust this return and it wrongly suppressed that message whenever the
+     * standalone fetch succeeded.)
+     *
+     * The fallback used to run only when [refresh] was true; the lighter [refresh] == false
+     * case (just "resend whatever you already have") had none — a failed send dropped the
+     * request on the floor. `force = refresh` keeps the fallback's aggressiveness matched to
+     * what was asked for either way.
      */
     suspend fun requestSync(
         context: Context,

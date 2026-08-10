@@ -935,13 +935,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ui.update { it.copy(resyncBusy = true) }
             try {
-                // requestSync's own return value means "the phone actually got
-                // this" specifically (not "we got fresh data by any means") --
-                // see its doc comment. A standalone fallback now runs whenever
-                // the phone can't be reached, so this resync isn't a total
-                // no-op when that happens, but `requested` staying false still
-                // correctly drives the "bring your phone nearby" message below.
-                val requested = runCatching { WearComms.requestSync(ctx, "", refresh = false) }.getOrDefault(false)
+                // Phone reachability is decided by our OWN node check, NOT by requestSync's
+                // return. requestSync returns relayed-OR-refreshed-locally, so on a standalone
+                // watch it comes back true whenever the fallback status fetch got any data --
+                // which would wrongly suppress the "bring your phone nearby" message below even
+                // though the phone's published settings/presets/auth were never actually synced
+                // (resync's whole job). phoneNodeId() answers the question resync really asks:
+                // is the phone reachable right now?
+                val phoneReachable = runCatching { WearComms.phoneNodeId(ctx) != null }.getOrDefault(false)
+                runCatching { WearComms.requestSync(ctx, "", refresh = false) }
                 runCatching { WearComms.pullLatest(ctx) }
                 snapshots = snapshotStore.current().vehicles.associateBy { it.vin }
                 // Same as the publish path: this READ the store, it did not fetch anything, so
@@ -951,7 +953,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 markFetchedFrom(snapshots.values)
                 refreshConnection()
                 if (vehicles.isEmpty() && sessionStore.loggedInBrands().isNotEmpty()) loadGarage() else publish()
-                if (!requested) _ui.update { it.copy(message = "Bring your phone nearby to sync") }
+                if (!phoneReachable) _ui.update { it.copy(message = "Bring your phone nearby to sync") }
             } finally {
                 _ui.update { it.copy(resyncBusy = false) }
             }
