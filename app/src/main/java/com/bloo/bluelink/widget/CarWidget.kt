@@ -1444,7 +1444,11 @@ class CarWidget : GlanceAppWidget() {
             if (rows > 0) {
                 InfoStack(
                     car, render, max = rows, availableWidth = w, footerShown = true,
-                    hideFields = setOf(WidgetInfoField.PERCENT),
+                    // Hide PERCENT only when the ring's BarHero is actually drawing it above.
+                    // With the ring off, BarHero doesn't render (see the `if (showsRing)` block),
+                    // so the Battery field is the ONLY place the percent would appear -- hiding it
+                    // unconditionally dropped it entirely. Mirrors MediumTall/MediumSquare.
+                    hideFields = if (showsRing) setOf(WidgetInfoField.PERCENT) else emptySet(),
                 )
             }
             // A FIXED-height module, not a weighted MapFill -- see
@@ -1483,6 +1487,9 @@ class CarWidget : GlanceAppWidget() {
         // the same column and has to be taken out of the ring's budget first.
         val mapRoom = split.map
         val ringEdge = split.ring
+        // RingOrGlyph draws the percent-bearing ring only when both hold; otherwise the
+        // icon-only glyph shows and carries no number.
+        val showsRing = render.config.showRing && car.percent != null
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             FooterRow(car, render)
@@ -1504,16 +1511,16 @@ class CarWidget : GlanceAppWidget() {
                 ring = {
                     RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
                 },
-                // hideFields drops PERCENT: RingImage's own centerText already
-                // bakes "82%" into the ring bitmap right beside this stack --
-                // without this, a user with Battery/Fuel in their chosen info
-                // fields saw that exact number twice on the same tile, the
-                // same duplicate-content bug already guarded against for the
-                // bar-hero tiers' own percent and XlTallLayout's primaryValue.
+                // Hide PERCENT only when the ring is drawn: RingImage's centerText already bakes
+                // "82%" into the ring beside this stack, so showing the field too printed it
+                // twice. But with the ring off the glyph carries no number, so the field is the
+                // only place the percent appears -- hiding it unconditionally dropped it. Mirrors
+                // MediumSquare/MediumTall.
                 content = { w ->
                     InfoStack(
                         car, render, max = split.rows, availableWidth = w,
-                        footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT),
+                        footerShown = true,
+                        hideFields = if (showsRing) setOf(WidgetInfoField.PERCENT) else emptySet(),
                     )
                 },
             )
@@ -1551,6 +1558,9 @@ class CarWidget : GlanceAppWidget() {
             wantMap = render.mapBitmap != null,
         )
         val ringEdge = split.ring
+        // Matches RingOrGlyph's own guard: the ring (which bakes "82%" into its centre) draws
+        // only when both hold; otherwise the icon-only glyph shows and carries no number.
+        val showsRing = render.config.showRing && car.percent != null
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             HeaderRow(car, render)
             FooterRow(car, render)
@@ -1563,10 +1573,14 @@ class CarWidget : GlanceAppWidget() {
             ChargeBarFallback(car, render, ringEdge, split.ringRoom)
             RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
             Spacer(GlanceModifier.height(10.dp))
-            // hideFields drops PERCENT -- RingImage's own centerText above
-            // already bakes "82%" into the ring, the same duplicate-content
-            // guard LargeSquareLayout's own InfoStack call now carries too.
-            InfoStack(car, render, max = split.rows, footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT))
+            // Hide PERCENT only when the ring is actually drawn (its centerText bakes "82%" in,
+            // so showing the field too would print it twice). With the ring off the glyph shows
+            // instead and carries no number, so the Battery field is the only place the percent
+            // appears -- dropping it there hid it entirely. Mirrors MediumTallLayout.
+            InfoStack(
+                car, render, max = split.rows, footerShown = true,
+                hideFields = if (showsRing) setOf(WidgetInfoField.PERCENT) else emptySet(),
+            )
             // A FIXED-height module, not a weighted MapFill -- see
             // MediumWideLayout's own note: a weighted element ahead of
             // ActionButtons left it with no real room on a real device.
@@ -1614,7 +1628,8 @@ class CarWidget : GlanceAppWidget() {
             if (rows > 0) {
                 InfoStack(
                     car, render, max = rows, availableWidth = w, footerShown = true,
-                    hideFields = setOf(WidgetInfoField.PERCENT),
+                    // See LargeWideLayout: hide PERCENT only when the ring's BarHero draws it.
+                    hideFields = if (showsRing) setOf(WidgetInfoField.PERCENT) else emptySet(),
                 )
             }
             // A FIXED-height module, not a weighted MapFill -- see
@@ -1717,6 +1732,9 @@ class CarWidget : GlanceAppWidget() {
         // column -- reserved first, as in LargeSquareLayout.
         val mapRoom = split.map
         val ringEdge = split.ring
+        // RingOrGlyph draws the percent-bearing ring only when both hold; else the glyph (no
+        // number) shows, so the Battery field becomes the sole carrier of the percent.
+        val showsRing = render.config.showRing && car.percent != null
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
             FooterRow(car, render)
@@ -1730,12 +1748,13 @@ class CarWidget : GlanceAppWidget() {
                 ring = {
                     RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
                 },
-                // hideFields drops PERCENT -- see LargeSquareLayout's own
-                // note: RingImage's centerText already bakes it into the ring.
+                // Hide PERCENT only when the ring draws it -- see LargeSquareLayout's own note;
+                // with the ring off the field is the only place the percent shows.
                 content = { w ->
                     InfoStack(
                         car, render, max = split.rows, availableWidth = w,
-                        footerShown = true, hideFields = setOf(WidgetInfoField.PERCENT),
+                        footerShown = true,
+                        hideFields = if (showsRing) setOf(WidgetInfoField.PERCENT) else emptySet(),
                     )
                 },
             )
