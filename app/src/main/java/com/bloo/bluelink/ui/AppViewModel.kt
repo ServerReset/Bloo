@@ -34,6 +34,7 @@ import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.toGeoLocation
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
@@ -1738,13 +1739,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     // The status payload carries last-known GPS for free — use
                     // it so the map/location works without the rate-limited
                     // findMyCar call (this is what the official app does).
-                    val statusLoc = status.vehicleLocation?.coord?.let { c ->
-                        val lat = c.lat
-                        val lon = c.lon
-                        if (lat != null && lon != null) {
-                            GeoLocation(lat, lon, status.vehicleLocation?.speed?.value)
-                        } else null
-                    }
+                    val statusLoc = status.toGeoLocation()
                     _state.update { st ->
                         st.copy(
                             statuses = st.statuses + (v.vin to status),
@@ -1938,13 +1933,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Chosen as ONE fix rather than per-field `?:`, so a status carrying a lat but no
         // lon cannot combine with a cached lon into coordinates that were never a real
         // position. Same all-or-nothing shape `locate()` uses to build `statusLoc`.
-        val fix = status?.vehicleLocation?.coord?.let { c ->
-            val la = c.lat
-            val lo = c.lon
-            if (la != null && lo != null) {
-                GeoLocation(la, lo, status.vehicleLocation?.speed?.value)
-            } else null
-        } ?: _state.value.locations[v.vin]
+        val fix = status.toGeoLocation() ?: _state.value.locations[v.vin]
         return VehicleSnapshot(
             vin = v.vin,
             name = v.name,
@@ -2776,11 +2765,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
         }
-        val statusLoc = s?.vehicleLocation?.coord?.let { c ->
-            val lat = c.lat
-            val lon = c.lon
-            if (lat != null && lon != null) GeoLocation(lat, lon, s.vehicleLocation?.speed?.value) else null
-        }
+        val statusLoc = s.toGeoLocation()
         // Only hit the rate-limited findMyCar if the status carried no GPS. If it
         // then fails (e.g. the daily locate limit) but we already have a fix, keep
         // showing that rather than throwing a scary error.

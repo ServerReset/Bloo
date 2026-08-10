@@ -475,6 +475,29 @@ fun VehicleStatus.rangeMiFor(hasBattery: Boolean): Int? {
     return ((if (hasBattery) batteryRange else null) ?: dte?.value)?.toInt()
 }
 
+/**
+ * This status's reported GPS fix as a [GeoLocation], or null when it carries no usable position.
+ *
+ * All-or-nothing on the coordinate pair: a fix is returned ONLY when BOTH lat and lon are present,
+ * so a status with one but not the other never yields half a position (the phone's snapshot path
+ * relied on that to avoid combining a fresh lat with a stale cached lon). Speed comes from the same
+ * status whose coord was read, so it always matches the fix.
+ *
+ * Nullable receiver: three phone call sites (loadStatus, snapshotOf, locate) had this exact block
+ * inline -- two on a nullable status, one on a non-null one -- so the receiver is nullable and a
+ * null status simply returns null.
+ */
+fun VehicleStatus?.toGeoLocation(): GeoLocation? {
+    val c = this?.vehicleLocation?.coord ?: return null
+    val lat = c.lat
+    val lon = c.lon
+    return if (lat != null && lon != null) {
+        GeoLocation(lat, lon, this.vehicleLocation?.speed?.value)
+    } else {
+        null
+    }
+}
+
 /** The charge-limit target for the *currently connected* charger, or null if unplugged.
  *  Mechanism: [EvStatus.batteryPlugin] tells us which charger is plugged in
  *  right now (1 = DC fast, 2 = AC, per the encoding documented on
