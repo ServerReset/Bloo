@@ -111,9 +111,13 @@ class WidgetScaleTest {
                     for (wantMap in listOf(false, true)) {
                         val avail = content(size)
                         val barH = Scale.barHeight(size)
-                        val room = Scale.ringRoom(testFrame(size, ts), hasHeader, false, 18.dp)
-                        val restAfterBar = (room - barH).coerceAtLeast(0.dp)
-                        val split = Scale.tallSplit(size, restAfterBar, capRows = 2, textScale = ts, wantMap = wantMap)
+                        // The bar-branch split is WidgetLayout.mediumWideBarPlan now -- the same
+                        // call the composable renders from -- so the ringRoom(18)/bar/capRows-2
+                        // reservation can't drift from it. The render-tree demand (header, the
+                        // 6dp spacers, buttons, map) is modelled below as the composable's Column.
+                        val split = WidgetLayout.mediumWideBarPlan(
+                            testFrame(size, ts), showHeader = hasHeader, barHeight = barH, wantMap = wantMap,
+                        )
                         val header = if (hasHeader) {
                             Scale.lineHeight(Scale.titleSp(size).value, ts) +
                                 Scale.lineHeight(Scale.subtitleSp(size).value, ts)

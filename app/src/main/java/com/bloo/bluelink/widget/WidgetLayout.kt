@@ -276,4 +276,25 @@ internal object WidgetLayout {
         val split = Scale.tallSplit(frame.size, ringRoom, capRows = spec.capRows, textScale = frame.textScale, wantMap = wantMap)
         return RingHeroPlan(split, primaryValueHeight)
     }
+
+    // ---- MEDIUM_WIDE bar branch (its own shape) --------------------------------
+    //
+    // Unlike the wide/ring families this splits AFTER subtracting the bar: header + bar, then
+    // tallSplit divides ringRoom-minus-bar between the info rows and the map. Its own plan (not
+    // folded into wideBarPlan) because the bar subtraction and capRows 2 make it a distinct
+    // sequence; the sweep's "wide medium bar layout" test calls this too.
+
+    /** Plan MEDIUM_WIDE's bar branch. [barHeight] is passed in (the composable already computed
+     *  Scale.barHeight for drawing the bar); the split covers what's left after header + bar. */
+    fun mediumWideBarPlan(
+        frame: Scale.Frame,
+        showHeader: Boolean,
+        barHeight: Dp,
+        wantMap: Boolean,
+    ): Scale.TallSplit {
+        // 18dp spacer allowance = MEDIUM_WIDE's inter-slot spacers; no footer on this tier.
+        val room = Scale.ringRoom(frame, showHeader, false, 18.dp)
+        val restAfterBar = (room - barHeight).coerceAtLeast(0.dp)
+        return Scale.tallSplit(frame.size, restAfterBar, capRows = 2, textScale = frame.textScale, wantMap = wantMap)
+    }
 }

@@ -1184,20 +1184,13 @@ class CarWidget : GlanceAppWidget() {
         if (showsRing) {
             val w = Scale.innerWidth(frame)
             val barH = Scale.barHeight(size)
-            // What the header, buttons and this layout's own spacers left,
-            // minus the bar itself, is what the rows and the map split --
-            // tallSplit reserves the map FIRST and hands rows whatever's
-            // left, the same three-way division every tall tier trusts.
-            // This used to hand the SAME leftover to both independently
-            // (rows sized from the full room, then the map ALSO capped at
-            // that same full room) -- fine whenever rows was 0, a real
-            // double-booking once it wasn't, overflowing the tile by
-            // however tall the info rows came out and pushing the button
-            // row past the bottom of it.
-            val room = Scale.ringRoom(frame, render.config.showHeader, false, 18.dp)
-            val restAfterBar = (room - barH).coerceAtLeast(0.dp)
-            val split = Scale.tallSplit(
-                size, restAfterBar, capRows = 2, textScale = render.theme.textScale, wantMap = render.mapBitmap != null,
+            // WidgetLayout.mediumWideBarPlan owns the ringRoom(18dp, no footer) - bar -> tallSplit
+            // (capRows 2) sequence -- the same plan the sweep's wide-medium-bar test calls, so
+            // the reservation and the assertion can't drift. tallSplit reserves the map first
+            // and hands rows the rest; the bar is subtracted before that three-way division.
+            val split = WidgetLayout.mediumWideBarPlan(
+                frame, showHeader = render.config.showHeader, barHeight = barH,
+                wantMap = render.mapBitmap != null,
             )
             val rows = split.rows
             Column(modifier = GlanceModifier.fillMaxSize()) {
