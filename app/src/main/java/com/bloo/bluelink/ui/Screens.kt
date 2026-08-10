@@ -7011,8 +7011,18 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         }
     } else {
         var menu by remember { mutableStateOf(false) }
-        val options = state.sectionsFor(v).filter {
-            it !in setOf("summary", "controls") && state.isSectionAvailable(v, it)
+        // Memoized on the exact slices the predicate reads, mirroring the sibling PebbleList
+        // (which documents the same fix). HotspotSlot takes the whole UiState, so it recomposes
+        // on every emission; without this it re-allocated the filtered list AND a fresh setOf()
+        // literal on every refresh/command tick for the visible car. The two `!=` checks replace
+        // the per-pass set allocation.
+        val options = remember(
+            state.sectionOrders[v.vin], state.hiddenPebbles, state.aiEnabled, state.hasBattery(v),
+            v.isGen5W, state.updateAvailable, state.updateTileDismissed,
+        ) {
+            state.sectionsFor(v).filter {
+                it != "summary" && it != "controls" && state.isSectionAvailable(v, it)
+            }
         }
         val hotDrag = LocalHotSeatDrag.current
         val hovered = hotDrag?.overSlot == true
