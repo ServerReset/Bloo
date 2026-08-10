@@ -352,6 +352,46 @@ class WearPhoneService : WearableListenerService() {
         super.onDestroy()
     }
 
+    /**
+     * Read the current PATH_EXTRAS item, apply [transform] to it under [extrasMutex], and
+     * republish -- the read-modify-write both the AI-summary and the weather-location handlers
+     * need, so a patch to one car's field can't clobber every other car's extras.
+     *
+     * Returns true if it published, false if the read timed out / Play Services was wedged (in
+     * which case it publishes NOTHING and logs [timeoutLog], because republishing off a blank
+     * WearExtras would drop every other car's data). Callers map that Boolean to their own return
+     * -- runAiSummary to a WearAiResult, setWeatherFromDeviceLocation to a bare return -- which is
+     * why this returns a Boolean rather than taking the whole handler: the two callers' failure
+     * values differ, but the read/lock/null-guard/release/publish around them was identical.
+     *
+     * [transform] returning null means "nothing to change" and skips the publish (currently
+     * unused; both callers always produce an updated copy, but it keeps the helper honest).
+     */
+    private suspend fun updateExtras(
+        ctx: android.content.Context,
+        timeoutLog: String,
+        transform: (WearExtras) -> WearExtras?,
+    ): Boolean = extrasMutex.withLock {
+        val dataClient = Wearable.getDataClient(ctx)
+        val items = runCatching {
+            Tasks.await(
+                dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}")),
+                10, TimeUnit.SECONDS,
+            )
+        }.getOrNull()
+        if (items == null) {
+            AppLog.log(timeoutLog)
+            return@withLock false
+        }
+        val existing = items.map {
+            WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD))
+        }.firstOrNull() ?: WearExtras()
+        items.release()
+        val updated = transform(existing) ?: return@withLock false
+        WearBridge.publishExtrasNow(ctx, updated)
+        true
+    }
+
     /** Generate an AI summary for the watch's [WearAction.AI_SUMMARY] request,
      *  always returning a result so the watch's busy spinner resolves either
      *  way -- unlike the extras push (only sent on success), this is the
@@ -373,26 +413,15 @@ class WearPhoneService : WearableListenerService() {
             )
         }.getOrNull() ?: return WearAiResult(vin, ok = false, message = "Couldn't generate a summary")
 
-        // Read the current extras item from the Data Layer, patch the ai map, republish.
-        extrasMutex.withLock {
-            val dataClient = Wearable.getDataClient(ctx)
-            val items = runCatching {
-                Tasks.await(
-                    dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}")),
-                    10, TimeUnit.SECONDS,
-                )
-            }.getOrNull()
-            // A null result means the read timed out or Play Services is wedged.
-            // Republishing off a blank WearExtras would drop every other car's
-            // extras, so bail out of the lock instead of clobbering them.
-            if (items == null) {
-                AppLog.log("⚠ AI summary: extras read timed out, skipping publish")
-                return WearAiResult(vin, ok = false, message = "Couldn't sync the summary to your watch")
-            }
-            val existing = items.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }.firstOrNull() ?: WearExtras()
-            items.release()
-            val updated = existing.copy(ai = existing.ai + (vin to summary))
-            WearBridge.publishExtrasNow(ctx, updated)
+        // Read the current extras item, patch the ai map, republish. A false return means the
+        // read timed out, in which case the summary reached no watch -- surface that to the
+        // spinner rather than a bare "generated".
+        val published = updateExtras(
+            ctx,
+            timeoutLog = "⚠ AI summary: extras read timed out, skipping publish",
+        ) { it.copy(ai = it.ai + (vin to summary)) }
+        if (!published) {
+            return WearAiResult(vin, ok = false, message = "Couldn't sync the summary to your watch")
         }
         AppLog.log("AI summary generated for ${snap.name}")
         return WearAiResult(vin, ok = true)
@@ -414,25 +443,14 @@ class WearPhoneService : WearableListenerService() {
         val lon = appearance.weatherLon
         if (lat == null || lon == null) return
         val weather = runCatching { com.bloo.bluelink.data.WeatherApi.fetch(lat, lon) }.getOrNull() ?: return
-        extrasMutex.withLock {
-            val dataClient = Wearable.getDataClient(ctx)
-            val items = runCatching {
-                Tasks.await(
-                    dataClient.getDataItems(android.net.Uri.parse("wear://*${WearSync.PATH_EXTRAS}")),
-                    10, TimeUnit.SECONDS,
-                )
-            }.getOrNull()
-            // A null result means the read timed out or Play Services is wedged.
-            // Republishing off a blank WearExtras would drop every other car's
-            // extras, so bail out of the lock instead of clobbering them.
-            if (items == null) {
-                AppLog.log("⚠ Watch weather-location request: extras read timed out, skipping publish")
-                return
-            }
-            val existing = items.map { WearSync.decodeExtras(DataMapItem.fromDataItem(it).dataMap.getString(WearSync.KEY_PAYLOAD)) }.firstOrNull() ?: WearExtras()
-            items.release()
-            WearBridge.publishExtrasNow(ctx, existing.copy(homeWeather = weather.toWear()))
-        }
+        // Same read-patch-republish as the AI-summary path; the timeout case logs and bails
+        // inside the helper. This caller returns Unit, so the published Boolean is not needed --
+        // the "set from watch request" log below is only reached when the whole handler runs.
+        val published = updateExtras(
+            ctx,
+            timeoutLog = "⚠ Watch weather-location request: extras read timed out, skipping publish",
+        ) { it.copy(homeWeather = weather.toWear()) }
+        if (!published) return
         AppLog.log("Weather location set from watch request")
     }
 }
