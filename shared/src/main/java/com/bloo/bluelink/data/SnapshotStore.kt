@@ -243,10 +243,6 @@ class SnapshotStore(private val context: Context) {
      *  need to keep observing. */
     suspend fun current(): SnapshotData = decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])
 
-    /** Replace the entire vehicle list (e.g. after a full account refresh).
-     *  Mechanism: preserves the previously-selected VIN if that car is still
-     *  present in the new list; otherwise falls back to the first vehicle so
-     *  there's always a selection as long as the list isn't empty. */
     /**
      * Replace the vehicle LIST while keeping each surviving car's last-known status.
      *
@@ -291,6 +287,10 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
+    /** Replace the entire vehicle list (e.g. after a full account refresh).
+     *  Mechanism: preserves the previously-selected VIN if that car is still
+     *  present in the new list; otherwise falls back to the first vehicle so
+     *  there's always a selection as long as the list isn't empty. */
     suspend fun saveVehicles(vehicles: List<VehicleSnapshot>) {
         context.snapshotDataStore.edit { prefs ->
             val existing = decode(prefs[Keys.PAYLOAD])

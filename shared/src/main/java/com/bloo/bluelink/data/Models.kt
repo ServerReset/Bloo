@@ -128,10 +128,7 @@ data class WindowOpen(
     val frontRight: Int? = null,
     val backLeft: Int? = null,
     val backRight: Int? = null,
-) {
-    val anyOpen: Boolean
-        get() = listOf(frontLeft, frontRight, backLeft, backRight).any { it == 1 }
-}
+)
 
 /** Current per-seat heater/vent state, used to infer which seats the car has. */
 @Serializable

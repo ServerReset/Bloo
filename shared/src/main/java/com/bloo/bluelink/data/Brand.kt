@@ -58,7 +58,7 @@ enum class Brand(
      * request shapes across all three, differing only by host. Ported from the
      * community hyundai_kia_connect_api project's KiaUvoApiCA (see [CanadaApi]
      * doc comment for the exact source). Sign-in always goes through an
-     * email one-time code (see [usesOtpLogin]).
+     * email one-time code.
      */
     HYUNDAI_CA(
         // Multi-letter, distinct from HYUNDAI's plain "H": brandIndicator is our
@@ -91,12 +91,6 @@ enum class Brand(
         clientSecret = "CLISCR01AHSPA",
         label = "Kia (Canada)",
     );
-
-    /** True when the login form shows a one-time-code challenge instead of
-     *  logging in directly (Kia US, and all three Canada brands). Distinct
-     *  from [requiresPin]: Kia US skips the PIN field entirely, while Canada
-     *  still needs one (its own commands are PIN-gated) alongside the code. */
-    val usesOtpLogin: Boolean get() = this == KIA || isCanada
 
     /** False only for Kia US, whose commands aren't PIN-gated at all; every
      *  other brand (including Canada, gated behind CanadaApi.pinAuth) needs

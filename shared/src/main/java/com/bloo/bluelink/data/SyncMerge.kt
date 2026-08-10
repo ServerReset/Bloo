@@ -402,16 +402,6 @@ object SyncMerge {
     }
 
     /**
-     * The shared decode used by both `importSettingsJson` and `mergeSettingsJson`:
-     * returns null on invalid JSON, a wrong/absent `_format`, a `_version` newer
-     * than [BACKUP_VERSION], or an absent `prefs` object (mirroring every guard in
-     * the original). Otherwise decodes `prefs` into [MergePlan.stringPuts] (real
-     * JSON strings, plus the numeric-fallback: a bare number is stored as a string
-     * pref in this app) versus [MergePlan.boolPuts] (bare JSON booleans), and
-     * `_removed` into [MergePlan.removes] — excluding [DEVICE_LOCAL_KEYS] from both
-     * puts and removes.
-     */
-    /**
      * Just the `_removed` list from a backup, for carrying tombstones forward.
      *
      * Separate from [parseBackup] deliberately: performDriveSync needs this on the UPLOAD half,
@@ -428,6 +418,16 @@ object SyncMerge {
             ?: emptySet()
     }.getOrDefault(emptySet())
 
+    /**
+     * The shared decode used by both `importSettingsJson` and `mergeSettingsJson`:
+     * returns null on invalid JSON, a wrong/absent `_format`, a `_version` newer
+     * than [BACKUP_VERSION], or an absent `prefs` object (mirroring every guard in
+     * the original). Otherwise decodes `prefs` into [MergePlan.stringPuts] (real
+     * JSON strings, plus the numeric-fallback: a bare number is stored as a string
+     * pref in this app) versus [MergePlan.boolPuts] (bare JSON booleans), and
+     * `_removed` into [MergePlan.removes] — excluding [DEVICE_LOCAL_KEYS] from both
+     * puts and removes.
+     */
     fun parseBackup(json: String): MergePlan? {
         val root = runCatching { backupJson.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
         if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return null
