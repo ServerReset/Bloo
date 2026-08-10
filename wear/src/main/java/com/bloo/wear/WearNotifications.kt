@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.bloo.bluelink.data.BlooColors
 
 /**
  * Watch-side notifications for command outcomes.
@@ -32,7 +33,7 @@ object WearNotifications {
     private const val CHANNEL_ID = "bloo_wear_alerts"
 
     // Bloo accent, applied to the notification's icon/title tint.
-    private const val ACCENT_COLOR = 0xFF7B83EB.toInt()
+    private const val ACCENT_COLOR = BlooColors.brandAccent
 
     /**
      * True when we're allowed to post notifications: always on pre-Tiramisu,

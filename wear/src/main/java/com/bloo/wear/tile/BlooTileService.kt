@@ -548,7 +548,7 @@ abstract class BlooTileService : TileService() {
 
         /** Fallback roles for before any phone sync has occurred. */
         val DEFAULT_ROLES = WearColorRoles(
-            primary = 0xFF7B83EB.toInt(),
+            primary = BlooColors.brandAccent,
             onPrimary = 0xFF000000.toInt(),
             primaryContainer = 0xFF3A3F7A.toInt(),
             onPrimaryContainer = 0xFFFFFFFF.toInt(),

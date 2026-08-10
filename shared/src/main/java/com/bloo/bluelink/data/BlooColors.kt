@@ -21,4 +21,5 @@ object BlooColors {
     const val tempHot         = 0xFFFF5722.toInt() // high temperature alert color
     const val climateTeal     = 0xFF5DA3A3.toInt() // neutral climate-control accent color
     const val warn            = 0xFFF5A623.toInt() // generic warning/caution color
+    const val brandAccent     = 0xFF7B83EB.toInt() // Bloo brand accent: notification tint, tile fallback primary
 }

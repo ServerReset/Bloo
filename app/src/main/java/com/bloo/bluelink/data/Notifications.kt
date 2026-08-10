@@ -19,7 +19,7 @@ import com.bloo.bluelink.R
 object Notifications {
     private const val CHANNEL = "bloo_alerts"
     /** Bloo's accent, used to tint the small icon in the shade. */
-    private const val ACCENT = 0xFF7B83EB.toInt()
+    private const val ACCENT = BlooColors.brandAccent
 
     /** A tappable action on an alert that issues a remote command for [vin]. */
     data class Action(val label: String, val vin: String, val wearAction: String)
@@ -246,7 +246,7 @@ object LiveCharge {
     // heads-up peek) while still clearing promotion condition 9 above with a
     // full step to spare.
     private const val CHANNEL = "bloo_live_charge"
-    private const val ACCENT = 0xFF7B83EB.toInt()
+    private const val ACCENT = BlooColors.brandAccent
     private const val CHARGE_GREEN = 0xFF34C759.toInt()
     private const val TRACK = 0x40FFFFFF
     private const val LIMIT_POINT = 0xFFFFFFFF.toInt()
