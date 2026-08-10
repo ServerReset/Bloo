@@ -1027,7 +1027,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // rather than throwing, so isSuccess was true whenever the call completed and
             // "Couldn't refresh" could never appear -- on all three buttons that use this.
             // The same mistake is recorded as fixed for WearComms.send further down.
-            val refreshed = runCatching { WearComms.requestSync(ctx, vin, refresh = true) }
+            // The trailing { retainStatuses(it) } is the fix for a real bug: without it, the
+            // STANDALONE fetch path (WearComms.requestSync -> WearCommandRunner.refresh, which
+            // only fires onStatuses when it did the fetch itself) threw the fetched
+            // VehicleStatus away. So a per-car refresh with no phone connected left
+            // statuses[vin] empty, hasLiveStatus false, and the Alerts tile, Diagnostics tile
+            // and the full Info card all hidden -- right after a "successful" refresh. refreshAll
+            // already passes this exact lambda; every caller of refreshStatus (the hold-to-
+            // refresh pill, Locate, More->Refresh, the post-standalone-command re-pull) inherited
+            // the drop, so the one central fix here covers them all. On the relayed path
+            // onStatuses is never invoked (the phone fetched and will publish a snapshot), so
+            // this only affects the standalone path.
+            val refreshed = runCatching { WearComms.requestSync(ctx, vin, refresh = true) { retainStatuses(it) } }
                 .getOrDefault(false)
             if (!refreshed && surface) _ui.update { it.copy(message = "Couldn't refresh") }
         }
