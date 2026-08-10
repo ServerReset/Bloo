@@ -1237,6 +1237,25 @@ class SettingsStore(private val context: Context) {
      * "Sync now" request, which is exactly how a bug (this device's own Drive URI
      * leaking into the portable export) existed in two copies at once.
      */
+    /**
+     * The last-modified time a Storage Access Framework document reports, in epoch millis, or
+     * null when the URI is not a document URI, the provider returns nothing, or the query throws.
+     *
+     * performDriveSync reads this in two places -- the download gate and the upload's
+     * self-write guard -- to compare in the PROVIDER's clock domain rather than the device's,
+     * which is what keeps the sync skew-safe and free of self-reimport. The two reads were
+     * byte-for-byte identical; this is that query, once. Never throws (runCatching), because a
+     * flaky Drive provider must degrade to "unknown time", not crash a sync pass.
+     */
+    private fun providerLastModifiedMs(parsed: android.net.Uri): Long? = runCatching {
+        if (android.provider.DocumentsContract.isDocumentUri(context, parsed)) {
+            context.contentResolver.query(
+                parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                null, null, null,
+            )?.use { if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 } else null }
+        } else null
+    }.getOrNull()
+
     suspend fun performDriveSync(): DriveSyncOutcome = driveSyncMutex.withLock {
         // The periodic worker, the auto-sync-on-refresh collector, and a
         // watch-requested sync can all fire within moments of each other with
@@ -1262,18 +1281,7 @@ class SettingsStore(private val context: Context) {
         // protected-merge path, not join-adopt.
         if (!syncSyncedEver() && lastSyncMs() > 0L) setSyncSyncedEver(true)
         // Check the file's actual last-modified time from Drive.
-        val fileModifiedMs = runCatching {
-            if (android.provider.DocumentsContract.isDocumentUri(context, parsed)) {
-                val cursor = context.contentResolver.query(
-                    parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
-                    null, null, null,
-                )
-                cursor?.use {
-                    if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
-                    else null
-                }
-            } else null
-        }.getOrNull()
+        val fileModifiedMs = providerLastModifiedMs(parsed)
         // Download: read the existing file from Drive.
         var downloadError: String? = null
         // withTimeout, not just runCatching -- a stalled SAF/DocumentsProvider
@@ -1464,18 +1472,7 @@ class SettingsStore(private val context: Context) {
                 // fallback breaks exactly when it's needed. Re-read the file's
                 // last-modified so the fallback compares in the provider's clock
                 // domain (no self-reimport, skew-safe), same as before.
-                val uploadedModifiedMs = runCatching {
-                    if (android.provider.DocumentsContract.isDocumentUri(context, parsed)) {
-                        val cursor = context.contentResolver.query(
-                            parsed, arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
-                            null, null, null,
-                        )
-                        cursor?.use {
-                            if (it.moveToFirst()) it.getLong(0).takeIf { ts -> ts > 0 }
-                            else null
-                        }
-                    } else null
-                }.getOrNull()
+                val uploadedModifiedMs = providerLastModifiedMs(parsed)
                 setLastSyncMs(uploadedModifiedMs ?: now)
                 // Clear ONLY the keys this upload body actually carried, not the
                 // whole set -- an edit made after the body snapshot (setters don't
