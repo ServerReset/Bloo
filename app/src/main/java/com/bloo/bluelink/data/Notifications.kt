@@ -1,7 +1,6 @@
 package com.bloo.bluelink.data
 
 import android.Manifest
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -35,17 +34,13 @@ object Notifications {
      * from system settings, since re-creating a channel resets none of that but
      * needlessly re-declaring it is still wasted work best avoided.
      */
-    private fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val mgr = context.getSystemService(NotificationManager::class.java)
-            if (mgr.getNotificationChannel(CHANNEL) == null) {
-                mgr.createNotificationChannel(
-                    NotificationChannel(CHANNEL, "Car alerts", NotificationManager.IMPORTANCE_DEFAULT)
-                        .apply { description = "Service-due, door-open and car-running alerts" },
-                )
-            }
-        }
-    }
+    private fun ensureChannel(context: Context) = ensureNotificationChannel(
+        context,
+        id = CHANNEL,
+        name = "Car alerts",
+        importance = NotificationManager.IMPORTANCE_DEFAULT,
+        description = "Service-due, door-open and car-running alerts",
+    )
 
     /**
      * Whether Bloo can actually get a notification in front of the user.
@@ -258,20 +253,15 @@ object LiveCharge {
 
     private fun idFor(vin: String) = ("live_charge_$vin").hashCode()
 
-    private fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val mgr = context.getSystemService(NotificationManager::class.java)
-            if (mgr.getNotificationChannel(CHANNEL) == null) {
-                mgr.createNotificationChannel(
-                    NotificationChannel(CHANNEL, "Charging", NotificationManager.IMPORTANCE_LOW)
-                        .apply {
-                            description = "Live progress while your car is charging"
-                            setShowBadge(false)
-                        },
-                )
-            }
-        }
-    }
+    private fun ensureChannel(context: Context) = ensureNotificationChannel(
+        context,
+        id = CHANNEL,
+        name = "Charging",
+        importance = NotificationManager.IMPORTANCE_LOW,
+        description = "Live progress while your car is charging",
+        // No launcher badge: a persistent live-progress bar shouldn't dot the app icon.
+        showBadge = false,
+    )
 
     /** Clears every car's live-charge notification at once -- used when the
      *  user turns the feature off, so nothing is left pinned in the shade

@@ -1,7 +1,6 @@
 package com.bloo.wear
 
 import android.Manifest
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -12,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.bloo.bluelink.data.BlooColors
+import com.bloo.bluelink.data.ensureNotificationChannel
 
 /**
  * Watch-side notifications for command outcomes.
@@ -90,19 +90,11 @@ object WearNotifications {
     }
 
     /** Create the alerts channel once (idempotent); no-op below Android O. */
-    private fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-            manager.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    "Car alerts",
-                    NotificationManager.IMPORTANCE_HIGH,
-                ).apply {
-                    description = "Command results and alerts from the watch"
-                },
-            )
-        }
-    }
+    private fun ensureChannel(context: Context) = ensureNotificationChannel(
+        context,
+        id = CHANNEL_ID,
+        name = "Car alerts",
+        importance = NotificationManager.IMPORTANCE_HIGH,
+        description = "Command results and alerts from the watch",
+    )
 }
