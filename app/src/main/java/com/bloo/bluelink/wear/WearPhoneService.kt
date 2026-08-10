@@ -21,7 +21,6 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
-import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -87,21 +86,21 @@ class WearPhoneService : WearableListenerService() {
      * absent watch will answer.
      */
     private suspend fun sendResult(nodeId: String, path: String, payload: String) {
-        var lastError: Throwable? = null
-        repeat(RESULT_ATTEMPTS) { attempt ->
-            val outcome = runCatching {
-                Tasks.await(
-                    Wearable.getMessageClient(applicationContext).sendMessage(
-                        nodeId, path, payload.toByteArray(),
-                    ),
-                    10, TimeUnit.SECONDS,
-                )
-            }
-            if (outcome.isSuccess) return
-            lastError = outcome.exceptionOrNull()
-            if (attempt < RESULT_ATTEMPTS - 1) delay(RESULT_RETRY_MS shl attempt)
+        // Shared retry loop (retryWithBackoff, :shared). This suspend fun is only ever called
+        // from the message-handling coroutine, which is off the main thread, satisfying
+        // Tasks.await's requirement.
+        com.bloo.bluelink.data.retryWithBackoff(
+            attempts = RESULT_ATTEMPTS,
+            firstDelayMs = RESULT_RETRY_MS,
+            onExhausted = { AppLog.log("⚠ Watch reply undelivered ($path): ${it?.message}") },
+        ) {
+            Tasks.await(
+                Wearable.getMessageClient(applicationContext).sendMessage(
+                    nodeId, path, payload.toByteArray(),
+                ),
+                10, TimeUnit.SECONDS,
+            )
         }
-        AppLog.log("⚠ Watch reply undelivered ($path): ${lastError?.message}")
     }
 
     /**

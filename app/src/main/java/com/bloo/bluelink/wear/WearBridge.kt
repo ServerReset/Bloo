@@ -24,7 +24,6 @@ import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -102,16 +101,15 @@ object WearBridge {
         // Fixed HERE rather than at each call site so no future caller has to know: every
         // publish* funnels through this one function.
         val request = PutDataMapRequest.create(path).apply(build).asPutDataRequest().setUrgent()
-        var lastError: Throwable? = null
-        repeat(PUBLISH_ATTEMPTS) { attempt ->
-            val outcome = runCatching {
-                Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
-            }
-            if (outcome.isSuccess) return@withContext
-            lastError = outcome.exceptionOrNull()
-            if (attempt < PUBLISH_ATTEMPTS - 1) delay(PUBLISH_RETRY_MS shl attempt)
+        // Shared retry loop (see SharedModule retryWithBackoff). Runs in this withContext(IO)
+        // block, which satisfies Tasks.await's not-main-thread requirement.
+        com.bloo.bluelink.data.retryWithBackoff(
+            attempts = PUBLISH_ATTEMPTS,
+            firstDelayMs = PUBLISH_RETRY_MS,
+            onExhausted = { com.bloo.bluelink.data.AppLog.log("⚠ Watch publish failed ($path): ${it?.message}") },
+        ) {
+            Tasks.await(Wearable.getDataClient(context).putDataItem(request), 10, TimeUnit.SECONDS)
         }
-        com.bloo.bluelink.data.AppLog.log("⚠ Watch publish failed ($path): ${lastError?.message}")
     }
 
 

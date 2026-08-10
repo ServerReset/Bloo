@@ -18,7 +18,6 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
@@ -418,19 +417,19 @@ object WearComms {
             // silently didn't happen leaves the watch showing a change the phone
             // will never confirm -- and the caller can't tell, because a single
             // swallowed failure returns exactly what a real one does.
-            var lastError: Throwable? = null
-            repeat(PUBLISH_ATTEMPTS) { attempt ->
-                val outcome = runCatching {
-                    Tasks.await(
-                        Wearable.getDataClient(context).putDataItem(request),
-                        TIMEOUT_SECONDS, TimeUnit.SECONDS,
-                    )
-                }
-                if (outcome.isSuccess) return@withContext true
-                lastError = outcome.exceptionOrNull()
-                if (attempt < PUBLISH_ATTEMPTS - 1) delay(PUBLISH_RETRY_MS shl attempt)
+            // Shared retry loop (retryWithBackoff, :shared). Unlike the two phone callers this
+            // one RETURNS the success Boolean -- so the value flows straight out of the helper,
+            // and publishPebbleOrder can still tell a delivered write from a swallowed one.
+            // Inside withContext(IO), satisfying Tasks.await's not-main-thread requirement.
+            com.bloo.bluelink.data.retryWithBackoff(
+                attempts = PUBLISH_ATTEMPTS,
+                firstDelayMs = PUBLISH_RETRY_MS,
+                onExhausted = { AppLog.log("⚠ Watch publish failed ($path): ${it?.message}") },
+            ) {
+                Tasks.await(
+                    Wearable.getDataClient(context).putDataItem(request),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS,
+                )
             }
-            AppLog.log("⚠ Watch publish failed ($path): ${lastError?.message}")
-            false
         }
 }
