@@ -41,16 +41,21 @@ data class Weather(
     // Straightforward Celsius-to-Fahrenheit conversions; kept as separate small
     // functions (rather than converting once at fetch time) so the canonical
     // stored value always stays Celsius and callers pick the unit at display time.
-    fun tempF(): Double = tempC * 9 / 5 + 32
+    // tempF() removed: its only caller was tempLabel, which now delegates to the shared
+    // weatherTemp (which does the C->F conversion itself). feelsLikeF/highF/lowF stay -- each is
+    // still the conversion for a label that emits a bare degree glyph and so can't route through
+    // weatherTemp's unit-suffixed output.
     fun feelsLikeF(): Double = feelsLikeC * 9 / 5 + 32
     // highC/lowC are nullable (Open-Meteo's daily block can be absent), so these
     // propagate null through rather than converting a missing reading into 32°F.
     fun highF(): Double? = highC?.let { it * 9 / 5 + 32 }
     fun lowF(): Double? = lowC?.let { it * 9 / 5 + 32 }
 
-    /** Temperature as a rounded, unit-suffixed string. */
-    fun tempLabel(fahrenheit: Boolean): String =
-        if (fahrenheit) "${tempF().roundToInt()}°F" else "${tempC.roundToInt()}°C"
+    /** Temperature as a rounded, unit-suffixed string. Delegates to the shared
+     *  [weatherTemp] so the C-to-F-and-round rule lives in exactly one place; this was a
+     *  byte-for-byte second copy of it, and weatherTemp's own KDoc had wrongly claimed the
+     *  watch was "its only caller" while the phone reached this identical copy instead. */
+    fun tempLabel(fahrenheit: Boolean): String = weatherTemp(tempC, fahrenheit)
 
     // No unit suffix here (just the degree glyph) -- this is meant for compact UI
     // spots that already show the primary temp with its own unit label nearby.

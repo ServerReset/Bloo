@@ -2913,7 +2913,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * command could hold it at.
      */
     fun startClimate(v: Vehicle, req: ClimateRequest) =
-        runCommand(v.vin, "climate", "Climate on (${req.tempF}°F)", { it.copy(airCtrlOn = true) }) {
+        // degLabel, not an inline "°F". req.tempF is a °F Int, but this status label was
+        // appending "°F" unconditionally -- so a metric user saw "Climate on (72°F)" while every
+        // other temperature in the app respected their unit. degLabel converts and suffixes per
+        // the chosen unit, and owns the rounding rule the rest of the app already routes through.
+        runCommand(
+            v.vin,
+            "climate",
+            "Climate on (${com.bloo.bluelink.data.degLabel(
+                req.tempF.toString(),
+                fahrenheit = appearance.value.unitSystem != "metric",
+            )})",
+            { it.copy(airCtrlOn = true) },
+        ) {
             val chunks = com.bloo.bluelink.data.climateChunks(req.durationMinutes)
             // Unchanged behavior for every request already within the single-
             // command cap: chunks is just [req.durationMinutes] and this is

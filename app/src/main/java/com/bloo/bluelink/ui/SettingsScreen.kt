@@ -382,6 +382,7 @@ import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
 import com.bloo.bluelink.data.climateChunks
+import com.bloo.bluelink.data.degLabel
 import com.bloo.uicommon.topFadeScrim
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.Dispatchers
@@ -2272,7 +2273,10 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
     // weather -- naming a temperature and asking for smart at once is a
     // contradiction, and smart is the more specific request).
     val temp = parseClimateTemperature(q, metric)
-    val tempLabel = temp?.let { if (metric) "${((it - 32) * 5 / 9.0).roundToInt()}°C" else "$it°F" }
+    // degLabel owns the F<->C-and-round rule (this was an inline third copy of it). `temp` is an
+    // Int °F from parseClimateTemperature, and fahrenheit = !metric, so the two branches map
+    // exactly onto degValue's two branches -- verified against FormatUtils.degValue.
+    val tempLabel = temp?.let { degLabel(it.toString(), fahrenheit = !metric) }
     // Defrost implies climate at full heat -- "clear the windscreen" is a
     // request about ice, not about a number, so it picks its own temperature
     // unless the query also named one.
@@ -3067,8 +3071,10 @@ private fun SettingsSearchResults(
         add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin}") {
             SelectionContainer { StatusRow("VIN", v.vin) }
         }
-        val battRange = st?.evStatus?.drvDistance?.firstOrNull()?.rangeByFuel?.totalAvailableRange?.value
-        ((if (state.hasBattery(v)) battRange else null) ?: st?.dte?.value)?.toInt()?.let { r ->
+        // VehicleStatus.rangeMiFor -- already imported, and its body was copied here
+        // character-for-character (battery-range-else-null ?: dte, then toInt). One source of
+        // truth for "what range do we show for this powertrain".
+        st?.rangeMiFor(state.hasBattery(v))?.let { r ->
             add("Range · ${v.name}", "range distance dte empty ${v.name}") { StatusRow("Range", formatDistance(r, appearance.unitSystem == "metric")) }
         }
         if (state.hasBattery(v)) {
