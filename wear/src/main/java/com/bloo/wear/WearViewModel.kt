@@ -921,15 +921,31 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         markAll(vehicles.map { "${it.vin}:refresh" }) {
             // onStatuses fires only on the STANDALONE fallback, where this watch did the fetch
             // itself and is the only thing holding the result. On the relayed path the phone
-            // fetched and will publish a snapshot, so there is nothing to retain here.
+            // fetched and will publish a snapshot, so there is nothing to retain here -- and
+            // fetchedVins stays empty, which the rollback below relies on.
+            val fetchedVins = mutableSetOf<String>()
             val refreshed = runCatching {
-                WearComms.requestSync(ctx, vin = "", refresh = true) { retainStatuses(it) }
+                WearComms.requestSync(ctx, vin = "", refresh = true) { fetched ->
+                    fetchedVins += fetched.keys
+                    retainStatuses(fetched)
+                }
             }.getOrDefault(false)
-            // If the whole "Refresh all" failed (standalone, no phone, network blip), undo the
-            // pre-marking above so each car's per-view auto-fetch (onCarShown) can still retry
-            // this session -- otherwise one failed button press would gate out live status for
-            // every car until the app restarts. Same rollback principle as refreshStatus.
-            if (!refreshed) sessionFetched.clear()
+            // Roll back the pre-marking for cars that did NOT get a status, so each can still
+            // auto-fetch on its next page view (onCarShown) instead of being gated out for the
+            // session. Three cases:
+            //  - total failure: clear everything (nothing fetched, nothing relayed).
+            //  - standalone PARTIAL: the fallback fetches per-car under its own runCatching, so
+            //    one car can fail while others succeed; onStatuses carried exactly the succeeded
+            //    VINs, so drop only the ones missing from it. (Without this, a car that failed in
+            //    a multi-car standalone refresh stayed gated -- the hole the per-car rollback in
+            //    refreshStatus closes for single fetches but this aggregate path did not.)
+            //  - relayed success: onStatuses never fired (fetchedVins empty) but the phone will
+            //    publish snapshots for every car, so KEEP the pre-marking -- do not clear.
+            when {
+                !refreshed -> sessionFetched.clear()
+                fetchedVins.isNotEmpty() ->
+                    sessionFetched.removeAll(vehicles.map { it.vin }.toSet() - fetchedVins)
+            }
         }
         refreshConnection()
     }
