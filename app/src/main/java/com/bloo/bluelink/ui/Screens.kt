@@ -9773,20 +9773,21 @@ private fun ClimatePebble(
         // had drifted to a different, unanimated palette).
         val tempRange = CLIMATE_TEMP_RANGE_F.first.toFloat()..CLIMATE_TEMP_RANGE_F.last.toFloat()
         val tempColor = com.bloo.uicommon.tempColor(tempF, tempRange.start, tempRange.endInclusive)
+        // The label + value readout is the same in either unit -- only degLabel's
+        // suffix (°F/°C) and the slider below differ -- so it's hoisted out of the
+        // branch. RollingNumber (used for the hero's %/range) rather than the plain
+        // AnimatedValue this had: it rolls the DIRECTION the value actually moved (up
+        // when dragged warmer, down when cooler) instead of always sliding one way.
+        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            RollingNumber(
+                text = degLabel(tempF.toString(), fahrenheit),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = tempColor,
+            )
+        }
         if (fahrenheit) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // RollingNumber (used for the hero's %/range) rather than the
-                // plain AnimatedValue this had: it rolls the DIRECTION the value
-                // actually moved (up when dragged warmer, down when cooler)
-                // instead of always sliding the same way regardless.
-                RollingNumber(
-                    text = degLabel(tempF.toString(), true),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = tempColor,
-                )
-            }
             AnimatedSlider(
                 value = tempF.toFloat(),
                 onValueChange = { tempF = it.roundToInt() },
@@ -9798,15 +9799,6 @@ private fun ClimatePebble(
             // Celsius: drive the slider in whole °C but keep tempF canonical for
             // the command, converting on each side.
             val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
-            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                RollingNumber(
-                    text = degLabel(tempF.toString(), false),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = tempColor,
-                )
-            }
             AnimatedSlider(
                 value = tempC.toFloat(),
                 onValueChange = { tempF = (it * 9 / 5f + 32).roundToInt() },
