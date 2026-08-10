@@ -2963,7 +2963,12 @@ class CarWidget : GlanceAppWidget() {
     private fun infoValue(field: WidgetInfoField, car: VehicleSnapshot, render: Render): String? = when (field) {
         WidgetInfoField.RANGE -> car.rangeMi?.let { formatDistance(it.toDouble(), render.metric) }
         WidgetInfoField.PERCENT -> car.percent?.let { "$it%" }
-        WidgetInfoField.ODOMETER -> car.odometer?.takeIf { it.isNotBlank() }
+        // formatDistance, matching the RANGE row above and the phone. The raw car.odometer is
+        // always MILES (parseOdometerMiles' contract), so displaying it unconverted showed a
+        // metric user miles here while km sat one row up. parseOdometerMiles also strips the
+        // thousands separators the raw string can carry.
+        WidgetInfoField.ODOMETER ->
+            parseOdometerMiles(car.odometer)?.let { formatDistance(it.toDouble(), render.metric) }
         WidgetInfoField.PLATE -> car.licensePlate?.takeIf { it.isNotBlank() }
         WidgetInfoField.SERVICE -> serviceDueLabel(car, render.metric)
         WidgetInfoField.UPDATED -> relativeLabel(car.fetchedAt.takeIf { it > 0 }).takeIf { it.isNotBlank() }

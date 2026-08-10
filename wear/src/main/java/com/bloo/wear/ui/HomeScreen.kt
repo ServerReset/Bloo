@@ -2008,7 +2008,10 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     // for the service-due math below; parseOdometerMiles handles the comma
     // stripping and the decimal formatting some brands include.
     val odoInt = parseOdometerMiles(car.odometer)
-    car.odometer?.let { StatusRow("Odometer", it) }
+    // formatDistance, to match the Range row and the phone: car.odometer is a raw MILES string,
+    // so showing it verbatim gave a metric user miles beside a km Range. odoInt is already parsed
+    // just above for the service-due math; reuse it.
+    odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
     car.licensePlate?.takeIf { it.isNotBlank() }?.let { StatusRow("Plate", it) }
     val lastSvc = car.lastServiceMiles
     val interval = car.serviceIntervalMiles
