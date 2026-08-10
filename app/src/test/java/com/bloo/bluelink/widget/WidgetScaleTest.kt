@@ -359,81 +359,46 @@ class WidgetScaleTest {
      */
     @Test
     fun `tall narrow tiers fit their tile at every action count`() {
-        // TALL_TIER_MARGIN and MIN_HERO_RESERVE are no longer read here: each branch now
-        // calls Scale.tallColumn, which applies both internally. That is the point of the
-        // rewrite -- the reservation the composable makes and the reservation this sweep
-        // checks are now the SAME function call, not two copies that can drift.
+        // Each branch now calls WidgetLayout.tallPlan -- the SAME call the composable renders
+        // from -- so the per-tier reservation constants (name, button overhead/gap/cap, row cap)
+        // live in exactly ONE place. The previous version still hand-copied those constants into
+        // Scale.tallColumn calls here, which was the last remaining drift vector (it had gone
+        // stale once, modelling COMPACT_TALL's overhead as 12 while the code used 20). What still
+        // legitimately lives here is the RENDER-TREE spacer arithmetic -- the gaps the composable
+        // emits around the plan's slots -- since those are the composable's layout, not the plan.
+        // The tall tiers never draw a map, so wantMap stays false (matching WidgetLayout's spec).
         for (size in sizes()) {
             val tier = tierFor(size)
             if (tier != WidgetTier.RAIL && tier != WidgetTier.COMPACT_TALL_NARROW && tier != WidgetTier.COMPACT_TALL) continue
             val budget = content(size)
             for (ts in scales) {
                 for (actionCount in 0..7) {
-                    for (wantMap in listOf(false, true)) {
-                        // Each branch now CALLS Scale.tallColumn -- the exact reservation the
-                        // composable makes -- instead of re-deriving maxStackedButtons + the
-                        // button-zone sum by hand. That hand-mirroring is what this file's own
-                        // comments flagged as the drift vector (it had already gone stale once,
-                        // modelling COMPACT_TALL's overhead as 12 while the composable used 20).
-                        // Only the RENDER spacers added after the split still have to mirror the
-                        // composable's tree; the column reservation can no longer diverge.
-                        when (tier) {
-                            WidgetTier.RAIL -> {
-                                // RAIL shows no name (nameHeight 0); overhead 16 = trailing 8 +
-                                // the forced pre-button Spacer(8). See RailLayout.
-                                val column = Scale.tallColumn(
-                                    size, nameHeight = 0.dp, buttonOverhead = 16.dp,
-                                    buttonTrailingGap = 8.dp, buttonCap = actionCount,
-                                )
-                                val split = Scale.tallSplit(size, column.heroRoom, capRows = 0, textScale = ts, wantMap = wantMap)
-                                val spacerBeforeMap = if (wantMap && split.map > 0.dp) 6.dp else 0.dp
-                                val spacerBeforeButtons = if (column.buttonCount > 0) 8.dp else 0.dp
-                                val used = column.buttonZone + split.ring + split.map + spacerBeforeMap + spacerBeforeButtons
-                                assertTrue(
-                                    used.value <= budget.value + 0.5f,
-                                    "RAIL ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount map=$wantMap",
-                                )
-                            }
-                            WidgetTier.COMPACT_TALL_NARROW -> {
-                                val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts) + 4.dp
-                                // overhead 8 = trailing 4 + forced pre-button Spacer(4);
-                                // buttonCap min(actions,4). See CompactTallNarrowLayout.
-                                val column = Scale.tallColumn(
-                                    size, nameHeight = nameH, buttonOverhead = 8.dp,
-                                    buttonTrailingGap = 4.dp, buttonCap = minOf(actionCount, 4),
-                                )
-                                val split = Scale.tallSplit(size, column.heroRoom, capRows = 1, textScale = ts, wantMap = wantMap)
-                                val spacerRows = if (split.rows > 0) 4.dp else 0.dp
-                                val spacerMap = if (wantMap && split.map > 0.dp) 4.dp else 0.dp
-                                val spacerButtons = if (column.buttonCount > 0) 4.dp else 0.dp
-                                val used = nameH + column.buttonZone + split.ring + Scale.infoBlockHeight(size, split.rows, ts) +
-                                    split.map + spacerRows + spacerMap + spacerButtons
-                                assertTrue(
-                                    used.value <= budget.value + 0.5f,
-                                    "COMPACT_TALL_NARROW ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount map=$wantMap",
-                                )
-                            }
-                            else -> {
-                                // COMPACT_TALL stacks its buttons like the narrow tiers.
-                                // overhead 20 = trailing 12 + forced pre-button Spacer(8);
-                                // no name-height bump (nameH has no +4). See CompactTallLayout.
-                                val nameH = Scale.lineHeight(Scale.titleSp(size).value, ts)
-                                val column = Scale.tallColumn(
-                                    size, nameHeight = nameH, buttonOverhead = 20.dp,
-                                    buttonTrailingGap = 12.dp, buttonCap = actionCount,
-                                )
-                                val split = Scale.tallSplit(size, column.heroRoom, capRows = 4, textScale = ts, wantMap = wantMap)
-                                val spacerRing = if (split.ring > 0.dp) 6.dp else 0.dp
-                                val spacerButtons = if (column.buttonCount > 0) 8.dp else 0.dp
-                                val used = nameH + split.ring + spacerRing + Scale.infoBlockHeight(size, split.rows, ts) +
-                                    split.map + column.buttonZone + spacerButtons
-                                assertTrue(
-                                    used.value <= budget.value + 0.5f,
-                                    "COMPACT_TALL ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount map=$wantMap",
-                                )
-                            }
+                    val plan = WidgetLayout.tallPlan(tier, size, ts, actionCount)
+                    val split = plan.split
+                    val used = when (tier) {
+                        WidgetTier.RAIL -> {
+                            // name/rows/map are all absent on RAIL; ring + button stack + the
+                            // forced pre-button Spacer(8) when buttons show.
+                            val spacerButtons = if (plan.buttonCount > 0) 8.dp else 0.dp
+                            plan.buttonZone + split.ring + spacerButtons
+                        }
+                        WidgetTier.COMPACT_TALL_NARROW -> {
+                            val spacerRows = if (split.rows > 0) 4.dp else 0.dp
+                            val spacerButtons = if (plan.buttonCount > 0) 4.dp else 0.dp
+                            plan.nameHeight + plan.buttonZone + split.ring +
+                                Scale.infoBlockHeight(size, split.rows, ts) + spacerRows + spacerButtons
+                        }
+                        else -> { // COMPACT_TALL
+                            val spacerRing = if (split.ring > 0.dp) 6.dp else 0.dp
+                            val spacerButtons = if (plan.buttonCount > 0) 8.dp else 0.dp
+                            plan.nameHeight + split.ring + spacerRing +
+                                Scale.infoBlockHeight(size, split.rows, ts) + plan.buttonZone + spacerButtons
                         }
                     }
+                    assertTrue(
+                        used.value <= budget.value + 0.5f,
+                        "$tier ${used} exceeds ${budget} at $size @${ts}x actions=$actionCount",
+                    )
                 }
             }
         }
