@@ -330,8 +330,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     // because they're written from both the main-thread command functions and
     // background coroutines (snapshot collection, status fetches), and are
     // read synchronously by buildCarView on every publish() -- @Volatile gives
-    // safe publication across threads without needing a full Mutex for what
-    // are simple map-replacement writes.
+    // safe publication across threads.
+    //
+    // @Volatile makes each single-reference ASSIGNMENT visible across threads, but it does
+    // NOT make a `map = map + delta` read-modify-write atomic. So every WRITER that merges
+    // (rather than wholesale-replaces) must run on ONE thread or two can clobber each other:
+    // the snapshot collector and the RELAYED command branch already write on Main, and
+    // [retainStatuses] confines its own merge to Main.immediate for exactly this reason.
+    // Wholesale-replacement writes (e.g. a full `statuses = newMap`) are safe unguarded.
     /** The garage's vehicle list, either fetched live (standalone) or derived
      *  from phone-synced [snapshots] (see [loadGarage]). */
     @Volatile
@@ -2067,9 +2073,22 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun retainStatuses(fetchedStatuses: Map<String, VehicleStatus>) {
         if (fetchedStatuses.isEmpty()) return
-        statuses = statuses + fetchedStatuses
+        // The merge is a compound read-modify-write (read the map, `+`, assign back), NOT the
+        // atomic single-reference write the @Volatile fields otherwise get. requestSync invokes
+        // this callback on Dispatchers.IO, and two standalone refreshes can overlap (refreshAll
+        // and a per-car refreshStatus both run this with no shared lock -- mark/markAll are
+        // ref-count busy flags, not mutexes). Off-Main, the per-car merge could read `statuses`
+        // before the all-cars merge's assign and then clobber it, dropping the other cars'
+        // statuses AND their fetchedAt stamps -- and statusCache.save() below would persist the
+        // loser. Confining just the two assignments to Main.immediate serializes them with the
+        // snapshot collector and the RELAYED command branch, which already write these maps on
+        // Main. The disk save/publish stay off-Main: save() re-reads the volatile fields, so it
+        // sees the fully-merged map.
         val now = System.currentTimeMillis()
-        fetchedAt = fetchedAt + fetchedStatuses.keys.associateWith { now }
+        withContext(Dispatchers.Main.immediate) {
+            statuses = statuses + fetchedStatuses
+            fetchedAt = fetchedAt + fetchedStatuses.keys.associateWith { now }
+        }
         runCatching {
             val existing = statusCache.load()
             statusCache.save(
