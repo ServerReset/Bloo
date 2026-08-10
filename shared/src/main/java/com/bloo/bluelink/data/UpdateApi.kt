@@ -218,3 +218,39 @@ object UpdateApi {
             }.getOrDefault(false)
         }
 }
+
+/**
+ * The side-effect-free decisions shared by the phone's UpdateChecker.checkPhone and the
+ * watch's WearViewModel.runUpdateCheck. Only the pure predicates live here: each caller
+ * keeps its own store reads/writes, its own debounce interval (phone 1 minute, watch
+ * 12h), the watch-only "already found one this session" guard, its `setLastCheckedAt`
+ * timing (phone stamps even on a failed fetch to debounce retries; the watch stamps only
+ * on success), and its own result mapping (sealed UpdateCheckResult vs Boolean + UI
+ * update). Those genuinely differ and MUST stay per-caller -- folding them in here would
+ * change behaviour. What was duplicated, and drifting (the watch comment literally says
+ * it "mirrors UpdateChecker.checkPhone"), is the gate arithmetic below.
+ */
+object UpdateGate {
+    /**
+     * Whether an update check should short-circuit without hitting the network:
+     * an unstamped local build (nothing to compare against), or -- unless [force] --
+     * a check within [minIntervalMs] of the last, or an active snooze window.
+     */
+    fun shouldSkipCheck(
+        buildRunNumber: Int,
+        force: Boolean,
+        now: Long,
+        lastCheckedAt: Long,
+        snoozeUntil: Long,
+        minIntervalMs: Long,
+    ): Boolean =
+        buildRunNumber <= 0 ||
+            (!force && now - lastCheckedAt < minIntervalMs) ||
+            (!force && now < snoozeUntil)
+
+    /** This build's branch, falling back to [UpdateApi.DEFAULT_BRANCH] when unstamped. */
+    fun resolveBranch(buildBranch: String): String = buildBranch.ifBlank { UpdateApi.DEFAULT_BRANCH }
+
+    /** Whether [run] is strictly newer than the installed [buildRunNumber]. */
+    fun isNewer(run: WorkflowRun, buildRunNumber: Int): Boolean = run.runNumber > buildRunNumber
+}

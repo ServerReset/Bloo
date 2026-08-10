@@ -4,6 +4,7 @@ import android.content.Context
 import com.bloo.bluelink.BuildConfig
 import com.bloo.bluelink.data.UPDATE_SNOOZE_MS
 import com.bloo.bluelink.data.UpdateApi
+import com.bloo.bluelink.data.UpdateGate
 import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.data.WorkflowRun
 
@@ -59,19 +60,29 @@ object UpdateChecker {
      *    build, otherwise a strictly greater run number is a real update.
      */
     suspend fun checkPhone(context: Context, force: Boolean = false): UpdateCheckResult {
+        // Unstamped local build: bail before touching the store at all (there's no
+        // baseline to compare a local build against).
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return UpdateCheckResult.UpToDate
         val store = UpdateStore(context)
         val now = System.currentTimeMillis()
-        // Skip rapid re-checks (1 minute debounce), but always check on cold start.
-        if (!force && now - store.lastCheckedAt() < 60_000L) return UpdateCheckResult.UpToDate
-        // Respect snooze ("Remind me in 3 days").
-        if (!force && now < store.snoozeUntil()) return UpdateCheckResult.UpToDate
+        // 1-minute debounce or an active snooze -- the shared gate (see UpdateGate).
+        // Cold start passes force = false but a fresh lastCheckedAt.
+        if (UpdateGate.shouldSkipCheck(
+                buildRunNumber = BuildConfig.BUILD_RUN_NUMBER,
+                force = force,
+                now = now,
+                lastCheckedAt = store.lastCheckedAt(),
+                snoozeUntil = store.snoozeUntil(),
+                minIntervalMs = 60_000L,
+            )
+        ) return UpdateCheckResult.UpToDate
 
-        val branch = BuildConfig.BUILD_BRANCH.ifBlank { UpdateApi.DEFAULT_BRANCH }
-        val run = UpdateApi.fetchLatestSuccessfulRun(branch)
+        val run = UpdateApi.fetchLatestSuccessfulRun(UpdateGate.resolveBranch(BuildConfig.BUILD_BRANCH))
+        // Stamp unconditionally -- even a failed fetch counts against the debounce, so a
+        // rate-limited call doesn't retry in a tight loop.
         store.setLastCheckedAt(now)
         if (run == null) return UpdateCheckResult.Failed("Could not reach GitHub (rate limited or offline)")
-        if (run.runNumber <= BuildConfig.BUILD_RUN_NUMBER) return UpdateCheckResult.UpToDate
+        if (!UpdateGate.isNewer(run, BuildConfig.BUILD_RUN_NUMBER)) return UpdateCheckResult.UpToDate
         return UpdateCheckResult.Available(UpdateInfo(run))
     }
 

@@ -22,6 +22,7 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.UPDATE_SNOOZE_MS
+import com.bloo.bluelink.data.UpdateGate
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.VehicleStatus
@@ -1414,20 +1415,29 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER <= 0) return false
         // Already found one this session? Don't re-hit the API — the banner is
         // already showing (or was snoozed), and a resume/tick shouldn't clobber it.
+        // (Watch-only guard; the phone has no session-level equivalent.)
         if (_ui.value.updateRun != null) return false
         val settings = localStore.flow.first()
         val now = System.currentTimeMillis()
-        if (!force && now - settings.updateLastCheckedAt < minInterval) return false
-        if (!force && now < settings.updateSnoozeUntil) return false
-        // Same-branch comparison + consume the 12h window only on a successful
-        // fetch - mirrors UpdateChecker.checkPhone (see there for why).
-        val branch = com.bloo.wear.BuildConfig.BUILD_BRANCH
-            .ifBlank { com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH }
+        // Debounce (12h here vs the phone's 1 min) or snooze -- the shared gate
+        // (UpdateGate), the same one UpdateChecker.checkPhone uses.
+        if (UpdateGate.shouldSkipCheck(
+                buildRunNumber = com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER,
+                force = force,
+                now = now,
+                lastCheckedAt = settings.updateLastCheckedAt,
+                snoozeUntil = settings.updateSnoozeUntil,
+                minIntervalMs = minInterval,
+            )
+        ) return false
+        val branch = UpdateGate.resolveBranch(com.bloo.wear.BuildConfig.BUILD_BRANCH)
         val run = runCatching {
             com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(branch)
         }.getOrNull() ?: return false
+        // Consume the debounce window only on a successful fetch (unlike the phone,
+        // which stamps even on failure) -- a watch failure retries next tick.
         localStore.setUpdateLastCheckedAt(now)
-        return if (run.runNumber > com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER) {
+        return if (UpdateGate.isNewer(run, com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER)) {
             _ui.update { it.copy(updateRun = run) }
             true
         } else false
