@@ -1172,27 +1172,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // this is network work that can take seconds, and a snapshot read before it would
         // be stale by the time it was used if the user changed a setting meanwhile.
         val prefs = settingsStore.snapshot()
-        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
-        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
-        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
-        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
+        // The 17 per-car/per-tile config fields, shared with refreshLocalCarConfig via
+        // perCarConfig so the two can't drift. firstRun's empty-collapsed rule lives inside it.
+        val cfg = perCarConfig(vehicles, prefs)
         val firstRun = !settingsStore.onboardingSeen()
         val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin) }.map { it.vin }
-        // On first open all pebbles start expanded regardless of any stored state.
-        val collapsed = if (firstRun) emptySet()
-        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
-        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
-        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
-        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it, prefs) }
-        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it, prefs) }
-        val tileBackground = settingsStore.tileBackground(prefs)
-        val tileLiveRefresh = settingsStore.tileLiveRefresh(prefs)
-        val shortcutSet = settingsStore.enabledShortcuts()
         val lastVin = settingsStore.lastVehicleVin()
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val screen = when {
@@ -1201,29 +1185,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> Screen.Garage
         }
         _state.update {
-            it.copy(
+            // Shared config first, then the fields only the full garage load owns.
+            cfg.apply(it).copy(
                 vehicles = vehicles,
-                seatConfigs = seatConfigs,
-                powertrains = powertrains,
-                sectionOrders = sectionOrders,
-                imageUrls = images,
-                licensePlates = plates,
-                lastServiceMiles = lastSvc,
-                serviceIntervalMiles = svcInterval,
-                climatePresets = climatePresets,
-                collapsedPebbles = collapsed,
-                hiddenPebbles = hidden,
-                hotspotSections = hotspots,
-                tileConfigs = tileConfigs,
-                tileLabels = tileLabels,
-                tileClimateTargets = tileClimateTargets,
-                tileBackground = tileBackground,
-                tileLiveRefresh = tileLiveRefresh,
-                shortcutSet = shortcutSet,
                 screen = screen,
                 garageLoadError = null,
             )
         }
+        val shortcutSet = cfg.shortcutSet
         // Restores the last-selected car. This used to ride along inside the
         // copy() above; it lives in its own flow now (see currentIndex), so it
         // has to be set alongside rather than within.
@@ -1288,12 +1257,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Settings screen already open) kept showing whatever it loaded before the
      * import, until some unrelated event happened to trigger a full reload.
      */
-    private suspend fun refreshLocalCarConfig() {
-        // ONE Preferences read for every per-car setting below, instead of one per
-        // getter per car. See SettingsStore.snapshot().
-        val prefs = settingsStore.snapshot()
-        val vehicles = _state.value.vehicles
-        if (vehicles.isEmpty()) return
+    /**
+     * Reads this device's 17 local per-car / per-tile config values for [vehicles] from one
+     * [prefs] snapshot and returns a UiState transform that folds them into `copy()`, plus the
+     * resolved shortcut set (the one value a caller needs OUTSIDE the copy, to re-push launcher
+     * shortcuts).
+     *
+     * This block was duplicated byte-for-byte between [loadGarageInner] and
+     * [refreshLocalCarConfig] -- all 17 vals with identical right-hand sides. The comment at the
+     * old refreshLocalCarConfig copy recorded the exact bug that duplication caused: fields it
+     * had OMITTED (pebble visibility, collapse, hotspots, tile config, shortcuts) wrote DataStore
+     * on a sync but never reached the running UiState, so "hid a pebble / moved a Quick-tile,
+     * synced, nothing changed". Two copies is how one falls behind the other; there is now one.
+     *
+     * `firstRun` -> empty collapsed set is preserved (all pebbles start expanded on first open),
+     * and callers layer their own distinct fields (loadGarageInner adds vehicles/screen/
+     * garageLoadError; refreshLocalCarConfig adds nothing) on top of the returned transform.
+     */
+    private suspend fun perCarConfig(
+        vehicles: List<Vehicle>,
+        prefs: androidx.datastore.preferences.core.Preferences,
+    ): PerCarConfig {
         val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
@@ -1302,14 +1286,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
-        // These fields used to be omitted here (only loadGarageInner read them),
-        // so an imported change to pebble visibility, collapse state, hotspots,
-        // Quick-tile config, or the shortcut set wrote DataStore but never reached
-        // the running UiState -- the garage kept rendering the pre-sync layout
-        // until a full cold-start reload. That was the "hid a pebble / moved a
-        // Quick-tile, synced, nothing changed" bug. Read them here too, mirroring
-        // loadGarageInner exactly (incl. its firstRun empty-collapsed rule).
         val firstRun = !settingsStore.onboardingSeen()
+        // On first open all pebbles start expanded regardless of any stored state.
         val collapsed = if (firstRun) emptySet()
         else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
@@ -1320,31 +1298,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val tileBackground = settingsStore.tileBackground(prefs)
         val tileLiveRefresh = settingsStore.tileLiveRefresh(prefs)
         val shortcutSet = settingsStore.enabledShortcuts()
-        _state.update {
-            it.copy(
-                seatConfigs = seatConfigs,
-                powertrains = powertrains,
-                sectionOrders = sectionOrders,
-                imageUrls = images,
-                licensePlates = plates,
-                lastServiceMiles = lastSvc,
-                serviceIntervalMiles = svcInterval,
-                climatePresets = climatePresets,
-                collapsedPebbles = collapsed,
-                hiddenPebbles = hidden,
-                hotspotSections = hotspots,
-                tileConfigs = tileConfigs,
-                tileLabels = tileLabels,
-                tileClimateTargets = tileClimateTargets,
-                tileBackground = tileBackground,
-                tileLiveRefresh = tileLiveRefresh,
-                shortcutSet = shortcutSet,
-            )
-        }
+        return PerCarConfig(
+            apply = {
+                it.copy(
+                    seatConfigs = seatConfigs,
+                    powertrains = powertrains,
+                    sectionOrders = sectionOrders,
+                    imageUrls = images,
+                    licensePlates = plates,
+                    lastServiceMiles = lastSvc,
+                    serviceIntervalMiles = svcInterval,
+                    climatePresets = climatePresets,
+                    collapsedPebbles = collapsed,
+                    hiddenPebbles = hidden,
+                    hotspotSections = hotspots,
+                    tileConfigs = tileConfigs,
+                    tileLabels = tileLabels,
+                    tileClimateTargets = tileClimateTargets,
+                    tileBackground = tileBackground,
+                    tileLiveRefresh = tileLiveRefresh,
+                    shortcutSet = shortcutSet,
+                )
+            },
+            shortcutSet = shortcutSet,
+        )
+    }
+
+    /** Result of [perCarConfig]: a UiState transform folding in the 17 config fields, plus the
+     *  shortcut set the caller needs separately for [com.bloo.bluelink.Shortcuts.refresh]. */
+    private class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Set<String>?)
+
+    private suspend fun refreshLocalCarConfig() {
+        // ONE Preferences read for every per-car setting below, instead of one per
+        // getter per car. See SettingsStore.snapshot().
+        val prefs = settingsStore.snapshot()
+        val vehicles = _state.value.vehicles
+        if (vehicles.isEmpty()) return
+        val cfg = perCarConfig(vehicles, prefs)
+        _state.update { cfg.apply(it) }
         // Quick-tile / shortcut changes must also re-push the launcher shortcuts,
         // exactly as loadGarageInner does, so an imported shortcut-set change is
         // reflected in the app-icon long-press menu and not just in-app.
-        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet)
+        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, cfg.shortcutSet)
     }
 
     /**
