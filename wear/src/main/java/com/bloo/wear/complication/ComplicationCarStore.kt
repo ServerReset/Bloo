@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.pinnedOrSelected
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -73,5 +74,5 @@ suspend fun resolveComplicationCar(
 ): VehicleSnapshot? {
     val data = runCatching { SnapshotStore(context).current() }.getOrNull() ?: return null
     val vin = runCatching { ComplicationCarStore(context).vinFor(dataSource, instanceId) }.getOrNull()
-    return vin?.let { v -> data.vehicles.firstOrNull { it.vin == v } } ?: data.selected
+    return data.pinnedOrSelected(vin)
 }

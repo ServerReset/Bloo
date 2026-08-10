@@ -420,3 +420,18 @@ class SnapshotStore(private val context: Context) {
             get() = vehicles.firstOrNull { it.vin == selectedVin } ?: vehicles.firstOrNull()
     }
 }
+
+/**
+ * The car a WATCH glanceable surface (Tile, complication) should show: the one pinned to that
+ * surface if [pinnedVin] is set AND still in the snapshot, otherwise the globally-[selected]
+ * car so an unconfigured or stale slot is never blank.
+ *
+ * IMPORTANT -- this "stale pin falls back to selected" rule is a WATCH-only choice. The phone
+ * widget and QS tile deliberately do the opposite: a pinned widget shows ITS car or nothing,
+ * never silently swapping to another (see CarWidget.provideGlance). Do NOT route those through
+ * this helper. The two watch surfaces (ComplicationCarStore.resolveComplicationCar and
+ * BlooTileService.pick) had this exact expression copied byte-for-byte; one home keeps the rule
+ * -- and any future change to how a stale pin is treated -- from drifting between them.
+ */
+fun SnapshotStore.SnapshotData.pinnedOrSelected(pinnedVin: String?): VehicleSnapshot? =
+    pinnedVin?.let { v -> vehicles.firstOrNull { it.vin == v } } ?: selected

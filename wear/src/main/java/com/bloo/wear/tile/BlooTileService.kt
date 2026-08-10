@@ -30,6 +30,7 @@ import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.formatDistance
+import com.bloo.bluelink.data.pinnedOrSelected
 import com.bloo.bluelink.data.vehicleStateLabel
 import com.bloo.wear.R
 import com.bloo.wear.TILE_CHIP_ACTIONS
@@ -167,9 +168,9 @@ abstract class BlooTileService : TileService() {
 
                 // Show the car pinned to this slot if it still exists, else the
                 // app/widget's selected car — so an unconfigured or stale slot is
-                // never blank.
-                fun pick(d: SnapshotStore.SnapshotData): VehicleSnapshot? =
-                    tileVin?.let { v -> d.vehicles.firstOrNull { it.vin == v } } ?: d.selected
+                // never blank. pinnedOrSelected is the one shared home for this
+                // watch-surface rule (the complication resolver uses it too).
+                fun pick(d: SnapshotStore.SnapshotData): VehicleSnapshot? = d.pinnedOrSelected(tileVin)
 
                 var data = store.current()
                 var car = pick(data)
