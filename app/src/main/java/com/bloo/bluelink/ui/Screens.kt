@@ -9177,7 +9177,9 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 if (status.trunkOpen == true) StatusRow("Trunk", "Open")
                 if (status.hoodOpen == true) StatusRow("Hood", "Open")
                 if (status.acc == true) StatusRow("Accessory power", "On")
-                StatusRow("Climate", if (status.airCtrlOn == true) "On" else "Off")
+                // Absent when climate state is unknown (airCtrlOn null), like the engine/doorLock
+                // rows above -- "Off" was being shown as fact for a car that never reported it.
+                status.airCtrlOn?.let { StatusRow("Climate", if (it) "On" else "Off") }
                 if (status.defrost == true) StatusRow("Defrost", "On")
                 status.airTemp?.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit)) }
                 status.percentFor(state.hasBattery(v))?.let {
