@@ -133,6 +133,7 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
@@ -1356,23 +1357,23 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         MorphButton(
             label = "Coldest",
             icon = Icons.Filled.AcUnit,
-            active = d.tempF == 62,
-            activeColor = tempColor(62),
+            active = d.tempF == CLIMATE_TEMP_RANGE_F.first,
+            activeColor = tempColor(CLIMATE_TEMP_RANGE_F.first),
             pending = false,
-            onClick = { vm.setClimateTemp(car.vin, 62) },
+            onClick = { vm.setClimateTemp(car.vin, CLIMATE_TEMP_RANGE_F.first) },
             modifier = Modifier.weight(1f),
         )
         MorphButton(
             label = "Warmest",
             icon = Icons.Filled.Whatshot,
-            active = d.tempF == 82,
-            activeColor = tempColor(82),
+            active = d.tempF == CLIMATE_TEMP_RANGE_F.last,
+            activeColor = tempColor(CLIMATE_TEMP_RANGE_F.last),
             pending = false,
-            onClick = { vm.setClimateTemp(car.vin, 82) },
+            onClick = { vm.setClimateTemp(car.vin, CLIMATE_TEMP_RANGE_F.last) },
             modifier = Modifier.weight(1f),
         )
     }
-    SliderRow("Run", "${d.duration} min", d.duration, 1, 10, 1) { vm.setClimateDuration(car.vin, it) }
+    SliderRow("Run", "${d.duration} min", d.duration, CLIMATE_DURATION_RANGE.first, CLIMATE_DURATION_RANGE.last, 1) { vm.setClimateDuration(car.vin, it) }
     Spacer(Modifier.height(4.dp))
     MorphButton(
         label = if (d.defrost) "Defrost on" else "Defrost",
