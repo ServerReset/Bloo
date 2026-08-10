@@ -1142,46 +1142,28 @@ internal fun SettingsScreen(vm: AppViewModel) {
                 }
                 Spacer(Modifier.height(12.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("On tap:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(60.dp))
-                    Spacer(Modifier.width(8.dp))
-                    MorphSegmented(
-                        modifier = Modifier.weight(1f),
-                        options = listOf(
-                            SegmentOption("background", "Run in background", Icons.Filled.Bolt),
-                            SegmentOption("open", "Open the app", Icons.Filled.OpenInNew),
-                        ),
-                        selectedKey = if (state.tileBackground) "background" else "open",
-                        onSelect = { vm.setTileBackground(it == "background") },
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (state.tileBackground) "Tiles fire the command directly and show a confirmation."
-                    else "Tiles briefly open Bloo to send the command, then close.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                InlineSegmentedRow(
+                    label = "On tap:",
+                    caption = if (state.tileBackground) "Tiles fire the command directly and show a confirmation."
+                        else "Tiles briefly open Bloo to send the command, then close.",
+                    options = listOf(
+                        SegmentOption("background", "Run in background", Icons.Filled.Bolt),
+                        SegmentOption("open", "Open the app", Icons.Filled.OpenInNew),
+                    ),
+                    selectedKey = if (state.tileBackground) "background" else "open",
+                    onSelect = { vm.setTileBackground(it == "background") },
                 )
 
                 Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Refresh:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(60.dp))
-                    Spacer(Modifier.width(8.dp))
-                    MorphSegmented(
-                        modifier = Modifier.weight(1f),
-                        options = listOf(
-                            SegmentOption("off", "Off", null),
-                            SegmentOption("on", "On", Icons.Filled.Refresh),
-                        ),
-                        selectedKey = if (state.tileLiveRefresh) "on" else "off",
-                        onSelect = { vm.setTileLiveRefresh(it == "on") },
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Pulls the car's latest state when the tile appears (throttled to once a minute per car).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                InlineSegmentedRow(
+                    label = "Refresh:",
+                    caption = "Pulls the car's latest state when the tile appears (throttled to once a minute per car).",
+                    options = listOf(
+                        SegmentOption("off", "Off", null),
+                        SegmentOption("on", "On", Icons.Filled.Refresh),
+                    ),
+                    selectedKey = if (state.tileLiveRefresh) "on" else "off",
+                    onSelect = { vm.setTileLiveRefresh(it == "on") },
                 )
                 Spacer(Modifier.height(12.dp))
                 QuickTilesManager(state, vm)
@@ -3448,6 +3430,39 @@ fun SettingsSegmentedRow(
         Spacer(Modifier.height(6.dp))
         MorphSegmented(options = options, selectedKey = selectedKey, onSelect = onSelect)
     }
+}
+
+/**
+ * A [MorphSegmented] with a fixed-width caption to its left and an explanatory line
+ * beneath -- the layout the Quick-tiles card uses for its "On tap" and "Refresh"
+ * choices. Distinct from [SettingsSegmentedRow], which stacks its label above the
+ * control and carries no sub-caption; this one keeps the label inline (a 60dp column,
+ * so the two rows' controls line up) and always has a hint below.
+ */
+@Composable
+private fun InlineSegmentedRow(
+    label: String,
+    caption: String,
+    options: List<SegmentOption>,
+    selectedKey: String,
+    onSelect: (String) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(60.dp))
+        Spacer(Modifier.width(8.dp))
+        MorphSegmented(
+            modifier = Modifier.weight(1f),
+            options = options,
+            selectedKey = selectedKey,
+            onSelect = onSelect,
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    Text(
+        caption,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+    )
 }
 
 /** Expressive per-car header: a tonal thumbnail/gradient bubble, name, and tile count. */
