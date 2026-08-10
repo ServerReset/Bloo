@@ -6823,17 +6823,7 @@ private fun VehicleDetailContent(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
             ) {
-                Surface(
-                    onClick = { scope.launch { scroll.animateScrollTo(0) } },
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
-                ) {
-                    Box(Modifier.height(48.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                        Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    }
-                }
+                CarNamePill(v.name) { scope.launch { scroll.animateScrollTo(0) } }
             }
         }
     }
@@ -6938,20 +6928,32 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
         ) {
-            Surface(
-                onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
-            ) {
-              Box(Modifier.height(48.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                  Text(v.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-              }
-            }
+            CarNamePill(v.name) { scope.launch { controlsScroll.animateScrollTo(0) } }
         }
         }
     }
+    }
+}
+
+/**
+ * The floating name pill shown at the top of a scrolled-past hero: a rounded glass
+ * [Surface] carrying the car's name that scrolls the view back to the top when tapped.
+ * The compact and wide hero layouts both reveal one (differing only in which corner it
+ * aligns to and which scroll state resets), so the chrome -- the glass fill, ambient
+ * ring, drop shadow and frosted rim, and the 48dp tap target -- lives here once.
+ */
+@Composable
+private fun CarNamePill(name: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
+    ) {
+        Box(Modifier.height(48.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+            Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
