@@ -3,6 +3,7 @@ package com.bloo.bluelink.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -450,8 +451,17 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         val message = runCatching {
             json.parseToJsonElement(body).let { el ->
                 (el as? kotlinx.serialization.json.JsonObject)?.let { obj ->
-                    (obj["errorMessage"] ?: obj["errorSubMessage"])
-                        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+                    // contentOrNull + the "null" sentinel guard, per key, BEFORE the `?:`.
+                    // A present errorMessage key with a JSON-null VALUE is JsonNull, which IS a
+                    // JsonPrimitive whose .content is the literal "null" -- so the old code threw
+                    // the string "null" as the user-facing error AND, because the `?:` sat at the
+                    // JsonElement level, JsonNull short-circuited it so errorSubMessage was never
+                    // consulted. Normalising each key to a real String? first fixes both: the
+                    // "null" literal is dropped and the fallback actually reaches errorSubMessage.
+                    // (Same treatment as KiaUsaApi.str().)
+                    fun field(key: String): String? =
+                        (obj[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
+                    field("errorMessage") ?: field("errorSubMessage")
                 }
             }
         }.getOrNull()
