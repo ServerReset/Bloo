@@ -1048,19 +1048,11 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    /** The measured width at or above which each square tier puts its info rows
-     *  BESIDE the ring rather than under it (RingWithContent's `minRowWidth`).
-     *
-     *  Hoisted to named constants because each is now read twice: once by
-     *  RingWithContent to choose its branch, and once by [Scale.squareSplit] to
-     *  budget for the branch that will be chosen. Those two reads have to agree
-     *  -- if squareSplit budgets side-by-side while RingWithContent stacks, the
-     *  rows are sized against a band they no longer share with the ring, which
-     *  reinstates exactly the overflow squareSplit exists to remove. As two
-     *  separate literals they would have been free to drift. */
-    private val MEDIUM_SQUARE_ROW_WIDTH = 140.dp
-    private val LARGE_SQUARE_ROW_WIDTH = 220.dp
-    private val XL_SQUARE_ROW_WIDTH = 260.dp
+    // The per-square-tier row-width thresholds (below which info rows stack under the ring
+    // instead of beside it) moved into WidgetLayout.SquareSpec, read via
+    // WidgetLayout.squareRowWidth. They must agree between RingWithContent's minRowWidth and
+    // squarePlan's sideBySide decision -- one home guarantees that, where two literals could
+    // drift and reinstate the overflow squareSplit exists to remove.
 
     @Composable
     private fun MediumSquareLayout(car: VehicleSnapshot, render: Render) {
@@ -1069,22 +1061,15 @@ class CarWidget : GlanceAppWidget() {
         // at MEDIUM's own minimum height (150dp).
         val size = LocalSize.current
         val frame = render.frame(size)
-        // 16.dp = the two Spacer(8.dp) in this column.
-        //
-        // Through Scale.squareSplit rather than sizing the ring straight off
-        // ringRoom, because the info rows below used to come from Scale.infoCap --
-        // a fraction of the raw tile height, subtracted from nothing. See
-        // squareSplit's own note: ring + rows + header + buttons overflowed this
-        // column on thousands of sizes, worst 22.4dp right at MEDIUM's own 150x150
-        // minimum at 1.4x text.
-        val split = Scale.squareSplit(
-            size,
-            room = Scale.ringRoom(frame, render.config.showHeader, false, 16.dp),
-            capRows = 3,
-            textScale = render.theme.textScale,
-            wantMap = false,
-            sideBySide = size.width >= MEDIUM_SQUARE_ROW_WIDTH,
-        )
+        // WidgetLayout.squarePlan owns the ringRoom -> squareSplit sequence and this tier's
+        // constants (16dp spacer allowance = the two Spacer(8.dp) in this column, capRows 3, no
+        // footer, no map). It replaced an infoCap row estimate that overflowed thousands of
+        // sizes (worst 22.4dp at 150x150, 1.4x text); the sweep asserts the assembled column
+        // fits by calling the same squarePlan.
+        val split = WidgetLayout.squarePlan(
+            WidgetTier.MEDIUM_SQUARE, frame,
+            showHeader = render.config.showHeader, showFooter = false, wantMap = false,
+        ).split
         val ringEdge = split.ring
         Column(modifier = GlanceModifier.fillMaxSize()) {
             HeaderRow(car, render)
@@ -1113,7 +1098,7 @@ class CarWidget : GlanceAppWidget() {
                 // actual measured width can't fit them side by side.
                 RingWithContent(
                     modifier = GlanceModifier.fillMaxWidth(),
-                    minRowWidth = MEDIUM_SQUARE_ROW_WIDTH,
+                    minRowWidth = WidgetLayout.squareRowWidth(WidgetTier.MEDIUM_SQUARE),
                     ringWidth = ringEdge,
                     frame = render.frame(LocalSize.current),
                     ring = { RingImage(car, render, edgeDp = ringEdge.value.toInt()) },
@@ -1409,14 +1394,13 @@ class CarWidget : GlanceAppWidget() {
         // Through Scale.squareSplit so the info rows come out of the same
         // column budget as the ring instead of Scale.infoCap's fraction of the
         // raw tile height -- see squareSplit's note for what that overflowed.
-        val split = Scale.squareSplit(
-            size,
-            room = Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 20.dp),
-            capRows = 4,
-            textScale = render.theme.textScale,
+        // WidgetLayout.squarePlan owns this tier's constants (20dp spacer allowance, capRows 4,
+        // footer, map). The sweep calls the same plan.
+        val split = WidgetLayout.squarePlan(
+            WidgetTier.LARGE_SQUARE, frame,
+            showHeader = render.config.showHeader, showFooter = render.config.showFooter,
             wantMap = render.mapBitmap != null,
-            sideBySide = size.width >= LARGE_SQUARE_ROW_WIDTH,
-        )
+        ).split
         // Full-width map below the row, so here it competes with the ring for
         // the same column and has to be taken out of the ring's budget first.
         val mapRoom = split.map
@@ -1439,7 +1423,7 @@ class CarWidget : GlanceAppWidget() {
             // which was already unweighted for this exact reason.
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth(),
-                minRowWidth = LARGE_SQUARE_ROW_WIDTH,
+                minRowWidth = WidgetLayout.squareRowWidth(WidgetTier.LARGE_SQUARE),
                 ringWidth = ringEdge,
                 frame = render.frame(LocalSize.current),
                 ring = {
@@ -1651,17 +1635,14 @@ class CarWidget : GlanceAppWidget() {
         // and XlTallLayout's fully stacked column.
         val size = LocalSize.current
         val frame = render.frame(size)
-        // Through Scale.squareSplit so the info rows come out of the same
-        // column budget as the ring instead of Scale.infoCap's fraction of the
-        // raw tile height -- see squareSplit's note for what that overflowed.
-        val split = Scale.squareSplit(
-            size,
-            room = Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 24.dp),
-            capRows = 4,
-            textScale = render.theme.textScale,
+        // WidgetLayout.squarePlan owns this tier's constants (24dp spacer allowance, capRows 4,
+        // footer, map) -- the same plan the sweep calls, so rows come out of the same column
+        // budget as the ring instead of an infoCap fraction of raw tile height.
+        val split = WidgetLayout.squarePlan(
+            WidgetTier.XL_SQUARE, frame,
+            showHeader = render.config.showHeader, showFooter = render.config.showFooter,
             wantMap = render.mapBitmap != null,
-            sideBySide = size.width >= XL_SQUARE_ROW_WIDTH,
-        )
+        ).split
         // Full-width map below the row, competing with the ring for the same
         // column -- reserved first, as in LargeSquareLayout.
         val mapRoom = split.map
@@ -1676,7 +1657,7 @@ class CarWidget : GlanceAppWidget() {
             ChargeBarFallback(car, render, ringEdge, split.ringRoom)
             RingWithContent(
                 modifier = GlanceModifier.fillMaxWidth(),
-                minRowWidth = XL_SQUARE_ROW_WIDTH,
+                minRowWidth = WidgetLayout.squareRowWidth(WidgetTier.XL_SQUARE),
                 ringWidth = ringEdge,
                 frame = render.frame(LocalSize.current),
                 ring = {

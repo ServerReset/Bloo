@@ -530,26 +530,25 @@ class WidgetScaleTest {
     fun `square tiers fit their whole column at every size`() {
         for (size in sizes()) {
             val tier = tierFor(size)
+            // rowWidth now comes from WidgetLayout.squareRowWidth -- the SAME source the
+            // composable's minRowWidth and squarePlan's sideBySide read, so this can't drift
+            // from either. The split itself is WidgetLayout.squarePlan, the exact call the
+            // composable renders from; only the render-tree assembly (spacers, ringRow shape)
+            // is modelled here, since that's the composable's Column, not the plan.
             val rowWidth = when (tier) {
-                WidgetTier.MEDIUM_SQUARE -> 140.dp
-                WidgetTier.LARGE_SQUARE -> 220.dp
-                WidgetTier.XL_SQUARE -> 260.dp
+                WidgetTier.MEDIUM_SQUARE, WidgetTier.LARGE_SQUARE, WidgetTier.XL_SQUARE ->
+                    WidgetLayout.squareRowWidth(tier)
                 else -> continue
             }
-            // Per-tier constants read straight off the composables:
-            //  MEDIUM_SQUARE: ringRoom(header, footer=false, 16), no footer, capRows 3,
-            //    two 8dp spacers already folded into the 16 spacer arg; column draws
-            //    header + 8 + ringRow + weightSpacer + 8 + buttons(one row).
-            //  LARGE_SQUARE: ringRoom(header, footer, 20), capRows 4, column draws
-            //    header + footer + 10 + ringRow + weightSpacer + map + 10 + buttons.
-            //  XL_SQUARE:   ringRoom(header, footer, 24), capRows 4, column draws
-            //    header + footer + 12 + ringRow + weightSpacer + map + buttons.
+            // The column's fixed spacer allowance, matching the composable's own Spacer calls:
+            //  MEDIUM_SQUARE: header + 8 + ringRow + weightSpacer + 8 + buttons  (16 total)
+            //  LARGE_SQUARE:  header + footer + 10 + ringRow + weightSpacer + map + 10 + buttons
+            //  XL_SQUARE:     header + footer + 12 + ringRow + weightSpacer + map + buttons
             val spacerArg = when (tier) {
                 WidgetTier.MEDIUM_SQUARE -> 16.dp
                 WidgetTier.LARGE_SQUARE -> 20.dp
                 else -> 24.dp
             }
-            val capRows = if (tier == WidgetTier.MEDIUM_SQUARE) 3 else 4
             val hasFooterTier = tier != WidgetTier.MEDIUM_SQUARE
             val wantMapTier = tier != WidgetTier.MEDIUM_SQUARE // MEDIUM_SQUARE never draws a map
             val budget = content(size)
@@ -557,11 +556,10 @@ class WidgetScaleTest {
                 for (showHeader in listOf(true, false)) {
                     for (showFooter in if (hasFooterTier) listOf(true, false) else listOf(false)) {
                         for (wantMap in if (wantMapTier) listOf(false, true) else listOf(false)) {
-                            val room = Scale.ringRoom(testFrame(size, ts), showHeader, showFooter, spacerArg)
-                            val split = Scale.squareSplit(
-                                size, room, capRows = capRows, textScale = ts, wantMap = wantMap,
-                                sideBySide = size.width >= rowWidth,
-                            )
+                            val split = WidgetLayout.squarePlan(
+                                tier, testFrame(size, ts),
+                                showHeader = showHeader, showFooter = showFooter, wantMap = wantMap,
+                            ).split
                             // The ring row is as tall as the taller of the ring and the info
                             // block when they sit side by side; when stacked, squareSplit has
                             // already subtracted the rows from the ring's room, so ring +

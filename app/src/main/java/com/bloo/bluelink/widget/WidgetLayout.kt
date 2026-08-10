@@ -115,4 +115,72 @@ internal object WidgetLayout {
         val split = Scale.tallSplit(size, column.heroRoom, capRows = spec.capRows, textScale = textScale, wantMap = wantMap)
         return TallPlan(nameHeight, column, split)
     }
+
+    // ---- Square tiers (MEDIUM_SQUARE / LARGE_SQUARE / XL_SQUARE) ----------------
+    //
+    // These share the ringRoom -> squareSplit sequence, differing only in the row-width
+    // threshold (below which rows stack under the ring instead of beside it), the spacer
+    // allowance handed to ringRoom, and the info-row cap. Unlike the tall tiers they also
+    // depend on RUNTIME config (showHeader/showFooter) and whether a map bitmap exists, so
+    // those are parameters rather than part of the static spec.
+
+    /** Per-tier square constants. `hasFooter` is whether the tier draws a footer AT ALL
+     *  (MEDIUM_SQUARE never does); the actual footer visibility still ANDs the config flag. */
+    private data class SquareSpec(
+        val rowWidth: Dp,
+        val spacerAllowance: Dp,
+        val capRows: Int,
+        val hasFooter: Boolean,
+    )
+
+    private val MEDIUM_SQUARE = SquareSpec(rowWidth = 140.dp, spacerAllowance = 16.dp, capRows = 3, hasFooter = false)
+    private val LARGE_SQUARE = SquareSpec(rowWidth = 220.dp, spacerAllowance = 20.dp, capRows = 4, hasFooter = true)
+    private val XL_SQUARE = SquareSpec(rowWidth = 260.dp, spacerAllowance = 24.dp, capRows = 4, hasFooter = true)
+
+    private fun squareSpecFor(tier: WidgetTier): SquareSpec? = when (tier) {
+        WidgetTier.MEDIUM_SQUARE -> MEDIUM_SQUARE
+        WidgetTier.LARGE_SQUARE -> LARGE_SQUARE
+        WidgetTier.XL_SQUARE -> XL_SQUARE
+        else -> null
+    }
+
+    /** The row-width threshold at/above which a square tier lays its info rows BESIDE the ring
+     *  (RingWithContent's `minRowWidth`), exposed so the composable's RingWithContent call and
+     *  [squarePlan]'s sideBySide decision read the same number — they must agree or the rows are
+     *  budgeted for a band they don't actually share. */
+    fun squareRowWidth(tier: WidgetTier): Dp =
+        (squareSpecFor(tier) ?: error("WidgetLayout.squareRowWidth called with non-square tier $tier")).rowWidth
+
+    /** The resolved square-tier budget: the [Scale.SquareSplit] over the tier's ringRoom. The
+     *  composable renders `split.ring`/`split.rows`/`split.map`/`split.ringRoom`; the sweep
+     *  asserts the assembled column fits. */
+    data class SquarePlan(val split: Scale.SquareSplit)
+
+    /**
+     * Plan a square tier's ring/rows/map split. [tier] must be MEDIUM/LARGE/XL_SQUARE.
+     *
+     * @param showHeader/showFooter the live config flags — ringRoom subtracts the header/footer
+     *   only when shown. (MEDIUM_SQUARE has no footer at all, so its showFooter is forced false.)
+     * @param wantMap whether a map bitmap exists to place (MEDIUM_SQUARE never shows one).
+     */
+    fun squarePlan(
+        tier: WidgetTier,
+        frame: Scale.Frame,
+        showHeader: Boolean,
+        showFooter: Boolean,
+        wantMap: Boolean,
+    ): SquarePlan {
+        val spec = squareSpecFor(tier)
+            ?: error("WidgetLayout.squarePlan called with non-square tier $tier")
+        val room = Scale.ringRoom(frame, showHeader, spec.hasFooter && showFooter, spec.spacerAllowance)
+        val split = Scale.squareSplit(
+            frame.size,
+            room = room,
+            capRows = spec.capRows,
+            textScale = frame.textScale,
+            wantMap = wantMap,
+            sideBySide = frame.size.width >= spec.rowWidth,
+        )
+        return SquarePlan(split)
+    }
 }
