@@ -557,6 +557,12 @@ class SettingsStore(private val context: Context) {
     suspend fun settingsMode(): String =
         context.settingsDataStore.data.first()[Keys.SETTINGS_MODE] ?: "simple"
 
+    /** The chosen distance/temperature unit system ("imperial" default, or "metric"), for
+     *  non-Compose callers that need it as a one-shot read rather than the [appearance] flow --
+     *  e.g. CarAlerts building a notification string off the main thread. Mirrors [settingsMode]. */
+    suspend fun unitSystem(): String =
+        context.settingsDataStore.data.first()[Keys.UNIT_SYSTEM] ?: "imperial"
+
     suspend fun setSettingsMode(value: String) {
         editTracked { it[Keys.SETTINGS_MODE] = value }
     }

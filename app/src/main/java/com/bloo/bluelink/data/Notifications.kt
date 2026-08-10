@@ -616,8 +616,11 @@ object CarAlerts {
             val interval = settings.serviceIntervalMiles(v.vin)
             // "Due" mileage only exists once both the last-serviced mileage and
             // the chosen interval are known; either missing means we can't judge
-            // due-ness at all (rather than treating it as "not due").
-            val due = if (last != null && interval != null) last + interval else null
+            // due-ness at all (rather than treating it as "not due"). nextServiceMiles
+            // is the shared formula -- this was a third inline `last + interval`, the
+            // exact re-inlining that helper's KDoc warns against, and the one the phone
+            // pebble and wear card both already route through.
+            val due = if (last != null && interval != null) nextServiceMiles(last, interval) else null
             // serviceDue returns raw signed miles remaining ((last+interval) - odo),
             // or null if any input is unknown. `remaining <= 0` is exactly the
             // original `odo >= due` edge (fires the moment odo reaches the interval).
@@ -625,7 +628,17 @@ object CarAlerts {
             val key = "service_${v.vin}"
             if (remaining != null && remaining <= 0) {
                 if (canDeliver && !settings.alertFired(key)) {
-                    out += Alert(serviceId(v), "${v.name} is due for service", "Odometer $odo mi is past the $due mi service interval.")
+                    // formatDistance, not a bare "mi". This notification stated miles to a
+                    // metric user while the phone service pebble and the wear service card
+                    // (both formatDistance) showed the same figures in km -- so the one
+                    // surface that interrupts you was the one in the wrong unit.
+                    val metric = settings.unitSystem() == "metric"
+                    out += Alert(
+                        serviceId(v),
+                        "${v.name} is due for service",
+                        "Odometer ${formatDistance(odo, metric)} is past the " +
+                            "${due?.let { formatDistance(it, metric) }} service interval.",
+                    )
                     settings.setAlertFired(key, true)
                 }
             } else {
