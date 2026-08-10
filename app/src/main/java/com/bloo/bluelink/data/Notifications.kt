@@ -65,19 +65,24 @@ object Notifications {
      * notifications. They were just resting on a permission check that answered a
      * narrower question than the one being asked.
      */
-    fun hasPermission(context: Context): Boolean {
+    fun hasPermission(context: Context, channelId: String = CHANNEL): Boolean {
         val runtimeGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         if (!runtimeGranted) return false
         val mgr = NotificationManagerCompat.from(context)
         if (!mgr.areNotificationsEnabled()) return false
-        // Channel-level block. runCatching because this reads a system service and the
-        // channel may not exist yet -- an absent channel is NOT a block (ensureChannel
-        // creates it on the way to posting), so absence must answer true.
+        // Channel-level block, tested against the channel actually being posted to
+        // ([channelId], defaulting to the alerts CHANNEL). LiveCharge has its OWN channel and
+        // must pass it -- checking the alerts channel's block state told LiveCharge the wrong
+        // answer in BOTH directions (block alerts -> it cancelled the still-enabled charging
+        // bar every poll; block only the charging channel -> it kept posting to a blocked one).
+        // runCatching because this reads a system service and the channel may not exist yet --
+        // an absent channel is NOT a block (ensureChannel creates it on the way to posting), so
+        // absence must answer true.
         return runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val ch = mgr.getNotificationChannel(CHANNEL)
+                val ch = mgr.getNotificationChannel(channelId)
                 ch == null || ch.importance != NotificationManager.IMPORTANCE_NONE
             } else true
         }.getOrDefault(true)
@@ -434,7 +439,10 @@ object LiveCharge {
         chargeLimit: Int? = null,
     ) {
         val id = idFor(vin)
-        if (!enabled || !charging || !Notifications.hasPermission(context)) {
+        // Check THIS feature's own channel, not the alerts channel: the charging bar posts to
+        // bloo_live_charge (CHANNEL here is LiveCharge's own const), so a per-channel block on
+        // the alerts channel must not cancel it, and a block on this one must stop it.
+        if (!enabled || !charging || !Notifications.hasPermission(context, CHANNEL)) {
             runCatching { NotificationManagerCompat.from(context).cancel(id) }
             return
         }
