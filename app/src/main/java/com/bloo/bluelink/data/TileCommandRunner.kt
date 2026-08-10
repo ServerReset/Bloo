@@ -125,7 +125,8 @@ object TileCommandRunner {
             val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
                 ?: return@withLock Result(false, "Car not found")
             val v = snap.toVehicle()
-            val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(ctx), CredentialStore(ctx))
+            val brand = Brand.fromIndicator(v.brandIndicator)
+            val repo = repositoryFor(brand, SessionStore(ctx), CredentialStore(ctx))
             runCatching {
                 when (cmd) {
                     "doors" ->
@@ -154,6 +155,14 @@ object TileCommandRunner {
                     // plug types are set together because setChargeTargets
                     // always sends both, and the API reports exactly these two.
                     "charge_limit" -> {
+                        // Guarded centrally here, so EVERY dispatch route (the natural-language
+                        // Settings-search command included) is covered, not just the rendered
+                        // sliders. Canada can't read its charge targets, so it must not write one
+                        // either -- setChargeTargets would POST the unverified evc/setsoc "level"
+                        // field. See Brand.supportsChargeLimits and CanadaApi's KNOWN GAP.
+                        if (!brand.supportsChargeLimits) {
+                            error("Charge limit isn't available on ${v.name}")
+                        }
                         val pct = climateTarget.toIntOrNull()?.coerceIn(CHARGE_LIMIT_RANGE)
                             ?: error("Bad charge limit")
                         repo.setChargeTargets(v, pct, pct)
