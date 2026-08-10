@@ -922,9 +922,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // onStatuses fires only on the STANDALONE fallback, where this watch did the fetch
             // itself and is the only thing holding the result. On the relayed path the phone
             // fetched and will publish a snapshot, so there is nothing to retain here.
-            runCatching {
+            val refreshed = runCatching {
                 WearComms.requestSync(ctx, vin = "", refresh = true) { retainStatuses(it) }
-            }
+            }.getOrDefault(false)
+            // If the whole "Refresh all" failed (standalone, no phone, network blip), undo the
+            // pre-marking above so each car's per-view auto-fetch (onCarShown) can still retry
+            // this session -- otherwise one failed button press would gate out live status for
+            // every car until the app restarts. Same rollback principle as refreshStatus.
+            if (!refreshed) sessionFetched.clear()
         }
         refreshConnection()
     }
@@ -1049,7 +1054,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // this only affects the standalone path.
             val refreshed = runCatching { WearComms.requestSync(ctx, vin, refresh = true) { retainStatuses(it) } }
                 .getOrDefault(false)
-            if (!refreshed && surface) _ui.update { it.copy(message = "Couldn't refresh") }
+            if (!refreshed) {
+                // Roll back the one-shot auto-fetch gate on failure, mirroring tripsFetched
+                // (removed on failure) and geocoded (released). onCarShown adds `vin` to
+                // sessionFetched BEFORE calling this, so without the rollback a car whose only
+                // standalone auto-fetch failed (no phone, network blip) would stay gated for the
+                // rest of the session -- statuses[vin] never fills, and the Diagnostics/Alerts
+                // tiles and full Info card stay hidden -- with no retry on a later page view.
+                // Removing an absent or blank ("" from refreshAll) vin is a harmless no-op.
+                sessionFetched.remove(vin)
+                if (surface) _ui.update { it.copy(message = "Couldn't refresh") }
+            }
         }
     }
 
