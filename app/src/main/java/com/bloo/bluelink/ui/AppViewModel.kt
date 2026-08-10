@@ -2104,17 +2104,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             settingsStore.setOnboardingSeen()
             vins.forEach { settingsStore.setCarConfigured(it) }
         }
-        _state.update {
-            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage, garageLoadError = null)
-        }
+        landInApp()
+    }
+
+    /** Leave a setup flow and show the garage (or the empty state if there are no cars),
+     *  clearing any stale load error. The trailing move shared by [finishOnboarding] and
+     *  [finishCarSetup], which had it written out identically. */
+    private fun landInApp() = _state.update {
+        it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage, garageLoadError = null)
     }
 
     /** Mark newly-detected cars as configured and return to the garage. */
     fun finishCarSetup(vins: List<String>) {
         viewModelScope.launch { vins.forEach { settingsStore.setCarConfigured(it) } }
-        _state.update {
-            it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage, garageLoadError = null)
-        }
+        landInApp()
     }
 
     /** Dismiss the post-onboarding "check out Settings" hint on the garage
