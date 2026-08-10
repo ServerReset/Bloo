@@ -32,10 +32,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.Brand
 import com.bloo.wear.WearUi
@@ -77,21 +75,15 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
         return
     }
 
-    // Hoisted so ScreenScaffold's curved scroll indicator tracks the very list
-    // RotaryScalingColumn scrolls -- they must share one state instance.
-    val listState = rememberScalingLazyListState()
-    // Suppress the inherited AppScaffold clock on this screen (timeText = {}
-    // renders nothing in that slot): the curved clock overlapped the centered
-    // "Sign in to Bloo" header.
-    ScreenScaffold(scrollState = listState, timeText = {}) {
-        RotaryScalingColumn(
-            state = listState,
-            contentPadding = PaddingValues(
-                horizontal = roundSafeHorizontalPadding(),
-                vertical = 28.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+    // RotaryScreenScaffold owns the shared list state and suppresses the inherited
+    // AppScaffold clock, which overlapped the centered "Sign in to Bloo" header.
+    RotaryScreenScaffold(
+        contentPadding = PaddingValues(
+            horizontal = roundSafeHorizontalPadding(),
+            vertical = 28.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
             // Header fades + slides in from the top.
             item {
                 AnimatedVisibility(
@@ -223,7 +215,6 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
             }
         }
     }
-}
 
 /**
  * One field row: an icon + label, whose value taps open the system keyboard.

@@ -126,12 +126,10 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.items
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
@@ -220,30 +218,12 @@ private val CarView.alertCount: Int
 fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit = {}) {
     if (ui.cars.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            WearEmptyState(
+                icon = Icons.Filled.DirectionsCar,
+                title = "No cars yet",
+                body = "Open Bloo on your phone to sign in.",
                 modifier = Modifier.padding(horizontal = roundSafeHorizontalPadding(flat = 20.dp, round = 22.dp)),
-            ) {
-                Icon(
-                    Icons.Filled.DirectionsCar,
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                )
-                Text(
-                    "No cars yet",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    "Open Bloo on your phone to sign in.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            )
         }
         return
     }
@@ -2430,16 +2410,10 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         vm.refreshTileWidgets()
     }
 
-    // Rotary/focus scaffolding (crown+bezel scroll, focus-on-appear) lives in
-    // RotaryScalingColumn now; this screen keeps its own edge-scale-off params,
-    // padding and spacing.
-    // Hoisted so ScreenScaffold's curved scroll indicator tracks the very same
-    // list RotaryScalingColumn scrolls (they must share one state).
-    val listState = rememberScalingLazyListState()
-    // Suppress the inherited clock — it overlapped the "Reorder tiles" header.
-    ScreenScaffold(scrollState = listState, timeText = {}) {
-    RotaryScalingColumn(
-        state = listState,
+    // RotaryScreenScaffold owns the shared list state and suppresses the inherited clock
+    // (it overlapped the "Reorder tiles" header); this screen keeps its own edge-scale-off
+    // params, padding and spacing.
+    RotaryScreenScaffold(
         scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
         contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(flat = 8.dp, round = 18.dp), vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -2588,6 +2562,5 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                 }
             }
         }
-    }
     }
 }

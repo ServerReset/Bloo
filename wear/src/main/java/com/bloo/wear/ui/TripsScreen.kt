@@ -1,26 +1,15 @@
 package com.bloo.wear.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.Icon
-import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScreenScaffold
-import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.formatEfficiency
 import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.wear.WearUi
@@ -68,63 +57,38 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
         return
     }
 
-    // One state shared between the curved scroll indicator and RotaryScalingColumn
-    // -- they must scroll the same list. Hoisted here so ScreenScaffold can track it.
-    val listState = rememberScalingLazyListState()
-
-    // timeText = {} suppresses the inherited clock, which otherwise overlapped the
-    // "Recent trips" header on this content screen.
-    ScreenScaffold(scrollState = listState, timeText = {}) {
-        RotaryScalingColumn(state = listState) {
-            item { ListHeader { Text("Recent trips", textAlign = TextAlign.Center) } }
+    RotaryScreenScaffold {
+        item { ScreenTitle("Recent trips") }
 
             if (trips.isNullOrEmpty()) {
                 val failed = vin in ui.tripsErrors
                 item {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    // titleMedium/centred, mirroring HomeScreen's "No cars yet" empty state.
+                    WearEmptyState(
+                        icon = if (failed) Icons.Filled.WifiOff else Icons.Filled.Route,
+                        title = if (failed) "Couldn't load trips" else "No trips yet",
+                        body = if (failed) "Check your connection and try again."
+                            else "Trips will appear once you've driven.",
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(
-                            imageVector = if (failed) Icons.Filled.WifiOff else Icons.Filled.Route,
-                            contentDescription = null,
-                            modifier = Modifier.size(32.dp),
-                            tint = if (failed) {
-                                MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            },
-                        )
-                        Text(
-                            // titleMedium mirrors HomeScreen's "No cars yet" -- the
-                            // same conceptual role, a big centred empty state.
-                            text = if (failed) "Couldn't load trips" else "No trips yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                        )
-                        Text(
-                            text = if (failed) {
-                                "Check your connection and try again."
-                            } else {
-                                "Trips will appear once you've driven."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                        if (failed) {
-                            MorphButton(
-                                label = "Retry",
-                                icon = Icons.Filled.Refresh,
-                                active = false,
-                                activeColor = MaterialTheme.colorScheme.primary,
-                                pending = false,
-                                onClick = { vm.loadTrips(vin) },
-                            )
-                        }
-                    }
+                        iconSize = 32.dp,
+                        iconTint = if (failed) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        },
+                        action = if (failed) {
+                            {
+                                MorphButton(
+                                    label = "Retry",
+                                    icon = Icons.Filled.Refresh,
+                                    active = false,
+                                    activeColor = MaterialTheme.colorScheme.primary,
+                                    pending = false,
+                                    onClick = { vm.loadTrips(vin) },
+                                )
+                            }
+                        } else null,
+                    )
                 }
             } else {
                 // One SectionCard per trip. Keyed by list position rather than by
@@ -156,6 +120,5 @@ fun TripsScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                     }
                 }
             }
-        }
     }
 }

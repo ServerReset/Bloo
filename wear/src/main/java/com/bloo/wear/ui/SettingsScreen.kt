@@ -36,10 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.bloo.uicommon.rememberConfirmArm
 import com.bloo.wear.WearUi
@@ -78,18 +75,12 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     // phone already uses -- same gate, one implementation.
     val confirmSignOut = rememberConfirmArm()
 
-    // Hoisted so ScreenScaffold's curved scroll indicator tracks the exact same
-    // list RotaryScalingColumn scrolls — they must share one state.
-    val listState = rememberScalingLazyListState()
-
     Box(Modifier.fillMaxSize()) {
-        // timeText = {} suppresses the inherited AppScaffold clock on this content
-        // screen: the curved clock overlapped section titles ("PIN LOCK", "AURORA…")
-        // at the top of the list. The clock stays on the main garage, whose layout
-        // is designed around it.
-        ScreenScaffold(scrollState = listState, timeText = {}) {
-            RotaryScalingColumn(state = listState) {
-                item { ListHeader { Text("Settings", textAlign = TextAlign.Center) } }
+        // RotaryScreenScaffold owns the shared list state and suppresses the inherited
+        // AppScaffold clock (it overlapped the "PIN LOCK"/"AURORA…" section titles at
+        // the top of the list). The clock stays on the main garage, designed around it.
+        RotaryScreenScaffold {
+                item { ScreenTitle("Settings") }
 
                 // ---- Accounts ------------------------------------------------
                 item {
@@ -504,13 +495,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                             // owns the Drive registry). The watch can't set a primary —
                             // that's a phone action — so this is display-only.
                             ui.settings?.syncDeviceSummary?.takeIf { it.isNotBlank() }?.let { summary ->
-                                Text(
-                                    "Devices".uppercase(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = EyebrowLetterSpacing,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
+                                Eyebrow("Devices")
                                 Text(
                                     summary,
                                     style = MaterialTheme.typography.bodySmall,
@@ -607,7 +592,6 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                     )
                 }
             }
-        }
 
         // Surfaces sync/refresh results (and any other message) while in Settings —
         // the home snackbar isn't on screen here.

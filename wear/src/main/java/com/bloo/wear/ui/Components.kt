@@ -87,8 +87,10 @@ import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.input.RemoteInputIntentHelper
 import coil.compose.AsyncImagePainter
@@ -991,4 +993,88 @@ fun RotaryScalingColumn(
         autoCentering = AutoCenteringParams(),
         content = content,
     )
+}
+
+/**
+ * A list screen's [ScreenScaffold] + [RotaryScalingColumn] pair, owning the one
+ * [ScalingLazyListState] both must share (the scaffold's curved scroll indicator and
+ * the column must scroll the same list) and suppressing the inherited AppScaffold clock
+ * (`timeText = {}`) that otherwise overlaps a content screen's top header. Login,
+ * Settings, Trips and the tile-reorder screen all hand-rolled this exact trio; they now
+ * call this and pass only what differs -- the [RotaryScalingColumn] tuning params and
+ * the list [content]. Callers keep any surrounding Box/overlay siblings of their own.
+ */
+@Composable
+fun RotaryScreenScaffold(
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(6.dp),
+    scalingParams: ScalingParams = ScalingLazyColumnDefaults.scalingParams(),
+    content: ScalingLazyListScope.() -> Unit,
+) {
+    val listState = rememberScalingLazyListState()
+    ScreenScaffold(scrollState = listState, timeText = {}) {
+        RotaryScalingColumn(
+            modifier = modifier,
+            state = listState,
+            contentPadding = contentPadding,
+            verticalArrangement = verticalArrangement,
+            scalingParams = scalingParams,
+            content = content,
+        )
+    }
+}
+
+/** The centered [ListHeader] title every list screen opens with. */
+@Composable
+fun ScreenTitle(title: String) = ListHeader { Text(title, textAlign = TextAlign.Center) }
+
+/**
+ * The small uppercase primary-tinted "eyebrow" label -- the exact styling
+ * [SectionCard]'s header and the settings group labels use. Intentionally minimal: it
+ * applies only the shared five-attribute style and no semantics/alignment/maxLines, so
+ * it can stand in wherever a bare inline eyebrow was hand-typed without changing
+ * TalkBack or layout. (Callers that need heading()/centering/clipping keep their own
+ * Text -- those params aren't Modifiers and would alter behaviour if baked in here.)
+ */
+@Composable
+fun Eyebrow(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = EyebrowLetterSpacing,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier,
+    )
+}
+
+/**
+ * A full-screen empty/error state: a tinted icon over a centered title and body, with an
+ * optional [action] (e.g. a Retry button) below. The garage "no cars" state and the
+ * trips empty/error state rendered this identical inner Column; each keeps its own outer
+ * wrapper -- so the layout [modifier] (the garage centers in a fillMaxSize Box with
+ * padding; trips is a fillMaxWidth list item) and the [iconSize]/[iconTint] stay with
+ * the caller.
+ */
+@Composable
+fun WearEmptyState(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 40.dp,
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+    action: (@Composable () -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(iconSize), tint = iconTint)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        action?.invoke()
+    }
 }
