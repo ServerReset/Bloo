@@ -430,18 +430,34 @@ class CarWidget : GlanceAppWidget() {
     private fun controlsMiniStatusEdge(size: DpSize, budget: Dp, fraction: Float = 0.32f, cap: Dp = 40.dp): Dp =
         Scale.ring(size, minOf(budget * fraction, cap))
 
-    /** Draws whichever of [RingImage]/[StatusGlyph] the config calls for at
-     *  [edge], or nothing when [edge] is too small to read -- the shared
-     *  body every controls-priority tier's mini status badge uses, so the
-     *  ring/glyph choice can't drift between them. */
+    /**
+     * The widget's hero status mark: the charge [RingImage] when the ring is enabled and a
+     * percent exists, otherwise the [StatusGlyph] (lock/plug icon) at the same [edgeDp].
+     *
+     * This one choice was hand-written identically in eight tier heroes -- every one passing
+     * the SAME edge to both branches -- so the ring-vs-glyph rule (and the fact both take the
+     * same size) lived in eight places that could drift. Both underlying composables already
+     * early-return when [edgeDp] is too small to read, so callers with a real reserved edge
+     * need no size guard; [MiniStatus] adds the controls-priority badge's own 16dp floor on
+     * top. NOTE: the two MICRO tiers are deliberately NOT routed through here -- they size the
+     * glyph (`fit.coerceIn(...)`) differently from the ring (`Scale.ring(size, fit)`), so they
+     * are genuinely two different sizes, not this shared one.
+     */
+    @Composable
+    private fun RingOrGlyph(car: VehicleSnapshot, render: Render, edgeDp: Int) {
+        if (render.config.showRing && car.percent != null) {
+            RingImage(car, render, edgeDp = edgeDp)
+        } else {
+            StatusGlyph(car, render.theme, sizeDp = edgeDp)
+        }
+    }
+
+    /** [RingOrGlyph] for the controls-priority mini status badge, with that badge's own
+     *  floor: nothing below 16dp, where the mark reads as a smudge next to the buttons. */
     @Composable
     private fun MiniStatus(car: VehicleSnapshot, render: Render, edge: Dp) {
         if (edge < 16.dp) return
-        if (render.config.showRing && car.percent != null) {
-            RingImage(car, render, edgeDp = edge.value.toInt())
-        } else {
-            StatusGlyph(car, render.theme, sizeDp = edge.value.toInt())
-        }
+        RingOrGlyph(car, render, edgeDp = edge.value.toInt())
     }
 
     @Composable
@@ -715,11 +731,7 @@ class CarWidget : GlanceAppWidget() {
             // Weighted spacers ABOVE and below centre what's left when there
             // is no map to fill it, rather than piling everything at the top.
             if (!hasMap) Spacer(GlanceModifier.defaultWeight())
-            if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = split.ring.value.toInt())
-            } else {
-                StatusGlyph(car, render.theme, sizeDp = split.ring.value.toInt())
-            }
+            RingOrGlyph(car, render, edgeDp = split.ring.value.toInt())
             if (hasMap) {
                 Spacer(GlanceModifier.height(6.dp))
                 MapFill(render, split.map)
@@ -792,11 +804,7 @@ class CarWidget : GlanceAppWidget() {
                 singleLine = true,
             )
             Spacer(GlanceModifier.height(4.dp))
-            if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
-            } else {
-                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
-            }
+            RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
             Spacer(GlanceModifier.height(4.dp))
             if (rows > 0) InfoStack(car, render, max = rows)
         }
@@ -992,11 +1000,7 @@ class CarWidget : GlanceAppWidget() {
             )
             Spacer(GlanceModifier.height(4.dp))
             if (!hasMap) Spacer(GlanceModifier.defaultWeight())
-            if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
-            } else {
-                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
-            }
+            RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
             if (split.rows > 0) {
                 Spacer(GlanceModifier.height(4.dp))
                 InfoStack(car, render, max = split.rows)
@@ -1498,11 +1502,7 @@ class CarWidget : GlanceAppWidget() {
                 ringWidth = ringEdge,
                 frame = render.frame(LocalSize.current),
                 ring = {
-                    if (render.config.showRing && car.percent != null) {
-                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
-                    } else {
-                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
-                    }
+                    RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
                 },
                 // hideFields drops PERCENT: RingImage's own centerText already
                 // bakes "82%" into the ring bitmap right beside this stack --
@@ -1561,11 +1561,7 @@ class CarWidget : GlanceAppWidget() {
             // without this the tier drew no gauge at all, which is reachable at
             // 1.4x text on a tile near LARGE's own 240x170 floor.
             ChargeBarFallback(car, render, ringEdge, split.ringRoom)
-            if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
-            } else {
-                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
-            }
+            RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
             Spacer(GlanceModifier.height(10.dp))
             // hideFields drops PERCENT -- RingImage's own centerText above
             // already bakes "82%" into the ring, the same duplicate-content
@@ -1674,11 +1670,7 @@ class CarWidget : GlanceAppWidget() {
             // header, footer and buttons, so it runs out of ring room sooner
             // than its size suggests.
             ChargeBarFallback(car, render, ringEdge, split.ringRoom)
-            if (render.config.showRing && car.percent != null) {
-                RingImage(car, render, edgeDp = ringEdge.value.toInt())
-            } else {
-                StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
-            }
+            RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
             Spacer(GlanceModifier.height(8.dp))
             // innerWidth + singleLine: this value line's height (primaryValueHeight, one
             // Scale.lineHeight) is reserved once in ringRoom's spacers, so it must not wrap;
@@ -1736,11 +1728,7 @@ class CarWidget : GlanceAppWidget() {
                 ringWidth = ringEdge,
                 frame = render.frame(LocalSize.current),
                 ring = {
-                    if (render.config.showRing && car.percent != null) {
-                        RingImage(car, render, edgeDp = ringEdge.value.toInt())
-                    } else {
-                        StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
-                    }
+                    RingOrGlyph(car, render, edgeDp = ringEdge.value.toInt())
                 },
                 // hideFields drops PERCENT -- see LargeSquareLayout's own
                 // note: RingImage's centerText already bakes it into the ring.
