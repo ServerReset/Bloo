@@ -633,11 +633,16 @@ object CarAlerts {
                     // (both formatDistance) showed the same figures in km -- so the one
                     // surface that interrupts you was the one in the wrong unit.
                     val metric = settings.unitSystem() == "metric"
+                    // odo and due are both non-null in this branch (remaining != null requires
+                    // all three inputs), but the compiler can't carry that through serviceDue's
+                    // signature -- odo is Int? from parseOdometerMiles. `?.let ?: ""` keeps it
+                    // total without a not-null assertion; the empty fallback is unreachable here.
+                    val odoStr = odo?.let { formatDistance(it, metric) } ?: ""
+                    val dueStr = due?.let { formatDistance(it, metric) } ?: ""
                     out += Alert(
                         serviceId(v),
                         "${v.name} is due for service",
-                        "Odometer ${formatDistance(odo, metric)} is past the " +
-                            "${due?.let { formatDistance(it, metric) }} service interval.",
+                        "Odometer $odoStr is past the $dueStr service interval.",
                     )
                     settings.setAlertFired(key, true)
                 }
