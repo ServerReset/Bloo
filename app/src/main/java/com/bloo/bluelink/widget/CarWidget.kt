@@ -497,9 +497,12 @@ class CarWidget : GlanceAppWidget() {
             } else {
                 StatusGlyph(car, render.theme, sizeDp = fit.coerceIn(14.dp, 36.dp).value.toInt())
                 Spacer(GlanceModifier.height(2.dp))
+                // innerWidth, not size.width - 8: the caption is inside Content's root padding.
+                // NOT singleLine -- this is the terminal element in a centred column with slack,
+                // so wrapping is an acceptable last resort here (unlike the compact name tiers).
                 FitText(
                     car.name, subtitleStyle(render.theme),
-                    maxWidth = (size.width - 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    maxWidth = Scale.innerWidth(render.frame(size)), horizontalAlignment = Alignment.CenterHorizontally,
                 )
             }
         }
@@ -780,9 +783,13 @@ class CarWidget : GlanceAppWidget() {
             minOf(left - Scale.infoBlockHeight(size, rows, scale), size.width - 8.dp),
         )
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            // innerWidth, not size.width - 8: the name is inside Content's root padding, so its
+            // real width is the tile minus that padding (up to 18dp/side), not a flat 8dp. And
+            // singleLine, because the column reserves exactly one nameHeight line for it below.
             FitText(
                 car.name, titleStyle(render.theme),
-                maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
+                maxWidth = Scale.innerWidth(frame), horizontalAlignment = Alignment.CenterHorizontally,
+                singleLine = true,
             )
             Spacer(GlanceModifier.height(4.dp))
             if (render.config.showRing && car.percent != null) {
@@ -976,9 +983,12 @@ class CarWidget : GlanceAppWidget() {
         // circle round on a genuinely narrow tile.
         val ringEdge = minOf(split.ring, size.width - 12.dp)
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            // innerWidth + singleLine: inside Content's root padding, and the column reserves
+            // one nameHeight line for this. See CompactSquareLayout's own note.
             FitText(
                 car.name, titleStyle(render.theme),
-                maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
+                maxWidth = Scale.innerWidth(frame), horizontalAlignment = Alignment.CenterHorizontally,
+                singleLine = true,
             )
             Spacer(GlanceModifier.height(4.dp))
             if (!hasMap) Spacer(GlanceModifier.defaultWeight())
@@ -1064,9 +1074,12 @@ class CarWidget : GlanceAppWidget() {
         val heroRoom = column.heroRoom
         val split = Scale.tallSplit(size, heroRoom, capRows = 4, textScale = render.theme.textScale, wantMap = hasMap)
         Column(modifier = GlanceModifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            // innerWidth + singleLine: inside Content's root padding, and the column reserves
+            // one nameHeight line for this. See CompactSquareLayout's own note.
             FitText(
                 car.name, titleStyle(render.theme),
-                maxWidth = size.width - 8.dp, horizontalAlignment = Alignment.CenterHorizontally,
+                maxWidth = Scale.innerWidth(frame), horizontalAlignment = Alignment.CenterHorizontally,
+                singleLine = true,
             )
             // Weighted only when there's no map to fill it, so whatever the
             // ring and rows don't claim still reads as centred rather than
@@ -1667,9 +1680,14 @@ class CarWidget : GlanceAppWidget() {
                 StatusGlyph(car, render.theme, sizeDp = ringEdge.value.toInt())
             }
             Spacer(GlanceModifier.height(8.dp))
+            // innerWidth + singleLine: this value line's height (primaryValueHeight, one
+            // Scale.lineHeight) is reserved once in ringRoom's spacers, so it must not wrap;
+            // and it sits inside Content's root padding, so innerWidth is its real width. The
+            // old `- 24.dp` was both a guess at the padding and unbounded on lines.
             FitText(
                 primaryValue(car, render), titleStyle(render.theme),
-                maxWidth = size.width - 24.dp, horizontalAlignment = Alignment.CenterHorizontally,
+                maxWidth = Scale.innerWidth(frame), horizontalAlignment = Alignment.CenterHorizontally,
+                singleLine = true,
             )
             Spacer(GlanceModifier.height(14.dp))
             InfoStack(
@@ -2167,10 +2185,22 @@ class CarWidget : GlanceAppWidget() {
         maxWidth: Dp,
         modifier: GlanceModifier = GlanceModifier,
         horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+        // Cap on wrapped lines. Default (unbounded) keeps the free-wrap behaviour every
+        // header/footer/subtitle relies on. `singleLine = true` (maxLines 1) is for a slot
+        // whose HEIGHT was reserved for exactly one line -- the compact tiers reserve
+        // `nameHeight` as a single Scale.lineHeight, so a name allowed to wrap to two lines
+        // there would bleed past the reserved column (RemoteViews doesn't clip). With it set,
+        // FitText skips wordWrap entirely and goes straight to FitLine, which shrinks the type
+        // to fit one line rather than wrapping -- the fit that matches the reservation.
+        singleLine: Boolean = false,
     ) {
         if (text.isBlank()) return
         if (!wouldOverflow(text, style, maxWidth)) {
             Text(text, style = style, maxLines = 1, modifier = modifier)
+            return
+        }
+        if (singleLine) {
+            FitLine(text, style, maxWidth, modifier, horizontalAlignment)
             return
         }
         val lines = wordWrap(text, style, maxWidth)
