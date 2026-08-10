@@ -183,4 +183,43 @@ internal object WidgetLayout {
         )
         return SquarePlan(split)
     }
+
+    // ---- Wide bar-hero tiers (LARGE_WIDE / XL_WIDE) -----------------------------
+    //
+    // Both run a header + footer + full-width BarHero + info rows + map + button row down one
+    // column, sized by ringRoom(spacers) -> tallSplit. They differ only in the spacer allowance
+    // (three explicit inter-slot Spacers: 3x10dp on LARGE, 3x14dp on XL) and the info-row cap.
+    // MEDIUM_WIDE is deliberately NOT here -- its bar branch has a different sequence (a
+    // restAfterBar split at capRows 2), so folding it in would obscure rather than share.
+
+    private data class WideSpec(val spacers: Dp, val capRows: Int)
+
+    private val LARGE_WIDE = WideSpec(spacers = 30.dp, capRows = 4)
+    private val XL_WIDE = WideSpec(spacers = 42.dp, capRows = WidgetInfoField.ALL.size)
+
+    private fun wideSpecFor(tier: WidgetTier): WideSpec? = when (tier) {
+        WidgetTier.LARGE_WIDE -> LARGE_WIDE
+        WidgetTier.XL_WIDE -> XL_WIDE
+        else -> null
+    }
+
+    /** The resolved wide bar-hero budget: the [Scale.TallSplit] over the tier's ringRoom (the
+     *  hero size is `split.ring`, fed to BarHero; rows/map come from the same split). */
+    data class WidePlan(val split: Scale.TallSplit)
+
+    /** Plan a wide bar-hero tier (LARGE_WIDE / XL_WIDE). ringRoom subtracts header/footer per the
+     *  live config flags; capRows and the spacer allowance are the per-tier spec. */
+    fun wideBarPlan(
+        tier: WidgetTier,
+        frame: Scale.Frame,
+        showHeader: Boolean,
+        showFooter: Boolean,
+        wantMap: Boolean,
+    ): WidePlan {
+        val spec = wideSpecFor(tier)
+            ?: error("WidgetLayout.wideBarPlan called with non-wide-bar tier $tier")
+        val ringRoom = Scale.ringRoom(frame, showHeader, showFooter, spec.spacers)
+        val split = Scale.tallSplit(frame.size, ringRoom, capRows = spec.capRows, textScale = frame.textScale, wantMap = wantMap)
+        return WidePlan(split)
+    }
 }

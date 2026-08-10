@@ -435,12 +435,17 @@ class WidgetScaleTest {
             val tier = tierFor(size)
             if (tier != WidgetTier.LARGE_WIDE && tier != WidgetTier.XL_WIDE) continue
             val budget = content(size)
+            // The per-tier spacer allowance is the render-tree total this test's `spacers` term
+            // below must also account for; the SPLIT itself now comes from WidgetLayout.wideBarPlan,
+            // the same call the composable renders from, so capRows and the ringRoom spacer arg
+            // can't drift between the two. header+footer are both shown here (the tier's common
+            // case), matching the composable's config-gated call with both flags on.
             val spacers = if (tier == WidgetTier.LARGE_WIDE) 30.dp else 42.dp
-            val capRows = if (tier == WidgetTier.LARGE_WIDE) 4 else WidgetInfoField.ALL.size
             for (ts in scales) {
                 for (wantMap in listOf(false, true)) {
-                    val ringRoom = Scale.ringRoom(testFrame(size, ts), hasHeader = true, hasFooter = true, spacers = spacers)
-                    val split = Scale.tallSplit(size, ringRoom, capRows = capRows, textScale = ts, wantMap = wantMap)
+                    val split = WidgetLayout.wideBarPlan(
+                        tier, testFrame(size, ts), showHeader = true, showFooter = true, wantMap = wantMap,
+                    ).split
                     val barH = Scale.barHeight(size)
                     val heroSp = Scale.heroSpIn(size, split.ring, barH + 4.dp, ts)
                     val heroBlock = if (heroSp == null) {

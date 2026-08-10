@@ -1341,15 +1341,14 @@ class CarWidget : GlanceAppWidget() {
         // a map, and then nothing -- the buttons had overflowed off the
         // bottom of the tile's own allocated bounds.
         //
-        // spacers = 30.dp, not the single-spacer 20.dp another tier might
-        // pass: this column has THREE explicit 10.dp Spacers below the
-        // header (before the hero, after it, before the buttons), not one,
-        // and ringRoom's own spacers argument is the caller's one chance to
-        // tell it about all of them at once.
-        val ringRoom = Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 30.dp)
-        val split = Scale.tallSplit(
-            size, ringRoom, capRows = 4, textScale = render.theme.textScale, wantMap = render.mapBitmap != null,
-        )
+        // WidgetLayout.wideBarPlan owns this tier's spacer allowance (30dp = the three explicit
+        // 10dp Spacers below the header: before the hero, after it, before the buttons) and its
+        // capRows 4 -- the same plan the sweep calls, so they can't drift.
+        val split = WidgetLayout.wideBarPlan(
+            WidgetTier.LARGE_WIDE, frame,
+            showHeader = render.config.showHeader, showFooter = render.config.showFooter,
+            wantMap = render.mapBitmap != null,
+        ).split
         val rows = split.rows
         val heroAvail = split.ring
         Column(modifier = GlanceModifier.fillMaxSize()) {
@@ -1526,13 +1525,13 @@ class CarWidget : GlanceAppWidget() {
         // subtracted from what everything else was budgeted against --
         // wantMap = true is the fix for the exact overflow LargeWideLayout's
         // own note describes.
-        // spacers = 42.dp: three explicit 14.dp Spacers below the header in
-        // this column, same reasoning as LargeWideLayout's own note.
-        val ringRoom = Scale.ringRoom(frame, render.config.showHeader, render.config.showFooter, 42.dp)
-        val split = Scale.tallSplit(
-            size, ringRoom, capRows = WidgetInfoField.ALL.size, textScale = render.theme.textScale,
+        // WidgetLayout.wideBarPlan owns this tier's spacer allowance (42dp = three explicit 14dp
+        // Spacers below the header) and its capRows (all info fields), shared with the sweep.
+        val split = WidgetLayout.wideBarPlan(
+            WidgetTier.XL_WIDE, frame,
+            showHeader = render.config.showHeader, showFooter = render.config.showFooter,
             wantMap = render.mapBitmap != null,
-        )
+        ).split
         val rows = split.rows
         val heroAvail = split.ring
         Column(modifier = GlanceModifier.fillMaxSize()) {
