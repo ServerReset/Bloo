@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,10 +41,10 @@ import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import com.bloo.uicommon.rememberConfirmArm
 import com.bloo.wear.WearUi
 import com.bloo.wear.WearViewModel
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
 
 /**
  * The Settings screen: one scrollable [RotaryScalingColumn] of [SettingSection]
@@ -74,15 +73,10 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
     val standalone = !ui.phoneConnected
     val advanced = ui.settings?.settingsMode == "advanced" || standalone
 
-    var confirmSignOut by remember { mutableStateOf(false) }
-    // Auto-reset the destructive confirm so a stale "tap again" can't sign you
-    // out minutes later.
-    LaunchedEffect(confirmSignOut) {
-        if (confirmSignOut) {
-            delay(4000)
-            confirmSignOut = false
-        }
-    }
+    // Two-tap guard on the destructive sign-out, auto-resetting after 4s so a stale
+    // "tap again" can't sign you out minutes later. The shared rememberConfirmArm the
+    // phone already uses -- same gate, one implementation.
+    val confirmSignOut = rememberConfirmArm()
 
     // Hoisted so ScreenScaffold's curved scroll indicator tracks the exact same
     // list RotaryScalingColumn scrolls — they must share one state.
@@ -591,12 +585,12 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                 // ---- Sign out (tap-to-confirm) ------------------------------
                 item {
                     MorphButton(
-                        label = if (confirmSignOut) "Tap to confirm" else "Sign out",
+                        label = if (confirmSignOut.armed) "Tap to confirm" else "Sign out",
                         icon = Icons.AutoMirrored.Filled.Logout,
-                        active = confirmSignOut,
+                        active = confirmSignOut.armed,
                         activeColor = MaterialTheme.colorScheme.error,
                         pending = false,
-                        onClick = { if (confirmSignOut) vm.signOutAll() else confirmSignOut = true },
+                        onClick = { if (confirmSignOut.armed) vm.signOutAll() else confirmSignOut.arm() },
                     )
                 }
 
