@@ -318,37 +318,14 @@ object LiveCharge {
     }
 
     /**
-     * The one entry point callers should use: applies the dismissal rule, then delegates
-     * to [update].
-     *
-     * There are three callers -- the 5-minute poll worker, the 30-minute alert worker, and
-     * the app's own post-refresh hook -- and every rule about WHEN this notification should
-     * exist has to hold in all three. It previously didn't: each called [update] directly
-     * and each independently got the "I couldn't fetch a status" case wrong, cancelling the
-     * bar because the network blipped. Putting the policy here means the next rule added
-     * lands once.
-     *
-     * Two rules live here:
-     *
-     * Charging ended -> clear the bar and FORGET any dismissal, so the next charging
-     * session shows it again instead of being permanently suppressed by one old swipe.
-     *
-     * Still charging but dismissed -> do nothing at all. Not a cancel: the notification is
-     * already gone, the user removed it, and re-cancelling would be a pointless call.
-     *
-     * Callers must still only call this for a car they actually have a status for --
-     * `charging = false` here genuinely means "the car told us it stopped", never "we
-     * don't know".
-     */
-    /**
      * Convenience overload: derive the five charge fields from an [EvStatus] and delegate.
      *
-     * The three callers named above -- AppViewModel's post-refresh hook, AlertWorker, and
+     * The three callers named below -- AppViewModel's post-refresh hook, AlertWorker, and
      * LiveChargePollWorker -- each held an `ev: EvStatus?` and mapped it to these five fields
-     * with the identical five lines. That mapping is exactly the kind of thing the KDoc above
-     * warns about: a rule ("charging means batteryCharge == true", "the limit is
-     * targetForCurrentPlug") that has to agree across three sites. It now lives here, next to the
-     * policy it belongs with.
+     * with the identical five lines. That mapping is exactly the kind of thing the KDoc on the
+     * full-parameter [sync] below warns about: a rule ("charging means batteryCharge == true",
+     * "the limit is targetForCurrentPlug") that has to agree across three sites. It now lives
+     * here, next to the policy it belongs with.
      *
      * `charging = ev?.batteryCharge == true` -- verified identical at all three old call sites,
      * including LiveChargePollWorker whose local `charging` val was that exact expression. The
@@ -373,6 +350,29 @@ object LiveCharge {
         chargeLimit = ev?.targetForCurrentPlug(),
     )
 
+    /**
+     * The one entry point callers should use: applies the dismissal rule, then delegates
+     * to [update].
+     *
+     * There are three callers -- the 5-minute poll worker, the 30-minute alert worker, and
+     * the app's own post-refresh hook -- and every rule about WHEN this notification should
+     * exist has to hold in all three. It previously didn't: each called [update] directly
+     * and each independently got the "I couldn't fetch a status" case wrong, cancelling the
+     * bar because the network blipped. Putting the policy here means the next rule added
+     * lands once.
+     *
+     * Two rules live here:
+     *
+     * Charging ended -> clear the bar and FORGET any dismissal, so the next charging
+     * session shows it again instead of being permanently suppressed by one old swipe.
+     *
+     * Still charging but dismissed -> do nothing at all. Not a cancel: the notification is
+     * already gone, the user removed it, and re-cancelling would be a pointless call.
+     *
+     * Callers must still only call this for a car they actually have a status for --
+     * `charging = false` here genuinely means "the car told us it stopped", never "we
+     * don't know".
+     */
     suspend fun sync(
         context: Context,
         settings: SettingsStore,

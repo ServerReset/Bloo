@@ -96,10 +96,10 @@ internal object Scale {
     fun infoBlockHeight(size: DpSize, rows: Int, textScale: Float): Dp =
         (lineHeight(valueSp(size).value, textScale).value * rows + 2f * rows).dp
 
-    /** The inverse of [infoBlockHeight]: how many rows actually fit in
-     *  [room]. [infoCap] estimates the room from a fraction of the tile;
-     *  this is for the layouts that have already worked out exactly what
-     *  they have left. */
+    /** The inverse of [infoBlockHeight]: how many rows actually fit in [room], for
+     *  layouts that have already worked out exactly what they have left. (The old
+     *  fraction-of-tile estimator this contrasted with, `infoCap`, was deleted -- see
+     *  its tombstone below; every caller now derives [room] from a real remainder.) */
     fun infoRowsIn(size: DpSize, room: Dp, textScale: Float, cap: Int): Int {
         val row = lineHeight(valueSp(size).value, textScale).value + 2f
         return (room.value / row).toInt().coerceIn(0, cap)

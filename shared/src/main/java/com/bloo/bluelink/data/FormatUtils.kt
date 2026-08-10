@@ -410,8 +410,9 @@ fun weatherLabel(code: Int): String = when (code) {
  *  as though it were a decision -- "the result is truncated (`.toInt()`, not
  *  rounded)" -- without ever saying why, while every other temperature conversion
  *  in the app rounded. Open-Meteo reports decimals, so truncating made every
- *  reading on the watch (its only caller) up to a degree cold: 22.8°C showed as
- *  "22°C". Same fix and same reasoning as [degValue], which the car-side
+ *  reading on the watch (then its only caller -- the phone now reaches this same
+ *  helper too, via WeatherApi.Weather.tempLabel) up to a degree cold: 22.8°C showed
+ *  as "22°C". Same fix and same reasoning as [degValue], which the car-side
  *  [degLabel] now shares.
  *
  *  Deliberately NOT routed through [degValue] by converting Celsius to Fahrenheit
