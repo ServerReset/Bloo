@@ -156,11 +156,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                             settings = settings,
                             vin = v.vin,
                             carName = v.name,
-                            charging = ev?.batteryCharge == true,
-                            percent = ev?.batteryStatus,
-                            minutesToFull = ev?.minutesToFull,
-                            pluggedInLabel = ev?.pluggedInLabel,
-                            chargeLimit = ev?.targetForCurrentPlug(),
+                            ev = ev,
                         )
                     }
                 }

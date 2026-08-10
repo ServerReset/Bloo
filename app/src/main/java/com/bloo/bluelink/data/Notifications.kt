@@ -340,6 +340,39 @@ object LiveCharge {
      * `charging = false` here genuinely means "the car told us it stopped", never "we
      * don't know".
      */
+    /**
+     * Convenience overload: derive the five charge fields from an [EvStatus] and delegate.
+     *
+     * The three callers named above -- AppViewModel's post-refresh hook, AlertWorker, and
+     * LiveChargePollWorker -- each held an `ev: EvStatus?` and mapped it to these five fields
+     * with the identical five lines. That mapping is exactly the kind of thing the KDoc above
+     * warns about: a rule ("charging means batteryCharge == true", "the limit is
+     * targetForCurrentPlug") that has to agree across three sites. It now lives here, next to the
+     * policy it belongs with.
+     *
+     * `charging = ev?.batteryCharge == true` -- verified identical at all three old call sites,
+     * including LiveChargePollWorker whose local `charging` val was that exact expression. The
+     * "only call this for a car you actually heard back from" contract on [sync] is unchanged:
+     * these callers already guard on a non-null status before reaching here.
+     */
+    suspend fun sync(
+        context: Context,
+        settings: SettingsStore,
+        vin: String,
+        carName: String,
+        ev: EvStatus?,
+    ) = sync(
+        context = context,
+        settings = settings,
+        vin = vin,
+        carName = carName,
+        charging = ev?.batteryCharge == true,
+        percent = ev?.batteryStatus,
+        minutesToFull = ev?.minutesToFull,
+        pluggedInLabel = ev?.pluggedInLabel,
+        chargeLimit = ev?.targetForCurrentPlug(),
+    )
+
     suspend fun sync(
         context: Context,
         settings: SettingsStore,

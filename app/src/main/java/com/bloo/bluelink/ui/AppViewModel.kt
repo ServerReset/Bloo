@@ -1913,16 +1913,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val ev = status.evStatus
             if (ev?.batteryCharge == true) anyCharging = true
             runCatching {
+                // Five-field derivation now lives in the LiveCharge.sync(ev=...) overload.
                 LiveCharge.sync(
                     context = getApplication(),
                     settings = settingsStore,
                     vin = v.vin,
                     carName = v.name,
-                    charging = ev?.batteryCharge == true,
-                    percent = ev?.batteryStatus,
-                    minutesToFull = ev?.minutesToFull,
-                    pluggedInLabel = ev?.pluggedInLabel,
-                    chargeLimit = ev?.targetForCurrentPlug(),
+                    ev = ev,
                 )
             }
         }
