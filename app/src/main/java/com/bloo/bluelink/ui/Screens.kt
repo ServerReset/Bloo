@@ -9513,18 +9513,26 @@ private fun ClimatePebble(
     var rearRight by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var settingsLoaded by remember(v.vin) { mutableStateOf(false) }
 
+    // Copy a ClimateRequest's nine fields into the sliders' state. Defined up here so the
+    // restore effect just below and the preset-apply buttons further down share ONE copy of the
+    // assignment -- it was written out twice, byte-for-byte, and "restore last-used" and "apply
+    // preset" are the same operation (set the sliders from a request). Captures only the nine
+    // `var` setters above it. NOT reused by the watch-sync effect below, which maps through
+    // SeatLevel.fromApi and so is genuinely different.
+    val applyRequest: (ClimateRequest) -> Unit = { r ->
+        tempF = r.tempF
+        duration = r.durationMinutes
+        defrost = r.defrost
+        steeringHeat = r.steeringWheelHeat
+        driver = r.seatFrontLeft
+        passenger = r.seatFrontRight
+        rearLeft = r.seatRearLeft
+        rearRight = r.seatRearRight
+    }
+
     // Restore the car's last-used climate settings the first time the pebble shows.
     LaunchedEffect(v.vin) {
-        vm.loadSavedClimate(v)?.let { r ->
-            tempF = r.tempF
-            duration = r.durationMinutes
-            defrost = r.defrost
-            steeringHeat = r.steeringWheelHeat
-            driver = r.seatFrontLeft
-            passenger = r.seatFrontRight
-            rearLeft = r.seatRearLeft
-            rearRight = r.seatRearRight
-        }
+        vm.loadSavedClimate(v)?.let(applyRequest)
         settingsLoaded = true
     }
 
@@ -9549,16 +9557,8 @@ private fun ClimatePebble(
     // cleared automatically once the live settings drift away from it (e.g. you
     // nudge a slider) so the highlight only marks a true match.
     var activePresetId by remember(v.vin) { mutableStateOf<String?>(null) }
-    val applyPreset: (ClimateRequest) -> Unit = { r ->
-        tempF = r.tempF
-        duration = r.durationMinutes
-        defrost = r.defrost
-        steeringHeat = r.steeringWheelHeat
-        driver = r.seatFrontLeft
-        passenger = r.seatFrontRight
-        rearLeft = r.seatRearLeft
-        rearRight = r.seatRearRight
-    }
+    // applyPreset was here; it was the same body as applyRequest (defined above, next to the
+    // sliders' state). The preset buttons below call applyRequest directly now.
     LaunchedEffect(currentReq, activePresetId, presets) {
         val active = presets.firstOrNull { it.id == activePresetId }
         if (active != null && active.request != currentReq) activePresetId = null
@@ -9636,7 +9636,7 @@ private fun ClimatePebble(
                     val defaultId = state.defaultClimatePresets[v.vin]
                     val matchingPreset = defaultId?.let { id -> presets.firstOrNull { it.id == id } }
                     if (matchingPreset != null) {
-                        applyPreset(matchingPreset.request)
+                        applyRequest(matchingPreset.request)
                         vm.startClimate(v, matchingPreset.request)
                         activePresetId = matchingPreset.id
                     } else if (weather != null) {
@@ -9699,7 +9699,7 @@ private fun ClimatePebble(
                     vm.stopClimate(v)
                     activePresetId = null
                 } else {
-                    applyPreset(preset.request)
+                    applyRequest(preset.request)
                     vm.startClimate(v, preset.request)
                     activePresetId = preset.id
                 }
