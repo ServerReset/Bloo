@@ -92,6 +92,22 @@ enum class LockTiming(val label: String) {
     AFTER_10_MIN("10 min"),
 }
 
+/**
+ * The wire-key form of a [LockTiming], matching the string vocabulary the watch stores and
+ * [shouldRelockAfter] switches on. NOT the enum's persistence format -- LockTiming persists via
+ * `.name` -- purely the bridge into the shared re-lock predicate so the phone and watch share
+ * one copy of the timing thresholds. Exhaustive with no `else` on purpose: adding a LockTiming
+ * value must fail to compile here until its key is chosen.
+ */
+val LockTiming.wireKey: String
+    get() = when (this) {
+        LockTiming.OFF -> "off"
+        LockTiming.IMMEDIATE -> "immediate"
+        LockTiming.AFTER_1_MIN -> "1min"
+        LockTiming.AFTER_5_MIN -> "5min"
+        LockTiming.AFTER_10_MIN -> "10min"
+    }
+
 /** Reorderable detail sections (pebbles), in their default order. */
 // "climate" ahead of "ai": pre-heating/cooling the car before walking out to
 // it is the single most common "glance and go" action this app exists for,

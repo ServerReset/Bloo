@@ -27,6 +27,8 @@ import com.bloo.bluelink.data.KiaRepository
 import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.LockTiming
+import com.bloo.bluelink.data.shouldRelockAfter
+import com.bloo.bluelink.data.wireKey
 import com.bloo.bluelink.data.maskEmail
 import com.bloo.bluelink.data.ReservChargeInfos
 import com.bloo.bluelink.data.TargetSOC
@@ -1090,14 +1092,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val a = settingsStore.appearance.first()
             if (!a.biometricLock || !canUseBiometrics()) return@launch
             val elapsed = System.currentTimeMillis() - backgroundedAtMs
-            val shouldLock = when (a.lockTiming) {
-                LockTiming.OFF -> false
-                LockTiming.IMMEDIATE -> true
-                LockTiming.AFTER_1_MIN -> elapsed >= 60_000
-                LockTiming.AFTER_5_MIN -> elapsed >= 300_000
-                LockTiming.AFTER_10_MIN -> elapsed >= 600_000
-            }
-            if (shouldLock) _state.update { it.copy(locked = true) }
+            // Shared with the watch's PIN maybeRelock via shouldRelockAfter -- the LockTiming
+            // enum maps to the same wire key the watch stores, so the timing thresholds have
+            // one home. See LockTiming.wireKey (exhaustive, so a new enum value must be mapped).
+            if (shouldRelockAfter(elapsed, a.lockTiming.wireKey)) _state.update { it.copy(locked = true) }
         }
         // Prompt to refresh if data is stale after returning from background.
         if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > STALE_STATUS_MS) {

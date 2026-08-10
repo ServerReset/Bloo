@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.shouldRelockAfter
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.UPDATE_SNOOZE_MS
 import com.bloo.bluelink.data.UpdateGate
@@ -1541,15 +1542,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         val ls = _ui.value.localSettings
         if (_ui.value.pinLocked || !ls.pinLockEnabled || !ls.hasPin || backgroundedAtMs == 0L) return
         val elapsed = System.currentTimeMillis() - backgroundedAtMs
-        val shouldLock = when (ls.pinLockTiming) {
-            "off" -> false
-            "immediate" -> true
-            "1min" -> elapsed >= 60_000L
-            "5min" -> elapsed >= 5 * 60_000L
-            "10min" -> elapsed >= 10 * 60_000L
-            else -> true
-        }
-        if (shouldLock) _ui.update { it.copy(pinLocked = true) }
+        // Shared with the phone's biometric maybeRelock via shouldRelockAfter -- pinLockTiming
+        // is already the wire key it switches on, so the 60s/5min/10min thresholds live in one
+        // place instead of a copy here and an enum copy on the phone.
+        if (shouldRelockAfter(elapsed, ls.pinLockTiming)) _ui.update { it.copy(pinLocked = true) }
     }
 
     /**
