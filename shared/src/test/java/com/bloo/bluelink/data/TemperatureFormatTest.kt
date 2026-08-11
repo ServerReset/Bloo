@@ -121,7 +121,9 @@ class TemperatureFormatTest {
     fun degLabelKeepsAHalfDegreeWhenNoConversionIsNeeded() {
         assertEquals("22.5°C", degLabel("22.5", fahrenheit = false, sourceUnit = 0))
         assertEquals("22°C", degLabel("22.0", fahrenheit = false, sourceUnit = 0))
-        assertEquals("72.5°F", degLabel("72.5", fahrenheit = true, sourceUnit = 1))
+        // Fahrenheit stays whole -- the half-degree exception is Celsius-only,
+        // because that is the unit the car's own setpoint table steps in.
+        assertEquals("73°F", degLabel("72.5", fahrenheit = true, sourceUnit = 1))
     }
 
     /** A non-numeric reading passes through with a bare degree sign rather than

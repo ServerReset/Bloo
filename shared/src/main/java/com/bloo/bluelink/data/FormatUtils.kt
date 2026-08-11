@@ -285,12 +285,18 @@ fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): Stri
     val sourceIsCelsius = sourceUnit == 0
     val valueIsAlreadyTarget = sourceIsCelsius != fahrenheit
 
-    // No conversion needed, so no rounding: the car reported 22.5 and the user asked
-    // for the unit it reported in, and turning that into "23" would throw away
-    // precision the car actually sent. Canada's setpoint table is in half degrees,
-    // so this is the common case there, not an edge one.
+    // A Celsius value shown in Celsius keeps its fraction, and ONLY that case does.
+    // Canada's setpoint table is in half degrees, so 22.5 is the common reading
+    // there and rounding it to "23" throws away precision the car actually sent.
+    //
+    // Fahrenheit stays whole, deliberately: [degValue]'s own doc records that a
+    // fractional °F reading displaying as "71°F" was a bug worth fixing, the UI
+    // sets °F in whole degrees everywhere, and a first cut of this that preserved
+    // fractions on BOTH axes turned "71.6" into "71.6°F" -- caught by the existing
+    // test, which is exactly what it was there for.
     if (valueIsAlreadyTarget) {
-        return "${trimTrailingZero(raw)}°${if (fahrenheit) "F" else "C"}"
+        if (fahrenheit) return "${raw.roundToInt()}°F"
+        return "${trimTrailingZero(raw)}°C"
     }
     val converted = if (fahrenheit) raw * 9 / 5.0 + 32 else (raw - 32) * 5 / 9.0
     return "${converted.roundToInt()}°${if (fahrenheit) "F" else "C"}"
