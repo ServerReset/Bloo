@@ -233,7 +233,7 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    private data class Render(
+    internal data class Render(
         val car: VehicleSnapshot?,
         val config: WidgetConfig,
         val theme: WidgetTheme,
@@ -2735,7 +2735,7 @@ class CarWidget : GlanceAppWidget() {
  * an explicit [WidgetAccent] override. [isDark] similarly follows the app's
  * real theme setting unless this widget's [WidgetConfig.theme] overrides it.
  */
-private data class WidgetTheme(
+internal data class WidgetTheme(
     val isDark: Boolean,
     val accent: Color,
     val accentArgb: Int,
