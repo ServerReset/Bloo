@@ -7536,6 +7536,36 @@ private fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: M
         v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, dragHandle,
         summary = "On-device Gemini Nano",
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        // The one pebble whose subject is not a part of the car, so it is the one
+        // that earns a different surface: a gradient marks "this was generated"
+        // rather than measured, the same way the Summarize action is the only
+        // header action that makes something rather than sending a command.
+        //
+        // Built from the scheme's own container roles rather than fixed hues, so it
+        // follows the user's accent, their vibrancy setting and light/dark with no
+        // second palette to maintain -- the mistake ChargeGreen's phone-side
+        // re-declaration made, which is why colours live in tokens here.
+        //
+        // containerColor stays tertiaryContainer underneath. The gradient paints
+        // over it, but it is what contentColorFor() reads to pick the text colour,
+        // and all three stops are container-toned, so the contrast that colour was
+        // chosen for holds across the whole sweep.
+        background = {
+            val scheme = MaterialTheme.colorScheme
+            val brush = remember(scheme.tertiaryContainer, scheme.primaryContainer, scheme.secondaryContainer) {
+                Brush.linearGradient(
+                    // Diagonal rather than vertical: a pebble is much wider than it
+                    // is tall when collapsed, so a vertical sweep would compress to
+                    // a flat band and read as a slightly-off solid fill.
+                    0f to scheme.tertiaryContainer,
+                    0.55f to scheme.primaryContainer.copy(alpha = 0.55f),
+                    1f to scheme.secondaryContainer.copy(alpha = 0.65f),
+                    start = Offset.Zero,
+                    end = Offset.Infinite,
+                )
+            }
+            Spacer(Modifier.matchParentSize().background(brush))
+        },
         headerAction = PebbleHeaderAction(
             label = "Summarize",
             icon = Icons.Filled.AutoAwesome,
@@ -8563,6 +8593,12 @@ internal fun Pebble(
     summary: String? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     headerAction: PebbleHeaderAction? = null,
+    /** Drawn BEHIND the header and body, clipped to the pebble's own shape.
+     *  [PebbleShell] has always had this -- the hero's car photo uses it -- but
+     *  [Pebble] did not forward it, so a per-car pebble could only ever have a flat
+     *  fill. Forwarded now, which is what lets the AI pebble carry a gradient
+     *  without either of them growing a special case for it. */
+    background: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val forceExpanded = LocalForceExpanded.current
@@ -8578,6 +8614,7 @@ internal fun Pebble(
         containerColor = containerColor,
         headerAction = headerAction,
         forceExpanded = forceExpanded,
+        background = background,
         content = content,
     )
 }
