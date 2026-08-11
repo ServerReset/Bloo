@@ -252,7 +252,18 @@ internal object Scale {
         val avail = availableHeight.coerceAtLeast(0.dp)
         val gap = buttonGap(size)
         val each = (avail - gap * (count - 1)) / count
-        return minOf(each.coerceAtLeast(16.dp), avail)
+        // NO floor. A 16.dp floor here was applied after the gaps were subtracted, so
+        // when the budget could not hold the stack it returned a height whose own
+        // total -- count heights plus count-1 gaps -- came to MORE than avail, and
+        // RemoteViews does not clip a Column: the last button drew past the bottom of
+        // the tile. A floor that overflows is not a floor, it is the overflow bug in
+        // miniature.
+        //
+        // Keeping a button tappable is still the right instinct, but it belongs where
+        // the count is chosen: WidgetBlueprint gives the band its own minimum and
+        // DROPS the module rather than squeezing it, so a stack that reaches here has
+        // already been judged to fit.
+        return each.coerceAtLeast(0.dp)
     }
 
     /** Gap between buttons, tightened on small tiles for the same reason:

@@ -219,6 +219,11 @@ internal object WidgetBlueprint {
 
     private val MIN_MAP = 44.dp
 
+    /** Slack kept around the button row so the pill is not flush against its band.
+     *  Flush, the dp-to-px rounding at the boundary clips the corner radius and the
+     *  button renders as a rectangle with its shape cut. */
+    private val BUTTON_BREATHING = 6.dp
+
     // ---- The allocator -------------------------------------------------------
 
     /** A module competing for room: its own floor, whether it is wanted at
@@ -306,8 +311,24 @@ internal object WidgetBlueprint {
             // reserved. This is the third instance of one mistake -- a module wanting
             // less than the allocator gave it -- after the map's own 110dp cap.
             val heroCeiling = maxOf(innerW, minLineHero(size, ts))
-            val buttonCeiling = Scale.buttonHeight(size) *
-                (if (facts.actionCount > 0 && innerW < 90.dp) facts.actionCount else 1)
+            // Includes the GAPS between stacked buttons, and a little breathing room.
+            //
+            // Both matter and both were wrong in the first cut of this ceiling. A
+            // stack of n buttons needs n heights PLUS n-1 gaps; budgeting only the
+            // heights left the band short by exactly the gaps, and the stack then
+            // overflowed the band by that much -- the last button clipped at the
+            // bottom edge.
+            //
+            // The breathing room fixes a subtler one: with the band exactly equal to
+            // the button, the pill sits flush against both edges of its box, and
+            // rounding dp to px there shaves the corner radius, so the buttons
+            // rendered as rectangles with their shapes cut. A couple of dp either
+            // side keeps the pill's own silhouette intact.
+            val stacked = facts.actionCount > 0 && innerW < 90.dp
+            val buttonRun = if (stacked) facts.actionCount else 1
+            val buttonCeiling = Scale.buttonHeight(size) * buttonRun +
+                (if (stacked) Scale.buttonGap(size) * (buttonRun - 1) else 0.dp) +
+                BUTTON_BREATHING
             val infoCeiling = minInfoRow(size, ts) * facts.infoFieldCount.coerceAtLeast(1)
             if (controls) {
                 if (wantsButtons) {
