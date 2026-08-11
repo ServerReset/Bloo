@@ -285,6 +285,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -5113,8 +5114,12 @@ private fun HeroHeader(
         // Both anchors report in the CARD's coordinate space, so the overlay's
         // offset is a plain lerp between two points in the same space.
         val cardCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-        val collapsedNumbers = remember { mutableStateOf<Offset?>(null) }
-        val expandedNumbers = remember { mutableStateOf<Offset?>(null) }
+        // Position AND width: the overlay needs the width to know how far apart to
+        // push the percentage and the range. Collapsed that width is the natural
+        // content width, so nothing moves; expanded it is the readout's full span,
+        // which is what puts the range on the right.
+        val collapsedNumbers = remember { mutableStateOf<Rect?>(null) }
+        val expandedNumbers = remember { mutableStateOf<Rect?>(null) }
         // Until BOTH ends have been measured there is nothing to interpolate
         // between, so the two anchors paint themselves and the card looks exactly
         // as it did before. That makes the first frame correct rather than blank,
@@ -5122,11 +5127,18 @@ private fun HeroHeader(
         // of losing the numbers entirely.
         val hoisted = cardCoords.value != null &&
             collapsedNumbers.value != null && expandedNumbers.value != null
-        fun report(into: androidx.compose.runtime.MutableState<Offset?>) =
+        fun report(into: androidx.compose.runtime.MutableState<Rect?>) =
             { coords: LayoutCoordinates ->
                 val card = cardCoords.value
                 if (card != null && coords.isAttached) {
-                    into.value = card.localPositionOf(coords, Offset.Zero)
+                    val origin = card.localPositionOf(coords, Offset.Zero)
+                    into.value = Rect(
+                        origin,
+                        androidx.compose.ui.geometry.Size(
+                            coords.size.width.toFloat(),
+                            coords.size.height.toFloat(),
+                        ),
+                    )
                 }
             }
 
@@ -5295,8 +5307,9 @@ private fun HeroHeader(
                 val from = collapsedNumbers.value
                 val to = expandedNumbers.value
                 if (hoisted && from != null && to != null) {
-                    val x = androidx.compose.ui.util.lerp(from.x, to.x, heroT)
-                    val y = androidx.compose.ui.util.lerp(from.y, to.y, heroT)
+                    val x = androidx.compose.ui.util.lerp(from.left, to.left, heroT)
+                    val y = androidx.compose.ui.util.lerp(from.top, to.top, heroT)
+                    val w = androidx.compose.ui.util.lerp(from.width, to.width, heroT)
                     Box(
                         Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
                     ) {
@@ -5304,7 +5317,10 @@ private fun HeroHeader(
                             LocalContentColor provides
                                 lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT),
                         ) {
-                            HeroNumbers(readout, heroT)
+                            HeroNumbers(
+                                readout, heroT,
+                                width = with(LocalDensity.current) { w.toDp() },
+                            )
                         }
                     }
                 }
@@ -6064,11 +6080,24 @@ private fun HeroCollapsedNumbers(
  * [t] drives only the type size, because position is the overlay's job.
  */
 @Composable
-private fun HeroNumbers(data: ChargeReadout, t: Float) {
+private fun HeroNumbers(data: ChargeReadout, t: Float, width: Dp? = null) {
     val type = MaterialTheme.typography
     val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
-    val rangeStyle = lerp(type.titleMedium, type.titleLarge, t)
-    Row(verticalAlignment = Alignment.Bottom) {
+    // Expanded, the range is a HEADLINE rather than a slightly-larger title. It is
+    // the number a driver actually acts on -- "can I get there" -- and at titleLarge
+    // it read as a caption beside the percentage instead of the second real figure
+    // on the card.
+    val rangeStyle = lerp(type.titleMedium, type.headlineMedium, t)
+    Row(
+        modifier = if (width != null) Modifier.width(width) else Modifier,
+        verticalAlignment = Alignment.Bottom,
+        // Given a width, the two ends push apart: percentage on the left, range on
+        // the right. Collapsed the width IS the natural content width, so
+        // SpaceBetween lays out exactly as a wrapped Row would and there is no jump
+        // when the arrangement starts to matter -- the gap simply opens as the card
+        // does.
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
         // RollingNumber, not Text: this is now the ONLY instance of the percentage,
         // so it has to keep the digit roll the readout's copy used to own. Losing it
         // would have traded one animation for another rather than adding the travel.
@@ -6082,9 +6111,43 @@ private fun HeroNumbers(data: ChargeReadout, t: Float) {
             if (data.charging) lerp(ChargeGreen, LocalContentColor.current, t)
             else LocalContentColor.current,
         )
-        data.rangeText?.let {
-            Spacer(Modifier.width(lerp(8.dp, 12.dp, t)))
-            Text(it, style = rangeStyle, fontWeight = FontWeight.Bold, maxLines = 1)
+        Spacer(Modifier.width(lerp(8.dp, 14.dp, t)))
+        Column(horizontalAlignment = Alignment.End) {
+            RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
+            // The status line ("Parked", "Charging - 25 min - DC") travels WITH the
+            // numbers, under the range, right-aligned to it.
+            //
+            // It has to live here rather than in the readout: hoisting the numbers
+            // into a single travelling instance hid the readout's whole numbers row,
+            // and the status line was inside it, so the expanded card simply stopped
+            // saying what the car was doing. That is the regression this fixes.
+            //
+            // Height LERPED rather than the node being dropped, which is what made
+            // the mileage "go to the top and then snap down": this Column is
+            // bottom-aligned in the Row, so its bottom edge is the status line's
+            // while the line exists and the RANGE's the instant it stops. Removing it
+            // at the end of the collapse teleported the range down by a whole line in
+            // one frame. clipToBounds because the Text keeps its intrinsic height as
+            // the slot shrinks.
+            val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }
+            Box(
+                Modifier
+                    .height(lerp(0.dp, statusSlot, t))
+                    .clipToBounds(),
+            ) {
+                if (t > 0.01f) {
+                    val statusColor by androidx.compose.animation.animateColorAsState(
+                        data.statusColor, animationSpec = tween(300), label = "statusLineColor",
+                    )
+                    Text(
+                        data.statusLine,
+                        style = type.labelLarge,
+                        color = statusColor,
+                        maxLines = 1,
+                        modifier = Modifier.graphicsLayer { alpha = ((t - 0.2f) / 0.8f).coerceIn(0f, 1f) },
+                    )
+                }
+            }
         }
     }
 }
@@ -6124,17 +6187,11 @@ private fun HeroMorphReadout(
     // sharedBounds with scaleToBounds + skipToLookaheadSize, which scales a layout measured
     // once. That was tried and reverted for a different reason -- the lookahead cost on every
     // pager page -- documented in this function's KDoc above.)
-    // The journey is titleMedium -> displayMedium, and it is real: this is the only readout
-    // now, so its collapsed end has to be legible at collapsed density rather than merely
-    // small enough to hide. Each frame is a genuine font size, which is the cost documented
-    // above and the reason the header reserves a height derived from titleMedium.
-    // Collapsed end is titleMedium, matching the height the header reserves for it. It used
-    // to be headlineSmall because this node was invisible at t = 0 and only had to look right
-    // once grown; now that it is the ONLY readout, its collapsed size is a real design value.
-    val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
-    // titleMedium collapsed, NOT bodyMedium: it sits on the car name's own line, so it has to
-    // be the name's size to read as the same line of text. bodyMedium made it a caption.
-    val rangeStyle = lerp(type.titleMedium, type.titleLarge, t)
+    // The type scale for the numbers lives in [HeroNumbers] now, with the numbers
+    // themselves. It was duplicated here, and a second copy of a lerped type scale
+    // is exactly the drift this rework exists to remove -- the two would have had to
+    // be kept in step by hand for the anchor to keep describing what the overlay
+    // draws.
     Column(
         // NO alpha ramp. This node is present and fully visible in BOTH states, which is the
         // whole point: one bar and one pair of numbers that move and change shape, rather than
@@ -6150,6 +6207,13 @@ private fun HeroMorphReadout(
         Row(
             Modifier
                 .padding(start = numbersStart)
+                // fillMaxWidth so this anchor reports the readout's real span rather
+                // than its own wrapped content width. The overlay lerps to that
+                // width, and it is what puts the range against the right edge; a
+                // wrapped anchor would have left it packed beside the percentage.
+                // Harmless when not hoisted -- the children stay left-packed, which
+                // is exactly how this row already looked.
+                .fillMaxWidth()
                 .graphicsLayer {
                     alpha = if (numbersHoisted) 0f
                     else ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
@@ -6157,69 +6221,16 @@ private fun HeroMorphReadout(
                 .onGloballyPositioned(onNumbersPositioned),
             verticalAlignment = Alignment.Bottom,
         ) {
-            // Collapsed there is no room for the state line below, so the PERCENTAGE carries
-            // the charging cue by taking the charge colour, and fades back to normal content
-            // colour as the card opens -- by which point the explicit
-            // "Charging · 25 min · DC" line has taken the job over.
+            // ONE definition of the numbers, shared with the collapsed anchor and the
+            // travelling overlay -- see [HeroNumbers]. This row's job is now only to
+            // be MEASURED: it lays the numbers out where the expanded card wants them
+            // and reports that, and the overlay draws the copy anyone actually sees.
             //
-            // This is a regression I introduced with the morph and then found: the old
-            // collapsed ChargeStatsLine appended " · Charging", and gating the state line on
-            // `t > 0` removed the only way to tell a charging car from a parked one without
-            // opening the card. A colour costs no height, which is what the collapsed density
-            // has none of.
-            val contentColor = LocalContentColor.current
-            RollingNumber(
-                data.pctText,
-                pctStyle,
-                FontWeight.Bold,
-                if (data.charging) lerp(ChargeGreen, contentColor, t) else contentColor,
-            )
-            // ONE lerped gap, and NO weighted spacer. This is the third arrangement here and the
-            // reason the previous two failed is the same fact both times: a weighted child takes
-            // ALL the leftover width, however small its weight. So `weight(0.001f + t)` pinned the
-            // range to the far edge at rest, and gating it on `t > 0.02f` merely moved the problem
-            // -- the range stayed right-aligned the whole way down and then SNAPPED left the frame
-            // the spacer stopped existing. That is the "goes to the right side then snaps to the
-            // left" on collapse: not an animation that needed tuning, a child appearing and
-            // disappearing.
-            //
-            // A fixed width cannot do that. The two numbers stay adjacent in BOTH states and the
-            // space between them just breathes a little as the card opens, so there is no
-            // arrangement change left to be discontinuous.
-            Spacer(Modifier.width(lerp(8.dp, 14.dp, t)))
-            Column(horizontalAlignment = Alignment.End) {
-                RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
-                // Height LERPED rather than the node being dropped, which is what made the
-                // mileage "go to the top and then snap down". This Column is bottom-aligned in
-                // the Row, so its bottom edge is the status line's bottom while the line exists
-                // and the RANGE's bottom the instant it stops existing. Removing it at t < 0.01
-                // therefore teleported the range down by a whole line, in one frame, at the very
-                // end of the collapse -- after the eye had already followed it upward.
-                //
-                // Now the slot's height interpolates to zero, so the range descends smoothly to
-                // its collapsed position and there is no discontinuity to see. clipToBounds
-                // because the Text inside keeps its own intrinsic height as the slot shrinks.
-                val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }
-                Box(
-                    Modifier
-                        .height(lerp(0.dp, statusSlot, t))
-                        .clipToBounds(),
-                ) {
-                    if (t > 0.01f) {
-                        val animatedStatusColor by androidx.compose.animation.animateColorAsState(
-                            data.statusColor, animationSpec = tween(300), label = "statusLineColor",
-                        )
-                        Text(
-                            data.statusLine,
-                            style = type.labelLarge,
-                            color = animatedStatusColor.copy(alpha = t),
-                            fontWeight = if (data.emphasizeStatus) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false,
-                        )
-                    }
-                }
-            }
+            // Rendering the same composable here rather than a hand-kept twin is what
+            // makes the anchor trustworthy: if this drew a different size from the
+            // overlay, the interpolation would be between two points that describe
+            // different things, and the numbers would drift as the card opened.
+            HeroNumbers(data, t)
         }
         // Plug-in hybrid's fuel tank: expanded only, same reasoning as the state line. Fades
         // in over the back half of the morph so it does not compete with the numbers growing.
