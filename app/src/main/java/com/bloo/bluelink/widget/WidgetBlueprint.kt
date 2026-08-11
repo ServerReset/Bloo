@@ -224,6 +224,11 @@ internal object WidgetBlueprint {
      *  button renders as a rectangle with its shape cut. */
     private val BUTTON_BREATHING = 6.dp
 
+    /** Ceiling on the between-band gap once leftover height is spread into it.
+     *  Past this a gap stops reading as rhythm and starts reading as the content
+     *  having come apart. */
+    private val MAX_SPREAD_GAP = 28.dp
+
     // ---- The allocator -------------------------------------------------------
 
     /** A module competing for room: its own floor, whether it is wanted at
@@ -310,7 +315,21 @@ internal object WidgetBlueprint {
             // which has none), so the same total height ends up drawn instead of
             // reserved. This is the third instance of one mistake -- a module wanting
             // less than the allocator gave it -- after the map's own 110dp cap.
-            val heroCeiling = maxOf(innerW, minLineHero(size, ts))
+            // The hero's ceiling depends on which instrument the band could hold,
+            // because the two are bounded by DIFFERENT axes.
+            //
+            // A ring cannot exceed the tile's width, so on an ordinary tile the width
+            // is the honest ceiling. A VERTICAL bar is the opposite: it is bounded by
+            // height and wants more of it than the tile is wide. Capping both at the
+            // width made the vertical bar unreachable -- a 60dp-wide tile capped its
+            // hero band at 46dp, below the bar's own 56dp minimum, so the narrow tall
+            // shape fell back to the token ring this was meant to replace. Caught by
+            // the test written for exactly that shape.
+            val heroCeiling = if (innerW < VBAR_MAX_WIDTH) {
+                maxOf(innerH * 0.5f, MIN_VBAR)
+            } else {
+                maxOf(innerW, minLineHero(size, ts))
+            }
             // Includes the GAPS between stacked buttons, and a little breathing room.
             //
             // Both matter and both were wrong in the first cut of this ceiling. A
@@ -397,6 +416,26 @@ internal object WidgetBlueprint {
             open = open.filter { (heights[it.module] ?: 0.dp) < it.max - 0.5.dp }
         }
 
+        // Anything still unclaimed becomes BREATHING SPACE between the bands.
+        //
+        // With every module capped, a tile can legitimately have height that nothing
+        // wants: a large widget with the map and the ring both switched off caps out
+        // at a header, a couple of stat rows and a button row, which on a 7x7 leaves
+        // hundreds of dp over. Dumping that into one module would undo the ceilings
+        // (it would be an over-sized band drawing small again) and leaving it at the
+        // bottom stacks the content against the top edge, which is the top-heavy look
+        // the ceilings were meant to fix.
+        //
+        // Spread between the bands it reads as deliberate spacing instead. Capped,
+        // because past a point a gap stops looking like rhythm and starts looking
+        // like the content came apart -- beyond the cap the tile simply has more room
+        // than it has things to say, and the honest answer is space at the bottom.
+        val spreadGap = if (taken.size > 1 && slack > 0.dp) {
+            minOf(gap + slack / (taken.size - 1), MAX_SPREAD_GAP)
+        } else {
+            gap
+        }
+
         // Restore the drawing order (priority order is not stacking order).
         val order = listOf(
             Module.HEADER, Module.HERO, Module.INFO, Module.MAP,
@@ -470,7 +509,7 @@ internal object WidgetBlueprint {
             size = size,
             innerWidth = innerW,
             innerHeight = innerH,
-            gap = gap,
+            gap = spreadGap,
             bands = bands,
             hero = hero,
             ringEdge = ringEdge,

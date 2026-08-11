@@ -111,6 +111,16 @@ private fun Stack(
     Column(
         modifier = GlanceModifier.fillMaxWidth().fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
+        // Centred, which only ever shows on a tile that has more room than it has
+        // things to say -- a large widget with both the map and the ring switched
+        // off, say. Everything else fills its height exactly (the allocator's
+        // ceilings and its spread gap see to that), so this is a no-op there.
+        //
+        // Where it does apply, centred content reads as deliberate and top-stacked
+        // content reads as a layout that ran out. The blueprint has already capped
+        // the gap at the point where spacing stops looking like rhythm, so the rest
+        // belongs as an even margin rather than a hole under the last band.
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         blueprint.bands.forEachIndexed { i, band ->
             if (i > 0) Spacer(GlanceModifier.height(blueprint.gap))
