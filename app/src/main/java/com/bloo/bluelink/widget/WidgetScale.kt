@@ -17,8 +17,7 @@ import androidx.compose.ui.unit.sp
  * pair), each time found by simulating this arithmetic outside the codebase
  * and each time re-provable only by simulating it again. WidgetScaleTest now
  * does that in CI instead, against the real functions rather than a
- * hand-copied model of them, which is the whole reason for the move --
- * [tierFor] was extracted to [WidgetTier] for exactly the same reason.
+ * hand-copied model of them, which is the whole reason for the move.
  *
  * Nothing else changes: it is still `Scale` in the same package, so every
  * call site reads identically.
@@ -59,26 +58,6 @@ internal object Scale {
     /** Smallest ring worth drawing; below this the space goes to text. */
     private val MIN_RING = 24.dp
 
-    /**
-     * The ring on a TALL tile, where it is the hero rather than one item
-     * in a row.
-     *
-     * [ring]'s continuous curve tops out at 140dp, which is right when
-     * the ring shares a row with text but leaves a tall widget looking
-     * broken: a 230x535 tile spent its first 140dp on the ring and the
-     * remaining ~250dp on nothing at all, because the leftover went into
-     * a single trailing weighted Spacer. Reported from a real device --
-     * a huge black void down the middle of the widget.
-     *
-     * Here the ring simply takes the room it's given, bounded by the
-     * tile's own width so it stays circular rather than by an arbitrary
-     * ceiling.
-     */
-    fun ringHero(size: DpSize, maxAvailable: Dp): Dp {
-        val room = minOf(maxAvailable, size.width - 24.dp)
-        return if (room < MIN_RING) 0.dp else room
-    }
-
     // ringWide() was removed. It bounded a WIDE tier's ring to 0.42 of the tile
     // width, which fixed a real device report (a 300dp-tall ring row with a 140dp
     // ring floating in the middle of it) -- but the wide tiers then moved to the
@@ -88,15 +67,10 @@ internal object Scale {
     // Deleted rather than left in place because it was the misleading kind of dead
     // code: a considered 14-line docstring presenting itself as the live answer to
     // "how does a wide tile size its ring", for a question the code no longer
-    // asks. Ring-vs-bar is decided by the WidgetTier dispatch in CarWidget.Content;
-    // within a tier, Scale.ring returning 0 is what selects ChargeBarFallback.
+    // asks. Ring-vs-bar is now decided by WidgetBlueprint, from the height the
+    // hero band actually won rather than from which tier a size fell into.
 
-    /** Estimated height of an [InfoStack] of [rows] rows, so a tall tier
-     *  can leave space for it before handing the rest to [ringHero]. */
-    fun infoBlockHeight(size: DpSize, rows: Int, textScale: Float): Dp =
-        (lineHeight(valueSp(size).value, textScale).value * rows + 2f * rows).dp
-
-    /** The inverse of [infoBlockHeight]: how many rows actually fit in [room], for
+    /** How many info rows actually fit in [room], for
      *  layouts that have already worked out exactly what they have left. (The old
      *  fraction-of-tile estimator this contrasted with, `infoCap`, was deleted -- see
      *  its tombstone below; every caller now derives [room] from a real remainder.) */
@@ -169,27 +143,6 @@ internal object Scale {
         return minOf(ideal, room)
     }
 
-    /**
-     * How many buttons stacked VERTICALLY actually fit within [budget], up to
-     * [cap] -- so a caller reserving room for "every configured action" does
-     * not reserve more than the tile can hold.
-     *
-     * This exists because reserving a fixed "up to N" without checking that N
-     * buttons' worth of height actually fits is the same mistake that cost
-     * this file several device-reported overflows already: on a Rail tile
-     * near its own 220dp floor, six stacked buttons at this tier's own button
-     * height can add up to MORE than the whole padded content box, before
-     * the ring or a map has claimed anything. Swept the full tier size range
-     * against this exact formula (WidgetScaleTest) rather than trusting it
-     * by inspection, the same way every other budget in this file is.
-     */
-    fun maxStackedButtons(size: DpSize, budget: Dp, overhead: Dp, cap: Int): Int {
-        val h = buttonHeight(size)
-        val gap = buttonGap(size)
-        val n = ((budget - overhead + gap).value / (h + gap).value).toInt()
-        return n.coerceIn(0, cap)
-    }
-
     /** The big percentage in the bar treatment -- deliberately larger
      *  than [titleSp], because on a wide tile the number IS the content
      *  and the space is horizontal. */
@@ -239,8 +192,8 @@ internal object Scale {
     // ---- Action-button capacity ------------------------------------------
     //
     // These four moved out of the ActionButtons composable, which is where the
-    // widget's REAL button geometry lived. [maxStackedButtons] above was only ever
-    // consulted by some tiers to pick a reservation; the composable then decided
+    // widget's REAL button geometry lived. A tier's own reservation helper was only
+    // ever consulted to pick a budget; the composable then decided
     // independently how many buttons to draw and how tall they were, using its own
     // arithmetic. So the sweep in WidgetScaleTest -- which can only call this file --
     // could not see the numbers that actually shipped.
@@ -345,111 +298,14 @@ internal object Scale {
         return if (want < MAP_MIN) 0.dp else want
     }
 
-    /** How a tall tier divides its free column. See [tallSplit].
-     *
-     *  [ringRoom] is what was OFFERED to the ring, which is not the same as
-     *  [ring] -- [ringHero] yields 0 below [MIN_RING] rather than drawing a
-     *  smudge, so a caller that wants to put something else in that space (a
-     *  bar, via ChargeBarFallback) needs to know how much space there was, not
-     *  just that the ring declined it. Without this the Tall tiers had no way
-     *  to tell "no room for a gauge" apart from "no room for a RING", and drew
-     *  no gauge at all in the second case. */
-    data class TallSplit(val ring: Dp, val rows: Int, val map: Dp, val ringRoom: Dp)
-
-    /**
-     * Splits a tall tier's free column between the hero ring, the info rows
-     * and the optional map.
-     *
-     * The tall tiers used to size the ring from `ringRoom - infoBlockHeight`
-     * and then hand the map a weighted slot below it. But [ringHero] takes
-     * everything it is offered, so that subtraction left exactly nothing for
-     * the weight to claim: turning on the location option produced a map of
-     * zero height on every tall tile whose ring was room-bound rather than
-     * width-bound, which is most of them. The map has to be reserved BEFORE
-     * the ring is sized, not left to compete with it afterwards.
-     *
-     * The reserve is capped at a third of the column so the map stays a
-     * supporting module and the ring stays the hero -- and the row count is
-     * then derived from what's actually left rather than from [infoCap]'s
-     * fixed fraction of the tile, so the three claims can't sum past the
-     * column they share.
-     */
-    fun tallSplit(
-        size: DpSize,
-        room: Dp,
-        capRows: Int,
-        textScale: Float,
-        wantMap: Boolean,
-    ): TallSplit {
-        val map = mapReserve(size, room, wantMap)
-        val rest = (room - map).coerceAtLeast(0.dp)
-        val rows = infoRowsIn(size, rest * 0.45f, textScale, capRows)
-        // Hoisted rather than inlined into the ringHero call so it can be
-        // reported back out -- see TallSplit.ringRoom.
-        val ringRoom = rest - infoBlockHeight(size, rows, textScale)
-        val ring = ringHero(size, ringRoom)
-        return TallSplit(ring, rows, map, ringRoom.coerceAtLeast(0.dp))
-    }
-
     // ---- The tall-column reservation, shared by RAIL / COMPACT_TALL_NARROW /
     //      COMPACT_TALL ---------------------------------------------------------
     //
-    // These two constants and [tallColumn] below were three near-identical copies of the
+    // These constants and the column reservation below were three near-identical copies of the
     // same arithmetic inside CarWidget's three tall tiers, differing only in four
     // numbers. The constants were `private` there, so WidgetScaleTest duplicated their
     // VALUES with a comment saying so ("Mirrors TALL_TIER_MARGIN in CarWidget.kt --
     // private there") — a silent-drift vector on top of the duplication.
-
-    /** Breathing room kept at the bottom of a tall column so the hero never sits flush
-     *  against the tile edge. */
-    val TALL_TIER_MARGIN = 16.dp
-
-    /** Floor reserved for the hero before buttons are allowed to claim height, so a tall
-     *  tile can't end up as a stack of buttons with no gauge above them. */
-    val MIN_HERO_RESERVE = 40.dp
-
-    /** What a tall column decided: how many stacked buttons, the height they claim
-     *  including their trailing gap, and what is left for the hero. */
-    data class TallColumn(val buttonCount: Int, val buttonZone: Dp, val heroRoom: Dp)
-
-    /**
-     * The reservation every tall tier makes: name (if it shows one), then as many stacked
-     * buttons as fit while leaving [MIN_HERO_RESERVE], then the rest to the hero.
-     *
-     * The four values the three tiers genuinely differ on are parameters; everything else
-     * was identical, and having it in one place is what lets WidgetScaleTest assert on the
-     * numbers the composables actually use instead of re-deriving them. The previous
-     * mirror had already gone stale: the test modelled COMPACT_TALL_NARROW as
-     * `ringRoom(spacers = 8.dp) - name` plus a single `buttonHeight`, a shape that tier
-     * stopped having, so it was asserting against arithmetic no composable ran.
-     *
-     * @param nameHeight 0 for RAIL, which shows no name at all.
-     * @param buttonOverhead what [maxStackedButtons] must keep free — the trailing gap
-     *   plus any spacer the tier always emits.
-     * @param buttonTrailingGap the gap after the last button, included in [TallColumn.buttonZone].
-     */
-    fun tallColumn(
-        size: DpSize,
-        nameHeight: Dp,
-        buttonOverhead: Dp,
-        buttonTrailingGap: Dp,
-        buttonCap: Int,
-    ): TallColumn {
-        val budget = size.height - contentPadding(size) * 2
-        val count = maxStackedButtons(
-            size,
-            (budget - nameHeight - MIN_HERO_RESERVE).coerceAtLeast(0.dp),
-            overhead = buttonOverhead,
-            cap = buttonCap,
-        )
-        val zone = if (count > 0) {
-            buttonHeight(size) * count + buttonGap(size) * (count - 1) + buttonTrailingGap
-        } else {
-            0.dp
-        }
-        val hero = (budget - nameHeight - zone - TALL_TIER_MARGIN).coerceAtLeast(0.dp)
-        return TallColumn(count, zone, hero)
-    }
 
     /** How many [InfoStack] rows to actually show.
      *
@@ -561,68 +417,6 @@ internal object Scale {
         lineHeight(subtitleSp(frame.size).value, frame.textScale) + FOOTER_GAP
 
     private val FOOTER_GAP = 6.dp
-
-    data class SquareSplit(val ring: Dp, val rows: Int, val map: Dp, val ringRoom: Dp)
-
-    /**
-     * [tallSplit] for the square tiers, which never got it.
-     *
-     * MEDIUM_SQUARE, LARGE_SQUARE and XL_SQUARE each sized their ring from
-     * [ringRoom] and then, entirely separately, asked [infoCap] how many info
-     * rows to draw. [infoCap] answers from a fraction of the RAW TILE HEIGHT --
-     * which is the precise mistake [ringRoom]'s own docstring exists to record,
-     * still being made for the row count. So the rows were never subtracted from
-     * anything, and ring + rows + header + footer + buttons could sum past the
-     * column they share.
-     *
-     * Swept over the resize range at three text scales, that overflowed 10,422
-     * sizes: worst 37.9dp at 240x211 and 1.4x text, where a 42dp ring sat beside
-     * an 80dp info block in a 42dp band. RemoteViews does not clip an
-     * overflowing Column, so the action buttons simply bleed off the bottom edge.
-     * The three tall tiers were immune the whole time, because [tallSplit]
-     * derives their rows from the real remainder.
-     *
-     * [sideBySide] is what makes this a separate function rather than a call to
-     * [tallSplit]: above its own width threshold a square tier puts the rows
-     * BESIDE the ring (RingWithContent's Row branch) instead of below it. Then
-     * the two share one vertical band and neither subtracts from the other --
-     * the band just has to hold the taller of them. Stacked, they need the
-     * subtraction, plus the 12dp of that branch's own internal spacer.
-     */
-    fun squareSplit(
-        size: DpSize,
-        room: Dp,
-        capRows: Int,
-        textScale: Float,
-        wantMap: Boolean,
-        sideBySide: Boolean,
-    ): SquareSplit {
-        // Reserved before the ring is sized, for tallSplit's reason: Scale.ring
-        // takes everything offered, so anything left to compete with it afterwards
-        // gets nothing.
-        val map = mapReserve(size, room, wantMap)
-        val rest = (room - map).coerceAtLeast(0.dp)
-        if (sideBySide) {
-            return SquareSplit(
-                ring = ring(size, rest),
-                rows = infoRowsIn(size, rest, textScale, capRows),
-                map = map,
-                ringRoom = rest,
-            )
-        }
-        // Same 0.45 ceiling tallSplit uses, so the rows stay a supporting module
-        // and the ring stays the hero on a tile shaped for one.
-        val rows = infoRowsIn(size, rest * 0.45f, textScale, capRows)
-        val ringRoom =
-            (rest - infoBlockHeight(size, rows, textScale) - STACKED_INFO_GAP).coerceAtLeast(0.dp)
-        return SquareSplit(ring(size, ringRoom), rows, map, ringRoom)
-    }
-
-    /** RingWithContent's own gap between the ring and the rows when it stacks
-     *  them -- its `Spacer(height = 8.dp)`, not the `width = 12.dp` one in its
-     *  side-by-side branch, which costs width and so does not belong in a
-     *  vertical budget. Reserved here because no caller was reserving it. */
-    private val STACKED_INFO_GAP = 8.dp
 
     // --- Horizontal fit ----------------------------------------------------
     //

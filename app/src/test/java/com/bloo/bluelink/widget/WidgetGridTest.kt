@@ -9,9 +9,9 @@ import kotlin.test.assertTrue
 /**
  * Pins [WidgetGrid]'s cell math: the `70n - 30` nominal formula, its inverse
  * rounding, and the clamping at the widget's declared 2..7 column / 1..7 row
- * range. [WidgetTierTest] separately proves the RENDERING consequences of
- * grid classification (every cell reaches a real layout); this file is just
- * the arithmetic underneath it.
+ * range. [WidgetBlueprintTest] separately proves the RENDERING consequences
+ * of grid classification (every cell reaches a real layout, nothing is cut
+ * off); this file is just the arithmetic underneath it.
  */
 class WidgetGridTest {
 

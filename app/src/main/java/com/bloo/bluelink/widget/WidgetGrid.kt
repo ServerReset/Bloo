@@ -10,16 +10,20 @@ import kotlin.math.roundToInt
  * user (and every launcher's own resize UI) thinks about it: a column count
  * and a row count, not an arbitrary dp rectangle.
  *
- * This exists because [tierFor] used to classify a measured size purely by
+ * This exists because the widget used to classify a measured size by
  * aspect-ratio thresholds tuned by trial and error against real device
  * screenshots -- correct, eventually, but with no relationship to the actual
  * question a user is answering when they drag a widget's resize handles
  * ("how many cells wide/tall do I want this"). [gridFor] answers that
- * question directly, from the same [Dp] measurement [tierFor] already gets,
- * and [tierFor] now classifies BY GRID SHAPE (how many columns, how many
- * rows, and their ratio) instead of by raw aspect ratio -- the same
- * information, reframed around the one abstraction every launcher and this
- * widget's own manifest (`car_widget_info.xml`) already agree on.
+ * question directly, from the same [Dp] measurement, and [WidgetBlueprint]
+ * reasons in those terms -- the same information, reframed around the one
+ * abstraction every launcher and this widget's own manifest
+ * (`car_widget_info.xml`) already agree on.
+ *
+ * The clearest case for the reframing is the one-row strip. Under aspect
+ * ratios a 2x1 and a 3x1 were not "wide enough" to count as strips and fell
+ * through to an icon, while a 5x1 got a real layout. A tile is a strip
+ * because it has ONE ROW, which is what [GridSize.rows] says outright.
  *
  * The cell formula (`70 * n - 30`) is the standard one Android's own widget
  * design guidance has used since App Widgets shipped: a 70dp cell pitch with
@@ -33,10 +37,10 @@ import kotlin.math.roundToInt
  * rows) as the nominal grid, because the classification only needs to be
  * right to the nearest whole cell, not to the dp.
  *
- * [tierFor] still finishes the job with the REAL measured [DpSize] (via
- * [Scale]/[WidgetLayout]'s continuous, budget-checked arithmetic) for
- * everything about how big things render -- only WHICH shape of layout
- * applies is grid-driven. That split is deliberate: a fixed dp-per-cell
+ * [WidgetBlueprint] still finishes the job with the REAL measured [DpSize]
+ * (via [Scale]'s continuous, budget-checked arithmetic) for everything about
+ * how big things render -- only WHICH shape of layout applies is
+ * grid-driven. That split is deliberate: a fixed dp-per-cell
  * assumption at render time would either waste real launcher space (round
  * DOWN) or overflow it (round UP), which is exactly the "clean, nothing cut
  * off" property this file's only job is to keep true. Grid membership is a
@@ -53,15 +57,14 @@ internal object WidgetGrid {
      * has fewer than 2 columns to work with: `car_widget_info.xml` doesn't
      * offer a 1-column drop size, and this whole rework is scoped to the
      * 2..7 column, 1..7 row space the widget is actually meant to cover --
-     * see [tierFor]'s own doc for the smaller MICRO/MICRO_TINY floor that
-     * still exists purely for a host that ignores minWidth and measures
-     * smaller anyway.
+     * a host that ignores minWidth and measures smaller than that is
+     * clamped up to it rather than given a shape nothing knows how to draw.
      */
     const val MIN_COLS = 2
     const val MAX_COLS = 7
 
     /** A widget can be exactly one row tall (a banner strip) up through the
-     *  full 7-row dashboard shape; see [tierFor]'s BANNER branch. */
+     *  full 7-row dashboard shape; see [WidgetBlueprint]'s strip path. */
     const val MIN_ROWS = 1
     const val MAX_ROWS = 7
 

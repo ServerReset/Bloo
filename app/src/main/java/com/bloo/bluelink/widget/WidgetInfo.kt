@@ -341,7 +341,7 @@ internal fun BarHero(
         // its own header, in which case a NAME would duplicate it.
         //
         // A NUMBER wouldn't, though, and dropping to genuinely nothing
-        // here was its own real bug: [Scale.ringHero]'s room-available
+        // here was its own real bug: the generic room-available
         // gate (24dp, tuned for a CIRCLE) is looser than what BarHero's
         // OWN heroSpIn floor actually needs (~35dp, HERO_MIN_SP scaled
         // plus the bar's own reserve) -- so a caller could clear the

@@ -267,7 +267,7 @@ class CarWidget : GlanceAppWidget() {
 
     // Every size in this file -- text, icons, padding, the ring, the bar --
     // comes from [Scale], which now lives in WidgetScale.kt so its vertical
-    // budgets can be tested. The [WidgetTier] enum still decides layout
+    // budgets can be tested. [WidgetBlueprint] decides layout
     // STRUCTURE (what appears, how it's arranged); Scale decides how big.
 
     @Composable
