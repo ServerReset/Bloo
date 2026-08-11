@@ -82,6 +82,48 @@ class TemperatureFormatTest {
         }
     }
 
+    /**
+     * A Celsius reading is not run through the Fahrenheit formula.
+     *
+     * The bug this pins, reported from a real device: a car sitting at 22.5°C
+     * displayed as -5°C, because every reading was assumed to be °F and
+     * (22.5 - 32) * 5/9 = -5.3. The API sends its own unit code alongside the
+     * value -- 0 Celsius, 1 Fahrenheit, matching every send path in this app --
+     * and reading it is the whole fix.
+     */
+    @Test
+    fun degLabelReadsTheApiUnitCodeInsteadOfAssumingFahrenheit() {
+        assertEquals("22.5°C", degLabel("22.5", fahrenheit = false, sourceUnit = 0))
+        assertEquals("73°F", degLabel("22.5", fahrenheit = true, sourceUnit = 0))
+        // The exact reported case must not come back.
+        kotlin.test.assertTrue(!degLabel("22.5", fahrenheit = false, sourceUnit = 0).startsWith("-"))
+    }
+
+    /** A Fahrenheit reading (unit 1, what both US backends send) converts exactly
+     *  as it always did -- the unit code must not disturb what was already right. */
+    @Test
+    fun degLabelStillConvertsFahrenheitReadings() {
+        assertEquals("72°F", degLabel("72", fahrenheit = true, sourceUnit = 1))
+        assertEquals("24°C", degLabel("75", fahrenheit = false, sourceUnit = 1))
+        for (raw in listOf("62", "70", "75", "82", "71.6")) {
+            val f = raw.toDouble()
+            assertEquals("${degValue(f, false)}°C", degLabel(raw, fahrenheit = false, sourceUnit = 1))
+            // An unknown unit keeps the historical assumption, so nothing that was
+            // reading correctly before the unit code existed changes now.
+            assertEquals(degLabel(raw, fahrenheit = false, sourceUnit = 1), degLabel(raw, fahrenheit = false))
+        }
+    }
+
+    /** No conversion means no rounding: Canada's setpoint table is in half degrees,
+     *  so turning the 22.5°C the car actually reported into "23°C" would throw away
+     *  precision on the common case rather than an edge one. */
+    @Test
+    fun degLabelKeepsAHalfDegreeWhenNoConversionIsNeeded() {
+        assertEquals("22.5°C", degLabel("22.5", fahrenheit = false, sourceUnit = 0))
+        assertEquals("22°C", degLabel("22.0", fahrenheit = false, sourceUnit = 0))
+        assertEquals("72.5°F", degLabel("72.5", fahrenheit = true, sourceUnit = 1))
+    }
+
     /** A non-numeric reading passes through with a bare degree sign rather than
      *  crashing or being hidden -- the car occasionally reports blanks or codes here,
      *  and showing the raw value beats showing nothing. */

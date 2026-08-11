@@ -1979,7 +1979,7 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     )
     if (live) Spacer(Modifier.height(6.dp))
     if (live) StatusRow("Engine", if (car.engineOn) "On" else "Off")
-    if (live) car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit)) }
+    if (live) car.tempSetting?.let { StatusRow("Set temp", degLabel(it, fahrenheit, car.tempSettingUnit)) }
     // climateOn is tri-state (Boolean?) unlike engineOn/defrostOn/accessoryOn, which
     // buildCarView already collapses to non-null. Omit the row when unknown -- like the Set
     // temp row above -- rather than stating "Off" as fact for a car that never reported it.

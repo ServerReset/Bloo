@@ -5101,6 +5101,11 @@ private fun HeroHeader(
             title = v.name,
             vm = vm,
             dragHandle = dragHandle,
+            // Follows the morph rather than switching: the photo fades in over the same
+            // t, so the name has to travel from the surface's own colour to the light one
+            // the scrim is built for. Snapping at a threshold would flash a white name
+            // onto a still-white card for the frames before the photo arrives.
+            titleColor = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT),
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
             // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.
@@ -5210,17 +5215,26 @@ private fun HeroHeader(
                             bottom = lerp(HeroReadoutBottomInset, 16.dp, heroT),
                         ),
                 ) {
-                    HeroMorphReadout(
-                        readout,
-                        heroT,
-                        // Collapsed, the numbers start after the name; expanded, they own the
-                        // left edge. Only this Row shifts -- the bar underneath does not.
-                        // Zero: this copy only ever shows EXPANDED, where it owns the card's
-                        // lower-left. The collapsed numbers are the header's, so nothing here has
-                        // to be offset past the car name any more -- which also retires the
-                        // measured-title-width plumbing that offset needed.
-                        numbersStart = 0.dp,
-                    )
+                    // Same travel as the title: this readout sits ON the photo once the
+                    // card is open, and it reads LocalContentColor, so without this the
+                    // percentage, range and state line were near-black on a dark image
+                    // exactly as the name was. One provider covers all three.
+                    CompositionLocalProvider(
+                        LocalContentColor provides
+                            lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT),
+                    ) {
+                        HeroMorphReadout(
+                            readout,
+                            heroT,
+                            // Collapsed, the numbers start after the name; expanded, they own the
+                            // left edge. Only this Row shifts -- the bar underneath does not.
+                            // Zero: this copy only ever shows EXPANDED, where it owns the card's
+                            // lower-left. The collapsed numbers are the header's, so nothing here has
+                            // to be offset past the car name any more -- which also retires the
+                            // measured-title-width plumbing that offset needed.
+                            numbersStart = 0.dp,
+                        )
+                    }
                 }
             },
             // Collapsed: name, percentage and range on ONE row, with the bar directly under
@@ -5922,7 +5936,16 @@ private fun HeroCollapsedNumbers(data: ChargeReadout, t: Float) {
     if (fade <= 0f) return
     val style = MaterialTheme.typography.titleMedium
     Row(
-        Modifier.graphicsLayer { alpha = fade },
+        // The leading gap off the car name. PebbleShell deliberately puts no Spacer
+        // before `titleTrailing` -- a gap left behind an absent node would squeeze the
+        // expanded title -- so the slot owns it, and this slot did not. The name ran
+        // straight into the percentage: "SONATA N-Line40%". Reported from a real device.
+        //
+        // Inside the faded Row, so it leaves with the numbers rather than holding a
+        // 10dp hole open in the title row after they have gone.
+        Modifier
+            .graphicsLayer { alpha = fade }
+            .padding(start = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -8439,6 +8462,17 @@ internal fun PebbleShell(
      * the expanded hero's title isn't squeezed by a gap left behind an absent node.
      */
     titleTrailing: (@Composable () -> Unit)? = null,
+    /**
+     * Overrides the colour of [title] and [summary]. [Color.Unspecified] (the default)
+     * inherits, which is what every pebble but the hero wants.
+     *
+     * The hero needs it because its `background` slot puts a PHOTO behind the header,
+     * and the header is drawn over that with the surface's own content colour -- so an
+     * expanded card rendered the car's name in near-black on a dark photo and it could
+     * not be read. The photo already carries a scrim built for light text; nothing was
+     * telling the text to be light. Reported from a real device.
+     */
+    titleColor: Color = Color.Unspecified,
     // onTitleWidth was deleted here. It reported the title's measured width so the hero could
     // offset its collapsed readout past the car name. That whole approach is gone: the numbers are
     // now trailing content ON this Row (see HeroCollapsedNumbers), so the Row positions them and
@@ -8707,6 +8741,7 @@ internal fun PebbleShell(
                                         transformOrigin = TransformOrigin(0f, 0.5f)
                                     },
                                 style = titleStyle,
+                                color = titleColor,
                                 fontWeight = FontWeight.Bold,
                                 // Cap at one line: at a large display/font size the
                                 // header action button (SplitExpandButton, now width-
@@ -9181,7 +9216,9 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
                 // rows above -- "Off" was being shown as fact for a car that never reported it.
                 status.airCtrlOn?.let { StatusRow("Climate", if (it) "On" else "Off") }
                 if (status.defrost == true) StatusRow("Defrost", "On")
-                status.airTemp?.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit)) }
+                status.airTemp?.let { t ->
+                    t.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit, t.unit)) }
+                }
                 status.percentFor(state.hasBattery(v))?.let {
                     StatusRow(if (state.hasBattery(v)) "Charge" else "Fuel", "$it%")
                 }
@@ -9380,7 +9417,9 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         }
         status?.evStatus?.batteryStatus?.let { add(DiagRow("Drive battery", "$it%")) }
         status?.rangeMiFor(state.hasBattery(v))?.let { add(DiagRow("Range", formatDistance(it, metric))) }
-        status?.airTemp?.value?.let { add(DiagRow("Climate setpoint", degLabel(it, fahrenheit))) }
+        status?.airTemp?.let { t ->
+            t.value?.let { add(DiagRow("Climate setpoint", degLabel(it, fahrenheit, t.unit))) }
+        }
         status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
         status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
         status?.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
@@ -9701,7 +9740,7 @@ private fun ClimatePebble(
                 value = if (climateOn) "On" else "Off",
                 iconTint = if (climateOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 valueColor = if (climateOn) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                trailing = status?.airTemp?.value?.let { degLabel(it, fahrenheit) },
+                trailing = status?.airTemp?.let { t -> t.value?.let { degLabel(it, fahrenheit, t.unit) } },
             )
         }
         if (driving) {
@@ -9711,7 +9750,9 @@ private fun ClimatePebble(
                     style = MaterialTheme.typography.bodySmall,
                     color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                 )
-                status?.airTemp?.value?.let { StatusRow("Set to", degLabel(it, fahrenheit)) }
+                status?.airTemp?.let { t ->
+                    t.value?.let { StatusRow("Set to", degLabel(it, fahrenheit, t.unit)) }
+                }
                 status?.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
                 status?.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
                 status?.seatHeaterVentState?.let { s ->

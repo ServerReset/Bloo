@@ -191,7 +191,12 @@ def moved_import_problems(raw, code, pkg_of, base='HEAD'):
         if added == '-' or deleted == '-':
             continue
         f = os.path.join(ROOT, rel)
-        if int(deleted) > 0:
+        # A DONOR is a file that genuinely gave code away, which means it ended
+        # up smaller. Treating any file with deletions as a donor made every
+        # ordinary edit one -- two files touched in the same commit became each
+        # other's donors, and every name one imported was reported against the
+        # other. Requiring a net loss keeps the rule pointed at moves.
+        if int(deleted) > int(added):
             shrank.append(f)
         if int(added) > 0:
             grew.append(f)

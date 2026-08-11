@@ -114,6 +114,13 @@ data class CarView(
     val accessoryOn: Boolean,
     val defrostOn: Boolean,
     val tempSetting: String?,
+    /** The API's own unit code for [tempSetting] -- 0 Celsius, 1 Fahrenheit.
+     *  Carried because the value is NOT normalised upstream: Canada reports the
+     *  setpoint in half-degree Celsius, and normalising it to °F would round
+     *  22.5°C to 22°C on the way through. Without this the watch assumed every
+     *  reading was °F and rendered a 22.5°C car as -5°C, the same bug the phone
+     *  had. Null keeps the old assumption. */
+    val tempSettingUnit: Int?,
     // tireAll was deleted here. It carried VehicleStatus.tirePressure.all, which was only
     // ever populated from the tyre warning LAMP, and its one reader rendered it as "N psi".
     // Both producers and that reader are gone, so this was write-only.
@@ -2326,6 +2333,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             accessoryOn = s?.acc == true,
             defrostOn = s?.defrost == true,
             tempSetting = s?.airTemp?.value,
+            tempSettingUnit = s?.airTemp?.unit,
             tireFl = (lamp?.frontLeft ?: 0) != 0,
             tireFr = (lamp?.frontRight ?: 0) != 0,
             tireRl = (lamp?.rearLeft ?: 0) != 0,

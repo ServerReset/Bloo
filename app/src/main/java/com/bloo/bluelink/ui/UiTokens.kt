@@ -51,6 +51,19 @@ internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGre
 /** The app's muted/secondary-text alpha, applied over LocalContentColor. */
 internal const val MutedContentAlpha = 0.7f
 
+/**
+ * Text and icons drawn ON the hero's car photo.
+ *
+ * Fixed rather than theme-derived, because what sits behind it is a photograph and
+ * a dark scrim, not a themed surface -- so it is the same in light and dark, and the
+ * colour scheme's own `onSurface` is the wrong answer in both. It was what the
+ * expanded hero used, which rendered the car's name in near-black on a dark photo.
+ *
+ * Slightly off pure white: at full white the name reads as harsher than the photo
+ * behind it, and every other light-on-dark surface in the app lands here too.
+ */
+internal val HeroOnPhoto = Color(0xFFF2F2F5)
+
 // ---- Sizing -------------------------------------------------------------------
 
 /** Shared control height: a collapsed pebble matches the lock/unlock button. */

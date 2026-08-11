@@ -393,7 +393,31 @@ class CanadaApi(private val brand: Brand) {
                 // airTemp.value straight into degLabel(), which treats its input
                 // as °F, so an undecoded "0AH" rendered as garbage "0AH°". Sibling
                 // of the 868 km→mi fix on dte just above.
-                TempValue(hexTempToF(it["value"]?.str(), unit, modelYear), unit)
+                // Normalised to °F HERE, so every surface downstream -- phone,
+                // watch, widget -- gets one unit rather than each having to know
+                // this backend's conventions. The watch in particular reads
+                // airTemp.value through a payload that carries no unit code, so a
+                // Celsius value reaching it could not be interpreted correctly
+                // however careful the formatting was at that end.
+                //
+                // Two shapes arrive on unit 0. The hex "0AH" index decodes via
+                // hexTempToF. A plain number on unit 0 is a Celsius reading, and
+                // that is the one that was being read as Fahrenheit: a car sitting
+                // at 22.5°C displayed as (22.5 - 32) * 5/9 = -5°C. Reported from a
+                // real device.
+                //
+                // The unit code is rewritten to 1 alongside, because it has to keep
+                // describing the value beside it -- leaving 0 on a converted °F
+                // number would tell degLabel the value is Celsius and convert it a
+                // second time.
+                // NOT normalised to °F. Converting here would round a 22.5°C
+                // setpoint to 72.5°F and back to 22°C, and this backend's table is
+                // IN half degrees, so that loses half a degree on the common case
+                // rather than an edge one. The value stays exactly as the car
+                // reported it and the unit code says what it is.
+                val rawTemp = it["value"]?.str()
+                val decoded = hexTempToF(rawTemp, unit, modelYear)
+                TempValue(decoded, if (decoded != rawTemp) 1 else unit)
             },
             battery = (vs["battery"] as? JsonObject)?.let { Battery12V(batSoc = it["batSoc"].int()) },
             evStatus = evStatus,

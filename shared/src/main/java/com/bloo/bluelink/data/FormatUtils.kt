@@ -267,15 +267,39 @@ fun relativeLabel(ms: Long?): String {
  * A climate setpoint (the API reports it as a °F string) rendered in the user's
  * chosen unit. Non-numeric values pass through with a bare degree sign.
  */
-fun degLabel(valueF: String, fahrenheit: Boolean): String {
-    // The API always reports temperatures as °F strings (even for cars whose
-    // owner prefers metric), so this is the one conversion point: a
-    // non-numeric string (unexpected/blank value) passes through unconverted
-    // with just a bare degree sign appended, rather than crashing or hiding
-    // the raw value entirely.
-    val f = valueF.toDoubleOrNull() ?: return "$valueF°"
-    return "${degValue(f, fahrenheit)}°${if (fahrenheit) "F" else "C"}"
+fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): String {
+    // A non-numeric string (unexpected/blank value) passes through unconverted with
+    // just a bare degree sign appended, rather than crashing or hiding the raw value.
+    val raw = valueF.toDoubleOrNull() ?: return "$valueF°"
+
+    // [sourceUnit] is the API's own unit code for THIS value, and reading it is what
+    // stops a Celsius car being converted as if it were Fahrenheit. This used to
+    // assume every reading was °F, which is true of the US backends but not of
+    // Canada: a car sitting at 22.5°C was run through the °F formula and displayed
+    // as (22.5 - 32) * 5/9 = -5°C. Reported from a real device.
+    //
+    // 0 = Celsius, 1 = Fahrenheit, matching every send path in this app --
+    // BlueLinkApi and KiaUsaApi both post unit 1 alongside a °F value, CanadaApi
+    // posts unit 0 alongside a Celsius index. A null or unrecognised code keeps the
+    // old assumption, so nothing that was reading correctly changes.
+    val sourceIsCelsius = sourceUnit == 0
+    val valueIsAlreadyTarget = sourceIsCelsius != fahrenheit
+
+    // No conversion needed, so no rounding: the car reported 22.5 and the user asked
+    // for the unit it reported in, and turning that into "23" would throw away
+    // precision the car actually sent. Canada's setpoint table is in half degrees,
+    // so this is the common case there, not an edge one.
+    if (valueIsAlreadyTarget) {
+        return "${trimTrailingZero(raw)}°${if (fahrenheit) "F" else "C"}"
+    }
+    val converted = if (fahrenheit) raw * 9 / 5.0 + 32 else (raw - 32) * 5 / 9.0
+    return "${converted.roundToInt()}°${if (fahrenheit) "F" else "C"}"
 }
+
+/** "22.5" stays "22.5"; "22.0" becomes "22". Keeps a half-degree setpoint honest
+ *  without printing a pointless ".0" on every whole one. */
+private fun trimTrailingZero(v: Double): String =
+    if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
 
 /**
  * A °F reading as a whole number in the user's chosen unit, rounded rather than
