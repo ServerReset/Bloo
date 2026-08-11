@@ -201,13 +201,19 @@ class WidgetBlueprintTest {
                 if (bp.buttonCount <= 0) continue
                 val gap = bp.gap.value * (bp.buttonCount - 1)
                 if (bp.buttonsStacked) {
-                    val need = Scale.buttonHeight(size).value * bp.buttonCount + gap
-                    val have = bp.height(WidgetBlueprint.Module.BUTTONS).value
-                    // One forced button is allowed to be thinner than ideal --
-                    // a small button is still pressable, a missing one is not --
-                    // so only a genuine multi-button overflow is a failure.
-                    if (bp.buttonCount > 1 && need > have + 0.01f) {
-                        bad += "${c}x$r stacked ${bp.buttonCount} buttons needing ${need}dp in ${have}dp"
+                    // Asks the SHIPPING function what height each button gets, rather
+                    // than assuming it is the full Scale.buttonHeight. That assumption
+                    // was the bug: stackedButtonHeight used to floor each button at
+                    // 16dp after subtracting the gaps, so a band too small for the
+                    // stack produced a total LARGER than the band, and RemoteViews
+                    // drew the overflow past the bottom of the tile. Dividing the band
+                    // is what makes the stack fit; this checks that it does.
+                    val have = bp.height(WidgetBlueprint.Module.BUTTONS)
+                    val each = Scale.stackedButtonHeight(size, have, bp.buttonCount)
+                    val need = each.value * bp.buttonCount + gap
+                    if (need > have.value + 0.01f) {
+                        bad += "${c}x$r stacked ${bp.buttonCount} buttons at ${each.value}dp " +
+                            "need ${need}dp in ${have.value}dp"
                     }
                 } else {
                     val need = Scale.minButtonWidth(size).value * bp.buttonCount + gap
