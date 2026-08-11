@@ -187,6 +187,12 @@ internal object WidgetBlueprint {
      */
     private val RING_WORTH_IT = 44.dp
 
+    /** How tall the hero band must be relative to the tile's width before a ring
+     *  beats a bar. Below it the circle cannot fill the tile horizontally however
+     *  large it gets, so the bar -- which spans the full width -- says the same
+     *  thing using the room that is actually there. */
+    private const val RING_ASPECT = 0.45f
+
     private fun minHeader(size: DpSize, textScale: Float, hasSwitcher: Boolean): Dp {
         val text = Scale.lineHeight(Scale.titleSp(size).value, textScale)
         // The switcher pill is a fixed-size touch target that does not shrink
@@ -286,14 +292,43 @@ internal object WidgetBlueprint {
             if (config.showHeader) {
                 add(Want(Module.HEADER, minHeader(size, ts, facts.multipleCars)))
             }
+            // Every module states a CEILING as well as a floor, and that is what makes
+            // the tile actually fill.
+            //
+            // Slack was being shared by weight with no cap, so a module took height it
+            // could not use and then drew smaller anyway: a ring cannot exceed the
+            // tile's WIDTH however tall its band is, and a button caps at ~48dp. Both
+            // sat in an over-sized band with the surplus blank -- the empty space
+            // above and below the ring, and the dead strip under the buttons.
+            //
+            // With ceilings the surplus flows on to whatever can still use it (the map,
+            // which has none), so the same total height ends up drawn instead of
+            // reserved. This is the third instance of one mistake -- a module wanting
+            // less than the allocator gave it -- after the map's own 110dp cap.
+            val heroCeiling = maxOf(innerW, minLineHero(size, ts))
+            val buttonCeiling = Scale.buttonHeight(size) *
+                (if (facts.actionCount > 0 && innerW < 90.dp) facts.actionCount else 1)
+            val infoCeiling = minInfoRow(size, ts) * facts.infoFieldCount.coerceAtLeast(1)
             if (controls) {
-                if (wantsButtons) add(Want(Module.BUTTONS, minButtons(size), weight = 0.5f))
-                if (wantsHero) add(Want(Module.HERO, minLineHero(size, ts), weight = 2f))
-                if (wantsInfo) add(Want(Module.INFO, minInfoRow(size, ts), weight = 0.5f))
+                if (wantsButtons) {
+                    add(Want(Module.BUTTONS, minButtons(size), weight = 0.5f, max = buttonCeiling))
+                }
+                if (wantsHero) {
+                    add(Want(Module.HERO, minLineHero(size, ts), weight = 2f, max = heroCeiling))
+                }
+                if (wantsInfo) {
+                    add(Want(Module.INFO, minInfoRow(size, ts), weight = 0.5f, max = infoCeiling))
+                }
             } else {
-                if (wantsHero) add(Want(Module.HERO, minLineHero(size, ts), weight = 3f))
-                if (wantsInfo) add(Want(Module.INFO, minInfoRow(size, ts), weight = 1f))
-                if (wantsButtons) add(Want(Module.BUTTONS, minButtons(size), weight = 0.5f))
+                if (wantsHero) {
+                    add(Want(Module.HERO, minLineHero(size, ts), weight = 3f, max = heroCeiling))
+                }
+                if (wantsInfo) {
+                    add(Want(Module.INFO, minInfoRow(size, ts), weight = 1f, max = infoCeiling))
+                }
+                if (wantsButtons) {
+                    add(Want(Module.BUTTONS, minButtons(size), weight = 0.5f, max = buttonCeiling))
+                }
             }
             if (config.showFooter) add(Want(Module.FOOTER, minFooter(size, ts)))
             // The map is last in PRIORITY (it is the first thing to lose on a
@@ -315,14 +350,30 @@ internal object WidgetBlueprint {
         }
 
         // Pass 2 -- share the slack by weight, capped so nothing runs away.
-        val totalWeight = taken.sumOf { it.weight.toDouble() }.toFloat()
         val heights = taken.associate { it.module to it.min }.toMutableMap()
-        if (totalWeight > 0f && remaining > 0.dp) {
-            for (w in taken.filter { it.weight > 0f }) {
-                val share = remaining * (w.weight / totalWeight)
-                val add = minOf(share, w.max - (heights[w.module] ?: 0.dp))
-                if (add > 0.dp) heights[w.module] = (heights[w.module] ?: 0.dp) + add
+        // Rounds, not one pass. A module that hits its ceiling stops taking, and its
+        // unclaimed share has to go back into the pot for whatever can still use it --
+        // otherwise capping the ring and the buttons would simply move the empty space
+        // rather than remove it, which is the bug this is fixing. Bounded because every
+        // round either fills the budget or takes at least one module out of the pool.
+        var slack = remaining
+        var open = taken.filter { it.weight > 0f }
+        while (slack > 0.5.dp && open.isNotEmpty()) {
+            val totalWeight = open.sumOf { it.weight.toDouble() }.toFloat()
+            if (totalWeight <= 0f) break
+            var used = 0.dp
+            for (w in open) {
+                val current = heights[w.module] ?: 0.dp
+                val share = slack * (w.weight / totalWeight)
+                val add = minOf(share, (w.max - current).coerceAtLeast(0.dp))
+                if (add > 0.dp) {
+                    heights[w.module] = current + add
+                    used += add
+                }
             }
+            if (used <= 0.dp) break
+            slack -= used
+            open = open.filter { (heights[it.module] ?: 0.dp) < it.max - 0.5.dp }
         }
 
         // Restore the drawing order (priority order is not stacking order).
@@ -353,7 +404,14 @@ internal object WidgetBlueprint {
             // Checked after ring in a first draft, which made this branch
             // unreachable -- every narrow tile still took the ring.
             innerW < VBAR_MAX_WIDTH && heroH >= MIN_VBAR -> Hero.VBAR
-            ringCandidate >= RING_WORTH_IT -> Hero.RING
+            // A ring has to be a meaningful part of the tile, not just legible. Its
+            // diameter is bounded by the NARROW axis, so on a wide short band it
+            // clears every size floor and still renders as a token circle adrift in
+            // empty width -- which is what "it's not using the bar when it should"
+            // was describing. Requiring the band to be at least this fraction of the
+            // width is what routes those shapes to the bar, which uses the axis the
+            // tile actually has.
+            ringCandidate >= RING_WORTH_IT && heroH >= innerW * RING_ASPECT -> Hero.RING
             heroH >= minBarHero(size, ts) -> Hero.BAR
             // Below the bar's floor a small ring still beats a bare text line: it is
             // the last thing that reads as a GAUGE, and MIN_RING is exactly the point

@@ -134,7 +134,11 @@ object WidgetMap {
 
         val cx = edge / 2f
         val cy = edge / 2f
-        val dotR = edge * 0.06f
+        // 4% of the edge, down from 6%. The marker is a POSITION, not a subject:
+        // at the old size it covered several blocks of the map it sits on, and
+        // widening the view to zoom 12 made that worse by putting more map behind
+        // the same dot. Reported as "icon for car on map too big".
+        val dotR = edge * 0.04f
         // White halo behind the coloured dot so it reads on any map background.
         canvas.drawCircle(cx, cy, dotR + edge * 0.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt()
