@@ -5094,6 +5094,42 @@ private fun HeroHeader(
             animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
             label = "heroMorph",
         )
+
+        // ---- The travelling numbers -------------------------------------------
+        //
+        // ONE instance of the percentage and range, drawn by the overlay below and
+        // positioned by MEASUREMENT rather than arithmetic.
+        //
+        // The two ends are laid out by the things that already know where they go:
+        // the title Row puts the collapsed numbers beside the car name, and the
+        // readout puts the expanded ones at the card's lower-left. Both keep doing
+        // exactly that -- they simply stop painting and report their position
+        // instead. Six earlier attempts computed the collapsed position by hand (a
+        // bottom anchor, a derived lift, the measured title width, a type-step
+        // ratio) and each landed slightly off, the last of them printing the
+        // numbers above the name. A Row places its children correctly by
+        // construction; the trick is to read that placement rather than reproduce it.
+        //
+        // Both anchors report in the CARD's coordinate space, so the overlay's
+        // offset is a plain lerp between two points in the same space.
+        val cardCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
+        val collapsedNumbers = remember { mutableStateOf<Offset?>(null) }
+        val expandedNumbers = remember { mutableStateOf<Offset?>(null) }
+        // Until BOTH ends have been measured there is nothing to interpolate
+        // between, so the two anchors paint themselves and the card looks exactly
+        // as it did before. That makes the first frame correct rather than blank,
+        // and a measurement that never arrives degrade to the old crossfade instead
+        // of losing the numbers entirely.
+        val hoisted = cardCoords.value != null &&
+            collapsedNumbers.value != null && expandedNumbers.value != null
+        fun report(into: androidx.compose.runtime.MutableState<Offset?>) =
+            { coords: LayoutCoordinates ->
+                val card = cardCoords.value
+                if (card != null && coords.isAttached) {
+                    into.value = card.localPositionOf(coords, Offset.Zero)
+                }
+            }
+
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -5119,6 +5155,16 @@ private fun HeroHeader(
             // it is the same shared transition as before -- the only change is which layer
             // it lives on.
             background = {
+                // The card's own coordinate space, captured once. Both anchors
+                // convert into this, so the overlay's lerp is between two points
+                // in one space rather than a mix of window and local offsets --
+                // which is the way this goes wrong silently, by landing the
+                // numbers off the card entirely.
+                Spacer(
+                    Modifier
+                        .matchParentSize()
+                        .onGloballyPositioned { cardCoords.value = it },
+                )
                 AnimatedVisibility(
                     visible = photoExpanded,
                     // The shared collapse spec PLUS a settle: the photo eases up from 92%
@@ -5226,6 +5272,8 @@ private fun HeroHeader(
                         HeroMorphReadout(
                             readout,
                             heroT,
+                            onNumbersPositioned = report(expandedNumbers),
+                            numbersHoisted = hoisted,
                             // Collapsed, the numbers start after the name; expanded, they own the
                             // left edge. Only this Row shifts -- the bar underneath does not.
                             // Zero: this copy only ever shows EXPANDED, where it owns the card's
@@ -5234,6 +5282,30 @@ private fun HeroHeader(
                             // measured-title-width plumbing that offset needed.
                             numbersStart = 0.dp,
                         )
+                    }
+                }
+                // THE numbers. One instance, travelling between the two anchors --
+                // and the travel is a plain lerp because both anchors are points in
+                // this same Box's space.
+                //
+                // Drawn LAST so it sits above the photo and the readout, and outside
+                // the readout's own Box so the readout's paddings (which lerp) cannot
+                // drag it: its position comes only from where the two ends actually
+                // measured.
+                val from = collapsedNumbers.value
+                val to = expandedNumbers.value
+                if (hoisted && from != null && to != null) {
+                    val x = androidx.compose.ui.util.lerp(from.x, to.x, heroT)
+                    val y = androidx.compose.ui.util.lerp(from.y, to.y, heroT)
+                    Box(
+                        Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
+                    ) {
+                        CompositionLocalProvider(
+                            LocalContentColor provides
+                                lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT),
+                        ) {
+                            HeroNumbers(readout, heroT)
+                        }
                     }
                 }
             },
@@ -5281,7 +5353,18 @@ private fun HeroHeader(
             // roughness the two-copy version originally had came from both being visible at
             // similar opacity: this one is gone by t = 0.35 and the expanded copy starts appearing
             // there, so they never overlap.
-            titleTrailing = if (heroT > 0.35f) null else { { HeroCollapsedNumbers(readout, heroT) } },
+            // Kept alive past 0.35 once hoisted: it is the collapsed ANCHOR then, and
+            // an anchor that is removed stops reporting, which would strand the
+            // overlay at its last known point.
+            titleTrailing = if (heroT > 0.35f && !hoisted) null else {
+                {
+                    HeroCollapsedNumbers(
+                        readout, heroT,
+                        onPositioned = report(collapsedNumbers),
+                        hoisted = hoisted,
+                    )
+                }
+            },
             summary = null,
             headerContent = {
                 // A RESERVATION, not content. The bar itself lives in the one readout at the
@@ -5930,11 +6013,26 @@ private fun animatedChargeFrac(target: Float): Float {
  * opacity, which the disjoint alpha ranges here and in [HeroMorphReadout] prevent.
  */
 @Composable
-private fun HeroCollapsedNumbers(data: ChargeReadout, t: Float) {
-    // Gone by t = 0.35, where the expanded copy starts appearing.
+private fun HeroCollapsedNumbers(
+    data: ChargeReadout,
+    t: Float,
+    /** Reports where this row landed, in the coordinate space the overlay uses.
+     *  The title Row positions it beside the name for free -- that placement is
+     *  the thing six arithmetic attempts could not reproduce -- so the way to
+     *  get a single travelling copy is to keep letting the Row do the placing
+     *  and then read the answer off it. */
+    onPositioned: (LayoutCoordinates) -> Unit = {},
+    /** True once the overlay has both anchors and is drawing the real numbers.
+     *  This row then measures and positions exactly as before but paints
+     *  nothing, so the title Row still reserves the right space and reports the
+     *  right position. */
+    hoisted: Boolean = false,
+) {
+    // Gone by t = 0.35, where the expanded copy starts appearing -- unless the
+    // overlay has taken over, in which case this stays laid out for its whole
+    // life as the collapsed ANCHOR and simply never paints.
     val fade = (1f - t / 0.35f).coerceIn(0f, 1f)
-    if (fade <= 0f) return
-    val style = MaterialTheme.typography.titleMedium
+    if (fade <= 0f && !hoisted) return
     Row(
         // The leading gap off the car name. PebbleShell deliberately puts no Spacer
         // before `titleTrailing` -- a gap left behind an absent node would squeeze the
@@ -5944,22 +6042,49 @@ private fun HeroCollapsedNumbers(data: ChargeReadout, t: Float) {
         // Inside the faded Row, so it leaves with the numbers rather than holding a
         // 10dp hole open in the title row after they have gone.
         Modifier
-            .graphicsLayer { alpha = fade }
-            .padding(start = 10.dp),
+            .graphicsLayer { alpha = if (hoisted) 0f else fade }
+            .padding(start = 10.dp)
+            .onGloballyPositioned(onPositioned),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        HeroNumbers(data, t = 0f)
+    }
+}
+
+/**
+ * The percentage and range, as ONE definition.
+ *
+ * Three call sites render this and only one of them is ever visible: the
+ * collapsed anchor in the title Row, the expanded anchor in the readout, and
+ * the real travelling instance the overlay draws between them. That is what
+ * makes the single copy true rather than nominal -- the two anchors exist to be
+ * MEASURED, not read, so there is one set of glyphs on screen and one place
+ * that decides what they say.
+ *
+ * [t] drives only the type size, because position is the overlay's job.
+ */
+@Composable
+private fun HeroNumbers(data: ChargeReadout, t: Float) {
+    val type = MaterialTheme.typography
+    val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
+    val rangeStyle = lerp(type.titleMedium, type.titleLarge, t)
+    Row(verticalAlignment = Alignment.Bottom) {
+        // RollingNumber, not Text: this is now the ONLY instance of the percentage,
+        // so it has to keep the digit roll the readout's copy used to own. Losing it
+        // would have traded one animation for another rather than adding the travel.
+        RollingNumber(
             data.pctText,
-            style = style,
-            fontWeight = FontWeight.Bold,
-            // Charging shows in the COLOUR here: this row has no space for the word, and the
-            // expanded readout spells it out in its state line instead.
-            color = if (data.charging) ChargeGreen else LocalContentColor.current,
-            maxLines = 1,
+            pctStyle,
+            FontWeight.Bold,
+            // Charging shows in the COLOUR while collapsed: that row has no space for
+            // the word, and the expanded readout spells it out in its state line, so
+            // the cue fades back to the ordinary content colour as the card opens.
+            if (data.charging) lerp(ChargeGreen, LocalContentColor.current, t)
+            else LocalContentColor.current,
         )
         data.rangeText?.let {
-            Spacer(Modifier.width(8.dp))
-            Text(it, style = style, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.width(lerp(8.dp, 12.dp, t)))
+            Text(it, style = rangeStyle, fontWeight = FontWeight.Bold, maxLines = 1)
         }
     }
 }
@@ -5972,6 +6097,12 @@ private fun HeroMorphReadout(
     /** Start inset for the NUMBERS row only, so it can sit after the car name while the bar
      *  below still spans the card. Zero for [ChargeFuelBar], which has no name beside it. */
     numbersStart: Dp = 0.dp,
+    /** Reports where the NUMBERS row landed, for the travelling overlay. See
+     *  [HeroCollapsedNumbers.onPositioned] -- same idea at the other end. */
+    onNumbersPositioned: (LayoutCoordinates) -> Unit = {},
+    /** True once the overlay draws the real numbers. This row keeps measuring and
+     *  positioning so it stays a valid anchor, and stops painting. */
+    numbersHoisted: Boolean = false,
 ) {
     val type = MaterialTheme.typography
     // Real type steps, lerped -- not a graphicsLayer scale -- and the reason is DEPENDENT
@@ -6019,7 +6150,11 @@ private fun HeroMorphReadout(
         Row(
             Modifier
                 .padding(start = numbersStart)
-                .graphicsLayer { alpha = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f) },
+                .graphicsLayer {
+                    alpha = if (numbersHoisted) 0f
+                    else ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
+                }
+                .onGloballyPositioned(onNumbersPositioned),
             verticalAlignment = Alignment.Bottom,
         ) {
             // Collapsed there is no room for the state line below, so the PERCENTAGE carries
