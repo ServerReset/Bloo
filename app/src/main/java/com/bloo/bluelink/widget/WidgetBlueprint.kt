@@ -117,7 +117,18 @@ internal object WidgetBlueprint {
         val size: DpSize,
         val innerWidth: Dp,
         val innerHeight: Dp,
+        /** The BASE gap: between a ring and the content beside it, between
+         *  buttons, and anywhere else a small separation is wanted. Stays small. */
         val gap: Dp,
+        /** The vertical gap between stacked BANDS, which additionally absorbs
+         *  leftover tile height (see [plan]) and so can be much larger than [gap].
+         *
+         *  A separate field rather than a wider meaning for [gap], because [gap] is
+         *  read horizontally too -- the side-by-side path spaces the mark from the
+         *  content with it AND subtracts it from the available width. Widening the
+         *  shared value silently changed both of those, which is the kind of quiet
+         *  breakage a new name prevents outright. */
+        val bandGap: Dp,
         val bands: List<Band>,
         val hero: Hero,
         /** Ring diameter when [hero] is [Hero.RING]; 0 otherwise. */
@@ -149,7 +160,7 @@ internal object WidgetBlueprint {
          *  [innerHeight]. */
         val committedHeight: Dp
             get() = bands.fold(0.dp) { acc, b -> acc + b.height } +
-                gap * (bands.size - 1).coerceAtLeast(0)
+                bandGap * (bands.size - 1).coerceAtLeast(0)
     }
 
     // ---- Module floors -------------------------------------------------------
@@ -509,7 +520,8 @@ internal object WidgetBlueprint {
             size = size,
             innerWidth = innerW,
             innerHeight = innerH,
-            gap = spreadGap,
+            gap = gap,
+            bandGap = spreadGap,
             bands = bands,
             hero = hero,
             ringEdge = ringEdge,
@@ -570,6 +582,7 @@ internal object WidgetBlueprint {
             innerWidth = innerW,
             innerHeight = innerH,
             gap = gap,
+            bandGap = gap,
             // A strip is one horizontal band by definition -- the whole tile.
             bands = listOf(Band(Module.HERO, innerH)),
             hero = hero,

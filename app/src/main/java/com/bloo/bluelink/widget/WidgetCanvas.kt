@@ -123,7 +123,11 @@ private fun Stack(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         blueprint.bands.forEachIndexed { i, band ->
-            if (i > 0) Spacer(GlanceModifier.height(blueprint.gap))
+            // bandGap, not gap: this is the vertical spacing the allocator uses to
+            // absorb leftover tile height. The horizontal uses below stay on the
+            // base gap, which is what keeps a side-by-side mark tight against its
+            // content on a tile that happens to have height to spare.
+            if (i > 0) Spacer(GlanceModifier.height(blueprint.bandGap))
             BandBox(band.height) { Module(band.module, band.height, car, render, blueprint) }
         }
     }
