@@ -105,7 +105,19 @@ internal fun MapModule(render: Render, room: Dp) {
     // -- room includes the leading spacer, and a map judged "worth
     // drawing" has to mean the picture itself clears the floor, not the
     // spacer padding it out to look like it does.
-    val imageHeight = minOf(Scale.mapHeight(LocalSize.current), (room - 8.dp).coerceAtLeast(0.dp))
+    // FILLS the room it was given, rather than capping at a preferred height and
+    // leaving the rest of the band blank.
+    //
+    // The map is the greediest module in the allocator (it takes the largest share
+    // of leftover height, because it is the one piece that genuinely improves with
+    // room) and it was then refusing most of what it won: capped at ~110dp, a tall
+    // tile handed it 250dp and it drew 110, leaving 140dp of empty card between the
+    // range and the buttons. That gap is what made big widgets look unfinished.
+    //
+    // Safe to fill because the bitmap is Crop-scaled: a taller box shows MORE of the
+    // neighbourhood around the car, which is the thing a location thumbnail wants
+    // anyway, rather than stretching the image.
+    val imageHeight = (room - 8.dp).coerceAtLeast(0.dp)
     if (imageHeight < Scale.MAP_MIN) return
     Spacer(GlanceModifier.height(8.dp))
     Image(

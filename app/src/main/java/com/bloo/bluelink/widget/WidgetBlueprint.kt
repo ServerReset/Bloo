@@ -175,6 +175,18 @@ internal object WidgetBlueprint {
      *  plus its own percentage text still reads. */
     private val VBAR_MAX_WIDTH = 90.dp
 
+    /**
+     * The diameter a ring needs before it is worth CHOOSING over a bar.
+     *
+     * Deliberately larger than [MIN_RING], and the two answer different questions.
+     * MIN_RING is "can this be drawn at all", which is what stops a ring becoming a
+     * smudge. This is "is a ring the best use of this band", and on a wide short
+     * tile the answer at 30dp is no: the tile has width to spare and the ring is
+     * bounded by the band's HEIGHT, so it renders as a token circle floating in a
+     * lot of empty card. A horizontal bar uses that width and says the same thing.
+     */
+    private val RING_WORTH_IT = 44.dp
+
     private fun minHeader(size: DpSize, textScale: Float, hasSwitcher: Boolean): Dp {
         val text = Scale.lineHeight(Scale.titleSp(size).value, textScale)
         // The switcher pill is a fixed-size touch target that does not shrink
@@ -341,8 +353,12 @@ internal object WidgetBlueprint {
             // Checked after ring in a first draft, which made this branch
             // unreachable -- every narrow tile still took the ring.
             innerW < VBAR_MAX_WIDTH && heroH >= MIN_VBAR -> Hero.VBAR
-            ringCandidate >= MIN_RING -> Hero.RING
+            ringCandidate >= RING_WORTH_IT -> Hero.RING
             heroH >= minBarHero(size, ts) -> Hero.BAR
+            // Below the bar's floor a small ring still beats a bare text line: it is
+            // the last thing that reads as a GAUGE, and MIN_RING is exactly the point
+            // where it stops being one.
+            ringCandidate >= MIN_RING -> Hero.RING
             heroH >= minLineHero(size, ts) -> Hero.LINE
             else -> Hero.NONE
         }
