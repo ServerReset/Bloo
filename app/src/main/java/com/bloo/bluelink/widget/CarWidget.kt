@@ -2327,22 +2327,6 @@ class CarWidget : GlanceAppWidget() {
     }
 
     /**
-     * The corner radius for surfaces INSIDE the widget -- action buttons, the
-     * map thumbnail -- derived from the same [WidgetConfig.corner] choice as
-     * the outer container so the whole widget speaks one shape language.
-     *
-     * Deliberately not the container's own radius: at 32dp a button only
-     * ~40dp tall is already a pill, so the inner scale is its own gentler
-     * ramp rather than the same numbers reused.
-     */
-    private fun innerCorner(config: WidgetConfig): Dp = when (config.effectiveCorner) {
-        WidgetConfig.CORNER_SHARP -> 0.dp
-        WidgetConfig.CORNER_ROUND -> 18.dp
-        WidgetConfig.CORNER_PILL -> 999.dp
-        else -> 14.dp
-    }
-
-    /**
      * The bar treatment: a big percentage over a horizontal charge bar.
      *
      * A ring is the right hero when a tile has height to spend on it. On a
@@ -2685,48 +2669,8 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    // ---- Text styles ---------------------------------------------------------
-    // @Composable (not plain functions) purely so each can read LocalSize.current
-    // itself -- every call site is already inside composition, so this scales
-    // font size continuously with the widget's exact measured size (see Scale)
-    // without having to thread a size param through every single caller.
-
-    @Composable
-    private fun titleStyle(theme: WidgetTheme) = TextStyle(
-        color = theme.onSurface,
-        fontSize = (Scale.titleSp(LocalSize.current).value * theme.textScale).sp,
-        fontWeight = FontWeight.Bold,
-    )
-    @Composable
-    private fun subtitleStyle(theme: WidgetTheme) = TextStyle(
-        color = theme.onSurfaceVariant,
-        fontSize = (Scale.subtitleSp(LocalSize.current).value * theme.textScale).sp,
-    )
-    @Composable
-    private fun valueStyle(theme: WidgetTheme) = TextStyle(
-        color = theme.onSurface,
-        fontSize = (Scale.valueSp(LocalSize.current).value * theme.textScale).sp,
-        fontWeight = FontWeight.Medium,
-    )
-
-    /**
-     * The label style on an [ActionButton].
-     *
-     * Here rather than at its two use sites because those two sites are the fit
-     * TEST and the RENDER: [ActionButtons] builds this style to ask whether every
-     * label fits its slot (via [wouldOverflow], which measures character count
-     * against font size) and [ActionButton] rebuilt an identical copy to actually
-     * draw them. Two independent copies of the input to a measurement and the
-     * thing being measured is the one duplication in this file that can't merely
-     * look wrong -- drift either shows labels that don't fit, or hides labels that
-     * would have.
-     */
-    @Composable
-    private fun buttonLabelStyle(theme: WidgetTheme) = TextStyle(
-        color = theme.onAccent,
-        fontSize = (Scale.subtitleSp(LocalSize.current).value * theme.textScale).sp,
-        fontWeight = FontWeight.Medium,
-    )
+    // Text styles and innerCorner now live in WidgetStyles.kt -- see that file
+    // for why the styling leaf moved out ahead of the modules that draw with it.
 }
 
 /**
