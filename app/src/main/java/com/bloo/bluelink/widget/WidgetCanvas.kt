@@ -310,6 +310,35 @@ private fun Hero(
             showNameFallback = !blueprint.has(WidgetBlueprint.Module.HEADER),
         )
 
+        // The percentage sits ABOVE the bar rather than beside it: beside would
+        // split a width this tile does not have into two halves that each fit
+        // nothing. FitText's own chain then handles the label -- and this is the
+        // one place character stacking is right, so a "74%" too wide even for the
+        // narrowest tile becomes 7 / 4 / % down the column instead of vanishing.
+        WidgetBlueprint.Hero.VBAR -> Column(
+            modifier = GlanceModifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val labelHeight = Scale.lineHeight(Scale.valueSp(LocalSize.current).value, render.theme.textScale)
+            val barHeight = (room - labelHeight - 4.dp).coerceAtLeast(0.dp)
+            FitText(
+                "${car.percent ?: 0}%",
+                valueStyle(render.theme),
+                maxWidth = width,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            )
+            if (barHeight > 0.dp) {
+                Spacer(GlanceModifier.height(4.dp))
+                VerticalChargeBar(
+                    car, render.theme,
+                    // A bar wide enough to read as a gauge but never wider than
+                    // the slot it was given.
+                    width = minOf(width, 14.dp),
+                    height = barHeight,
+                )
+            }
+        }
+
         WidgetBlueprint.Hero.LINE -> PrimaryInfoLine(car, render, maxWidth = width)
 
         WidgetBlueprint.Hero.NONE -> Unit

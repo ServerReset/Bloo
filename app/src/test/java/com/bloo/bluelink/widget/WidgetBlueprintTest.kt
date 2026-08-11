@@ -160,7 +160,10 @@ class WidgetBlueprintTest {
         for ((_, _, size) in sizes()) {
             val bp = WidgetBlueprint.plan(size, WidgetConfig(vin = "test"), WidgetBlueprint.Facts())
             when (bp.hero) {
-                WidgetBlueprint.Hero.RING, WidgetBlueprint.Hero.BAR ->
+                WidgetBlueprint.Hero.RING,
+                WidgetBlueprint.Hero.BAR,
+                WidgetBlueprint.Hero.VBAR,
+                ->
                     assertTrue(WidgetInfoField.PERCENT in bp.suppressedInfo)
                 WidgetBlueprint.Hero.LINE -> {
                     assertTrue(WidgetInfoField.PERCENT in bp.suppressedInfo)
@@ -274,6 +277,35 @@ class WidgetBlueprintTest {
                 "${c}x1 shows ${bp.buttonCount} buttons, narrower tile showed $previous",
             )
             previous = bp.buttonCount
+        }
+    }
+
+    @Test
+    fun `a tall narrow tile uses the vertical bar rather than a stub`() {
+        // The shape this was added for: height to spare, almost no width. A ring
+        // is bounded by the NARROW axis, so it would be a small circle with the
+        // rest of the tile empty, and a horizontal bar would be a stub. Neither
+        // reads; a fill up the long axis does.
+        val config = WidgetConfig(vin = "test")
+        val narrowTall = DpSize(60.dp, 320.dp)
+        val bp = WidgetBlueprint.plan(narrowTall, config, WidgetBlueprint.Facts())
+        assertTrue(
+            bp.hero == WidgetBlueprint.Hero.VBAR,
+            "narrow tall tile chose ${bp.hero}, not a vertical bar",
+        )
+    }
+
+    @Test
+    fun `a wide tile never picks the vertical bar`() {
+        // The mirror check: VBAR is for the narrow axis only. A wide tile that
+        // fell into it would draw a thin column on a broad card.
+        for ((c, r, size) in sizes()) {
+            if (c < 3) continue
+            val bp = WidgetBlueprint.plan(size, WidgetConfig(vin = "test"), WidgetBlueprint.Facts())
+            assertTrue(
+                bp.hero != WidgetBlueprint.Hero.VBAR,
+                "${c}x$r is wide but chose a vertical bar",
+            )
         }
     }
 }

@@ -86,8 +86,14 @@ internal fun HeaderRow(
             // singleLine: Scale.headerHeight reserves exactly one title + one subtitle
             // line, so neither may wrap -- a wrapped name would make the header 3 lines
             // and overflow that reservation. FitText shrinks to fit one line instead.
-            FitText(car.name, titleStyle(render.theme), maxWidth = textWidth, singleLine = true)
-            FitText(statusSubtitle(car), subtitleStyle(render.theme), maxWidth = textWidth, singleLine = true)
+            FitText(
+                car.name, titleStyle(render.theme), maxWidth = textWidth,
+                singleLine = true, allowStack = false,
+            )
+            FitText(
+                statusSubtitle(car), subtitleStyle(render.theme), maxWidth = textWidth,
+                singleLine = true, allowStack = false,
+            )
         }
         // Follow-selected widgets get a car switcher chevron. Via
         // Render.hasSwitcher so Scale.headerHeight reserves for exactly the
@@ -161,7 +167,7 @@ internal fun NameAndStat(car: VehicleSnapshot, render: Render, width: Dp) {
     val size = LocalSize.current
     val scale = render.theme.textScale
     val avail = Scale.innerHeight(render.frame(size))
-    FitText(car.name, titleStyle(render.theme), maxWidth = width)
+    FitText(car.name, titleStyle(render.theme), maxWidth = width, allowStack = false)
     val both = Scale.lineHeight(Scale.titleSp(size).value, scale) +
         Scale.lineHeight(Scale.subtitleSp(size).value, scale)
     if (both <= avail) PrimaryInfoLine(car, render, maxWidth = width)
@@ -272,7 +278,10 @@ internal fun InfoRow(field: WidgetInfoField, car: VehicleSnapshot, render: Rende
     val value = infoValue(field, car, render) ?: return
     if (width < NARROW_WIDTH) {
         Column(modifier = GlanceModifier.fillMaxWidth()) {
-            FitText(fieldLabel(field, car), subtitleStyle(render.theme), maxWidth = width - 4.dp)
+            FitText(
+                fieldLabel(field, car), subtitleStyle(render.theme),
+                maxWidth = width - 4.dp, allowStack = false,
+            )
             FitText(value, valueStyle(render.theme), maxWidth = width - 4.dp)
         }
     } else {
@@ -400,7 +409,7 @@ internal fun BarHero(
         ).joinToString(" · ").takeIf { showSub && it.isNotBlank() }
         if (sub != null) {
             Spacer(GlanceModifier.height(4.dp))
-            FitText(sub, subtitleStyle(theme), maxWidth = width)
+            FitText(sub, subtitleStyle(theme), maxWidth = width, allowStack = false)
         }
     }
 }

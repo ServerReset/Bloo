@@ -42,7 +42,19 @@ object WidgetMap {
     // house number's worth of street, not a neighbourhood). 13 covers
     // roughly 4x the ground per tile at the same pixel size, reading as
     // "which part of town" rather than "which specific driveway".
-    private const val ZOOM = 13
+    /**
+     * Deliberately one step wider than it was.
+     *
+     * At 13 the thumbnail covered roughly a quarter of the area it does now, which
+     * on a small tile is a few blocks: enough to see the car sits on a road, not
+     * enough to recognise WHERE. Reported as "too zoomed in". A parked-car map is
+     * read for orientation -- which part of town -- so it wants the neighbourhood,
+     * and the marker carries the precision.
+     *
+     * Also cheaper: the same window now needs fewer tiles, so a car that moves a
+     * street away is far more likely to hit tiles already on disk.
+     */
+    private const val ZOOM = 12
     private val TILE_PX = com.bloo.bluelink.data.MapTiles.TILE_PX
     // OSM's usage policy requires an identifying User-Agent; a default/missing one
     // gets a "blocked" tile back. Built by MapTiles so all three surfaces send the
@@ -158,10 +170,11 @@ object WidgetMap {
 
     /**
      * Quantize a coordinate to the finest granularity that can still move the picture.
-     * At [ZOOM] 13 one tile spans roughly 5km, so the ~450px output is about 11m per
-     * pixel -- and 1e-4 degrees is about 11m. So one step of this key is one pixel:
-     * anything finer could not change a rendered pixel, and anything coarser would make
-     * a moving car's map visibly lag.
+     * At [ZOOM] 12 one tile spans roughly 10km, so the ~450px output is about 22m per
+     * pixel, and 1e-4 degrees is about 11m -- so one step of this key is now HALF a
+     * pixel. Deliberately left as it was rather than coarsened to match: it stays on
+     * the safe side (a key that changes slightly too often costs one redraw; one that
+     * changes too rarely makes a moving car's map visibly lag).
      */
     private fun quantize(deg: Double): Long = Math.round(deg * 10_000)
 

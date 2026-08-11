@@ -14,6 +14,7 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
+import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.height
@@ -230,6 +231,56 @@ internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, heig
                     ) {}
                 }
             }
+        }
+    }
+}
+
+/**
+ * The charge as a VERTICAL bar that fills from the bottom, for a tile that has
+ * height and almost no width.
+ *
+ * The mirror of [ChargeBar], and it exists because the horizontal one is the
+ * wrong instrument on a tall narrow tile: a 60dp-wide, 300dp-tall shape gave a
+ * ring a 60dp circle with 240dp of nothing under it, and a horizontal bar a
+ * 60dp stub. Both read as an empty tile. A fill rising up the long axis uses
+ * exactly the room that shape actually has, and it needs no label to be
+ * understood -- which matters, because a tile this narrow may not have room for
+ * a legible percentage beside it.
+ *
+ * Deliberately simpler than [ChargeBar]: no limit marker and no split gap. Both
+ * are width-dependent devices (the gap is skipped below 60dp there for the same
+ * reason) and this bar's whole premise is that width is what it does not have.
+ * The charge colour still carries the charging state.
+ */
+@Composable
+internal fun VerticalChargeBar(
+    car: VehicleSnapshot,
+    theme: WidgetTheme,
+    width: Dp,
+    height: Dp,
+) {
+    val pct = (car.percent ?: 0).coerceIn(0, 100)
+    val frac = pct / 100f
+    // Floored at the bar's own width when there is any charge at all, so a low
+    // reading is a rounded nub rather than a hairline -- the same reasoning as
+    // ChargeBar's floor, on the other axis.
+    val filled = if (frac <= 0f) 0.dp else minOf(height, maxOf(height * frac, width))
+    val empty = (height - filled).coerceAtLeast(0.dp)
+    val fillColor = if (car.charging == true) theme.charge else theme.accentProvider
+    Column(modifier = GlanceModifier.width(width).height(height)) {
+        // Empty portion FIRST: a Column stacks downward, so the fill has to be
+        // the last child for it to sit at the bottom and rise as charge grows.
+        if (empty > 0.dp) {
+            Box(
+                modifier = GlanceModifier.width(width).height(empty)
+                    .cornerRadius(width / 2).background(theme.surfaceVariant),
+            ) {}
+        }
+        if (filled > 0.dp) {
+            Box(
+                modifier = GlanceModifier.width(width).height(filled)
+                    .cornerRadius(width / 2).background(fillColor),
+            ) {}
         }
     }
 }

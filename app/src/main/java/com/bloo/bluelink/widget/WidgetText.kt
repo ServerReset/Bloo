@@ -122,6 +122,19 @@ internal fun FitText(
     // FitText skips wordWrap entirely and goes straight to FitLine, which shrinks the type
     // to fit one line rather than wrapping -- the fit that matches the reservation.
     singleLine: Boolean = false,
+    /**
+     * Whether a word too wide to shrink may be stacked ONE CHARACTER PER LINE.
+     *
+     * True for a short value like a percentage, where "74%" down the side of a
+     * narrow tile is a deliberate, readable treatment. False for prose -- a car
+     * NAME stacked this way is unreadable and looks broken: a one-column tile
+     * rendered "Lanas Whip" as a column reading "L", "a", clipped after two
+     * characters. Reported from a real device.
+     *
+     * With it off the chain shrinks past the comfortable floor instead, which is
+     * the same last resort a longer word already got.
+     */
+    allowStack: Boolean = true,
 ) {
     if (text.isBlank()) return
     if (!wouldOverflow(text, style, maxWidth)) {
@@ -129,17 +142,17 @@ internal fun FitText(
         return
     }
     if (singleLine) {
-        FitLine(text, style, maxWidth, modifier, horizontalAlignment)
+        FitLine(text, style, maxWidth, modifier, horizontalAlignment, allowStack)
         return
     }
     val lines = wordWrap(text, style, maxWidth)
     if (lines.size <= 1) {
-        FitLine(lines.firstOrNull() ?: text, style, maxWidth, modifier, horizontalAlignment)
+        FitLine(lines.firstOrNull() ?: text, style, maxWidth, modifier, horizontalAlignment, allowStack)
         return
     }
     Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
         lines.forEach { line ->
-            FitLine(line, style, maxWidth, GlanceModifier, horizontalAlignment)
+            FitLine(line, style, maxWidth, GlanceModifier, horizontalAlignment, allowStack)
         }
     }
 }
@@ -161,6 +174,8 @@ internal fun FitLine(
     maxWidth: Dp,
     modifier: GlanceModifier,
     horizontalAlignment: Alignment.Horizontal,
+    /** See [FitText]'s own parameter -- false for prose, true for a short value. */
+    allowStack: Boolean = true,
 ) {
     if (!wouldOverflow(text, style, maxWidth)) {
         Text(text, style = style, maxLines = 1, modifier = modifier)
@@ -171,7 +186,11 @@ internal fun FitLine(
         Text(text, style = shrunk, maxLines = 1, modifier = modifier)
         return
     }
-    if (text.length > Scale.MAX_STACK_CHARS) {
+    // Stacking is only ever right for a SHORT token. A longer one would build a
+    // column taller than the tile, which is the same clipping problem on the
+    // other axis -- and for prose it is wrong at any length, because a name read
+    // one letter per row is not readable at all.
+    if (text.length > Scale.MAX_STACK_CHARS || !allowStack) {
         // Text too small to read is recoverable by resizing the widget;
         // text cut off the edge is not.
         val forced = shrunkToFit(text, style, maxWidth, relaxed = true)
@@ -179,6 +198,11 @@ internal fun FitLine(
             Text(text, style = forced, maxLines = 1, modifier = modifier)
             return
         }
+        // Nothing legible fits even relaxed. Drawing the stack anyway would put
+        // an unreadable letter-column on the tile; yielding leaves the space to
+        // the modules that CAN say something, which is the same contract every
+        // other "no room" path in this widget keeps.
+        if (!allowStack) return
     }
     Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
         VerticalText(text, style)

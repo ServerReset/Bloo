@@ -66,6 +66,17 @@ internal object WidgetBlueprint {
          *  diameter. */
         BAR,
 
+        /** A VERTICAL bar filling from the bottom, with the percentage beside or
+         *  above it.
+         *
+         *  The mirror of [BAR], for the mirrored shape: a tall narrow tile has
+         *  height to spare and almost no width, which is the one case where a
+         *  horizontal bar is the wrong instrument -- it would be a 30dp stub on a
+         *  200dp-tall tile. A vertical bar uses exactly the axis that tile has,
+         *  and a fill that rises with charge reads correctly without any label at
+         *  all. */
+        VBAR,
+
         /** One ordinary text line ("69% · 214 mi"). The last resort that still
          *  says something, for a band too short for even a bar. */
         LINE,
@@ -154,6 +165,15 @@ internal object WidgetBlueprint {
      *  this the percentage is smaller than body text, which looks like a
      *  mistake rather than a headline. */
     private const val MIN_BAR_SP = 15f
+
+    /** A vertical bar needs real height to read as a fill rather than a dash --
+     *  below this it says less than the percentage text alone would. */
+    private val MIN_VBAR = 56.dp
+
+    /** Above this width a ring is a real gauge rather than a token, so the
+     *  vertical bar stops being the better answer. Set at the point where a ring
+     *  plus its own percentage text still reads. */
+    private val VBAR_MAX_WIDTH = 90.dp
 
     private fun minHeader(size: DpSize, textScale: Float, hasSwitcher: Boolean): Dp {
         val text = Scale.lineHeight(Scale.titleSp(size).value, textScale)
@@ -313,6 +333,14 @@ internal object WidgetBlueprint {
             // a short wide tile can still carry a real ring beside its text --
             // this is the 7x2 / 7x3 case the old widget rendered as a blank.
             sideBySide && minOf(innerH, innerW / 3) >= MIN_RING -> Hero.RING
+            // BEFORE the ring, not after, and the order is the whole point. A
+            // ring is bounded by the NARROW axis (its diameter cannot exceed
+            // innerW), so on a 60dp-wide, 300dp-tall tile it passes the 24dp ring
+            // check comfortably and then draws a 46dp circle with 200dp of empty
+            // tile beneath it. That is how these shapes ended up looking empty.
+            // Checked after ring in a first draft, which made this branch
+            // unreachable -- every narrow tile still took the ring.
+            innerW < VBAR_MAX_WIDTH && heroH >= MIN_VBAR -> Hero.VBAR
             ringCandidate >= MIN_RING -> Hero.RING
             heroH >= minBarHero(size, ts) -> Hero.BAR
             heroH >= minLineHero(size, ts) -> Hero.LINE
@@ -432,7 +460,7 @@ internal object WidgetBlueprint {
      */
     private fun suppressed(hero: Hero): Set<WidgetInfoField> = when (hero) {
         Hero.NONE -> emptySet()
-        Hero.RING, Hero.BAR -> setOf(WidgetInfoField.PERCENT)
+        Hero.RING, Hero.BAR, Hero.VBAR -> setOf(WidgetInfoField.PERCENT)
         Hero.LINE -> setOf(WidgetInfoField.PERCENT, WidgetInfoField.RANGE)
     }
 }

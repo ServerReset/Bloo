@@ -302,7 +302,15 @@ internal fun ActionButton(
                 // other label in the widget already trusts (RemoteViews doesn't
                 // clip, so "forced on" and "silently unreadable" are the same bug
                 // if this were still a plain Text).
-                FitLine(action.label, labelStyle, labelMaxWidth, GlanceModifier, Alignment.Start)
+                // allowStack = false: a button label is a word ("Climate"), and a word stacked
+                    // one letter per row inside a pill is unreadable. If it will not fit
+                    // even relaxed, the label yields and the icon stands alone -- which is
+                    // exactly what BUTTON_LABELS_OFF looks like, and a button that still
+                    // works beats a button wearing a column of letters.
+                    FitLine(
+                        action.label, labelStyle, labelMaxWidth, GlanceModifier,
+                        Alignment.Start, allowStack = false,
+                    )
             }
         } else {
             Image(

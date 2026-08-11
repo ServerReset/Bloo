@@ -361,6 +361,9 @@ class CarWidget : GlanceAppWidget() {
                     TextStyle(color = theme.accentProvider, fontSize = Scale.titleSp(size), fontWeight = FontWeight.Bold),
                     maxWidth = inner,
                     horizontalAlignment = Alignment.CenterHorizontally,
+                    // The wordmark, not a value: "Bloo" down the side of a tile one
+                    // letter per row is not a logo, it is a fault.
+                    allowStack = false,
                 )
                 // The call to action only earns its space once there's room
                 // for it to read as a sentence. Below that the wordmark
@@ -375,6 +378,7 @@ class CarWidget : GlanceAppWidget() {
                         TextStyle(color = theme.onSurfaceVariant, fontSize = Scale.subtitleSp(size)),
                         maxWidth = inner,
                         horizontalAlignment = Alignment.CenterHorizontally,
+                        allowStack = false,
                     )
                 }
             }
