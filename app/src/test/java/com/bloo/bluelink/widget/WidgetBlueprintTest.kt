@@ -199,7 +199,13 @@ class WidgetBlueprintTest {
             for (f in facts()) {
                 val bp = WidgetBlueprint.plan(size, WidgetConfig(vin = "test"), f)
                 if (bp.buttonCount <= 0) continue
-                val gap = bp.gap.value * (bp.buttonCount - 1)
+                // Scale.buttonGap, NOT bp.gap. They are different gaps and conflating
+                // them is why this failed: bp.gap is the spacing between BANDS, which
+                // now absorbs leftover tile height and can reach 28dp, while the space
+                // between stacked BUTTONS is Scale.buttonGap at a few dp. Using the
+                // band gap inflated the stack's requirement by ~20dp and failed a
+                // layout that fits.
+                val gap = Scale.buttonGap(size).value * (bp.buttonCount - 1)
                 if (bp.buttonsStacked) {
                     // Asks the SHIPPING function what height each button gets, rather
                     // than assuming it is the full Scale.buttonHeight. That assumption
