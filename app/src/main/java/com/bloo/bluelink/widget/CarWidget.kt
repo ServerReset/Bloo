@@ -88,6 +88,54 @@ import kotlinx.coroutines.flow.first
  * All data is read once in [provideGlance] (suspend) and handed to the content as a
  * plain [Render] holder; the composables themselves do no I/O.
  */
+
+/** Top-level (not nested in [CarWidget]) so the render layer's other files --
+ *  [WidgetValues], and any further slice of CarWidget.kt's own composables --
+ *  can take it as a plain parameter type without an outer-class qualifier.
+ *  Nested-but-internal was tried first and does NOT do this: an unqualified
+ *  `Render` in another file only resolves against top-level declarations,
+ *  never a nested class of some other top-level type, however visible. */
+internal data class Render(
+    val car: VehicleSnapshot?,
+    val config: WidgetConfig,
+    val theme: WidgetTheme,
+    val metric: Boolean,
+    val multiCar: Boolean,
+    /** True when the car data is older than the staleness window — surfaces so
+     *  the widget can flag "this may be out of date" instead of showing an
+     *  hours-old lock/charge state as if it were live. */
+    val stale: Boolean,
+    /** Pre-fetched location map tile (null when disabled, no coords, or fetch
+     *  failed) — I/O can't run in the Glance composables, so it's done in
+     *  provideGlance and handed in ready to draw. */
+    val mapBitmap: android.graphics.Bitmap?,
+    /** Pre-fetched, pre-blurred car photo for the "Photo background" option
+     *  (null when disabled or the car has no photo set) -- same reasoning
+     *  as [mapBitmap], decoded/blurred in provideGlance via [WidgetPhoto]. */
+    val photoBitmap: android.graphics.Bitmap?,
+) {
+    /** Whether HeaderRow draws the car-switcher pill, which is taller than the
+     *  two text lines beside it at the smaller text settings.
+     *
+     *  One definition, read by HeaderRow to decide whether to draw it and by
+     *  [Scale.headerHeight] to reserve for it. As an inline condition in
+     *  HeaderRow only, no budget could see it. */
+    val hasSwitcher: Boolean get() = multiCar && config.vin == null
+
+    /** The per-render facts every vertical budget needs. [size] is the only
+     *  thing not already known here, so each tier builds this once from
+     *  LocalSize rather than passing four arguments down. */
+    fun frame(size: DpSize): Scale.Frame =
+        Scale.Frame(size, theme.textScale, pillCorner(size), hasSwitcher)
+
+    /** True when Content's root padding gets its pill-corner bonus. Derived from
+     *  the same rule Content applies, so the padding it draws and the padding
+     *  every budget subtracts cannot disagree -- they did for all 18 tiers,
+     *  which each assumed plain contentPadding. */
+    fun pillCorner(size: DpSize): Boolean =
+        config.effectiveCorner == WidgetConfig.CORNER_PILL && Scale.pillAppliesAt(size)
+}
+
 class CarWidget : GlanceAppWidget() {
 
     // Exact = recompose for the real current size, so every launcher cell count
@@ -232,48 +280,6 @@ class CarWidget : GlanceAppWidget() {
             }
         }
     }
-
-    internal data class Render(
-        val car: VehicleSnapshot?,
-        val config: WidgetConfig,
-        val theme: WidgetTheme,
-        val metric: Boolean,
-        val multiCar: Boolean,
-        /** True when the car data is older than the staleness window — surfaces so
-         *  the widget can flag "this may be out of date" instead of showing an
-         *  hours-old lock/charge state as if it were live. */
-        val stale: Boolean,
-        /** Pre-fetched location map tile (null when disabled, no coords, or fetch
-         *  failed) — I/O can't run in the Glance composables, so it's done in
-         *  provideGlance and handed in ready to draw. */
-        val mapBitmap: android.graphics.Bitmap?,
-        /** Pre-fetched, pre-blurred car photo for the "Photo background" option
-         *  (null when disabled or the car has no photo set) -- same reasoning
-         *  as [mapBitmap], decoded/blurred in provideGlance via [WidgetPhoto]. */
-        val photoBitmap: android.graphics.Bitmap?,
-    ) {
-        /** Whether HeaderRow draws the car-switcher pill, which is taller than the
-         *  two text lines beside it at the smaller text settings.
-         *
-         *  One definition, read by HeaderRow to decide whether to draw it and by
-         *  [Scale.headerHeight] to reserve for it. As an inline condition in
-         *  HeaderRow only, no budget could see it. */
-        val hasSwitcher: Boolean get() = multiCar && config.vin == null
-
-        /** The per-render facts every vertical budget needs. [size] is the only
-         *  thing not already known here, so each tier builds this once from
-         *  LocalSize rather than passing four arguments down. */
-        fun frame(size: DpSize): Scale.Frame =
-            Scale.Frame(size, theme.textScale, pillCorner(size), hasSwitcher)
-
-        /** True when Content's root padding gets its pill-corner bonus. Derived from
-         *  the same rule Content applies, so the padding it draws and the padding
-         *  every budget subtracts cannot disagree -- they did for all 18 tiers,
-         *  which each assumed plain contentPadding. */
-        fun pillCorner(size: DpSize): Boolean =
-            config.effectiveCorner == WidgetConfig.CORNER_PILL && Scale.pillAppliesAt(size)
-    }
-
 
     /** Below this width, [InfoStack] stops putting a value beside its label
      *  and starts stacking instead -- the same "give up on one line" width
