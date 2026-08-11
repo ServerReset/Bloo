@@ -249,6 +249,19 @@ class WidgetBlueprintTest {
     }
 
     @Test
+    fun `isStrip is true for exactly the one-row sizes`() {
+        // The canvas picks its arrangement from this flag rather than
+        // re-deriving it, so it has to mean what it says at every size.
+        for ((c, r, size) in sizes()) {
+            val bp = WidgetBlueprint.plan(size, WidgetConfig(vin = "test"), WidgetBlueprint.Facts())
+            assertTrue(
+                bp.isStrip == (r == 1),
+                "${c}x$r isStrip=${bp.isStrip}",
+            )
+        }
+    }
+
+    @Test
     fun `a wider strip never shows fewer buttons than a narrower one`() {
         var previous = 0
         for (c in WidgetGrid.MIN_COLS..WidgetGrid.MAX_COLS) {

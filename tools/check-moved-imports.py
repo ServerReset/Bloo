@@ -99,6 +99,17 @@ def strip_noise(text: str) -> str:
                 i += 2 if text[i] == '\\' else 1
             i += 1
             continue
+        if text[i] == '`':
+            # A backtick-quoted identifier -- overwhelmingly a Kotlin test name,
+            # which is an English sentence. `fun \`no blueprint ever commits more
+            # height than the tile has\`()` contains the word "height", and
+            # reading that as a reference to androidx.glance.layout.height is
+            # how a checker earns a reputation for crying wolf.
+            i += 1
+            while i < n and text[i] != '`':
+                i += 1
+            i += 1
+            continue
         out.append(text[i])
         i += 1
     return ''.join(out)
@@ -111,6 +122,28 @@ def kotlin_files() -> list[str]:
         found += [os.path.join(base, f) for f in files if f.endswith('.kt')]
     return sorted(found)
 
+
+
+
+def locals_of(body):
+    """Every name that is bound INSIDE this file and therefore needs no import:
+    declarations at any nesting, typed parameters, vals/vars, loop variables
+    (including destructured ones) and explicit lambda parameters.
+
+    Both rules below need this identically. They did not share it at first, and
+    the weaker copy in the move rule reported `size` in a `for ((c, r, size) in
+    ...)` as a missing import -- a false positive produced purely by the two
+    copies disagreeing about what counts as local.
+    """
+    out = {d.group(1) for line in body.split('\n') if (d := ANY_DECL_RE.match(line))}
+    out |= set(re.findall(r'\b(\w+)\s*:\s*[A-Z]', body))
+    out |= set(re.findall(r'\b(?:val|var)\s+(\w+)', body))
+    out |= set(re.findall(r'\bfor\s*\(\s*\(?\s*([\w\s,]+?)\s*\)?\s+in\b', body))
+    out |= {n.strip() for group in re.findall(r'\bfor\s*\(\s*\(([^)]*)\)\s+in\b', body)
+            for n in group.split(',')}
+    out |= {n.strip() for group in re.findall(r'\{\s*([\w\s,]+?)\s*->', body)
+            for n in group.split(',')}
+    return {n for n in out if n}
 
 
 def moved_import_problems(raw, code, pkg_of, base='HEAD'):
@@ -186,7 +219,7 @@ def moved_import_problems(raw, code, pkg_of, base='HEAD'):
         wildcards = {m.group(1) for m in IMPORT_RE.finditer(raw[f]) if m.group(2)}
         have |= {m.group(3) for m in IMPORT_RE.finditer(raw[f]) if m.group(3)}
         body = IMPORT_RE.sub('', code[f])
-        local = {d.group(1) for line in body.split('\n') if (d := ANY_DECL_RE.match(line))}
+        local = locals_of(body)
         for name, path in sorted(donor.items()):
             if name in have or name in local:
                 continue
@@ -210,7 +243,12 @@ def moved_import_problems(raw, code, pkg_of, base='HEAD'):
             # ADVISORY rather than failing the check. It is still worth
             # printing: `sp` was one of the seven symbols that broke this
             # build, and `heroSp.sp` is precisely this shape.
-            if re.search(r'[\w)]\s*\.\s*' + re.escape(name) + r'(?![\w])', body):
+            # `x.name(` is a member FUNCTION call, never an extension property:
+            # `14.sp` and `value.dp` are the shape being looked for, and neither
+            # is ever followed by an argument list. Without this, every
+            # `blueprint.height(MODULE)` reads as a possible lost import of
+            # androidx.glance.layout.height.
+            if re.search(r'[\w)]\s*\.\s*' + re.escape(name) + r'(?![\w(])', body):
                 out.append((f, name,
                             f'possible extension-property use, imported by a file '
                             f'that shed code: {path}', False))
@@ -247,17 +285,7 @@ def main() -> int:
 
         body = IMPORT_RE.sub('', text)
         # Names declared in THIS file (any nesting) shadow the need for an import.
-        local = {d.group(1) for line in body.split('\n') if (d := ANY_DECL_RE.match(line))}
-        # Parameters and locals: `name:` in a signature, `val x =`, `for (x in`.
-        local |= set(re.findall(r'\b(\w+)\s*:\s*[A-Z]', body))
-        local |= set(re.findall(r'\b(?:val|var)\s+(\w+)', body))
-        # Loop variables and destructured loop variables: `for (brand in ...)`.
-        local |= set(re.findall(r'\bfor\s*\(\s*\(?\s*([\w\s,]+?)\s*\)?\s+in\b', body))
-        local |= {n.strip() for group in re.findall(r'\bfor\s*\(\s*\(([^)]*)\)\s+in\b', body)
-                  for n in group.split(',')}
-        # Explicit lambda parameters: `{ car, i -> ... }`.
-        local |= {n.strip() for group in re.findall(r'\{\s*([\w\s,]+?)\s*->', body)
-                  for n in group.split(',')}
+        local = locals_of(body)
 
         used = set(re.findall(r'(?<![\w.])([A-Za-z_]\w*)', body))
         for name in sorted(used):

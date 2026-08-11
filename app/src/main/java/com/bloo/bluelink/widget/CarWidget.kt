@@ -17,51 +17,35 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.ColorFilter
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.GlanceTheme
-import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
-import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
-import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.ContentScale
-import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.R
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
-import com.bloo.bluelink.data.coordString
-import com.bloo.bluelink.data.formatDistance
-import com.bloo.bluelink.data.parseOdometerMiles
-import com.bloo.bluelink.data.serviceDue
-import com.bloo.bluelink.data.relativeLabel
 import com.bloo.bluelink.ui.ThemeMode
 import com.bloo.bluelink.ui.resolveWidgetAccent
 import com.bloo.bluelink.ui.resolveWidgetIsDark
@@ -346,28 +330,19 @@ class CarWidget : GlanceAppWidget() {
                 // theme's plain surface tint to stay legible under white text.
                 Box(GlanceModifier.fillMaxSize().cornerRadius(corner).background(ColorProvider(Color(0f, 0f, 0f, 0.38f)))) {}
             }
-            Box(modifier = root) {
-                when (tierFor(size)) {
-                    WidgetTier.MICRO_TINY -> MicroTinyLayout(car, effective)
-                    WidgetTier.MICRO -> MicroLayout(car, effective)
-                    WidgetTier.BANNER -> BannerLayout(car, effective)
-                    WidgetTier.RAIL -> RailLayout(car, effective)
-                    WidgetTier.COMPACT_SQUARE -> CompactSquareLayout(car, effective)
-                    WidgetTier.COMPACT_WIDE_NARROW -> CompactWideNarrowLayout(car, effective)
-                    WidgetTier.COMPACT_WIDE -> CompactWideLayout(car, effective)
-                    WidgetTier.COMPACT_TALL_NARROW -> CompactTallNarrowLayout(car, effective)
-                    WidgetTier.COMPACT_TALL -> CompactTallLayout(car, effective)
-                    WidgetTier.MEDIUM_SQUARE -> MediumSquareLayout(car, effective)
-                    WidgetTier.MEDIUM_WIDE -> MediumWideLayout(car, effective)
-                    WidgetTier.MEDIUM_TALL -> MediumTallLayout(car, effective)
-                    WidgetTier.LARGE_SQUARE -> LargeSquareLayout(car, effective)
-                    WidgetTier.LARGE_WIDE -> LargeWideLayout(car, effective)
-                    WidgetTier.LARGE_TALL -> LargeTallLayout(car, effective)
-                    WidgetTier.XL_WIDE -> XlWideLayout(car, effective)
-                    WidgetTier.XL_TALL -> XlTallLayout(car, effective)
-                    WidgetTier.XL_SQUARE -> XlSquareLayout(car, effective)
-                }
-            }
+            // One canvas for every size. This used to be an eighteen-arm
+            // dispatch into eighteen hand-written tier layouts, each deciding
+            // what to show, arranging it, and budgeting its own vertical space
+            // -- three jobs tangled together in eighteen places, which is why a
+            // budget fix in one tier taught the other seventeen nothing and the
+            // same overflow kept reappearing one tier over.
+            //
+            // WidgetBlueprint now decides, and WidgetCanvas draws each module
+            // inside the height it was allocated. Which arrangement a tile gets
+            // (strip, side-by-side, or stack) is a property of the blueprint,
+            // not of a tier table, so there is no size that can fall between
+            // two entries and land somewhere nobody designed.
+            Box(modifier = root) { WidgetCanvas(car, effective) }
         }
     }
 
@@ -406,63 +381,12 @@ class CarWidget : GlanceAppWidget() {
         }
     }
 
-    // ---- Tier layouts --------------------------------------------------------
-
-    /** Fixed safety margin subtracted from a tall tier's free-column budget,
-     *  on top of whatever's individually reserved (buttons, name). Covers the
-     *  small incidental spacers between modules -- the gap before a map, the
-     *  gap before info rows -- that would otherwise need reserving one at a
-     *  time for a saving of a few dp. Shared by [RailLayout],
-     *  [CompactTallNarrowLayout] and [CompactTallLayout]; swept for overflow
-     *  in WidgetScaleTest with this exact value.
-     *
-     *  Was 12.dp: too small on a narrow, short tile where the button stack
-     *  alone (plus its own gap-before spacer) already consumes the whole
-     *  budget -- heroRoom then clamps to 0.dp, and clamping means this
-     *  margin was never actually SUBTRACTED from anything, so the forced
-     *  gap-before-map/gap-before-buttons spacers that render unconditionally
-     *  whenever there's a map or a button row overflowed the tile by up to
-     *  2-4dp regardless of how big this constant was. Bumped to cover that
-     *  plus the matching bump to each layout's own maxStackedButtons
-     *  overhead below, so the button count itself leaves room rather than
-     *  relying on this margin alone. */
-    // Moved to Scale.TALL_TIER_MARGIN. It lived here as a private val, which meant
-    // WidgetScaleTest duplicated its VALUE with a comment admitting so -- a silent
-    // drift vector on top of the three copies of the arithmetic that used it. The
-    // reasoning above still applies; it just belongs next to the function that
-    // applies it, so both the composables and the sweep read one definition.
-
-    /** Minimum height a tall/narrow tier's hero (ring or glyph) is guaranteed
-     *  before the button stack is even sized, so a widget configured with
-     *  every action doesn't degrade to zero status -- just buttons filling
-     *  the whole tile, with no charge, lock state, or which car it even is.
-     *  Reported from a real device: a RAIL-shaped tile with 4 actions
-     *  configured showed a name and four buttons and nothing else, because
-     *  the button stack alone consumed the whole budget before the ring was
-     *  ever sized. Subtracted from the budget maxStackedButtons sees, so a
-     *  generous action list gets fewer stacked buttons rather than the ring
-     *  losing the room entirely. [MIN_RING] is 24.dp; this is deliberately
-     *  bigger so the ring reads as a real gauge, not the smallest legible
-     *  circle. */
-    // Moved to Scale.MIN_HERO_RESERVE. It lived here as a private val, which meant
-    // WidgetScaleTest duplicated its VALUE with a comment admitting so -- a silent
-    // drift vector on top of the three copies of the arithmetic that used it. The
-    // reasoning above still applies; it just belongs next to the function that
-    // applies it, so both the composables and the sweep read one definition.
-
-    // The per-square-tier row-width thresholds (below which info rows stack under the ring
-    // instead of beside it) moved into WidgetLayout.SquareSpec, read via
-    // WidgetLayout.squareRowWidth. They must agree between RingWithContent's minRowWidth and
-    // squarePlan's sideBySide decision -- one home guarantees that, where two literals could
-    // drift and reinstate the overflow squareSplit exists to remove.
-
-    // ---- Modules -------------------------------------------------------------
-
-
-    // ---- Small pieces --------------------------------------------------------
-
-    // Text styles and innerCorner now live in WidgetStyles.kt -- see that file
-    // for why the styling leaf moved out ahead of the modules that draw with it.
+    // Everything this class used to hold below Content -- eighteen tier
+    // layouts, the shared modules they composed, the text styles, and the
+    // breadcrumbs for constants that had already moved to Scale -- is gone.
+    // The layouts were replaced by WidgetBlueprint (what to show) plus
+    // WidgetCanvas (drawing it); the modules live in WidgetInfo, WidgetGauges,
+    // WidgetButtons and WidgetMapModule; the styles in WidgetStyles.
 }
 
 /**

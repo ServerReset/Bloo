@@ -49,10 +49,9 @@ import com.bloo.bluelink.data.VehicleSnapshot
  * the SAME edge to both branches -- so the ring-vs-glyph rule (and the fact both take the
  * same size) lived in eight places that could drift. Both underlying composables already
  * early-return when [edgeDp] is too small to read, so callers with a real reserved edge
- * need no size guard; [MiniStatus] adds the controls-priority badge's own 16dp floor on
- * top. NOTE: the two MICRO tiers are deliberately NOT routed through here -- they size the
- * glyph (`fit.coerceIn(...)`) differently from the ring (`Scale.ring(size, fit)`), so they
- * are genuinely two different sizes, not this shared one.
+ * need no size guard: a caller that was given a real edge by the blueprint can pass it
+ * straight through, and one that was not never reaches here, because an undrawable mark
+ * is decided against up front rather than discovered halfway down.
  */
 @Composable
 internal fun RingOrGlyph(car: VehicleSnapshot, render: Render, edgeDp: Int) {
@@ -61,14 +60,6 @@ internal fun RingOrGlyph(car: VehicleSnapshot, render: Render, edgeDp: Int) {
     } else {
         StatusGlyph(car, render.theme, sizeDp = edgeDp)
     }
-}
-
-/** [RingOrGlyph] for the controls-priority mini status badge, with that badge's own
- *  floor: nothing below 16dp, where the mark reads as a smudge next to the buttons. */
-@Composable
-internal fun MiniStatus(car: VehicleSnapshot, render: Render, edge: Dp) {
-    if (edge < 16.dp) return
-    RingOrGlyph(car, render, edgeDp = edge.value.toInt())
 }
 
 @Composable
@@ -241,33 +232,4 @@ internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, heig
             }
         }
     }
-}
-
-/**
- * The gauge for the big tiers when [Scale.ring] yielded nothing.
- *
- * [Scale.ringRoom] measures what the header, buttons and footer left, and
- * [Scale.ring] turns too little of it into NO ring rather than a smudge.
- * That is the right call for a ring -- but it meant a LARGE or XL tile at
- * the 1.4x text size, where those three can eat the whole height, showed
- * no charge indicator whatsoever. A 240x170 tile lands there today.
- *
- * A bar needs 10-14dp where a ring needs 24 at the very least, so it fits
- * where the ring couldn't. It is drawn out of the room the ring was
- * already budgeted and then didn't use, and only when that room genuinely
- * holds it, so it cannot squeeze the weighted content row beneath it.
- * Nothing changes on tiles where a ring does fit.
- */
-@Composable
-internal fun ChargeBarFallback(car: VehicleSnapshot, render: Render, ringEdge: Dp, room: Dp) {
-    if (!render.config.showRing || car.percent == null || ringEdge > 0.dp) return
-    val size = LocalSize.current
-    val barH = Scale.barHeight(size)
-    if (room < barH + 8.dp) return
-    ChargeBar(
-        car, render.theme,
-        width = Scale.innerWidth(render.frame(size)),
-        height = barH,
-    )
-    Spacer(GlanceModifier.height(8.dp))
 }

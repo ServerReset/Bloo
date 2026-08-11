@@ -115,6 +115,12 @@ internal object WidgetBlueprint {
          *  above it -- the wide, short shapes (7x2, 7x3) where stacking would
          *  leave both halves starved but a row gives each a real slice. */
         val sideBySide: Boolean,
+        /** True when this came from the one-row [strip] path rather than the
+         *  stacking allocator. The canvas must not re-derive this from the band
+         *  count or the row count: two places deciding the same thing is how
+         *  a layout ends up arranged one way and budgeted the other, which is
+         *  the entire failure mode this rebuild exists to remove. */
+        val isStrip: Boolean,
         val infoRows: Int,
         val buttonCount: Int,
         val buttonsStacked: Boolean,
@@ -346,6 +352,7 @@ internal object WidgetBlueprint {
             hero = hero,
             ringEdge = ringEdge,
             sideBySide = sideBySide,
+            isStrip = false,
             infoRows = infoRows,
             buttonCount = buttonCount,
             buttonsStacked = stacked,
@@ -406,6 +413,7 @@ internal object WidgetBlueprint {
             hero = hero,
             ringEdge = ringEdge,
             sideBySide = true,
+            isStrip = true,
             infoRows = 0,
             buttonCount = buttonCount,
             buttonsStacked = false,
