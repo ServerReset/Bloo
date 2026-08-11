@@ -10525,11 +10525,19 @@ private fun chargerLabel(plugin: Int?): String? = com.bloo.bluelink.data.charger
 private fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
 
 /**
- * A climate setpoint (the API reports it as a °F string) rendered in the user's
- * chosen unit. Non-numeric values pass through with a bare degree sign.
+ * A climate setpoint rendered in the user's chosen unit. Non-numeric values pass
+ * through with a bare degree sign.
+ *
+ * [sourceUnit] is the API's own unit code for this value -- 0 Celsius, 1
+ * Fahrenheit. It has to be forwarded rather than dropped: this file-private
+ * wrapper SHADOWS the shared function for every call site in this file, so a
+ * two-argument version here silently pinned all of them to the old
+ * assume-Fahrenheit behaviour no matter what the shared one learned to do.
+ * That is exactly what happened -- the four setpoint call sites were updated
+ * to pass the unit and failed to compile against this wrapper.
  */
-private fun degLabel(valueF: String, fahrenheit: Boolean): String =
-    com.bloo.bluelink.data.degLabel(valueF, fahrenheit)
+private fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): String =
+    com.bloo.bluelink.data.degLabel(valueF, fahrenheit, sourceUnit)
 
 // Five fixed stops instead of a free continuous 0-2 range with 20 snap
 // points -- most of those were indistinguishable by eye, and "what number is
