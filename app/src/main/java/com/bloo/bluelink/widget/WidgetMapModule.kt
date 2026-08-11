@@ -40,6 +40,21 @@ import androidx.glance.layout.height
  *  enough of it to be a map, and then this is a plain spacer again. The
  *  weight is what actually sizes it; [room] is how the caller and this
  *  function agree on whether it is drawn at all. */
+/**
+ * Fills a tall layout's leftover vertical space with the location map.
+ *
+ * Every big tier used to end with a bare `Spacer(defaultWeight())`, which
+ * by definition collects ALL the slack in one place -- on a 600x520dp tile
+ * that was a black gap taller than the content above it, with the buttons
+ * shoved against the bottom edge. Reported from a real device.
+ *
+ * The map is exactly what belongs there: it's the one piece of content
+ * that genuinely wants more room the more room there is, so it takes the
+ * weight instead of a spacer and grows with the widget. Without
+ * coordinates (or with the map switched off) it falls back to the spacer,
+ * because leaving a gap is still better than stretching something that
+ * was never meant to fill.
+ */
 @Composable
 internal fun ColumnScope.MapFill(render: Render, room: Dp) {
     val bmp = render.mapBitmap
@@ -80,6 +95,9 @@ internal fun ColumnScope.MapFill(render: Render, room: Dp) {
  *  sizes: the overflow reproduces to exactly 8dp whenever the map's own
  *  budget is capped below its ideal height, not just at one contrived
  *  point. */
+/** The location map thumbnail, shown only when the pre-fetched bitmap exists
+ *  (config.showMap on + car has coords + tile fetched OK). Rounded corners to
+ *  match the widget's card language. */
 @Composable
 internal fun MapModule(render: Render, room: Dp) {
     val bmp = render.mapBitmap ?: return
