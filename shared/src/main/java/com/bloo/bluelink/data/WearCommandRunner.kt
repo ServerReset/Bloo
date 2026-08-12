@@ -55,6 +55,15 @@ object WearCommandRunner {
                 seatRearRight = SeatLevel.fromApi(command.seatRearRight),
             )
             runCatching {
+                // The optimistic climate flag, but only for a brand whose status
+                // can later CONFIRM it (see Brand.reportsClimateState). Europe
+                // never reports airCtrlOn, and SnapshotStore keeps the old value
+                // when a status field is null -- so an optimistic `true` there is
+                // written once and never corrected, leaving the climate button lit
+                // permanently and the toggle sending STOP after the car's own
+                // timer already ended the session. Unknown is the honest answer.
+                fun climateFlag(on: Boolean): Boolean? =
+                    if (v.brand.reportsClimateState) on else null
                 val updated = when (command.action) {
                     WearAction.TOGGLE_LOCK ->
                         if (snap.locked == true) { repo.unlock(v); snap.copy(locked = false) }
@@ -62,7 +71,7 @@ object WearCommandRunner {
                     WearAction.LOCK -> { repo.lock(v); snap.copy(locked = true) }
                     WearAction.UNLOCK -> { repo.unlock(v); snap.copy(locked = false) }
                     WearAction.TOGGLE_CLIMATE ->
-                        if (snap.climateOn == true) { repo.stopClimate(v); snap.copy(climateOn = false) }
+                        if (snap.climateOn == true) { repo.stopClimate(v); snap.copy(climateOn = climateFlag(false)) }
                         else {
                             // The car rejects remote climate commands while it's
                             // moving (same gate the phone UI's own Start button
@@ -70,13 +79,13 @@ object WearCommandRunner {
                             // the widget/relay path (both funnel through here),
                             // neither of which checked this before.
                             if (snap.isDriving) error("Can't start climate while driving")
-                            repo.startClimate(v, climate); snap.copy(climateOn = true)
+                            repo.startClimate(v, climate); snap.copy(climateOn = climateFlag(true))
                         }
                     WearAction.CLIMATE_ON -> {
                         if (snap.isDriving) error("Can't start climate while driving")
-                        repo.startClimate(v, climate); snap.copy(climateOn = true)
+                        repo.startClimate(v, climate); snap.copy(climateOn = climateFlag(true))
                     }
-                    WearAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = false) }
+                    WearAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = climateFlag(false)) }
                     WearAction.TOGGLE_CHARGE ->
                         if (snap.charging == true) { repo.stopCharge(v); snap.copy(charging = false) }
                         else { repo.startCharge(v); snap.copy(charging = true) }

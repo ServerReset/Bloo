@@ -144,6 +144,29 @@ enum class Brand(
      *  Only Hyundai EU today; Kia/Genesis EU would join this check. */
     val isEurope: Boolean get() = this == HYUNDAI_EU
 
+    /**
+     * Whether a status refresh can tell us if remote climate is actually RUNNING
+     * (`VehicleStatus.airCtrlOn`).
+     *
+     * False for Europe: [EuApi] maps the CCS2 payload's Green/Cabin/Body/
+     * Drivetrain/Chassis/Electronics objects and none of them is wired to a
+     * climate-state field, so airCtrlOn is always null there.
+     *
+     * It matters because the command paths write an OPTIMISTIC climateOn the
+     * moment a start succeeds, and every other brand has that corrected by the
+     * next refresh. With nothing to correct it -- and SnapshotStore's merge
+     * deliberately keeping the old value when a status field is null, so a
+     * missing field never wipes a known one -- the optimistic `true` would
+     * survive forever: a widget climate button lit permanently, and a toggle
+     * that sends STOP because it believes climate is still on long after the
+     * car's own timer ended it.
+     *
+     * So the honest state for those brands is UNKNOWN, not a guess that cannot
+     * be checked. If a CCS2 climate field is ever identified, parse it in EuApi
+     * and delete this.
+     */
+    val reportsClimateState: Boolean get() = !isEurope
+
     companion object {
         // Looks up an enum entry by its exact `name` (e.g. "KIA"); falls back to
         // HYUNDAI (the original, pre-multi-brand default) if `name` is null or
