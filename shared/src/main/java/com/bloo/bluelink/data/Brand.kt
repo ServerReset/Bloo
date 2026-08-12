@@ -319,10 +319,26 @@ val Vehicle.supportsConnectedStore: Boolean
 val Vehicle.isGen5W: Boolean
     get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope && (generation.trim().toIntOrNull() ?: 3) < 3
 
-/** Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the
- *  Hyundai/Genesis US telematics API this app already uses for lock/unlock;
- *  Kia's US API (Kia Connect) has no equivalent endpoint, and no equivalent
- *  was found in the Canada backend either ([CanadaApi] only exposes
- *  lock/unlock/climate/charge). */
+/**
+ * Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the
+ * Hyundai/Genesis US telematics API this app already uses for lock/unlock;
+ * Kia's US API (Kia Connect) has no equivalent endpoint, and no equivalent was
+ * found in the Canada backend ([CanadaApi] only exposes lock/unlock/climate/
+ * charge) or the Europe one ([EuApi], same four).
+ *
+ * On [Brand] rather than [Vehicle], because not every caller has a Vehicle. The
+ * widget only has a VehicleSnapshot and its brand indicator, so it re-derived
+ * this rule by hand -- and a hand copy of a rule is a rule that gets updated in
+ * one place. That is not hypothetical here: the WATCH had the same copy, it
+ * missed the `isCanada` half, and every Canadian user had Flash and Horn
+ * buttons that silently did nothing on every tap. The watch was fixed by
+ * routing to the shared accessor; the widget's copy survived, and adding
+ * Europe would have reproduced the bug exactly for EU users.
+ */
+val Brand.supportsHornLights: Boolean
+    get() = this != Brand.KIA && !isCanada && !isEurope
+
+/** [Brand.supportsHornLights] for a [Vehicle], which is what the phone screens
+ *  have to hand. One rule, two spellings of the same question. */
 val Vehicle.supportsHornLights: Boolean
-    get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope
+    get() = brand.supportsHornLights

@@ -24,6 +24,7 @@ import androidx.glance.layout.height
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.supportsHornLights
 
 /**
  * Sixth slice out of CarWidget.kt: the action buttons -- which verbs this car
@@ -42,15 +43,23 @@ import com.bloo.bluelink.data.VehicleSnapshot
 /** The user's configured actions, filtered down to what this car's brand
  *  actually supports and capped to [max] -- the shared resolution behind
  *  both [ActionButtons] and the MICRO tier's single-button controls mode.
- *  Kia's US API (and the Canada backend) has no flash/horn endpoint --
- *  com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator) is the
- *  same lookup Vehicle.supportsHornLights uses on the phone. Without this,
- *  a Kia user who'd configured Flash/Horn got a button that silently did
- *  nothing on every tap (WearCommandRunner routes it to KiaRepository's
- *  default no-op flashLights/hornAndLights). */
+ *  Kia's US API, the Canada backend and the Europe one have no flash/horn
+ *  endpoint, so a user who had configured those buttons got one that silently
+ *  did nothing on every tap -- the command routes to a repository that leaves
+ *  flashLights/hornAndLights on the interface's no-op defaults.
+ *
+ *  Which brands those are is [Brand.supportsHornLights]'s question to answer,
+ *  not this function's. It used to be re-derived here by hand, which is how the
+ *  watch shipped the same dead buttons to every Canadian user from its own
+ *  copy. */
 internal fun resolvedActions(car: VehicleSnapshot, render: Render, max: Int): List<WidgetAction> {
-    val hornLightsSupported = com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator)
-        .let { it != com.bloo.bluelink.data.Brand.KIA && !it.isCanada }
+    // The SHARED rule, not a copy of it. This line used to re-derive
+    // "Kia and Canada can't do horn/flash" by hand, which is exactly how the
+    // watch shipped dead Flash and Horn buttons to every Canadian user -- and
+    // adding Europe would have done it again here, because EuRepository leaves
+    // flashLights/hornAndLights on the interface's no-op defaults too.
+    val hornLightsSupported =
+        com.bloo.bluelink.data.Brand.fromIndicator(car.brandIndicator).supportsHornLights
     return render.config.actions.mapNotNull { WidgetAction.fromKey(it) }
         // Hide every charge verb on a car with no chargeable pack, not just the
         // CHARGE toggle -- see WidgetAction.NEEDS_BATTERY.

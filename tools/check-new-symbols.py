@@ -113,6 +113,14 @@ for f,lines in added.items():
         "System", "Math", "Integer", "Long", "Double", "Float", "Boolean",
         "Character", "Byte", "Short", "Number", "Thread", "StringBuilder",
         "Object", "Class", "Runtime",
+        # kotlin.text is a DEFAULT import, so Charsets.UTF_8 needs no import line.
+        # Flagged the moment a new file used it, while three existing files
+        # (CanadaApi, KiaUsaApi, SyncMerge) had been using it unqualified all
+        # along -- invisible because the checker reads new/changed lines only.
+        # That asymmetry is what makes a false positive here expensive: it looks
+        # like the NEW code is wrong when the codebase already settled the
+        # question.
+        "Charsets",
     }
     for ln in lines:
         if _is_doc_line(ln): continue
