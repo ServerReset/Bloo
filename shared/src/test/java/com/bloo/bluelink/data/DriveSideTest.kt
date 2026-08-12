@@ -89,4 +89,30 @@ class DriveSideTest {
             assertEquals(SeatLevel.HIGH_COOL, req.seatRearRight)
         }
     }
+
+    // ---- EU sign-in country ----
+
+    /** A user in a market the region serves sends their OWN country, not
+     *  Germany's -- which is the whole point of the change. */
+    @Test
+    fun `a served European country is sent as itself`() {
+        assertEquals("fr", euLoginCountry("FR"))
+        assertEquals("gb", euLoginCountry("GB"))
+        assertEquals("it", euLoginCountry("it"))
+        assertEquals("no", euLoginCountry("NO"))
+        assertEquals("de", euLoginCountry("DE"))
+    }
+
+    /**
+     * THE safety property. Anything the region does not serve falls back to the
+     * value every user sent before, so this cannot break a sign-in that works
+     * today -- a German owner whose phone is set to US English keeps sending
+     * "de" rather than a country the European IDP has never heard of.
+     */
+    @Test
+    fun `anything outside the region falls back to the previous value`() {
+        for (c in listOf("US", "CA", "AU", "JP", "KR", "ZZ", "", null)) {
+            assertEquals("de", euLoginCountry(c), "$c is not a European market")
+        }
+    }
 }

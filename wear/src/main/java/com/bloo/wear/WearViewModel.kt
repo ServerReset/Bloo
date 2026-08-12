@@ -2319,7 +2319,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // CanadaRepository leaves generation blank, so the `?: 3` fallback made
             // `3 < 3` false. Anything that starts populating a Canada generation would
             // have flipped the watch's Trips gating and not the phone's.
-            tripsSupported = !v.isGen5W,
+            // Both halves: the head unit has to serve the feed (not Gen5W) AND
+            // the brand's backend has to have one at all. Kia US, Canada and
+            // Europe have no trips endpoint, so the watch tile was showing for
+            // them and never filling.
+            tripsSupported = !v.isGen5W && v.brand.supportsTrips,
             hornLightsSupported = v.supportsHornLights,
             // `?: snap?.engineOn` -- the phone's snapshot carries engineOn, and this was the
             // one field with that fallback available and unused. `accessoryOn` and `defrostOn`

@@ -167,6 +167,24 @@ enum class Brand(
      */
     val reportsClimateState: Boolean get() = !isEurope
 
+    /**
+     * Whether this brand's backend can return trip history at all.
+     *
+     * Only the Hyundai/Genesis US telematics API has an evTripDetails feed, and
+     * [BlueLinkRepository] is the only repository that overrides `trips()` --
+     * Kia US, all three Canada brands and Europe inherit the interface's
+     * `emptyList()`, and their API clients have no trips endpoint to call.
+     *
+     * The Trips pebble already hides itself for Gen5W head units, on the stated
+     * reasoning that a feed which reports nothing should not sit there
+     * permanently empty. That reasoning applies identically here and was simply
+     * never extended to the brands whose BACKEND cannot serve it -- so Kia US
+     * and Canada have been showing an empty Trips pebble, and Europe was about
+     * to join them, precisely because EU cars are modern enough that the Gen5W
+     * check correctly does not catch them.
+     */
+    val supportsTrips: Boolean get() = this == HYUNDAI || this == GENESIS
+
     companion object {
         // Looks up an enum entry by its exact `name` (e.g. "KIA"); falls back to
         // HYUNDAI (the original, pre-multi-brand default) if `name` is null or

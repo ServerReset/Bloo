@@ -74,6 +74,25 @@ class BrandCapabilityTest {
         assertTrue(Brand.HYUNDAI.supportsChargeLimits)
     }
 
+    /**
+     * Trips exist only where a backend actually serves them.
+     *
+     * BlueLinkRepository is the only one that overrides trips(); Kia US, the
+     * Canada brands and Europe inherit the interface's emptyList() and their API
+     * clients have no endpoint to call. The pebble already hides for Gen5W head
+     * units so it does not sit permanently empty -- this is the same rule for
+     * the same reason, one level further out.
+     */
+    @Test
+    fun `only the US Hyundai and Genesis brands claim trip history`() {
+        assertTrue(Brand.HYUNDAI.supportsTrips)
+        assertTrue(Brand.GENESIS.supportsTrips)
+        assertFalse(Brand.KIA.supportsTrips, "Kia US has no trips endpoint")
+        for (b in Brand.entries.filter { it.isCanada || it.isEurope }) {
+            assertFalse(b.supportsTrips, "$b has no trips endpoint")
+        }
+    }
+
     /** Every brand but Kia US gates its commands behind the login PIN. Europe
      *  included -- its commands need a PIN-derived control token. */
     @Test

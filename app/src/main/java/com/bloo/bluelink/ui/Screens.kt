@@ -9267,6 +9267,11 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
     // excluded from the check and keeps the pebble.
     val isGen5W = v.isGen5W
     if (isGen5W) return
+    // Same reasoning one step further out: a Gen5W head unit reports nothing,
+    // and neither does a backend with no trips endpoint. Kia US, Canada and
+    // Europe all inherit the repository's empty default, so without this they
+    // show the pebble and it never fills.
+    if (!v.brand.supportsTrips) return
     val trips = state.trips[v.vin]
     val loading = state.isPending(v.vin, "trips")
     LaunchedEffect(v.vin) { vm.loadTrips(v) }

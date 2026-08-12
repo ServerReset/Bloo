@@ -67,3 +67,39 @@ fun driveSideFor(countryCode: String?): DriveSide =
  * a real signal can replace without touching the payload code.
  */
 fun deviceDriveSide(): DriveSide = driveSideFor(Locale.getDefault().country)
+
+/**
+ * The countries Hyundai's Europe region serves, as the lower-case codes its
+ * IDP login expects.
+ *
+ * The EU/EEA plus the UK and the non-EU European markets Bluelink covers. It
+ * is a fixed list rather than "any country" on purpose -- see [euLoginCountry]
+ * for what happens to anything outside it.
+ */
+private val EUROPE_LOGIN_COUNTRIES = setOf(
+    "at", "be", "bg", "ch", "cy", "cz", "de", "dk", "ee", "es", "fi", "fr",
+    "gb", "gr", "hr", "hu", "ie", "is", "it", "lt", "lu", "lv", "mt", "nl",
+    "no", "pl", "pt", "ro", "se", "si", "sk",
+)
+
+/** Germany, the value the EU sign-in URL carried for every user before this. */
+private const val DEFAULT_EU_LOGIN_COUNTRY = "de"
+
+/**
+ * The `country` to send on the Europe OAuth authorize URL.
+ *
+ * It was pinned to "de" for everyone, which is the one value guaranteed to be
+ * right for exactly one market. Sending the user's own country is the obvious
+ * improvement, but doing it naively could BREAK sign-ins that work today: a
+ * German owner whose phone is set to US English would start sending "us" to a
+ * European IDP that has no such market.
+ *
+ * So this only ever substitutes a country the region actually serves, and falls
+ * back to "de" otherwise. That makes it safe in the direction that matters --
+ * every user who signs in today still sends a country the endpoint accepts, and
+ * users in the other thirty markets now send their own instead of Germany's.
+ */
+fun euLoginCountry(countryCode: String? = Locale.getDefault().country): String {
+    val code = countryCode?.lowercase(Locale.US).orEmpty()
+    return if (code in EUROPE_LOGIN_COUNTRIES) code else DEFAULT_EU_LOGIN_COUNTRY
+}

@@ -201,8 +201,17 @@ class EuApi(private val brand: Brand) {
             fun idp(url: String) = Request.Builder().url(url).header("User-Agent", USER_AGENT_IDP)
 
             // 1. authorize — seed IDP session cookies (follows redirect to login form).
+            //
+            // The country was pinned to "de" for every user, which is right for
+            // exactly one of the thirty-odd markets this region serves.
+            // euLoginCountry sends the device's own country instead, but only
+            // when it is one the region actually serves -- so a German owner
+            // with a US-English phone still sends "de" rather than a country
+            // this IDP has never heard of, and nobody who can sign in today
+            // stops being able to.
             val authorizeUrl = "$loginFormHost/auth/api/v2/user/oauth2/authorize" +
-                "?response_type=code&client_id=$serviceId&redirect_uri=$redirectUri&lang=en&state=ccsp&country=de"
+                "?response_type=code&client_id=$serviceId&redirect_uri=$redirectUri" +
+                "&lang=en&state=ccsp&country=${euLoginCountry()}"
             follow.newCall(idp(authorizeUrl).get().build()).execute().close()
 
             // 2. RSA public key (JWK) for password encryption.
