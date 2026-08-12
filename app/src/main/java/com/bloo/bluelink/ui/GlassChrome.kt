@@ -18,14 +18,26 @@ import com.bloo.uicommon.dropShadow
  * glass (a real hardware-blurred, refractive material) was removed in favor
  * of this simpler, consistent look across every device and surface.
  *
- * Raised from 0.62 -- floating chrome (the settings/back/flip buttons, the
- * name pill) sits directly over car photos of unpredictable brightness with
- * no blur to separate it from what's behind, and at 0.62 a bright patch of
- * photo showed through enough to read as barely-there. Every call site
- * shares this one constant, so this single change also strengthens every
- * other frosted surface (dialogs, search bar, widget) the same way.
+ * The history: 0.62 read as barely-there over a bright patch of car photo
+ * (no blur to separate floating chrome from what's behind it), so it was
+ * raised to 0.74. Lowered again to 0.68 on request -- more transparent than
+ * that 0.74 baseline was -- while still staying clear of the specific 0.62
+ * value already found insufficient. If a bright-photo legibility complaint
+ * comes back, this is the number that moved.
+ *
+ * Every call site is meant to share this one constant with NO override, which
+ * several stopped doing (0.86 to 0.98, scattered across a dialog, a settings
+ * card row, and two panels) -- each without a legibility reason distinct from
+ * what every other piece of frosted chrome already has, which made "the same
+ * transparency everywhere" untrue in practice despite this function's own
+ * intent. Those overrides are gone; every one of those call sites now takes
+ * the bare default. The two that keep an explicit override (the cover
+ * screen's collapsed/compact search pill, in SettingsScreen) have their own
+ * standing comment for why: a very small, isolated control over an
+ * unpredictable photo hero, where "reads as a distinct tappable thing at
+ * all" is a different, stronger requirement than the general frosted look.
  */
-fun glassContainerAlpha(frosted: Float = 0.74f): Float = frosted
+fun glassContainerAlpha(frosted: Float = 0.68f): Float = frosted
 
 /**
  * The hairline rim every piece of frosted chrome (floating pills, dialogs,

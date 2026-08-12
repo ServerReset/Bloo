@@ -500,7 +500,14 @@ internal data class WidgetTheme(
      * photo like a flat sticker.
      */
     fun forPhoto(): WidgetTheme {
-        fun glassy(c: Color) = c.copy(alpha = 0.62f)
+        // Matches glassContainerAlpha's own default (GlassChrome.kt) exactly, not a
+        // separately-tuned number -- the doc comment above already claimed this used
+        // "the same translucency the rest of the app's glass surfaces use", but this
+        // was still the phone app's OLD value from before that was raised to 0.74 and
+        // then back down to 0.68; the two had quietly drifted apart. RemoteViews has
+        // no access to that Compose function directly, so the value is copied here
+        // rather than shared, which is exactly how it drifted the first time.
+        fun glassy(c: Color) = c.copy(alpha = 0.68f)
         return copy(
             onSurface = ColorProvider(Color.White),
             onSurfaceVariant = ColorProvider(Color(0xFFE4E4E8)),

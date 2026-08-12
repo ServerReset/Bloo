@@ -2216,7 +2216,15 @@ private fun GlassAlertDialog(
             }
         }
         // Near-opaque fill -- this card sits over the scrim, framed by the
-        // app's frosted edge (appGlassRim).
+        // app's frosted edge (appGlassRim). Kept as its own override rather than
+        // folded into the shared default the rest of the app's frosted chrome now
+        // uses uniformly: a modal dialog is a different category from a pill or a
+        // pebble card floating over live content -- it always sits over its own
+        // dedicated scrim, never directly over an unpredictable photo, and its
+        // job is paragraphs of body text and buttons a user has to read and act
+        // on, not a glanceable control. The general "everything shares one
+        // transparency" rule is about the floating chrome that DOES sit over
+        // content; this is the one deliberate exception, not a leftover.
         Surface(
             shape = shape,
             color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.97f)),
@@ -11785,7 +11793,9 @@ private fun SyncDeviceRow(
     val shape = RoundedCornerShape(18.dp)
     val container =
         if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.9f))
+        // Shared default, not its own 0.9 -- see glassContainerAlpha's own doc
+        // for why every frosted surface takes the one value now.
+        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha())
     Row(
         Modifier
             .fillMaxWidth()

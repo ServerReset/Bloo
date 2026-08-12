@@ -2523,7 +2523,9 @@ internal fun SearchLayer(
             val panelShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
             Surface(
                 shape = panelShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.98f)),
+                // Shared default, not its own 0.98 -- see glassContainerAlpha's own
+                // doc for why every frosted surface takes the one value now.
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                 modifier = Modifier.width(barW).dropShadow(panelShape, blurRadius = 16.dp, offsetY = 6.dp),
@@ -2719,8 +2721,12 @@ private fun SearchPill(
             // from a disabled control, which is what the screenshot showed.
             color = when {
                 form == SearchForm.PILL && !expanded -> scheme.secondaryContainer
+                // compact keeps its own override -- the 40dp cover-screen circle this
+                // comment describes -- everything else now takes the shared default
+                // rather than its own hand-picked 0.86, which had no comment of its
+                // own explaining why it differed from every other floating surface.
                 else -> scheme.surfaceContainerHighest.copy(
-                    alpha = glassContainerAlpha(if (compact) 0.97f else 0.86f),
+                    alpha = if (compact) glassContainerAlpha(0.97f) else glassContainerAlpha(),
                 )
             },
             contentColor = if (form == SearchForm.PILL && !expanded) {
