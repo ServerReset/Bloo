@@ -6136,7 +6136,18 @@ private fun HeroCollapsedNumbers(
  * [t] drives only the type size, because position is the overlay's job.
  */
 @Composable
-private fun HeroNumbers(data: ChargeReadout, t: Float, width: Dp? = null) {
+private fun HeroNumbers(
+    data: ChargeReadout,
+    t: Float,
+    width: Dp? = null,
+    // Stretches the inner Row to whatever width its PARENT already resolved via its own
+    // fillMaxWidth, instead of this function measuring/being handed one. Exists so a caller
+    // that is already fillMaxWidth (HeroMorphReadout's un-hoisted anchor) doesn't need
+    // BoxWithConstraints to hand a Dp down -- that was tried and reverted for the
+    // subcomposition cost, see the call site. Ignored when [width] is set; the two are
+    // mutually exclusive ways of getting the same SpaceBetween arrangement a real width.
+    fillWidth: Boolean = false,
+) {
     val type = MaterialTheme.typography
     val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
     // Expanded, the range is a HEADLINE rather than a slightly-larger title. It is
@@ -6145,7 +6156,11 @@ private fun HeroNumbers(data: ChargeReadout, t: Float, width: Dp? = null) {
     // on the card.
     val rangeStyle = lerp(type.titleMedium, type.headlineMedium, t)
     Row(
-        modifier = if (width != null) Modifier.width(width) else Modifier,
+        modifier = when {
+            width != null -> Modifier.width(width)
+            fillWidth -> Modifier.fillMaxWidth()
+            else -> Modifier
+        },
         verticalAlignment = Alignment.Bottom,
         // Given a width, the two ends push apart: percentage on the left, range on
         // the right. Collapsed the width IS the natural content width, so
@@ -6185,6 +6200,15 @@ private fun HeroNumbers(data: ChargeReadout, t: Float, width: Dp? = null) {
             // at the end of the collapse teleported the range down by a whole line in
             // one frame. clipToBounds because the Text keeps its intrinsic height as
             // the slot shrinks.
+            //
+            // Alpha now tracks the SAME t as the height reveal (plain `t`, not an offset
+            // 0.2..1 window) rather than racing it on its own curve. Offset, the fade and
+            // the clip-reveal disagreed about how much of the line should be visible at any
+            // given t -- e.g. at t=0.5 the box was already half-revealed but the text was
+            // only 37% opaque, so a half-clipped glyph was also half-transparent, which
+            // read as the line stuttering into view rather than smoothly fading in. On the
+            // way out it is the same disagreement in reverse. Matching the two removes that
+            // -- the text is exactly as opaque as the slot is tall, throughout.
             val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }
             Box(
                 Modifier
@@ -6200,7 +6224,7 @@ private fun HeroNumbers(data: ChargeReadout, t: Float, width: Dp? = null) {
                         style = type.labelLarge,
                         color = statusColor,
                         maxLines = 1,
-                        modifier = Modifier.graphicsLayer { alpha = ((t - 0.2f) / 0.8f).coerceIn(0f, 1f) },
+                        modifier = Modifier.graphicsLayer { alpha = t.coerceIn(0f, 1f) },
                     )
                 }
             }
@@ -6261,55 +6285,52 @@ private fun HeroMorphReadout(
         // on the name's line -- so this copy must be invisible until that one has gone, or both
         // are on screen at once and the morph reads as a double image.
         //
-        // BoxWithConstraints, not Row directly, so this anchor can hand HeroNumbers its own
-        // measured width. Before the travelling overlay has anchors from BOTH ends to lerp
-        // between (see `hoisted` below), THIS row is what's actually on screen for however many
-        // frames that takes -- on a real device, the card's own size can depend on an image
-        // still loading, so cardCoords can lag well past the first frame. HeroNumbers defaults
-        // to no width, and with none its SpaceBetween arrangement has nothing to distribute
-        // across, so the percentage and range/status rendered packed together at the row's left
-        // edge -- correct for the COLLAPSED anchor (which wants exactly that, beside the car
-        // name) but wrong here, where the expanded card wants the range pinned to the right
-        // edge. Reported from a real device: range and status sat beside the percentage on the
-        // first expand and only moved once the card was closed and reopened, i.e. exactly the
-        // frames this row is the visible one rather than the overlay.
-        BoxWithConstraints(
+        // A plain Row, not BoxWithConstraints -- that was tried (to hand HeroNumbers its own
+        // measured width so this anchor doesn't render left-packed for however many frames it
+        // takes the travelling overlay to hoist) and reverted for the same reason ChargeBar's
+        // own KDoc already warns about a few hundred lines down: BoxWithConstraints is
+        // SUBCOMPOSITION, found there once already "while chasing dropped frames in the hero's
+        // collapse". This Row is present and re-measured on every frame of the whole heroT
+        // transition (only its alpha changes, never its existence), so a subcomposition here
+        // paid that cost every frame the card was opening or closing, times however many pager
+        // pages keep this composed at once -- reported as the animation "dropping frames" after
+        // that change landed.
+        //
+        // fillMaxWidth achieves the same thing for free: this Row already stretches to the
+        // readout's full available width, and HeroNumbers' own inner Row can be told to do the
+        // same (fillWidth = true) rather than being handed a measured Dp -- both end up
+        // constrained to the identical width, but the fillMaxWidth version costs one ordinary
+        // layout pass instead of a second, nested composition pass.
+        Row(
             Modifier
                 .padding(start = numbersStart)
                 // fillMaxWidth so this anchor reports the readout's real span rather
                 // than its own wrapped content width. The overlay lerps to that
-                // width, and it is what puts the range against the right edge.
+                // width, and it is what puts the range against the right edge; a
+                // wrapped anchor would have left it packed beside the percentage.
                 .fillMaxWidth()
                 .graphicsLayer {
                     alpha = if (numbersHoisted) 0f
                     else ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
                 }
                 .onGloballyPositioned(onNumbersPositioned),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            // Captured here, in BoxWithConstraintsScope, rather than read as `maxWidth`
-            // inside the Row below -- Row's own content lambda is a RowScope, which does
-            // not inherit BoxWithConstraintsScope's implicit receiver, so `maxWidth` there
-            // does not resolve to this constraint at all (caught by the Kotlin compiler,
-            // not by inspection: "cannot be called in this context with an implicit
-            // receiver").
-            val numbersWidth = maxWidth
-            Row(verticalAlignment = Alignment.Bottom) {
-                // ONE definition of the numbers, shared with the collapsed anchor and the
-                // travelling overlay -- see [HeroNumbers]. This row's job is now only to
-                // be MEASURED: it lays the numbers out where the expanded card wants them
-                // and reports that, and the overlay draws the copy anyone actually sees.
-                //
-                // Rendering the same composable here rather than a hand-kept twin is what
-                // makes the anchor trustworthy: if this drew a different size from the
-                // overlay, the interpolation would be between two points that describe
-                // different things, and the numbers would drift as the card opened.
-                //
-                // `width = numbersWidth`, from the BoxWithConstraints above: the same width
-                // fillMaxWidth already reserved, now actually reaching HeroNumbers's own
-                // SpaceBetween Row so it can push the range right BEFORE the overlay takes
-                // over, not only after.
-                HeroNumbers(data, t, width = numbersWidth)
-            }
+            // ONE definition of the numbers, shared with the collapsed anchor and the
+            // travelling overlay -- see [HeroNumbers]. This row's job is now only to
+            // be MEASURED: it lays the numbers out where the expanded card wants them
+            // and reports that, and the overlay draws the copy anyone actually sees.
+            //
+            // Rendering the same composable here rather than a hand-kept twin is what
+            // makes the anchor trustworthy: if this drew a different size from the
+            // overlay, the interpolation would be between two points that describe
+            // different things, and the numbers would drift as the card opened.
+            //
+            // fillWidth = true, not a measured `width`: this Row is already fillMaxWidth,
+            // so HeroNumbers' own inner SpaceBetween Row just needs to be told to match it
+            // (see [HeroNumbers]'s own `fillWidth` param) rather than being handed the number
+            // back through a subcomposition.
+            HeroNumbers(data, t, fillWidth = true)
         }
         // Plug-in hybrid's fuel tank: expanded only, same reasoning as the state line. Fades
         // in over the back half of the morph so it does not compete with the numbers growing.
